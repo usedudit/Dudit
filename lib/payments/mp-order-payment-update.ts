@@ -66,6 +66,22 @@ export function buildMpApprovedPaymentUpdate(params: {
       String(entry?.method || "").toLowerCase().includes("mercado pago"),
   )
 
+  // Split fee_details into feeAmount (mercadopago_fee) and interestAmount (installment_fee)
+  let feeAmount = 0
+  let interestAmount = 0
+  if (params.mpFeeDetails && params.mpFeeDetails.length > 0) {
+    for (const fd of params.mpFeeDetails) {
+      const amt = Number(fd.amount) || 0
+      if (fd.type === "installment_fee") {
+        interestAmount += amt
+      } else {
+        feeAmount += amt
+      }
+    }
+  } else {
+    feeAmount = params.mpTotalFeeAmount ?? 0
+  }
+
   const mpLeg: Record<string, unknown> = {
     method: params.paymentMethodName,
     amount: chargeAmount,
@@ -76,9 +92,9 @@ export function buildMpApprovedPaymentUpdate(params: {
     adjustmentPercent: 0,
     adjustmentAmount: 0,
     installmentNumber: params.mpInstallments ?? 1,
-    feeAmount: params.mpTotalFeeAmount ?? 0,
+    feeAmount,
     fixedFeeAmount: 0,
-    interestAmount: 0,
+    interestAmount,
     feeBearer: "merchant",
     paymentMethodId: params.mpPaymentMethodId ?? null,
     paymentTypeId: params.mpPaymentTypeId ?? null,

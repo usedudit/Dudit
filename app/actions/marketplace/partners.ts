@@ -71,9 +71,11 @@ async function _getPartnerProfile(partnerId: string) {
     }
   }
 
-  if (data.cpf) {
+  // CPF now lives on stores (fiscal fields per-store)
+  const storeCpf = store?.cpf || data?.cpf
+  if (storeCpf) {
     try {
-      data.cpf = await decryptCPF(data.cpf)
+      data.cpf = await decryptCPF(storeCpf)
     } catch (e) {
       console.error("[Partner] CPF decryption error:", e)
     }
@@ -590,11 +592,6 @@ export async function updatePartnerAction(partnerId: string, data: any) {
   if (data.isShowcaseActive !== undefined) storeUpdateData.is_showcase_active = data.isShowcaseActive
 
   // Partner table fields
-  if (data.businessType) updateData.business_type = data.businessType
-  if (data.cnpj !== undefined) {
-    updateData.cnpj = data.cnpj ? data.cnpj.replace(/\D/g, "") : null
-    if (updateData.cnpj === "") updateData.cnpj = null
-  }
   if (data.businessInfo !== undefined) {
     const existingInfo = normalizeBusinessInfo(partnerCheck?.business_info)
     const newInfo = normalizeBusinessInfo(data.businessInfo)
@@ -604,13 +601,6 @@ export async function updatePartnerAction(partnerId: string, data: any) {
       mode: existingInfo.mode // Never trust the frontend for mode changes on update
     }
   }
-
-  // Campos fiscais
-  if (data.crt !== undefined) updateData.crt = data.crt
-  if (data.contribuinte !== undefined) updateData.contribuinte = data.contribuinte
-  if (data.inscricaoEstadual !== undefined) updateData.inscricao_estadual = data.inscricaoEstadual
-  if (data.ieIsento !== undefined) updateData.ie_isento = data.ieIsento
-  if (data.inscricaoMunicipal !== undefined) updateData.inscricao_municipal = data.inscricaoMunicipal
   
   if (data.categoryId !== undefined) updateData.category_id = data.categoryId
   if (data.subcategoryId !== undefined) updateData.subcategory_id = data.subcategoryId
@@ -652,22 +642,7 @@ export async function updatePartnerAction(partnerId: string, data: any) {
     updateData.order_flow = data.orderFlow
   }
 
-  // Handle CPF (Encrypted)
-  if (data.cpf !== undefined) {
-    const cleanCPF = data.cpf ? data.cpf.replace(/\D/g, "") : null
-    if (cleanCPF) {
-      try {
-        const { encryptCPF } = await import("@/lib/crypto")
-        updateData.cpf = await encryptCPF(cleanCPF)
-      } catch (error) {
-        console.error("Erro ao criptografar CPF:", error)
-      }
-    } else {
-      updateData.cpf = null
-    }
-  }
-
-  // 1. Atualiza dados do parceiro (SE houver algo para atualizar)
+  // Atualiza dados do parceiro (SE houver algo para atualizar)
   if (Object.keys(updateData).length > 0) {
     const { error } = await supabase
       .from("partners")
@@ -677,67 +652,6 @@ export async function updatePartnerAction(partnerId: string, data: any) {
     if (error) {
       console.error("Erro no update de partner:", error)
       return { error: "Erro ao atualizar dados: " + error.message }
-    }
-  }
-
-  // 2. Atualiza ENDEREÇO (separado, na tabela addresses)
-  // Verifica se veio algum dado de endereço
-  const hasAddressData =
-    data.zipCode !== undefined ||
-    data.street !== undefined ||
-    data.number !== undefined ||
-    data.city !== undefined ||
-    data.state !== undefined;
-
-  if (hasAddressData) {
-    const addressData: any = {};
-    if (data.zipCode !== undefined) addressData.zip_code = data.zipCode
-    if (data.street !== undefined) addressData.street = data.street
-    if (data.number !== undefined) addressData.number = data.number
-    if (data.complement !== undefined) addressData.complement = data.complement
-    if (data.neighborhood !== undefined) addressData.neighborhood = data.neighborhood
-    if (data.city !== undefined) addressData.city = data.city
-    if (data.state !== undefined) addressData.state = data.state
-
-    // Busca o endereço padrão atual
-    const { data: currentAddress } = await supabase
-      .from('addresses')
-      .select('id')
-      .eq('partner_id', partnerId)
-      .eq('is_default', true)
-      .maybeSingle();
-
-    if (currentAddress) {
-      // Atualiza
-      await supabase.from('addresses').update(addressData).eq('id', currentAddress.id);
-    } else {
-      // Cria se não existir (caso de erro anterior ou migração)
-      await supabase.from('addresses').insert({
-        partner_id: partnerId,
-        ...addressData,
-        country: 'BR',
-        is_default: true
-      });
-    }
-
-    // GEOCODING: atualiza latitude/longitude no partner baseado no novo endereço
-    if (addressData.street && addressData.city) {
-      const addressString = [
-        addressData.street, addressData.number,
-        addressData.city, addressData.state
-      ].filter(Boolean).join(", ")
-      try {
-        const coords = await geocodeAddress(addressString)
-        if (coords) {
-          await supabase.from('stores').update({ latitude: coords.lat, longitude: coords.lng }).eq('partner_id', partnerId)
-          // Also persist coordinates to the addresses record
-          if (currentAddress) {
-            await supabase.from('addresses').update({ latitude: coords.lat, longitude: coords.lng }).eq('id', currentAddress.id)
-          }
-        }
-      } catch (e) {
-        console.error("Geocoding exception:", e)
-      }
     }
   }
 
@@ -808,6 +722,7 @@ export async function registerPartner(data: any) {
     }
     // -------------------------------------------------------
 
+    // Encrypt CPF for store (fiscal fields moved per-store)
     let cpfEncrypted = null
     if (data.cpf) {
       const cleanCPF = String(data.cpf).replace(/\D/g, "")
@@ -817,7 +732,6 @@ export async function registerPartner(data: any) {
       }
     }
 
-    // DADOS APENAS DA TABELA PARTNERS (Sem endereço aqui!)
     if (data.storeImageUrl && data.storeImageUrl.startsWith("data:")) {
       return { success: false, error: "Formato de imagem inválido (base64 não permitido)" }
     }
@@ -826,9 +740,6 @@ export async function registerPartner(data: any) {
 
     const insertPartnerData: any = {
       user_id: userId,
-      business_type: data.businessType,
-      cnpj: data.cnpj?.replace(/\D/g, "") || null,
-      cpf: cpfEncrypted,
       business_info: normalizeBusinessInfo(data.businessInfo),
       is_active: true,
       category_id: data.categoryId || null,
@@ -858,6 +769,9 @@ export async function registerPartner(data: any) {
         banner_url: data.bannerUrl || defaultBannerUrl,
         phone: normalizePhoneToE164(sanitizedPhone),
         opening_hours: data.businessHours || null,
+        business_type: data.businessType,
+        cnpj: data.cnpj?.replace(/\D/g, "") || null,
+        cpf: cpfEncrypted,
         is_headquarters: true,
         is_active: true,
         is_showcase_active: true,

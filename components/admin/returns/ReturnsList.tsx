@@ -155,7 +155,7 @@ const ReturnsList = ({ initialData }: ReturnsListProps) => {
 
                                                 <div className="flex items-center gap-2 text-xs text-brand-inactive-text">
                                                     <StoreIcon size={12} />
-                                                    <span>{request.partners?.stores?.[0]?.name || request.partners?.store_name || request.partners?.business_type || "-"}</span>
+                                                    <span>{request.stores?.name || request.partners?.stores?.[0]?.name || request.partners?.store_name || "-"}</span>
                                                     <span className="ml-auto">{timelineCount} eventos</span>
                                                     {refundAmount > 0 && (
                                                         <span className="font-bold">{formatCurrency(refundAmount)}</span>
@@ -308,7 +308,7 @@ function ReturnDetailsSheet({ request, isOpen, onClose }: ReturnDetailsSheetProp
                         <div>
                             <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body block">Vendedor</span>
                             <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                {request.partners?.store_name || request.partners?.business_type || "-"}
+                                {request.stores?.name || request.partners?.store_name || "-"}
                             </span>
                         </div>
                     </div>

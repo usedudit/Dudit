@@ -19,14 +19,12 @@ const getCachedPartnerReceiptHeader = (partnerId: string) => unstable_cache(
             await Promise.all([
                 supabase
                     .from("partners")
-                    .select(
-                        "cnpj, inscricao_estadual, inscricao_municipal, ie_isento",
-                    )
+                    .select("id")
                     .eq("id", partnerId)
                     .maybeSingle(),
                 supabase
                     .from("stores")
-                    .select("name, description, crt, contribuinte, inscricao_estadual, ie_isento, inscricao_municipal, addresses(*)")
+                    .select("name, description, cnpj, cpf, crt, contribuinte, inscricao_estadual, ie_isento, inscricao_municipal, addresses(*)")
                     .eq("partner_id", partnerId)
                     .order("is_headquarters", { ascending: false })
                     .limit(1)
@@ -58,10 +56,10 @@ const getCachedPartnerReceiptHeader = (partnerId: string) => unstable_cache(
             legalName: store?.description || store?.name || "Estabelecimento",
             addressLine: addressParts.join(", ") || "Endereço não informado",
             taxIdLine: buildPartnerTaxIdLine({
-                cnpj: partner.cnpj,
-                stateRegistration: store?.inscricao_estadual || partner.inscricao_estadual,
-                municipalRegistration: store?.inscricao_municipal || partner.inscricao_municipal,
-                ieIsento: store?.ie_isento ?? partner.ie_isento,
+                cnpj: store?.cnpj,
+                stateRegistration: store?.inscricao_estadual,
+                municipalRegistration: store?.inscricao_municipal,
+                ieIsento: store?.ie_isento,
             }),
         }
 

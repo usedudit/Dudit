@@ -45,26 +45,34 @@ async function resolvePixKeyFromPartner(
 ) {
     if (!pixKeyType || pixKeyType === "random") return null
     const supabase = createAdminClient()
-    const { data: partner } = await supabase
-        .from("partners")
-        .select("cnpj, cpf, user_id")
-        .eq("id", partnerId)
-        .single()
+    const { data: store } = await supabase
+        .from("stores")
+        .select("cpf, cnpj, partner_id")
+        .eq("partner_id", partnerId)
+        .order("is_headquarters", { ascending: false })
+        .limit(1)
+        .maybeSingle()
 
-    if (!partner) return null
+    const partnerCpf = store?.cpf || null
+    const partnerCnpj = store?.cnpj || null
     if (pixKeyType === "cpf") {
-        if (partner.cpf) {
+        if (partnerCpf) {
             try {
-                return await decryptCPF(partner.cpf)
+                return await decryptCPF(partnerCpf)
             } catch {
                 return null
             }
         }
         return null
     }
-    if (pixKeyType === "cnpj") return partner.cnpj || null
+    if (pixKeyType === "cnpj") return partnerCnpj || null
     if (pixKeyType === "email") {
-        if (!partner.user_id) return null
+        const { data: partner } = await supabase
+            .from("partners")
+            .select("user_id")
+            .eq("id", partnerId)
+            .single()
+        if (!partner?.user_id) return null
         try {
             const { data: authData } = await supabase.auth.admin.getUserById(partner.user_id)
             return authData?.user?.email || null

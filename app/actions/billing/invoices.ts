@@ -41,7 +41,16 @@ export async function generateInvoiceAction(
 
         const partner = (purchase as any).partners || {}
         const partnerAddress = partner.address || ""
-        const partnerDoc = partner.cnpj || partner.cpf || ""
+
+        // Doc comes from stores (fiscal fields per-store)
+        const { data: storeDoc } = await admin
+            .from("stores")
+            .select("cnpj, cpf")
+            .eq("partner_id", purchase.partner_id)
+            .order("is_headquarters", { ascending: false })
+            .limit(1)
+            .maybeSingle()
+        const partnerDoc = storeDoc?.cnpj || storeDoc?.cpf || ""
 
         let customerDetails: { name: string; document: string | null; email: string | null } | null = null
         if (purchase.user_id) {

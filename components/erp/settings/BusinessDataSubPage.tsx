@@ -34,6 +34,7 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { formatE164ToDisplay } from "@/lib/utils/phone-utils"
 import { useStore } from "@/lib/store-context"
+import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
 import type { BusinessMode } from "@/lib/business-info"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 
@@ -104,8 +105,8 @@ export const BusinessDataSubPage = ({
     const [generalInfo, setGeneralInfo] = useState({
         storeName: store?.name || partner.store_name || "",
         storeDescription: store?.description || partner.store_description || "",
-        businessType: partner.business_type || "pf",
-        cnpj: partner.cpf || partner.cnpj || "",
+        businessType: store?.business_type || "pf",
+        cnpj: store?.cpf || store?.cnpj || "",
         sells: store?.business_info?.sells || partnerBusinessInfo?.sells || ["products"],
         mode: ((store?.business_info?.mode || partnerBusinessInfo?.mode || "erp")) as BusinessMode,
         phone: store?.phone ? formatE164ToDisplay(store.phone) : (partner.phone ? formatE164ToDisplay(partner.phone) : ""),
@@ -130,6 +131,31 @@ export const BusinessDataSubPage = ({
         loadCategoryPath()
     }, [generalInfo.categoryId, generalInfo.subcategoryId])
 
+    useEffect(() => {
+        if (!store?.id) return
+        const fetchAddress = async () => {
+            const { data: storeData } = await supabase
+                .from("stores")
+                .select("*, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default)")
+                .eq("id", store.id)
+                .single()
+            if (storeData?.addresses?.[0]) {
+                const addr = storeData.addresses[0]
+                setAddresses({
+                    zipCode: addr.zip_code || "",
+                    street: addr.street || "",
+                    number: addr.number || "",
+                    complement: addr.complement || "",
+                    neighborhood: addr.neighborhood || "",
+                    city: addr.city || "",
+                    state: addr.state || "",
+                    noNumber: addr.number === "S/N",
+                })
+            }
+        }
+        fetchAddress()
+    }, [store?.id])
+
     const partnerAddress = partner.addresses?.[0] || partner.address || {};
     const storeAddress = store?.addresses?.[0] || store?.address || {};
     const effectiveZip = store?.zip_code || storeAddress.zip_code || partnerAddress.zip_code || partner.zip_code || "";
@@ -151,11 +177,11 @@ export const BusinessDataSubPage = ({
     })
 
     const [fiscalInfo, setFiscalInfo] = useState({
-        crt: store?.crt || partner.crt || "1",
-        contribuinte: store?.contribuinte || partner.contribuinte || "9",
-        inscricaoEstadual: store?.inscricao_estadual || partner.inscricao_estadual || "",
-        ieIsento: store?.ie_isento ?? partner.ie_isento ?? false,
-        inscricaoMunicipal: store?.inscricao_municipal || partner.inscricao_municipal || "",
+        crt: store?.crt || "1",
+        contribuinte: store?.contribuinte || "9",
+        inscricaoEstadual: store?.inscricao_estadual || "",
+        ieIsento: store?.ie_isento ?? false,
+        inscricaoMunicipal: store?.inscricao_municipal || "",
     })
 
     const storeHoursObj = store?.opening_hours && typeof store.opening_hours === "object" && Object.keys(store.opening_hours).length > 0 ? store.opening_hours : null
@@ -239,7 +265,7 @@ export const BusinessDataSubPage = ({
                     mode: generalInfo.mode,
                 }
 
-                // F5.4b + F5.5c: Store-level fields → updateStoreAction
+                // Store-level fields → updateStoreAction
                 if (store?.id) {
                     const storeResult = await updateStoreAction({
                         storeId: store.id,
@@ -261,6 +287,14 @@ export const BusinessDataSubPage = ({
                         city: addresses.city,
                         state: addresses.state,
                         noNumber: addresses.noNumber,
+                        business_type: generalInfo.businessType as "pf" | "pj",
+                        cnpj: generalInfo.businessType === "pj" ? (generalInfo.cnpj || null) : null,
+                        cpf: generalInfo.businessType === "pf" ? (generalInfo.cnpj || null) : null,
+                        crt: fiscalInfo.crt,
+                        contribuinte: fiscalInfo.contribuinte,
+                        inscricaoEstadual: fiscalInfo.inscricaoEstadual || null,
+                        ieIsento: fiscalInfo.ieIsento,
+                        inscricaoMunicipal: fiscalInfo.inscricaoMunicipal || null,
                     })
                     if (!storeResult.success) {
                         notifyError(storeResult.error!)
@@ -269,23 +303,8 @@ export const BusinessDataSubPage = ({
                     }
                 }
 
-                // Partner-level fields → updatePartnerAction
+                // Partner-level fields → updatePartnerAction (address + category only)
                 const partnerResult = await updatePartnerAction(partner.id, {
-                    businessType: generalInfo.businessType as "pf" | "pj",
-                    cnpj: generalInfo.businessType === "pj" ? (generalInfo.cnpj || null) : null,
-                    cpf: generalInfo.businessType === "pf" ? (generalInfo.cnpj || null) : null,
-                    zipCode: addresses.zipCode,
-                    street: addresses.street,
-                    number: addresses.noNumber ? "S/N" : addresses.number,
-                    complement: addresses.complement,
-                    neighborhood: addresses.neighborhood,
-                    city: addresses.city,
-                    state: addresses.state,
-                    crt: fiscalInfo.crt,
-                    contribuinte: fiscalInfo.contribuinte,
-                    inscricaoEstadual: fiscalInfo.inscricaoEstadual || null,
-                    ieIsento: fiscalInfo.ieIsento,
-                    inscricaoMunicipal: fiscalInfo.inscricaoMunicipal || null,
                     category: generalInfo.category || null,
                     categoryId: generalInfo.categoryId,
                     subcategoryId: generalInfo.subcategoryId,

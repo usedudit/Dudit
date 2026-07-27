@@ -775,7 +775,7 @@ export async function getAdminTargetDetails(targetType: string, targetId: string
     if (targetType === "product") {
         const { data, error } = await adminClient
             .from("products")
-            .select("*, partner:partners(business_type, id), store:stores(name, logo_url)")
+            .select("*, store:stores(name, logo_url, business_type)")
             .eq("id", targetId)
             .single()
         if (error || !data) return null
@@ -783,13 +783,20 @@ export async function getAdminTargetDetails(targetType: string, targetId: string
     }
 
     if (targetType === "partner") {
-        const { data, error } = await adminClient
+        const { data: partner, error } = await adminClient
             .from("partners")
             .select("*")
             .eq("id", targetId)
             .single()
-        if (error || !data) return null
-        return data
+        if (error || !partner) return null
+        const { data: store } = await adminClient
+            .from("stores")
+            .select("name, logo_url, business_type")
+            .eq("partner_id", targetId)
+            .order("is_headquarters", { ascending: false })
+            .limit(1)
+            .maybeSingle()
+        return { ...partner, store }
     }
 
     return null

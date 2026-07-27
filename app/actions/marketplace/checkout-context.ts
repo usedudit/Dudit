@@ -324,7 +324,7 @@ export async function getMarketplaceCheckoutContextAction(input: {
   const depositAllowed = hasMinimumPlan(plan?.slug || "free", "crescer")
   const depositPercent = Number(partnerRow?.service_deposit_percentage || 50)
   const depositEnabled = Boolean(partnerRow?.service_deposit_enabled)
-  const serviceDepositMpEnabled = Boolean(partnerRow?.service_deposit_mp_enabled)
+  const serviceDepositMpEnabled = Boolean(partnerRow?.service_deposit_enabled && partnerRow?.mp_user_id)
   const mpConnected = Boolean(input.mpConnected ?? partnerRow?.mp_user_id)
 
   const depositAvailable =

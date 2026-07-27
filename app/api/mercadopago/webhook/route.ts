@@ -391,6 +391,22 @@ async function processWebhookWithRetry(
       ? Number(paymentInfo.transaction_details.installment_amount)
       : null
 
+    // Split fee_details into feeAmount (mercadopago_fee) and interestAmount (installment_fee)
+    let mpLegFeeAmount = 0
+    let mpLegInterestAmount = 0
+    if (mpFeeDetails.length > 0) {
+      for (const fd of mpFeeDetails) {
+        const amt = Number(fd.amount) || 0
+        if (fd.type === "installment_fee") {
+          mpLegInterestAmount += amt
+        } else {
+          mpLegFeeAmount += amt
+        }
+      }
+    } else {
+      mpLegFeeAmount = totalFeeAmount ?? 0
+    }
+
     const mpLeg: Record<string, unknown> = {
       method: paymentMethodName,
       amount: Number(paymentInfo.transaction_amount || 0),
@@ -401,9 +417,9 @@ async function processWebhookWithRetry(
       adjustmentPercent: 0,
       adjustmentAmount: 0,
       installmentNumber: paymentInfo.installments ?? 1,
-      feeAmount: totalFeeAmount ?? 0,
+      feeAmount: mpLegFeeAmount,
       fixedFeeAmount: 0,
-      interestAmount: 0,
+      interestAmount: mpLegInterestAmount,
       feeBearer: "merchant",
       paymentMethodId: paymentInfo.payment_method_id ?? null,
       paymentTypeId: paymentInfo.payment_type_id ?? null,

@@ -59,11 +59,10 @@ const OrderListRow = React.memo(({ order, isPending, onDetail }: OrderListRowPro
                     <div className="flex items-center gap-1">
                         <StoreIcon size={12} className="text-brand-inactive-text shrink-0" />
                         <span className="font-medium text-[13px] text-brand-dark dark:text-dark-heading truncate">
-                            {order.partners?.store_name || order.partners?.business_type || "-"}
+                            {order.stores?.name || order.partners?.store_name || "-"}
                         </span>
                     </div>
                     {order.stores?.name && (
-                        <span className="text-[11px] font-medium text-brand-inactive-text ml-4">
                             Loja: {order.stores.name}
                         </span>
                     )}

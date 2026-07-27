@@ -149,6 +149,15 @@ interface UpdateStoreInput {
     latitude?: number | null
     longitude?: number | null
     timezone?: string
+    // Tax / fiscal fields (per store)
+    business_type?: "pf" | "pj"
+    cnpj?: string | null
+    cpf?: string | null
+    crt?: string
+    contribuinte?: string
+    inscricaoEstadual?: string | null
+    ieIsento?: boolean
+    inscricaoMunicipal?: string | null
     // Address fields
     city?: string
     state?: string
@@ -188,6 +197,26 @@ export async function updateStoreAction(input: UpdateStoreInput): Promise<Action
         if (input.latitude !== undefined) updateData.latitude = input.latitude
         if (input.longitude !== undefined) updateData.longitude = input.longitude
         if (input.timezone !== undefined) updateData.timezone = input.timezone
+        // Tax / fiscal fields
+        if (input.business_type !== undefined) updateData.business_type = input.business_type
+        if (input.cnpj !== undefined) {
+            updateData.cnpj = input.cnpj ? input.cnpj.replace(/\D/g, "") : null
+            if (updateData.cnpj === "") updateData.cnpj = null
+        }
+        if (input.cpf !== undefined) {
+            const cleanCPF = input.cpf ? input.cpf.replace(/\D/g, "") : null
+            if (cleanCPF) {
+                const { encryptCPF } = await import("@/lib/crypto")
+                updateData.cpf = await encryptCPF(cleanCPF)
+            } else {
+                updateData.cpf = null
+            }
+        }
+        if (input.crt !== undefined) updateData.crt = input.crt
+        if (input.contribuinte !== undefined) updateData.contribuinte = input.contribuinte
+        if (input.inscricaoEstadual !== undefined) updateData.inscricao_estadual = input.inscricaoEstadual
+        if (input.ieIsento !== undefined) updateData.ie_isento = input.ieIsento
+        if (input.inscricaoMunicipal !== undefined) updateData.inscricao_municipal = input.inscricaoMunicipal
         updateData.updated_at = new Date().toISOString()
 
         // F5.5c: Handle address upsert

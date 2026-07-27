@@ -26,7 +26,7 @@ AS $$
         s.name AS store_name,
         s.logo_url AS store_image_url,
         s.description AS store_description,
-        p.business_type,
+        s.business_type,
         s.latitude,
         s.longitude,
         s.opening_hours,

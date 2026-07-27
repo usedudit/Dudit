@@ -25,6 +25,9 @@ interface Store {
   is_headquarters: boolean
   is_active: boolean
   address_id: string | null
+  business_type: string | null
+  cnpj: string | null
+  cpf: string | null
   crt: string | null
   contribuinte: string | null
   inscricao_estadual: string | null

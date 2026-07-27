@@ -74,9 +74,9 @@ ALTER TABLE suppliers
   ADD CONSTRAINT suppliers_cnpj_format 
   CHECK (cnpj IS NULL OR cnpj ~ '^[0-9A-Z]{14}$');
 
-ALTER TABLE partners 
-  DROP CONSTRAINT IF EXISTS partners_cnpj_format,
-  ADD CONSTRAINT partners_cnpj_format 
+ALTER TABLE stores 
+  DROP CONSTRAINT IF EXISTS stores_cnpj_format,
+  ADD CONSTRAINT stores_cnpj_format 
   CHECK (cnpj IS NULL OR cnpj ~ '^[0-9A-Z]{14}$');
 
 -- Validação de preços e quantidades (não negativos)

@@ -22,17 +22,19 @@ async function validatePartnerCPFCNPJ(
   supabase: any,
 ): Promise<CPFCNPJValidationResult> {
   try {
-    const { data: partner, error: partnerError } = await supabase
-      .from("partners")
-      .select("cpf, cnpj")
-      .eq("id", partnerId)
-      .single()
+    const { data: store, error: storeError } = await supabase
+      .from("stores")
+      .select("cnpj, cpf")
+      .eq("partner_id", partnerId)
+      .order("is_headquarters", { ascending: false })
+      .limit(1)
+      .maybeSingle()
 
-    if (partnerError || !partner) {
-      return { isValid: false, message: "Parceiro não encontrado" }
+    if (storeError) {
+      return { isValid: false, message: "Erro ao buscar dados fiscais da loja" }
     }
 
-    const partnerDoc = (partner.cnpj || partner.cpf || "").replace(/\D/g, "")
+    const partnerDoc = (store?.cnpj || store?.cpf || "").replace(/\D/g, "")
     if (!partnerDoc) {
       return { isValid: false, message: "CPF/CNPJ do parceiro não cadastrado" }
     }

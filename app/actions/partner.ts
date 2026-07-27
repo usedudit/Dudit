@@ -96,9 +96,6 @@ export async function createPartnerAction(data: CreatePartnerData) {
 
     const insertData: any = {
       user_id: data.userId,
-      business_type: data.businessType,
-      cnpj: cnpjClean,
-      cpf: cpfEncrypted,
       business_info: {
         sells: data.offeringType === "both" ? ["products", "services"] : data.offeringType === "services" ? ["services"] : ["products"],
         mode: "erp",
@@ -136,6 +133,9 @@ export async function createPartnerAction(data: CreatePartnerData) {
         logo_url: data.storeImageUrl || null,
         banner_url: getRandomDefaultBanner(),
         opening_hours: data.openingHours || defaultOpeningHours,
+        business_type: data.businessType,
+        cnpj: cnpjClean,
+        cpf: cpfEncrypted,
         is_headquarters: true,
         is_active: true,
         is_showcase_active: true,
@@ -320,29 +320,29 @@ export async function updatePartnerAction(
   if (isSeoSensitiveChange) {
     updateData.last_seo_update_at = new Date().toISOString()
   }
-  if (data.businessType) updateData.business_type = data.businessType
-  if (data.cnpj !== undefined) updateData.cnpj = data.cnpj
-  if (data.cpf !== undefined) {
-    const cleanCPF = data.cpf ? String(data.cpf).replace(/\D/g, "") : null
-    if (cleanCPF) {
-      const { encryptCPF } = await import("@/lib/crypto")
-      try {
-        updateData.cpf = await encryptCPF(cleanCPF)
-      } catch (error) {
-        console.error("Error encrypting CPF:", error)
-        return { error: "Erro ao criptografar CPF" }
-      }
-    } else {
-      updateData.cpf = null
-    }
-  }
 
-  // Handle store updates (headquarters store)
+  // Handle store updates (headquarters store) — all fiscal fields moved per-store
   const storeUpdateData: Record<string, any> = {}
   if (data.storeName) storeUpdateData.name = data.storeName
   if (data.storeDescription !== undefined) storeUpdateData.description = data.storeDescription
   if (data.openingHours !== undefined) storeUpdateData.opening_hours = normalizeOpeningHours(data.openingHours)
   if (data.storeImageUrl !== undefined) storeUpdateData.logo_url = data.storeImageUrl
+  if (data.businessType) storeUpdateData.business_type = data.businessType
+  if (data.cnpj !== undefined) storeUpdateData.cnpj = data.cnpj
+  if (data.cpf !== undefined) {
+    const cleanCPF = data.cpf ? String(data.cpf).replace(/\D/g, "") : null
+    if (cleanCPF) {
+      const { encryptCPF } = await import("@/lib/crypto")
+      try {
+        storeUpdateData.cpf = await encryptCPF(cleanCPF)
+      } catch (error) {
+        console.error("Error encrypting CPF:", error)
+        return { error: "Erro ao criptografar CPF" }
+      }
+    } else {
+      storeUpdateData.cpf = null
+    }
+  }
 
   if ((data as any).gallery !== undefined) {
     if (!Array.isArray((data as any).gallery)) {
@@ -390,11 +390,11 @@ export async function updatePartnerAction(
   if (data.city !== undefined) { addressData.city = data.city; hasAddressData = true }
   if (data.state !== undefined) { addressData.state = data.state; hasAddressData = true }
 
-  if (data.crt !== undefined) updateData.crt = data.crt
-  if (data.contribuinte !== undefined) updateData.contribuinte = data.contribuinte
-  if (data.inscricaoEstadual !== undefined) updateData.inscricao_estadual = data.inscricaoEstadual
-  if (data.ieIsento !== undefined) updateData.ie_isento = data.ieIsento
-  if (data.inscricaoMunicipal !== undefined) updateData.inscricao_municipal = data.inscricaoMunicipal
+  if (data.crt !== undefined) storeUpdateData.crt = data.crt
+  if (data.contribuinte !== undefined) storeUpdateData.contribuinte = data.contribuinte
+  if (data.inscricaoEstadual !== undefined) storeUpdateData.inscricao_estadual = data.inscricaoEstadual
+  if (data.ieIsento !== undefined) storeUpdateData.ie_isento = data.ieIsento
+  if (data.inscricaoMunicipal !== undefined) storeUpdateData.inscricao_municipal = data.inscricaoMunicipal
 
   if (hasAddressData) {
     const currentAddr = storeAddress || {}

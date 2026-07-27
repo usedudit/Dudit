@@ -29,6 +29,7 @@ DECLARE
     inv_hash TEXT;
     inv_data JSONB;
     v_now TIMESTAMPTZ := now();
+    store_doc TEXT;
 BEGIN
     -- ── 1. Load subscription + plan + partner ──
     SELECT s.*, p.id AS plan_id, p.name AS plan_name, p.price AS plan_price, p.slug AS plan_slug
@@ -45,6 +46,9 @@ BEGIN
     IF NOT FOUND THEN
         RETURN jsonb_build_object('error', 'Partner not found');
     END IF;
+
+    -- Fetch store document (cnpj/cpf from stores, fiscal fields per-store)
+    SELECT COALESCE(cnpj, cpf, '') INTO store_doc FROM stores WHERE partner_id = sub_record.partner_id AND is_headquarters = true LIMIT 1;
 
     -- ── 2. Map subscription status to purchase status ──
     purchase_status := CASE sub_record.status
@@ -167,7 +171,7 @@ BEGIN
                 'status', 'issued',
                 'partner', jsonb_build_object(
                     'name', COALESCE(partner_record.store_name, ''),
-                    'document', COALESCE(partner_record.cnpj, partner_record.cpf, ''),
+                    'document', store_doc,
                     'address', '',
                     'phone', COALESCE(partner_record.phone, ''),
                     'store_image_url', COALESCE(partner_record.store_image_url, '')

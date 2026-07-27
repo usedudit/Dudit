@@ -33,7 +33,7 @@ export default async function SettingsPage() {
 
   const { data: store } = await supabase
     .from("stores")
-    .select("*, addresses(*)")
+    .select("*, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default)")
     .eq("partner_id", context.partnerId)
     .order("is_headquarters", { ascending: false })
     .limit(1)
@@ -51,12 +51,12 @@ export default async function SettingsPage() {
     addresses: store?.addresses || [],
   }
 
-  // Decrypt CPF for display
-  if (partner.cpf) {
+  // Decrypt CPF from store for display
+  if (store?.cpf) {
     try {
-      partner.cpf = await decryptCPF(partner.cpf)
+      partner.store_cpf = await decryptCPF(store.cpf)
     } catch (e) {
-      console.error("[Settings] Error decrypting partner CPF:", e)
+      console.error("[Settings] Error decrypting store CPF:", e)
     }
   }
 

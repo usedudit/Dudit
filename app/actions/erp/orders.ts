@@ -1264,11 +1264,17 @@ async function createOrderStockMovement(params: {
 
     const movementId = (movementRecord as any)?.id
     if (movementId) {
+        const { data: orderRef } = await params.supabase
+            .from("orders")
+            .select("order_number")
+            .eq("id", params.orderId)
+            .single()
+        const orderNumber = (orderRef as any)?.order_number || params.orderId
         const { error: linkError } = await params.supabase
             .from("stock_movements")
             .update({
                 order_id: params.orderId,
-                reference_name: `Pedido: ${params.orderId}`,
+                reference_name: `Pedido: ${orderNumber}`,
             })
             .eq("id", movementId)
 

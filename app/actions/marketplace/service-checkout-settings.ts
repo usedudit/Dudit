@@ -23,7 +23,7 @@ export async function getServiceCheckoutSettingsAction(partnerId: string) {
 
   const { data, error } = await supabase
     .from("partners")
-    .select("service_deposit_enabled, service_deposit_type, service_deposit_percentage, service_deposit_mp_enabled, mp_user_id")
+    .select("service_deposit_enabled, service_deposit_type, service_deposit_percentage, mp_user_id")
     .eq("id", partnerId)
     .single()
 
@@ -36,7 +36,7 @@ export async function getServiceCheckoutSettingsAction(partnerId: string) {
       depositEnabled: Boolean(data?.service_deposit_enabled),
       depositType: data?.service_deposit_type || "percentage",
       depositPercentage: Number(data?.service_deposit_percentage || 50),
-      depositMpEnabled: Boolean(data?.service_deposit_mp_enabled),
+      depositMpEnabled: Boolean(data?.service_deposit_enabled && data?.mp_user_id),
       mpConnected: !!data?.mp_user_id,
     },
   }
@@ -65,8 +65,6 @@ export async function updateServiceCheckoutSettingsAction(input: {
     return { success: false, error: "Entrada disponível apenas nos planos Crescer e Escalar." }
   }
 
-  let depositMpEnabled = input.depositMpEnabled
-
   if (input.depositEnabled) {
     const { data: partnerRow } = await supabase
       .from("partners")
@@ -77,7 +75,6 @@ export async function updateServiceCheckoutSettingsAction(input: {
     if (!mpConnected) {
       return { success: false, error: "Para cobrar sinal obrigatório, conecte o Mercado Pago nas integrações." }
     }
-    depositMpEnabled = true
   }
 
   const { error } = await supabase
@@ -86,7 +83,6 @@ export async function updateServiceCheckoutSettingsAction(input: {
       service_deposit_enabled: input.depositEnabled,
       service_deposit_type: "percentage",
       service_deposit_percentage: input.depositPercentage,
-      service_deposit_mp_enabled: depositMpEnabled,
     })
     .eq("id", input.partnerId)
 

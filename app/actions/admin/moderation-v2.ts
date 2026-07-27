@@ -337,7 +337,7 @@ export async function editField(
                 store_image_url: "logo_url"
             }
             const actualField = storeFieldMap[field] || field
-            const isStoreField = ["name", "description", "logo_url", "banner_url", "gallery", "opening_hours", "phone", "risk_score", "rating", "marketplace_reputation", "vendas_totais", "vendas_produtos", "vendas_servicos", "vendas_assinaturas", "completed_orders_count", "completed_appointments_count", "active_subscriptions_count", "cancellation_rate", "timezone", "pickup_payment_policy"].includes(actualField)
+            const isStoreField = ["name", "description", "logo_url", "banner_url", "gallery", "opening_hours", "phone", "risk_score", "rating", "marketplace_reputation", "vendas_totais", "vendas_produtos", "vendas_servicos", "vendas_assinaturas", "completed_orders_count", "completed_appointments_count", "active_subscriptions_count", "cancellation_rate", "timezone", "pickup_payment_policy", "business_type", "cnpj", "cpf", "crt", "contribuinte", "inscricao_estadual", "ie_isento", "inscricao_municipal"].includes(actualField)
             
             if (isStoreField) {
                 const { data } = await fetchAdmin.from("stores").select(actualField).eq("partner_id", targetId).limit(1).maybeSingle()

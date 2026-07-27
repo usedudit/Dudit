@@ -530,7 +530,7 @@ export async function uploadXMLAction(
     // 5. Validar destinatário da NF
     const { data: partner } = await supabase
       .from("partners")
-      .select("id, cpf, cnpj, business_type")
+      .select("id")
       .eq("id", partnerId)
       .single()
 
@@ -538,12 +538,20 @@ export async function uploadXMLAction(
       return { success: false, error: "Parceiro não encontrado" }
     }
 
+    const { data: storeDoc } = await supabase
+      .from("stores")
+      .select("cpf, cnpj, business_type")
+      .eq("partner_id", partnerId)
+      .order("is_headquarters", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
     let partnerDoc = ""
-    if (partner.business_type === "pj" && partner.cnpj) {
-      partnerDoc = partner.cnpj.replace(/\D/g, "")
-    } else if (partner.cpf) {
+    if (storeDoc?.business_type === "pj" && storeDoc?.cnpj) {
+      partnerDoc = storeDoc.cnpj.replace(/\D/g, "")
+    } else if (storeDoc?.cpf) {
       try {
-        partnerDoc = (await decryptCPF(partner.cpf)).replace(/\D/g, "")
+        partnerDoc = (await decryptCPF(storeDoc.cpf)).replace(/\D/g, "")
       } catch {
         return { success: false, error: "Erro ao descriptografar CPF do parceiro" }
       }

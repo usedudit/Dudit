@@ -637,7 +637,7 @@ function ReportDetailsSheet({ report, isOpen, onClose, onResolve, onDismiss, onS
                                             </div>
                                             <div className="flex items-center gap-2 mt-2 pt-2 border-t border-brand-border/50 dark:border-dark-border/50">
                                                 <StoreIcon size={12} className="text-brand-inactive-text" />
-                                                <span className="text-xs font-bold text-brand-dark dark:text-dark-heading truncate">Vendedor: {targetDetails.partner?.business_type || "Desconhecido"}</span>
+                                                <span className="text-xs font-bold text-brand-dark dark:text-dark-heading truncate">Vendedor: {targetDetails.store?.name || "Desconhecido"}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -653,7 +653,7 @@ function ReportDetailsSheet({ report, isOpen, onClose, onResolve, onDismiss, onS
                                             )}
                                         </div>
                                         <div className="flex flex-col gap-1 min-w-0">
-                                            <span className="font-bold text-brand-dark dark:text-dark-heading">{targetDetails.business_type}</span>
+                                            <span className="font-bold text-brand-dark dark:text-dark-heading">{targetDetails.store?.business_type || "Parceiro"}</span>
                                             <span className="text-xs font-medium text-brand-inactive-text font-mono">ID: {targetDetails.id}</span>
                                             <span className="text-xs font-medium text-brand-inactive-text">Entrou em: {new Date(targetDetails.created_at).toLocaleDateString("pt-BR")}</span>
                                         </div>

@@ -203,7 +203,7 @@ interface ColumnMigration {
 
 const MIGRATIONS: ColumnMigration[] = [
   // CPF
-  { table: "partners", column: "cpf", context: "cpf", label: "CPF de parceiros" },
+  { table: "stores", column: "cpf", context: "cpf", label: "CPF de lojas" },
   { table: "customers", column: "cpf", context: "cpf", label: "CPF de clientes" },
   { table: "suppliers", column: "cpf", context: "cpf", label: "CPF de fornecedores" },
 

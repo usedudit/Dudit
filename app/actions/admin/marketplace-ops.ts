@@ -44,8 +44,7 @@ export async function getAdminMarketplaceOrders(
             exchange_parent_order_id,
             exchange_return_request_id,
             created_at,
-            partners(id, business_type),
-            stores!left(id, name),
+            stores!left(id, name, business_type),
             order_items(id, product_id, product_name, product_price, quantity, subtotal, net_item_value),
             return_requests!order_id(id, request_type, status, resolution_type, refund_amount, store_credit_amount, source, created_at)
         `)
@@ -118,11 +117,10 @@ export async function getAdminReturnRequests(
             order_id,
             customer_id,
             exchange_order_id,
-            partners(id, business_type),
-            stores!left(id, name),
+            stores!left(id, name, business_type),
             orders!order_id(id, order_number, situation, delivery_status, total_amount, amount_paid, payment_method, payment_provider, store_id),
             return_items!return_items_return_request_id_fkey(id, product_name_snapshot, quantity, net_item_value_snapshot, reason, condition),
-            return_evidence(id, file_url, file_type, created_at),
+            return_evidence(id, file_url, file_type, file_name, created_at),
             return_events(id, event_type, from_status, to_status, message, metadata, created_at)
         `)
         .is("deleted_at", null)

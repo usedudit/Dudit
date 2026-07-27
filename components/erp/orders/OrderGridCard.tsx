@@ -131,7 +131,18 @@ const OrderGridCard = React.memo(
                                     const breakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : []
                                     let pmLabel = order.payment_method || null
                                     if (breakdown.length > 0) {
-                                        const methods = [...new Set(breakdown.map((b: any) => b.method).filter(Boolean))]
+                                        const seen = new Set<string>()
+                                        const methods: string[] = []
+                                        for (const b of breakdown) {
+                                            const m = b?.method
+                                            if (m && !b?.checkoutPricing) {
+                                                const key = String(m).toLowerCase().trim()
+                                                if (!seen.has(key)) {
+                                                    seen.add(key)
+                                                    methods.push(m)
+                                                }
+                                            }
+                                        }
                                         if (methods.length > 0) {
                                             pmLabel = methods.join(", ")
                                         }

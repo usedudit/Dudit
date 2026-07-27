@@ -52,7 +52,7 @@ export const getPartnerByUserIdCached = cache(async (userId: string) => {
 
     const { data: store } = await supabase
         .from("stores")
-        .select("id, name, description, logo_url, banner_url, opening_hours, phone, addresses(*)")
+        .select("id, name, description, logo_url, banner_url, opening_hours, phone, business_type, cnpj, cpf, addresses(*)")
         .eq("partner_id", partner.id)
         .order("is_headquarters", { ascending: false })
         .limit(1)
@@ -78,10 +78,12 @@ export const getPartnerByUserIdCached = cache(async (userId: string) => {
         }
     }
 
-    if (data && data.cpf) {
+    // CPF now lives on stores (fiscal fields per-store)
+    const storeCpf = store?.cpf
+    if (storeCpf) {
         try {
             const { decryptCPF } = await import("@/lib/crypto")
-            data.cpf = await decryptCPF(data.cpf)
+            data.cpf_decrypted = await decryptCPF(storeCpf)
         } catch (e) {
             console.error("[PartnerData] CPF decryption error:", e)
         }
