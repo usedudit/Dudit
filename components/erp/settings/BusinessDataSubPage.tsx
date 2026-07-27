@@ -141,11 +141,11 @@ export const BusinessDataSubPage = ({
         const fetchAddress = async () => {
             const { data: storeData } = await supabase
                 .from("stores")
-                .select("*, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default)")
+                .select("*, addresses!store_id(id, zip_code, street, number, complement, neighborhood, city, state, is_default, municipio_codigo_ibge)")
                 .eq("id", store.id)
                 .single()
             if (storeData?.addresses?.[0]) {
-                const addr = storeData.addresses[0]
+                const addr = storeData.addresses[0] as any
                 setAddresses({
                     zipCode: addr.zip_code || "",
                     street: addr.street || "",
@@ -155,6 +155,7 @@ export const BusinessDataSubPage = ({
                     city: addr.city || "",
                     state: addr.state || "",
                     noNumber: addr.number === "S/N",
+                    ibge: addr.municipio_codigo_ibge || "",
                 })
             }
         }

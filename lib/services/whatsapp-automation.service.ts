@@ -446,48 +446,11 @@ export async function processDueScheduledJobs(limit = 20): Promise<number> {
   return (jobs || []).length
 }
 
-// ─── Entity-specific triggers ───────────────────────────────────────────────
+// ─── Entity-specific triggers (delegated to Central Notification Engine) ───────────
 
 export async function onAppointmentCreated(appointment: Record<string, unknown>) {
-  if (appointment.source === "unavailable") return
-  const partnerId = String(appointment.partner_id)
-  const appointmentId = String(appointment.id)
-
-  const admin = getAdminClient()
-
-  // Get store name from stores table
-  const { data: hqStore } = await admin
-    .from("stores")
-    .select("name")
-    .eq("partner_id", partnerId)
-    .order("is_headquarters", { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  await dispatchWhatsappAutomation({
-    partnerId,
-    trigger: "appointment_created",
-    entityType: "appointment",
-    entityId: appointmentId,
-    appointmentId,
-    customerId: appointment.customer_id as string | null,
-    templateVariables: {
-      customer_name: String(appointment.customer_name),
-      service_name: String(appointment.service_name),
-      date: String(appointment.start_date),
-      time: String(appointment.start_time),
-      store_name: hqStore?.name || "",
-    },
-    includeAppointmentButtons: true,
-  })
-
-  await scheduleAppointmentReminders({
-    partnerId,
-    appointmentId,
-    startDate: String(appointment.start_date),
-    startTime: String(appointment.start_time),
-    customerId: appointment.customer_id as string | null,
-  })
+  const { onAppointmentCreated: centralOnAppointmentCreated } = await import("./notification-automation.service")
+  return centralOnAppointmentCreated(appointment)
 }
 
 export async function onAppointmentStatusChanged(
@@ -495,172 +458,18 @@ export async function onAppointmentStatusChanged(
   previousStatus: string,
   newStatus: string,
 ) {
-  const partnerId = String(appointment.partner_id)
-  const appointmentId = String(appointment.id)
-  const prev = previousStatus.toLowerCase()
-  const next = newStatus.toLowerCase()
-
-  if (prev === next) return
-
-  const admin = getAdminClient()
-
-  // Get store name from stores table
-  const { data: hqStore } = await admin
-    .from("stores")
-    .select("name")
-    .eq("partner_id", partnerId)
-    .order("is_headquarters", { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  const vars: Record<string, string> = {
-    customer_name: String(appointment.customer_name || "cliente"),
-    service_name: String(appointment.service_name || "serviço"),
-    date: String(appointment.start_date || ""),
-    time: String(appointment.start_time || ""),
-    store_name: hqStore?.name || "",
-    ...((appointment.cancellation_note as string) ? { cancellation_note: appointment.cancellation_note as string } : {}),
-  }
-
-  if (next === "confirmado") {
-    await dispatchWhatsappAutomation({
-      partnerId,
-      trigger: "appointment_confirmed",
-      entityType: "appointment",
-      entityId: appointmentId,
-      appointmentId,
-      customerId: appointment.customer_id as string | null,
-      templateVariables: vars,
-    })
-  } else if (next === "cancelado") {
-    await dispatchWhatsappAutomation({
-      partnerId,
-      trigger: "appointment_cancelled",
-      entityType: "appointment",
-      entityId: appointmentId,
-      appointmentId,
-      customerId: appointment.customer_id as string | null,
-      templateVariables: vars,
-    })
-  }
+  const { onAppointmentStatusChanged: centralOnAppointmentStatusChanged } = await import("./notification-automation.service")
+  return centralOnAppointmentStatusChanged(appointment, previousStatus, newStatus)
 }
 
 export async function onAppointmentRescheduled(appointment: Record<string, unknown>) {
-  const partnerId = String(appointment.partner_id)
-  const appointmentId = String(appointment.id)
-
-  const admin = getAdminClient()
-
-  // Delete old pending scheduled jobs
-  await admin
-    .from("whatsapp_scheduled_jobs")
-    .delete()
-    .eq("entity_type", "appointment")
-    .eq("entity_id", appointmentId)
-    .eq("status", "pending")
-
-  // Get store name from stores table
-  const { data: hqStore } = await admin
-    .from("stores")
-    .select("name")
-    .eq("partner_id", partnerId)
-    .order("is_headquarters", { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  const vars = {
-    customer_name: String(appointment.customer_name || "Cliente"),
-    service_name: String(appointment.service_name),
-    date: String(appointment.start_date),
-    time: String(appointment.start_time),
-    store_name: hqStore?.name || "",
-  }
-
-  await dispatchWhatsappAutomation({
-    partnerId,
-    trigger: "appointment_rescheduled",
-    entityType: "appointment",
-    entityId: appointmentId,
-    appointmentId,
-    customerId: appointment.customer_id as string | null,
-    templateVariables: vars,
-  })
-
-  // Schedule new reminders
-  await scheduleAppointmentReminders({
-    partnerId,
-    appointmentId,
-    startDate: String(appointment.start_date),
-    startTime: String(appointment.start_time),
-    customerId: appointment.customer_id as string | null,
-  })
-}
-
-const ORDER_TRIGGER_MAP: Record<string, WhatsappAutomationTrigger> = {
-  pending: "order_created",
-  paid: "order_payment_approved",
-  in_process: "order_preparing",
-  pickup_available: "order_ready_pickup",
-  shipped: "order_shipped",
-  sent: "order_out_for_delivery",
-  delivered: "order_delivered",
+  const { onAppointmentRescheduled: centralOnAppointmentRescheduled } = await import("./notification-automation.service")
+  return centralOnAppointmentRescheduled(appointment)
 }
 
 export async function onOrderStatusChanged(order: Record<string, unknown>, situation?: string, deliveryStatus?: string) {
-  const partnerId = String(order.partner_id)
-  const orderId = String(order.id)
-
-  const { getOrderMixType } = await import("./notification-automation.service")
-  const mixType = await getOrderMixType(orderId)
-  if (mixType === "service") return
-
-  let trigger: WhatsappAutomationTrigger | null = null
-  if (situation && ORDER_TRIGGER_MAP[situation]) {
-    trigger = ORDER_TRIGGER_MAP[situation]
-  } else if (deliveryStatus === "preparing") {
-    trigger = "order_preparing"
-  } else if (deliveryStatus === "pickup_available") {
-    trigger = "order_ready_pickup"
-  } else if (deliveryStatus === "sent") {
-    trigger = "order_out_for_delivery"
-  } else if (deliveryStatus === "delivered") {
-    trigger = "order_delivered"
-  }
-
-  if (!trigger) return
-
-  const admin = getAdminClient()
-
-  // Get store name from stores table
-  const { data: hqStore } = await admin
-    .from("stores")
-    .select("name")
-    .eq("partner_id", partnerId)
-    .order("is_headquarters", { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  const formatCurrency = (v: unknown) => {
-    const n = Number(v)
-    if (v == null || Number.isNaN(n)) return ""
-    return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(n)
-  }
-
-  await dispatchWhatsappAutomation({
-    partnerId,
-    trigger,
-    entityType: "order",
-    entityId: orderId,
-    orderId,
-    customerId: order.buyer_id as string | null,
-    phone: order.buyer_phone as string | null,
-    templateVariables: {
-      order_number: String(order.order_number || orderId.slice(0, 8)),
-      customer_name: String(order.customer_name || order.buyer_name || "cliente"),
-      amount: formatCurrency(order.total_amount),
-      store_name: hqStore?.name || "",
-    },
-  })
+  const { onOrderStatusChanged: centralOnOrderStatusChanged } = await import("./notification-automation.service")
+  return centralOnOrderStatusChanged(order, situation, deliveryStatus)
 }
 
 export async function onDeliveryStatusChanged(delivery: Record<string, unknown>, newStatus: string) {

@@ -125,6 +125,8 @@ export async function shouldDeliverWhatsapp(
     order_shipped: "order_shipped",
     order_out_for_delivery: "order_shipped",
     order_delivered: "order_delivered",
+    order_cancelled: "order_cancelled",
+    order_refunded: "order_refunded",
     delivery_route_started: "order_shipped",
     delivery_in_progress: "order_shipped",
     delivery_delivered: "order_delivered",

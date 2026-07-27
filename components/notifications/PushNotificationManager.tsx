@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useRef } from "react"
 import { useSupabase } from "@/providers/supabase-provider"
 import { isFirebaseClientConfigured } from "@/lib/notifications/firebase-config"
 import { registerPushSubscriptionAction } from "@/app/actions/notifications"
@@ -24,7 +24,7 @@ function getDeviceFingerprint(): string {
   let hash = 0
   for (let i = 0; i < fingerprint.length; i++) {
     const chr = fingerprint.charCodeAt(i)
-    hash = ((hash << 5) - hash) + chr
+    hash = (hash << 5) - hash + chr
     hash |= 0
   }
   return hash.toString(36)
@@ -32,6 +32,7 @@ function getDeviceFingerprint(): string {
 
 export function PushNotificationManager() {
   const { user } = useSupabase()
+  const lastRegisteredTokenRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (!user?.id || !isFirebaseClientConfigured()) return
@@ -39,7 +40,7 @@ export function PushNotificationManager() {
     if (!("Notification" in window)) return
 
     let cancelled = false
-    let registered = false
+    let unsubscribeForeground: (() => void) | undefined
 
     async function setup() {
       try {
@@ -53,7 +54,7 @@ export function PushNotificationManager() {
         if (permission !== "granted" || cancelled) return
 
         const { initializeApp, getApps } = await import("firebase/app")
-        const { getMessaging, getToken } = await import("firebase/messaging")
+        const { getMessaging, getToken, onMessage } = await import("firebase/messaging")
         const { firebaseClientConfig } = await import("@/lib/notifications/firebase-config")
 
         const app = getApps().length ? getApps()[0]! : initializeApp(firebaseClientConfig)
@@ -67,20 +68,32 @@ export function PushNotificationManager() {
 
         if (!token || cancelled) return
 
-        if (!registered) {
+        if (lastRegisteredTokenRef.current !== token) {
           await registerPushSubscriptionAction({
             fcmToken: token,
             deviceName: await getDeviceName(),
             deviceFingerprint: getDeviceFingerprint(),
           })
-          registered = true
+          lastRegisteredTokenRef.current = token
         }
+
+        // Foreground message listener: prevents default alert spam and handles toast if needed
+        unsubscribeForeground = onMessage(messaging, (payload) => {
+          if (cancelled) return
+          // Log foreground notification gracefully
+          console.log("[push] foreground notification received", payload.data?.title || payload.notification?.title)
+        })
       } catch (err) {
         console.warn("[push] registration skipped", err)
       }
     }
 
     setup()
+
+    return () => {
+      cancelled = true
+      if (unsubscribeForeground) unsubscribeForeground()
+    }
   }, [user?.id])
 
   return null

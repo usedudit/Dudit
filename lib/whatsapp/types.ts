@@ -20,6 +20,8 @@ export type WhatsappAutomationTrigger =
   | "order_shipped"
   | "order_out_for_delivery"
   | "order_delivered"
+  | "order_cancelled"
+  | "order_refunded"
   | "delivery_route_started"
   | "delivery_in_progress"
   | "delivery_delivered"

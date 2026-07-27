@@ -375,7 +375,7 @@ export async function getDeliveryRoutePointsAction(params: { partnerId: string; 
 
   const { data: store } = await supabase
     .from("stores")
-    .select("id, addresses!store_id!left(latitude, longitude)")
+    .select("id, addresses!store_id(latitude, longitude)")
     .eq("partner_id", params.partnerId)
     .order("is_headquarters", { ascending: false })
     .limit(1)
@@ -549,7 +549,7 @@ export async function getSmartDeliverySuggestionsAction(input: {
   // origin coords from addresses (single source of truth)
   const { data: store } = await supabase
     .from("stores")
-    .select("id, addresses!store_id!left(latitude, longitude)")
+    .select("id, addresses!store_id(latitude, longitude)")
     .eq("partner_id", input.partnerId)
     .maybeSingle()
   const addr = Array.isArray(store?.addresses) ? store.addresses[0] : null

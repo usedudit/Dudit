@@ -54,7 +54,7 @@ export async function sendPushToUser(params: {
   type: NotificationType
   entityType: string | null
   entityId: string | null
-}): Promise<{ sent: number; failed: number; skipped: boolean }> {
+}): Promise<{ sent: number; failed: number; skipped: boolean; reason?: string }> {
   const app = getFirebaseAdmin()
   const adminDb = getAdminClient()
 
@@ -65,7 +65,7 @@ export async function sendPushToUser(params: {
       status: "skipped",
       metadata: { reason: "fcm_not_configured" },
     })
-    return { sent: 0, failed: 0, skipped: true }
+    return { sent: 0, failed: 0, skipped: true, reason: "fcm_not_configured" }
   }
 
   const { data: subscriptions } = await adminDb
@@ -78,9 +78,9 @@ export async function sendPushToUser(params: {
       notification_id: params.notificationId,
       channel: "push",
       status: "skipped",
-      metadata: { reason: "no_subscriptions" },
+      metadata: { reason: "no_active_push_subscriptions" },
     })
-    return { sent: 0, failed: 0, skipped: true }
+    return { sent: 0, failed: 0, skipped: true, reason: "no_subscriptions" }
   }
 
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -118,6 +118,7 @@ export async function sendPushToUser(params: {
           channel: "push",
           status: "sent",
           push_subscription_id: sub.id,
+          metadata: { user_id: params.userId, type: params.type },
         })
       } catch (err: unknown) {
         failed++
@@ -137,7 +138,7 @@ export async function sendPushToUser(params: {
           status: "failed",
           push_subscription_id: sub.id,
           error_message: message.slice(0, 500),
-          metadata: { code: code || null },
+          metadata: { user_id: params.userId, code: code || null, error_details: message },
         })
       }
     }),
@@ -149,3 +150,20 @@ export async function sendPushToUser(params: {
 
   return { sent, failed, skipped: false }
 }
+
+export async function cleanupStalePushSubscriptions(maxAgeDays = 60): Promise<number> {
+  const adminDb = getAdminClient()
+  const cutoff = new Date(Date.now() - maxAgeDays * 24 * 60 * 60 * 1000).toISOString()
+  const { data, error } = await adminDb
+    .from("push_subscriptions")
+    .delete()
+    .lt("last_seen_at", cutoff)
+    .select("id")
+
+  if (error) {
+    console.error("[fcm] stale subscriptions cleanup error", error.message)
+    return 0
+  }
+  return data?.length ?? 0
+}
+

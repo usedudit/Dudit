@@ -10,8 +10,7 @@ import type {
   NotificationsPageResult,
   NotificationType,
 } from "@/lib/notifications/types"
-import { sendPushToUser } from "./fcm.service"
-import { shouldDeliverPush } from "./notification-preferences.service"
+import { resolveAndDeliverNotification } from "./notification-resolver.service"
 
 const PAGE_SIZE = 30
 
@@ -96,23 +95,25 @@ export async function createNotification(
     notification_id: notification.id,
     channel: "in_app",
     status: "sent",
-    metadata: { type: input.type },
+    metadata: { type: input.type, origin },
   })
 
-  shouldDeliverPush(input.userId, input.type).then((shouldPush) => {
-    if (!shouldPush) return
-    sendPushToUser({
-      userId: input.userId,
-      notificationId: notification.id,
-      title: input.title,
-      body: input.message,
-      href,
-      type: input.type,
-      entityType: input.entityType ?? null,
-      entityId: input.entityId ?? null,
-    }).catch((err) => {
-      console.error("[notifications] push delivery failed", err instanceof Error ? err.message : err)
-    })
+  resolveAndDeliverNotification({
+    userId: input.userId,
+    notificationId: notification.id,
+    type: input.type,
+    title: input.title,
+    body: input.message,
+    href,
+    entityType: input.entityType ?? null,
+    entityId: input.entityId ?? null,
+    partnerId: (input.data?.partner_id as string | undefined) || null,
+    storeId: (input.data?.store_id as string | undefined) || null,
+    customerId: (input.data?.customer_id as string | undefined) || null,
+    phone: (input.data?.phone as string | undefined) || null,
+    data: input.data,
+  }).catch((err) => {
+    console.error("[notifications] delivery resolver failed", err instanceof Error ? err.message : err)
   })
 
   return { notification, created: true }

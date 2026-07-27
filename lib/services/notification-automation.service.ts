@@ -54,6 +54,9 @@ async function notifyCustomer(params: {
   type: NotificationType
   entityType: "order" | "appointment" | "subscription"
   entityId: string
+  partnerId?: string | null
+  customerId?: string | null
+  phone?: string | null
   ctx: Parameters<typeof buildNotificationContent>[2]
   variant?: string
   origin?: "manual" | "automation" | "system"
@@ -66,7 +69,13 @@ async function notifyCustomer(params: {
     message: content.message,
     entityType: params.entityType,
     entityId: params.entityId,
-    data: { ...params.ctx, audience: "customer" },
+    data: {
+      ...params.ctx,
+      audience: "customer",
+      partner_id: params.partnerId,
+      customer_id: params.customerId,
+      phone: params.phone,
+    },
     idempotencyKey: buildIdempotencyKey(
       params.type,
       params.entityType,
@@ -232,6 +241,8 @@ export async function runScheduledNotificationJob(job: {
     type: "appointment_reminder",
     entityType: "appointment",
     entityId: appointment.id,
+    partnerId: appointment.partner_id as string,
+    customerId: appointment.customer_id as string,
     variant: job.job_type,
     ctx: {
       serviceName: appointment.service_name,
@@ -348,6 +359,8 @@ export async function onAppointmentStatusChanged(
         type: "appointment_confirmed",
         entityType: "appointment",
         entityId: appointmentId,
+        partnerId,
+        customerId: appointment.customer_id as string | null | undefined,
         ctx,
         origin,
       })
@@ -363,6 +376,8 @@ export async function onAppointmentStatusChanged(
         type: "appointment_cancelled",
         entityType: "appointment",
         entityId: appointmentId,
+        partnerId,
+        customerId: appointment.customer_id as string | null | undefined,
         ctx,
         origin,
       })
@@ -429,6 +444,8 @@ export async function onAppointmentRescheduled(
       type: "appointment_rescheduled",
       entityType: "appointment",
       entityId: appointmentId,
+      partnerId,
+      customerId: appointment.customer_id as string | null | undefined,
       ctx,
       origin,
     })
@@ -586,6 +603,9 @@ export async function onOrderStatusChanged(
             type,
             entityType: "order",
             entityId: orderId,
+            partnerId,
+            customerId: (order.customer_id as string) || (order.buyer_id as string) || undefined,
+            phone: (order.buyer_phone as string) || undefined,
             ctx: { ...ctx, orderNumber },
             origin,
           })
@@ -620,6 +640,9 @@ export async function onOrderStatusChanged(
           type,
           entityType: "order",
           entityId: orderId,
+          partnerId,
+          customerId: (order.customer_id as string) || (order.buyer_id as string) || undefined,
+          phone: (order.buyer_phone as string) || undefined,
           ctx: { ...ctx, orderNumber },
           origin,
         })

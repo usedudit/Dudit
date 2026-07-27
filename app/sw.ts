@@ -277,8 +277,8 @@ if (FCM_API_KEY && FCM_PROJECT_ID) {
         icon: "/icons/icon-192x192.png",
         badge: "/icons/icon-192x192.png",
         data: { href, notificationId },
-        tag: notificationId || undefined,
-      })
+        tag: notificationId || `dudit-${Date.now()}`,
+      } as NotificationOptions)
     })
 
     self.addEventListener("notificationclick", (event) => {
@@ -288,14 +288,18 @@ if (FCM_API_KEY && FCM_PROJECT_ID) {
       const url = href.startsWith("http") ? href : `${self.location.origin}${href}`
 
       event.waitUntil(
-        self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
+        self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(async (windowClients) => {
           for (const client of windowClients) {
             if ("focus" in client) {
-              return client.focus()
+              await client.focus()
+              if ("navigate" in client && typeof (client as { navigate?: (u: string) => Promise<unknown> }).navigate === "function") {
+                await (client as { navigate: (u: string) => Promise<unknown> }).navigate(url)
+              }
+              return
             }
           }
           if (self.clients.openWindow) {
-            return self.clients.openWindow(url)
+            await self.clients.openWindow(url)
           }
         }),
       )
