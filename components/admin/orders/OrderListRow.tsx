@@ -63,6 +63,7 @@ const OrderListRow = React.memo(({ order, isPending, onDetail }: OrderListRowPro
                         </span>
                     </div>
                     {order.stores?.name && (
+                        <span className="text-[11px] font-medium text-brand-inactive-text ml-4">
                             Loja: {order.stores.name}
                         </span>
                     )}

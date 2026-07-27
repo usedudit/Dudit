@@ -20,7 +20,8 @@ import {
     AlertModal,
     SavingStatusModal,
     NumberInputWithCheckbox,
-    FormSection
+    FormSection,
+    FormDropdown
 } from "@/components/reusable"
 import { BusinessHoursSelector } from "@/components/BusinessHoursSelector"
 import { updatePartnerAction } from "@/app/actions/marketplace/partners"
@@ -506,6 +507,62 @@ export const BusinessDataSubPage = ({
                                                             name="cnpj"
                                                         />
                                                     </motion.div>
+
+                                                    {generalInfo.businessType === "pj" && (
+                                                        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                                                <FormDropdown
+                                                                    label="CRT - Código de Regime Tributário"
+                                                                    value={fiscalInfo.crt}
+                                                                    setValue={(v) => setFiscalInfo({ ...fiscalInfo, crt: v })}
+                                                                    options={[
+                                                                        { value: "1", label: "1 - Simples Nacional" },
+                                                                        { value: "2", label: "2 - Simples Nacional (excesso sublimite)" },
+                                                                        { value: "3", label: "3 - Regime Normal" },
+                                                                        { value: "4", label: "4 - MEI" },
+                                                                    ]}
+                                                                />
+                                                                <FormDropdown
+                                                                    label="Contribuinte ICMS"
+                                                                    value={fiscalInfo.contribuinte}
+                                                                    setValue={(v) => setFiscalInfo({ ...fiscalInfo, contribuinte: v })}
+                                                                    options={[
+                                                                        { value: "1", label: "1 - Contribuinte de ICMS" },
+                                                                        { value: "2", label: "2 - Contribuinte isento de inscrição" },
+                                                                        { value: "9", label: "9 - Não contribuinte" },
+                                                                    ]}
+                                                                />
+                                                            </div>
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                                                <div className="flex-1 w-full">
+                                                                    <Input
+                                                                        label="Inscrição Estadual (IE)"
+                                                                        placeholder="Ex: 110.042.490.114"
+                                                                        value={fiscalInfo.inscricaoEstadual}
+                                                                        onChange={(e) => setFiscalInfo({ ...fiscalInfo, inscricaoEstadual: e.target.value })}
+                                                                    />
+                                                                </div>
+                                                                <div className="flex-1 w-full">
+                                                                    <Input
+                                                                        label="Inscrição Municipal (IM)"
+                                                                        placeholder="Ex: 123456"
+                                                                        value={fiscalInfo.inscricaoMunicipal}
+                                                                        onChange={(e) => setFiscalInfo({ ...fiscalInfo, inscricaoMunicipal: e.target.value })}
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center gap-3 pt-1">
+                                                                <Checkbox
+                                                                    id="ieIsento"
+                                                                    checked={fiscalInfo.ieIsento}
+                                                                    onChange={(e) => setFiscalInfo({ ...fiscalInfo, ieIsento: e })}
+                                                                />
+                                                                <label htmlFor="ieIsento" className="text-sm font-medium text-brand-dark dark:text-dark-heading cursor-pointer select-none">
+                                                                    Inscrição Estadual isenta (IE Isento)
+                                                                </label>
+                                                            </div>
+                                                        </motion.div>
+                                                    )}
                                                 </div>
                                             </FormSection>
 
