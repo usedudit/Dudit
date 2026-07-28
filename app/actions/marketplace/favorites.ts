@@ -260,8 +260,8 @@ export async function getUserFavoritesAction(params?: {
                 const storeId = rawStore?.id || rawPartner?.id
                 const storeName = rawStore?.name || "Vendedor"
                 const storeImage = rawStore?.logo_url || rawStore?.image_url || rawPartner?.store_image_url
-                const storeCity = rawStore?.city || rawPartner?.addresses?.[0]?.city || null
-                const storeState = rawStore?.state || rawPartner?.addresses?.[0]?.state || null
+                const storeCity = rawStore?.addresses?.[0]?.city || rawPartner?.addresses?.[0]?.city || null
+                const storeState = rawStore?.addresses?.[0]?.state || rawPartner?.addresses?.[0]?.state || null
                 const partner = rawPartner
                     ? {
                         ...rawPartner,
@@ -301,8 +301,8 @@ export async function getUserFavoritesAction(params?: {
                 const storeId = rawStore?.id || rawPartner?.id
                 const storeName = rawStore?.name || "Vendedor"
                 const storeImage = rawStore?.logo_url || rawStore?.image_url || rawPartner?.store_image_url
-                const storeCity = rawStore?.city || rawPartner?.addresses?.[0]?.city || null
-                const storeState = rawStore?.state || rawPartner?.addresses?.[0]?.state || null
+                const storeCity = rawStore?.addresses?.[0]?.city || rawPartner?.addresses?.[0]?.city || null
+                const storeState = rawStore?.addresses?.[0]?.state || rawPartner?.addresses?.[0]?.state || null
                 const partner = rawPartner
                     ? {
                         ...rawPartner,

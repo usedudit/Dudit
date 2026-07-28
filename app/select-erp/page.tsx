@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import { requireUser } from "@/lib/auth/authorization"
-import { getAllUserPartnerAccess } from "@/lib/auth/partner-context"
+import { getAllUserStoreAccess, type StoreAccessRecord } from "@/lib/auth/partner-context"
 import type { PartnerRole } from "@/lib/permissions/types"
 import type { RoleId } from "@/lib/permissions/rbac-types"
 import { selectErpAction } from "./actions"
@@ -26,32 +26,31 @@ function roleIdToPartnerRole(roleId: RoleId | string | null | undefined): Partne
 export default async function SelectErpPage() {
     const user = await requireUser()
 
-    const partnerAccess = await getAllUserPartnerAccess()
+    const storeAccess = await getAllUserStoreAccess()
 
     // If no access at all, redirect to partner registration
-    if (partnerAccess.length === 0) {
+    if (storeAccess.length === 0) {
         redirect("/auth/login?mode=partner")
     }
 
-    // Check if user has their own partner account
-    const hasOwnPartner = partnerAccess.some(a => a.roleId === "owner")
+    // Check if user has their own partner account (owns stores)
+    const hasOwnStore = storeAccess.some(a => a.isOwn)
 
-    // Check if user has access to any ERP that isn't theirs
-    const hasNonOwnAccess = partnerAccess.some(a => a.roleId !== "owner")
+    // Check if user has access to any store that isn't theirs
+    const hasNonOwnAccess = storeAccess.some(a => !a.isOwn)
 
-
-    // Only auto-redirect if the user has a single ERP that belongs to them
-    if (partnerAccess.length === 1 && !hasNonOwnAccess) {
+    // Only auto-redirect if the user has a single store that belongs to them
+    if (storeAccess.length === 1 && !hasNonOwnAccess) {
         redirect("/erp/dashboard")
     }
 
-    // Sort: own ERPs first, then others
+    // Sort: own stores first, then others
     const sortedAccess = [
-        ...partnerAccess.filter(a => a.roleId === "owner"),
-        ...partnerAccess.filter(a => a.roleId !== "owner"),
+        ...storeAccess.filter(a => a.isOwn),
+        ...storeAccess.filter(a => !a.isOwn),
     ]
 
-    // Multiple ERPs - show selection screen
+    // Multiple stores - show selection screen
     return (
         <div className="flex flex-col min-h-screen bg-gray-50">
             <header className="lg:flex flex-col w-full sticky top-0 z-50 shadow-md">
@@ -75,18 +74,19 @@ export default async function SelectErpPage() {
                             Que bom te ver por aqui!
                         </h1>
                         <p className="text-brand-dark text-sm">
-                            Você tem acesso a um ou mais negócios. Escolha qual deseja acessar.
+                            Você tem acesso a uma ou mais lojas. Escolha qual deseja acessar.
                         </p>
                     </div>
 
-                    {/* ERP Cards */}
+                    {/* Store Cards */}
                     <div className="flex flex-col gap-3">
                         {sortedAccess.map((access, index) => {
-                            const isOwn = access.roleId === "owner"
+                            const isOwn = access.isOwn
 
                             return (
-                                <form key={access.partnerId} action={selectErpAction}>
+                                <form key={access.storeId} action={selectErpAction}>
                                     <input type="hidden" name="partnerId" value={access.partnerId} />
+                                    <input type="hidden" name="storeId" value={access.storeId} />
                                     <button
                                         type="submit"
                                         className="w-full text-left block bg-transparent p-0 border-0 cursor-pointer focus:outline-none"
@@ -97,10 +97,11 @@ export default async function SelectErpPage() {
                                             title={
                                                 <div className="flex items-center gap-2">
                                                     <span className="truncate">{access.storeName} |</span>
+                                                    <p className="text-xs font-bold text-brand-inactive-text">{access.partnerName}</p>
                                                     <p className="text-xs font-bold text-brand-inactive-text">{ROLE_LABELS[roleIdToPartnerRole(access.roleId)] || access.roleId}</p>
 
                                                     {isOwn && (
-                                                        <p className="text-xs font-bold text-brand-green">Seu negócio</p>
+                                                        <p className="text-xs font-bold text-brand-green">Sua loja</p>
                                                     )}
                                                 </div>
                                             }
@@ -120,8 +121,8 @@ export default async function SelectErpPage() {
                         })}
                     </div>
 
-                    {/* Create Partner Account Button - only show if user doesn't have their own partner */}
-                    {!hasOwnPartner && (
+                    {/* Create Partner Account Button - only show if user doesn't have their own store */}
+                    {!hasOwnStore && (
                         <div className="mt-6 text-center">
                             <Button
                                 asChild

@@ -46,6 +46,8 @@ export function FavoritesPageClient({ userProfile, cartCount }: FavoritesPageCli
     const [counts, setCounts] = useState({ total: 0, produtos: 0, servicos: 0 })
     const [isSortModalOpen, setIsSortModalOpen] = useState(false)
     const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+    const hasLoadedOnce = useRef(false)
+    const lastContextCountRef = useRef(contextCount)
 
     // Redirect unauthenticated users
     useEffect(() => {
@@ -66,6 +68,7 @@ export function FavoritesPageClient({ userProfile, cartCount }: FavoritesPageCli
                 if (favResult.counts) {
                     setCounts(favResult.counts)
                 }
+                hasLoadedOnce.current = true
             }
         } catch (error) {
             console.error("[Favorites] Fetch error:", error)
@@ -78,10 +81,10 @@ export function FavoritesPageClient({ userProfile, cartCount }: FavoritesPageCli
         fetchFavorites()
     }, [fetchFavorites])
 
-    const prevContextCount = useRef(contextCount)
+    // Sync with provider count changes (but ignore initial load from 0)
     useEffect(() => {
-        if (prevContextCount.current !== contextCount) {
-            prevContextCount.current = contextCount
+        if (hasLoadedOnce.current && contextCount !== lastContextCountRef.current) {
+            lastContextCountRef.current = contextCount
             fetchFavorites()
         }
     }, [contextCount, fetchFavorites])

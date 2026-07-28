@@ -46,6 +46,20 @@ export interface PartnerAccessRecord {
     businessInfo: any // Added for feature flags
 }
 
+export interface StoreAccessRecord {
+    storeId: string
+    storeName: string
+    partnerId: string
+    partnerName: string
+    userId: string
+    roleId: RoleId
+    role: PartnerRole
+    permissions: RbacPermissions
+    isOwn: boolean
+    ownerName: string | null
+    businessInfo: any
+}
+
 // ─── Active Partner Cookie Management ───────────────────────────────────────
 
 /**
@@ -296,6 +310,139 @@ export const getAllUserPartnerAccess = cache(async (resolvedUser?: any): Promise
 export const getUserPartnerCount = cache(async (): Promise<number> => {
     const access = await getAllUserPartnerAccess()
     return access.length
+})
+
+// ─── Store-Level Access ───────────────────────────────────────────────────────
+
+const getCachedUserStoreAccess = (userId: string) => unstable_cache(
+    async () => {
+        const admin = createAdminClient()
+        const template = await getPermissionTemplate()
+
+        // Get all partner_ids the user has access to (owned + invited)
+        const [ownedPartnersRes, invitedPartnersRes] = await Promise.all([
+            admin.from("partners").select("id, business_info").eq("user_id", userId).eq("is_active", true).neq("erp_disabled", true),
+            admin.from("partner_users").select("partner_id").eq("user_id", userId)
+        ])
+
+        const ownedPartnerIds = (ownedPartnersRes.data || []).map((p: any) => p.id)
+        const invitedPartnerIds = (invitedPartnersRes.data || []).map((p: any) => p.partner_id)
+        const allPartnerIds = [...new Set([...ownedPartnerIds, ...invitedPartnerIds])]
+
+        if (allPartnerIds.length === 0) return []
+
+        // Get all stores for these partners
+        const { data: stores } = await admin.from("stores")
+            .select("id, name, partner_id")
+            .in("partner_id", allPartnerIds)
+
+        if (!stores || stores.length === 0) return []
+
+        // For invited users, get store_members to know which stores they have access to
+        const invitedStoreIds = new Set<string>()
+        if (invitedPartnerIds.length > 0) {
+            const { data: storeMembers } = await admin.from("store_members")
+                .select("store_id, partner_user_id, role, permissions")
+                .in("store_id", stores.map((s: any) => s.id))
+            if (storeMembers) {
+                // Get partner_user_ids for this user in these partners
+                const { data: partnerUsers } = await admin.from("partner_users")
+                    .select("id, partner_id")
+                    .eq("user_id", userId)
+                    .in("partner_id", invitedPartnerIds)
+                const partnerUserIds = new Set((partnerUsers || []).map((pu: any) => pu.id))
+                for (const sm of storeMembers) {
+                    if (partnerUserIds.has(sm.partner_user_id)) {
+                        invitedStoreIds.add(sm.store_id)
+                    }
+                }
+            }
+        }
+
+        // Get partner names for display
+        const { data: partners } = await admin.from("partners")
+            .select("id, business_info")
+            .in("id", allPartnerIds)
+        const partnerNames = new Map<string, string>()
+        if (partners) {
+            for (const p of partners) {
+                const biz = p.business_info as any
+                partnerNames.set(p.id, biz?.nome_fantasia || biz?.razao_social || "Parceiro")
+            }
+        }
+
+        // Get owner names for invited partners
+        const ownerUserIds = new Set<string>()
+        if (invitedPartnerIds.length > 0) {
+            const { data: invitedPartners } = await admin.from("partners")
+                .select("id, user_id")
+                .in("id", invitedPartnerIds)
+            if (invitedPartners) {
+                for (const p of invitedPartners) {
+                    if (p.user_id) ownerUserIds.add(p.user_id)
+                }
+            }
+        }
+        const ownerNames = new Map<string, string>()
+        if (ownerUserIds.size > 0) {
+            const { data: profiles } = await admin.from("user_profiles")
+                .select("user_id, full_name")
+                .in("user_id", Array.from(ownerUserIds))
+            if (profiles) {
+                for (const p of profiles) {
+                    ownerNames.set(p.user_id, p.full_name)
+                }
+            }
+        }
+
+        // Build store access records
+        const storeRecords: StoreAccessRecord[] = []
+        for (const store of stores) {
+            const isOwned = ownedPartnerIds.includes(store.partner_id)
+            const hasAccess = isOwned || invitedStoreIds.has(store.id)
+            if (!hasAccess) continue
+
+            const partnerName = partnerNames.get(store.partner_id) || "Parceiro"
+            const roleId = isOwned ? "owner" : "operator" // invited users get operator as base
+            const dbPerms = isOwned ? {} : undefined
+            const ownerName = isOwned ? "Você" : (ownerNames.get(
+                (await admin.from("partners").select("user_id").eq("id", store.partner_id).single()).data?.user_id || ""
+            ) || "Desconhecido")
+
+            storeRecords.push({
+                storeId: store.id,
+                storeName: store.name,
+                partnerId: store.partner_id,
+                partnerName,
+                userId,
+                roleId,
+                role: roleId.toUpperCase() as PartnerRole,
+                permissions: normalizePermissions(template, dbPerms),
+                isOwn: isOwned,
+                ownerName: isOwned ? "Você" : ownerName,
+                businessInfo: null
+            })
+        }
+
+        return storeRecords
+    },
+    [TAGS.userAccess(userId)],
+    {
+        tags: [TAGS.userAccess(userId)],
+        revalidate: 900
+    }
+)
+
+/**
+ * Gets ALL store access records for the current user.
+ * Returns stores the user has access to (owned partners' stores + store_members for invited).
+ */
+export const getAllUserStoreAccess = cache(async (resolvedUser?: any): Promise<StoreAccessRecord[]> => {
+    const user = resolvedUser || await getCurrentUser()
+    if (!user) return []
+
+    const records = await getCachedUserStoreAccess(user.id)()
+    return records
 })
 
 const checkRealTimePartnerAccess = (partnerId: string, userId: string) => unstable_cache(

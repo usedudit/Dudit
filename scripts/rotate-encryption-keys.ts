@@ -206,6 +206,7 @@ const MIGRATIONS: ColumnMigration[] = [
   { table: "stores", column: "cpf", context: "cpf", label: "CPF de lojas" },
   { table: "customers", column: "cpf", context: "cpf", label: "CPF de clientes" },
   { table: "suppliers", column: "cpf", context: "cpf", label: "CPF de fornecedores" },
+  { table: "user_profiles", column: "cpf", context: "cpf", label: "CPF de usuarios" },
 
   // TOTP secrets (pode não existir em todas as instâncias)
   { table: "user_2fa_secrets", column: "secret", context: "cpf", label: "Segredos 2FA" },
@@ -300,7 +301,7 @@ async function migrateColumn(migration: ColumnMigration, activeVersion: KeyVersi
     const BATCH_SIZE = 50
     for (let i = 0; i < records.length; i += BATCH_SIZE) {
       const batch = records.slice(i, i + BATCH_SIZE)
-      const updates: { id: string; [key: string]: any }[] = []
+      const updates: { id: string;[key: string]: any }[] = []
 
       for (const record of batch) {
         const oldValue = (record as any)[column]
