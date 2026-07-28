@@ -346,6 +346,8 @@ export async function getStockMovementDetails(id: string) {
             reason: reason,
             user: userName,
             notes: data.notes || '',
+            referenceName: data.reference_name || data.reference_type || '-',
+            orderId: data.order_id || null,
             reference: data.order_id && data.orders?.order_number
                 ? `Pedido #${data.orders.order_number}`
                 : data.reference_name || data.reference_type || '-',

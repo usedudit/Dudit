@@ -577,14 +577,33 @@ export async function getCustomerByIdAction(customerId: string) {
   ;(customer as any).mobile = customer.phone
 
   // Aggregate order stats for KPI display (by buyer_id AND customer_id)
+  let marketplaceUserId = customer.marketplace_user_id
+  let userId = customer.user_id
+  if (!userId && !marketplaceUserId && customer.email) {
+    try {
+      const adminDb = createAdminClient()
+      const { data: authUserRes } = await adminDb.auth.admin.getUserByEmail(customer.email)
+      if (authUserRes?.user?.id) {
+        marketplaceUserId = authUserRes.user.id
+        await adminDb
+          .from("customers")
+          .update({ marketplace_user_id: marketplaceUserId })
+          .eq("id", customer.id)
+      }
+    } catch (e) {
+      console.error("[getCustomerAction] Auto-link error:", e)
+    }
+  }
+
   const allCustomerIds = Array.from(
-    new Set([customer.id, customer.user_id, customer.marketplace_user_id].filter(Boolean))
+    new Set([customer.id, userId, marketplaceUserId].filter(Boolean))
   ) as string[]
   const conditions = [
     `customer_id.in.(${allCustomerIds.join(",")})`,
     `buyer_id.in.(${allCustomerIds.join(",")})`,
   ]
-  const { data: orderAgg } = await supabase
+  const adminDbForStats = createAdminClient()
+  const { data: orderAgg } = await adminDbForStats
     .from("orders")
     .select("total_amount, created_at")
     .or(conditions.join(","))
@@ -616,23 +635,40 @@ export async function getCustomerByIdAction(customerId: string) {
 
 export async function getCustomerOrdersAction(customerId: string) {
   const user = await requireUser()
-  if (!user) return { error: "NÃ£o autenticado" }
+  if (!user) return { error: "Não autenticado" }
 
-  const supabase = await getSupabaseServerClient()
   const adminDb = createAdminClient()
 
-  const { data: customer } = await supabase
+  const { data: customer } = await adminDb
     .from("customers")
-    .select("id, user_id, marketplace_user_id")
+    .select("id, partner_id, user_id, marketplace_user_id, email, phone")
     .eq("id", customerId)
     .maybeSingle()
 
   if (!customer) {
-    return { orders: [] }
+    return { orders: [], stats: null }
+  }
+
+  let userId = customer.user_id
+  let marketplaceUserId = customer.marketplace_user_id
+
+  if (!userId && !marketplaceUserId && customer.email) {
+    try {
+      const { data: authUserRes } = await adminDb.auth.admin.getUserByEmail(customer.email)
+      if (authUserRes?.user?.id) {
+        marketplaceUserId = authUserRes.user.id
+        await adminDb
+          .from("customers")
+          .update({ marketplace_user_id: marketplaceUserId })
+          .eq("id", customer.id)
+      }
+    } catch (e) {
+      console.error("[getCustomerOrdersAction] Auto-link error:", e)
+    }
   }
 
   const allCustomerIds = Array.from(
-    new Set([customer.id, customer.user_id, customer.marketplace_user_id].filter(Boolean))
+    new Set([customer.id, userId, marketplaceUserId].filter(Boolean))
   ) as string[]
 
   const orderConditions = [

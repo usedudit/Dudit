@@ -109,6 +109,7 @@ export async function getOrderFinancialBreakdownAction(orderId: string, partnerI
   let totalPercentageFees = 0
   let totalFixedFees = 0
   let totalInterest = 0
+  let totalBreakdownMethodDiscount = 0
   const feeLines: { method: string; fee: number }[] = []
   const fixedFeeLines: { method: string; fee: number }[] = []
 
@@ -116,6 +117,10 @@ export async function getOrderFinancialBreakdownAction(orderId: string, partnerI
   for (const entry of paymentBreakdown) {
     const method = String(entry.method || "").toLowerCase().trim()
     const bearer = String(entry.feeBearer || "merchant")
+    const pmDiscount = Math.max(0, Number(entry.paymentMethodDiscountAmount || 0))
+    if (pmDiscount > 0) {
+      totalBreakdownMethodDiscount += pmDiscount
+    }
 
     // Only merchant-borne fees are costs for the business
     if (bearer !== "merchant") continue
@@ -136,6 +141,8 @@ export async function getOrderFinancialBreakdownAction(orderId: string, partnerI
       totalInterest += intFee
     }
   }
+
+  const finalMethodDiscount = Math.max(totalBreakdownMethodDiscount, storedMethodDiscount)
 
   // Merge stored columns as safety net (breakdown values take priority,
   // stored columns fill gaps when breakdown has 0 for a specific category)
@@ -169,8 +176,8 @@ export async function getOrderFinancialBreakdownAction(orderId: string, partnerI
   const discountLines: FinancialBreakdownLine[] = []
   if (couponDiscount > 0) discountLines.push({ label: "Desconto de cupom", value: -couponDiscount })
   if (manualDiscount > 0) discountLines.push({ label: "Desconto manual", value: -manualDiscount })
-  if (storedMethodDiscount > 0) discountLines.push({ label: "Desconto do método", value: -storedMethodDiscount })
-  const totalDiscounts = round2(-(couponDiscount + manualDiscount + storedMethodDiscount))
+  if (finalMethodDiscount > 0) discountLines.push({ label: "Desconto do método", value: -finalMethodDiscount })
+  const totalDiscounts = round2(-(couponDiscount + manualDiscount + finalMethodDiscount))
 
   // ── Build costs section ──
   const costLines: FinancialBreakdownLine[] = []

@@ -91,7 +91,7 @@ export async function syncToExploreRedis({
             category_id, category:product_categories!category_id(name), created_at, updated_at, is_active, show_in_marketplace,
             marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
             partners(id),
-            stores(id, name, logo_url, latitude, longitude, addresses!store_id!left(city, state, latitude, longitude)),
+            stores(id, name, logo_url, addresses!store_id!left(city, state, latitude, longitude)),
             product_variants(variant_options, price_adjustment, is_active),
             show_price_in_store
           `)
@@ -119,8 +119,8 @@ export async function syncToExploreRedis({
           ...rawPartner,
           store_name: rawStore?.name,
           store_avatar: rawStore?.logo_url || "https://img.dudit.com.br/static/Placeholder.png",
-          latitude: rawStore?.latitude,
-          longitude: rawStore?.longitude,
+          latitude: rawStore?.addresses?.[0]?.latitude,
+          longitude: rawStore?.addresses?.[0]?.longitude,
           city: rawStore?.addresses?.[0]?.city || null,
           state: rawStore?.addresses?.[0]?.state || null
         } : null

@@ -187,6 +187,97 @@ function normalizePaymentMethodLabel(value?: string | null) {
     return formatPaymentMethodLabel(value, null)
 }
 
+export async function applyStoreCreditDeduction(
+    supabase: any,
+    params: {
+        partnerId: string
+        customerId: string | null
+        amount: number
+    }
+) {
+    if (!params.customerId || params.amount <= 0.009) return
+    const amountToDeduct = Math.max(0, Number(params.amount.toFixed(2)))
+    if (amountToDeduct <= 0) return
+
+    try {
+        const { data: customer } = await supabase
+            .from("customers")
+            .select("store_credit")
+            .eq("id", params.customerId)
+            .maybeSingle()
+
+        if (customer) {
+            const currentBalance = Math.max(0, Number(customer.store_credit || 0))
+            const newBalance = Math.max(0, Number((currentBalance - amountToDeduct).toFixed(2)))
+            await supabase
+                .from("customers")
+                .update({ store_credit: newBalance })
+                .eq("id", params.customerId)
+        }
+
+        const { data: credits } = await supabase
+            .from("store_credits")
+            .select("id, remaining_amount")
+            .eq("partner_id", params.partnerId)
+            .eq("customer_id", params.customerId)
+            .eq("status", "ACTIVE")
+            .gt("remaining_amount", 0)
+            .order("created_at", { ascending: true })
+
+        let remainingToDeduct = amountToDeduct
+        for (const credit of credits || []) {
+            if (remainingToDeduct <= 0.009) break
+            const cur = Number(credit.remaining_amount || 0)
+            if (cur <= 0) continue
+
+            const deduction = Math.min(cur, remainingToDeduct)
+            const newRem = Math.max(0, Number((cur - deduction).toFixed(2)))
+            remainingToDeduct = Number((remainingToDeduct - deduction).toFixed(2))
+
+            await supabase
+                .from("store_credits")
+                .update({
+                    remaining_amount: newRem,
+                    status: newRem <= 0.009 ? "USED" : "ACTIVE"
+                })
+                .eq("id", credit.id)
+        }
+    } catch (err) {
+        console.error("[applyStoreCreditDeduction] Error deducting store credit:", err)
+    }
+}
+
+export async function restoreStoreCreditDeduction(
+    supabase: any,
+    params: {
+        partnerId: string
+        customerId: string | null
+        amount: number
+    }
+) {
+    if (!params.customerId || params.amount <= 0.009) return
+    const amountToRestore = Math.max(0, Number(params.amount.toFixed(2)))
+
+    try {
+        const { data: customer } = await supabase
+            .from("customers")
+            .select("store_credit")
+            .eq("id", params.customerId)
+            .maybeSingle()
+
+        if (customer) {
+            const currentBalance = Math.max(0, Number(customer.store_credit || 0))
+            const newBalance = Number((currentBalance + amountToRestore).toFixed(2))
+            await supabase
+                .from("customers")
+                .update({ store_credit: newBalance })
+                .eq("id", params.customerId)
+        }
+    } catch (err) {
+        console.error("[restoreStoreCreditDeduction] Error restoring store credit:", err)
+    }
+}
+
 
 function sanitizePaymentBreakdown(entries: ERPOrderPayload["paymentBreakdown"]) {
     const mapped = (entries || [])
@@ -203,6 +294,7 @@ function sanitizePaymentBreakdown(entries: ERPOrderPayload["paymentBreakdown"]) 
                 effectiveAmount: effectiveAmt,
                 netAmount: entry?.netAmount != null ? Math.max(0, Number(entry.netAmount)) : effectiveAmt,
                 feeBearer: entry?.feeBearer || null,
+                paymentMethodDiscountAmount: Math.max(0, Number(entry?.paymentMethodDiscountAmount || 0)),
                 interestAmount: Math.max(0, Number(entry?.interestAmount || 0)),
                 feeAmount: Math.max(0, Number(entry?.feeAmount || 0)),
                 fixedFeeAmount: Math.max(0, Number(entry?.fixedFeeAmount || 0)),
@@ -1274,7 +1366,7 @@ async function createOrderStockMovement(params: {
             .from("stock_movements")
             .update({
                 order_id: params.orderId,
-                reference_name: `Pedido: ${orderNumber}`,
+                reference_name: `Pedido #${orderNumber}`,
             })
             .eq("id", movementId)
 
@@ -1468,17 +1560,26 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     // Usa o subtotal original do pedido como base do desconto do método,
     // em vez do serverComputedTotal (que pode incluir brindes/promoções).
     const discountBase = hasBreakdown ? Math.max(0, Number(data.subtotal || 0) || serverComputedTotal) : Math.max(serverComputedTotal, finalTotal)
-    const paymentMethodDiscountAmount = Math.max(0, discountBase - finalTotal)
     const paymentMethodExtraAmount = Math.max(0, finalTotal - discountBase)
     // Extract individual adjustment totals from payment breakdown for separate columns
     let paymentMethodInterestAmount = 0
     let paymentMethodFeeAmount = 0
     let paymentMethodFixedFeeAmount = 0
+    let breakdownPaymentMethodDiscountAmount = 0
+    let paymentMethodStoreCreditAmount = 0
     for (const entry of sanitizedPaymentBreakdown) {
+        const m = String(entry.method || "").toLowerCase().trim()
         paymentMethodInterestAmount = Math.max(0, paymentMethodInterestAmount + Number(entry.interestAmount || 0))
         paymentMethodFeeAmount = Math.max(0, paymentMethodFeeAmount + Number(entry.feeAmount || 0))
         paymentMethodFixedFeeAmount = Math.max(0, paymentMethodFixedFeeAmount + Number(entry.fixedFeeAmount || 0))
+        breakdownPaymentMethodDiscountAmount = Math.max(0, breakdownPaymentMethodDiscountAmount + Number(entry.paymentMethodDiscountAmount || 0))
+        if (m === "store_credit" || m === "store-credit" || m.includes("vale-compra") || m.includes("vale_compra") || m.includes("crédito")) {
+            paymentMethodStoreCreditAmount = Math.max(0, paymentMethodStoreCreditAmount + Number(entry.amount || entry.effectiveAmount || 0))
+        }
     }
+    const paymentMethodDiscountAmount = breakdownPaymentMethodDiscountAmount > 0
+        ? breakdownPaymentMethodDiscountAmount
+        : Math.max(0, discountBase - finalTotal)
     let serverTotalAmount = finalTotal
     const adjustedPaymentBreakdown = sanitizedPaymentBreakdown
     const paymentMethodSummary = buildPaymentMethodSummary(adjustedPaymentBreakdown, data.paymentMethod)
@@ -1552,6 +1653,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         payment_method_interest_amount: paymentMethodInterestAmount,
         payment_method_fee_amount: paymentMethodFeeAmount,
         payment_method_fixed_fee_amount: paymentMethodFixedFeeAmount,
+        store_credit_amount: paymentMethodStoreCreditAmount,
         coupon_id: couponIdToSave,
         delivery_fee: serverShippingCost,
         additional_costs: data.additionalCosts,
@@ -1582,6 +1684,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         delete (fallbackInsertPayload as any).payment_method_interest_amount
         delete (fallbackInsertPayload as any).payment_method_fee_amount
         delete (fallbackInsertPayload as any).payment_method_fixed_fee_amount
+        delete (fallbackInsertPayload as any).store_credit_amount
         orderInsertResult = await supabase
             .from("orders")
             .insert(fallbackInsertPayload)
@@ -1592,6 +1695,14 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     const order = orderInsertResult.data
     const orderError = orderInsertResult.error
     if (orderError) return { error: orderError.message }
+
+    if (paymentMethodStoreCreditAmount > 0 && data.customerId) {
+        await applyStoreCreditDeduction(supabase, {
+            partnerId,
+            customerId: data.customerId,
+            amount: paymentMethodStoreCreditAmount,
+        })
+    }
 
     // Fetch cost prices for products and services for unit_cost snapshot
     const productIds = sanitizedItems.filter(item => item.productId).map(item => item.productId)
@@ -2335,17 +2446,21 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     const hasUpdateBreakdown = sanitizedPaymentBreakdown.length > 0
     const updateFinalTotal = hasUpdateBreakdown ? updateBreakdownTotal : (Number(data.totalAmount) || updateServerTotal)
     const updatePricingBase = hasUpdateBreakdown ? updateServerTotal : Math.max(updateServerTotal, updateFinalTotal)
-    const updatePaymentMethodDiscountAmount = Math.max(0, updatePricingBase - updateFinalTotal)
     const updatePaymentMethodExtraAmount = Math.max(0, updateFinalTotal - updatePricingBase)
     // Extract individual adjustment totals from payment breakdown for separate columns
     let updatePaymentMethodInterestAmount = 0
     let updatePaymentMethodFeeAmount = 0
     let updatePaymentMethodFixedFeeAmount = 0
+    let updateBreakdownPaymentMethodDiscountAmount = 0
     for (const entry of sanitizedPaymentBreakdown) {
         updatePaymentMethodInterestAmount = Math.max(0, updatePaymentMethodInterestAmount + Number(entry.interestAmount || 0))
         updatePaymentMethodFeeAmount = Math.max(0, updatePaymentMethodFeeAmount + Number(entry.feeAmount || 0))
         updatePaymentMethodFixedFeeAmount = Math.max(0, updatePaymentMethodFixedFeeAmount + Number(entry.fixedFeeAmount || 0))
+        updateBreakdownPaymentMethodDiscountAmount = Math.max(0, updateBreakdownPaymentMethodDiscountAmount + Number(entry.paymentMethodDiscountAmount || 0))
     }
+    const updatePaymentMethodDiscountAmount = updateBreakdownPaymentMethodDiscountAmount > 0
+        ? updateBreakdownPaymentMethodDiscountAmount
+        : Math.max(0, updatePricingBase - updateFinalTotal)
     updateServerTotal = updateFinalTotal
     const adjustedPaymentBreakdown = sanitizedPaymentBreakdown
     const paymentMethodSummary = buildPaymentMethodSummary(adjustedPaymentBreakdown, data.paymentMethod)
@@ -3386,7 +3501,6 @@ export async function updateOrdersStatusInBatchAction(payload: {
             .limit(1)
             .maybeSingle()
         const storeName = store?.name || "Vendedor"
-        const customerName = String(firstOrder.customer_name || "cliente")
 
         if (payload.actionType === "payment_status" && payload.statusValue) {
             const paymentStatusMap: Record<string, string> = {
@@ -3396,112 +3510,38 @@ export async function updateOrdersStatusInBatchAction(payload: {
             }
             const situation = paymentStatusMap[payload.statusValue] || payload.statusValue
 
-            const whatsappMessages: Record<string, string[]> = {
-                paid: [
-                    `✅ *Pagamento confirmado!*`,
-                    ``,
-                    `Oba, ${customerName}! O pagamento de alguns pedidos seus foram aprovados. 🎉`,
-                    ``,
-                    `*Vendedor:* ${storeName}`,
-                    ``,
-                    `Já estamos providenciando tudo. Te manteremos atualizado! 📦`,
-                ],
-                pending: [
-                    `⏳ *Pagamento pendente*`,
-                    ``,
-                    `Olá, ${customerName}! O pagamento de alguns pedidos seus está pendente.`,
-                    ``,
-                    `*Vendedor:* ${storeName}`,
-                    ``,
-                    `Assim que for confirmado, avisamos por aqui. 📲`,
-                ],
-                partially_paid: [
-                    `💳 *Pagamento parcial recebido*`,
-                    ``,
-                    `Olá, ${customerName}! Recebemos um pagamento parcial de alguns pedidos seus.`,
-                    ``,
-                    `*Vendedor:* ${storeName}`,
-                ],
-            }
+            const sysTitle = situation === "paid" ? "✅ Pagamento confirmado!" : situation === "partially_paid" ? "💳 Pagamento parcial" : "⏳ Pagamento pendente"
+            const sysMsg = situation === "paid"
+                ? `Oba! O pagamento de alguns pedidos seus em ${storeName} foi aprovado. 🎉`
+                : situation === "partially_paid"
+                ? `Olá! Recebemos um pagamento parcial de alguns pedidos seus em ${storeName}.`
+                : `Olá! O pagamento de alguns pedidos seus em ${storeName} está pendente.`
+            const partnerTitle = situation === "paid" ? "💰 Pagamento confirmado!" : situation === "partially_paid" ? "💳 Pagamento parcial recebido" : "⏳ Pagamento pendente"
+            const partnerMsg = situation === "paid"
+                ? `Sucesso! O pagamento de ${currentOrders?.length || 0} pedidos foi confirmado.`
+                : situation === "partially_paid"
+                ? `${currentOrders?.length || 0} pedidos receberam pagamento parcial.`
+                : `${currentOrders?.length || 0} pedidos estão com pagamento pendente.`;
 
-            const systemTitleMap: Record<string, string> = {
-                paid: "✅ Pagamento confirmado!",
-                pending: "⏳ Pagamento pendente",
-                partially_paid: "💳 Pagamento parcial",
-            }
-
-            const systemMessageMap: Record<string, string> = {
-                paid: `Oba! O pagamento de alguns pedidos seus em ${storeName} foi aprovado. 🎉`,
-                pending: `Olá! O pagamento de alguns pedidos seus em ${storeName} está pendente.`,
-                partially_paid: `Olá! Recebemos um pagamento parcial de alguns pedidos seus em ${storeName}.`,
-            }
-
-            const partnerTitleMap: Record<string, string> = {
-                paid: "💰 Pagamento confirmado!",
-                pending: "⏳ Pagamento pendente",
-                partially_paid: "💳 Pagamento parcial recebido",
-            }
-
-            const partnerMessageMap: Record<string, string> = {
-                paid: `Sucesso! O pagamento de ${currentOrders?.length || 0} pedidos foi confirmado.`,
-                pending: `${currentOrders?.length || 0} pedidos estão com pagamento pendente.`,
-                partially_paid: `${currentOrders?.length || 0} pedidos receberam pagamento parcial.`,
-            }
-
-            const msg = whatsappMessages[situation] || whatsappMessages.pending
-            const sysTitle = systemTitleMap[situation] || systemTitleMap.pending
-            const sysMsg = systemMessageMap[situation] || systemMessageMap.pending
-            const partnerTitle = partnerTitleMap[situation] || partnerTitleMap.pending
-            const partnerMsg = partnerMessageMap[situation] || partnerMessageMap.pending
-
-            // WhatsApp consolidated
-            if (firstOrder.customer_id) {
-                (async () => {
-                    const { normalizePhoneToE164 } = await import("@/lib/whatsapp/phone")
-                    const { data: customer } = await supabase
-                        .from("customers")
-                        .select("phone")
-                        .eq("id", firstOrder.customer_id)
-                        .eq("partner_id", payload.partnerId)
-                        .maybeSingle()
-                    const phone = normalizePhoneToE164(customer?.phone || null)
-
-                    if (phone) {
-                        const { getActiveWhatsappConnection } = await import("@/lib/services/whatsapp-connection.service")
-                        const connection = await getActiveWhatsappConnection(payload.partnerId)
-                        if (connection?.is_active) {
-                            const { queueWhatsappMessage, processWhatsappMessageById } = await import("@/lib/services/whatsapp-dispatch.service")
-                            const queueResult = await queueWhatsappMessage({
-                                partnerId: payload.partnerId,
-                                customerId: firstOrder.customer_id || null,
-                                orderId: firstOrder.id,
-                                phoneNumber: phone,
-                                templateName: undefined,
-                                messageType: "text",
-                                payload: { body: msg.join("\n"), triggerType: "order_payment_approved" },
-                                triggerType: "order_payment_approved",
-                                idempotencyKey: `bulk_payment:${payload.partnerId}:${payload.orderIds.slice(0, 5).join(",")}`,
-                            })
-                            if (queueResult.resultStatus === "queued") {
-                                await processWhatsappMessageById(queueResult.messageId!)
-                            }
-                        }
-                    }
-                })()
-            }
-
-            // System notification consolidated
+            // System notification consolidated via Central Resolver (In-App + External Channel)
             (async () => {
                 const { createNotification, getPartnerTeamUserIds } = await import("@/lib/services/notification.service")
                 if (firstOrder.buyer_id) {
                     await createNotification({
-                        userId: String(firstOrder.buyer_id),
+                        userId: firstOrder.buyer_id as string,
                         type: situation === "paid" ? "order_paid" : "order_created",
                         title: sysTitle,
                         message: sysMsg,
                         entityType: "order",
                         entityId: firstOrder.id,
-                        data: { audience: "customer", partner_id: payload.partnerId, storeName },
+                        data: {
+                            audience: "customer",
+                            partner_id: payload.partnerId,
+                            storeName,
+                            isBatch: true,
+                            batchCount: currentOrders?.length || 2,
+                            customer_id: firstOrder.customer_id || undefined,
+                        },
                         idempotencyKey: `bulk_payment:customer:${payload.partnerId}:${payload.orderIds.sort().join(",")}`,
                         origin: "manual",
                     })
@@ -3526,118 +3566,42 @@ export async function updateOrdersStatusInBatchAction(payload: {
         if (payload.actionType === "delivery_status" && payload.statusValue) {
             const deliveryStatus = payload.statusValue
 
-            const deliveryWAMap: Record<string, string[]> = {
-                preparing: [
-                    `📦 *Pedidos em preparação*`,
-                    ``,
-                    `Olá, ${customerName}! Alguns pedidos seus estão sendo preparados.`,
-                    ``,
-                    `*Vendedor:* ${storeName}`,
-                    ``,
-                    `Logo logo estarão prontos! ⏳`,
-                ],
-                sent: [
-                    `🚚 *Pedidos enviados*`,
-                    ``,
-                    `Olá, ${customerName}! Alguns pedidos seus foram enviados para entrega.`,
-                    ``,
-                    `*Vendedor:* ${storeName}`,
-                    ``,
-                    `Fique de olho, eles chegam rapidinho! 🚀`,
-                ],
-                delivered: [
-                    `✅ *Pedidos entregues*`,
-                    ``,
-                    `Tudo certo, ${customerName}! Alguns pedidos seus foram entregues com sucesso.`,
-                    ``,
-                    `*Vendedor:* ${storeName}`,
-                    ``,
-                    `Esperamos que você goste! 😁`,
-                ],
-                pickup_available: [
-                    `📦 *Pedidos prontos para retirada*`,
-                    ``,
-                    `Olá, ${customerName}! Alguns pedidos seus estão prontos e te esperando.`,
-                    `*Local de retirada:* ${storeName}`,
-                    ``,
-                    `Pode vir buscar quando quiser! 🏃‍♂️`,
-                ],
-            }
+            const sysTitle = deliveryStatus === "delivered" ? "✅ Pedidos entregues" : deliveryStatus === "sent" ? "🚚 Pedidos enviados" : deliveryStatus === "pickup_available" ? "📦 Pedidos prontos para retirada" : "📦 Pedidos em preparação"
+            const sysMsg = deliveryStatus === "delivered"
+                ? `Tudo certo! Alguns pedidos seus em ${storeName} foram entregues.`
+                : deliveryStatus === "sent"
+                ? `Olá! Alguns pedidos seus em ${storeName} foram enviados para entrega.`
+                : deliveryStatus === "pickup_available"
+                ? `Olá! Alguns pedidos seus em ${storeName} estão prontos para retirada.`
+                : `Olá! Alguns pedidos seus em ${storeName} estão sendo preparados.`
+            const partnerMsg = deliveryStatus === "delivered"
+                ? `${currentOrders?.length || 0} pedidos foram entregues.`
+                : deliveryStatus === "sent"
+                ? `${currentOrders?.length || 0} pedidos foram enviados para entrega.`
+                : deliveryStatus === "pickup_available"
+                ? `${currentOrders?.length || 0} pedidos estão prontos para retirada.`
+                : `${currentOrders?.length || 0} pedidos estão em preparação.`;
 
-            const deliverySysTitleMap: Record<string, string> = {
-                preparing: "📦 Pedidos em preparação",
-                sent: "🚚 Pedidos enviados",
-                delivered: "✅ Pedidos entregues",
-                pickup_available: "📦 Pedidos prontos para retirada",
-            }
-
-            const deliverySysMsgMap: Record<string, string> = {
-                preparing: `Olá! Alguns pedidos seus em ${storeName} estão sendo preparados.`,
-                sent: `Olá! Alguns pedidos seus em ${storeName} foram enviados para entrega.`,
-                delivered: `Tudo certo! Alguns pedidos seus em ${storeName} foram entregues.`,
-                pickup_available: `Olá! Alguns pedidos seus em ${storeName} estão prontos para retirada.`,
-            }
-
-            const deliveryPartnerMsgMap: Record<string, string> = {
-                preparing: `${currentOrders?.length || 0} pedidos estão em preparação.`,
-                sent: `${currentOrders?.length || 0} pedidos foram enviados para entrega.`,
-                delivered: `${currentOrders?.length || 0} pedidos foram entregues.`,
-                pickup_available: `${currentOrders?.length || 0} pedidos estão prontos para retirada.`,
-            }
-
-            const waMsg = deliveryWAMap[deliveryStatus] || deliveryWAMap.preparing
-            const sysTitle = deliverySysTitleMap[deliveryStatus] || deliverySysTitleMap.preparing
-            const sysMsg = deliverySysMsgMap[deliveryStatus] || deliverySysMsgMap.preparing
-            const partnerMsg = deliveryPartnerMsgMap[deliveryStatus] || deliveryPartnerMsgMap.preparing
-
-            // WhatsApp consolidated
-            if (firstOrder.customer_id) {
-                (async () => {
-                    const { normalizePhoneToE164 } = await import("@/lib/whatsapp/phone")
-                    const { data: customer } = await supabase
-                        .from("customers")
-                        .select("phone")
-                        .eq("id", firstOrder.customer_id)
-                        .eq("partner_id", payload.partnerId)
-                        .maybeSingle()
-                    const phone = normalizePhoneToE164(customer?.phone || null)
-
-                    if (phone) {
-                        const { getActiveWhatsappConnection } = await import("@/lib/services/whatsapp-connection.service")
-                        const connection = await getActiveWhatsappConnection(payload.partnerId)
-                        if (connection?.is_active) {
-                            const { queueWhatsappMessage, processWhatsappMessageById } = await import("@/lib/services/whatsapp-dispatch.service")
-                            const queueResult = await queueWhatsappMessage({
-                                partnerId: payload.partnerId,
-                                customerId: firstOrder.customer_id || null,
-                                orderId: firstOrder.id,
-                                phoneNumber: phone,
-                                templateName: undefined,
-                                messageType: "text",
-                                payload: { body: waMsg.join("\n"), triggerType: "order_delivered" },
-                                triggerType: "order_delivered",
-                                idempotencyKey: `bulk_delivery:${payload.partnerId}:${payload.orderIds.slice(0, 5).join(",")}`,
-                            })
-                            if (queueResult.resultStatus === "queued") {
-                                await processWhatsappMessageById(queueResult.messageId!)
-                            }
-                        }
-                    }
-                })()
-            }
-
-            // System notification consolidated
+            // System notification consolidated via Central Resolver (In-App + External Channel)
             (async () => {
                 const { createNotification, getPartnerTeamUserIds } = await import("@/lib/services/notification.service")
+                const notifType = deliveryStatus === "delivered" ? "order_delivered" : deliveryStatus === "sent" ? "order_shipped" : "order_created"
                 if (firstOrder.buyer_id) {
                     await createNotification({
-                        userId: String(firstOrder.buyer_id),
-                        type: "order_delivered",
+                        userId: firstOrder.buyer_id as string,
+                        type: notifType,
                         title: sysTitle,
                         message: sysMsg,
                         entityType: "order",
                         entityId: firstOrder.id,
-                        data: { audience: "customer", partner_id: payload.partnerId, storeName },
+                        data: {
+                            audience: "customer",
+                            partner_id: payload.partnerId,
+                            storeName,
+                            isBatch: true,
+                            batchCount: currentOrders?.length || 2,
+                            customer_id: firstOrder.customer_id || undefined,
+                        },
                         idempotencyKey: `bulk_delivery:customer:${payload.partnerId}:${payload.orderIds.sort().join(",")}`,
                         origin: "manual",
                     })
@@ -3646,12 +3610,12 @@ export async function updateOrdersStatusInBatchAction(payload: {
                 for (const userId of teamUserIds) {
                     await createNotification({
                         userId,
-                        type: "order_delivered",
+                        type: notifType,
                         title: sysTitle,
                         message: partnerMsg,
                         entityType: "order",
                         entityId: firstOrder.id,
-                        data: { audience: "seller", partner_id: payload.partnerId, count: currentOrders?.length },
+                        data: { audience: "seller", partner_id: payload.partnerId, count: currentOrders?.length, isBatch: true, batchCount: currentOrders?.length || 2 },
                         idempotencyKey: `bulk_delivery:seller:${payload.partnerId}:${userId}:${payload.orderIds.sort().join(",")}`,
                         origin: "manual",
                     })
@@ -3673,7 +3637,7 @@ export type ERPOrderListCursor = { createdAt: string; id: string }
 function buildOrdersKeysetOrFilter(cursor: ERPOrderListCursor): string {
     const ts = cursor.createdAt
     const id = cursor.id
-    const q = (s: string) => `"${String(s).replace(/"/g, '""')}"`
+    const q = (s: string) => `"${(s || "").toString().replace(/"/g, '""')}"`
     return `created_at.lt.${q(ts)},and(created_at.eq.${q(ts)},id.lt.${q(id)})`
 }
 

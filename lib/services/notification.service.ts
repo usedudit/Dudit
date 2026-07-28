@@ -155,18 +155,28 @@ export async function getPartnerTeamUserIds(partnerId: string): Promise<string[]
 async function resolveUserIdFromCustomerLookup(admin: ReturnType<typeof getAdminClient>, customerId: string): Promise<string | null> {
   const { data: customer } = await admin
     .from("customers")
-    .select("user_id")
+    .select("id, user_id, marketplace_user_id, email")
     .eq("id", customerId)
     .maybeSingle()
 
-  if (customer?.user_id) {
-    const { data: profile } = await admin
-      .from("user_profiles")
-      .select("user_id")
-      .eq("user_id", customer.user_id)
-      .maybeSingle()
+  if (customer?.user_id || customer?.marketplace_user_id) {
+    return customer.user_id || customer.marketplace_user_id
+  }
 
-    if (profile?.user_id) return profile.user_id
+  if (customer?.email) {
+    try {
+      const { data: authUserRes } = await admin.auth.admin.getUserByEmail(customer.email)
+      if (authUserRes?.user?.id) {
+        const foundId = authUserRes.user.id
+        await admin
+          .from("customers")
+          .update({ marketplace_user_id: foundId })
+          .eq("id", customerId)
+        return foundId
+      }
+    } catch (e) {
+      console.error("[notifications] Error resolving customer user by email:", e)
+    }
   }
 
   return null
@@ -188,7 +198,7 @@ export async function resolveCustomerUserId(params: {
   if (params.marketplaceOrderId) {
     const { data: order } = await admin
       .from("orders")
-      .select("buyer_id")
+      .select("buyer_id, customer_id")
       .eq("id", params.marketplaceOrderId)
       .maybeSingle()
     if (order?.buyer_id) {
@@ -196,15 +206,15 @@ export async function resolveCustomerUserId(params: {
       if (resolved) return resolved
       return order.buyer_id
     }
+    if (order?.customer_id) {
+      const resolved = await resolveUserIdFromCustomerLookup(admin, order.customer_id)
+      if (resolved) return resolved
+    }
   }
 
   if (params.customerId) {
     const resolved = await resolveUserIdFromCustomerLookup(admin, params.customerId)
     if (resolved) return resolved
-
-    console.warn("[notifications] customer.user_id does not exist in user_profiles", {
-      customerId: params.customerId,
-    })
   }
 
   return null

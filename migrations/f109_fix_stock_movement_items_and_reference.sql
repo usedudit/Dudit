@@ -224,7 +224,7 @@ BEGIN
     UPDATE public.stock_movements
     SET
         order_id = p_order_id,
-        reference_name = 'Pedido: ' || COALESCE(v_order_number, p_order_id::TEXT)
+        reference_name = 'Pedido #' || COALESCE(v_order_number, p_order_id::TEXT)
     WHERE id = v_movement_id;
 
     RETURN jsonb_build_object('success', true, 'items_count', jsonb_array_length(p_items), 'movement_id', v_movement_id);

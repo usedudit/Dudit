@@ -188,13 +188,15 @@ export async function resolveAndDeliverNotification(input: DeliveryResolverInput
           orderId: input.entityType === "order" ? input.entityId : null,
           appointmentId: input.entityType === "appointment" ? input.entityId : null,
           templateVariables: {
-            customer_name: (input.data?.customerName as string) || "Cliente",
+            customer_name: (input.data?.customerName as string) || (input.data?.customer_name as string) || "Cliente",
             service_name: (input.data?.serviceName as string) || "",
             order_number: (input.data?.orderNumber as string) || "",
             store_name: (input.data?.storeName as string) || "",
             date: (input.data?.date as string) || "",
             time: (input.data?.time as string) || "",
             amount: (input.data?.amount as string) || "",
+            is_batch: input.data?.isBatch ? "true" : "",
+            batch_count: String(input.data?.batchCount || ""),
           },
         })
 

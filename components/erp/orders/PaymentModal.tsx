@@ -1593,6 +1593,10 @@ const PaymentModal = ({
                         effectiveAmount: Number(pr?.effectiveAmount ?? finalAmt),
                         netAmount: Number(pr?.netAmount ?? finalAmt),
                         feeBearer: pr?.feeBearer || null,
+                        paymentMethodDiscountAmount: Number(pr?.paymentMethodDiscountAmount || 0),
+                        interestAmount: Number(pr?.interestAmount || 0),
+                        feeAmount: Number(pr?.feeAmount || 0),
+                        fixedFeeAmount: Number(pr?.fixedFeeAmount || 0),
                         paymentMethodId: payment.paymentMethodId || null,
                         installmentNumber: Math.max(1, Number(payment.installmentNumber || 1)),
                     }
@@ -1650,6 +1654,10 @@ const PaymentModal = ({
                     return Number(paymentCalculation?.netAmount ?? totalPaidCalculated ?? 0);
                 })(),
                 feeBearer: paymentCalculation?.feeBearer || null,
+                paymentMethodDiscountAmount: Number(paymentCalculation?.paymentMethodDiscountAmount || 0),
+                interestAmount: Number(paymentCalculation?.interestAmount || 0),
+                feeAmount: Number(paymentCalculation?.feeAmount || 0),
+                fixedFeeAmount: Number(paymentCalculation?.fixedFeeAmount || 0),
                 paymentMethodId: selectedMethodId || null,
                 installmentNumber: Math.max(1, Number(installments || 1)),
             }];

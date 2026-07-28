@@ -821,8 +821,8 @@ export async function processReturnRequestAction(input: unknown) {
         const { data: request, error: requestError } = await supabase
             .from("return_requests")
             .select(`
-                id, partner_id, order_id, status, request_type, desired_resolution, approved_resolution, order_total_snapshot, customer_id, customer_name_snapshot, customer_email_snapshot,
-                orders!order_id(total_amount, amount_paid, payment_provider, mp_payment_id, payment_breakdown, buyer_id, customer_name),
+                id, partner_id, store_id, order_id, status, request_type, desired_resolution, approved_resolution, order_total_snapshot, customer_id, customer_name_snapshot, customer_email_snapshot,
+                orders!order_id(total_amount, amount_paid, payment_provider, mp_payment_id, payment_breakdown, buyer_id, customer_name, store_id),
                 return_items!return_items_return_request_id_fkey(net_item_value_snapshot)
             `)
             .eq("id", data.requestId)
@@ -990,6 +990,8 @@ export async function processReturnRequestAction(input: unknown) {
                 .maybeSingle()
 
             if (!existingMovement) {
+                const effectiveStoreId = (request as any).store_id || (request as any).orders?.store_id || null
+
                 const { data: stockMovementRes, error: stockMovementErr } = await supabase.rpc("create_batch_stock_movement", {
                     p_partner_id: request.partner_id,
                     p_movement_type: "in",
@@ -997,6 +999,7 @@ export async function processReturnRequestAction(input: unknown) {
                     p_notes: `Devolução DVL-${data.requestId.slice(0, 6).toUpperCase()}`,
                     p_created_by: user.id,
                     p_items: returnToStockItems,
+                    p_store_id: effectiveStoreId,
                 })
 
                 if (stockMovementErr) throw stockMovementErr
@@ -1007,6 +1010,7 @@ export async function processReturnRequestAction(input: unknown) {
                         .from("stock_movements")
                         .update({
                             source_return_request_id: data.requestId,
+                            store_id: effectiveStoreId,
                             reason: "RETURN_IN",
                             notes: `Devolução DVL-${data.requestId.slice(0, 6).toUpperCase()}`
                         })

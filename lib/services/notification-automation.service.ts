@@ -719,3 +719,68 @@ export async function broadcastAdminAnnouncement(params: {
     idempotencyKey: `admin_announcement:${params.announcementId}:${userId}`,
   }))
 }
+
+export async function notifyCustomerBatchOrders(params: {
+  userId: string
+  partnerId: string
+  type: NotificationType
+  orders: Array<{ id: string; orderNumber?: string }>
+  customerName?: string
+  storeName?: string
+  phone?: string
+  origin?: "manual" | "automation" | "system"
+}) {
+  if (!params.orders || params.orders.length === 0) return
+  if (params.orders.length === 1) {
+    const singleOrder = params.orders[0]
+    return onOrderStatusChanged(
+      {
+        id: singleOrder.id,
+        order_number: singleOrder.orderNumber,
+        partner_id: params.partnerId,
+        buyer_id: params.userId,
+        buyer_phone: params.phone,
+        customer_name: params.customerName,
+      },
+      params.type === "order_paid" ? "paid" : undefined,
+      undefined,
+      params.origin,
+    )
+  }
+
+  const count = params.orders.length
+  const batchId = params.orders.map((o) => o.id).sort().join("-")
+  const content = buildNotificationContent(params.type, "customer", {
+    isBatch: true,
+    batchCount: count,
+    storeName: params.storeName,
+    customerName: params.customerName,
+  })
+
+  await createNotification({
+    userId: params.userId,
+    type: params.type,
+    title: content.title,
+    message: content.message,
+    entityType: "order",
+    entityId: params.orders[0].id,
+    data: {
+      isBatch: true,
+      batchCount: count,
+      orderIds: params.orders.map((o) => o.id),
+      partner_id: params.partnerId,
+      customer_id: params.userId,
+      phone: params.phone,
+      storeName: params.storeName,
+      customerName: params.customerName,
+    },
+    idempotencyKey: buildIdempotencyKey(
+      params.type,
+      "order_batch",
+      batchId,
+      params.userId,
+    ),
+    origin: params.origin,
+  })
+}
+

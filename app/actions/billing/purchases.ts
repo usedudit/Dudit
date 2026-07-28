@@ -180,7 +180,7 @@ export async function listPurchasesPageAction(
     return {
         data: (data || []).map((item: any) => ({
             ...item,
-            partner_name: item.partners?.store_name || null,
+            partner_name: item.partners?.stores?.[0]?.name || null,
         })),
         total: count ?? 0,
         page,

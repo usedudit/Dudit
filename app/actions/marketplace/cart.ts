@@ -1177,6 +1177,7 @@ export async function checkoutCartAction(
       discount_amount: persistedCouponDiscount,
       payment_method_discount_amount: persistedPaymentMethodDiscount,
       payment_method_extra_amount: persistedPaymentMethodExtra,
+      store_credit_amount: appliedStoreCredit,
       promotions_applied: promotionsAppliedSnapshot,
       checkout_fulfillment: fulfillmentPayload,
       order_source: "Vitrine Online",
@@ -1187,6 +1188,15 @@ export async function checkoutCartAction(
     .single()
 
   if (orderError || !order) return { error: orderError?.message || "Erro ao criar pedido" }
+
+  if (appliedStoreCredit > 0 && resolvedCustomerId) {
+    const { applyStoreCreditDeduction } = await import("@/app/actions/erp/orders")
+    await applyStoreCreditDeduction(adminClient, {
+      partnerId,
+      customerId: resolvedCustomerId,
+      amount: appliedStoreCredit,
+    })
+  }
 
   // Set payment expiration
   {

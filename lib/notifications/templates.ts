@@ -19,6 +19,8 @@ interface TemplateContext {
     count?: string
     supplierName?: string
     cancellationNote?: string
+    isBatch?: boolean
+    batchCount?: number
 }
 
 // ─── WhatsApp Message Builder ─────────────────────────────────────────────────
@@ -35,6 +37,8 @@ interface WhatsappMessageContext {
     tracking_code?: string
     delivery_address?: string
     cancellation_note?: string
+    is_batch?: boolean | string
+    batch_count?: number | string
 }
 
 function fmtDate(dateStr?: string): string {
@@ -63,7 +67,17 @@ export function buildWhatsappMessage(
     const service = ctx.service_name || "serviço"
     const store = ctx.store_name || "vendedor"
     const when = fmtWhen(ctx.date, ctx.time)
-    const orderRef = ctx.order_number ? `#${ctx.order_number}` : "seu pedido"
+    const isBatch = Boolean(
+        ctx.is_batch === true ||
+        ctx.is_batch === "true" ||
+        (ctx.batch_count && Number(ctx.batch_count) > 1),
+    )
+    const batchCount = Number(ctx.batch_count) || 2
+    const orderRef = isBatch
+        ? `de ${batchCount} pedidos seus`
+        : ctx.order_number
+        ? `o pedido #${ctx.order_number}`
+        : "seu pedido"
     const amount = ctx.amount || ""
 
     switch (trigger) {
@@ -164,96 +178,166 @@ export function buildWhatsappMessage(
 
         // ── Pedidos ──
         case "order_created":
-            return [
-                `🛒 *Pedido recebido!*`,
-                ``,
-                ``,
-                `Olá, ${customer}! Recebemos o pedido ${orderRef} com sucesso.`,
-                ``,
-                ``,
-                amount ? `*Valor:* ${amount}` : "",
-                `*Vendedor:* ${store}`,
-                ``,
-                ``,
-                `Assim que o pagamento for confirmado, te avisamos por aqui. 📲`,
-            ].filter(Boolean).join("\n")
+            return isBatch
+                ? [
+                    `🛒 *Pedidos recebidos!*`,
+                    ``,
+                    ``,
+                    `Olá, ${customer}! Recebemos ${batchCount} pedidos seus em ${store} com sucesso.`,
+                    ``,
+                    ``,
+                    `Assim que o pagamento for confirmado, te avisamos por aqui. 📲`,
+                ].filter(Boolean).join("\n")
+                : [
+                    `🛒 *Pedido recebido!*`,
+                    ``,
+                    ``,
+                    `Olá, ${customer}! Recebemos ${orderRef} com sucesso.`,
+                    ``,
+                    ``,
+                    amount ? `*Valor:* ${amount}` : "",
+                    `*Vendedor:* ${store}`,
+                    ``,
+                    ``,
+                    `Assim que o pagamento for confirmado, te avisamos por aqui. 📲`,
+                ].filter(Boolean).join("\n")
 
         case "order_payment_approved":
-            return [
-                `✅ *Pagamento confirmado!*`,
-                ``,
-                `Oba, ${customer}! O pagamento do pedido ${orderRef} foi aprovado. 🎉`,
-                ``,
-                ``,
-                amount ? `*Valor:* ${amount}` : "",
-                `*Vendedor:* ${store}`,
-                ``,
-                ``,
-                `Já estamos providenciando tudo. Te manteremos atualizado! 📦`,
-            ].filter(Boolean).join("\n")
+            return isBatch
+                ? [
+                    `✅ *Pagamento de pedidos confirmado!*`,
+                    ``,
+                    `Oba, ${customer}! O pagamento de alguns pedidos seus em ${store} foi aprovado. 🎉`,
+                    ``,
+                    ``,
+                    `Já estamos providenciando tudo. Te manteremos atualizado! 📦`,
+                ].filter(Boolean).join("\n")
+                : [
+                    `✅ *Pagamento confirmado!*`,
+                    ``,
+                    `Oba, ${customer}! O pagamento do ${orderRef} foi aprovado. 🎉`,
+                    ``,
+                    ``,
+                    amount ? `*Valor:* ${amount}` : "",
+                    `*Vendedor:* ${store}`,
+                    ``,
+                    ``,
+                    `Já estamos providenciando tudo. Te manteremos atualizado! 📦`,
+                ].filter(Boolean).join("\n")
 
         case "order_preparing":
-            return [
-                `📦*Pedido em preparação!*`,
-                ``,
-                ``,
-                `Olá, ${customer}! O pedido ${orderRef} já está sendo preparado.`,
-                ``,
-                ``,
-                `*Vendedor:* ${store}`,
-                ``,
-                ``,
-                `Logo logo ele estará pronto! ⏳`,
-            ].filter(Boolean).join("\n")
+            return isBatch
+                ? [
+                    `📦 *Pedidos em preparação!*`,
+                    ``,
+                    ``,
+                    `Olá, ${customer}! Seus ${batchCount} pedidos em ${store} já estão sendo preparados.`,
+                    ``,
+                    ``,
+                    `Logo logo eles estarão prontos! ⏳`,
+                ].filter(Boolean).join("\n")
+                : [
+                    `📦 *Pedido em preparação!*`,
+                    ``,
+                    ``,
+                    `Olá, ${customer}! O ${orderRef} já está sendo preparado.`,
+                    ``,
+                    ``,
+                    `*Vendedor:* ${store}`,
+                    ``,
+                    ``,
+                    `Logo logo ele estará pronto! ⏳`,
+                ].filter(Boolean).join("\n")
 
         case "order_ready_pickup":
-            return [
-                `📦 *Pedido pronto para retirada!*`,
-                ``,
-                ``,
-                `Olá, ${customer}! Seu pedido ${orderRef} está pronto e te esperando.`,
-                `*Local de retirada:* ${store}`,
-                ``,
-                ``,
-                `Pode vir buscar quando quiser! 🏃‍♂️`,
-            ].filter(Boolean).join("\n")
+            return isBatch
+                ? [
+                    `📦 *Pedidos prontos para retirada!*`,
+                    ``,
+                    ``,
+                    `Olá, ${customer}! Seus ${batchCount} pedidos estão prontos e te esperando.`,
+                    `*Local de retirada:* ${store}`,
+                    ``,
+                    ``,
+                    `Pode vir buscar quando quiser! 🏃‍♂️`,
+                ].filter(Boolean).join("\n")
+                : [
+                    `📦 *Pedido pronto para retirada!*`,
+                    ``,
+                    ``,
+                    `Olá, ${customer}! Seu ${orderRef} está pronto e te esperando.`,
+                    `*Local de retirada:* ${store}`,
+                    ``,
+                    ``,
+                    `Pode vir buscar quando quiser! 🏃‍♂️`,
+                ].filter(Boolean).join("\n")
 
         case "order_shipped":
-            return [
-                `🚚 *Pedido enviado!*`,
-                ``,
-                ``,
-                `Boas notícias, ${customer}! Seu pedido ${orderRef} acabou de ser despachado.`,
-                ctx.tracking_code ? `*Código de rastreio:* ${ctx.tracking_code}` : "",
-                `*Vendedor:* ${store}`,
-                ``,
-                ``,
-                `Agora é só aguardar a entrega. Prepare o coração! 📦💨`,
-            ].filter(Boolean).join("\n")
+            return isBatch
+                ? [
+                    `🚚 *Pedidos enviados!*`,
+                    ``,
+                    ``,
+                    `Boas notícias, ${customer}! Seus ${batchCount} pedidos em ${store} acabaram de ser despachados.`,
+                    ``,
+                    ``,
+                    `Agora é só aguardar a entrega. Prepare o coração! 📦💨`,
+                ].filter(Boolean).join("\n")
+                : [
+                    `🚚 *Pedido enviado!*`,
+                    ``,
+                    ``,
+                    `Boas notícias, ${customer}! Seu ${orderRef} acabou de ser despachado.`,
+                    ctx.tracking_code ? `*Código de rastreio:* ${ctx.tracking_code}` : "",
+                    `*Vendedor:* ${store}`,
+                    ``,
+                    ``,
+                    `Agora é só aguardar a entrega. Prepare o coração! 📦💨`,
+                ].filter(Boolean).join("\n")
 
         case "order_out_for_delivery":
-            return [
-                `🏍️ *Pedido saiu para entrega!*`,
-                ``,
-                ``,
-                `Quase lá, ${customer}! O pedido ${orderRef} está a caminho do seu endereço.`,
-                `*Vendedor:* ${store}`,
-                ``,
-                ``,
-                `Fique de olho, ele chega rapidinho! 🚀`,
-            ].filter(Boolean).join("\n")
+            return isBatch
+                ? [
+                    `🏍️ *Pedidos saíram para entrega!*`,
+                    ``,
+                    ``,
+                    `Quase lá, ${customer}! Seus ${batchCount} pedidos em ${store} estão a caminho do seu endereço.`,
+                    ``,
+                    ``,
+                    `Fique de olho, chegam rapidinho! 🚀`,
+                ].filter(Boolean).join("\n")
+                : [
+                    `🏍️ *Pedido saiu para entrega!*`,
+                    ``,
+                    ``,
+                    `Quase lá, ${customer}! O ${orderRef} está a caminho do seu endereço.`,
+                    `*Vendedor:* ${store}`,
+                    ``,
+                    ``,
+                    `Fique de olho, ele chega rapidinho! 🚀`,
+                ].filter(Boolean).join("\n")
 
         case "order_delivered":
-            return [
-                `🎁 *Pedido entregue!*`,
-                ``,
-                ``,
-                `Tudo certo, ${customer}! O pedido ${orderRef} foi entregue com sucesso.`,
-                `*Vendedor:* ${store}`,
-                ``,
-                ``,
-                `Esperamos que você goste! Se precisar de algo, estamos por aqui. 😁`,
-            ].filter(Boolean).join("\n")
+            return isBatch
+                ? [
+                    `🎁 *Pedidos entregues!*`,
+                    ``,
+                    ``,
+                    `Tudo certo, ${customer}! Seus ${batchCount} pedidos em ${store} foram entregues com sucesso.`,
+                    ``,
+                    ``,
+                    `Esperamos que você goste! Se precisar de algo, estamos por aqui. 😁`,
+                ].filter(Boolean).join("\n")
+                : [
+                    `🎁 *Pedido entregue!*`,
+                    ``,
+                    ``,
+                    `Tudo certo, ${customer}! O ${orderRef} foi entregue com sucesso.`,
+                    `*Vendedor:* ${store}`,
+                    ``,
+                    ``,
+                    `Esperamos que você goste! Se precisar de algo, estamos por aqui. 😁`,
+                ].filter(Boolean).join("\n")
 
         // ── Entregas ──
         case "delivery_route_started":
@@ -360,6 +444,8 @@ export function buildNotificationContent(
     audience: NotificationAudience,
     ctx: TemplateContext = {},
 ): { title: string; message: string } {
+    const isBatch = Boolean(ctx.isBatch || (ctx.batchCount && ctx.batchCount > 1))
+    const batchCount = ctx.batchCount || 2
     const orderRef = ctx.orderNumber ? `#${ctx.orderNumber}` : "seu pedido"
     const store = ctx.storeName || "vendedor"
     const service = ctx.serviceName || "serviço"
@@ -369,6 +455,18 @@ export function buildNotificationContent(
 
     switch (type) {
         case "order_created":
+            if (isBatch) {
+                if (audience === "seller") {
+                    return {
+                        title: "🛒 Novos pedidos pendentes",
+                        message: `O cliente ${customer} realizou ${batchCount} pedidos aguardando pagamento.`,
+                    }
+                }
+                return {
+                    title: "📦 Pedidos realizados!",
+                    message: `Oba! Seus ${batchCount} pedidos em ${store} foram registrados com sucesso. 🎉`,
+                }
+            }
             if (ctx.mixType === "service") {
                 return {
                     title: "📅 Novo agendamento!",
@@ -386,6 +484,18 @@ export function buildNotificationContent(
                 message: `O pedido ${orderRef} foi realizado por ${customer} e está aguardando pagamento.`,
             }
         case "order_paid":
+            if (isBatch) {
+                if (audience === "seller") {
+                    return {
+                        title: "💰 Pagamento de pedidos confirmado!",
+                        message: `Sucesso! O pagamento de ${batchCount} pedidos de ${customer} foi confirmado.`,
+                    }
+                }
+                return {
+                    title: "✅ Pagamento de pedidos aprovado!",
+                    message: `Oba! O pagamento de alguns pedidos seus em ${store} foi aprovado. 🎉`,
+                }
+            }
             if (audience === "seller") {
                 return {
                     title: "💰 Pagamento confirmado!",
@@ -397,6 +507,18 @@ export function buildNotificationContent(
                 message: `Tudo certo! O pagamento do seu pedido ${orderRef} em ${store} foi confirmado. Obrigado! 🎉`,
             }
         case "order_shipped":
+            if (isBatch) {
+                if (audience === "seller") {
+                    return {
+                        title: "🚚 Pedidos enviados",
+                        message: `${batchCount} pedidos de ${customer} foram enviados.`,
+                    }
+                }
+                return {
+                    title: "🚚 Seus pedidos foram enviados!",
+                    message: `Boas notícias! Seus ${batchCount} pedidos em ${store} já estão a caminho. Prepare o coração! 📦`,
+                }
+            }
             if (audience === "seller") {
                 return {
                     title: "🚚 Pedido enviado",
@@ -408,6 +530,18 @@ export function buildNotificationContent(
                 message: `Boas notícias! Seu pedido ${orderRef} em ${store} já está a caminho. Prepare o coração! 📦`,
             }
         case "order_delivered":
+            if (isBatch) {
+                if (audience === "seller") {
+                    return {
+                        title: "🎁 Pedidos entregues",
+                        message: `${batchCount} pedidos de ${customer} foram entregues com sucesso.`,
+                    }
+                }
+                return {
+                    title: "🎁 Pedidos entregues!",
+                    message: `Oba! Seus ${batchCount} pedidos em ${store} foram entregues. Esperamos que você goste! 😁`,
+                }
+            }
             if (audience === "seller") {
                 return {
                     title: "🎁 Pedido entregue",
@@ -419,6 +553,18 @@ export function buildNotificationContent(
                 message: `Oba! Seu pedido ${orderRef} em ${store} foi entregue. Esperamos que você goste! 😁`,
             }
         case "order_cancelled":
+            if (isBatch) {
+                if (audience === "seller") {
+                    return {
+                        title: "❌ Pedidos cancelados",
+                        message: `${batchCount} pedidos de ${customer} foram cancelados.`,
+                    }
+                }
+                return {
+                    title: "💔 Pedidos cancelados",
+                    message: `Seus ${batchCount} pedidos em ${store} foram cancelados. Se tiver dúvidas, fale conosco. 🥺`,
+                }
+            }
             if (audience === "seller") {
                 return {
                     title: "❌ Pedido cancelado",
