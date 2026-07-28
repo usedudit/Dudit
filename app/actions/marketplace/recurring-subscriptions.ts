@@ -339,7 +339,7 @@ export async function getMarketplaceRecurringPlanAction(planId: string) {
       for (const planItem of data.recurring_plan_items) {
         const qty = Number(planItem.quantity || 1)
         let itemPrice = Number(planItem.unit_price || 0)
-        
+
         if (itemPrice <= 0) {
           if (planItem.item_type === 'product' && planItem.products) {
             itemPrice = Number((planItem.products as any).price || 0)
@@ -680,8 +680,7 @@ export async function getMySubscriptionCreditsAction() {
       .from("subscription_item_credits")
       .select(`
         id, subscription_id, quantity, consumed, expires_at, created_at,
-        recurring_subscriptions(recurring_plans(name)),
-        stores(id, name),
+        recurring_subscriptions(recurring_plans(name), stores(name)),
         services(name),
         products(name)
       `)
@@ -697,7 +696,7 @@ export async function getMySubscriptionCreditsAction() {
         id: row.id,
         subscriptionId: row.subscription_id,
         planName: row.recurring_subscriptions?.recurring_plans?.name || "Plano",
-        storeName: row.stores?.name || "Vendedor",
+        storeName: row.recurring_subscriptions?.stores?.name || "Vendedor",
         itemName: row.services?.name || row.products?.name || "Item",
         totalCredits: row.quantity,
         consumedCredits: row.consumed,

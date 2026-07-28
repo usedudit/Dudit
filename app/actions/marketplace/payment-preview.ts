@@ -4,7 +4,6 @@ import { requireUser } from "@/lib/auth/authorization"
 import { pickBestPaymentMethod } from "@/lib/services/payment-method.service"
 import { computePaymentLine, type PaymentMethodFeeConfig } from "@/lib/payments/financial-engine"
 import { toCanonicalPaymentType } from "@/lib/payments/payment-method"
-import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { createAdminClient } from "@/lib/supabase/server"
 
 const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100
@@ -119,18 +118,19 @@ export async function previewMarketplacePaymentAction(input: {
 }) {
   await requireUser()
 
-  const supabase = await getSupabaseServerClient()
+  const adminSupabase = createAdminClient()
   
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input.paymentMethodId)
   
   let method: any = null
 
   if (isUuid) {
-    const { data, error } = await supabase
+    const { data, error } = await adminSupabase
       .from("payment_methods")
       .select("id, partner_id, type, payment_type, is_active, discount_percent, fee_percent, fee_fixed, priority, is_default, name, default_finance_account_id, max_installments, fee_bearer")
       .eq("id", input.paymentMethodId)
       .eq("partner_id", input.partnerId)
+      .eq("is_active", true)
       .single()
   
     if (error || !data) {
@@ -139,7 +139,7 @@ export async function previewMarketplacePaymentAction(input: {
     method = data
   } else {
     const { pickBestPaymentMethod } = await import("@/lib/services/payment-method.service")
-    const best = await pickBestPaymentMethod(supabase as any, input.paymentMethodId as any, input.partnerId, { preferDefault: true })
+    const best = await pickBestPaymentMethod(adminSupabase as any, input.paymentMethodId as any, input.partnerId, { preferDefault: true })
     if (!best) {
       return { success: false as const, error: "Nenhum método de pagamento ativo foi encontrado para o método selecionado." }
     }
@@ -148,7 +148,6 @@ export async function previewMarketplacePaymentAction(input: {
   
   const chosenType = toCanonicalPaymentType(method.type || method.payment_type)
 
-  const adminSupabase = createAdminClient()
   const { data: fees } = await adminSupabase
     .from("payment_method_installment_fees")
     .select("installment_number, fee_percent")

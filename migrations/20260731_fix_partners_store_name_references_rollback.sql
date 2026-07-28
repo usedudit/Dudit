@@ -367,6 +367,13 @@ BEGIN
 END;
 $$;
 
+-- ─── Constraint fix (kept — additive, safe) ─────────────────────────────
+-- 'confirmed' is left in the constraint to keep the RPC working.
+-- To fully revert to original, run manually:
+--   ALTER TABLE xml_import_items DROP CONSTRAINT xml_import_items_match_status_check,
+--   ADD CONSTRAINT xml_import_items_match_status_check
+--     CHECK (match_status IN ('pending','matched','similar','new','skipped','error'));
+
 COMMIT;
 
 NOTIFY pgrst, 'reload schema';

@@ -285,6 +285,7 @@ export async function createProductComprehensiveAction(data: {
     description?: string
     sku?: string
     gtin?: string
+    barcode?: string
     brand?: string
     category?: string
     categoryId?: string | null
@@ -353,6 +354,21 @@ export async function createProductComprehensiveAction(data: {
     csrf_token?: string
     marketplace_category_id?: string | null
     marketplaceCategoryId?: string | null
+    variants?: Array<{
+        sku?: string
+        name?: string
+        price?: number
+        promotional_price?: number
+        stock_quantity?: number
+        options?: Record<string, string>
+        image_url?: string
+        is_active?: boolean
+    }>
+    suppliers?: Array<{
+        supplier_id: string
+        supplier_product_code?: string
+        cost_price?: number
+    }>
 }): Promise<ActionResponse<any>> {
     const actionStart = performance.now()
     try {
@@ -518,12 +534,24 @@ const productData = {
                 productData.sku = generateSKUWithSuffix(sku, attempt)
             }
 
+            const productPayload = {
+                ...productData,
+                ncm: fiscalData.ncm,
+                cest: fiscalData.cest,
+                barcode: data.barcode || data.gtin || null,
+                weight: logisticsData.weight_gross,
+                height: logisticsData.height,
+                width: logisticsData.width,
+                length: logisticsData.length,
+                is_active: data.isActive !== false,
+            }
+
             const result = await supabase.rpc(
                 "create_product_transaction",
                 {
-                    p_product_data: productData,
-                    p_fiscal_data: fiscalData,
-                    p_logistics_data: logisticsData
+                    p_product: productPayload,
+                    p_variants: data.variants || [],
+                    p_suppliers: data.suppliers || []
                 }
             )
 

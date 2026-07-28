@@ -1697,7 +1697,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         return { error: reserveResult.error }
     }
 
-    if (shouldDeductInventory(data.deliveryStatus)) {
+    if (shouldDeductInventory(data.deliveryStatus) || paymentState.situation === 'paid' || paymentState.situation === 'partially_paid') {
         const finalizeResult = await finalizeOrderInventory({
             client: supabase,
             partnerId,
@@ -2575,7 +2575,8 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             if ("error" in reserveResult) return { error: reserveResult.error }
         }
 
-        if (shouldDeductInventory(data.deliveryStatus)) {
+        const situationJustBecamePaid = currentOrder.situation !== "paid" && paymentState.situation === "paid"
+        if (shouldDeductInventory(data.deliveryStatus) || (!currentOrder.inventory_deducted && situationJustBecamePaid)) {
             const finalizeResult = await finalizeOrderInventory({
                 client: supabase,
                 partnerId: data.partnerId,

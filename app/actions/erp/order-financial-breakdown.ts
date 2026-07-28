@@ -137,14 +137,20 @@ export async function getOrderFinancialBreakdownAction(orderId: string, partnerI
     }
   }
 
-  // Fallback to stored columns if breakdown is empty
-  if (totalPercentageFees === 0 && totalFixedFees === 0 && totalInterest === 0) {
-    totalPercentageFees = storedMethodFee
-    totalFixedFees = storedMethodFixedFee
-    totalInterest = storedMethodInterest
-    if (storedMethodFee > 0) feeLines.push({ method: "pagamento", fee: storedMethodFee })
-    if (storedMethodFixedFee > 0) fixedFeeLines.push({ method: "pagamento", fee: storedMethodFixedFee })
+  // Merge stored columns as safety net (breakdown values take priority,
+  // stored columns fill gaps when breakdown has 0 for a specific category)
+  const mergedFee = Math.max(totalPercentageFees, storedMethodFee)
+  const mergedFixedFee = Math.max(totalFixedFees, storedMethodFixedFee)
+  const mergedInterest = Math.max(totalInterest, storedMethodInterest)
+  if (mergedFee > totalPercentageFees && storedMethodFee > 0) {
+    feeLines.push({ method: "pagamento", fee: storedMethodFee })
   }
+  if (mergedFixedFee > totalFixedFees && storedMethodFixedFee > 0) {
+    fixedFeeLines.push({ method: "pagamento", fee: storedMethodFixedFee })
+  }
+  totalPercentageFees = mergedFee
+  totalFixedFees = mergedFixedFee
+  totalInterest = mergedInterest
 
   // ── Delivery subsidy ──
   const deliverySubsidy = deliveryPayer === "seller" ? deliveryFee : 0

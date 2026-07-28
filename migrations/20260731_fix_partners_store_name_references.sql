@@ -370,6 +370,14 @@ $$;
 -- ─── 7. Drop obsolete index on partners.store_name ─────────────────────────
 DROP INDEX IF EXISTS public.idx_partners_search_name_trgm;
 
+-- ─── 8. Fix check constraint on xml_import_items.match_status ─────────────
+--     The execute_xml_import RPC sets match_status = 'confirmed', which was
+--     not in the original constraint (pending/matched/similar/new/skipped/error).
+ALTER TABLE public.xml_import_items
+DROP CONSTRAINT IF EXISTS xml_import_items_match_status_check,
+ADD CONSTRAINT xml_import_items_match_status_check
+  CHECK (match_status IN ('pending', 'matched', 'similar', 'new', 'skipped', 'error', 'confirmed'));
+
 COMMIT;
 
 NOTIFY pgrst, 'reload schema';

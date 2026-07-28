@@ -10,7 +10,6 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { sanitizeNotes } from "@/lib/input-validator"
 
 import { generateUniqueSupplierCode } from "@/lib/utils/code-generators"
-import { createAddressAction } from "@/app/actions/shared/addresses"
 import { canUseFeature } from "@/lib/services/subscription.service"
 import { revalidateSuppliers } from "@/lib/utils/revalidation"
 
@@ -96,21 +95,21 @@ export async function createComprehensiveSupplierAction(data: {
 
   // Criar endereço na tabela addresses se dados foram fornecidos
   if (data.street || data.city) {
-    await createAddressAction({
-      entityId: newSupplier.id,
-      entityType: "supplier",
-      zipCode: data.zipCode || "",
-      street: data.street || "",
-      number: data.number || "",
-      complement: data.complement,
-      neighborhood: data.neighborhood || "",
-      city: data.city || "",
-      state: data.state || "",
+    const addrData: any = {
+      supplier_id: newSupplier.id,
+      zip_code: data.zipCode || null,
+      street: data.street || null,
+      number: data.number || null,
+      complement: data.complement || null,
+      neighborhood: data.neighborhood || null,
+      city: data.city || null,
+      state: data.state || null,
       country: data.country || "BR",
-      municipioCodigoIbge: data.municipioCodigoIbge,
-      isDefault: true,
-      csrf_token: data.csrf_token,
-    })
+      municipio_codigo_ibge: data.municipioCodigoIbge || null,
+      is_default: true,
+      address_type: "primary",
+    }
+    await supabase.from("addresses").insert(addrData)
   }
 
   revalidatePath("/erp/suppliers")
@@ -312,8 +311,8 @@ export async function updateComprehensiveSupplierAction(data: {
     return { error: error.message }
   }
 
-  // Save country and municipio_codigo_ibge to addresses table
-  if (data.country !== undefined || data.municipioCodigoIbge !== undefined) {
+  // Upsert address into addresses table if address data was provided
+  if (data.street || data.city || data.zipCode) {
     const { data: existingAddr } = await supabase
       .from("addresses")
       .select("id")
@@ -321,32 +320,26 @@ export async function updateComprehensiveSupplierAction(data: {
       .eq("is_default", true)
       .maybeSingle()
 
+    const addrUpsert: any = {
+      zip_code: data.zipCode || null,
+      street: data.street || null,
+      number: data.number || null,
+      complement: data.complement || null,
+      neighborhood: data.neighborhood || null,
+      city: data.city || null,
+      state: data.state || null,
+      country: data.country || "BR",
+      municipio_codigo_ibge: data.municipioCodigoIbge || null,
+      updated_at: new Date().toISOString(),
+    }
+
     if (existingAddr) {
-      const addrUpdate: any = {}
-      if (data.country !== undefined) addrUpdate.country = data.country || null
-      if (data.municipioCodigoIbge !== undefined) addrUpdate.municipio_codigo_ibge = data.municipioCodigoIbge || null
-      if (Object.keys(addrUpdate).length > 0) {
-        addrUpdate.updated_at = new Date().toISOString()
-        await supabase.from("addresses").update(addrUpdate).eq("id", existingAddr.id)
-      }
-    } else if (data.street || data.city) {
-      // Create address if it doesn't exist but we have address data
-      const { createAddressAction } = await import("@/app/actions/shared/addresses")
-      await createAddressAction({
-        entityId: data.supplierId,
-        entityType: "supplier",
-        zipCode: data.zipCode || "",
-        street: data.street || "",
-        number: data.number || "",
-        complement: data.complement,
-        neighborhood: data.neighborhood || "",
-        city: data.city || "",
-        state: data.state || "",
-        country: data.country || "BR",
-        municipioCodigoIbge: data.municipioCodigoIbge,
-        isDefault: true,
-        csrf_token: data.csrf_token,
-      })
+      await supabase.from("addresses").update(addrUpsert).eq("id", existingAddr.id)
+    } else {
+      addrUpsert.supplier_id = data.supplierId
+      addrUpsert.is_default = true
+      addrUpsert.address_type = "primary"
+      await supabase.from("addresses").insert(addrUpsert)
     }
   }
 
@@ -536,14 +529,21 @@ export async function getSupplierByIdAction(supplierId: string) {
   // Pull address fields from addresses table (legacy columns on suppliers were dropped)
   const { data: supplierAddr } = await supabase
     .from("addresses")
-    .select("municipio_codigo_ibge, country")
+    .select("zip_code, street, number, complement, neighborhood, city, state, country, municipio_codigo_ibge")
     .eq("supplier_id", supplierId)
     .eq("is_default", true)
     .maybeSingle()
 
   if (supplierAddr) {
-    supplier.municipio_codigo_ibge = supplierAddr.municipio_codigo_ibge
+    supplier.zip_code = supplierAddr.zip_code
+    supplier.street = supplierAddr.street
+    supplier.number = supplierAddr.number
+    supplier.complement = supplierAddr.complement
+    supplier.neighborhood = supplierAddr.neighborhood
+    supplier.city = supplierAddr.city
+    supplier.state = supplierAddr.state
     supplier.country = supplierAddr.country
+    supplier.municipio_codigo_ibge = supplierAddr.municipio_codigo_ibge
   }
 
   return { supplier }

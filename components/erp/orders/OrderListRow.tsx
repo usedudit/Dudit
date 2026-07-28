@@ -102,27 +102,10 @@ const OrderListItem = React.memo(
                                 <div className="mt-1 flex items-center">
                                     {(() => {
                                         const breakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : []
-                                        let pmLabel = order.payment_method || null
-                                        if (breakdown.length > 0) {
-                                            const seen = new Set<string>()
-                                            const methods: string[] = []
-                                            for (const b of breakdown) {
-                                                const m = b?.method
-                                                if (m && !b?.checkoutPricing) {
-                                                    const key = String(m).toLowerCase().trim()
-                                                    if (!seen.has(key)) {
-                                                        seen.add(key)
-                                                        methods.push(m)
-                                                    }
-                                                }
-                                            }
-                                            if (methods.length > 0) {
-                                                pmLabel = methods.join(", ")
-                                            }
-                                            const inst = breakdown.find((b: any) => b.installmentNumber && !b.checkoutPricing)
-                                            if (inst && inst.installmentNumber > 1) {
-                                                pmLabel = `${pmLabel} - ${inst.installmentNumber}x`
-                                            }
+                                        const paymentEntry = breakdown.find((b: any) => b?.method && !b?.checkoutPricing)
+                                        let pmLabel = paymentEntry?.method || order.payment_method || null
+                                        if (paymentEntry?.installmentNumber > 1) {
+                                            pmLabel = `${pmLabel} - ${paymentEntry.installmentNumber}x`
                                         }
                                         if (order.payment_provider === "Mercado Pago" && pmLabel) {
                                             pmLabel = `Mercado Pago (${pmLabel})`
