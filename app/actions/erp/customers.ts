@@ -77,11 +77,11 @@ export async function createComprehensiveCustomerAction(data: {
   contribuinte?: string | null
   cnpj?: string | null
   nomeFantasia?: string | null
+  razaoSocial?: string | null
   inscricaoEstadual?: string | null
   ieIsento?: boolean
   inscricaoMunicipal?: string | null
-  regimeTributario?: string | null
-  contribuinteIcms?: string | null
+  crt?: string | null
   country?: string | null
   zipCode: string
   street: string
@@ -195,11 +195,11 @@ export async function createComprehensiveCustomerAction(data: {
     contribuinte: data.contribuinte || null,
     cnpj: data.cnpj ? data.cnpj.replace(/\D/g, "") : null,
     nome_fantasia: data.nomeFantasia || null,
+    razao_social: data.razaoSocial || null,
     inscricao_estadual: data.ieIsento ? "" : (data.inscricaoEstadual || null),
     ie_isento: data.ieIsento ?? false,
     inscricao_municipal: data.inscricaoMunicipal || null,
-    regime_tributario: data.regimeTributario || null,
-    contribuinte_icms: data.contribuinteIcms || null,
+    crt: data.crt || null,
     store_credit: 0,
     status: data.status || "ativo",
     notes: sanitizeNotes(data.notes),
@@ -311,11 +311,11 @@ export async function updateComprehensiveCustomerAction(data: {
   contribuinte?: string | null
   cnpj?: string | null
   nomeFantasia?: string | null
+  razaoSocial?: string | null
   inscricaoEstadual?: string | null
   ieIsento?: boolean
   inscricaoMunicipal?: string | null
-  regimeTributario?: string | null
-  contribuinteIcms?: string | null
+  crt?: string | null
   country?: string | null
   zipCode: string
   street: string
@@ -411,9 +411,11 @@ export async function updateComprehensiveCustomerAction(data: {
       contribuinte: data.contribuinte || null,
       cnpj: data.cnpj ? data.cnpj.replace(/\D/g, "") : null,
       nome_fantasia: data.nomeFantasia || null,
+      razao_social: data.razaoSocial || null,
       inscricao_estadual: data.ieIsento ? "" : (data.inscricaoEstadual || null),
       ie_isento: data.ieIsento ?? false,
       inscricao_municipal: data.inscricaoMunicipal || null,
+      crt: data.crt || null,
       status: data.status || "ativo",
       notes: sanitizeNotes(data.notes),
       birth_date: data.birthDate || null,

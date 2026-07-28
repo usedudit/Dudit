@@ -108,7 +108,7 @@ export const BusinessDataSubPage = ({
     const [generalInfo, setGeneralInfo] = useState({
         storeName: store?.name || partner.store_name || "",
         storeDescription: store?.description || partner.store_description || "",
-        businessType: store?.business_type || "pf",
+        personType: store?.person_type || "pf",
         cnpj: store?.cpf || store?.cnpj || "",
         razaoSocial: store?.razao_social || "",
         nomeFantasia: store?.nome_fantasia || "",
@@ -335,11 +335,11 @@ export const BusinessDataSubPage = ({
                         state: addresses.state,
                         noNumber: addresses.noNumber,
                         municipioCodigoIbge: addresses.ibge || undefined,
-                        business_type: generalInfo.businessType as "pf" | "pj",
-                        cnpj: generalInfo.businessType === "pj" ? (generalInfo.cnpj || null) : null,
-                        cpf: generalInfo.businessType === "pf" ? (generalInfo.cnpj || null) : null,
-                        razaoSocial: generalInfo.businessType === "pj" ? (generalInfo.razaoSocial || null) : null,
-                        nomeFantasia: generalInfo.businessType === "pj" ? (generalInfo.nomeFantasia || null) : null,
+                        person_type: generalInfo.personType as "pf" | "pj",
+                        cnpj: generalInfo.personType === "pj" ? (generalInfo.cnpj || null) : null,
+                        cpf: generalInfo.personType === "pf" ? (generalInfo.cnpj || null) : null,
+                        razaoSocial: generalInfo.personType === "pj" ? (generalInfo.razaoSocial || null) : null,
+                        nomeFantasia: generalInfo.personType === "pj" ? (generalInfo.nomeFantasia || null) : null,
                         crt: fiscalInfo.crt,
                         contribuinte: fiscalInfo.contribuinte,
                         inscricaoEstadual: fiscalInfo.inscricaoEstadual || null,
@@ -518,14 +518,14 @@ export const BusinessDataSubPage = ({
                                                                 icon={UserIcon}
                                                                 title="Pessoa Física"
                                                                 description="Usado para pessoas"
-                                                                onClick={() => setGeneralInfo({ ...generalInfo, businessType: "pf" })}
-                                                                className={`px-4 py-3 gap-4 ${generalInfo.businessType === "pf" ? "border-brand-green dark:border-brand-green" : ""}`}
+                                                                onClick={() => setGeneralInfo({ ...generalInfo, personType: "pf" })}
+                                                                className={`px-4 py-3 gap-4 ${generalInfo.personType === "pf" ? "border-brand-green dark:border-brand-green" : ""}`}
                                                                 right={
                                                                     <RadioButton
-                                                                        name="businessType"
+                                                                        name="personType"
                                                                         value="pf"
-                                                                        checked={generalInfo.businessType === "pf"}
-                                                                        onChange={() => setGeneralInfo({ ...generalInfo, businessType: "pf" })}
+                                                                        checked={generalInfo.personType === "pf"}
+                                                                        onChange={() => setGeneralInfo({ ...generalInfo, personType: "pf" })}
                                                                     />
                                                                 }
                                                             />
@@ -533,14 +533,14 @@ export const BusinessDataSubPage = ({
                                                                 icon={StoreIcon}
                                                                 title="Pessoa Jurídica"
                                                                 description="Usado para empresas"
-                                                                onClick={() => setGeneralInfo({ ...generalInfo, businessType: "pj" })}
-                                                                className={`px-4 py-3 gap-4 ${generalInfo.businessType === "pj" ? "border-brand-green dark:border-brand-green" : ""}`}
+                                                                onClick={() => setGeneralInfo({ ...generalInfo, personType: "pj" })}
+                                                                className={`px-4 py-3 gap-4 ${generalInfo.personType === "pj" ? "border-brand-green dark:border-brand-green" : ""}`}
                                                                 right={
                                                                     <RadioButton
-                                                                        name="businessType"
+                                                                        name="personType"
                                                                         value="pj"
-                                                                        checked={generalInfo.businessType === "pj"}
-                                                                        onChange={() => setGeneralInfo({ ...generalInfo, businessType: "pj" })}
+                                                                        checked={generalInfo.personType === "pj"}
+                                                                        onChange={() => setGeneralInfo({ ...generalInfo, personType: "pj" })}
                                                                     />
                                                                 }
                                                             />
@@ -550,18 +550,18 @@ export const BusinessDataSubPage = ({
                                                     <motion.div initial={false} animate={{ opacity: 1 }} className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                                         <div className="flex flex-col gap-1.5">
                                                             <CpfCnpjInput
-                                                                label={generalInfo.businessType === "pj" ? "CNPJ" : "CPF"}
-                                                                placeholder={generalInfo.businessType === "pj" ? "00.000.000/0000-00" : "000.000.000-00"}
+                                                                label={generalInfo.personType === "pj" ? "CNPJ" : "CPF"}
+                                                                placeholder={generalInfo.personType === "pj" ? "00.000.000/0000-00" : "000.000.000-00"}
                                                                 value={generalInfo.cnpj}
                                                                 onChange={(e) => setGeneralInfo({ ...generalInfo, cnpj: e.target.value })}
-                                                                onBlur={generalInfo.businessType === "pj" ? handleCnpjBlur : undefined}
+                                                                onBlur={generalInfo.personType === "pj" ? handleCnpjBlur : undefined}
                                                                 name="cnpj"
                                                             />
                                                             {isSearchingCnpj && <span className="text-[11px] text-brand-primary animate-pulse font-medium">Consultando CNPJ...</span>}
                                                         </div>
                                                     </motion.div>
 
-                                                    {generalInfo.businessType === "pj" && (
+                                                    {generalInfo.personType === "pj" && (
                                                         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
                                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                                                 <Input

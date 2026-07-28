@@ -244,7 +244,7 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                 fullName: isUserLoggedIn ? "" : generateNameFromEmail(email),
                 ...partnerData,
                 businessInfo: partnerData.businessInfo,
-                cnpj: null, cpf: null, businessType: "pf",
+                cnpj: null, cpf: null, personType: "pf",
                 zipCode: partnerData.address.cep,
                 street: partnerData.address.street,
                 number: partnerData.address.noNumber ? "S/N" : partnerData.address.number,

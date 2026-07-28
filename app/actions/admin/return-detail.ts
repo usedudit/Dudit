@@ -15,7 +15,7 @@ export async function getAdminReturnRequestDetail(returnRequestId: string) {
     .from("return_requests")
     .select(`
       *,
-      partners(id, is_active, user_id),\r\n      stores(id, name, risk_score, business_type),
+      partners(id, is_active, user_id),\r\n      stores(id, name, risk_score, person_type),
       orders!order_id(
         id, order_number, situation, delivery_status, total_amount, amount_paid,
         paid_amount, payment_method, payment_provider, created_at, return_policy_snapshot,

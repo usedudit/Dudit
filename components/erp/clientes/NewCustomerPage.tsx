@@ -100,6 +100,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
     const [contribuinte, setContribuinte] = useState("9")
     const [ieIsento, setIeIsento] = useState(false)
     const [inscricaoMunicipal, setInscricaoMunicipal] = useState("")
+    const [crt, setCrt] = useState("1")
 
     // Address States
     const [cep, setCep] = useState("")
@@ -156,6 +157,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
         setStoreCredit(c.store_credit || 0)
         setStatus(c.status === "ativo" ? "Ativo" : c.status === "inativo" ? "Inativo" : "Bloqueado")
         setContribuinte(c.contribuinte || "9")
+        setCrt(c.crt || "1")
         setIeIsento(c.ie_isento ?? false)
         setInscricaoMunicipal(c.inscricao_municipal || "")
         setObservacoes(c.notes || "")
@@ -272,7 +274,9 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                     if (data.bairro) setNeighborhood(data.bairro)
                     if (data.municipio) setCity(data.municipio)
                     if (data.uf) setUf(data.uf)
-                    if (data.simples_optante) setContribuinte("1")
+                    if (data.simples_optante) { setContribuinte("1"); setCrt("1") }
+                    else if (data.simei_optante) setCrt("4")
+                    else setCrt("3")
                     notifySuccess("Dados da empresa importados com sucesso!")
 
                 } else if (data?.error) {
@@ -371,6 +375,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                 inscricaoEstadual: ieIsento ? "" : ie,
                 ieIsento: ieIsento,
                 inscricaoMunicipal: inscricaoMunicipal,
+                crt: crt,
                 zipCode: cep,
                 street: street,
                 number: noNumber ? "S/N" : number,
@@ -645,8 +650,18 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                                 </div>
                                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                                                     <Input label="Nome Fantasia" placeholder="Nome comercial" value={fantasia} onChange={(e) => setFantasia(e.target.value)} />
-                                                                    <Input label="Inscrição Municipal" placeholder="Ex: 123456" value={inscricaoMunicipal} onChange={(e) => setInscricaoMunicipal(e.target.value)} />
-                                                                </div>
+                                                                <Input label="Inscrição Municipal" placeholder="Ex: 123456" value={inscricaoMunicipal} onChange={(e) => setInscricaoMunicipal(e.target.value)} />
+                                                            </div>
+                                                            <FormDropdown
+                                                                label="CRT (Código de Regime Tributário)"
+                                                                value={crt}
+                                                                setValue={(val) => setCrt(val)}
+                                                                options={[
+                                                                    { value: "1", label: "1 - Simples Nacional" },
+                                                                    { value: "3", label: "3 - Regime Normal" },
+                                                                    { value: "4", label: "4 - MEI" }
+                                                                ]}
+                                                            />
                                                                 <FormDropdown
                                                                     label="Contribuinte"
                                                                     value={contribuinte}

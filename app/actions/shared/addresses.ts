@@ -172,6 +172,7 @@ export async function createAddressAction(data: {
     insertData.partner_id = data.entityId
   } else if (data.entityType === "supplier") {
     insertData.supplier_id = data.entityId
+    insertData.municipio_codigo_ibge = data.municipioCodigoIbge || null
   } else if (data.entityType === "customer") {
     insertData.customer_id = data.entityId
     insertData.municipio_codigo_ibge = data.municipioCodigoIbge || null

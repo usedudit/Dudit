@@ -769,7 +769,7 @@ export async function registerPartner(data: any) {
         banner_url: data.bannerUrl || defaultBannerUrl,
         phone: normalizePhoneToE164(sanitizedPhone),
         opening_hours: data.businessHours || null,
-        business_type: data.businessType,
+        person_type: data.personType,
         cnpj: data.cnpj?.replace(/\D/g, "") || null,
         cpf: cpfEncrypted,
         is_headquarters: true,

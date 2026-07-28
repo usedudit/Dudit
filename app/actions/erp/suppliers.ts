@@ -24,9 +24,11 @@ export async function createComprehensiveSupplierAction(data: {
   contribuinte?: string
   cnpj?: string
   nomeFantasia?: string
+  razaoSocial?: string
   inscricaoEstadual?: string
-  regimeTributario?: string
-  contribuinteIcms?: string
+  ieIsento?: boolean
+  inscricaoMunicipal?: string
+  crt?: string
   country?: string
   zipCode?: string
   street?: string
@@ -78,9 +80,11 @@ export async function createComprehensiveSupplierAction(data: {
     contribuinte: data.contribuinte || null,
     cnpj: data.cnpj ? data.cnpj.replace(/\D/g, "") : null,
     nome_fantasia: data.nomeFantasia || null,
+    razao_social: data.razaoSocial || null,
     inscricao_estadual: data.inscricaoEstadual || null,
-    regime_tributario: data.regimeTributario || null,
-    contribuinte_icms: data.contribuinteIcms || null,
+    ie_isento: data.ieIsento ?? false,
+    inscricao_municipal: data.inscricaoMunicipal || null,
+    crt: data.crt || null,
     notes: sanitizeNotes(data.notes),
     supplier_code: supplierCode,
     image_url: data.image_url || null,
@@ -246,9 +250,11 @@ export async function updateComprehensiveSupplierAction(data: {
   contribuinte?: string
   cnpj?: string
   nomeFantasia?: string
+  razaoSocial?: string
   inscricaoEstadual?: string
-  regimeTributario?: string
-  contribuinteIcms?: string
+  ieIsento?: boolean
+  inscricaoMunicipal?: string
+  crt?: string
   country?: string
   zipCode?: string
   street?: string
@@ -290,18 +296,11 @@ export async function updateComprehensiveSupplierAction(data: {
       contribuinte: data.contribuinte || null,
       cnpj: data.cnpj ? data.cnpj.replace(/\D/g, "") : null,
       nome_fantasia: data.nomeFantasia || null,
+      razao_social: data.razaoSocial || null,
       inscricao_estadual: data.inscricaoEstadual || null,
-      regime_tributario: data.regimeTributario || null,
-      contribuinte_icms: data.contribuinteIcms || null,
-      country: data.country || null,
-      zip_code: data.zipCode || null,
-      street: data.street || null,
-      number: data.number || null,
-      complement: data.complement || null,
-      neighborhood: data.neighborhood || null,
-      city: data.city || null,
-      state: data.state || null,
-      municipio_codigo_ibge: data.municipioCodigoIbge || null,
+      ie_isento: data.ieIsento ?? false,
+      inscricao_municipal: data.inscricaoMunicipal || null,
+      crt: data.crt || null,
       notes: sanitizeNotes(data.notes),
       image_url: data.image_url || null,
       updated_at: new Date().toISOString(),
@@ -311,6 +310,44 @@ export async function updateComprehensiveSupplierAction(data: {
 
   if (error) {
     return { error: error.message }
+  }
+
+  // Save country and municipio_codigo_ibge to addresses table
+  if (data.country !== undefined || data.municipioCodigoIbge !== undefined) {
+    const { data: existingAddr } = await supabase
+      .from("addresses")
+      .select("id")
+      .eq("supplier_id", data.supplierId)
+      .eq("is_default", true)
+      .maybeSingle()
+
+    if (existingAddr) {
+      const addrUpdate: any = {}
+      if (data.country !== undefined) addrUpdate.country = data.country || null
+      if (data.municipioCodigoIbge !== undefined) addrUpdate.municipio_codigo_ibge = data.municipioCodigoIbge || null
+      if (Object.keys(addrUpdate).length > 0) {
+        addrUpdate.updated_at = new Date().toISOString()
+        await supabase.from("addresses").update(addrUpdate).eq("id", existingAddr.id)
+      }
+    } else if (data.street || data.city) {
+      // Create address if it doesn't exist but we have address data
+      const { createAddressAction } = await import("@/app/actions/shared/addresses")
+      await createAddressAction({
+        entityId: data.supplierId,
+        entityType: "supplier",
+        zipCode: data.zipCode || "",
+        street: data.street || "",
+        number: data.number || "",
+        complement: data.complement,
+        neighborhood: data.neighborhood || "",
+        city: data.city || "",
+        state: data.state || "",
+        country: data.country || "BR",
+        municipioCodigoIbge: data.municipioCodigoIbge,
+        isDefault: true,
+        csrf_token: data.csrf_token,
+      })
+    }
   }
 
   revalidatePath("/erp/suppliers")
@@ -354,9 +391,11 @@ export async function duplicateSupplierAction(supplierId: string) {
       contribuinte: originalSupplier.contribuinte,
       cnpj: originalSupplier.cnpj,
       nome_fantasia: originalSupplier.nome_fantasia,
+      razao_social: originalSupplier.razao_social,
       inscricao_estadual: originalSupplier.inscricao_estadual,
-      regime_tributario: originalSupplier.regime_tributario,
-      contribuinte_icms: originalSupplier.contribuinte_icms,
+      ie_isento: originalSupplier.ie_isento ?? false,
+      inscricao_municipal: originalSupplier.inscricao_municipal,
+      crt: originalSupplier.crt,
       country: originalSupplier.country,
       zip_code: originalSupplier.zip_code,
       street: originalSupplier.street,
@@ -492,6 +531,19 @@ export async function getSupplierByIdAction(supplierId: string) {
       const { decryptCPF } = await import("@/lib/crypto")
       supplier.cpf = await decryptCPF(supplier.cpf)
     } catch { /* keep encrypted */ }
+  }
+
+  // Pull address fields from addresses table (legacy columns on suppliers were dropped)
+  const { data: supplierAddr } = await supabase
+    .from("addresses")
+    .select("municipio_codigo_ibge, country")
+    .eq("supplier_id", supplierId)
+    .eq("is_default", true)
+    .maybeSingle()
+
+  if (supplierAddr) {
+    supplier.municipio_codigo_ibge = supplierAddr.municipio_codigo_ibge
+    supplier.country = supplierAddr.country
   }
 
   return { supplier }

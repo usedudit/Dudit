@@ -653,7 +653,7 @@ function ReportDetailsSheet({ report, isOpen, onClose, onResolve, onDismiss, onS
                                             )}
                                         </div>
                                         <div className="flex flex-col gap-1 min-w-0">
-                                            <span className="font-bold text-brand-dark dark:text-dark-heading">{targetDetails.store?.business_type || "Parceiro"}</span>
+                                            <span className="font-bold text-brand-dark dark:text-dark-heading">{targetDetails.store?.person_type || "Parceiro"}</span>
                                             <span className="text-xs font-medium text-brand-inactive-text font-mono">ID: {targetDetails.id}</span>
                                             <span className="text-xs font-medium text-brand-inactive-text">Entrou em: {new Date(targetDetails.created_at).toLocaleDateString("pt-BR")}</span>
                                         </div>

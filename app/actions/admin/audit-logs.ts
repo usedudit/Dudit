@@ -53,8 +53,8 @@ async function enrichAuditLogs(admin: any, items: AuditLogRow[]) {
     }
     
     if (partnerIds.length > 0) {
-        const { data: stores } = await admin.from("stores").select("partner_id, business_type").in("partner_id", partnerIds)
-        const map = new Map<string, string>(stores?.map((s: any) => [s.partner_id, s.business_type]) || [])
+        const { data: stores } = await admin.from("stores").select("partner_id, person_type").in("partner_id", partnerIds)
+        const map = new Map<string, string>(stores?.map((s: any) => [s.partner_id, s.person_type]) || [])
         items.forEach(i => { if (i.target_type === 'partner' && i.target_id) i.target_name = map.get(i.target_id) })
     }
 

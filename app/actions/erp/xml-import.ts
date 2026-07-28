@@ -540,14 +540,14 @@ export async function uploadXMLAction(
 
     const { data: storeDoc } = await supabase
       .from("stores")
-      .select("cpf, cnpj, business_type")
+      .select("cpf, cnpj, person_type")
       .eq("partner_id", partnerId)
       .order("is_headquarters", { ascending: false })
       .limit(1)
       .maybeSingle()
 
     let partnerDoc = ""
-    if (storeDoc?.business_type === "pj" && storeDoc?.cnpj) {
+    if (storeDoc?.person_type === "pj" && storeDoc?.cnpj) {
       partnerDoc = storeDoc.cnpj.replace(/\D/g, "")
     } else if (storeDoc?.cpf) {
       try {
@@ -650,7 +650,7 @@ export async function uploadXMLAction(
           cpf: supplier.documentType === "cpf" ? supplier.document : null,
           person_type: supplier.documentType === "cnpj" ? "pj" : "pf",
           inscricao_estadual: metadata.emitente.ie || null,
-          regime_tributario: metadata.emitente.crt || null,
+          crt: metadata.emitente.crt || null,
           email: metadata.emitente.email || null,
           phone: metadata.emitente.fone || null,
         })

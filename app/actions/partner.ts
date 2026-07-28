@@ -27,7 +27,7 @@ interface CreatePartnerData {
   city?: string | null
   state?: string | null
   // Dados fiscais opcionais
-  businessType: "pf" | "pj"
+  personType: "pf" | "pj"
   cnpj: string | null
   cpf?: string | null
   // Horários opcionais na criação
@@ -133,7 +133,7 @@ export async function createPartnerAction(data: CreatePartnerData) {
         logo_url: data.storeImageUrl || null,
         banner_url: getRandomDefaultBanner(),
         opening_hours: data.openingHours || defaultOpeningHours,
-        business_type: data.businessType,
+        person_type: data.personType,
         cnpj: cnpjClean,
         cpf: cpfEncrypted,
         is_headquarters: true,
@@ -327,7 +327,7 @@ export async function updatePartnerAction(
   if (data.storeDescription !== undefined) storeUpdateData.description = data.storeDescription
   if (data.openingHours !== undefined) storeUpdateData.opening_hours = normalizeOpeningHours(data.openingHours)
   if (data.storeImageUrl !== undefined) storeUpdateData.logo_url = data.storeImageUrl
-  if (data.businessType) storeUpdateData.business_type = data.businessType
+  if (data.personType) storeUpdateData.person_type = data.personType
   if (data.cnpj !== undefined) storeUpdateData.cnpj = data.cnpj
   if (data.cpf !== undefined) {
     const cleanCPF = data.cpf ? String(data.cpf).replace(/\D/g, "") : null
@@ -467,7 +467,7 @@ export async function updatePartnerAction(
 
 export async function registerPartner(data: {
   userId: string
-  businessType: "pf" | "pj"
+  personType: "pf" | "pj"
   cnpj: string | null
   cpf?: string | null
   sellsProducts: boolean
@@ -515,7 +515,7 @@ export async function registerPartner(data: {
       neighborhood: data.address.neighborhood || null,
       city: data.address.city || null,
       state: data.address.state || null,
-      businessType: data.businessType,
+      personType: data.personType,
       cnpj: data.cnpj,
       cpf: data.cpf,
       // Usa os horários passados ou o padrão se undefined

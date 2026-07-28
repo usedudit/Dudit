@@ -84,6 +84,9 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
     const [observacoes, setObservacoes] = useState("")
     const [status, setStatus] = useState("Ativo")
     const [contribuinte, setContribuinte] = useState("9")
+    const [crt, setCrt] = useState("1")
+    const [ieIsento, setIeIsento] = useState(false)
+    const [inscricaoMunicipal, setInscricaoMunicipal] = useState("")
     const [imageUrl, setImageUrl] = useState("")
     const [imagePreview, setImagePreview] = useState("")
     const [showImageCropper, setShowImageCropper] = useState(false)
@@ -135,6 +138,9 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                         setMobile(s.phone || "")
                         setStatus(s.status === "ativo" ? "Ativo" : "Inativo")
                         setContribuinte(s.contribuinte || "9")
+                        setCrt(s.crt || "1")
+                        setIeIsento(s.ie_isento ?? false)
+                        setInscricaoMunicipal(s.inscricao_municipal || "")
                         setObservacoes(s.notes || "")
                         setSupplierCode(s.supplier_code || "")
                         setImageUrl(s.image_url || "")
@@ -200,6 +206,9 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                     if (data.municipio) setCity(data.municipio)
                     if (data.uf) setUf(data.uf)
                     if (data.municipio_codigo_ibge) setMunicipioIbge(data.municipio_codigo_ibge)
+                    if (data.simples_optante) { setContribuinte("1"); setCrt("1") }
+                    else if (data.simei_optante) setCrt("4")
+                    else setCrt("3")
                     notifySuccess("Dados da empresa importados com sucesso!")
                 } else if (data?.error) {
                     notifyError("CNPJ não encontrado ou erro na consulta.")
@@ -282,7 +291,10 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                 contribuinte: contribuinte,
                 cnpj: cnpj,
                 nomeFantasia: fantasia,
-                inscricaoEstadual: ie,
+                inscricaoEstadual: ieIsento ? "" : ie,
+                ieIsento: ieIsento,
+                inscricaoMunicipal: inscricaoMunicipal,
+                crt: crt,
                 zipCode: cep,
                 street: street,
                 number: noNumber ? "S/N" : number,
@@ -485,9 +497,35 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                                                                         />
                                                                         {isSearchingCnpj && <span className="text-[11px] text-brand-primary animate-pulse font-medium">Consultando CNPJ...</span>}
                                                                     </div>
-                                                                    <Input label="Inscrição Estadual" placeholder="Isento ou número da IE" value={ie} onChange={(e) => setIe(e.target.value)} />
+                                                                    <Input label="Inscrição Estadual" placeholder="Isento ou número da IE" value={ie} onChange={(e) => setIe(e.target.value)} disabled={ieIsento} />
                                                                 </div>
-                                                                <Input label="Nome Fantasia" placeholder="Nome comercial" value={fantasia} onChange={(e) => setFantasia(e.target.value)} />
+                                                                <div className="flex items-center gap-3">
+                                                                    <Checkbox
+                                                                        id="supplierIeIsento"
+                                                                        checked={ieIsento}
+                                                                        onChange={(e) => {
+                                                                            setIeIsento(e)
+                                                                            if (e) setIe("")
+                                                                        }}
+                                                                    />
+                                                                    <label htmlFor="supplierIeIsento" className="text-sm font-medium text-brand-dark dark:text-dark-heading cursor-pointer select-none">
+                                                                        Inscrição Estadual isenta (IE Isento)
+                                                                    </label>
+                                                                </div>
+                                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                                                    <Input label="Nome Fantasia" placeholder="Nome comercial" value={fantasia} onChange={(e) => setFantasia(e.target.value)} />
+                                                                    <Input label="Inscrição Municipal" placeholder="Ex: 123456" value={inscricaoMunicipal} onChange={(e) => setInscricaoMunicipal(e.target.value)} />
+                                                                </div>
+                                                                <FormDropdown
+                                                                    label="CRT (Código de Regime Tributário)"
+                                                                    value={crt}
+                                                                    setValue={(val) => setCrt(val)}
+                                                                    options={[
+                                                                        { value: "1", label: "1 - Simples Nacional" },
+                                                                        { value: "3", label: "3 - Regime Normal" },
+                                                                        { value: "4", label: "4 - MEI" }
+                                                                    ]}
+                                                                />
                                                                 <FormDropdown
                                                                     label="Contribuinte"
                                                                     value={contribuinte}

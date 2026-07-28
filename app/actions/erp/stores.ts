@@ -23,6 +23,16 @@ export async function listStoresAction(partnerId: string) {
         .order("created_at", { ascending: true })
 
     if (error) throw new Error(error.message)
+
+    for (const store of data || []) {
+        if (store.cpf) {
+            try {
+                const { decryptCPF } = await import("@/lib/crypto")
+                store.cpf = await decryptCPF(store.cpf)
+            } catch { /* keep encrypted */ }
+        }
+    }
+
     return data || []
 }
 
@@ -39,6 +49,14 @@ export async function getStoreAction(storeId: string) {
     if (error) throw new Error(error.message)
 
     await requireStoreAccess(storeId, data.partner_id)
+
+    if (data.cpf) {
+        try {
+            const { decryptCPF } = await import("@/lib/crypto")
+            data.cpf = await decryptCPF(data.cpf)
+        } catch { /* keep encrypted */ }
+    }
+
     return data
 }
 
@@ -148,7 +166,7 @@ interface UpdateStoreInput {
     subcategory_id?: string | null
     timezone?: string
     // Tax / fiscal fields (per store)
-    business_type?: "pf" | "pj"
+    person_type?: "pf" | "pj"
     cnpj?: string | null
     cpf?: string | null
     razaoSocial?: string | null
@@ -197,7 +215,7 @@ export async function updateStoreAction(input: UpdateStoreInput): Promise<Action
         if (input.subcategory_id !== undefined) updateData.subcategory_id = input.subcategory_id
         if (input.timezone !== undefined) updateData.timezone = input.timezone
         // Tax / fiscal fields
-        if (input.business_type !== undefined) updateData.business_type = input.business_type
+        if (input.person_type !== undefined) updateData.person_type = input.person_type
         if (input.razaoSocial !== undefined) updateData.razao_social = input.razaoSocial
         if (input.nomeFantasia !== undefined) updateData.nome_fantasia = input.nomeFantasia
         if (input.cnpj !== undefined) {

@@ -23,21 +23,16 @@ interface ComprehensiveSupplierFormProps {
   supplier?: any
 }
 
+const crtOptions = [
+  { value: "1", label: "1 – Simples Nacional" },
+  { value: "3", label: "3 – Regime Normal" },
+  { value: "4", label: "4 – MEI" },
+]
+
 const contribuinteOptions = [
   { value: "1", label: "1 - Contribuinte ICMS" },
   { value: "2", label: "2 - Contribuinte Isento de Inscrição no Cadastro de Contribuintes" },
   { value: "9", label: "9 - Não Contribuinte" },
-]
-
-const regimeTributarioOptions = [
-  { value: "Não definido", label: "Não definido" },
-  { value: "Simples nacional", label: "Simples Nacional" },
-  {
-    value: "Simples nacional - Excesso de sublimite de receita bruta",
-    label: "Simples Nacional - Excesso de Sublimite",
-  },
-  { value: "Regime normal", label: "Regime Normal" },
-  { value: "MEI", label: "MEI" },
 ]
 
 export function ComprehensiveSupplierForm({ partnerId, supplier }: ComprehensiveSupplierFormProps) {
@@ -58,8 +53,9 @@ export function ComprehensiveSupplierForm({ partnerId, supplier }: Comprehensive
     cnpj: supplier?.cnpj || "",
     nomeFantasia: supplier?.nome_fantasia || "",
     inscricaoEstadual: supplier?.inscricao_estadual || "",
-    regimeTributario: supplier?.regime_tributario || "Não definido",
-    contribuinteIcms: supplier?.contribuinte_icms || "9",
+    ieIsento: supplier?.ie_isento ?? false,
+    inscricaoMunicipal: supplier?.inscricao_municipal || "",
+    crt: supplier?.crt || "1",
     country: supplier?.country || "",
     zipCode: supplier?.zip_code || "",
     street: supplier?.street || "",
@@ -81,8 +77,9 @@ export function ComprehensiveSupplierForm({ partnerId, supplier }: Comprehensive
     cnpj: supplier?.cnpj || "",
     nomeFantasia: supplier?.nome_fantasia || "",
     inscricaoEstadual: supplier?.inscricao_estadual || "",
-    regimeTributario: supplier?.regime_tributario || "Não definido",
-    contribuinteIcms: supplier?.contribuinte_icms || "9",
+    ieIsento: supplier?.ie_isento ?? false,
+    inscricaoMunicipal: supplier?.inscricao_municipal || "",
+    crt: supplier?.crt || "1",
     country: supplier?.country || "",
     zipCode: supplier?.zip_code || "",
     street: supplier?.street || "",
@@ -108,12 +105,15 @@ export function ComprehensiveSupplierForm({ partnerId, supplier }: Comprehensive
     try {
       const result = await fetchCNPJDataAction(cnpj)
       if (result.success && result.data) {
+        let crtVal = "3"
+        if (result.data.simples_optante) crtVal = "1"
+        else if (result.data.simei_optante) crtVal = "4"
         setFormData((prev) => ({
           ...prev,
           name: result.data.razao_social || "",
           nomeFantasia: result.data.nome_fantasia || "",
           inscricaoEstadual: result.data.inscricao_estadual || "",
-          regimeTributario: result.data.tributacao_regime || "Não definido",
+          crt: crtVal,
           street: result.data.logradouro || "",
           number: result.data.numero || "",
           neighborhood: result.data.bairro || "",
@@ -159,12 +159,13 @@ export function ComprehensiveSupplierForm({ partnerId, supplier }: Comprehensive
           phone: formData.phone,
           personType: formData.personType,
           cpf: formData.personType === "pf" ? formData.cpf : undefined,
-          contribuinte: formData.personType === "pf" ? formData.contribuinte : undefined,
+          contribuinte: formData.contribuinte || undefined,
           cnpj: formData.personType === "pj" ? formData.cnpj : undefined,
           nomeFantasia: formData.personType === "pj" ? formData.nomeFantasia : undefined,
           inscricaoEstadual: formData.personType === "pj" ? formData.inscricaoEstadual : undefined,
-          regimeTributario: formData.personType === "pj" ? formData.regimeTributario : undefined,
-          contribuinteIcms: formData.personType === "pj" ? formData.contribuinteIcms : undefined,
+          ieIsento: formData.personType === "pj" ? formData.ieIsento : undefined,
+          inscricaoMunicipal: formData.personType === "pj" ? formData.inscricaoMunicipal : undefined,
+          crt: formData.personType === "pj" ? formData.crt : undefined,
           country: formData.personType === "foreign" ? formData.country : undefined,
           zipCode: formData.zipCode,
           street: formData.street,
@@ -183,12 +184,13 @@ export function ComprehensiveSupplierForm({ partnerId, supplier }: Comprehensive
           phone: formData.phone,
           personType: formData.personType,
           cpf: formData.personType === "pf" ? formData.cpf : undefined,
-          contribuinte: formData.personType === "pf" ? formData.contribuinte : undefined,
+          contribuinte: formData.contribuinte || undefined,
           cnpj: formData.personType === "pj" ? formData.cnpj : undefined,
           nomeFantasia: formData.personType === "pj" ? formData.nomeFantasia : undefined,
           inscricaoEstadual: formData.personType === "pj" ? formData.inscricaoEstadual : undefined,
-          regimeTributario: formData.personType === "pj" ? formData.regimeTributario : undefined,
-          contribuinteIcms: formData.personType === "pj" ? formData.contribuinteIcms : undefined,
+          ieIsento: formData.personType === "pj" ? formData.ieIsento : undefined,
+          inscricaoMunicipal: formData.personType === "pj" ? formData.inscricaoMunicipal : undefined,
+          crt: formData.personType === "pj" ? formData.crt : undefined,
           country: formData.personType === "foreign" ? formData.country : undefined,
           zipCode: formData.zipCode,
           street: formData.street,
@@ -485,16 +487,16 @@ export function ComprehensiveSupplierForm({ partnerId, supplier }: Comprehensive
                   </div>
 
                   <div className="grid gap-2">
-                    <Label htmlFor="regimeTributario">Código de Regime Tributário*</Label>
+                    <Label htmlFor="crt">CRT (Código de Regime Tributário)*</Label>
                     <Select
-                      value={formData.regimeTributario}
-                      onValueChange={(value) => setFormData({ ...formData, regimeTributario: value })}
+                      value={formData.crt}
+                      onValueChange={(value) => setFormData({ ...formData, crt: value })}
                     >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {regimeTributarioOptions.map((option) => (
+                        {crtOptions.map((option) => (
                           <SelectItem key={option.value} value={option.value}>
                             {option.label}
                           </SelectItem>
@@ -503,23 +505,31 @@ export function ComprehensiveSupplierForm({ partnerId, supplier }: Comprehensive
                     </Select>
                   </div>
 
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="ieIsento"
+                      checked={formData.ieIsento}
+                      onChange={(e) => {
+                        setFormData({ ...formData, ieIsento: e.target.checked })
+                        if (e.target.checked) setFormData((prev) => ({ ...prev, inscricaoEstadual: "" }))
+                      }}
+                      className="rounded border-gray-300"
+                    />
+                    <Label htmlFor="ieIsento" className="text-sm font-medium cursor-pointer">
+                      Inscrição Estadual isenta (IE Isento)
+                    </Label>
+                  </div>
+
                   <div className="grid gap-2">
-                    <Label htmlFor="contribuinteIcms">Contribuinte ICMS*</Label>
-                    <Select
-                      value={formData.contribuinteIcms}
-                      onValueChange={(value) => setFormData({ ...formData, contribuinteIcms: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {contribuinteOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="inscricaoMunicipal">Inscrição Municipal</Label>
+                    <Input
+                      id="inscricaoMunicipal"
+                      name="inscricaoMunicipal"
+                      value={formData.inscricaoMunicipal}
+                      onChange={(e) => setFormData({ ...formData, inscricaoMunicipal: e.target.value })}
+                      placeholder="Ex: 123456"
+                    />
                   </div>
                 </>
               )}

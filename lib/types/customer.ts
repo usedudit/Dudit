@@ -6,6 +6,8 @@ export interface Customer {
   phone: string | null
   cpf_cnpj: string | null
   marketplace_user_id: string | null
+  razao_social: string | null
+  crt: string | null
   created_at: string
   [key: string]: any
 }
@@ -16,4 +18,6 @@ export interface CustomerInput {
   email?: string | null
   phone?: string | null
   cpf_cnpj?: string | null
+  razao_social?: string | null
+  crt?: string | null
 }

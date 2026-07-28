@@ -141,10 +141,14 @@ export async function fetchCNPJDataAction(cnpj: string) {
     const email = corporateEmail || anyEmail
 
     let regimeTributario = "Não definido"
+    let simplesOptante = false
+    let simeiOptante = false
     if (data.company.simei?.optant) {
       regimeTributario = "MEI"
+      simeiOptante = true
     } else if (data.company.simples?.optant) {
       regimeTributario = "Simples nacional"
+      simplesOptante = true
     } else if (data.company.size?.acronym === "DEMAIS") {
       regimeTributario = "Regime normal"
     }
@@ -163,6 +167,8 @@ export async function fetchCNPJDataAction(cnpj: string) {
         inscricao_municipal: "", // Not provided by API
         suframa: suframaNumber,
         tributacao_regime: regimeTributario,
+        simples_optante: simplesOptante,
+        simei_optante: simeiOptante,
 
         // Company details
         natureza_juridica: data.company.nature?.text || "",

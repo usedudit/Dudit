@@ -25,11 +25,13 @@ export interface Supplier {
   cpf?: string | null
   cnpj?: string | null
   nomeFantasia?: string | null
+  razaoSocial?: string | null
   personType?: string | null
   contribuinte?: string | null
   inscricaoEstadual?: string | null
-  regimeTributario?: string | null
-  contribuinteIcms?: string | null
+  ieIsento?: boolean | null
+  inscricaoMunicipal?: string | null
+  crt?: string | null
   country?: string | null
   zipCode?: string | null
   street?: string | null

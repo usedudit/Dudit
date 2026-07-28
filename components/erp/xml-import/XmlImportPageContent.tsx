@@ -1,8 +1,8 @@
 "use client"
 
 import React, { useState, useMemo, useCallback, useRef, useEffect, Fragment } from "react"
-import { AnimatePresence } from "framer-motion"
-import { Button, Checkbox, Input, IconPlaceholder, Badge, Spinner, SelectionBanner, ThreeDotsLoader, InfoCard, FormSection, ActionsDropdown, FormTextarea, Separator, FormDropdown } from "@/components/reusable"
+import { AnimatePresence, motion } from "framer-motion"
+import { Button, Checkbox, Input, IconPlaceholder, Badge, Spinner, SelectionBanner, ThreeDotsLoader, InfoCard, FormSection, ActionsDropdown, FormTextarea, Separator, FormDropdown, ListItem } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
@@ -532,11 +532,15 @@ function ImportListRow({ item, selected, onSelect, onClick }: { item: ImportItem
         : ""
 
     return (
-        <tr className="border-b border-brand-border dark:border-dark-border transition-colors cursor-pointer hover:bg-brand-gray dark:hover:bg-dark-background/50" onClick={() => onClick()}>
-            <td className="py-3 px-2 pl-6" onClick={(e) => e.stopPropagation()}>
+        <motion.tr
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="group hover:[&:not(:has(.action-btn:hover))]:bg-brand-gray dark:hover:[&:not(:has(.action-btn:hover))]:bg-dark-border/20 transition-colors cursor-pointer bg-white dark:bg-dark-background"
+            onClick={() => onClick()}>
+            <td className="py-2 pl-6 pr-0 border-b border-brand-border dark:border-dark-border w-14" onClick={(e) => e.stopPropagation()}>
                 <Checkbox checked={selected} onChange={() => onSelect()} />
             </td>
-            <td className="py-3 px-2">
+            <td className="p-2 border-b border-brand-border dark:border-dark-border">
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
                         <FileTextIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
@@ -551,29 +555,29 @@ function ImportListRow({ item, selected, onSelect, onClick }: { item: ImportItem
                     </div>
                 </div>
             </td>
-            <td className="py-3 px-2">
+            <td className="p-2 border-b border-brand-border dark:border-dark-border">
                 <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading truncate block max-w-[180px]">{item.supplier_name || "-"}</span>
             </td>
-            <td className="py-3 px-2 text-center">
+            <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
                 <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">{item.imported_items || 0}/{item.items_count || 0}</span>
             </td>
-            <td className="py-3 px-2 text-right">
+            <td className="p-2 border-b border-brand-border dark:border-dark-border text-right">
                 <div className="flex flex-col">
                     <span className="font-medium text-[13px] text-brand-dark dark:text-dark-heading">{dateStr}</span>
                     {timeStr && <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">{timeStr}</span>}
                 </div>
             </td>
-            <td className="py-3 px-2 text-center">
+            <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
                 <div className="flex justify-center"><Badge variant={meta.variant}>{meta.label}</Badge></div>
             </td>
-            <td className="py-3 px-2" onClick={(e) => e.stopPropagation()}>
+            <td className="p-2 border-b border-brand-border dark:border-dark-border" onClick={(e) => e.stopPropagation()}>
                 <div className="flex justify-center action-btn">
                     <ActionsDropdown
                         onView={() => onClick()}
                     />
                 </div>
             </td>
-        </tr>
+        </motion.tr>
     )
 }
 
@@ -583,21 +587,27 @@ function ImportGridCard({ item, selected, onSelect, onClick }: { item: ImportIte
     const meta = STATUS_META[item.status] || { label: item.status, variant: "gray" as const }
 
     return (
-        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all duration-300 cursor-pointer group flex flex-col h-full relative" onClick={() => onClick()}>
+        <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all duration-300 cursor-pointer group flex flex-col h-full relative"
+            onClick={() => onClick()}>
             <div className="flex gap-4 mb-2">
-                <div className="w-12 h-12 rounded-lg bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
                     <FileTextIcon className="w-6 h-6 text-brand-inactive-text dark:text-dark-body" />
                 </div>
                 <div className="flex-1 min-w-0 flex flex-col justify-center">
                     <div className="flex items-center gap-2 min-w-0 pr-1">
                         <div className="flex items-center gap-2 min-w-0 flex-1">
-                            <h3 className="font-bold text-[14px] text-brand-dark dark:text-dark-heading leading-tight truncate shrink-0">NF-e {item.invoice_number || "-"}</h3>
+                            <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">NF-e {item.invoice_number || "-"}</h3>
                         </div>
                         <div className="flex items-center gap-1">
                             <div onClick={(e) => e.stopPropagation()}>
                                 <ActionsDropdown onView={() => onClick()} />
                             </div>
-                            <div onClick={(e) => e.stopPropagation()}>
+                            <div className="shrink-0 -mt-1 -mr-1" onClick={(e) => e.stopPropagation()}>
                                 <Checkbox checked={selected} onChange={() => onSelect()} />
                             </div>
                         </div>
@@ -611,7 +621,7 @@ function ImportGridCard({ item, selected, onSelect, onClick }: { item: ImportIte
                 </div>
                 <Badge variant={meta.variant}>{meta.label}</Badge>
             </div>
-        </div>
+        </motion.div>
     )
 }
 
@@ -703,6 +713,7 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
     const [isReverting, setIsReverting] = useState(false)
     const [showRevertModal, setShowRevertModal] = useState(false)
     const [revertReason, setRevertReason] = useState("")
+    const [showSummaryModal, setShowSummaryModal] = useState(false)
     const [financeData, setFinanceData] = useState<any[] | null>(null)
     const [stockData, setStockData] = useState<any[] | null>(null)
     const [detailTab, setDetailTab] = useState("details")
@@ -929,9 +940,22 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                                         <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
                                             <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden mb-8">
                                                 <div className="bg-brand-gray dark:bg-dark-border/30 p-6 border-b border-brand-border dark:border-dark-border">
-                                                    <div className="flex items-center justify-between">
-                                                        <div className="flex items-center gap-1.5 font-bold text-brand-dark dark:text-dark-heading text-[16px]">
-                                                            Série {preview.invoice.serie || "-"} | N° {preview.invoice.numero || "-"}
+                                                    <div className="flex items-start justify-between">
+                                                        <div className="flex flex-col gap-1.5">
+                                                            <div className="flex items-center gap-1.5 font-bold text-brand-dark dark:text-dark-heading text-[16px]">
+                                                                <span>Série {preview.invoice.serie || "-"} | N° {preview.invoice.numero || "-"}</span>
+                                                                {preview.invoice.ambiente === "1" && <Badge variant="green" icon={null}>Produção</Badge>}
+                                                                {preview.invoice.ambiente === "2" && <Badge variant="orange" icon={null}>Homologação</Badge>}
+                                                            </div>
+                                                            {(preview.invoice.modelo || preview.invoice.protocolo || preview.invoice.data_saida) && (
+                                                                <div className="flex items-center gap-1.5 text-xs text-brand-inactive-text dark:text-dark-body">
+                                                                    {preview.invoice.modelo && <span>Mod {preview.invoice.modelo}</span>}
+                                                                    {(preview.invoice.modelo && (preview.invoice.protocolo || preview.invoice.data_saida)) && <span>•</span>}
+                                                                    {preview.invoice.protocolo && <span>Prot {preview.invoice.protocolo}</span>}
+                                                                    {(preview.invoice.protocolo && preview.invoice.data_saida) && <span>•</span>}
+                                                                    {preview.invoice.data_saida && <span>Saída: {safeDate(preview.invoice.data_saida)}</span>}
+                                                                </div>
+                                                            )}
                                                         </div>
                                                         {preview.invoice.valor_total > 0 && (
                                                             <div className="text-right">
@@ -939,13 +963,6 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                                                                 <p className="font-bold text-brand-dark dark:text-dark-heading text-[16px]">R$ {preview.invoice.valor_total.toFixed(2)}</p>
                                                             </div>
                                                         )}
-                                                    </div>
-                                                    <div className="flex items-center gap-3 mt-2">
-                                                        {preview.invoice.modelo && <span className="text-xs bg-brand-gray dark:bg-dark-border/30 px-2 py-0.5 rounded text-brand-inactive-text">Mod {preview.invoice.modelo}</span>}
-                                                        {preview.invoice.protocolo && <span className="text-xs bg-brand-gray dark:bg-dark-border/30 px-2 py-0.5 rounded text-brand-inactive-text">Prot {preview.invoice.protocolo}</span>}
-                                                        {preview.invoice.ambiente === "1" && <span className="text-xs bg-green-100 dark:bg-green-900/30 px-2 py-0.5 rounded text-green-700 dark:text-green-400">Produção</span>}
-                                                        {preview.invoice.ambiente === "2" && <span className="text-xs bg-yellow-100 dark:bg-yellow-900/30 px-2 py-0.5 rounded text-yellow-700 dark:text-yellow-400">Homologação</span>}
-                                                        {preview.invoice.data_saida && <span className="text-xs text-brand-inactive-text">Saída: {safeDate(preview.invoice.data_saida)}</span>}
                                                     </div>
                                                 </div>
 
@@ -967,7 +984,7 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                                                         <div className="flex items-center gap-2">
                                                             <InfoIcon size={14} className="text-brand-inactive-text shrink-0" />
                                                             <span className="text-xs font-medium text-brand-inactive-text">Chave NF-e:</span>
-                                                            <span className="text-xs font-mono text-brand-dark dark:text-dark-heading break-all">{preview.invoice.chave}</span>
+                                                            <span className="text-xs text-brand-dark dark:text-dark-heading break-all">{preview.invoice.chave}</span>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1142,6 +1159,19 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                                         </div>
 
                                         <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-l-0 xl:border-l border-brand-border dark:border-dark-border space-y-6">
+                                            {/* Mobile/Tablet: Summary ListItem */}
+                                            <div className="xl:hidden">
+                                                <h3 className="font-bold text-brand-dark dark:text-dark-heading mb-4 text-base">Resumo</h3>
+                                                <ListItem
+                                                    icon={FileTextIcon}
+                                                    title={`${summaryCounts.total} ${summaryCounts.total === 1 ? "item" : "itens"}`}
+                                                    description={preview.invoice.valor_total > 0 ? `R$ ${preview.invoice.valor_total.toFixed(2)}` : "Sem valor total"}
+                                                    showChevron={true}
+                                                    onClick={() => setShowSummaryModal(true)}
+                                                    className="border-0 bg-transparent px-0 hover:bg-transparent"
+                                                />
+                                            </div>
+
                                             {isFailed && preview.errors?.length > 0 && (
                                                 <InfoCard color="red" title="Erro na importação" message={
                                                     <ul className="list-disc pl-4 text-sm space-y-1">
@@ -1164,129 +1194,133 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                                                     message="Este XML já foi importado anteriormente e teve sua importação revertida. Revise os dados e confirme para importar novamente."
                                                 />
                                             )}
-                                            <SidebarCard>
-                                                <h3 className="font-bold text-brand-dark dark:text-dark-heading mb-4">Resumo</h3>
-                                                <div className="space-y-3 text-sm">
-                                                    {/* Itens */}
-                                                    <div className="flex items-center justify-between gap-3">
-                                                        <span className="text-brand-inactive-text dark:text-dark-body">Total de Itens</span>
-                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">{summaryCounts.total}</span>
-                                                    </div>
-                                                    {isPreview && (
-                                                        <>
-                                                            <div className="flex items-center justify-between gap-3">
-                                                                <span className="text-brand-inactive-text dark:text-dark-body">Novos</span>
-                                                                <span className="font-bold text-blue-600">{summaryCounts.novos}</span>
-                                                            </div>
-                                                            <div className="flex items-center justify-between gap-3">
-                                                                <span className="text-brand-inactive-text dark:text-dark-body">Existentes</span>
-                                                                <span className="font-bold text-brand-dark dark:text-dark-heading">{summaryCounts.existentes}</span>
-                                                            </div>
-                                                            {summaryCounts.conflitos > 0 && (
+
+                                            {/* Desktop: SidebarCard with summary */}
+                                            <div className="hidden xl:block">
+                                                <SidebarCard>
+                                                    <h3 className="font-bold text-brand-dark dark:text-dark-heading mb-4">Resumo</h3>
+                                                    <div className="space-y-3 text-sm">
+                                                        {/* Itens */}
+                                                        <div className="flex items-center justify-between gap-3">
+                                                            <span className="text-brand-inactive-text dark:text-dark-body">Total de Itens</span>
+                                                            <span className="font-bold text-brand-dark dark:text-dark-heading">{summaryCounts.total}</span>
+                                                        </div>
+                                                        {isPreview && (
+                                                            <>
                                                                 <div className="flex items-center justify-between gap-3">
-                                                                    <span className="text-brand-inactive-text dark:text-dark-body">Conflitos</span>
-                                                                    <span className="font-bold text-orange-500">{summaryCounts.conflitos}</span>
+                                                                    <span className="text-brand-inactive-text dark:text-dark-body">Novos</span>
+                                                                    <span className="font-bold text-blue-600">{summaryCounts.novos}</span>
                                                                 </div>
-                                                            )}
+                                                                <div className="flex items-center justify-between gap-3">
+                                                                    <span className="text-brand-inactive-text dark:text-dark-body">Existentes</span>
+                                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">{summaryCounts.existentes}</span>
+                                                                </div>
+                                                                {summaryCounts.conflitos > 0 && (
+                                                                    <div className="flex items-center justify-between gap-3">
+                                                                        <span className="text-brand-inactive-text dark:text-dark-body">Conflitos</span>
+                                                                        <span className="font-bold text-orange-500">{summaryCounts.conflitos}</span>
+                                                                    </div>
+                                                                )}
+                                                                <div className="flex items-center justify-between gap-3">
+                                                                    <span className="text-brand-inactive-text dark:text-dark-body">Movimentações</span>
+                                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">{preview.items.filter((i: any) => i.match_status !== "skipped").length}</span>
+                                                                </div>
+                                                                <div className="flex items-center justify-between gap-3">
+                                                                    <span className="text-brand-inactive-text dark:text-dark-body">Parcelas</span>
+                                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">{summaryCounts.duplicatas || "1"}</span>
+                                                                </div>
+                                                            </>
+                                                        )}
+                                                        {preview.invoice.valor_total > 0 && (
                                                             <div className="flex items-center justify-between gap-3">
-                                                                <span className="text-brand-inactive-text dark:text-dark-body">Movimentações</span>
-                                                                <span className="font-bold text-brand-dark dark:text-dark-heading">{preview.items.filter((i: any) => i.match_status !== "skipped").length}</span>
+                                                                <span className="text-brand-inactive-text dark:text-dark-body">Valor Total</span>
+                                                                <span className="font-bold text-brand-dark dark:text-dark-heading">R$ {preview.invoice.valor_total.toFixed(2)}</span>
                                                             </div>
+                                                        )}
+                                                        {preview.invoice.data_emissao && (
                                                             <div className="flex items-center justify-between gap-3">
-                                                                <span className="text-brand-inactive-text dark:text-dark-body">Parcelas</span>
-                                                                <span className="font-bold text-brand-dark dark:text-dark-heading">{summaryCounts.duplicatas || "1"}</span>
+                                                                <span className="text-brand-inactive-text dark:text-dark-body">Data de Emissão</span>
+                                                                <span className="font-bold text-brand-dark dark:text-dark-heading">{safeDate(preview.invoice.data_emissao)}</span>
                                                             </div>
-                                                        </>
-                                                    )}
-                                                    {preview.invoice.valor_total > 0 && (
-                                                        <div className="flex items-center justify-between gap-3">
-                                                            <span className="text-brand-inactive-text dark:text-dark-body">Valor Total</span>
-                                                            <span className="font-bold text-brand-dark dark:text-dark-heading">R$ {preview.invoice.valor_total.toFixed(2)}</span>
-                                                        </div>
-                                                    )}
-                                                    {preview.invoice.data_emissao && (
-                                                        <div className="flex items-center justify-between gap-3">
-                                                            <span className="text-brand-inactive-text dark:text-dark-body">Data de Emissão</span>
-                                                            <span className="font-bold text-brand-dark dark:text-dark-heading">{safeDate(preview.invoice.data_emissao)}</span>
-                                                        </div>
-                                                    )}
-                                                    {preview.created_at && (
-                                                        <div className="flex items-center justify-between gap-3">
-                                                            <span className="text-brand-inactive-text dark:text-dark-body">Importado em</span>
-                                                            <span className="font-bold text-brand-dark dark:text-dark-heading">{safeDateTime(preview.created_at)}</span>
-                                                        </div>
-                                                    )}
-                                                    {/* Duplicatas / contas a pagar */}
-                                                    {isPreview && preview.duplicatas?.length > 0 && (
-                                                        <div className="pt-2 border-t border-brand-border dark:border-dark-border">
-                                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-2">Duplicatas</span>
-                                                            <div className="space-y-1">
-                                                                {preview.duplicatas.map((d: any, i: number) => (
-                                                                    <div key={i} className="flex items-center justify-between text-xs">
-                                                                        <span className="text-brand-dark dark:text-dark-heading">Parcela {d.numero || i + 1}</span>
-                                                                        <div className="text-right">
-                                                                            <span className="font-bold text-brand-dark dark:text-dark-heading">R$ {Number(d.valor || 0).toFixed(2)}</span>
-                                                                            <span className="text-brand-inactive-text ml-1">{d.vencimento ? safeDate(d.vencimento) : ""}</span>
+                                                        )}
+                                                        {preview.created_at && (
+                                                            <div className="flex items-center justify-between gap-3">
+                                                                <span className="text-brand-inactive-text dark:text-dark-body">Importado em</span>
+                                                                <span className="font-bold text-brand-dark dark:text-dark-heading">{safeDateTime(preview.created_at)}</span>
+                                                            </div>
+                                                        )}
+                                                        {/* Duplicatas / contas a pagar */}
+                                                        {isPreview && preview.duplicatas?.length > 0 && (
+                                                            <div className="pt-2 border-t border-brand-border dark:border-dark-border">
+                                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-2">Duplicatas</span>
+                                                                <div className="space-y-1">
+                                                                    {preview.duplicatas.map((d: any, i: number) => (
+                                                                        <div key={i} className="flex items-center justify-between text-xs">
+                                                                            <span className="text-brand-dark dark:text-dark-heading">Parcela {d.numero || i + 1}</span>
+                                                                            <div className="text-right">
+                                                                                <span className="font-bold text-brand-dark dark:text-dark-heading">R$ {Number(d.valor || 0).toFixed(2)}</span>
+                                                                                <span className="text-brand-inactive-text ml-1">{d.vencimento ? safeDate(d.vencimento) : ""}</span>
+                                                                            </div>
                                                                         </div>
-                                                                    </div>
-                                                                ))}
+                                                                    ))}
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    )}
-                                                    {isPreview && (
-                                                        <div className="pt-2 border-t border-brand-border dark:border-dark-border">
-                                                            <label className="flex items-center gap-2 cursor-pointer">
-                                                                <Checkbox checked={createPayables} onChange={setCreatePayables} />
-                                                                <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">Criar contas a pagar</span>
-                                                            </label>
-                                                            <p className="text-xs text-brand-inactive-text mt-1 ml-6">
-                                                                {preview.duplicatas?.length > 0
-                                                                    ? `${preview.duplicatas.length} parcela(s) da NF-e`
-                                                                    : "Uma conta com vencimento em 30 dias"}
-                                                            </p>
-                                                        </div>
-                                                    )}
-                                                    {/* Finance data for completed/reversed imports */}
-                                                    {(isCompleted || isReversed) && financeData && financeData.length > 0 && (
-                                                        <div className="pt-2 border-t border-brand-border dark:border-dark-border">
-                                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-2">Contas a Pagar</span>
-                                                            <div className="space-y-1">
-                                                                {financeData.map((t: any, i: number) => (
-                                                                    <div key={i} className="flex items-center justify-between text-xs">
-                                                                        <div className="flex items-center gap-1">
-                                                                            <span className="text-brand-dark dark:text-dark-heading font-medium">R$ {Number(t.amount || 0).toFixed(2)}</span>
-                                                                            <Badge variant={t.status === "paid" ? "green" : t.status === "cancelled" ? "gray" : "orange"}>
-                                                                                {t.status === "paid" ? "Pago" : t.status === "cancelled" ? "Cancelado" : "Pendente"}
-                                                                            </Badge>
+                                                        )}
+                                                        {isPreview && (
+                                                            <div className="pt-2 border-t border-brand-border dark:border-dark-border">
+                                                                <label className="flex items-center gap-2 cursor-pointer">
+                                                                    <Checkbox checked={createPayables} onChange={setCreatePayables} />
+                                                                    <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">Criar contas a pagar</span>
+                                                                </label>
+                                                                <p className="text-xs text-brand-inactive-text mt-1 ml-6">
+                                                                    {preview.duplicatas?.length > 0
+                                                                        ? `${preview.duplicatas.length} parcela(s) da NF-e`
+                                                                        : "Uma conta com vencimento em 30 dias"}
+                                                                </p>
+                                                            </div>
+                                                        )}
+                                                        {/* Finance data for completed/reversed imports */}
+                                                        {(isCompleted || isReversed) && financeData && financeData.length > 0 && (
+                                                            <div className="pt-2 border-t border-brand-border dark:border-dark-border">
+                                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-2">Contas a Pagar</span>
+                                                                <div className="space-y-1">
+                                                                    {financeData.map((t: any, i: number) => (
+                                                                        <div key={i} className="flex items-center justify-between text-xs">
+                                                                            <div className="flex items-center gap-1">
+                                                                                <span className="text-brand-dark dark:text-dark-heading font-medium">R$ {Number(t.amount || 0).toFixed(2)}</span>
+                                                                                <Badge variant={t.status === "paid" ? "green" : t.status === "cancelled" ? "gray" : "orange"}>
+                                                                                    {t.status === "paid" ? "Pago" : t.status === "cancelled" ? "Cancelado" : "Pendente"}
+                                                                                </Badge>
+                                                                            </div>
+                                                                            <span className="text-brand-inactive-text">{t.due_date ? safeDate(t.due_date) : ""}</span>
                                                                         </div>
-                                                                        <span className="text-brand-inactive-text">{t.due_date ? safeDate(t.due_date) : ""}</span>
-                                                                    </div>
-                                                                ))}
+                                                                    ))}
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    )}
-                                                    {/* Stock movements for completed/reversed imports */}
-                                                    {(isCompleted || isReversed) && stockData && stockData.length > 0 && (
-                                                        <div className="pt-2 border-t border-brand-border dark:border-dark-border">
-                                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-2">Movimentações de Estoque</span>
-                                                            <div className="space-y-1">
-                                                                {stockData.map((m: any, i: number) => (
-                                                                    <div key={i} className="text-xs text-brand-dark dark:text-dark-heading">
-                                                                        <span className="font-medium">
-                                                                            {m.movement_type === "adjustment" ? "Ajuste (reversão)" : "Entrada"}:
-                                                                        </span>{' '}
-                                                                        {m.stock_movement_items?.map((smi: any, j: number) => (
-                                                                            <span key={j}>
-                                                                                {smi.quantity > 0 ? "+" : ""}{formatQuantityWithUnit(smi.quantity, smi.unit || smi.raw_unit)}
-                                                                            </span>
-                                                                        ))}
-                                                                    </div>
-                                                                ))}
+                                                        )}
+                                                        {/* Stock movements for completed/reversed imports */}
+                                                        {(isCompleted || isReversed) && stockData && stockData.length > 0 && (
+                                                            <div className="pt-2 border-t border-brand-border dark:border-dark-border">
+                                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-2">Movimentações de Estoque</span>
+                                                                <div className="space-y-1">
+                                                                    {stockData.map((m: any, i: number) => (
+                                                                        <div key={i} className="text-xs text-brand-dark dark:text-dark-heading">
+                                                                            <span className="font-medium">
+                                                                                {m.movement_type === "adjustment" ? "Ajuste (reversão)" : "Entrada"}:
+                                                                            </span>{' '}
+                                                                            {m.stock_movement_items?.map((smi: any, j: number) => (
+                                                                                <span key={j}>
+                                                                                    {smi.quantity > 0 ? "+" : ""}{formatQuantityWithUnit(smi.quantity, smi.unit || smi.raw_unit)}
+                                                                                </span>
+                                                                            ))}
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </SidebarCard>
+                                                        )}
+                                                    </div>
+                                                </SidebarCard>
+                                            </div>
                                         </div>
                                     </div>
                                 </FadeIn>
@@ -1310,6 +1344,126 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                     </Button>
                 </div>
             )}
+
+            {/* Mobile/Tablet: Summary modal */}
+            <DefaultModal isOpen={showSummaryModal} onClose={() => setShowSummaryModal(false)} title="Resumo">
+                <div className="space-y-3 text-sm">
+                    <div className="flex items-center justify-between gap-3">
+                        <span className="text-brand-inactive-text dark:text-dark-body">Total de Itens</span>
+                        <span className="font-bold text-brand-dark dark:text-dark-heading">{summaryCounts.total}</span>
+                    </div>
+                    {isPreview && (
+                        <>
+                            <div className="flex items-center justify-between gap-3">
+                                <span className="text-brand-inactive-text dark:text-dark-body">Novos</span>
+                                <span className="font-bold text-blue-600">{summaryCounts.novos}</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-3">
+                                <span className="text-brand-inactive-text dark:text-dark-body">Existentes</span>
+                                <span className="font-bold text-brand-dark dark:text-dark-heading">{summaryCounts.existentes}</span>
+                            </div>
+                            {summaryCounts.conflitos > 0 && (
+                                <div className="flex items-center justify-between gap-3">
+                                    <span className="text-brand-inactive-text dark:text-dark-body">Conflitos</span>
+                                    <span className="font-bold text-orange-500">{summaryCounts.conflitos}</span>
+                                </div>
+                            )}
+                            <div className="flex items-center justify-between gap-3">
+                                <span className="text-brand-inactive-text dark:text-dark-body">Movimentações</span>
+                                <span className="font-bold text-brand-dark dark:text-dark-heading">{preview.items.filter((i: any) => i.match_status !== "skipped").length}</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-3">
+                                <span className="text-brand-inactive-text dark:text-dark-body">Parcelas</span>
+                                <span className="font-bold text-brand-dark dark:text-dark-heading">{summaryCounts.duplicatas || "1"}</span>
+                            </div>
+                        </>
+                    )}
+                    {preview.invoice.valor_total > 0 && (
+                        <div className="flex items-center justify-between gap-3">
+                            <span className="text-brand-inactive-text dark:text-dark-body">Valor Total</span>
+                            <span className="font-bold text-brand-dark dark:text-dark-heading">R$ {preview.invoice.valor_total.toFixed(2)}</span>
+                        </div>
+                    )}
+                    {preview.invoice.data_emissao && (
+                        <div className="flex items-center justify-between gap-3">
+                            <span className="text-brand-inactive-text dark:text-dark-body">Data de Emissão</span>
+                            <span className="font-bold text-brand-dark dark:text-dark-heading">{safeDate(preview.invoice.data_emissao)}</span>
+                        </div>
+                    )}
+                    {preview.created_at && (
+                        <div className="flex items-center justify-between gap-3">
+                            <span className="text-brand-inactive-text dark:text-dark-body">Importado em</span>
+                            <span className="font-bold text-brand-dark dark:text-dark-heading">{safeDateTime(preview.created_at)}</span>
+                        </div>
+                    )}
+                    {isPreview && preview.duplicatas?.length > 0 && (
+                        <div className="pt-2 border-t border-brand-border dark:border-dark-border">
+                            <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-2">Duplicatas</span>
+                            <div className="space-y-1">
+                                {preview.duplicatas.map((d: any, i: number) => (
+                                    <div key={i} className="flex items-center justify-between text-xs">
+                                        <span className="text-brand-dark dark:text-dark-heading">Parcela {d.numero || i + 1}</span>
+                                        <div className="text-right">
+                                            <span className="font-bold text-brand-dark dark:text-dark-heading">R$ {Number(d.valor || 0).toFixed(2)}</span>
+                                            <span className="text-brand-inactive-text ml-1">{d.vencimento ? safeDate(d.vencimento) : ""}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    {isPreview && (
+                        <div className="pt-2 border-t border-brand-border dark:border-dark-border">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <Checkbox checked={createPayables} onChange={setCreatePayables} />
+                                <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">Criar contas a pagar</span>
+                            </label>
+                            <p className="text-xs text-brand-inactive-text mt-1 ml-6">
+                                {preview.duplicatas?.length > 0
+                                    ? `${preview.duplicatas.length} parcela(s) da NF-e`
+                                    : "Uma conta com vencimento em 30 dias"}
+                            </p>
+                        </div>
+                    )}
+                    {(isCompleted || isReversed) && financeData && financeData.length > 0 && (
+                        <div className="pt-2 border-t border-brand-border dark:border-dark-border">
+                            <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-2">Contas a Pagar</span>
+                            <div className="space-y-1">
+                                {financeData.map((t: any, i: number) => (
+                                    <div key={i} className="flex items-center justify-between text-xs">
+                                        <div className="flex items-center gap-1">
+                                            <span className="text-brand-dark dark:text-dark-heading font-medium">R$ {Number(t.amount || 0).toFixed(2)}</span>
+                                            <Badge variant={t.status === "paid" ? "green" : t.status === "cancelled" ? "gray" : "orange"}>
+                                                {t.status === "paid" ? "Pago" : t.status === "cancelled" ? "Cancelado" : "Pendente"}
+                                            </Badge>
+                                        </div>
+                                        <span className="text-brand-inactive-text">{t.due_date ? safeDate(t.due_date) : ""}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    {(isCompleted || isReversed) && stockData && stockData.length > 0 && (
+                        <div className="pt-2 border-t border-brand-border dark:border-dark-border">
+                            <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-2">Movimentações de Estoque</span>
+                            <div className="space-y-1">
+                                {stockData.map((m: any, i: number) => (
+                                    <div key={i} className="text-xs text-brand-dark dark:text-dark-heading">
+                                        <span className="font-medium">
+                                            {m.movement_type === "adjustment" ? "Ajuste (reversão)" : "Entrada"}:
+                                        </span>{' '}
+                                        {m.stock_movement_items?.map((smi: any, j: number) => (
+                                            <span key={j}>
+                                                {smi.quantity > 0 ? "+" : ""}{formatQuantityWithUnit(smi.quantity, smi.unit || smi.raw_unit)}
+                                            </span>
+                                        ))}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </DefaultModal>
 
             {/* Reversal confirmation modal */}
             {showRevertModal && (
