@@ -2,14 +2,12 @@ import { redirect } from "next/navigation"
 import type { Metadata } from 'next'
 import { ProductDetailsPageClient } from "@/components/marketplace/ProductDetailsPage"
 import {
-  getCachedHomeProducts,
   getMarketplaceProduct,
   getProductVariants,
   getProductReviews,
 } from "@/app/actions/marketplace/products"
 import { getStoreBySlug } from "@/app/actions/marketplace/stores"
-import { createSlug } from "@/lib/utils/slugify"
-import { getProductUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
+import { getProductUrl } from "@/lib/utils/url-generator"
 import { formatCurrency } from "@/lib/utils";
 import { getCurrentUser } from "@/lib/auth/authorization"
 import { getUserSessionData } from "@/lib/data/user"
@@ -17,27 +15,8 @@ import { getSponsoredAdsForSlot } from "@/app/actions/marketplace/ads"
 
 import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
 
-// Removed force-dynamic - getCurrentUser() calls cookies() which already makes this dynamic
+export const dynamic = 'force-dynamic'
 export const dynamicParams = true
-
-export async function generateStaticParams() {
-  try {
-    const products = await getCachedHomeProducts()
-    return products.map((product: any) => {
-      const p = Array.isArray(product.partners) ? product.partners[0] : product.partners
-      const address = p?.addresses?.[0] || p?.address || p || {}
-      const city = address.city || p?.city
-      const state = address.state || p?.state
-      return {
-        slug: createSlug(product.name), // Gera o slug estático também
-        cidadeUf: formatCityStateSlug(city, state),
-        id: product.id,
-      }
-    })
-  } catch (error) {
-    return []
-  }
-}
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string; cidadeUf: string; id: string }> }): Promise<Metadata> {
   const { id, slug } = await params

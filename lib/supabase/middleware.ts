@@ -324,12 +324,10 @@ export async function middleware(request: NextRequest) {
   // 5. SUPABASE AUTH (ONLY for routes that need it)
   // CRITICAL: Skip auth for public cacheable pages to avoid Set-Cookie headers
   // that would prevent Cloudflare from caching the response.
-  // Exception: If they have an active auth cookie, we must verify their status (banned check).
-  const NEEDS_AUTH_CHECK = ["/erp", "/account", "/perfil", "/pedidos", "/auth/login", "/select-erp", "/ddt-admin", "/cart", "/banned"]
+  const NEEDS_AUTH_CHECK = ["/erp", "/account", "/perfil", "/pedidos", "/auth/login", "/select-erp", "/ddt-admin", "/cart", "/banned", "/checkout"]
   const isPost = request.method === "POST"
   const isAction = request.headers.has("Next-Action")
-  const hasAuthCookie = request.cookies.getAll().some(c => c.name.startsWith('sb-') && c.name.includes('-auth-token'))
-  const needsAuthCheck = !isAction && (isPost || hasAuthCookie || NEEDS_AUTH_CHECK.some(prefix => pathname === prefix || pathname.startsWith(prefix + "/")))
+  const needsAuthCheck = !isAction && (isPost || NEEDS_AUTH_CHECK.some(prefix => pathname === prefix || pathname.startsWith(prefix + "/")))
 
   if (needsAuthCheck) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL

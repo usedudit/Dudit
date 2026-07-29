@@ -22,11 +22,10 @@ import {
 } from "@/components/reusable"
 import OSPreview from "@/components/erp/service-orders/OSPreview"
 import { r2PublicConfig } from "@/lib/r2/r2-public"
-import { formatCurrency } from "@/lib/utils"
 import { SERVICE_ORDER_STATUS_META, type ServiceOrderStatus } from "@/lib/types/service-order"
 import { HistoryTimeline } from "@/components/erp/shared/HistoryTimeline"
-import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { useSupabase } from "@/providers/supabase-provider"
+import { FileIcon } from "@/lib/icons"
 import { ClockIcon } from "lucide-react"
 
 const CDN_URL = r2PublicConfig.cdnUrl || "https://img.dudit.com.br"
@@ -107,14 +106,27 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
         return `${d.toLocaleDateString("pt-BR")} às ${d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
     }
 
-    // Resolve Partner Details
-    const partner = order?.partners || null
-    const partnerName = partner?.stores?.[0]?.name || partner?.store_name || "Parceiro"
-    const partnerLogo = partner?.store_image_url ? buildImageUrl(partner.store_image_url) : null
-    const partnerPlan = partner?.plan_tier || "free"
+    const formatFileSize = (size: any) => {
+        if (size === undefined || size === null) return ""
+        const bytes = Number(size)
+        if (isNaN(bytes) || bytes === 0) return ""
+        const k = 1024
+        const sizes = ["B", "KB", "MB", "GB"]
+        const i = Math.floor(Math.log(bytes) / Math.log(k))
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i]
+    }
 
-    // Check if Before & After sections are allowed based on the partner's plan
-    const beforeAfterEnabled = hasMinimumPlan(partnerPlan, "crescer")
+    const filteredHistory = useMemo(() => {
+        return (history || []).filter((h: any) => {
+            const action = (h.action_type || "").toLowerCase()
+            return action !== "created" && action !== "order_created"
+        })
+    }, [history])
+
+    const partner = order?.partners || null
+    const partnerName = partner?.name || "Parceiro"
+    const partnerLogo = partner?.logo_url ? buildImageUrl(partner.logo_url) : null
+    const partnerPlan = partner?.plan_tier || "free"
 
     // ─── REAL-TIME POLLING ───────────────────────────────────────────────────
     useEffect(() => {
@@ -290,17 +302,6 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
     const isFinalized = order.status === "concluida" || order.status === "entregue" || order.status === "cancelada" || order.signature_image_key
     const statusMeta = SERVICE_ORDER_STATUS_META[order.status as ServiceOrderStatus]
 
-    // Group attachments by category
-    const groupedAttachments = useMemo(() => {
-        const g: Record<string, any[]> = { normal: [], antes: [], depois: [] }
-        for (const att of attachments || []) {
-            const cat = att.category || "normal"
-            if (!g[cat]) g[cat] = []
-            g[cat].push(att)
-        }
-        return g
-    }, [attachments])
-
     return (
         <div className="flex flex-col h-screen bg-white dark:bg-dark-background overflow-hidden relative text-left">
             <style>{`
@@ -376,20 +377,18 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                 )}
 
                                 <div className={`mb-8 ${activeTab === "Visualização" ? "hidden lg:block" : "block"}`}>
-                                    {/* Messages */}
-                                    {isFinalized && (
-                                        <div>
-                                            {order.signature_image_key ? (
-                                                <InfoCard title='Aprovado pelo cliente' message={`Aprovador: ${order.approver_name || "Cliente"} - Data: ${formatDateTime(order.signed_at)}`} color='green' />
-                                            ) : (
-                                                <InfoCard title='Ordem de serviço finalizada ou cancelada' message="" color='red' />
-                                            )}
-                                        </div>
-                                    )}
-
                                     {/* ─── TAB: DADOS GERAIS ─── */}
                                     {activeTab === "Dados Gerais" && (
                                         <div className="space-y-8 text-left">
+                                            {isFinalized && (
+                                                <>
+                                                    {order.signature_image_key ? (
+                                                        <InfoCard title='Aprovado pelo cliente' message={`Aprovador: ${order.approver_name || "Cliente"} - Data: ${formatDateTime(order.signed_at)}`} color='green' />
+                                                    ) : (
+                                                        <InfoCard title='Ordem de serviço finalizada ou cancelada' message="" color='red' />
+                                                    )}
+                                                </>
+                                            )}
                                             <FormSection title="Informações do serviço">
                                                 <div className="space-y-3">
                                                     <div className="flex justify-between items-center text-sm">
@@ -403,7 +402,7 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                                     {order.expected_completion_date && (
                                                         <div className="flex justify-between items-center text-sm">
                                                             <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Previsão de conclusão</span>
-                                                            <span className="font-bold text-brand-dark dark:text-dark-heading">{formatDateString(order.expected_completion_date)}</span>
+                                                            <span className="font-bold text-brand-dark dark:text-dark-heading">{formatDateTime(order.expected_completion_date)}</span>
                                                         </div>
                                                     )}
                                                 </div>
@@ -433,7 +432,7 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                                 )}
                                             </FormSection>
 
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div>
                                                 {order.description && (
                                                     <FormSection title="Observações" hasSeparator>
                                                         <p className="text-xs text-brand-inactive-text dark:text-dark-body whitespace-pre-wrap leading-relaxed">{order.description}</p>
@@ -480,83 +479,40 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                     {/* ─── TAB: ANEXOS ─── */}
                                     {activeTab === "Anexos" && (
                                         <div className="space-y-6 text-left">
-                                            {/* If before/after enabled, group attachments */}
-                                            {beforeAfterEnabled ? (
-                                                <>
-                                                    {/* Antes */}
-                                                    <FormSection title="Antes">
-                                                        {groupedAttachments.antes.length === 0 ? (
-                                                            <p className="text-xs italic text-brand-inactive-text">Nenhum anexo registrado antes do serviço.</p>
-                                                        ) : (
-                                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                                                {groupedAttachments.antes.map((att: any, idx: number) => (
-                                                                    <div key={idx} className="rounded-xl overflow-hidden border border-brand-border relative bg-white aspect-square flex items-center justify-center">
-                                                                        {att.file_type?.startsWith("image/") ? (
-                                                                            <img src={buildImageUrl(att.file_key)} alt="" className="w-full h-full object-cover" />
-                                                                        ) : (
-                                                                            <span className="text-xs text-brand-inactive-text text-center px-2 truncate w-full">{att.file_name || "Anexo"}</span>
-                                                                        )}
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                    </FormSection>
-
-                                                    {/* Depois */}
-                                                    <FormSection title="Depois" hasSeparator>
-                                                        {groupedAttachments.depois.length === 0 ? (
-                                                            <p className="text-xs italic text-brand-inactive-text">Nenhum anexo registrado depois do serviço.</p>
-                                                        ) : (
-                                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                                                {groupedAttachments.depois.map((att: any, idx: number) => (
-                                                                    <div key={idx} className="rounded-xl overflow-hidden border border-brand-border relative bg-white aspect-square flex items-center justify-center">
-                                                                        {att.file_type?.startsWith("image/") ? (
-                                                                            <img src={buildImageUrl(att.file_key)} alt="" className="w-full h-full object-cover" />
-                                                                        ) : (
-                                                                            <span className="text-xs text-brand-inactive-text text-center px-2 truncate w-full">{att.file_name || "Anexo"}</span>
-                                                                        )}
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                    </FormSection>
-
-                                                    {/* Gerais / Outros */}
-                                                    {groupedAttachments.normal.length > 0 && (
-                                                        <FormSection title="Outros Anexos" hasSeparator>
-                                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                                                {groupedAttachments.normal.map((att: any, idx: number) => (
-                                                                    <div key={idx} className="rounded-xl overflow-hidden border border-brand-border relative bg-white aspect-square flex items-center justify-center">
-                                                                        {att.file_type?.startsWith("image/") ? (
-                                                                            <img src={buildImageUrl(att.file_key)} alt="" className="w-full h-full object-cover" />
-                                                                        ) : (
-                                                                            <span className="text-xs text-brand-inactive-text text-center px-2 truncate w-full">{att.file_name || "Anexo"}</span>
-                                                                        )}
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        </FormSection>
-                                                    )}
-                                                </>
+                                            {attachments.length === 0 ? (
+                                                <div className="flex flex-col items-center justify-center text-center py-8">
+                                                    <IconPlaceholder
+                                                        icon={FileIcon}
+                                                        title="Nenhum anexo"
+                                                        subtitle="Não foram encontrados anexos para esta OS."
+                                                    />
+                                                </div>
                                             ) : (
-                                                /* Standalone list of all attachments */
-                                                <FormSection title="Anexos">
-                                                    {attachments.length === 0 ? (
-                                                        <p className="text-xs italic text-brand-inactive-text">Nenhum anexo registrado nesta ordem de serviço.</p>
-                                                    ) : (
-                                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                                            {attachments.map((att: any, idx: number) => (
-                                                                <div key={idx} className="rounded-xl overflow-hidden border border-brand-border relative bg-white aspect-square flex items-center justify-center">
-                                                                    {att.file_type?.startsWith("image/") ? (
-                                                                        <img src={buildImageUrl(att.file_key)} alt="" className="w-full h-full object-cover" />
-                                                                    ) : (
-                                                                        <span className="text-xs text-brand-inactive-text text-center px-2 truncate w-full">{att.file_name || "Anexo"}</span>
-                                                                    )}
-                                                                </div>
-                                                            ))}
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                                    {attachments.map((att: any) => (
+                                                        <div
+                                                            key={att.id || att.file_key}
+                                                            onClick={() => {
+                                                                if (att.file_key) {
+                                                                    window.open(buildImageUrl(att.file_key), "_blank")
+                                                                }
+                                                            }}
+                                                            className="flex items-center gap-3 p-3 bg-brand-gray dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl group relative cursor-pointer hover:bg-brand-gray/80 dark:hover:bg-dark-border/40 transition-colors"
+                                                        >
+                                                            <div className="w-10 h-10 rounded-lg bg-white dark:bg-dark-border flex items-center justify-center border border-brand-border dark:border-dark-border shrink-0">
+                                                                <FileIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">
+                                                                    {att.file_name || "Anexo"}
+                                                                </p>
+                                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                                    {att.file_size ? formatFileSize(att.file_size) : ""}
+                                                                </p>
+                                                            </div>
                                                         </div>
-                                                    )}
-                                                </FormSection>
+                                                    ))}
+                                                </div>
                                             )}
                                         </div>
                                     )}
@@ -564,7 +520,7 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                     {/* ─── TAB: HISTÓRICO ─── */}
                                     {activeTab === "Histórico" && (
                                         <div className="space-y-4 text-left">
-                                            {history.length === 0 ? (
+                                            {filteredHistory.length === 0 ? (
                                                 <div className="flex flex-col items-center justify-center text-center py-8">
                                                     <IconPlaceholder
                                                         icon={ClockIcon}
@@ -574,7 +530,7 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                                 </div>
                                             ) : (
                                                 <HistoryTimeline
-                                                    entries={history.map((h: any) => ({
+                                                    entries={filteredHistory.map((h: any) => ({
                                                         id: h.id,
                                                         actor_name: "Sistema",
                                                         change_lines: h.change_lines || [],

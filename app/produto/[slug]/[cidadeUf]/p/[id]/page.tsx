@@ -18,25 +18,6 @@ import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
 export const dynamic = 'force-dynamic'
 export const dynamicParams = true
 
-export async function generateStaticParams() {
-  try {
-    const products = await getCachedHomeProducts()
-    return products.map((product: any) => {
-      const p = Array.isArray(product.partners) ? product.partners[0] : product.partners
-      const address = p?.addresses?.[0] || p?.address || p || {}
-      const city = address.city || p?.city
-      const state = address.state || p?.state
-      return {
-        slug: createSlug(product.name), // Gera o slug estático também
-        cidadeUf: formatCityStateSlug(city, state),
-        id: product.id,
-      }
-    })
-  } catch (error) {
-    return []
-  }
-}
-
 export async function generateMetadata({ params }: { params: Promise<{ slug: string; cidadeUf: string; id: string }> }): Promise<Metadata> {
   const { id } = await params
   const product = await getMarketplaceProduct(id)

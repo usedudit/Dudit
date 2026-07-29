@@ -227,21 +227,38 @@ async function createAppointmentSaleAndSyncGoals(params: {
     saleId = sale?.id || null
 
     if (saleId) {
-      const svcNames = String(params.appointment.service_name || "Serviço").split(',').map((s: string) => s.trim()).filter(Boolean)
-      const svcCount = svcNames.length
-      const svcUnitPrice = svcCount > 1 ? Math.round((baseAmount / svcCount) * 100) / 100 : baseAmount
-      const saleItems = svcNames.map((name: string) => ({
-        sale_id: saleId,
-        partner_id: params.partnerId,
-        product_id: null,
-        variant_id: null,
-        product_name: name,
-        variant_name: null,
-        unit_price: svcUnitPrice,
-        quantity: 1,
-        subtotal: svcUnitPrice,
-        total_price: svcUnitPrice,
-      }))
+      const rawServices = (params.appointment.services || []) as Array<{ name: string; price: number }>
+      let saleItems: any[]
+      if (rawServices.length > 0) {
+        saleItems = rawServices.map((svc: { name: string; price: number }) => ({
+          sale_id: saleId,
+          partner_id: params.partnerId,
+          product_id: null,
+          variant_id: null,
+          product_name: svc.name,
+          variant_name: null,
+          unit_price: Number(svc.price || 0),
+          quantity: 1,
+          subtotal: Number(svc.price || 0),
+          total_price: Number(svc.price || 0),
+        }))
+      } else {
+        const svcNames = String(params.appointment.service_name || "Serviço").split(',').map((s: string) => s.trim()).filter(Boolean)
+        const svcCount = svcNames.length
+        const svcUnitPrice = svcCount > 1 ? Math.round((baseAmount / svcCount) * 100) / 100 : baseAmount
+        saleItems = svcNames.map((name: string) => ({
+          sale_id: saleId,
+          partner_id: params.partnerId,
+          product_id: null,
+          variant_id: null,
+          product_name: name,
+          variant_name: null,
+          unit_price: svcUnitPrice,
+          quantity: 1,
+          subtotal: svcUnitPrice,
+          total_price: svcUnitPrice,
+        }))
+      }
       await params.supabase.from("sale_items").insert(saleItems)
     }
   } else {
@@ -266,21 +283,38 @@ async function createAppointmentSaleAndSyncGoals(params: {
       .delete()
       .eq("sale_id", saleId)
 
-    const svcNames = String(params.appointment.service_name || "Serviço").split(',').map((s: string) => s.trim()).filter(Boolean)
-    const svcCount = svcNames.length
-    const svcUnitPrice = svcCount > 1 ? Math.round((baseAmount / svcCount) * 100) / 100 : baseAmount
-    const saleItems = svcNames.map((name: string) => ({
-      sale_id: saleId,
-      partner_id: params.partnerId,
-      product_id: null,
-      variant_id: null,
-      product_name: name,
-      variant_name: null,
-      unit_price: svcUnitPrice,
-      quantity: 1,
-      subtotal: svcUnitPrice,
-      total_price: svcUnitPrice,
-    }))
+    const rawServices = (params.appointment.services || []) as Array<{ name: string; price: number }>
+    let saleItems: any[]
+    if (rawServices.length > 0) {
+      saleItems = rawServices.map((svc: { name: string; price: number }) => ({
+        sale_id: saleId,
+        partner_id: params.partnerId,
+        product_id: null,
+        variant_id: null,
+        product_name: svc.name,
+        variant_name: null,
+        unit_price: Number(svc.price || 0),
+        quantity: 1,
+        subtotal: Number(svc.price || 0),
+        total_price: Number(svc.price || 0),
+      }))
+    } else {
+      const svcNames = String(params.appointment.service_name || "Serviço").split(',').map((s: string) => s.trim()).filter(Boolean)
+      const svcCount = svcNames.length
+      const svcUnitPrice = svcCount > 1 ? Math.round((baseAmount / svcCount) * 100) / 100 : baseAmount
+      saleItems = svcNames.map((name: string) => ({
+        sale_id: saleId,
+        partner_id: params.partnerId,
+        product_id: null,
+        variant_id: null,
+        product_name: name,
+        variant_name: null,
+        unit_price: svcUnitPrice,
+        quantity: 1,
+        subtotal: svcUnitPrice,
+        total_price: svcUnitPrice,
+      }))
+    }
     await params.supabase.from("sale_items").insert(saleItems)
   }
 
@@ -963,7 +997,7 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
       }
     }
 
-    // -- Stock Movement Integration (store-aware) --
+    // -- Stock Movement Integration (store-aware, only finalize consumed when paid) --
     try {
       const { handleAppointmentItemsStockMovement } = await import("@/app/actions/erp/appointment-items")
       for (let i = 0; i < createdRows.length; i++) {
@@ -976,6 +1010,9 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
             newStatus: row.status,
             userId: user.id,
             storeId: payload[i]?.storeId || null,
+            paymentStatus: row.payment_status || null,
+            paidAmount: Number(row.paid_amount || 0),
+            price: Number(row.price || 0),
           })
         } catch (stockRowErr) {
           console.error(`[appointment_stock_create] failed for row ${row.id}:`, stockRowErr)
@@ -1012,17 +1049,21 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
     revalidatePath("/erp/dashboard")
     revalidatePath("/erp/servicos")
 
-    Promise.all([
-      import("@/lib/services/whatsapp-automation.service"),
-      import("@/lib/services/notification-automation.service"),
-    ])
-      .then(([whatsapp, notifications]) => {
-        for (const row of createdRows) {
-          whatsapp.onAppointmentCreated(row).catch(console.error)
-          notifications.onAppointmentCreated(row, "manual").catch(console.error)
-        }
-      })
-      .catch(() => { })
+    // Only send notifications for marketplace/online appointments, not manual ones
+    const rowsToNotify = createdRows.filter(row => row.sales_channel && row.sales_channel !== "manual")
+    if (rowsToNotify.length > 0) {
+      Promise.all([
+        import("@/lib/services/whatsapp-automation.service"),
+        import("@/lib/services/notification-automation.service"),
+      ])
+        .then(([whatsapp, notifications]) => {
+          for (const row of rowsToNotify) {
+            whatsapp.onAppointmentCreated(row).catch(console.error)
+            notifications.onAppointmentCreated(row, "system").catch(console.error)
+          }
+        })
+        .catch(() => { })
+    }
 
     return { success: true, created: data || [] }
   } catch (error: any) {
@@ -1112,25 +1153,46 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
         .eq("order_id", updated.marketplace_order_id)
         .neq("is_gift", true)
 
-      const svcNames = String(updated.service_name || "Serviço").split(',').map((s: string) => s.trim()).filter(Boolean)
-      const svcCount = svcNames.length
-      const svcUnitPrice = svcCount > 1 ? Math.round((orderPrice / svcCount) * 100) / 100 : orderPrice
-      const serviceItems = svcNames.map((name: string) => ({
-        order_id: updated.marketplace_order_id,
-        product_id: null,
-        variant_id: null,
-        product_name: name,
-        product_price: svcUnitPrice,
-        quantity: 1,
-        subtotal: svcUnitPrice,
-        line_type: "service_booking",
-        fulfillment_mode: updated.fulfillment_mode || "on_site",
-        service_id: updated.service_id,
-        is_gift: false,
-        original_price: null,
-        is_promotional: false,
-        promotion_id: null,
-      }))
+      const individualSvcs = (payload.services || []) as Array<{ name: string; price: number; id?: string | null }>
+      let serviceItems: any[]
+      if (individualSvcs.length > 0) {
+        serviceItems = individualSvcs.map((svc: { name: string; price: number; id?: string | null }) => ({
+          order_id: updated.marketplace_order_id,
+          product_id: null,
+          variant_id: null,
+          product_name: svc.name,
+          product_price: Number(svc.price || 0),
+          quantity: 1,
+          subtotal: Number(svc.price || 0),
+          line_type: "service_booking",
+          fulfillment_mode: updated.fulfillment_mode || "on_site",
+          service_id: svc.id || updated.service_id,
+          is_gift: false,
+          original_price: null,
+          is_promotional: false,
+          promotion_id: null,
+        }))
+      } else {
+        const svcNames = String(updated.service_name || "Serviço").split(',').map((s: string) => s.trim()).filter(Boolean)
+        const svcCount = svcNames.length
+        const svcUnitPrice = svcCount > 1 ? Math.round((orderPrice / svcCount) * 100) / 100 : orderPrice
+        serviceItems = svcNames.map((name: string) => ({
+          order_id: updated.marketplace_order_id,
+          product_id: null,
+          variant_id: null,
+          product_name: name,
+          product_price: svcUnitPrice,
+          quantity: 1,
+          subtotal: svcUnitPrice,
+          line_type: "service_booking",
+          fulfillment_mode: updated.fulfillment_mode || "on_site",
+          service_id: updated.service_id,
+          is_gift: false,
+          original_price: null,
+          is_promotional: false,
+          promotion_id: null,
+        }))
+      }
       await supabase.from("order_items").insert(serviceItems)
     }
 
@@ -1216,7 +1278,7 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
       }
     }
 
-    // -- Stock Movement Integration (store-aware) --
+    // -- Stock Movement Integration (store-aware, only finalize consumed when paid) --
     try {
       const { handleAppointmentItemsStockMovement } = await import("@/app/actions/erp/appointment-items")
       await handleAppointmentItemsStockMovement({
@@ -1226,6 +1288,9 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
         newStatus: normalizedStatus,
         userId: user.id,
         storeId: payload.storeId ?? current.store_id ?? null,
+        paymentStatus: String(paymentStatusValue || current.payment_status || ''),
+        paidAmount: effectivePaidAmount,
+        price: price,
       })
     } catch (stockErr) {
       console.error("[appointment_stock] failed to process movement:", stockErr)

@@ -22,7 +22,8 @@ import {
 import {
     formatDateStr,
     getWeekDays,
-    getGridHoursRange
+    getGridHoursRange,
+    getDayOpeningTime
 } from './utils';
 
 import { TopSelectionBar } from './Shared';
@@ -326,6 +327,22 @@ const AppointmentsPage = ({
         revalidate();
     }, [cacheKey, currentRange, currentDate, calendarView, fetchRange, getAdjacentRanges]);
 
+    // -- Refresh data when page becomes visible (e.g. returning from checkout on orders page) --
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                appointmentCacheRef.current.clear()
+                setIsLoadingAppointments(true)
+                fetchRange(currentRange.startDate, currentRange.endDate).then(freshData => {
+                    if (freshData) setAppointments(freshData)
+                    setIsLoadingAppointments(false)
+                })
+            }
+        }
+        document.addEventListener('visibilitychange', handleVisibilityChange)
+        return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }, [currentRange, fetchRange])
+
     // --- ACTIONS ---
 
     const handleOpenCreate = (time?: string, date?: Date, staffId?: string) => {
@@ -342,7 +359,7 @@ const AppointmentsPage = ({
 
         setPreSelectedStaffId(staffId);
 
-        if (time && time !== "09:00") {
+        if (time) {
             setTempSelectionTime(time);
         } else {
             setTempSelectionTime(null);
@@ -491,9 +508,9 @@ const AppointmentsPage = ({
                     serviceId: item.serviceId || null,
                     categoryId: item.categoryId || null,
                     date: item.date || formatDateStr(currentDate),
-                    time: item.time || '09:00',
+                    time: item.time || getDayOpeningTime(currentDate, openingHours),
                     endDate: item.endDate || item.date || formatDateStr(currentDate),
-                    endTime: item.endTime || item.time || '09:00',
+                    endTime: item.endTime || item.time || getDayOpeningTime(currentDate, openingHours),
                     duration: Number(item.duration || 60),
                     staffId: String(item.staffId || preSelectedStaffId || realStaffMembers[0]?.id || ''),
                     staffName: item.staffName || realStaffMembers.find((s) => s.id === String(item.staffId || preSelectedStaffId))?.name || realStaffMembers[0]?.name || 'Profissional',
@@ -702,7 +719,7 @@ const AppointmentsPage = ({
         const y = e.clientY;
         const screenWidth = window.innerWidth;
         const align = x > screenWidth / 2 ? 'left' : 'right';
-        const timeStr = "09:00";
+        const timeStr = getDayOpeningTime(date, openingHours);
         setActivePopover({
             time: timeStr,
             date: date,

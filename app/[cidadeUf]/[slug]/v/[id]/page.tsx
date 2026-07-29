@@ -16,6 +16,8 @@ import {
 import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { listMarketplaceRecurringPlansAction } from "@/app/actions/marketplace/recurring-subscriptions"
 
+export const dynamic = 'force-dynamic'
+
 export async function generateMetadata({ params }: { params: Promise<{ slug: string; cidadeUf: string; id: string }> }): Promise<Metadata> {
   const { id } = await params
   const store = await getCachedStoreById(id)

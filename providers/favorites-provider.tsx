@@ -36,7 +36,6 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
     const fetchedRef = useRef(false)
 
     // Fetch favorites on mount (once per session, when user is available)
-    // Uses a small delay to avoid competing with page hydration
     useEffect(() => {
         if (!user?.id) {
             setFavoriteKeys(new Set())
@@ -48,13 +47,28 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
         if (fetchedRef.current) return
         fetchedRef.current = true
 
+        const cacheKey = `fav_keys_${user.id}`
+        if (typeof sessionStorage !== "undefined") {
+            const cached = sessionStorage.getItem(cacheKey)
+            if (cached) {
+                try {
+                    const parsed = JSON.parse(cached)
+                    setFavoriteKeys(new Set(parsed))
+                    setIsLoaded(true)
+                    return
+                } catch {}
+            }
+        }
+
         const id = setTimeout(() => {
             getUserFavoriteIdsAction().then((result) => {
                 if (result.success) {
-                    const keys = new Set(
-                        result.favorites.map((f) => makeKey(f.item_id, f.item_type))
-                    )
+                    const rawKeys = result.favorites.map((f) => makeKey(f.item_id, f.item_type))
+                    const keys = new Set(rawKeys)
                     setFavoriteKeys(keys)
+                    if (typeof sessionStorage !== "undefined") {
+                        sessionStorage.setItem(cacheKey, JSON.stringify(rawKeys))
+                    }
                 }
                 setIsLoaded(true)
             })
@@ -87,6 +101,9 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
                     next.delete(key)
                 } else {
                     next.add(key)
+                }
+                if (user?.id && typeof sessionStorage !== "undefined") {
+                    sessionStorage.setItem(`fav_keys_${user.id}`, JSON.stringify(Array.from(next)))
                 }
                 return next
             })

@@ -68,13 +68,19 @@ export function PushNotificationManager() {
 
         if (!token || cancelled) return
 
-        if (lastRegisteredTokenRef.current !== token) {
+        if (!user?.id) return
+        const sessionKey = `fcm_token_${user.id}`
+        const sessionRegisteredToken = typeof sessionStorage !== "undefined" ? sessionStorage.getItem(sessionKey) : null
+        if (lastRegisteredTokenRef.current !== token && sessionRegisteredToken !== token) {
           await registerPushSubscriptionAction({
             fcmToken: token,
             deviceName: await getDeviceName(),
             deviceFingerprint: getDeviceFingerprint(),
           })
           lastRegisteredTokenRef.current = token
+          if (typeof sessionStorage !== "undefined") {
+            sessionStorage.setItem(sessionKey, token)
+          }
         }
 
         // Foreground message listener: prevents default alert spam and handles toast if needed

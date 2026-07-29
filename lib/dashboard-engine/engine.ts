@@ -3,6 +3,7 @@ import { getPartnerPlan } from "@/lib/services/subscription.service";
 import { normalizeBusinessInfo } from "@/lib/business-info";
 import { DashboardContext, DashboardLayout } from "./types";
 import { getStoreUrl } from "@/lib/utils/url-generator";
+import { getActiveStoreId } from "@/lib/auth/partner-context";
 import {
   getChecklistItems,
   getCards,
@@ -22,6 +23,9 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
   const startOfMonthIso = startOfMonth.toISOString();
+
+  // 0. Tenta obter a loja ativa (se o usuário selecionou uma)
+  const activeStoreId = await getActiveStoreId();
 
   // 1. Executa todas as consultas ao DB de forma paralela e agregada
   const [
@@ -46,19 +50,24 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
       .eq("id", partnerId)
       .single(),
     
-    // Loja associada (para URL pública com store_id)
-    supabase
-      .from("stores")
-      .select("id, name, slug, city, state, logo_url, image_url, banner_url, phone, is_showcase_active")
-      .eq("partner_id", partnerId)
-      .maybeSingle(),
+    // Loja associada (para URL pública com store_id) — prioriza a loja ativa se disponível
+    activeStoreId
+      ? supabase
+          .from("stores")
+          .select("id, name, slug, city, state, logo_url, image_url, banner_url, phone, is_showcase_active")
+          .eq("id", activeStoreId)
+          .maybeSingle()
+      : supabase
+          .from("stores")
+          .select("id, name, slug, city, state, logo_url, image_url, banner_url, phone, is_showcase_active")
+          .eq("partner_id", partnerId)
+          .maybeSingle(),
     
     supabase
       .from("addresses")
       .select("city, state")
       .or(`partner_id.eq.${partnerId},store_id.in.(select id from stores where partner_id = '${partnerId}')`)
-      .limit(1)
-      .maybeSingle(),
+      .limit(1),
 
     // Métodos de Pagamento (para validar Pix)
     supabase
@@ -143,7 +152,8 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
 
   const hasPhone = !!store?.phone;
   const hasCategory = !!partner.category_id;
-  const hasAddress = (addressRes.data || []).length > 0;
+  const addressData = addressRes.data || [];
+  const hasAddress = Array.isArray(addressData) ? addressData.length > 0 : !!addressData;
   const hasHours = !!store?.opening_hours && Object.keys(store.opening_hours).length > 0;
   const hasPix = (paymentMethodsRes.data || []).some(
     (m: any) => (m.type === "pix" || m.payment_type === "pix") && m.is_active
@@ -219,8 +229,9 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
     : null;
 
   // 6. Gera saudação e mensagens baseadas no modo e preenchimento
+  const storeName = store?.name?.trim() || "Sua Loja";
   const greeting = {
-    title: `Olá, ${store?.name || "Sua Loja"}! 👋`,
+    title: `Olá, ${storeName}! 👋`,
     subtitle: checklist
       ? "Complete o onboarding para começar a vender na Dudit."
       : "Veja como está seu negócio hoje no Marketplace."
@@ -228,24 +239,26 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
 
   // 7. Gera a URL pública do perfil do vendedor
   const storeData = storeRes.data
+  const firstAddress = Array.isArray(addressData) ? addressData[0] : addressData;
   const partnerForUrl = storeData
     ? {
         id: storeData.id,
         name: storeData.name,
         slug: storeData.slug,
         store_name: storeData.name,
-        city: storeData.city,
-        state: storeData.state,
+        city: storeData.city || (firstAddress as any)?.city,
+        state: storeData.state || (firstAddress as any)?.state,
+        addresses: firstAddress ? [firstAddress] : [],
       }
     : {
         id: partnerId,
         store_name: storeData?.name || "",
-        addresses: addressRes.data || [],
+        addresses: firstAddress ? [firstAddress] : [],
       };
   const partnerUrl = getStoreUrl(partnerForUrl);
 
   return {
-    storeName: storeData?.name || "Sua Loja",
+    storeName: storeName,
     partnerUrl,
     isQuickMode: context.isQuickMode,
     planSlug: context.planSlug,

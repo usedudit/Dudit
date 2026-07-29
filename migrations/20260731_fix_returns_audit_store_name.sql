@@ -782,11 +782,12 @@ BEGIN
   -- Try resolving actor details from user_profiles if auth.uid() is set
   IF v_actor_id IS NOT NULL THEN
     SELECT
-      COALESCE(NULLIF(trim(full_name), ''), display_name, 'Usuário'),
-      email
+      COALESCE(NULLIF(trim(up.full_name), ''), 'Usuário'),
+      au.email
     INTO v_actor_name, v_actor_email
-    FROM public.user_profiles
-    WHERE user_id = v_actor_id;
+    FROM public.user_profiles up
+    LEFT JOIN auth.users au ON au.id = up.user_id
+    WHERE up.user_id = v_actor_id;
   END IF;
 
   IF (TG_OP = 'DELETE') THEN

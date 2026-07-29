@@ -2091,10 +2091,15 @@ export async function searchProductByBarcodeAction(
         await requireUser()
 
         let resolvedPartnerId = partnerId
+        let resolvedStoreId: string | null = null
         if (!resolvedPartnerId) {
             const context = await getCurrentPartnerContext()
             if (!context) return { success: false, error: "Contexto do parceiro não encontrado" }
             resolvedPartnerId = context.partnerId
+            resolvedStoreId = context.activeStoreId
+        } else {
+            const context = await getCurrentPartnerContext()
+            if (context) resolvedStoreId = context.activeStoreId
         }
 
         await requirePermission(resolvedPartnerId, "products", "view")
@@ -2103,13 +2108,18 @@ export async function searchProductByBarcodeAction(
         const cleanCode = code.trim()
         if (!cleanCode) return { success: false, error: "Código inválido" }
 
+        const applyStoreFilter = (q: any) => {
+            if (resolvedStoreId) return q.eq("store_id", resolvedStoreId)
+            return q
+        }
+
         // 1. GTIN exact match on products
-        const { data: gtinMatch } = await scopeActiveOnly(supabase
+        const { data: gtinMatch } = await scopeActiveOnly(applyStoreFilter(supabase
             .from("products")
             .select("*, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
             .eq("partner_id", resolvedPartnerId)
             .eq("gtin", cleanCode)
-            .eq("is_active", true))
+            .eq("is_active", true)))
             .maybeSingle()
 
         if (gtinMatch) {
@@ -2117,12 +2127,12 @@ export async function searchProductByBarcodeAction(
         }
 
         // 2. SKU exact match on products
-        const { data: skuMatch } = await scopeActiveOnly(supabase
+        const { data: skuMatch } = await scopeActiveOnly(applyStoreFilter(supabase
             .from("products")
             .select("*, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
             .eq("partner_id", resolvedPartnerId)
             .eq("sku", cleanCode)
-            .eq("is_active", true))
+            .eq("is_active", true)))
             .maybeSingle()
 
         if (skuMatch) {
@@ -2130,13 +2140,18 @@ export async function searchProductByBarcodeAction(
         }
 
         // 3. SKU exact match on product variants (joining active product only)
-        const { data: variantMatch } = await supabase
+        let variantBaseQuery = supabase
             .from("product_variants")
             .select("*, products!inner(*, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options))")
             .eq("sku", cleanCode)
             .eq("is_active", true)
             .is("products.deleted_at", null)
-            .maybeSingle()
+
+        if (resolvedStoreId) {
+            variantBaseQuery = variantBaseQuery.eq("products.store_id", resolvedStoreId)
+        }
+
+        const { data: variantMatch } = await variantBaseQuery.maybeSingle()
 
         if (variantMatch && variantMatch.products && variantMatch.products.partner_id === resolvedPartnerId) {
             const product = {
@@ -2147,12 +2162,12 @@ export async function searchProductByBarcodeAction(
         }
 
         // 4. Partial SKU fallback
-        const { data: partialSkuMatch } = await scopeActiveOnly(supabase
+        const { data: partialSkuMatch } = await scopeActiveOnly(applyStoreFilter(supabase
             .from("products")
             .select("*, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
             .eq("partner_id", resolvedPartnerId)
             .eq("is_active", true)
-            .ilike("sku", `%${cleanCode}%`))
+            .ilike("sku", `%${cleanCode}%`)))
             .limit(1)
 
         if (partialSkuMatch && partialSkuMatch.length > 0) {
@@ -2160,12 +2175,12 @@ export async function searchProductByBarcodeAction(
         }
 
         // 5. Product name fallback
-        const { data: nameMatch } = await scopeActiveOnly(supabase
+        const { data: nameMatch } = await scopeActiveOnly(applyStoreFilter(supabase
             .from("products")
             .select("*, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
             .eq("partner_id", resolvedPartnerId)
             .eq("is_active", true)
-            .ilike("name", `%${cleanCode}%`))
+            .ilike("name", `%${cleanCode}%`)))
             .limit(1)
 
         if (nameMatch && nameMatch.length > 0) {

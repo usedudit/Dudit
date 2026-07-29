@@ -5,7 +5,7 @@ import { CalendarX, X, CalendarPlus, CalendarOff, ArrowUpDown, AlertTriangle } f
 import { MoneyIcon, PartiallyPaidIcon, LikeIcon, PlayIcon, EyeOffIcon, ClockIcon, BlockedIcon } from '@/lib/icons';
 import { Button } from '../../../reusable';
 import { Appointment, StaffMember } from '../types';
-import { getAppointmentStyle, getEndTime, formatDateStr, getWeekDays, arrangeAppointments, isMultiDay, checkAppointmentCollision, getGridHoursRange } from '../utils';
+import { getAppointmentStyle, getEndTime, formatDateStr, getWeekDays, arrangeAppointments, isMultiDay, checkAppointmentCollision, getGridHoursRange, getDayOpeningTime } from '../utils';
 import { AppointmentListCard } from '../AppointmentListCard';
 import { UserProfileImage } from '@/lib/utils/UserProfileImage';
 
@@ -580,7 +580,7 @@ export const TimelineView = ({ appointments, allAppointments = [], currentDate, 
                                                 setActivePopover({
                                                     staffId: staff.id,
                                                     date: day,
-                                                    time: '09:00',
+                                                    time: getDayOpeningTime(day, openingHours),
                                                     top: y,
                                                     left: x,
                                                     align,

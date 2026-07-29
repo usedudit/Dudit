@@ -65,17 +65,24 @@ export async function fetchPartnerProductsBucket() {
   const context = await getCurrentPartnerContext()
   if (!context) throw new Error("No context")
   const partnerId = context.partnerId
+  const storeId = context.activeStoreId
   const { allowed } = await checkPermission(partnerId, "products", "view")
   if (!allowed) throw new Error("Forbidden")
 
   const { getAdminClient } = await import("@/lib/supabase/admin")
   const supabase = getAdminClient()
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("products")
     .select("id, name, sku, gtin, price, promotional_price, category_id, stock_available, allow_sell_without_stock, images, unit, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
     .eq("partner_id", partnerId)
     .eq("is_active", true)
+
+  if (storeId) {
+    query = query.eq("store_id", storeId)
+  }
+
+  const { data, error } = await query
     .order("name")
     .limit(500)
 
@@ -281,15 +288,22 @@ export async function fetchPartnerServicesBucket(): Promise<PartnerServiceBucket
   const context = await getCurrentPartnerContext()
   if (!context) throw new Error("No context")
   const partnerId = context.partnerId
+  const storeId = context.activeStoreId
 
   const { getAdminClient } = await import("@/lib/supabase/admin")
   const supabase = getAdminClient()
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("services")
     .select("id, name, price, promotional_price, category_id, duration_minutes, buffer_minutes, billing_unit, is_active, images")
     .eq("partner_id", partnerId)
     .eq("is_active", true)
+
+  if (storeId) {
+    query = query.eq("store_id", storeId)
+  }
+
+  const { data, error } = await query
     .order("name")
     .limit(500)
 

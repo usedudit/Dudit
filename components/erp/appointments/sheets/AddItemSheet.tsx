@@ -15,6 +15,7 @@ interface AddItemSheetProps {
     isOpen: boolean
     onClose: () => void
     partnerId?: string
+    storeId?: string | null
     onConfirm: (item: {
         product_id?: string | null
         variant_id?: string | null
@@ -25,7 +26,7 @@ interface AddItemSheetProps {
     }) => void
 }
 
-export default function AddItemSheet({ isOpen, onClose, partnerId, onConfirm }: AddItemSheetProps) {
+export default function AddItemSheet({ isOpen, onClose, partnerId, storeId, onConfirm }: AddItemSheetProps) {
     const [searchQuery, setSearchQuery] = useState("")
     const [searchResults, setSearchResults] = useState<any[]>([])
     const [isLoading, setIsLoading] = useState(false)
@@ -73,7 +74,7 @@ export default function AddItemSheet({ isOpen, onClose, partnerId, onConfirm }: 
             setIsLoading(true)
             setShowResults(true)
             try {
-                const results = await searchProductsForAppointmentItems(searchQuery)
+                const results = await searchProductsForAppointmentItems(searchQuery, storeId)
                 setSearchResults(results)
             } catch {
                 setSearchResults([])

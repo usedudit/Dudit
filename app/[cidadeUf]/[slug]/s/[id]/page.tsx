@@ -13,6 +13,7 @@ import { getUserSessionData } from "@/lib/data/user"
 import { getSponsoredAdsForSlot } from "@/app/actions/marketplace/ads"
 import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
 
+export const dynamic = 'force-dynamic'
 export const dynamicParams = true
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string; cidadeUf: string; id: string }> }): Promise<Metadata> {

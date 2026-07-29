@@ -1884,9 +1884,7 @@ export default function CreateReturnPage({
                                                 showMap={true}
                                             />
                                         ) : (
-                                            <div className="rounded-2xl border border-dashed border-brand-border dark:border-dark-border p-6 text-sm text-brand-inactive-text dark:text-dark-body text-center bg-brand-gray/10">
-                                                Selecione um pedido para visualizar os dados do cliente e o mapa de entrega aqui.
-                                            </div>
+                                            <InfoCard color="gray" title="Sem Pedido Selecionado" message="Selecione um pedido para visualizar os dados do cliente e o mapa de entrega aqui." />
                                         )}
                                     </div>
                                 </div>

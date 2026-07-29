@@ -11,9 +11,9 @@ interface SaleDetailSheetProps {
 
 const SaleDetailSheet = ({ onClose, appointment }: SaleDetailSheetProps) => {
     // Mock data based on the appointment or defaults
-    const clientName = appointment?.customer || 'Bagus Fikri';
+    const clientName = appointment?.customer || 'John Doe';
     const saleId = `#14`;
-    const dateStr = 'dom 11 jan 2026';
+    const dateStr = 'qui 01 jan 2026';
     const subtotal = appointment?.price || 150;
     const total = subtotal; // Assuming no tax/discount for this view
     const services = [

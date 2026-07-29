@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
 import {
     ShoppingCartIcon,
     Package,
     WrenchIcon,
     ChevronRightIcon,
+    ChevronLeftIcon,
     AlertTriangleIcon,
     CheckCircleIcon,
     StoreIcon,
@@ -26,6 +26,7 @@ import {
     CopyIcon,
     PlayIcon,
     MailIcon,
+    PlusIcon,
 } from "@/lib/icons";
 import { Button, Badge, ListItem, FormSection, DefaultModal, InfoCard } from "@/components/reusable";
 import { Tooltip } from "@/components/reusable/Tooltip"
@@ -78,7 +79,7 @@ function QRCodeCard({ partnerUrl, storeName }: { partnerUrl: string; storeName: 
     const profileUrl = `${origin}${partnerUrl}`;
 
     React.useEffect(() => {
-        setQrCodeUrl(`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(profileUrl)}`);
+        setQrCodeUrl(`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(profileUrl)}`);
     }, [profileUrl]);
 
     const copyLink = async () => {
@@ -109,31 +110,18 @@ function QRCodeCard({ partnerUrl, storeName }: { partnerUrl: string; storeName: 
     };
 
     return (
-        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 h-full flex flex-col">
-            <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
-                    <QRCodeIcon size={20} className="text-brand-green" />
-                </div>
-                <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Seu Perfil de Vendedor</h3>
-            </div>
-
-            <div className="flex flex-col items-center gap-4 flex-1">
-                <div className="bg-white dark:bg-dark-surface p-4 rounded-2xl border border-brand-border dark:border-dark-border">
-                    <img
-                        src={qrCodeUrl}
-                        alt="QR Code do perfil"
-                        className="w-48 h-48 mx-auto"
-                    />
-                </div>
-                <p className="text-center text-sm font-medium text-brand-inactive-text dark:text-dark-body">
-                    Escaneie ou compartilhe seu perfil
+        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 h-full flex flex-row items-center gap-6">
+            <div className="flex-1 min-w-0">
+                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-2">Seu Perfil de Vendedor</h3>
+                <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-4">
+                    Compartilhe seu perfil com clientes e receba pedidos direto pela sua vitrine.
                 </p>
 
-                <div className="flex gap-3 w-full">
+                <div className="flex gap-3">
                     <Button
                         variant="outline"
                         size="sm"
-                        className="flex-1 gap-2"
+                        className="gap-2"
                         onClick={copyLink}
                     >
                         <CopyIcon className="w-4 h-4" />
@@ -142,7 +130,7 @@ function QRCodeCard({ partnerUrl, storeName }: { partnerUrl: string; storeName: 
                     <Button
                         variant="outline"
                         size="sm"
-                        className="flex-1 gap-2"
+                        className="gap-2"
                         onClick={shareProfile}
                     >
                         <ShareIcon className="w-4 h-4" />
@@ -150,9 +138,30 @@ function QRCodeCard({ partnerUrl, storeName }: { partnerUrl: string; storeName: 
                     </Button>
                 </div>
             </div>
+
+            <div className="shrink-0">
+                <div className="bg-white dark:bg-dark-surface p-2 rounded-xl border border-brand-border dark:border-dark-border">
+                    <img
+                        src={qrCodeUrl}
+                        alt="QR Code do perfil"
+                        className="w-28 h-28"
+                    />
+                </div>
+            </div>
         </div>
     );
 }
+
+const shortcutIconMap: Record<string, React.ComponentType<any>> = {
+    PlusIcon,
+    WrenchIcon,
+    ShoppingCartIcon,
+    Package,
+    StoreIcon,
+    SettingsIcon,
+    HelpCircleIcon,
+    CreditCardIcon,
+};
 
 function ShortcutsCard({ shortcuts, sellsProducts, sellsServices }: {
     shortcuts: DashboardLayout["shortcuts"];
@@ -162,20 +171,6 @@ function ShortcutsCard({ shortcuts, sellsProducts, sellsServices }: {
     const router = useRouter();
 
     const allShortcuts = [
-        ...(sellsProducts ? [{
-            id: "add-product",
-            label: "Anunciar Produto",
-            description: "Crie um novo anúncio no marketplace",
-            icon: "PlusIcon",
-            href: "/erp/products?create=true"
-        }] : []),
-        ...(sellsServices ? [{
-            id: "add-service",
-            label: "Anunciar Serviço",
-            description: "Ofereça um novo serviço aos clientes",
-            icon: "WrenchIcon",
-            href: "/erp/servicos?create=true"
-        }] : []),
         ...shortcuts,
         {
             id: "orders",
@@ -206,7 +201,7 @@ function ShortcutsCard({ shortcuts, sellsProducts, sellsServices }: {
                 {allShortcuts.slice(0, 5).map((shortcut) => (
                     <ListItem
                         key={shortcut.id}
-                        icon={shortcut.icon}
+                        icon={shortcutIconMap[shortcut.icon] || RocketIcon}
                         title={shortcut.label}
                         description={shortcut.description}
                         onClick={() => router.push(shortcut.href)}
@@ -227,12 +222,17 @@ function ShortcutsCard({ shortcuts, sellsProducts, sellsServices }: {
     );
 }
 
+const helpIconMap: Record<string, React.ComponentType<any>> = {
+    HelpCircleIcon,
+    MailIcon,
+    InfoIcon,
+};
+
 function HelpCard() {
     const router = useRouter();
 
     const helpItems = [
         { label: "Central de Ajuda", description: "Artigos, tutoriais e perguntas frequentes", href: "/ajuda", icon: "HelpCircleIcon" },
-        { label: "Vídeos Tutoriais", description: "Aprenda a usar a Dudit com nossos vídeos", href: "/ajuda/videos", icon: "PlayIcon" },
         { label: "Fale Conosco", description: "Suporte via chat, e-mail ou WhatsApp", href: "/ajuda/contato", icon: "MailIcon" },
         { label: "Status do Sistema", description: "Verifique o status dos serviços da Dudit", href: "https://status.dudit.com.br", icon: "InfoIcon", external: true },
     ];
@@ -250,7 +250,7 @@ function HelpCard() {
                 {helpItems.map((item) => (
                     <ListItem
                         key={item.label}
-                        icon={item.icon}
+                        icon={helpIconMap[item.icon] || HelpCircleIcon}
                         title={item.label}
                         description={item.description}
                         right={item.external ? <LinkIcon className="w-4 h-4 text-brand-inactive-text" /> : <ChevronRightIcon className="text-brand-inactive-text w-4 h-4" />}
@@ -259,17 +259,32 @@ function HelpCard() {
                     />
                 ))}
             </div>
-
-            <Button
-                variant="ghost"
-                size="sm"
-                className="w-full mt-2 text-brand-green font-bold"
-                onClick={() => router.push("/ajuda")}
-            >
-                Ver todos os recursos <ChevronRightIcon size={16} />
-            </Button>
         </div>
     );
+}
+
+interface Chapter {
+    id: string;
+    title: string;
+    items: DashboardChecklistItem[];
+}
+
+const CHAPTER_CONFIG: { id: string; title: string; itemIds: string[] }[] = [
+    { id: "chapter-1", title: "Produtos e Serviços", itemIds: ["items"] },
+    { id: "chapter-2", title: "Dados da Loja", itemIds: ["business-data", "showcase"] },
+    { id: "chapter-3", title: "Pagamento e Entrega", itemIds: ["payments", "logistics"] },
+];
+
+function buildChapters(items: DashboardChecklistItem[]): Chapter[] {
+    return CHAPTER_CONFIG
+        .map((cfg) => ({
+            id: cfg.id,
+            title: cfg.title,
+            items: cfg.itemIds
+                .map((id) => items.find((i) => i.id === id))
+                .filter(Boolean) as DashboardChecklistItem[],
+        }))
+        .filter((ch) => ch.items.length > 0);
 }
 
 function ProgressCard({
@@ -281,76 +296,102 @@ function ProgressCard({
     onItemClick: (item: DashboardChecklistItem) => void;
     onImportClick: () => void;
 }) {
-    if (!checklist) return null;
+    const [currentChapterIdx, setCurrentChapterIdx] = useState(0);
+
+    if (!checklist || checklist.items.length === 0) return null;
+
+    const chapters = buildChapters(checklist.items);
+    const currentChapter = chapters[currentChapterIdx] || chapters[0];
+
+    const chapterCompleted = (ch: Chapter) => ch.items.every((i) => i.completed);
 
     return (
         <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 h-full flex flex-col">
-            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-6">
-                <div>
-                    <h3 className="text-[17px] font-bold text-brand-dark dark:text-dark-heading">
-                        Seu Progresso de Ativação
-                    </h3>
-                    <p className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body mt-0.5">
-                        Complete as tarefas abaixo para deixar sua vitrine pronta.
+            <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
+                    <StoreIcon size={20} className="text-brand-green" />
+                </div>
+                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Primeiros Passos</h3>
+            </div>
+
+            <div className="flex items-center gap-1.5 mb-5">
+                {chapters.map((ch, idx) => {
+                    const done = chapterCompleted(ch);
+                    const isActive = idx === currentChapterIdx;
+                    return (
+                        <button
+                            key={ch.id}
+                            onClick={() => setCurrentChapterIdx(idx)}
+                            className={`h-1.5 flex-1 rounded-full transition-all ${
+                                done
+                                    ? "bg-brand-green"
+                                    : isActive
+                                        ? "bg-brand-green/60"
+                                        : "bg-brand-gray dark:bg-dark-border"
+                            }`}
+                        />
+                    );
+                })}
+            </div>
+
+            <div className="flex flex-row gap-6 flex-1 min-h-0">
+                <div className="flex flex-col justify-center gap-2 w-[200px] shrink-0">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body">
+                        Capítulo {currentChapterIdx + 1} de {chapters.length}
                     </p>
-                </div>
-                <div className="text-right shrink-0">
-                    <span className="text-[28px] font-black text-brand-green tracking-tight">
-                        {checklist.percentComplete}%
-                    </span>
-                    <span className="text-xs font-bold text-brand-inactive-text block uppercase">
-                        {checklist.completedCount} de {checklist.totalCount} concluídos
-                    </span>
-                </div>
-            </div>
+                    <h4 className="text-xl font-bold text-brand-dark dark:text-dark-heading leading-tight">
+                        {currentChapter.title}
+                    </h4>
+                    <p className="text-xs text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                        {currentChapter.items.length === 1
+                            ? currentChapter.items[0].description
+                            : `Complete as ${currentChapter.items.length} etapas abaixo para avançar.`}
+                    </p>
 
-            <div className="w-full h-3 bg-brand-gray dark:bg-dark-border rounded-full overflow-hidden mb-6">
-                <motion.div
-                    className="h-full bg-brand-green rounded-full"
-                    initial={{ width: 0 }}
-                    animate={{ width: `${checklist.percentComplete}%` }}
-                    transition={{ duration: 0.5, ease: "easeOut" }}
-                />
-            </div>
+                    <div className="flex items-center gap-2 mt-2">
+                        <button
+                            onClick={() => setCurrentChapterIdx((p) => Math.max(0, p - 1))}
+                            disabled={currentChapterIdx === 0}
+                            className="w-8 h-8 rounded-full flex items-center justify-center bg-brand-gray dark:bg-dark-border disabled:opacity-30 hover:bg-brand-gray/70 dark:hover:bg-dark-border/70 transition-colors"
+                        >
+                            <ChevronLeftIcon size={16} className="text-brand-dark dark:text-dark-heading" />
+                        </button>
+                        <button
+                            onClick={() => setCurrentChapterIdx((p) => Math.min(chapters.length - 1, p + 1))}
+                            disabled={currentChapterIdx === chapters.length - 1}
+                            className="w-8 h-8 rounded-full flex items-center justify-center bg-brand-gray dark:bg-dark-border disabled:opacity-30 hover:bg-brand-gray/70 dark:hover:bg-dark-border/70 transition-colors"
+                        >
+                            <ChevronRightIcon size={16} className="text-brand-dark dark:text-dark-heading" />
+                        </button>
+                    </div>
+                </div>
 
-            <div className="flex flex-col gap-3 flex-1 overflow-y-auto">
-                {checklist.items.map((item, idx) => (
-                    <ListItem
-                        key={item.id}
-                        left={
-                            item.completed ? (
+                <div className="flex-1 flex flex-col gap-2 overflow-y-auto min-w-0">
+                    {currentChapter.items.map((item) => (
+                        <div
+                            key={item.id}
+                            onClick={() => onItemClick(item)}
+                            className="flex items-center gap-3 px-4 py-3 rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all cursor-pointer"
+                        >
+                            {item.completed ? (
                                 <CheckCircleIcon size={22} className="text-brand-green shrink-0" />
                             ) : (
-                                <div>
-                                    {idx + 1}
+                                <div className="w-[22px] h-[22px] rounded-full border-2 border-brand-border dark:border-dark-border flex items-center justify-center shrink-0">
+                                    <div className="w-2 h-2 rounded-full bg-brand-border dark:bg-dark-border" />
                                 </div>
-                            )
-                        }
-                        title={
-                            <div className="flex items-center gap-2">
-                                <span className={`${item.completed ? 'line-through text-brand-inactive-text dark:text-dark-body' : 'text-brand-dark dark:text-dark-heading'}`}>
+                            )}
+                            <div className="flex-1 min-w-0">
+                                <p className={`text-sm font-bold truncate ${item.completed ? 'line-through text-brand-inactive-text dark:text-dark-body' : 'text-brand-dark dark:text-dark-heading'}`}>
                                     {item.title}
-                                </span>
+                                </p>
+                                <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate">
+                                    {item.description}
+                                </p>
                             </div>
-                        }
-                        description={item.description}
-                        right={
-                            <Button
-                                variant={item.completed ? "outline" : "default"}
-                                size="sm"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onItemClick(item);
-                                }}
-                                className={item.completed ? "hidden" : "h-9 shrink-0"}
-                            >
-                                {item.completed ? "Configurar" : "Começar"}
-                            </Button>
-                        }
-                        onClick={() => onItemClick(item)}
-                        className="px-4 py-3 gap-4 border-0"
-                    />
-                ))}
+                            <ChevronRightIcon size={18} className="text-brand-inactive-text shrink-0" />
+                        </div>
+                    ))}
+                </div>
             </div>
         </div>
     );

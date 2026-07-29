@@ -12,9 +12,10 @@ interface SelectServiceSheetProps {
   onOpenChange: (open: boolean) => void
   onSelect: (service: any) => void
   partnerId: string
+  storeId?: string | null
 }
 
-export default function SelectServiceSheet({ open, onOpenChange, onSelect, partnerId }: SelectServiceSheetProps) {
+export default function SelectServiceSheet({ open, onOpenChange, onSelect, partnerId, storeId }: SelectServiceSheetProps) {
   const [services, setServices] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState("")
@@ -22,12 +23,12 @@ export default function SelectServiceSheet({ open, onOpenChange, onSelect, partn
   useEffect(() => {
     if (!open) return
     setLoading(true)
-    getERPServicesPageAction(partnerId, { cursor: null, limit: 200 })
+    getERPServicesPageAction(partnerId, { cursor: null, limit: 200, storeId: storeId || undefined })
       .then((res) => {
         if (res.success) setServices(res.items || [])
       })
       .finally(() => setLoading(false))
-  }, [open, partnerId])
+  }, [open, partnerId, storeId])
 
   const filtered = useMemo(() => {
     const term = search.toLowerCase()

@@ -968,7 +968,7 @@ export async function getServiceOrderByTokenAction(
     const [services, products, attachments, historyRes, saleRes, addressRes] = await Promise.all([
       admin.from("service_order_services").select("*").eq("service_order_id", row.id).order("sort_order"),
       admin.from("service_order_products").select("*").eq("service_order_id", row.id).order("sort_order"),
-      admin.from("service_order_attachments").select("file_name, file_key, file_type, category, created_at").eq("service_order_id", row.id).order("created_at", { ascending: false }),
+      admin.from("service_order_attachments").select("file_name, file_key, file_type, file_size, category, created_at").eq("service_order_id", row.id).order("created_at", { ascending: false }),
       admin.from("audit_logs").select("id, action_type, change_lines, created_at").eq("entity_type", "service_order").eq("entity_id", row.id).order("created_at", { ascending: false }).limit(50),
       row.sale_id ? admin.from("sales").select("id, sale_number, total_amount, discount_amount, final_amount, paid_amount, payment_status, status, created_at").eq("id", row.sale_id).single() : Promise.resolve({ data: null }),
       row.store_id

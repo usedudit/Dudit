@@ -13,9 +13,10 @@ interface SelectProductSheetProps {
   onOpenChange: (open: boolean) => void
   onSelect: (product: any) => void
   partnerId: string
+  storeId?: string | null
 }
 
-export default function SelectProductSheet({ open, onOpenChange, onSelect, partnerId }: SelectProductSheetProps) {
+export default function SelectProductSheet({ open, onOpenChange, onSelect, partnerId, storeId }: SelectProductSheetProps) {
   const [products, setProducts] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState("")
@@ -23,12 +24,12 @@ export default function SelectProductSheet({ open, onOpenChange, onSelect, partn
   useEffect(() => {
     if (!open) return
     setLoading(true)
-    getERPProductsPageAction(partnerId, { cursor: null, limit: 200 })
+    getERPProductsPageAction(partnerId, { cursor: null, limit: 200, storeId: storeId || undefined })
       .then((res) => {
         if (res.success) setProducts(res.items || [])
       })
       .finally(() => setLoading(false))
-  }, [open, partnerId])
+  }, [open, partnerId, storeId])
 
   const filtered = useMemo(() => {
     const term = search.toLowerCase()

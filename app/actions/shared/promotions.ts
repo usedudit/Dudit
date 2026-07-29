@@ -1125,6 +1125,84 @@ export async function listActivePromotionsForMarketplaceAction(partnerId: string
   return await filterRawPromotionsByGiftStock(activePromos, supabase)
 }
 
+export async function listActivePromotionsForPartnersAction(partnerIds: string[]): Promise<Map<string, PricingPromotion[]>> {
+  const promoMap = new Map<string, PricingPromotion[]>()
+  if (!partnerIds || partnerIds.length === 0) return promoMap
+
+  const supabase = getAdminClient()
+  const now = new Date().toISOString()
+
+  const { data: campaigns } = await supabase
+    .from("campaigns")
+    .select("id, partner_id, customer_scope")
+    .in("partner_id", partnerIds)
+    .eq("is_active", true)
+    .or(`starts_at.is.null,starts_at.lte.${now}`)
+    .or(`ends_at.is.null,ends_at.gte.${now}`)
+
+  if (!campaigns || campaigns.length === 0) {
+    return promoMap
+  }
+
+  const activeCampaignIds = campaigns.filter((c: any) => c.customer_scope === "all").map((c: any) => c.id)
+  if (activeCampaignIds.length === 0) {
+    return promoMap
+  }
+
+  const { data: promotions } = await supabase
+    .from("promotions")
+    .select(`
+      *,
+      promotion_products(product_id),
+      promotion_categories(category_id),
+      promotion_services(service_id)
+    `)
+    .in("partner_id", partnerIds)
+    .eq("is_active", true)
+    .in("campaign_id", activeCampaignIds)
+
+  if (!promotions || promotions.length === 0) {
+    return promoMap
+  }
+
+  for (const promo of promotions) {
+    const limit = promo.usage_limit
+    const currentCount = promo.usage_count || 0
+    if (limit !== null && currentCount >= limit) {
+      continue
+    }
+
+    const pid = promo.partner_id
+    if (!promoMap.has(pid)) {
+      promoMap.set(pid, [])
+    }
+
+    promoMap.get(pid)!.push({
+      id: promo.id,
+      campaignId: promo.campaign_id,
+      partnerId: promo.partner_id,
+      name: promo.name,
+      promotionType: promo.promotion_type as PromotionType,
+      discountType: promo.discount_type as DiscountType | null,
+      discountValue: promo.discount_value ? Number(promo.discount_value) : null,
+      maxDiscountAmount: promo.max_discount_amount ? Number(promo.max_discount_amount) : null,
+      minSpendAmount: promo.min_spend_amount ? Number(promo.min_spend_amount) : null,
+      giftProductId: promo.gift_product_id,
+      giftServiceId: promo.gift_service_id,
+      buyQuantity: promo.buy_quantity,
+      payQuantity: promo.pay_quantity,
+      priority: promo.priority || 0,
+      applyScope: promo.apply_scope as ApplyScope,
+      allowCouponCombination: promo.allow_coupon_combination ?? false,
+      applicableProductIds: (promo.promotion_products || []).map((p: any) => p.product_id),
+      applicableCategoryIds: (promo.promotion_categories || []).map((c: any) => c.category_id),
+      applicableServiceIds: (promo.promotion_services || []).map((s: any) => s.service_id),
+    })
+  }
+
+  return promoMap
+}
+
 export async function getPromotionScopeDataAction(partnerId: string) {
   await requireUser()
   await requirePermission(partnerId, "coupons", "view")

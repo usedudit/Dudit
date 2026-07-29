@@ -488,6 +488,19 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
             newErrors.add("productsPrice")
         }
 
+        if (!editData && expectedDate) {
+            const now = new Date()
+            const [ey, em, ed] = expectedDate.split("-").map(Number)
+            const expectedDateTime = expectedCompletionTime
+                ? new Date(ey, em - 1, ed, ...expectedCompletionTime.split(":").map(Number))
+                : new Date(ey, em - 1, ed, 23, 59, 59)
+            if (expectedDateTime <= now) {
+                toast({ description: "A data prevista não pode ser anterior à data e hora atual." })
+                setActiveTab("general")
+                return
+            }
+        }
+
         if (newErrors.size > 0) {
             setFieldErrors(newErrors)
             if (hasEmptyService || hasEmptyProduct) {
@@ -1999,6 +2012,7 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                 onOpenChange={setShowServiceSheet}
                 onSelect={handleAddService}
                 partnerId={partnerId}
+                storeId={storeId}
             />
 
             <SelectProductSheet
@@ -2006,6 +2020,7 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                 onOpenChange={setShowProductSheet}
                 onSelect={handleAddProduct}
                 partnerId={partnerId}
+                storeId={storeId}
             />
 
             <SelectCouponSheet

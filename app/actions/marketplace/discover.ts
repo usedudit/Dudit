@@ -421,31 +421,36 @@ function processProduct(item: RawProduct, extra?: Record<string, any>) {
     }
 }
 
+// ─── Shared Request-Scoped Product Pool ────────────────────────────────────
+
+const getSharedHomeProductsPool = cache(async (allIdsKey: string, allIds: string[]): Promise<RawProduct[]> => {
+    if (allIds.length === 0) return []
+    const supabase = getAdminClient()
+    const { data, error } = await supabase
+        .from("products")
+        .select(`${BASE_FIELDS}, ${STATS_FIELDS}, condition, created_at, category_id, ${PARTNER_JOIN}`)
+        .eq("is_active", true)
+        .eq("show_in_marketplace", true)
+        .in("partner_id", allIds)
+        .order("created_at", { ascending: false })
+        .limit(120)
+
+    if (error || !data) return []
+    return data as RawProduct[]
+})
+
 // ─── SECTION FETCHERS ───────────────────────────────────────────────────────
 
 // ─── 1. 🔥 Bombando na sua região ───────────────────────────────────────────
 
 async function fetchTrending(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
-    const supabase = getAdminClient()
     const allIds = [...tiers.allIds]
     if (allIds.length === 0) {
         dLog(`[Discover] SKIP trending reason=no_partners`)
         return null
     }
 
-    let { data: trendingData, error } = await supabase
-        .from("products")
-        .select(`${BASE_FIELDS}, ${STATS_FIELDS}, ${PARTNER_JOIN}`)
-        .eq("is_active", true)
-        .eq("show_in_marketplace", true)
-        .in("partner_id", allIds)
-        .limit(60)
-
-    if (error) {
-        dError(`[DISCOVER][TRENDING] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
-        dLog(`[Discover] SKIP trending reason=error`)
-        return null
-    }
+    const trendingData = await getSharedHomeProductsPool(allIds.join(","), allIds)
 
     if (!trendingData || trendingData.length === 0) {
         dLog(`[Discover] SKIP trending reason=no_products`)
@@ -649,19 +654,7 @@ async function fetchNearby(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
         return null
     }
 
-    let { data, error } = await supabase
-        .from("products")
-        .select(`${BASE_FIELDS}, ${PARTNER_JOIN}`)
-        .eq("is_active", true)
-        .eq("show_in_marketplace", true)
-        .in("partner_id", allIds)
-        .limit(60)
-
-    if (error) {
-        dError(`[DISCOVER][NEARBY] Error:`, error)
-        dLog(`[Discover] SKIP nearby reason=error`)
-        return null
-    }
+    const data = await getSharedHomeProductsPool(allIds.join(","), allIds)
 
     if (!data || data.length === 0) {
         dLog(`[Discover] SKIP nearby reason=no_products`)
@@ -754,15 +747,8 @@ async function fetchRecent(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
         return null
     }
 
-    const [prodResult, servResult] = await Promise.all([
-        supabase
-            .from("products")
-            .select(`${BASE_FIELDS}, created_at, ${PARTNER_JOIN}`)
-            .eq("is_active", true)
-            .eq("show_in_marketplace", true)
-            .in("partner_id", allIds)
-            .order("created_at", { ascending: false })
-            .limit(60),
+    const [products, servResult] = await Promise.all([
+        getSharedHomeProductsPool(allIds.join(","), allIds),
         supabase
             .from("services")
             .select(`id, name, price, images, rating, created_at, ${PARTNER_JOIN}`)
@@ -773,14 +759,10 @@ async function fetchRecent(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
             .limit(30),
     ])
 
-    if (prodResult.error) {
-        dError(`[DISCOVER][RECENT] Products Error:`, prodResult.error, `city=${ctx.city} state=${ctx.state}`)
-    }
     if (servResult.error) {
         dError(`[DISCOVER][RECENT] Services Error:`, servResult.error, `city=${ctx.city} state=${ctx.state}`)
     }
 
-    const products = (prodResult.data || []) as RawProduct[]
     const services = (servResult.data || []) as any[]
 
     if (products.length === 0 && services.length === 0) {
@@ -878,20 +860,7 @@ async function fetchGems(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSec
     }
 
     const seed = dailySeed(ctx.userId)
-
-    let { data, error } = await supabase
-        .from("products")
-        .select(`${BASE_FIELDS}, ${STATS_FIELDS}, condition, created_at, category_id, ${PARTNER_JOIN}`)
-        .eq("is_active", true)
-        .eq("show_in_marketplace", true)
-        .in("partner_id", allIds)
-        .limit(80)
-
-    if (error) {
-        dError(`[DISCOVER][GEMS] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
-        dLog(`[Discover] SKIP gems reason=error`)
-        return null
-    }
+    const data = await getSharedHomeProductsPool(allIds.join(","), allIds)
 
     if (!data || data.length === 0) {
         dLog(`[Discover] SKIP gems reason=no_products`)
@@ -1891,16 +1860,8 @@ async function getHomeSectionsUncached(ctx: DiscoverCtx): Promise<HomeSection[]>
         }
     }
     if (partnerIds.size > 0) {
-        const { listActivePromotionsForMarketplaceAction } = await import("@/app/actions/shared/promotions")
-        const promoResults = await Promise.allSettled(
-            [...partnerIds].map(pid => listActivePromotionsForMarketplaceAction(pid))
-        )
-        const promoMap = new Map<string, any[]>()
-        let idx = 0
-        for (const pid of partnerIds) {
-            const res = promoResults[idx++]
-            promoMap.set(pid, res.status === "fulfilled" ? res.value : [])
-        }
+        const { listActivePromotionsForPartnersAction } = await import("@/app/actions/shared/promotions")
+        const promoMap = await listActivePromotionsForPartnersAction([...partnerIds])
         for (const section of result) {
             for (const item of section.items) {
                 const pid = getPartnerId(item)

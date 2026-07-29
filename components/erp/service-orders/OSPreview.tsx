@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useMemo } from 'react';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils';
 import { UserProfileImage } from '@/lib/utils/UserProfileImage';
 import { r2PublicConfig } from "@/lib/r2/r2-public";
 
@@ -259,11 +259,11 @@ const OSPreview = ({
                                                 </div>
                                                 <div className="flex flex-col">
                                                     <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Emissão</span>
-                                                    <span className="font-bold text-sm text-brand-dark">{formatDate(orderDate)}</span>
+                                                    <span className="font-bold text-sm text-brand-dark">{formatDateTime(orderDate)}</span>
                                                 </div>
                                                 <div className="flex flex-col">
                                                     <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Previsão</span>
-                                                    <span className="font-bold text-sm text-brand-dark">{expectedCompletionDate ? formatDate(expectedCompletionDate) : "-"}</span>
+                                                    <span className="font-bold text-sm text-brand-dark">{expectedCompletionDate ? formatDateTime(expectedCompletionDate) : "-"}</span>
                                                 </div>
                                                 {salespersonName && (
                                                     <div className="flex flex-col">

@@ -15,8 +15,18 @@ export const dynamic = "force-dynamic"
  * in a single parallel batch with ONE auth context.
  * Replaces 4 separate client-side server actions that each did their own auth.
  */
-async function loadCatalogs(partnerId: string) {
+async function loadCatalogs(partnerId: string, storeId?: string | null) {
   const supabase = await getSupabaseServerClient()
+
+  let servicesQuery = scopeActiveOnly(supabase
+    .from("services")
+    .select("id, name, price, promotional_price, category_id, duration_minutes, buffer_minutes, billing_unit, resources, service_categories!category_id(name)")
+    .eq("partner_id", partnerId)
+    .eq("is_active", true))
+
+  if (storeId) {
+    servicesQuery = servicesQuery.eq("store_id", storeId)
+  }
 
   const [partnerUsersRes, partnerRes, customersRes, servicesRes, unavailableRes] = await Promise.all([
     supabase
@@ -37,13 +47,7 @@ async function loadCatalogs(partnerId: string) {
       .eq("status", "ativo")
       .order("name", { ascending: true })
       .limit(500),
-    scopeActiveOnly(supabase
-      .from("services")
-      .select("id, name, price, promotional_price, category_id, duration_minutes, buffer_minutes, billing_unit, resources, service_categories!category_id(name)")
-      .eq("partner_id", partnerId)
-      .eq("is_active", true))
-      .order("name")
-      .limit(500),
+    servicesQuery.order("name").limit(500),
     supabase
       .from("unavailable_types")
       .select("*")
@@ -131,7 +135,7 @@ export default async function AgendamentosPage() {
   if (!allowed) return <AccessDenied />
 
   // SSR: single parallel fetch replaces 4 client-side server actions
-  const catalogs = await loadCatalogs(partnerId)
+  const catalogs = await loadCatalogs(partnerId, activeStoreId)
 
   return (
     <>

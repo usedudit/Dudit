@@ -198,6 +198,9 @@ export async function handleAppointmentItemsStockMovement(params: {
     newStatus: string
     userId: string
     storeId?: string | null
+    paymentStatus?: string | null
+    paidAmount?: number | null
+    price?: number | null
 }) {
     const supabase = createAdminClient()
     const { appointmentId, partnerId, oldStatus, newStatus, userId, storeId } = params
@@ -208,16 +211,29 @@ export async function handleAppointmentItemsStockMovement(params: {
     const isCancelled = (s: string | null) => ['Cancelado', 'Ausência'].includes(s || "")
     const isWaiting = (s: string | null) => ['Reservado', 'Confirmado', 'Aguardando'].includes(s || "")
 
+    // Only allow full stock finalization for consumed items when appointment is fully paid
+    const isFullyPaid = (() => {
+        const ps = String(params.paymentStatus || '').toLowerCase()
+        if (ps === 'paid' || ps === 'pago') return true
+        const paidAmt = Number(params.paidAmount || 0)
+        const totalPrice = Number(params.price || 0)
+        if (paidAmt > 0 && totalPrice > 0 && paidAmt >= totalPrice - 0.009) return true
+        return false
+    })()
+
     let action: 'reserve' | 'finalize' | 'release' | null = null
+    let finalizeConsumed = false
 
     if ((oldStatus === null || isWaiting(oldStatus)) && isInProgress(newStatus)) {
         action = 'reserve'
     } else if (isInProgress(oldStatus) && isCompleted(newStatus)) {
         action = 'finalize'
+        finalizeConsumed = isFullyPaid
     } else if (isInProgress(oldStatus) && isCancelled(newStatus)) {
         action = 'release'
     } else if ((oldStatus === null || isWaiting(oldStatus)) && isCompleted(newStatus)) {
         action = 'finalize'
+        finalizeConsumed = isFullyPaid
     }
 
     if (!action) return
@@ -253,14 +269,34 @@ export async function handleAppointmentItemsStockMovement(params: {
             }
         }
     } else if (action === 'finalize') {
-        const consumableItems = appointmentItems
-            .filter((i: any) => i.usage_type === 'consumed' && i.product_id)
-            .map((i: any) => ({
-                product_id: i.product_id,
-                variant_id: i.variant_id || null,
-                quantity: Number(i.quantity),
-            }))
+        // Consumed items only get stock movement (decrement) when appointment is fully paid
+        if (finalizeConsumed) {
+            const consumableItems = appointmentItems
+                .filter((i: any) => i.usage_type === 'consumed' && i.product_id)
+                .map((i: any) => ({
+                    product_id: i.product_id,
+                    variant_id: i.variant_id || null,
+                    quantity: Number(i.quantity),
+                }))
 
+            if (consumableItems.length > 0) {
+                const result = await finalizeOrderInventory({
+                    client: supabase,
+                    partnerId,
+                    orderId: appointmentId,
+                    items: consumableItems,
+                    createdBy: userId,
+                    reason: "Uso em serviço",
+                    notes: `Agendamento concluído`,
+                    storeId: storeId || null,
+                })
+                if (!result.success) {
+                    console.error(`[appointment_stock] finalize (consumed) failed for ${appointmentId}:`, result.error)
+                }
+            }
+        }
+
+        // Returnable items are always released when completed (return to stock)
         const returnableItems = appointmentItems
             .filter((i: any) => i.usage_type === 'returnable' && i.product_id)
             .map((i: any) => ({
@@ -268,22 +304,6 @@ export async function handleAppointmentItemsStockMovement(params: {
                 variant_id: i.variant_id || null,
                 quantity: Number(i.quantity),
             }))
-
-        if (consumableItems.length > 0) {
-            const result = await finalizeOrderInventory({
-                client: supabase,
-                partnerId,
-                orderId: appointmentId,
-                items: consumableItems,
-                createdBy: userId,
-                reason: "Uso em serviço",
-                notes: `Agendamento concluído`,
-                storeId: storeId || null,
-            })
-            if (!result.success) {
-                console.error(`[appointment_stock] finalize (consumed) failed for ${appointmentId}:`, result.error)
-            }
-        }
 
         if (returnableItems.length > 0) {
             const result = await releaseOrderInventory({
@@ -397,7 +417,7 @@ export async function getPartnerPlanAction() {
     }
 }
 
-export async function searchProductsForAppointmentItems(query: string) {
+export async function searchProductsForAppointmentItems(query: string, storeId?: string | null) {
     if (!query || query.trim().length < 2) return []
 
     try {
@@ -408,13 +428,19 @@ export async function searchProductsForAppointmentItems(query: string) {
         const supabase = createAdminClient()
         const searchTerm = `%${query}%`
 
-        const { data, error } = await supabase
+        let sb = supabase
             .from("products")
             .select("id, name, sku, price, promotional_price, category_id, stock_available, images, product_variants(id, variant_name, sku, price_adjustment, stock_available)")
             .eq("partner_id", ctx.partnerId)
             .eq("is_active", true)
             .or(`name.ilike.${searchTerm},sku.ilike.${searchTerm}`)
-            .limit(10)
+
+        const storeFilter = storeId || ctx.activeStoreId
+        if (storeFilter) {
+            sb = sb.eq("store_id", storeFilter)
+        }
+
+        const { data, error } = await sb.limit(10)
 
         if (error) {
             console.error("Error searching products for appointment items:", error)

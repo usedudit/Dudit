@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/lib/auth/authorization"
 import { getUserSessionData } from "@/lib/data/user"
 import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
 
+export const dynamic = 'force-dynamic'
 export const dynamicParams = true
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string; cidadeUf: string; id: string }> }): Promise<Metadata> {

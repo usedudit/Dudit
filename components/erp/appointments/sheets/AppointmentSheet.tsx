@@ -15,7 +15,7 @@ import { usePermissions } from '@/lib/permission-context';
 import { RecurrenceView, ActivityLog } from '../Shared';
 import { Appointment } from '../types';
 import { ServiceItemCard } from '../ServiceItemCard';
-import { formatDateStr, formatDuration, parseLocalDate, checkAppointmentCollision } from '../utils';
+import { formatDateStr, formatDuration, parseLocalDate, checkAppointmentCollision, getDayOpeningTime } from '../utils';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
 import { useMediaQuery } from '@/components/erp/hooks';
 import BottomSheet from '@/components/BottomSheet';
@@ -558,9 +558,9 @@ export const AppointmentSheet = ({
             setSelectedCalDate(targetDate);
             setBaseCalDate(targetDate);
             setStartDateRange(todayStr);
-            setStartTimeRange(initialTimeSlot || '09:00');
+            setStartTimeRange(initialTimeSlot || getDayOpeningTime(targetDate, openingHours));
             setEndDateRange(todayStr);
-            setEndTimeRange(initialTimeSlot ? addMinutes(initialTimeSlot, 60) : '10:00');
+            setEndTimeRange(initialTimeSlot ? addMinutes(initialTimeSlot, 60) : addMinutes(getDayOpeningTime(targetDate, openingHours), 60));
 
             if (initialTimeSlot) {
                 setSelectedTimeSlot(initialTimeSlot);
@@ -689,10 +689,10 @@ export const AppointmentSheet = ({
                         const tomorrow = new Date(selectedDate || defaultDate);
                         tomorrow.setDate(tomorrow.getDate() + 1);
                         setEndDateRange(formatDateStr(tomorrow));
-                        setEndTimeRange('09:00');
+                        setEndTimeRange(getDayOpeningTime(selectedDate || defaultDate, openingHours));
                     } else {
                         setEndDateRange(todayStr);
-                        setEndTimeRange(addMinutes(initialTimeSlot || '09:00', 60));
+                        setEndTimeRange(addMinutes(initialTimeSlot || getDayOpeningTime(selectedDate || defaultDate, openingHours), 60));
                     }
                 }
 
@@ -827,7 +827,7 @@ export const AppointmentSheet = ({
     const generateRecurringAppointments = () => {
         const finalDateObj = selectedDate || defaultDate;
         const baseDateStr = needsRangePicker ? startDateRange : formatDateStr(finalDateObj);
-        const timeStr = needsRangePicker ? startTimeRange : (selectedTimeSlot || '09:00');
+        const timeStr = needsRangePicker ? startTimeRange : (selectedTimeSlot || getDayOpeningTime(finalDateObj, openingHours));
 
         const isOutsideHours = checkOutsideOperatingHours(baseDateStr, timeStr, calculatedDuration);
         if (isOutsideHours) {
@@ -1029,7 +1029,7 @@ export const AppointmentSheet = ({
 
     const handleSaveChanges = () => {
         const finalDateStr = needsRangePicker ? startDateRange : formatDateStr(selectedCalDate);
-        const timeStr = needsRangePicker ? startTimeRange : (editTime || selectedTimeSlot || '09:00');
+        const timeStr = needsRangePicker ? startTimeRange : (editTime || selectedTimeSlot || getDayOpeningTime(selectedCalDate, openingHours));
         const isOutsideHours = checkOutsideOperatingHours(finalDateStr, timeStr, calculatedDuration);
         if (isOutsideHours) {
             toast.error("Horário Inválido", "O horário selecionado está fora do horário de funcionamento do negócio.");
@@ -1453,8 +1453,8 @@ export const AppointmentSheet = ({
 
     // Logic to calculate sequential time slots for the summary view
     const getServiceTimeRange = (index: number) => {
-        // Fallback for when "editTime" might be empty (new creation), usually '09:00' default
-        let startTime = needsRangePicker ? startTimeRange : (editTime || selectedTimeSlot || '09:00');
+        // Fallback for when "editTime" might be empty (new creation), use opening time
+        let startTime = needsRangePicker ? startTimeRange : (editTime || selectedTimeSlot || getDayOpeningTime(selectedCalDate, openingHours));
 
         // Calculate accumulated duration of previous services
         for (let i = 0; i < index; i++) {
@@ -1824,7 +1824,7 @@ export const AppointmentSheet = ({
                         const displayOrderNumber = orderNumber || (linkedOrderId ? linkedOrderId.slice(0, 8).toUpperCase() : null);
 
                         const finalDateStr = needsRangePicker ? startDateRange : formatDateStr(selectedCalDate);
-                        const timeStr = needsRangePicker ? startTimeRange : (editTime || selectedTimeSlot || '09:00');
+                        const timeStr = needsRangePicker ? startTimeRange : (editTime || selectedTimeSlot || getDayOpeningTime(selectedCalDate, openingHours));
                         const isOutsideHours = checkOutsideOperatingHours(finalDateStr, timeStr, calculatedDuration);
                         const hasCollision = appointmentsList && appointment ? checkAppointmentCollision({
                             ...appointment,
@@ -3261,6 +3261,7 @@ export const AppointmentSheet = ({
                 isOpen={isAddItemSheetOpen}
                 onClose={() => setIsAddItemSheetOpen(false)}
                 partnerId={partnerId}
+                storeId={storeIdProp}
                 onConfirm={(newItem) => {
                     const item = {
                         ...newItem,

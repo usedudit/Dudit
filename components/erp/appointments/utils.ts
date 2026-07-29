@@ -319,4 +319,16 @@ export const getGridHoursRange = (currentDate: Date, openingHours: any) => {
     return { startHour, endHour };
 };
 
+export const getDayOpeningTime = (date: Date, openingHours: any): string => {
+    const DAYS_OF_WEEK = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+    const dName = DAYS_OF_WEEK[date.getDay()];
+    if (openingHours) {
+        const dConfig = openingHours[dName];
+        if (dConfig && dConfig.enabled && dConfig.from) {
+            return dConfig.from;
+        }
+    }
+    return "09:00";
+};
+
 

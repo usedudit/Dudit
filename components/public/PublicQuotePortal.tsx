@@ -237,8 +237,8 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
         }))
     }, [items])
 
-    // Disable approval features if quote is finalized
     const isFinalized = quote.status === "approved" || quote.status === "rejected" || quote.status === "expired" || quote.status === "cancelled" || quote.converted
+    const isActionable = !isFinalized && (quote.status === "sent" || quote.status === "pending_client" || quote.status === "viewed")
 
     return (
         <div className="flex flex-col h-screen bg-white dark:bg-dark-background overflow-hidden relative">
@@ -294,24 +294,18 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                             <div className="flex-1 overflow-y-auto no-scrollbar relative p-4 md:p-6 pb-24">
                                 {/* Success and Error Banners */}
                                 {successMessage && (
-                                    <div className="mb-6 p-4 bg-green-50 border border-green-200 text-green-800 rounded-2xl flex items-center gap-3">
-                                        <span className="text-xs font-semibold">{successMessage}</span>
-                                        <button onClick={() => setSuccessMessage(null)} className="ml-auto text-green-500 hover:text-green-700">✕</button>
-                                    </div>
+                                    <InfoCard message={successMessage} color='green' rightElement={<Button variant="link" className="text-brand-green mb-8" onClick={() => setSuccessMessage(null)} value="X" />} />
                                 )}
 
                                 {errorMessage && (
-                                    <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-800 rounded-2xl flex items-center gap-3">
-                                        <span className="text-xs font-semibold">{errorMessage}</span>
-                                        <button onClick={() => setErrorMessage(null)} className="ml-auto text-red-500 hover:text-red-700">✕</button>
-                                    </div>
+                                    <InfoCard message={errorMessage} color='red' rightElement={<Button variant="link" className="text-brand-red mb-8" onClick={() => setErrorMessage(null)} value="X" />} />
                                 )}
 
                                 {/* TABS CONTENT */}
                                 <div className={`${activeTab === "Visualização" ? "hidden lg:block" : "block"}`}>
                                     {/* Messages */}
                                     {isFinalized && (
-                                        <div>
+                                        <div className="mb-8">
                                             {quote.status === "approved" ? (
                                                 <InfoCard title='Aprovado pelo cliente' message={`Aprovador: ${quote.approver_name || "Cliente"} - Data: ${formatDateTime(quote.approved_at)}`} color='green' />
                                             ) : quote.status === "rejected" ? (
@@ -366,7 +360,7 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                                                 </FormSection>
                                             )}
 
-                                            {isFinalized && (
+                                            {isActionable && (
                                                 <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-brand-border dark:border-dark-border">
                                                     <Button
                                                         onClick={() => setShowRejectModal(true)}
