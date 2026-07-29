@@ -27,6 +27,10 @@ import {
     PlayIcon,
     MailIcon,
     PlusIcon,
+    FacebookIcon,
+    XIcon,
+    TelegramIcon,
+    LinkedinIcon,
 } from "@/lib/icons";
 import { Button, Badge, ListItem, FormSection, DefaultModal, InfoCard } from "@/components/reusable";
 import { Tooltip } from "@/components/reusable/Tooltip"
@@ -73,6 +77,7 @@ interface DashboardChecklistItem {
 function QRCodeCard({ partnerUrl, storeName }: { partnerUrl: string; storeName: string }) {
     const [qrCodeUrl, setQrCodeUrl] = useState<string>("");
     const [copied, setCopied] = useState(false);
+    const [showShareOptions, setShowShareOptions] = useState(false);
     const { toast } = useToast();
 
     const origin = typeof window !== "undefined" ? window.location.origin : "https://dudit.com.br";
@@ -101,16 +106,17 @@ function QRCodeCard({ partnerUrl, storeName }: { partnerUrl: string; storeName: 
                     text: `Confira meu perfil na Dudit: ${storeName}`,
                     url: profileUrl,
                 });
+                setShowShareOptions(false);
             } catch (e) {
                 if ((e as Error).name !== "AbortError") copyLink();
             }
         } else {
-            copyLink();
+            setShowShareOptions(true);
         }
     };
 
     return (
-        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 h-full flex flex-row items-center gap-6">
+        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 h-[280px] flex flex-row items-center gap-6">
             <div className="flex-1 min-w-0">
                 <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-2">Seu Perfil de Vendedor</h3>
                 <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-4">
@@ -137,6 +143,59 @@ function QRCodeCard({ partnerUrl, storeName }: { partnerUrl: string; storeName: 
                         Compartilhar
                     </Button>
                 </div>
+
+                {showShareOptions && (
+                    <div className="mt-4 p-4 bg-brand-gray/30 dark:bg-dark-border/30 rounded-xl border border-brand-border dark:border-dark-border">
+                        <p className="text-sm font-medium text-brand-dark dark:text-dark-heading mb-2">Compartilhar via:</p>
+                        <div className="flex gap-2 flex-wrap">
+                            <a
+                                href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`Confira meu perfil na Dudit: ${storeName} ${profileUrl}`)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-8 h-8 rounded-full bg-[#25D366] hover:bg-[#25D366]/90 flex items-center justify-center"
+                                title="WhatsApp"
+                            >
+                                <WhatsappIcon size={16} className="text-white" />
+                            </a>
+                            <a
+                                href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(profileUrl)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-8 h-8 rounded-full bg-[#1877F2] hover:bg-[#1877F2]/90 flex items-center justify-center"
+                                title="Facebook"
+                            >
+                                <FacebookIcon size={16} className="text-white" />
+                            </a>
+                            <a
+                                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(storeName)}&url=${encodeURIComponent(profileUrl)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-8 h-8 rounded-full bg-black hover:bg-black/90 flex items-center justify-center"
+                                title="X"
+                            >
+                                <XIcon size={16} className="text-white" />
+                            </a>
+                            <a
+                                href={`https://t.me/share/url?url=${encodeURIComponent(profileUrl)}&text=${encodeURIComponent(storeName)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-8 h-8 rounded-full bg-[#26A5E4] hover:bg-[#26A5E4]/90 flex items-center justify-center"
+                                title="Telegram"
+                            >
+                                <TelegramIcon size={16} className="text-white" />
+                            </a>
+                            <a
+                                href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(profileUrl)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-8 h-8 rounded-full bg-[#0A66C2] hover:bg-[#0A66C2]/90 flex items-center justify-center"
+                                title="LinkedIn"
+                            >
+                                <LinkedinIcon size={16} className="text-white" />
+                            </a>
+                        </div>
+                    </div>
+                )}
             </div>
 
             <div className="shrink-0">
@@ -189,7 +248,7 @@ function ShortcutsCard({ shortcuts, sellsProducts, sellsServices }: {
     ];
 
     return (
-        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 h-full">
+        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 h-[280px] flex flex-col">
             <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
                     <RocketIcon size={20} className="text-brand-green" />
@@ -197,7 +256,7 @@ function ShortcutsCard({ shortcuts, sellsProducts, sellsServices }: {
                 <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Atalhos Rápidos</h3>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2 flex-1 overflow-y-auto">
                 {allShortcuts.slice(0, 5).map((shortcut) => (
                     <ListItem
                         key={shortcut.id}
@@ -238,7 +297,7 @@ function HelpCard() {
     ];
 
     return (
-        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 h-full">
+        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 h-[280px] flex flex-col">
             <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
                     <HelpCircleIcon size={20} className="text-brand-green" />
@@ -246,7 +305,7 @@ function HelpCard() {
                 <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Ajuda e Suporte</h3>
             </div>
 
-            <div className="space-y-2 flex-1">
+            <div className="space-y-2 flex-1 overflow-y-auto">
                 {helpItems.map((item) => (
                     <ListItem
                         key={item.label}
@@ -263,20 +322,20 @@ function HelpCard() {
     );
 }
 
-interface Chapter {
+interface Stage {
     id: string;
     title: string;
     items: DashboardChecklistItem[];
 }
 
-const CHAPTER_CONFIG: { id: string; title: string; itemIds: string[] }[] = [
-    { id: "chapter-1", title: "Produtos e Serviços", itemIds: ["items"] },
-    { id: "chapter-2", title: "Dados da Loja", itemIds: ["business-data", "showcase"] },
-    { id: "chapter-3", title: "Pagamento e Entrega", itemIds: ["payments", "logistics"] },
+const STAGE_CONFIG: { id: string; title: string; itemIds: string[] }[] = [
+    { id: "stage-1", title: "Produtos e Serviços", itemIds: ["items"] },
+    { id: "stage-2", title: "Dados da Loja", itemIds: ["business-data", "showcase"] },
+    { id: "stage-3", title: "Pagamento e Entrega", itemIds: ["payments", "logistics"] },
 ];
 
-function buildChapters(items: DashboardChecklistItem[]): Chapter[] {
-    return CHAPTER_CONFIG
+function buildStages(items: DashboardChecklistItem[]): Stage[] {
+    return STAGE_CONFIG
         .map((cfg) => ({
             id: cfg.id,
             title: cfg.title,
@@ -284,7 +343,7 @@ function buildChapters(items: DashboardChecklistItem[]): Chapter[] {
                 .map((id) => items.find((i) => i.id === id))
                 .filter(Boolean) as DashboardChecklistItem[],
         }))
-        .filter((ch) => ch.items.length > 0);
+        .filter((st) => st.items.length > 0);
 }
 
 function ProgressCard({
@@ -296,69 +355,76 @@ function ProgressCard({
     onItemClick: (item: DashboardChecklistItem) => void;
     onImportClick: () => void;
 }) {
-    const [currentChapterIdx, setCurrentChapterIdx] = useState(0);
+    const [currentStageIdx, setCurrentStageIdx] = useState(0);
 
     if (!checklist || checklist.items.length === 0) return null;
 
-    const chapters = buildChapters(checklist.items);
-    const currentChapter = chapters[currentChapterIdx] || chapters[0];
+    const stages = buildStages(checklist.items);
+    const currentStage = stages[currentStageIdx] || stages[0];
 
-    const chapterCompleted = (ch: Chapter) => ch.items.every((i) => i.completed);
+    const stageCompleted = (st: Stage) => st.items.every((i) => i.completed);
 
     return (
-        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 h-full flex flex-col">
-            <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
-                    <StoreIcon size={20} className="text-brand-green" />
+        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 h-[280px] flex flex-col">
+            <div className="flex items-start justify-between gap-4 mb-4">
+                <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Primeiros Passos</h3>
+                    <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
+                        Complete as etapas para deixar sua vitrine pronta.
+                    </p>
                 </div>
-                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Primeiros Passos</h3>
+                <div className="flex items-center gap-2 shrink-0 ml-4">
+                    <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider">
+                        {stages.filter(stageCompleted).length} / {stages.length}
+                    </span>
+                    <div className="w-32 h-1.5 bg-brand-gray dark:bg-dark-border rounded-full overflow-hidden">
+                        {stages.map((st, idx) => {
+                            const done = stageCompleted(st);
+                            const active = idx === currentStageIdx;
+                            const widthPercent = 100 / stages.length;
+                            return (
+                                <div
+                                    key={st.id}
+                                    className={`h-full transition-all duration-300 ${
+                                        done
+                                            ? "bg-brand-green"
+                                            : active
+                                                ? "bg-brand-green/60"
+                                                : "bg-brand-gray dark:bg-dark-border"
+                                    }`}
+                                    style={{ width: `${widthPercent}%` }}
+                                />
+                            );
+                        })}
+                    </div>
+                </div>
             </div>
 
-            <div className="flex items-center gap-1.5 mb-5">
-                {chapters.map((ch, idx) => {
-                    const done = chapterCompleted(ch);
-                    const isActive = idx === currentChapterIdx;
-                    return (
-                        <button
-                            key={ch.id}
-                            onClick={() => setCurrentChapterIdx(idx)}
-                            className={`h-1.5 flex-1 rounded-full transition-all ${
-                                done
-                                    ? "bg-brand-green"
-                                    : isActive
-                                        ? "bg-brand-green/60"
-                                        : "bg-brand-gray dark:bg-dark-border"
-                            }`}
-                        />
-                    );
-                })}
-            </div>
-
-            <div className="flex flex-row gap-6 flex-1 min-h-0">
+            <div className="flex flex-row gap-4 flex-1 min-h-0">
                 <div className="flex flex-col justify-center gap-2 w-[200px] shrink-0">
                     <p className="text-[11px] font-bold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body">
-                        Capítulo {currentChapterIdx + 1} de {chapters.length}
+                        Etapa {currentStageIdx + 1} de {stages.length}
                     </p>
                     <h4 className="text-xl font-bold text-brand-dark dark:text-dark-heading leading-tight">
-                        {currentChapter.title}
+                        {currentStage.title}
                     </h4>
                     <p className="text-xs text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                        {currentChapter.items.length === 1
-                            ? currentChapter.items[0].description
-                            : `Complete as ${currentChapter.items.length} etapas abaixo para avançar.`}
+                        {currentStage.items.length === 1
+                            ? currentStage.items[0].description
+                            : `Complete as ${currentStage.items.length} tarefas abaixo para avançar.`}
                     </p>
 
                     <div className="flex items-center gap-2 mt-2">
                         <button
-                            onClick={() => setCurrentChapterIdx((p) => Math.max(0, p - 1))}
-                            disabled={currentChapterIdx === 0}
+                            onClick={() => setCurrentStageIdx((p) => Math.max(0, p - 1))}
+                            disabled={currentStageIdx === 0}
                             className="w-8 h-8 rounded-full flex items-center justify-center bg-brand-gray dark:bg-dark-border disabled:opacity-30 hover:bg-brand-gray/70 dark:hover:bg-dark-border/70 transition-colors"
                         >
                             <ChevronLeftIcon size={16} className="text-brand-dark dark:text-dark-heading" />
                         </button>
                         <button
-                            onClick={() => setCurrentChapterIdx((p) => Math.min(chapters.length - 1, p + 1))}
-                            disabled={currentChapterIdx === chapters.length - 1}
+                            onClick={() => setCurrentStageIdx((p) => Math.min(stages.length - 1, p + 1))}
+                            disabled={currentStageIdx === stages.length - 1}
                             className="w-8 h-8 rounded-full flex items-center justify-center bg-brand-gray dark:bg-dark-border disabled:opacity-30 hover:bg-brand-gray/70 dark:hover:bg-dark-border/70 transition-colors"
                         >
                             <ChevronRightIcon size={16} className="text-brand-dark dark:text-dark-heading" />
@@ -367,7 +433,7 @@ function ProgressCard({
                 </div>
 
                 <div className="flex-1 flex flex-col gap-2 overflow-y-auto min-w-0">
-                    {currentChapter.items.map((item) => (
+                    {currentStage.items.map((item) => (
                         <div
                             key={item.id}
                             onClick={() => onItemClick(item)}
@@ -717,7 +783,7 @@ function AdaptiveBottomCard({
     }
 
     return (
-        <div className={`bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 h-full flex flex-col ${slides.length <= 1 ? '' : 'min-h-[280px]'}`}>
+        <div className={`bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 h-[280px] flex flex-col ${slides.length <= 1 ? '' : 'min-h-[280px]'}`}>
             <div className="flex-1 flex flex-col justify-center">
                 {renderSlideContent()}
             </div>
@@ -784,8 +850,8 @@ function ModeCard({ partnerId, onSuccess }: { partnerId: string; onSuccess: () =
     };
 
     return (
-        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6">
-            <div className="flex flex-col items-center text-center gap-4">
+        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 h-[280px] flex flex-col">
+            <div className="flex flex-col items-center text-center gap-4 flex-1 justify-center">
                 <div className="w-12 h-12 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center">
                     <RocketIcon size={24} className="text-brand-green" />
                 </div>

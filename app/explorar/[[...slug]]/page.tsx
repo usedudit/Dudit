@@ -15,6 +15,8 @@ import type { SponsoredAd } from "@/lib/ads/types"
 import ThreeDotsLoader from "@/components/reusable/ThreeDotsLoader"
 import { QueryClient, dehydrate } from "@tanstack/react-query"
 import { HydrationBoundary } from "@tanstack/react-query"
+import { redirect } from "next/navigation"
+import { cookies } from "next/headers"
 
 const CATEGORY_SLUG_MAP: { [key: string]: string } = {
     "casa-e-utilidades": "Casa & Utilidades",
@@ -270,6 +272,34 @@ export default async function ExplorarPage({
             state: sessionData.profile.state || null,
         }
         : null
+
+    // Server-side redirect: if no city slug in URL, try to redirect to user's city
+    if (!firstSlug) {
+        let redirectSlug: string | null = null
+
+        // 1. Check user profile (logged in with address)
+        if (userProfile?.city && userProfile?.state) {
+            const normCity = userProfile.city
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/[^a-z0-9]+/g, "-")
+                .replace(/(^-|-$)/g, "")
+            redirectSlug = `${normCity}-${userProfile.state.toLowerCase()}`
+        }
+        // 2. Check cookie (logged out but has saved location)
+        else {
+            const cookieStore = await cookies()
+            const savedCity = cookieStore.get("dudit_city")?.value
+            if (savedCity && savedCity !== "brasil" && !savedCity.startsWith("estado-")) {
+                redirectSlug = savedCity
+            }
+        }
+
+        if (redirectSlug) {
+            redirect(`/explorar/${redirectSlug}`)
+        }
+    }
 
     // Se não tem slug, mostra Brasil inteiro (como /explorar/brasil)
     if (!firstSlug) {

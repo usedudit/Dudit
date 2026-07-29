@@ -1304,19 +1304,38 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
         }
     }
 
-    const openShippingSheetWithCustomer = useCallback(async (customerId: string) => {
-        const details = await getPOSCustomerDetailsAction({ partnerId, customerId })
-        if (details.success && details.data) {
-            setShippingCustomerDetails(details.data)
-        } else {
-            setShippingCustomerDetails(null)
+    const openShippingSheetWithCustomer = useCallback((customerId: string, fallbackCustomer?: any) => {
+        const selected = fallbackCustomer || customers.find((c) => c.id === customerId)
+        if (selected) {
+            const addr = (selected as any).addresses?.[0]
+            setShippingCustomerDetails({
+                id: selected.id,
+                name: selected.name,
+                email: selected.email || null,
+                phone: selected.phone || null,
+                cpf: (selected as any).cpf || null,
+                address: addr ? {
+                    zipCode: addr.zipCode || addr.zip_code || "",
+                    street: addr.street || "",
+                    number: addr.number || "",
+                    complement: addr.complement || "",
+                    neighborhood: addr.neighborhood || "",
+                    city: addr.city || "",
+                    state: addr.state || addr.uf || "",
+                } : null,
+            })
         }
         setIsShippingSheetOpen(true)
-    }, [partnerId])
+        getPOSCustomerDetailsAction({ partnerId, customerId }).then((details) => {
+            if (details.success && details.data) {
+                setShippingCustomerDetails(details.data)
+            }
+        })
+    }, [partnerId, customers])
 
-    const handleOpenShippingSheet = useCallback(async () => {
+    const handleOpenShippingSheet = useCallback(() => {
         if (selectedCustomerId) {
-            await openShippingSheetWithCustomer(selectedCustomerId)
+            openShippingSheetWithCustomer(selectedCustomerId)
             return
         }
         setCustomerSelectIntent("shipping-preflight")
@@ -2124,7 +2143,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                             setIsSelectCustomerOpen(false)
                             if (customerSelectIntent === "shipping-preflight") {
                                 setCustomerSelectIntent("default")
-                                void openShippingSheetWithCustomer(customer.id)
+                                openShippingSheetWithCustomer(customer.id, customer)
                             }
                         }}
                         partnerId={partnerId}

@@ -473,7 +473,7 @@ const productIds = Array.from(
         payment_method_fixed_fee_amount: paymentMethodFixedFeeAmount,
         payment_method_extra_amount: paymentMethodExtraAmount,
         coupon_id: draft?.coupon_id || null,
-        delivery_fee: shippingFee,
+        delivery_fee: (deliveryBreakdown?.deliveryPayer === "seller" || deliveryPayer === "seller") ? 0 : shippingFee,
         distance_km: distanceKm,
         delivery_breakdown: deliveryBreakdown,
         additional_costs: otherCosts,
@@ -488,7 +488,7 @@ const productIds = Array.from(
         inventory_deducted: true,
         order_number: finalOrderNumber,
         pricing_version: pricingResult.pricingVersion,
-        delivery_payer: deliveryPayer,
+        delivery_payer: (deliveryBreakdown?.deliveryPayer as "seller" | "customer") || deliveryPayer,
         seller_commission_amount: sellerCommissionAmount,
         ...(preparationEstimate ? {
             preparation_time_minutes: preparationEstimate.preparationTimeMinutes,

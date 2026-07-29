@@ -226,11 +226,17 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
         const fetchOrders = async () => {
             setIsLoadingOrders(true);
             try {
+                console.log("[CustomerDetailPage DEBUG] Calling getCustomerOrdersAction with realCustomerId:", realCustomerId);
                 const res = await getCustomerOrdersAction(realCustomerId);
-                if (res.orders) setFetchedOrders(res.orders);
-                if (res.stats) setOrderStats(res.stats);
+                console.log("[CustomerDetailPage DEBUG] res received from getCustomerOrdersAction:", res);
+                if (res && "orders" in res && Array.isArray((res as any).orders)) {
+                    setFetchedOrders((res as any).orders);
+                }
+                if (res && "stats" in res && (res as any).stats) {
+                    setOrderStats((res as any).stats);
+                }
             } catch (e) {
-                console.error(e);
+                console.error("[CustomerDetailPage DEBUG] fetchOrders error:", e);
             } finally {
                 setIsLoadingOrders(false);
             }
@@ -503,6 +509,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                     <div className="flex items-center gap-3 mb-6">
                                                         <UserProfileImage
                                                             fullName={customer.name || "Cliente"}
+                                                            imageUrl={customer.image_url || customer.imageUrl || customer.avatar_url}
                                                             className="w-14 h-14 text-xl shrink-0"
                                                         />
                                                         <div className="min-w-0">
@@ -733,6 +740,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                         <div className="relative">
                                                             <UserProfileImage
                                                                 fullName={customer.name || "Cliente"}
+                                                                imageUrl={customer.image_url || customer.imageUrl || customer.avatar_url}
                                                                 className="w-12 h-12 text-xl"
                                                             />
                                                         </div>

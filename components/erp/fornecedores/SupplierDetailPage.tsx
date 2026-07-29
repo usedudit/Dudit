@@ -255,6 +255,7 @@ export const SupplierDetailPage = ({ supplier, onBack, onEdit }: Props) => {
                                                     <div className="flex items-center gap-3 mb-6">
                                                         <UserProfileImage
                                                             fullName={supplier.name || "Fornecedor"}
+                                                            imageUrl={supplier.image_url || supplier.imageUrl || supplier.avatar_url}
                                                             className="w-14 h-14 text-xl shrink-0"
                                                         />
                                                         <div className="min-w-0">
@@ -398,6 +399,7 @@ export const SupplierDetailPage = ({ supplier, onBack, onEdit }: Props) => {
                                                         <div className="relative">
                                                             <UserProfileImage
                                                                 fullName={supplier.name || "Fornecedor"}
+                                                                imageUrl={supplier.image_url || supplier.imageUrl || supplier.avatar_url}
                                                                 className="w-12 h-12 text-xl"
                                                             />
                                                         </div>

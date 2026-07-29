@@ -84,14 +84,20 @@ export function PlanDetailsPageClient({
 
     const partner = useMemo(() => {
         const p = plan.partners || {}
-        const store = plan.stores || p.stores
+        const store = plan.stores || p.stores || p.store
         const address = store?.addresses?.[0] || p.addresses?.[0] || {}
+        const storeId = store?.id || p.store_id || plan.store_id || p.id || plan.partner_id || "1"
+        const storeName = store?.name || p?.name || p?.storeName || "Vendedor da Dudit"
+
         return {
-            id: p.id || plan.partner_id || "1",
+            id: storeId,
+            store_id: storeId,
+            name: storeName,
+            partner_id: p.id || plan.partner_id,
             user_id: p.user_id,
-            store_name: store?.name || p?.storeName || "Vendedor da Dudit",
-            city: address?.city || "Brasil",
-            state: address?.state || "BR",
+            store_name: storeName,
+            city: address?.city || store?.city || p.city || "Brasil",
+            state: address?.state || store?.state || p.state || "BR",
             store_image_url: store?.logo_url || p.store_image_url || null,
             store_avatar: store?.logo_url || p.store_image_url || p.store_avatar || p.profile_image_url || "https://img.dudit.com.br/static/Placeholder.png",
             profile_image_url: store?.logo_url || p.profile_image_url || null,

@@ -24,6 +24,7 @@ import OSPreview from "@/components/erp/service-orders/OSPreview"
 import { r2PublicConfig } from "@/lib/r2/r2-public"
 import { SERVICE_ORDER_STATUS_META, type ServiceOrderStatus } from "@/lib/types/service-order"
 import { HistoryTimeline } from "@/components/erp/shared/HistoryTimeline"
+import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { useSupabase } from "@/providers/supabase-provider"
 import { FileIcon } from "@/lib/icons"
 import { ClockIcon } from "lucide-react"
@@ -127,6 +128,9 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
     const partnerName = partner?.name || "Parceiro"
     const partnerLogo = partner?.logo_url ? buildImageUrl(partner.logo_url) : null
     const partnerPlan = partner?.plan_tier || "free"
+
+    // Check if Before & After sections are allowed based on the partner's plan
+    const beforeAfterEnabled = hasMinimumPlan(partnerPlan, "crescer")
 
     // ─── REAL-TIME POLLING ───────────────────────────────────────────────────
     useEffect(() => {
@@ -302,6 +306,17 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
     const isFinalized = order.status === "concluida" || order.status === "entregue" || order.status === "cancelada" || order.signature_image_key
     const statusMeta = SERVICE_ORDER_STATUS_META[order.status as ServiceOrderStatus]
 
+    // Group attachments by category
+    const groupedAttachments = useMemo(() => {
+        const g: Record<string, any[]> = { normal: [], antes: [], depois: [] }
+        for (const att of attachments || []) {
+            const cat = att.category || "normal"
+            if (!g[cat]) g[cat] = []
+            g[cat].push(att)
+        }
+        return g
+    }, [attachments])
+
     return (
         <div className="flex flex-col h-screen bg-white dark:bg-dark-background overflow-hidden relative text-left">
             <style>{`
@@ -323,7 +338,7 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                     <div className="flex items-center justify-between pb-2">
                                         <div className="flex items-center gap-3">
                                             {partnerLogo ? (
-                                                <img src={partnerLogo} alt={partnerName} className="h-9 w-9 object-cover rounded-lg border border-brand-border dark:border-dark-border" />
+                                                <img src={partnerLogo} alt={partnerName} className="h-9 w-9 object-cover rounded-full border border-brand-border dark:border-dark-border" />
                                             ) : (
                                                 <div className="h-9 w-9 rounded-lg bg-brand-green flex items-center justify-center text-white font-bold text-sm shrink-0">
                                                     {partnerName.substring(0, 2).toUpperCase()}
@@ -479,39 +494,83 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                     {/* ─── TAB: ANEXOS ─── */}
                                     {activeTab === "Anexos" && (
                                         <div className="space-y-6 text-left">
-                                            {attachments.length === 0 ? (
+                                            {beforeAfterEnabled && (
+                                                <>
+                                                    <FormSection title="Antes">
+                                                        {groupedAttachments.antes.length === 0 ? (
+                                                            <p className="text-xs italic text-brand-inactive-text">Nenhum anexo registrado antes do serviço.</p>
+                                                        ) : (
+                                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                                                {groupedAttachments.antes.map((att: any, idx: number) => (
+                                                                    <div key={idx} className="rounded-xl overflow-hidden border border-brand-border relative bg-white aspect-square flex items-center justify-center">
+                                                                        {att.file_type?.startsWith("image/") ? (
+                                                                            <img src={buildImageUrl(att.file_key)} alt="" className="w-full h-full object-cover" />
+                                                                        ) : (
+                                                                            <span className="text-xs text-brand-inactive-text text-center px-2 truncate w-full">{att.file_name || "Anexo"}</span>
+                                                                        )}
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </FormSection>
+
+                                                    <FormSection title="Depois" hasSeparator>
+                                                        {groupedAttachments.depois.length === 0 ? (
+                                                            <p className="text-xs italic text-brand-inactive-text">Nenhum anexo registrado depois do serviço.</p>
+                                                        ) : (
+                                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                                                {groupedAttachments.depois.map((att: any, idx: number) => (
+                                                                    <div key={idx} className="rounded-xl overflow-hidden border border-brand-border relative bg-white aspect-square flex items-center justify-center">
+                                                                        {att.file_type?.startsWith("image/") ? (
+                                                                            <img src={buildImageUrl(att.file_key)} alt="" className="w-full h-full object-cover" />
+                                                                        ) : (
+                                                                            <span className="text-xs text-brand-inactive-text text-center px-2 truncate w-full">{att.file_name || "Anexo"}</span>
+                                                                        )}
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </FormSection>
+                                                </>
+                                            )}
+
+                                            {groupedAttachments.normal.length > 0 && (
+                                                <FormSection title={beforeAfterEnabled ? "Outros Anexos" : "Anexos"}>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                                        {groupedAttachments.normal.map((att: any) => (
+                                                            <div
+                                                                key={att.id || att.file_key}
+                                                                onClick={() => {
+                                                                    if (att.file_key) {
+                                                                        window.open(buildImageUrl(att.file_key), "_blank")
+                                                                    }
+                                                                }}
+                                                                className="flex items-center gap-3 p-3 bg-brand-gray dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl group relative cursor-pointer hover:bg-brand-gray/80 dark:hover:bg-dark-border/40 transition-colors"
+                                                            >
+                                                                <div className="w-10 h-10 rounded-lg bg-white dark:bg-dark-border flex items-center justify-center border border-brand-border dark:border-dark-border shrink-0">
+                                                                    <FileIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">
+                                                                        {att.file_name || "Anexo"}
+                                                                    </p>
+                                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                                        {att.file_size ? formatFileSize(att.file_size) : ""}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </FormSection>
+                                            )}
+
+                                            {attachments.length === 0 && (
                                                 <div className="flex flex-col items-center justify-center text-center py-8">
                                                     <IconPlaceholder
                                                         icon={FileIcon}
                                                         title="Nenhum anexo"
                                                         subtitle="Não foram encontrados anexos para esta OS."
                                                     />
-                                                </div>
-                                            ) : (
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                                                    {attachments.map((att: any) => (
-                                                        <div
-                                                            key={att.id || att.file_key}
-                                                            onClick={() => {
-                                                                if (att.file_key) {
-                                                                    window.open(buildImageUrl(att.file_key), "_blank")
-                                                                }
-                                                            }}
-                                                            className="flex items-center gap-3 p-3 bg-brand-gray dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl group relative cursor-pointer hover:bg-brand-gray/80 dark:hover:bg-dark-border/40 transition-colors"
-                                                        >
-                                                            <div className="w-10 h-10 rounded-lg bg-white dark:bg-dark-border flex items-center justify-center border border-brand-border dark:border-dark-border shrink-0">
-                                                                <FileIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                                            </div>
-                                                            <div className="flex-1 min-w-0">
-                                                                <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">
-                                                                    {att.file_name || "Anexo"}
-                                                                </p>
-                                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                                    {att.file_size ? formatFileSize(att.file_size) : ""}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                    ))}
                                                 </div>
                                             )}
                                         </div>

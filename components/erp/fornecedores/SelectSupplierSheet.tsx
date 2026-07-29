@@ -332,7 +332,7 @@ const SelectSupplierSheet = ({
                                     )}
                                     <UserProfileImage
                                         fullName={supplier.name || "Fornecedor"}
-                                        imageUrl={undefined}
+                                        imageUrl={(supplier as any).image_url || (supplier as any).imageUrl || (supplier as any).avatar_url}
                                         className="h-12 w-12 shrink-0 text-lg"
                                     />
                                     <div className="min-w-0 flex-1">

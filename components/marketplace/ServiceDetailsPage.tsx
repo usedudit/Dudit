@@ -224,14 +224,19 @@ export function ServiceDetailsPageClient({
         const p = Array.isArray(service.partners) ? service.partners[0] : service.partners
         const store = service?.stores || p?.stores || p?.store
         const address = store?.addresses?.[0] || p?.addresses?.[0] || {}
+        const storeId = store?.id || p?.store_id || service.store_id || p?.id || service.partner_id || "1"
+        const storeName = store?.name || p?.name || p?.store_name || "Profissional"
+
         return {
-            id: p?.id || service.partner_id,
-            store_id: p?.store_id || store?.id,
+            id: storeId,
+            store_id: storeId,
+            name: storeName,
+            partner_id: p?.id || service.partner_id,
             user_id: p?.user_id,
             phone: store?.phone || store?.whatsapp_phone || p?.phone,
-            store_name: store?.name || p?.store_name || "Profissional",
-            city: address?.city || "Brasil",
-            state: address?.state || "BR",
+            store_name: storeName,
+            city: address?.city || store?.city || p?.city || "Brasil",
+            state: address?.state || store?.state || p?.state || "BR",
             store_avatar: store?.logo_url || store?.image_url || p?.store_image_url || PLACEHOLDER,
             profile_image_url: store?.logo_url || p?.store_image_url || null,
             banner_url: store?.banner_url || p?.banner_url || null,

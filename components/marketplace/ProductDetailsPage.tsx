@@ -201,13 +201,19 @@ export function ProductDetailsPageClient({
         const p = Array.isArray(product.partners) ? product.partners[0] : product.partners
         const store = product?.stores || p?.stores
         const address = store?.addresses?.[0] || p?.addresses?.[0] || {}
+        const storeId = store?.id || p?.store_id || product.store_id || p?.id || product.partner_id || "1"
+        const storeName = store?.name || p?.name || p?.store_name || "Vendedor da Dudit"
+
         return {
-            id: p?.id || product.partner_id || "1",
+            id: storeId,
+            store_id: storeId,
+            name: storeName,
             user_id: p?.user_id,
+            partner_id: p?.id || product.partner_id,
             phone: store?.phone || store?.whatsapp_phone || p?.phone,
-            store_name: store?.name || p?.store_name || "Vendedor da Dudit",
-            city: address?.city || "Brasil",
-            state: address?.state || "BR",
+            store_name: storeName,
+            city: address?.city || store?.city || p?.city || "Brasil",
+            state: address?.state || store?.state || p?.state || "BR",
             store_image_url: store?.logo_url || store?.image_url || p?.store_image_url || null,
             store_avatar: store?.logo_url || store?.image_url || p?.store_image_url || p?.store_avatar || p?.profile_image_url || "https://img.dudit.com.br/static/Placeholder.png",
             profile_image_url: store?.logo_url || p?.profile_image_url || null,
@@ -230,29 +236,30 @@ export function ProductDetailsPageClient({
 
     const [activePromotions, setActivePromotions] = useState<any[]>([])
 
+    // Combined effect: promotions + view counter + delivery config
+    // Grouped into a single timer to reduce Server Action POST count on mount
     useEffect(() => {
-        if (!partner?.id) return
+        if (!partner?.id || !product?.id) return
         const timer = setTimeout(() => {
+            // Fire all deferred actions in parallel
             listActivePromotionsForMarketplaceAction(partner.id)
                 .then((res) => {
                     if (Array.isArray(res)) setActivePromotions(res)
                 })
                 .catch((e) => console.error("Error loading promotions:", e))
-        }, 800)
-        return () => clearTimeout(timer)
-    }, [partner?.id])
 
-    useEffect(() => {
-        if (!product?.id) return
-        const timer = setTimeout(() => {
             fetch("/api/marketplace/view", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ entityType: "produto", entityId: product.id }),
             }).catch(() => { })
-        }, 500)
+
+            getPartnerDeliveryConfigAction(partner.id).then((res: any) => {
+                if (res.success) setDeliveryConfig(res)
+            })
+        }, 600)
         return () => clearTimeout(timer)
-    }, [product?.id])
+    }, [partner?.id, product?.id])
 
     const activePromo = useMemo(() => {
         return activePromotions.find((promo) => {
@@ -704,15 +711,7 @@ export function ProductDetailsPageClient({
     }, [userId, partner.id, partner.user_id, supabase])
 
     const partnerProfileImageUrl = getR2ImageUrl(partner.store_avatar)
-    useEffect(() => {
-        if (!partner.id) return
-        const timer = setTimeout(() => {
-            getPartnerDeliveryConfigAction(partner.id).then((res: any) => {
-                if (res.success) setDeliveryConfig(res)
-            })
-        }, 500)
-        return () => clearTimeout(timer)
-    }, [partner.id])
+    // NOTE: delivery config fetch is now merged into the combined useEffect above (line ~239)
 
 
 
@@ -1467,7 +1466,7 @@ export function ProductDetailsPageClient({
                     return (
                         <div className="border border-brand-border rounded-2xl overflow-hidden bg-white">
                             {/* Top clickable block linking to partner profile */}
-                            <Link href={getStoreUrl(partner)} className="block group">
+                            <Link href={getStoreUrl(partner)} prefetch={false} className="block group">
                                 {/* Banner */}
                                 <div className="h-20 w-full relative bg-gray-100 overflow-hidden select-none">
                                     <img src={sellerBannerImage} alt="" className="w-full h-full object-cover" />

@@ -47,6 +47,7 @@ const SupplierListRow = React.memo(
             <div className="flex items-center gap-3 text-left">
               <UserProfileImage
                 fullName={supplier.name || "Fornecedor"}
+                imageUrl={supplier.image_url || supplier.imageUrl || supplier.avatar_url}
                 className="w-10 h-10 text-[14px]"
               />
               <div className="flex flex-col">

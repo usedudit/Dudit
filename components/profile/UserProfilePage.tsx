@@ -783,7 +783,7 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                                 className="w-full max-w-[200px] mx-auto text-center uppercase tracking-wider font-bold h-10 border border-brand-border dark:border-dark-border rounded-xl bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading text-sm focus:outline-none focus:ring-1 focus:ring-red-500"
                             />
                         </div>
- 
+
                         {/* ALTERNATIVAS DISCRETAS */}
                         <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 py-4 border-t border-brand-border dark:border-dark-border text-xs text-brand-inactive-text">
                             <a href="/erp/clientes" className="hover:text-brand-dark dark:hover:text-dark-heading transition-colors font-medium">
@@ -803,7 +803,7 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                                 Voltar
                             </button>
                         </div>
- 
+
                         {/* FOOTER ACTIONS */}
                         <div className="flex flex-col sm:flex-row gap-3 mt-4 pt-4 border-t border-brand-border dark:border-dark-border">
                             <Button
@@ -826,7 +826,7 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                     </div>
                 )}
             </DefaultModal>
- 
+
             {/* Modal para Assinatura Ativa (Bloqueio) */}
             <DefaultModal
                 isOpen={activeSubModalOpen}

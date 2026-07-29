@@ -47,7 +47,7 @@ export async function createNotification(
   const audience = (input.data?.audience as NotificationAudience | undefined) || "customer"
   const origin = input.origin || "system"
 
-  if (origin === "manual" && (audience === "seller" || audience === "admin")) {
+  if (origin === "manual") {
     return { notification: null, created: false }
   }
 
@@ -147,6 +147,81 @@ export async function getPartnerTeamUserIds(partnerId: string): Promise<string[]
   if (partner?.user_id) userIds.add(partner.user_id)
   for (const member of members || []) {
     if (member.user_id) userIds.add(member.user_id)
+  }
+
+  return [...userIds]
+}
+
+export async function getStoreTeamUserIds(params: {
+  partnerId: string
+  storeId?: string | null
+  staffPartnerUserId?: string | null
+}): Promise<string[]> {
+  const admin = getAdminClient()
+  const userIds = new Set<string>()
+
+  // 1. Owner do partner
+  const { data: partner } = await admin
+    .from("partners")
+    .select("user_id")
+    .eq("id", params.partnerId)
+    .maybeSingle()
+
+  if (partner?.user_id) userIds.add(partner.user_id)
+
+  // 2. Todos os partner_users do partner
+  const { data: rawPartnerUsers } = await admin
+    .from("partner_users")
+    .select("id, user_id, role")
+    .eq("partner_id", params.partnerId)
+
+  const partnerUsers = (rawPartnerUsers || []) as Array<{ id: string; user_id: string | null; role: string | null }>
+
+  if (partnerUsers.length === 0) {
+    return [...userIds]
+  }
+
+  // 2a. Usuários com role OWNER sempre recebem acesso
+  for (const pu of partnerUsers) {
+    if (pu.role === "OWNER" && pu.user_id) {
+      userIds.add(pu.user_id)
+    }
+  }
+
+  // 3. Se um funcionário/profissional específico foi atribuído (ex: agendamento)
+  if (params.staffPartnerUserId) {
+    const staffPu = partnerUsers.find((pu: { id: string; user_id: string | null }) => pu.id === params.staffPartnerUserId)
+    if (staffPu?.user_id) {
+      userIds.add(staffPu.user_id)
+    }
+  }
+
+  // 4. Se storeId foi fornecido, filtrar membros vinculados à loja
+  if (params.storeId) {
+    const puIds = partnerUsers.map((pu: { id: string }) => pu.id).filter(Boolean)
+    if (puIds.length > 0) {
+      const { data: rawStoreMembers } = await admin
+        .from("store_members")
+        .select("partner_user_id")
+        .eq("store_id", params.storeId)
+        .in("partner_user_id", puIds)
+
+      const storeMembers = (rawStoreMembers || []) as Array<{ partner_user_id: string }>
+
+      if (storeMembers.length > 0) {
+        const memberPuIds = new Set(storeMembers.map((sm: { partner_user_id: string }) => sm.partner_user_id))
+        for (const pu of partnerUsers) {
+          if (memberPuIds.has(pu.id) && pu.user_id) {
+            userIds.add(pu.user_id)
+          }
+        }
+      }
+    }
+  } else {
+    // Fallback caso não haja storeId: incluir todos os partner_users
+    for (const pu of partnerUsers) {
+      if (pu.user_id) userIds.add(pu.user_id)
+    }
   }
 
   return [...userIds]

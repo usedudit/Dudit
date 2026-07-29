@@ -48,16 +48,17 @@ export async function GET(request: NextRequest) {
     new Set([customer.id, userId, marketplaceUserId].filter(Boolean))
   ) as string[]
 
-  const orderConditions = [
-    `customer_id.in.(${allCustomerIds.join(",")})`,
-    `buyer_id.in.(${allCustomerIds.join(",")})`,
-  ]
+  const orderOrParts: string[] = []
+  for (const id of allCustomerIds) {
+    orderOrParts.push(`customer_id.eq.${id}`)
+    orderOrParts.push(`buyer_id.eq.${id}`)
+  }
 
   const { data: customerOrders } = await supabase
     .from("orders")
     .select("id, buyer_id")
     .eq("partner_id", customer.partner_id)
-    .or(orderConditions.join(","))
+    .or(orderOrParts.join(","))
 
   const orderIds = (customerOrders || []).map((o: any) => o.id).filter(Boolean)
   const orderBuyerIds = (customerOrders || []).map((o: any) => o.buyer_id).filter(Boolean)
@@ -70,11 +71,24 @@ export async function GET(request: NextRequest) {
   // 5. Build OR conditions for querying reviews (by user_id OR by order_id), strictly scoped to customer.partner_id
   const orConditions: string[] = []
   if (candidateUserIds.length > 0) {
-    orConditions.push(`user_id.in.(${candidateUserIds.join(",")})`)
+    for (const uId of candidateUserIds) {
+      orConditions.push(`user_id.eq.${uId}`)
+    }
   }
   if (orderIds.length > 0) {
-    orConditions.push(`order_id.in.(${orderIds.join(",")})`)
+    for (const oId of orderIds) {
+      orConditions.push(`order_id.eq.${oId}`)
+    }
   }
+
+  console.log("[customer-reviews DEBUG]", {
+    customerId,
+    foundCustomer: customer,
+    allCustomerIds,
+    orderBuyerIds,
+    candidateUserIds,
+    orConditions: orConditions.join(","),
+  })
 
   if (orConditions.length === 0) {
     return NextResponse.json({ reviews: [] })

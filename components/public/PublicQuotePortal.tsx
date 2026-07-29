@@ -261,7 +261,7 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                                     <div className="flex items-center justify-between pb-2">
                                         <div className="flex items-center gap-3">
                                             {partnerLogo ? (
-                                                <img src={partnerLogo} alt={partnerName} className="h-9 w-9 object-cover rounded-lg border border-brand-border dark:border-dark-border" />
+                                                <img src={partnerLogo} alt={partnerName} className="h-9 w-9 object-cover rounded-full border border-brand-border dark:border-dark-border" />
                                             ) : (
                                                 <div className="h-9 w-9 rounded-lg bg-brand-green flex items-center justify-center text-white font-bold text-sm shrink-0">
                                                     {partnerName.substring(0, 2).toUpperCase()}

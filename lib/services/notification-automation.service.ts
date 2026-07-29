@@ -9,6 +9,7 @@ import {
   createNotification,
   createNotificationsForUsers,
   getPartnerTeamUserIds,
+  getStoreTeamUserIds,
   resolveCustomerUserId,
   scheduleNotificationJob,
 } from "./notification.service"
@@ -20,6 +21,8 @@ function formatCurrency(value: number | null | undefined): string | undefined {
 
 async function notifyPartnerTeam(params: {
   partnerId: string
+  storeId?: string | null
+  staffPartnerUserId?: string | null
   type: NotificationType
   entityType: "order" | "appointment" | "subscription"
   entityId: string
@@ -27,7 +30,11 @@ async function notifyPartnerTeam(params: {
   variant?: string
   origin?: "manual" | "automation" | "system"
 }) {
-  const userIds = await getPartnerTeamUserIds(params.partnerId)
+  const userIds = await getStoreTeamUserIds({
+    partnerId: params.partnerId,
+    storeId: params.storeId,
+    staffPartnerUserId: params.staffPartnerUserId,
+  })
   const content = buildNotificationContent(params.type, "seller", params.ctx)
 
   await createNotificationsForUsers(userIds, (userId) => ({
@@ -37,7 +44,7 @@ async function notifyPartnerTeam(params: {
     message: content.message,
     entityType: params.entityType,
     entityId: params.entityId,
-    data: { ...params.ctx, audience: "seller", partner_id: params.partnerId },
+    data: { ...params.ctx, audience: "seller", partner_id: params.partnerId, store_id: params.storeId },
     idempotencyKey: buildIdempotencyKey(
       params.type,
       params.entityType,
@@ -267,6 +274,8 @@ export async function onAppointmentCreated(
 
   const partnerId = String(appointment.partner_id)
   const appointmentId = String(appointment.id)
+  const storeId = appointment.store_id ? String(appointment.store_id) : null
+  const staffPartnerUserId = appointment.staff_partner_user_id ? String(appointment.staff_partner_user_id) : null
 
   const admin = getAdminClient()
   const { data: partner } = await admin
@@ -286,6 +295,8 @@ export async function onAppointmentCreated(
 
   await notifyPartnerTeam({
     partnerId,
+    storeId,
+    staffPartnerUserId,
     type: "appointment_created",
     entityType: "appointment",
     entityId: appointmentId,
@@ -319,6 +330,8 @@ export async function onAppointmentStatusChanged(
 ) {
   const partnerId = String(appointment.partner_id)
   const appointmentId = String(appointment.id)
+  const storeId = appointment.store_id ? String(appointment.store_id) : null
+  const staffPartnerUserId = appointment.staff_partner_user_id ? String(appointment.staff_partner_user_id) : null
   const prev = previousStatus.toLowerCase()
   const next = newStatus.toLowerCase()
   if (prev === next) return
@@ -384,6 +397,8 @@ export async function onAppointmentStatusChanged(
     }
     await notifyPartnerTeam({
       partnerId,
+      storeId,
+      staffPartnerUserId,
       type: "appointment_cancelled",
       entityType: "appointment",
       entityId: appointmentId,
@@ -399,6 +414,8 @@ export async function onAppointmentRescheduled(
 ) {
   const partnerId = String(appointment.partner_id)
   const appointmentId = String(appointment.id)
+  const storeId = appointment.store_id ? String(appointment.store_id) : null
+  const staffPartnerUserId = appointment.staff_partner_user_id ? String(appointment.staff_partner_user_id) : null
 
   const admin = getAdminClient()
 
@@ -453,6 +470,8 @@ export async function onAppointmentRescheduled(
 
   await notifyPartnerTeam({
     partnerId,
+    storeId,
+    staffPartnerUserId,
     type: "appointment_rescheduled",
     entityType: "appointment",
     entityId: appointmentId,
@@ -483,6 +502,8 @@ export async function notifyAppointmentCreatedFromMarketplace(params: {
   customerId?: string | null
   marketplaceOrderId?: string | null
   storeName?: string
+  storeId?: string | null
+  staffPartnerUserId?: string | null
 }) {
   const appointment = {
     partner_id: params.partnerId,
@@ -493,6 +514,8 @@ export async function notifyAppointmentCreatedFromMarketplace(params: {
     start_time: params.startTime,
     customer_id: params.customerId || null,
     marketplace_order_id: params.marketplaceOrderId || null,
+    store_id: params.storeId || null,
+    staff_partner_user_id: params.staffPartnerUserId || null,
     source: "appointment",
   }
 
@@ -523,6 +546,19 @@ export async function onOrderStatusChanged(
   const orderNumber = String(order.order_number || orderId.slice(0, 8))
 
   const admin = getAdminClient()
+
+  let storeId = (order.store_id as string | null) || null
+  if (!storeId) {
+    const { data: orderDb } = await admin
+      .from("orders")
+      .select("store_id")
+      .eq("id", orderId)
+      .maybeSingle()
+    if (orderDb?.store_id) {
+      storeId = orderDb.store_id
+    }
+  }
+
   const { data: partner } = await admin
     .from("partners")
     .select("id")
@@ -563,6 +599,7 @@ export async function onOrderStatusChanged(
       if (mixType !== "service") {
         await notifyPartnerTeam({
           partnerId,
+          storeId,
           type: "order_created",
           entityType: "order",
           entityId: orderId,
@@ -578,6 +615,7 @@ export async function onOrderStatusChanged(
     } else {
       await notifyPartnerTeam({
         partnerId,
+        storeId,
         type: "order_created",
         entityType: "order",
         entityId: orderId,
@@ -618,6 +656,7 @@ export async function onOrderStatusChanged(
       if (!skipForPartner) {
         await notifyPartnerTeam({
           partnerId,
+          storeId,
           type,
           entityType: "order",
           entityId: orderId,

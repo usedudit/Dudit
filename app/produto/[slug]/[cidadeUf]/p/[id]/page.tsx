@@ -82,6 +82,8 @@ export default async function ProductDetailsPage({
     getCurrentUser(),
     getMarketplaceProduct(id),
   ])
+
+  // Parallelize session data fetch (independent of product)
   const sessionData = user ? await getUserSessionData(user.id) : null
 
   const userProfile = sessionData?.profile ? {

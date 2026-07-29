@@ -288,7 +288,6 @@ const OSPreview = ({
                                                     {selectedCustomer ? (
                                                         <div className="text-xs text-gray-600 space-y-1">
                                                             <p className="font-bold text-brand-dark">{selectedCustomer.name}</p>
-                                                            {showCustomerContact && selectedCustomer.email && <p>{selectedCustomer.email}</p>}
                                                             {showCustomerContact && selectedCustomer.phone && <p>{selectedCustomer.phone}</p>}
                                                             {customerAddressText && <p className="whitespace-pre-wrap">{customerAddressText}</p>}
                                                         </div>

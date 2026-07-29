@@ -332,7 +332,7 @@ const SelectCustomerSheet = ({
                                     )}
                                     <UserProfileImage
                                         fullName={customer.name || "Cliente"}
-                                        imageUrl={customer.avatar_url}
+                                        imageUrl={(customer as any).image_url || customer.avatar_url || (customer as any).imageUrl}
                                         className="h-12 w-12 shrink-0 text-lg"
                                     />
                                     <div className="min-w-0 flex-1">

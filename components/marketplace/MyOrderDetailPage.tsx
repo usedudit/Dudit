@@ -1494,7 +1494,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                 </div>
                                             </div>
                                         ) : (
-                                            <Link href={getStoreUrl({ ...store, id: store?.store_id || store?.id || order.partner_id })} prefetch={true} className="flex items-center gap-4 block cursor-pointer">
+                                            <Link href={getStoreUrl({ ...store, id: store?.store_id || store?.id || order.store_id || order.partner_id, name: store?.name || sellerName })} prefetch={true} className="flex items-center gap-4 block cursor-pointer">
                                                 <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border shrink-0">
                                                     <img src={storeImage} alt={sellerName} className="w-full h-full object-cover" />
                                                 </div>

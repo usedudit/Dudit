@@ -50,6 +50,7 @@ const CustomerGridCard = React.memo(
                     {/* Avatar do Cliente */}
                     <UserProfileImage
                         fullName={customer.name || "Cliente"}
+                        imageUrl={customer.image_url || customer.imageUrl || customer.avatar_url}
                         className="w-12 h-12 text-lg"
                     />
 

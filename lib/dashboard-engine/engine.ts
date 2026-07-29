@@ -4,6 +4,7 @@ import { normalizeBusinessInfo } from "@/lib/business-info";
 import { DashboardContext, DashboardLayout } from "./types";
 import { getStoreUrl } from "@/lib/utils/url-generator";
 import { getActiveStoreId } from "@/lib/auth/partner-context";
+import { createSlug } from "@/lib/utils/slugify";
 import {
   getChecklistItems,
   getCards,
@@ -237,25 +238,24 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
       : "Veja como está seu negócio hoje no Marketplace."
   };
 
-  // 7. Gera a URL pública do perfil do vendedor
+  // 7. Gera a URL pública do perfil do vendedor (baseada na loja ativa)
   const storeData = storeRes.data
   const firstAddress = Array.isArray(addressData) ? addressData[0] : addressData;
-  const partnerForUrl = storeData
-    ? {
-        id: storeData.id,
+
+  const storeSlug = storeData?.slug || (storeData?.name ? createSlug(storeData.name) : "");
+  const storeId = storeData?.id || "";
+  const storeCity = storeData?.city || firstAddress?.city;
+  const storeState = storeData?.state || firstAddress?.state;
+
+  const partnerUrl = storeData && storeSlug && storeId
+    ? getStoreUrl({
+        id: storeId,
+        slug: storeSlug,
         name: storeData.name,
-        slug: storeData.slug,
-        store_name: storeData.name,
-        city: storeData.city || (firstAddress as any)?.city,
-        state: storeData.state || (firstAddress as any)?.state,
-        addresses: firstAddress ? [firstAddress] : [],
-      }
-    : {
-        id: partnerId,
-        store_name: storeData?.name || "",
-        addresses: firstAddress ? [firstAddress] : [],
-      };
-  const partnerUrl = getStoreUrl(partnerForUrl);
+        city: storeCity,
+        state: storeState,
+      })
+    : "/";
 
   return {
     storeName: storeName,

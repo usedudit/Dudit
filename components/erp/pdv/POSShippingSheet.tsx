@@ -134,9 +134,14 @@ export default function POSShippingSheet({
 
   const hasSelectedCustomer = !!selectedCustomerId
   const hasStreet = !!customerDetails?.address?.street?.trim()
-  const shippingFeeValue = isCustomShipping
-    ? (shippingFree ? 0 : Math.max(0, Number(shippingInput || 0)))
-    : calculatedFee
+
+  const isStoreSubsidizedBySettings = (breakdown as any)?.deliveryPayer === "seller"
+  const isSubsidized = isCustomShipping ? shippingFree : isStoreSubsidizedBySettings
+
+  const calculatedOriginalFee = Number((breakdown as any)?.originalFee || (breakdown as any)?.baseFee || 0)
+  const feeToDisplay = isCustomShipping
+    ? Math.max(0, Number(shippingInput || calculatedFee || 0))
+    : (calculatedOriginalFee > 0 ? calculatedOriginalFee : calculatedFee)
 
   useEffect(() => {
     let active = true
@@ -155,8 +160,9 @@ export default function POSShippingSheet({
         setDistanceKm(Number(quote.distanceKm || 0))
         setBreakdown(quote.breakdown as Record<string, unknown>)
         const fee = Number(quote.fee || 0)
-        setCalculatedFee(fee)
-        if (!shippingFree) setShippingInput(fee)
+        const origFee = Number((quote.breakdown as any)?.originalFee || fee)
+        setCalculatedFee(origFee || fee)
+        if (!shippingFree) setShippingInput(origFee || fee)
         setDeliveryError(null)
       } else {
         setDeliveryError(quote.error || "Não foi possível calcular o frete.")
@@ -164,7 +170,18 @@ export default function POSShippingSheet({
       setIsQuoteLoading(false)
     })()
     return () => { active = false }
-  }, [isOpen, hasSelectedCustomer, hasStreet, customerDetails?.id, customerDetails?.address?.street, customerDetails?.address?.number, customerDetails?.address?.city, customerDetails?.address?.state, customerDetails?.address?.zipCode, customerDetails?.address?.neighborhood, partnerId, storeId, shippingFree])
+  }, [
+    isOpen,
+    hasSelectedCustomer,
+    hasStreet,
+    partnerId,
+    storeId,
+    shippingFree,
+    activeTab,
+    customerDetails?.id,
+    customerDetails?.address?.street,
+    customerDetails?.address?.zipCode,
+  ])
 
   const content = (
     <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
@@ -212,14 +229,37 @@ export default function POSShippingSheet({
                 message={deliveryError}
               />
             ) : (
-              <div className="rounded-xl border border-brand-border p-4 text-sm dark:border-dark-border">
+              <div className="rounded-xl border border-brand-border p-4 text-sm dark:border-dark-border space-y-2">
                 <div className="flex justify-between"><span>Distância</span><span>{distanceKm == null ? "-" : `${distanceKm.toFixed(2)} km`}</span></div>
                 <div className="flex justify-between"><span>Taxa base</span><span>R$ {Number((breakdown as any)?.baseFee || 0).toFixed(2)}</span></div>
                 <div className="flex justify-between"><span>Taxa por distância</span><span>R$ {Number((breakdown as any)?.distanceFee || 0).toFixed(2)}</span></div>
                 <div className="flex justify-between"><span>Ajuste por horário</span><span>R$ {Number((breakdown as any)?.timeAdjustmentTotal || 0).toFixed(2)}</span></div>
-                <div className="mt-2 border-t border-brand-border pt-2 font-bold dark:border-dark-border flex justify-between">
-                  <span>Taxa final</span><span>R$ {Number(shippingFeeValue || 0).toFixed(2)}</span>
+
+                <div className="mt-2 border-t border-brand-border pt-2 font-bold dark:border-dark-border flex justify-between items-center">
+                  <span>Taxa do envio</span>
+                  <div className="text-right">
+                    <span>R$ {feeToDisplay.toFixed(2)}</span>
+                    {isSubsidized && (
+                      <span className="ml-2 inline-block rounded-md bg-amber-100 dark:bg-amber-900/60 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:text-amber-300">
+                        Subsidiado pela loja
+                      </span>
+                    )}
+                  </div>
                 </div>
+
+                {isSubsidized && (
+                  <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 p-2.5 text-xs text-amber-800 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/60 mt-2 space-y-1">
+                    <div className="flex justify-between font-semibold">
+                      <span>Cobrado do cliente:</span>
+                      <span className="text-emerald-600 dark:text-emerald-400">R$ 0,00</span>
+                    </div>
+                    <div className="flex justify-between text-brand-dark/70 dark:text-dark-muted">
+                      <span>Custo da loja (subsídio):</span>
+                      <span>R$ {feeToDisplay.toFixed(2)}</span>
+                    </div>
+                  </div>
+                )}
+
                 {isQuoteLoading && <p className="mt-2 text-xs text-brand-inactive-text">Recalculando valores...</p>}
               </div>
             )}
@@ -235,15 +275,14 @@ export default function POSShippingSheet({
                   <MoneyInput
                     label="Valor do Envio"
                     name="customShippingFee"
-                    value={shippingFree ? 0 : shippingInput}
+                    value={shippingInput}
                     onChange={(value) => setShippingInput(value)}
                     suffix={(
                       <label className="flex items-center gap-1 text-xs text-brand-dark dark:text-dark-heading cursor-pointer">
                         <Checkbox checked={shippingFree} onChange={() => setShippingFree((prev) => !prev)} name="shippingFree" />
-                        Sem custo
+                        Sem custo (subsidiado)
                       </label>
                     )}
-                    readOnly={shippingFree}
                   />
                 )}
               </div>
@@ -260,7 +299,22 @@ export default function POSShippingSheet({
           <Button
             className="h-12 flex-1"
             disabled={!hasSelectedCustomer || !hasStreet}
-            onClick={() => onApply({ shippingFee: shippingFeeValue, distanceKm, breakdown })}
+            onClick={() => {
+              const effectiveDeliveryPayer = isSubsidized ? "seller" : "customer"
+              const effectiveOriginalFee = feeToDisplay
+              const effectiveCustomerFee = effectiveDeliveryPayer === "seller" ? 0 : effectiveOriginalFee
+
+              onApply({
+                shippingFee: effectiveCustomerFee,
+                distanceKm,
+                breakdown: {
+                  ...breakdown,
+                  deliveryPayer: effectiveDeliveryPayer,
+                  originalFee: effectiveOriginalFee,
+                  deliverySubsidy: effectiveDeliveryPayer === "seller" ? effectiveOriginalFee : 0,
+                },
+              })
+            }}
           >
             Aplicar envio
           </Button>

@@ -10,6 +10,7 @@ import type { ActionResponse } from "@/lib/types/action-response"
 import { safeRevalidateTag } from "@/lib/utils/revalidation"
 import { TAGS } from "@/lib/utils/revalidation-tags"
 import { DASHBOARD_TAGS } from "@/lib/data/dashboard"
+import { getRandomDefaultBanner } from "@/lib/utils/banner"
 
 export async function listStoresAction(partnerId: string) {
     await requireUser()
@@ -100,6 +101,7 @@ export async function createStoreAction(input: CreateStoreInput): Promise<Action
                 phone: input.phone || null,
                 opening_hours: input.opening_hours || null,
                 logo_url: input.logo_url || null,
+                banner_url: getRandomDefaultBanner(),
                 is_active: true,
             })
             .select("id")

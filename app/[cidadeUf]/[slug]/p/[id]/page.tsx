@@ -1,3 +1,4 @@
+import { cache } from "react"
 import { redirect } from "next/navigation"
 import type { Metadata } from 'next'
 import { ProductDetailsPageClient } from "@/components/marketplace/ProductDetailsPage"
@@ -13,6 +14,9 @@ import { getCurrentUser } from "@/lib/auth/authorization"
 import { getUserSessionData } from "@/lib/data/user"
 import { getSponsoredAdsForSlot } from "@/app/actions/marketplace/ads"
 
+// React cache() deduplicates getStoreBySlug between generateMetadata and page render
+const getStoreBySlugCached = cache(getStoreBySlug)
+
 import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
 
 export const dynamic = 'force-dynamic'
@@ -20,7 +24,7 @@ export const dynamicParams = true
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string; cidadeUf: string; id: string }> }): Promise<Metadata> {
   const { id, slug } = await params
-  const store = slug ? await getStoreBySlug(slug) : null
+  const store = slug ? await getStoreBySlugCached(slug) : null
   const storeId = store?.id || null
   const product = await getMarketplaceProduct(id, storeId)
 
@@ -79,13 +83,16 @@ export default async function ProductDetailsPage({
   const { id, slug: currentSlug, cidadeUf: currentCidadeUf } = await params
 
   const [store, user] = await Promise.all([
-    getStoreBySlug(currentSlug).catch(() => null),
+    getStoreBySlugCached(currentSlug).catch(() => null),
     getCurrentUser(),
   ])
   const storeId = store?.id || null
 
-  const product = await getMarketplaceProduct(id, storeId)
-  const sessionData = user ? await getUserSessionData(user.id) : null
+  // Parallelize product + session data (independent once we have storeId)
+  const [product, sessionData] = await Promise.all([
+    getMarketplaceProduct(id, storeId),
+    user ? getUserSessionData(user.id) : Promise.resolve(null),
+  ])
 
   const userProfile = sessionData?.profile ? {
     full_name: sessionData.profile.full_name,

@@ -368,6 +368,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     const percentagePresets = [5, 10, 15, 20]
     const [isShippingSheetOpen, setIsShippingSheetOpen] = useState(false)
     const [shippingCustomerDetails, setShippingCustomerDetails] = useState<any | null>(null)
+    const [deliveryBreakdown, setDeliveryBreakdown] = useState<Record<string, unknown> | null>(null)
     const [customerSelectIntent, setCustomerSelectIntent] = useState<"default" | "shipping-preflight">("default")
 
     // --- Calculations ---
@@ -1230,6 +1231,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             couponDiscountAmount: effectiveCouponDiscountAmount,
             shippingCost: parseFloat(shippingFee || "0"),
             additionalCosts: parseFloat(otherCosts || "0"),
+            deliveryBreakdown: deliveryBreakdown || undefined,
             totalAmount,
             notes,
             csrf_token: csrfToken || undefined,
@@ -2253,9 +2255,10 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                         if (details.success && details.data) setShippingCustomerDetails(details.data)
                         notifySuccess("Endereço cadastrado com sucesso.")
                     }}
-                    onApply={({ shippingFee: fee, isCustom }: any) => {
+                    onApply={({ shippingFee: fee, isCustom, breakdown }: any) => {
                         setShippingFee(String(Math.max(0, Number(fee || 0))))
                         setIsCustomShipping(!!isCustom)
+                        setDeliveryBreakdown(breakdown || null)
                         setIsShippingSheetOpen(false)
                     }}
                 />

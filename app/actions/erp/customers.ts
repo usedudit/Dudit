@@ -598,15 +598,16 @@ export async function getCustomerByIdAction(customerId: string) {
   const allCustomerIds = Array.from(
     new Set([customer.id, userId, marketplaceUserId].filter(Boolean))
   ) as string[]
-  const conditions = [
-    `customer_id.in.(${allCustomerIds.join(",")})`,
-    `buyer_id.in.(${allCustomerIds.join(",")})`,
-  ]
+  const orParts: string[] = []
+  for (const id of allCustomerIds) {
+    orParts.push(`customer_id.eq.${id}`)
+    orParts.push(`buyer_id.eq.${id}`)
+  }
   const adminDbForStats = createAdminClient()
   const { data: orderAgg } = await adminDbForStats
     .from("orders")
     .select("total_amount, created_at")
-    .or(conditions.join(","))
+    .or(orParts.join(","))
     .neq("situation", "cancelled")
 
   if (orderAgg) {
@@ -671,10 +672,12 @@ export async function getCustomerOrdersAction(customerId: string) {
     new Set([customer.id, userId, marketplaceUserId].filter(Boolean))
   ) as string[]
 
-  const orderConditions = [
-    `customer_id.in.(${allCustomerIds.join(",")})`,
-    `buyer_id.in.(${allCustomerIds.join(",")})`,
-  ]
+  const orParts: string[] = []
+  for (const id of allCustomerIds) {
+    orParts.push(`customer_id.eq.${id}`)
+    orParts.push(`buyer_id.eq.${id}`)
+  }
+  const filter = orParts.join(",")
 
   const { data: orders, error } = await adminDb
     .from("orders")
@@ -694,19 +697,28 @@ export async function getCustomerOrdersAction(customerId: string) {
       notes,
       order_items ( id, quantity, service_id, line_type )
     `)
-    .or(orderConditions.join(","))
+    .or(filter)
     .order("created_at", { ascending: false })
     .limit(50)
 
+  console.log("[getCustomerOrdersAction DEBUG]", {
+    customerId,
+    foundCustomer: customer,
+    allCustomerIds,
+    filter,
+    ordersFetchedCount: orders?.length ?? 0,
+    error: error?.message || null,
+  })
+
   if (error) {
-    return { error: error.message, stats: null }
+    return { orders: [], error: error.message, stats: null }
   }
 
   // Aggregate stats across ALL orders (no limit) for accurate KPIs
   const { data: statsRaw } = await adminDb
     .from("orders")
     .select("total_amount, created_at, situation")
-    .or(orderConditions.join(","))
+    .or(filter)
     .neq("situation", "cancelled")
 
   let stats = null
@@ -777,7 +789,7 @@ export async function getPartnerCustomersAction(partnerId: string, currentStoreI
 
     const { data: customers, error } = await supabase
       .from("customers")
-      .select("id, name, email, phone, cpf, status, store_credit, created_at, partner_id, person_type, birth_date")
+      .select("id, name, email, phone, cpf, status, store_credit, created_at, partner_id, person_type, birth_date, image_url")
       .eq("partner_id", partnerId)
       .order("created_at", { ascending: false })
       .limit(500)
@@ -914,7 +926,7 @@ export async function getERPCustomersPageAction(
 
     let q = supabase
       .from("customers")
-      .select("id, partner_id, name, email, phone, phone_fixed, status, store_credit, created_at, cpf, person_type, cnpj, birth_date, user_id")
+      .select("id, partner_id, name, email, phone, phone_fixed, status, store_credit, created_at, cpf, person_type, cnpj, birth_date, user_id, image_url")
       .eq("partner_id", partnerId)
 
     if (cursor) {

@@ -35,7 +35,7 @@ const PAGE_SIZE = 100
 
 export async function getERPServiceOrdersPageAction(
   partnerId: string,
-  options?: { cursor?: ServiceOrderListCursor; limit?: number; status?: string; storeId?: string | null; showLegacy?: boolean },
+  options?: { cursor?: ServiceOrderListCursor; limit?: number; status?: string; storeId?: string | null },
 ): Promise<
   | { success: true; items: any[]; nextCursor: ServiceOrderListCursor; hasMore: boolean }
   | { success: false; error: string }
@@ -57,10 +57,8 @@ export async function getERPServiceOrdersPageAction(
       q = q.eq("status", options.status)
     }
 
-    if (options?.storeId && !options?.showLegacy) {
+    if (options?.storeId) {
       q = q.eq("store_id", options.storeId)
-    } else if (options?.showLegacy) {
-      q = q.is("store_id", null)
     }
 
     if (cursor) {

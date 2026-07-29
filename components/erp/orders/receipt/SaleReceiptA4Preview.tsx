@@ -42,6 +42,8 @@ const SaleReceiptA4Preview = ({
     const total = data.total
     const saleDate = data.saleDateTime
 
+    const isDeliveryFree = data.deliveryPayer === 'seller'
+
     const pages = useMemo(() => {
         const ROW_HEIGHT = 85
         const TOTALS_SECTION_HEIGHT = 320
@@ -289,12 +291,16 @@ const SaleReceiptA4Preview = ({
                                                     <span className="font-bold">+{formatCurrency(data.methodInterest)}</span>
                                                 </div>
                                             )}
-                                            {shippingNum > 0.009 && (
-                                                <div className="flex justify-between items-center text-xs">
-                                                    <span className="text-gray-500 font-medium">Entrega</span>
-                                                    <span className="font-bold">{formatCurrency(shippingNum)}</span>
-                                                </div>
-                                            )}
+{shippingNum > 0.009 && (
+                                                  <div className="flex justify-between items-center text-xs">
+                                                      <span className="text-gray-500 font-medium">
+                                                          {isDeliveryFree ? "Entrega (grátis)" : "Entrega"}
+                                                      </span>
+                                                      <span className={`font-bold ${isDeliveryFree ? 'text-brand-green' : ''}`}>
+                                                          {isDeliveryFree ? "Grátis" : formatCurrency(shippingNum)}
+                                                      </span>
+                                                  </div>
+                                              )}
                                             {data.change > 0.009 && (
                                                 <div className="flex justify-between items-center text-xs">
                                                     <span className="text-gray-500 font-medium">Troco</span>

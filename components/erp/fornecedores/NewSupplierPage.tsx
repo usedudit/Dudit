@@ -38,6 +38,7 @@ import ImageCropperModal from "@/components/ImageCropperModal"
 import { consultarCNPJ } from "@/lib/nuvem-fiscal"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 import { validateEmail, validateCPF, validateCNPJ, validatePhoneBR, validateURL, validateCEP } from "@/lib/input-validator"
+import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 
 interface NewSupplierPageProps {
     onBack: () => void;
@@ -60,7 +61,7 @@ const REQUIRED_FIELDS = [
 const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplierId, onSuccess, onError }) => {
     const { success: notifySuccess, error: notifyError } = useNotification()
     const { uploadFile, isLoading: isUploadingImage } = useR2Upload({
-        prefix: "partners/",
+        prefix: "suppliers/",
     })
     const [activeTab, setActiveTab] = useState("general")
     const [isScrolled, setIsScrolled] = useState(false)
@@ -399,8 +400,45 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                                 <div className={`col-span-12 ${activeTab !== 'notes' ? 'lg:col-span-8 lg:pr-12' : ''}`}>
                                     <AnimatePresence mode="wait">
                                         <TabsContent value="general" className="mt-0">
-                                            <FadeIn key="general" className="space-y-10">
-                                                {/* Identificação */}
+                                             <FadeIn key="general" className="space-y-10">
+                                                 {/* Imagem do Fornecedor */}
+                                                 <div className="bg-white dark:bg-dark-surface p-4 rounded-2xl border border-brand-border dark:border-dark-border flex items-center gap-4">
+                                                     <label className="w-16 h-16 bg-gray-50 dark:bg-gray-800 rounded-full shrink-0 flex items-center justify-center relative group cursor-pointer overflow-hidden border-2 border-dashed border-brand-border dark:border-dark-border hover:border-brand-dark transition-colors">
+                                                         <input
+                                                             type="file"
+                                                             accept="image/png, image/jpeg, image/webp"
+                                                             className="hidden"
+                                                             onChange={(e) => {
+                                                                 const file = e.target.files?.[0]
+                                                                 if (file) {
+                                                                     setSelectedImageForCrop(file)
+                                                                     setShowImageCropper(true)
+                                                                 }
+                                                                 e.target.value = ""
+                                                             }}
+                                                         />
+                                                         {imagePreview ? (
+                                                             <img
+                                                                 src={getR2ImageUrl(imagePreview)}
+                                                                 alt="Imagem do fornecedor"
+                                                                 className="w-full h-full object-cover"
+                                                             />
+                                                         ) : (
+                                                             <EditIcon size={24} className="text-gray-300 group-hover:opacity-10 transition-opacity" />
+                                                         )}
+                                                         <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                             <span className="text-white text-[10px] font-bold uppercase tracking-wider">
+                                                                 {imagePreview ? "Alterar" : "Enviar"}
+                                                             </span>
+                                                         </div>
+                                                     </label>
+                                                     <div className="min-w-0 flex-1">
+                                                         <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading">Imagem do Fornecedor</h3>
+                                                         <p className="text-xs text-brand-inactive-text mt-0.5">Formatos aceitos: PNG, JPG ou WEBP (máx. 5MB)</p>
+                                                     </div>
+                                                 </div>
+
+                                                 {/* Identificação */}
                                                 <FormSection title="Dados Gerais">
                                                     <div className="grid grid-cols-12 gap-5">
                                                         <div className="col-span-12 md:col-span-6">

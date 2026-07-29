@@ -467,9 +467,11 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                 const expanded = isExpanded(storeKey)
                                 const inStockItems = data.items.filter((item: any) => !isItemOutOfStock(item))
                                 const allSelected = inStockItems.length > 0 && inStockItems.every((item: any) => getItemSelected(item))
-                                const sellerName = data.store?.name || "Loja"
-                                const sellerImage = data.store?.logo_url
-                                const storeObj = data.store ? { ...data.store, id: data.store.id, store_name: data.store.name } : data.partner
+                                const sellerName = data.store?.name || data.partner?.name || "Loja"
+                                const sellerImage = data.store?.logo_url || data.partner?.logo_url || data.partner?.store_image_url
+                                const storeObj = data.store
+                                    ? { ...data.store, id: data.store.id, name: data.store.name }
+                                    : { ...data.partner, id: data.partner?.store_id || data.partner?.id, name: data.partner?.name || sellerName }
 
                                 return (
                                     <Fragment key={storeKey}>

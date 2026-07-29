@@ -856,7 +856,7 @@ export function CheckoutPageClient() {
         const isFree = diff <= 0
         const percentage = Math.min(100, (current / threshold) * 100)
 
-        const storeUrl = checkoutContext?.partner ? getStoreUrl(checkoutContext.partner) : "/"
+        const storeUrl = checkoutContext?.store ? getStoreUrl(checkoutContext.store) : checkoutContext?.partner ? getStoreUrl(checkoutContext.partner) : "/"
 
         return (
             <div className="border border-brand-border dark:border-dark-border rounded-xl p-4 bg-brand-slate/10 dark:bg-dark-border/10 space-y-3 shadow-sm mb-6">

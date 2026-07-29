@@ -60,7 +60,7 @@ export const getCachedStoreById = async (storeId: string) => {
         fn = unstable_cache(
             async () => {
                 const supabase = createAdminClient()
-                const { data, error } = await supabase
+                let { data, error } = await supabase
                     .from("stores")
                     .select(`
                         *,
@@ -69,6 +69,20 @@ export const getCachedStoreById = async (storeId: string) => {
                     `)
                     .eq("id", storeId)
                     .maybeSingle()
+
+                if (!data && !error) {
+                    const fallback = await supabase
+                        .from("stores")
+                        .select(`
+                            *,
+                            addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default, latitude, longitude),
+                            partners!left(id, business_info, created_at, payment_methods(*))
+                        `)
+                        .eq("partner_id", storeId)
+                        .maybeSingle()
+                    if (fallback.data) data = fallback.data
+                }
+
                 if (error) console.error("[getCachedStoreById] Erro na query:", error.message, { storeId })
                 if (!data) console.error("[getCachedStoreById] Store nao encontrada:", { storeId })
                 return data

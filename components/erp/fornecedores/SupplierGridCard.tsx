@@ -46,6 +46,7 @@ const SupplierGridCard = React.memo(
         <div className="flex gap-4 mb-2">
           <UserProfileImage
             fullName={supplier.name || "Fornecedor"}
+            imageUrl={supplier.image_url || supplier.imageUrl || supplier.avatar_url}
             className="w-12 h-12 text-lg"
           />
 

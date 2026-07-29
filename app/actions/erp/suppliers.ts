@@ -440,7 +440,7 @@ export async function getERPSuppliersPageAction(
 
     let q = supabase
       .from("suppliers")
-      .select("id, name, email, phone, person_type, cpf, cnpj, nome_fantasia, inscricao_estadual, status, created_at, supplier_code, notes")
+      .select("id, name, email, phone, person_type, cpf, cnpj, nome_fantasia, inscricao_estadual, status, created_at, supplier_code, notes, image_url")
       .eq("partner_id", partnerId)
 
     if (cursor) {

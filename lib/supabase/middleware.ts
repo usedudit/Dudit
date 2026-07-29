@@ -119,7 +119,12 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  console.log(`[MIDDLEWARE] ${request.method} ${pathname}`)
+  // Only log non-Server-Action requests to reduce noise
+  // Server Actions (POST with Next-Action header) are internal Next.js calls
+  const isServerAction = request.headers.has("Next-Action")
+  if (!isServerAction) {
+    console.log(`[MIDDLEWARE] ${request.method} ${pathname}`)
+  }
   const forwarded = request.headers.get("x-forwarded-for")
   const ip = forwarded ? forwarded.split(",")[0].trim() : request.headers.get("x-real-ip") || "unknown"
 
@@ -326,8 +331,7 @@ export async function middleware(request: NextRequest) {
   // that would prevent Cloudflare from caching the response.
   const NEEDS_AUTH_CHECK = ["/erp", "/account", "/perfil", "/pedidos", "/auth/login", "/select-erp", "/ddt-admin", "/cart", "/banned", "/checkout"]
   const isPost = request.method === "POST"
-  const isAction = request.headers.has("Next-Action")
-  const needsAuthCheck = !isAction && (isPost || NEEDS_AUTH_CHECK.some(prefix => pathname === prefix || pathname.startsWith(prefix + "/")))
+  const needsAuthCheck = !isServerAction && (isPost || NEEDS_AUTH_CHECK.some(prefix => pathname === prefix || pathname.startsWith(prefix + "/")))
 
   if (needsAuthCheck) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL

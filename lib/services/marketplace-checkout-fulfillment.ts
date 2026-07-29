@@ -502,7 +502,7 @@ export async function fulfillMarketplaceOrder(
         }
 
         if (bookingResult.appointmentId && line.bookingMetadata) {
-          const { serviceName, date, time } = line.bookingMetadata
+          const { serviceName, date, time, staffId, storeId: bookingStoreId } = line.bookingMetadata
           import("@/lib/services/notification-automation.service")
             .then(({ notifyAppointmentCreatedFromMarketplace }) =>
               notifyAppointmentCreatedFromMarketplace({
@@ -515,6 +515,8 @@ export async function fulfillMarketplaceOrder(
                 customerId: null,
                 marketplaceOrderId: orderId,
                 storeName: undefined,
+                storeId: bookingStoreId || order.store_id || null,
+                staffPartnerUserId: staffId || null,
               }),
             )
             .catch(console.error)

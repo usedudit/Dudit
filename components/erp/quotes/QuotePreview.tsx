@@ -229,16 +229,16 @@ const QuotePreview = ({
                                                     <span className="font-bold text-sm text-brand-dark">{invoiceNumber}</span>
                                                 </div>
                                                 <div className="flex flex-col">
-                                                    <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Data</span>
+                                                    <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Emissão</span>
                                                     <span className="font-bold text-sm text-brand-dark">{formatDate(quoteDate)}</span>
                                                 </div>
                                                 <div className="flex flex-col">
-                                                    <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Vencimento</span>
+                                                    <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Validade</span>
                                                     <span className="font-bold text-sm text-brand-dark">{formatDate(expiryDate)}</span>
                                                 </div>
                                                 {salespersonName && (
                                                     <div className="flex flex-col">
-                                                        <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Vendedor</span>
+                                                        <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Responsável</span>
                                                         <span className="font-bold text-sm text-brand-dark">{salespersonName}</span>
                                                     </div>
                                                 )}
@@ -248,18 +248,17 @@ const QuotePreview = ({
                                         <div className="px-8 pb-6">
                                             <div className="grid grid-cols-2 gap-8">
                                                 <div>
-                                                    <h3 className="font-bold text-sm text-brand-dark mb-3">Emitente</h3>
+                                                    <h3 className="font-bold text-sm text-brand-dark mb-3">Dados da empresa</h3>
                                                     <div className="text-xs text-gray-600 space-y-1">
                                                         <p className="font-bold text-brand-dark">{partnerName}</p>
                                                         <p className="whitespace-pre-wrap">{partnerAddress}</p>
                                                     </div>
                                                 </div>
                                                 <div>
-                                                    <h3 className="font-bold text-sm text-brand-dark mb-3">Destinatário</h3>
+                                                    <h3 className="font-bold text-sm text-brand-dark mb-3">Dados do cliente</h3>
                                                     {selectedCustomer ? (
                                                         <div className="text-xs text-gray-600 space-y-1">
                                                             <p className="font-bold text-brand-dark">{selectedCustomer.name}</p>
-                                                            {showCustomerContact && selectedCustomer.email && <p>{selectedCustomer.email}</p>}
                                                             {showCustomerContact && selectedCustomer.phone && <p>{selectedCustomer.phone}</p>}
                                                             {customerAddressText && <p className="whitespace-pre-wrap">{customerAddressText}</p>}
                                                         </div>

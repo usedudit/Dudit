@@ -62,6 +62,7 @@ type ERPOrderPayload = {
     couponDiscountAmount?: number
     shippingCost: number
     additionalCosts: number
+    deliveryBreakdown?: Record<string, unknown> | null
     totalAmount: number
     paidAmount?: number
     notes?: string
@@ -1632,6 +1633,8 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         }
     }
 
+    const effectiveDeliveryPayer = (data.deliveryBreakdown?.deliveryPayer as "seller" | "customer") || deliveryPayer
+
     const orderInsertPayload: Record<string, unknown> = {
         partner_id: partnerId,
         customer_id: data.customerId || null,
@@ -1655,7 +1658,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         payment_method_fixed_fee_amount: paymentMethodFixedFeeAmount,
         store_credit_amount: paymentMethodStoreCreditAmount,
         coupon_id: couponIdToSave,
-        delivery_fee: serverShippingCost,
+        delivery_fee: effectiveDeliveryPayer === "seller" ? 0 : serverShippingCost,
         additional_costs: data.additionalCosts,
         notes: sanitizeNotes(data.notes),
         payment_method: paymentMethodSummary,
@@ -1666,7 +1669,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         finance_account_id: data.financeAccountId,
         created_by: user.id,
         pricing_version: pricingResult.pricingVersion,
-        delivery_payer: deliveryPayer,
+        delivery_payer: effectiveDeliveryPayer,
         seller_commission_amount: sellerCommissionAmount,
         ...(preparationEstimate || {}),
     }
@@ -2471,6 +2474,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         fallbackPaidAmount: Number(currentOrder.paid_amount || 0),
     })
     const updateServerShipping = updatePricingResult.shipping
+    const updateEffectiveDeliveryPayer = (data.deliveryBreakdown?.deliveryPayer as "seller" | "customer") || ((currentOrder as any).delivery_payer || "customer")
 
     const orderUpdatePayload: Record<string, unknown> = {
         customer_id: data.customerId || null,
@@ -2491,7 +2495,8 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         payment_method_interest_amount: updatePaymentMethodInterestAmount,
         payment_method_fee_amount: updatePaymentMethodFeeAmount,
         payment_method_fixed_fee_amount: updatePaymentMethodFixedFeeAmount,
-        delivery_fee: updateServerShipping,
+        delivery_fee: updateEffectiveDeliveryPayer === "seller" ? 0 : updateServerShipping,
+        delivery_payer: updateEffectiveDeliveryPayer,
         additional_costs: data.additionalCosts,
         notes: sanitizeNotes(data.notes),
         payment_method: paymentMethodSummary,

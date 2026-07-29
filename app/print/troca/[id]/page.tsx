@@ -46,14 +46,14 @@ const REASON_LABELS: Record<string, string> = {
 
 export default async function PrintTrocaPage({ params }: PageProps) {
     const { id } = await params
-    
+
     const user = await getCurrentUser()
     if (!user) {
         redirect("/auth/login")
     }
 
     const supabase = getAdminClient()
-    
+
     // Find partner_id from return_requests table
     const { data: requestData } = await supabase
         .from("return_requests")
@@ -135,8 +135,8 @@ export default async function PrintTrocaPage({ params }: PageProps) {
             <div className="flex flex-col w-full h-full bg-white dark:bg-dark-surface relative overflow-hidden quote-a4-print">
                 <div className="w-full flex flex-col items-center p-0">
                     <div className="w-[650px] min-w-[650px] shrink-0 bg-white text-[#113833] shadow-md overflow-hidden relative font-sans rounded-sm min-h-[1050px] flex flex-col pdf-print-page">
-                        
-                        {/* Colored A4 Brand Header block */}
+
+                        {/* ✅ HEADER - relative z-10 agora está DENTRO desta div */}
                         <div
                             className="px-8 py-8 relative overflow-hidden flex flex-col justify-between h-[160px] shrink-0"
                             style={{ backgroundColor: primaryColor }}
@@ -175,8 +175,8 @@ export default async function PrintTrocaPage({ params }: PageProps) {
                                     <span className="text-white font-bold text-sm">{partnerName}</span>
                                 </div>
                                 <div>
-                                    <h1 className="text-3xl font-medium text-white">{title}</h1>
-                                    <p className="text-white/80 text-xs tracking-widest font-light mt-1 uppercase">
+                                    <h1 className="text-2xl font-medium text-white">{title}</h1>
+                                    <p className="text-white/80 text-xs tracking-widest font-light mt-1">
                                         Solicitação #{returnRequest.id.slice(0, 8).toUpperCase()}
                                     </p>
                                 </div>
@@ -187,44 +187,43 @@ export default async function PrintTrocaPage({ params }: PageProps) {
                         <div className="px-8 py-6">
                             <div className="grid grid-cols-3 gap-4 border-b border-gray-200 pb-6 w-full">
                                 <div className="flex flex-col">
-                                    <span className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-0.5">
+                                    <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">
                                         Pedido Original
                                     </span>
-                                    <span className="font-bold text-sm text-[#113833]">#{returnRequest.orderNumber}</span>
+                                    <span className="font-bold text-sm text-brand-dark">#{returnRequest.orderNumber}</span>
                                 </div>
                                 <div className="flex flex-col">
-                                    <span className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-0.5">
+                                    <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">
                                         Data Abertura
                                     </span>
-                                    <span className="font-bold text-sm text-[#113833]">{formatDate(returnRequest.createdAt)}</span>
+                                    <span className="font-bold text-sm text-brand-dark">{formatDate(returnRequest.createdAt)}</span>
                                 </div>
                                 <div className="flex flex-col">
-                                    <span className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-0.5">
+                                    <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">
                                         Status Atual
                                     </span>
-                                    <span className="font-bold text-sm text-[#113833]">
+                                    <span className="font-bold text-sm text-brand-dark">
                                         {STATUS_LABELS[returnRequest.status] || returnRequest.status}
                                     </span>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Emitente & Consumidor info */}
                         <div className="px-8 pb-6">
                             <div className="grid grid-cols-2 gap-8">
                                 <div>
-                                    <h3 className="font-bold text-sm text-[#113833] mb-3">Emitente</h3>
+                                    <h3 className="font-bold text-sm text-brand-dark mb-3">Dados da empresa</h3>
                                     <div className="text-xs text-gray-600 space-y-1">
-                                        <p className="font-bold uppercase text-[#113833]">{partnerHeader.fantasyName || partnerName}</p>
+                                        <p className="font-bold text-sm text-brand-dark">{partnerHeader.fantasyName || partnerName}</p>
                                         {partnerHeader.legalName && <p>{partnerHeader.legalName}</p>}
                                         <p className="whitespace-pre-wrap">{partnerAddress}</p>
                                         {partnerHeader.taxIdLine && <p>{partnerHeader.taxIdLine}</p>}
                                     </div>
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-sm text-[#113833] mb-3">Cliente</h3>
+                                    <h3 className="font-bold text-sm text-brand-dark mb-3">Dados do cliente</h3>
                                     <div className="text-xs text-gray-600 space-y-1">
-                                        <p className="font-bold text-[#113833]">{returnRequest.customerName}</p>
+                                        <p className="font-bold text-sm text-brand-dark">{returnRequest.customerName}</p>
                                         {returnRequest.customerPhone && <p>Tel: {returnRequest.customerPhone}</p>}
                                         {returnRequest.customerEmail && <p>Email: {returnRequest.customerEmail}</p>}
                                         {returnRequest.customerAddress && <p>Endereço: {returnRequest.customerAddress}</p>}
@@ -368,7 +367,7 @@ export default async function PrintTrocaPage({ params }: PageProps) {
                     </div>
                 </div>
             </div>
-            
+
             <script
                 dangerouslySetInnerHTML={{
                     __html: `

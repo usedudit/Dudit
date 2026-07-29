@@ -22,8 +22,8 @@ export async function createCollection(name: string, description?: string): Prom
     if (!name || name.trim().length < 2) {
       return { success: false, error: "Nome deve ter pelo menos 2 caracteres" }
     }
-    if (name.length > 100) {
-      return { success: false, error: "Nome deve ter no máximo 100 caracteres" }
+    if (name.length > 50) {
+      return { success: false, error: "Nome deve ter no máximo 50 caracteres" }
     }
     if (description && description.length > 500) {
       return { success: false, error: "Descrição deve ter no máximo 500 caracteres" }
@@ -57,8 +57,8 @@ export async function updateCollection(id: string, name: string, description?: s
     if (!name || name.trim().length < 2) {
       return { success: false, error: "Nome deve ter pelo menos 2 caracteres" }
     }
-    if (name.length > 100) {
-      return { success: false, error: "Nome deve ter no máximo 100 caracteres" }
+    if (name.length > 50) {
+      return { success: false, error: "Nome deve ter no máximo 50 caracteres" }
     }
     if (description && description.length > 500) {
       return { success: false, error: "Descrição deve ter no máximo 500 caracteres" }
@@ -332,30 +332,45 @@ export async function getCollectionItems(collectionId: string, storeId?: string)
   const productIds = links.filter((l: any) => l.item_type === "product").map((l: any) => l.item_id)
   const serviceIds = links.filter((l: any) => l.item_type === "service").map((l: any) => l.item_id)
 
-  let [productsData, servicesData] = await Promise.all([
+  const [productsRes, servicesRes] = await Promise.all([
     productIds.length > 0
       ? (() => {
           let q = supabase
             .from("products")
-            .select("id, name, price, promotional_price, images, rating, condition, created_at, partners!inner(id), stores(id, name, logo_url)")
+            .select(`
+              id, name, price, promotional_price, images, rating, condition, created_at,
+              category_id, category:product_categories!category_id(name),
+              partners(id),
+              stores!inner(id, name, slug, logo_url, banner_url, addresses!store_id!left(city, state)),
+              product_variants(variant_options, price_adjustment, is_active),
+              show_price_in_store
+            `)
             .in("id", productIds)
             .eq("is_active", true)
           if (storeId) q = q.eq("store_id", storeId)
-          return q.then((r: any) => r.data || [])
+          return q
         })()
-      : Promise.resolve([]),
+      : Promise.resolve({ data: [] }),
     serviceIds.length > 0
       ? (() => {
           let q = supabase
             .from("services")
-            .select("id, name, price, images, rating, created_at, partners!inner(id), stores(id, name, logo_url)")
+            .select(`
+              id, name, price, images, rating, created_at, billing_unit, price_type,
+              partners(id),
+              stores!inner(id, name, slug, logo_url, banner_url, addresses!store_id!left(city, state)),
+              show_price_in_store
+            `)
             .in("id", serviceIds)
             .eq("is_active", true)
           if (storeId) q = q.eq("store_id", storeId)
-          return q.then((r: any) => r.data || [])
+          return q
         })()
-      : Promise.resolve([]),
+      : Promise.resolve({ data: [] }),
   ])
+
+  let productsData = (productsRes.data || []) as any[]
+  let servicesData = (servicesRes.data || []) as any[]
 
   if (productsData.length > 0) {
     const visibleProductIds = await filterMarketplaceVisibleProducts(productsData.map((p: any) => p.id))
@@ -366,8 +381,69 @@ export async function getCollectionItems(collectionId: string, storeId?: string)
     servicesData = servicesData.filter((s: any) => visibleServiceIds.has(s.id))
   }
 
-  const productMap = new Map(productsData.map((p: any) => [p.id, { ...p, _type: "product" as const }]))
-  const serviceMap = new Map(servicesData.map((s: any) => [s.id, { ...s, _type: "service" as const }]))
+  // Normalize products for ItemCard compatibility
+  const productMap = new Map<string, any>()
+  for (const p of productsData) {
+    const rawPartner = Array.isArray(p.partners) ? p.partners[0] : p.partners
+    const rawStore = Array.isArray(p.stores) ? p.stores[0] : p.stores
+    const storeName = rawStore?.name || "Vendedor"
+    const storeImage = rawStore?.logo_url || null
+    const storeCity = rawStore?.addresses?.[0]?.city || null
+    const storeState = rawStore?.addresses?.[0]?.state || null
+    const partner = rawPartner
+      ? {
+          ...rawPartner,
+          store_name: storeName,
+          store_image_url: storeImage,
+          store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
+          city: storeCity,
+          state: storeState,
+        }
+      : null
+
+    const variants = p.product_variants || []
+    const activeVariant = variants.find((v: any) => v.is_active)
+    const fallbackPrice = activeVariant?.price_adjustment || null
+
+    const { product_variants, ...rest } = p
+    productMap.set(p.id, {
+      ...rest,
+      category: (p.category as any)?.name || null,
+      itemType: "produto",
+      partners: partner,
+      fallback_variant_price: fallbackPrice,
+      originalPrice: p.promotional_price ? Number(p.price) : undefined,
+      price: Number(p.promotional_price || p.price),
+    })
+  }
+
+  // Normalize services for ItemCard compatibility
+  const serviceMap = new Map<string, any>()
+  for (const s of servicesData) {
+    const rawPartner = Array.isArray(s.partners) ? s.partners[0] : s.partners
+    const rawStore = Array.isArray(s.stores) ? s.stores[0] : s.stores
+    const storeName = rawStore?.name || "Vendedor"
+    const storeImage = rawStore?.logo_url || null
+    const storeCity = rawStore?.addresses?.[0]?.city || null
+    const storeState = rawStore?.addresses?.[0]?.state || null
+    const partner = rawPartner
+      ? {
+          ...rawPartner,
+          store_name: storeName,
+          store_image_url: storeImage,
+          store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
+          city: storeCity,
+          state: storeState,
+        }
+      : null
+
+    serviceMap.set(s.id, {
+      ...s,
+      itemType: "servico",
+      partners: partner,
+      price: Number(s.price),
+    })
+  }
 
   const items = links
     .map((link: any) => {

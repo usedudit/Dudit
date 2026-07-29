@@ -128,6 +128,8 @@ interface OrderGeneralTabProps {
     originalPaidAmount?: number
     paymentMethodDiscountAmount?: number
     paymentMethodExtraAmount?: number
+    originalDeliveryPayer?: string
+    originalDeliverySubsidy?: number
     role?: string
 }
 
@@ -157,6 +159,8 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
     originalPaidAmount = 0,
     paymentMethodDiscountAmount = 0,
     paymentMethodExtraAmount = 0,
+    originalDeliveryPayer = "customer",
+    originalDeliverySubsidy = 0,
     role = "OPERATOR",
     searchPromotions = [],
 }) => {
@@ -806,10 +810,23 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                     }
                                 />
 
-                                {Number(shippingFee || 0) > 0 && (
+                                {(Number(shippingFee || 0) > 0 || originalDeliveryPayer === "seller" || Number(originalDeliverySubsidy || 0) > 0) && (
                                     <PaymentRow
                                         label="Valor da Entrega"
-                                        value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(shippingFee)}</span>}
+                                        value={
+                                            (originalDeliveryPayer === "seller" || Number(originalDeliverySubsidy || 0) > 0) ? (
+                                                <div className="text-right">
+                                                    <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+                                                        {formatCurrency(Number(originalDeliverySubsidy || shippingFee || 0))}
+                                                    </span>
+                                                    <span className="ml-2 inline-block rounded bg-amber-100 dark:bg-amber-900/60 px-1.5 py-0.5 text-xs font-semibold text-amber-800 dark:text-amber-300">
+                                                        Subsidiado pela loja
+                                                    </span>
+                                                </div>
+                                            ) : (
+                                                <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(shippingFee)}</span>
+                                            )
+                                        }
                                     />
                                 )}
 
@@ -916,12 +933,21 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                         </div>
                                     )}
 
-                                    {parseFloat(shippingFee || "0") > 0 && (
+                                    {(parseFloat(shippingFee || "0") > 0 || originalDeliveryPayer === "seller" || Number(originalDeliverySubsidy || 0) > 0) && (
                                         <div className="flex justify-between items-center text-[15px]">
                                             <span className="text-brand-inactive-text font-medium">Entrega</span>
-                                            <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                {formatCurrency(shippingFee)}
-                                            </span>
+                                            <div className="text-right font-bold text-brand-dark dark:text-dark-heading">
+                                                {(originalDeliveryPayer === "seller" || Number(originalDeliverySubsidy || 0) > 0) ? (
+                                                    <div>
+                                                        <span>{formatCurrency(Number(originalDeliverySubsidy || shippingFee || 0))}</span>
+                                                        <span className="ml-1.5 text-xs font-semibold text-amber-800 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/60 px-1.5 py-0.5 rounded">
+                                                            (Subsidiado pela loja)
+                                                        </span>
+                                                    </div>
+                                                ) : (
+                                                    formatCurrency(shippingFee)
+                                                )}
+                                            </div>
                                         </div>
                                     )}
 

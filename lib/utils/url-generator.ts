@@ -43,32 +43,24 @@ export function getProductUrl(product: any, partner?: any): string {
  * @deprecated Use getStoreUrl() para vitrines baseadas em loja.
  */
 export function getPartnerUrl(partner: any): string {
-    if (!partner) return "/"
-
-    const partnerSlug = partner.slug || createSlug(partner.store_name || "")
-    const partnerId = partner.id || ""
-
-    const address = partner.addresses?.[0] || partner.address || partner
-    const city = partner.city || address?.city
-    const state = partner.state || address?.state
-
-    const cityStateSlug = formatCityStateSlug(city, state)
-
-    return `/${cityStateSlug}/${partnerSlug}/v/${partnerId}`
+    return getStoreUrl(partner)
 }
 
 /**
  * Gera a URL canonica da loja (store-based vitrine)
- * /[cidade-uf]/[slug-da-loja]
+ * /[cidade-uf]/[slug-gerado-de-store.name]/v/[id-da-loja]
  */
 export function getStoreUrl(store: any): string {
     if (!store) return "/"
 
-    const storeSlug = store.slug || createSlug(store.name || store.store_name || "")
-    const storeId = store.store_id || store.id || ""
-    const address = store.addresses?.[0]
-    const city = store.city || address?.city
-    const state = store.state || address?.state
+    const s = (Array.isArray(store?.stores) ? store.stores[0] : store?.stores) || (Array.isArray(store?.store) ? store.store[0] : store?.store) || store
+    const storeId = s?.id || store?.store_id || store?.id || ""
+    const storeName = s?.name || store?.name || ""
+    const storeSlug = createSlug(storeName)
+
+    const address = s?.addresses?.[0] || store?.addresses?.[0] || store?.address || s || store
+    const city = s?.city || store?.city || address?.city
+    const state = s?.state || store?.state || address?.state
 
     const cityStateSlug = formatCityStateSlug(city, state)
 

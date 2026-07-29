@@ -152,7 +152,7 @@ export function UserCollectionsPage({ collections: initialCollections }: UserCol
             onChange={(e) => setName(e.target.value)}
             disabled={isPending}
             required
-            maxLength={100}
+            maxLength={50}
           />
           <FormTextarea
             label="Descrição (Opcional)"

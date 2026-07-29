@@ -24,7 +24,6 @@ import {
 } from "@/components/reusable"
 import { CepInput } from "@/components/reusable/Inputs/CepInput"
 import { CpfCnpjInput } from "@/components/reusable/Inputs/CpfCnpjInput"
-import { MoneyInput } from "@/components/reusable/Inputs/MoneyInput"
 import { StateComboBox } from "@/components/reusable/Inputs/StateComboBox"
 import { NumberInputWithCheckbox } from "@/components/reusable/Inputs/NumberInputWithCheckbox"
 import { ChevronLeftIcon, SaveIcon, EditIcon, UserIcon, StoreIcon } from "@/lib/icons"
@@ -39,6 +38,7 @@ import { getAddressesAction } from "@/app/actions/shared/addresses"
 import { consultarCNPJ } from "@/lib/nuvem-fiscal"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 import { validateEmail, validateCPF, validateCNPJ, validatePhoneBR, validateURL, validateCEP } from "@/lib/input-validator"
+import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 
 interface NewCustomerPageProps {
     onBack: () => void;
@@ -512,7 +512,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                             />
                                                             {imagePreview ? (
                                                                 <img
-                                                                    src={imagePreview}
+                                                                    src={getR2ImageUrl(imagePreview)}
                                                                     alt="Imagem do cliente"
                                                                     className="w-full h-full object-cover"
                                                                 />
@@ -650,18 +650,18 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                                 </div>
                                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                                                     <Input label="Nome Fantasia" placeholder="Nome comercial" value={fantasia} onChange={(e) => setFantasia(e.target.value)} />
-                                                                <Input label="Inscrição Municipal" placeholder="Ex: 123456" value={inscricaoMunicipal} onChange={(e) => setInscricaoMunicipal(e.target.value)} />
-                                                            </div>
-                                                            <FormDropdown
-                                                                label="CRT (Código de Regime Tributário)"
-                                                                value={crt}
-                                                                setValue={(val) => setCrt(val)}
-                                                                options={[
-                                                                    { value: "1", label: "1 - Simples Nacional" },
-                                                                    { value: "3", label: "3 - Regime Normal" },
-                                                                    { value: "4", label: "4 - MEI" }
-                                                                ]}
-                                                            />
+                                                                    <Input label="Inscrição Municipal" placeholder="Ex: 123456" value={inscricaoMunicipal} onChange={(e) => setInscricaoMunicipal(e.target.value)} />
+                                                                </div>
+                                                                <FormDropdown
+                                                                    label="CRT (Código de Regime Tributário)"
+                                                                    value={crt}
+                                                                    setValue={(val) => setCrt(val)}
+                                                                    options={[
+                                                                        { value: "1", label: "1 - Simples Nacional" },
+                                                                        { value: "3", label: "3 - Regime Normal" },
+                                                                        { value: "4", label: "4 - MEI" }
+                                                                    ]}
+                                                                />
                                                                 <FormDropdown
                                                                     label="Contribuinte"
                                                                     value={contribuinte}
@@ -936,7 +936,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                     </AnimatePresence>
                                 </div>
 
-                                 {/* Sidebar Column */}
+                                {/* Sidebar Column */}
                                 {activeTab !== 'notes' && (
                                     <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
                                         {activeTab === 'general' ? (
@@ -956,7 +956,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                                     setShowImageCropper(true)
                                                                 }
                                                                 e.target.value = ""
-                                                              }}
+                                                            }}
                                                         />
                                                         {imagePreview ? (
                                                             <img

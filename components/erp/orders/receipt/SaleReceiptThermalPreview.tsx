@@ -39,6 +39,7 @@ export default function SaleReceiptThermalPreview({
     printMode = false,
 }: SaleReceiptThermalPreviewProps) {
     const grossTotal = data.items.reduce((acc, item) => acc + item.totalPrice, 0)
+    const isDeliveryFree = data.deliveryPayer === 'seller'
 
     return (
         <div
@@ -132,7 +133,7 @@ export default function SaleReceiptThermalPreview({
                         <Row left="Juros de método" right={`+${formatReceiptAmount(data.methodInterest)}`} />
                     )}
                     {data.shippingFee > 0.009 && (
-                        <Row left="Entrega" right={formatReceiptAmount(data.shippingFee)} />
+                        <Row left={isDeliveryFree ? "Entrega (grátis)" : "Entrega"} right={isDeliveryFree ? "Grátis" : formatReceiptAmount(data.shippingFee)} />
                     )}
                     {data.otherCosts > 0.009 && (
                         <Row left="Outros custos" right={formatReceiptAmount(data.otherCosts)} />

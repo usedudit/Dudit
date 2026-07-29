@@ -46,6 +46,7 @@ export type SaleReceiptData = {
     couponDiscount: number
     methodFee: number
     methodInterest: number
+    methodFixedFee?: number
     shippingFee: number
     otherCosts: number
     sellerName: string
@@ -54,6 +55,7 @@ export type SaleReceiptData = {
     secondaryColor?: string
     partnerAvatar?: string
     returnPolicyBlock?: SaleReceiptReturnPolicyBlock | null
+    deliveryPayer?: 'seller' | 'customer'
 }
 
 export const DEFAULT_RECEIPT_FOOTER_MESSAGE = "* OBRIGADO E VOLTE SEMPRE *"
@@ -224,29 +226,30 @@ export function buildSaleReceiptFromOrder(
               }
             : null
 
-    return {
-        customerName: order.customers?.name || order.customer_name || "Consumidor final",
-        orderNumber: String(order.order_number || order.id || ""),
-        saleDateTime: formatDateTime(order.created_at || order.order_date || new Date()),
-        items: mapOrderItemsToReceiptItems(order.order_items || []),
-        subtotal,
-        total,
-        change,
-        paymentLines: buildPaymentLinesFromOrder(order),
-        methodDiscount,
-        generalDiscount: manualDiscount,
-        couponDiscount,
-        methodFee: methodFee + methodFixedFee,
-        methodInterest,
-        shippingFee,
-        otherCosts,
-        sellerName: options?.sellerName || order.seller_name || "Não informado",
-        partner,
-        primaryColor: options?.primaryColor,
-        secondaryColor: options?.secondaryColor,
-        partnerAvatar: options?.partnerAvatar,
-        returnPolicyBlock,
-    }
+return {
+          customerName: order.customers?.name || order.customer_name || "Consumidor final",
+          orderNumber: String(order.order_number || order.id || ""),
+          saleDateTime: formatDateTime(order.created_at || order.order_date || new Date()),
+          items: mapOrderItemsToReceiptItems(order.order_items || []),
+          subtotal,
+          total,
+          change,
+          paymentLines: buildPaymentLinesFromOrder(order),
+          methodDiscount,
+          generalDiscount: manualDiscount,
+          couponDiscount,
+          methodFee: methodFee + methodFixedFee,
+          methodInterest,
+          shippingFee,
+          otherCosts,
+          sellerName: options?.sellerName || order.seller_name || "Não informado",
+          partner,
+          primaryColor: options?.primaryColor,
+          secondaryColor: options?.secondaryColor,
+          partnerAvatar: options?.partnerAvatar,
+          returnPolicyBlock,
+          deliveryPayer: order.delivery_payer as 'seller' | 'customer' | undefined,
+      }
 }
 
 export type SaleReceiptCartSnapshot = {
@@ -267,6 +270,8 @@ export type SaleReceiptCartSnapshot = {
     methodDiscount?: number
     methodFee?: number
     methodInterest?: number
+    methodFixedFee?: number
+    deliveryPayer?: 'seller' | 'customer'
     sellerName?: string
 }
 
@@ -297,6 +302,7 @@ export function buildSaleReceiptFromCartSnapshot(
         couponDiscount,
         methodFee: Math.max(0, Number(snapshot.methodFee || 0)),
         methodInterest: Math.max(0, Number(snapshot.methodInterest || 0)),
+        methodFixedFee: 0,
         shippingFee: Math.max(0, Number(snapshot.shippingFee || 0)),
         otherCosts: Math.max(0, Number(snapshot.otherCosts || 0)),
         sellerName: snapshot.sellerName || "Não informado",
@@ -304,5 +310,6 @@ export function buildSaleReceiptFromCartSnapshot(
         primaryColor: options?.primaryColor,
         secondaryColor: options?.secondaryColor,
         partnerAvatar: options?.partnerAvatar,
+        deliveryPayer: snapshot.deliveryPayer,
     }
 }
