@@ -1003,7 +1003,9 @@ export async function getServiceOrderByTokenAction(
     const addressRow = addressesList.find((a: any) => a.is_default) || addressesList[0]
     let partnerAddress = "Endereço não cadastrado"
     if (addressRow) {
-      partnerAddress = `${addressRow.street || ""}, ${addressRow.number || "S/N"}${addressRow.complement ? ` - ${addressRow.complement}` : ""}${addressRow.neighborhood ? ` - ${addressRow.neighborhood}` : ""}, ${addressRow.city || ""} - ${addressRow.state || ""}`.replace(/\s+/g, ' ').trim()
+      const streetNumber = [addressRow.street, addressRow.number].filter(Boolean).join(", ")
+      const neighborhoodCityState = [addressRow.neighborhood, [addressRow.city, addressRow.state].filter(Boolean).join("/")].filter(Boolean).join(" - ")
+      partnerAddress = [streetNumber, neighborhoodCityState].filter(Boolean).join("\n")
     }
 
     const serviceOrder = {

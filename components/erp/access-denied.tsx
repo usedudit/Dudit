@@ -12,7 +12,7 @@ export function AccessDenied() {
                     subtitle="Você não tem permissão para acessar esta área. Se acredita que isso é um erro, entre em contato com o administrador da sua equipe."
                     itemButton={{
                         text: "Voltar para o Início",
-                        action: "/erp/dashboard"
+                        action: "/erp/inicio"
                     }}
                 />
             </div>

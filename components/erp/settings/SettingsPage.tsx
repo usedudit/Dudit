@@ -123,13 +123,15 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
 
     if (activePage !== "home") {
       newTab = PAGE_TO_SLUG[activePage] || activePage
-    } else {
-      newTab = activeTab
     }
 
     if (newTab !== currentTab) {
       const url = new URL(window.location.href)
-      url.searchParams.set("tab", newTab)
+      if (newTab) {
+        url.searchParams.set("tab", newTab)
+      } else {
+        url.searchParams.delete("tab")
+      }
       window.history.replaceState(null, "", url.toString())
     }
   }, [activePage, activeTab, searchParams])
@@ -264,7 +266,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                               className="px-4 py-3 gap-4"
                             />
                           )}
-                          {!isQuick && canAccessTeam && isTeamResourceActive && (
+                          {canAccessTeam && (
                             <ListItem
                               icon={Users}
                               title={teamPlanBlocked ? (

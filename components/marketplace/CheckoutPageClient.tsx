@@ -366,7 +366,7 @@ export function CheckoutPageClient() {
             notifyError("Erro", "Erro ao atualizar forma de atendimento.")
         }
     }
-    const storeImage = checkoutContext?.store?.logo_url || checkoutContext?.store?.image_url || partnerInfo?.store_avatar || partnerInfo?.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"
+    const storeImage = checkoutContext?.store?.logo_url || partnerInfo?.store_avatar || partnerInfo?.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"
     const sellerName = checkoutContext?.store?.name || checkoutContext?.partner?.storeName || partnerInfo?.store_name || "Loja"
 
     const quantities = useMemo<Record<string, number>>(() => {
@@ -1311,33 +1311,6 @@ export function CheckoutPageClient() {
                                         <div className="text-xs text-brand-inactive-text mt-0.5">
                                             Qtd: {line.quantity}
                                         </div>
-                                        {serviceAvailability[line.lineId]?.checked && !serviceAvailability[line.lineId]?.available && (
-                                            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-brand-orange dark:text-orange-400 font-medium">
-                                                <span className="w-1.5 h-1.5 rounded-full bg-brand-orange shrink-0" />
-                                                <span>Este horário não está mais disponível</span>
-                                                <span className="text-brand-inactive-text/40">•</span>
-                                                <button
-                                                    onClick={() => {
-                                                        const service = { id: line.serviceId, name: line.baseName || line.displayName }
-                                                        const p = checkoutContext?.partner
-                                                        if (service.id && p) window.location.href = getServiceUrl(service, p)
-                                                    }}
-                                                    className="font-semibold text-brand-green hover:underline"
-                                                >
-                                                    Remarcar
-                                                </button>
-                                                <span className="text-brand-inactive-text/40">•</span>
-                                                <button
-                                                    onClick={async () => {
-                                                        await deleteCartItemsAction([line.lineId])
-                                                        window.location.reload()
-                                                    }}
-                                                    className="font-semibold text-brand-red hover:underline"
-                                                >
-                                                    Remover
-                                                </button>
-                                            </div>
-                                        )}
                                     </div>
                                     <div className="text-sm font-bold text-brand-dark dark:text-dark-heading shrink-0 pr-1">
                                         {line.isGift ? (
@@ -1349,6 +1322,33 @@ export function CheckoutPageClient() {
                                             formatCurrency(line.lineTotal)
                                         )}
                                     </div>
+                                    {serviceAvailability[line.lineId]?.checked && !serviceAvailability[line.lineId]?.available && (
+                                        <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-brand-orange dark:text-orange-400 font-medium">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-brand-orange shrink-0" />
+                                            <span>Este horário não está mais disponível</span>
+                                            <span className="text-brand-inactive-text/40">•</span>
+                                            <button
+                                                onClick={() => {
+                                                    const service = { id: line.serviceId, name: line.baseName || line.displayName }
+                                                    const p = checkoutContext?.partner
+                                                    if (service.id && p) window.location.href = getServiceUrl(service, p)
+                                                }}
+                                                className="font-semibold text-brand-green hover:underline"
+                                            >
+                                                Remarcar
+                                            </button>
+                                            <span className="text-brand-inactive-text/40">•</span>
+                                            <button
+                                                onClick={async () => {
+                                                    await deleteCartItemsAction([line.lineId])
+                                                    window.location.reload()
+                                                }}
+                                                className="font-semibold text-brand-red hover:underline"
+                                            >
+                                                Remover
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         {checkoutContext.lines.some((l) => l.lineKind === "subscription") && (
@@ -1885,6 +1885,19 @@ export function CheckoutPageClient() {
             }
             if (!formData.deliveryAddress) {
                 setDeliveryError("Por favor, selecione um endereço de entrega")
+                setIsLoading(false)
+                return
+            }
+            if (deliveryQuoteLoading) {
+                setDeliveryError("Aguarde o cálculo da taxa de entrega.")
+                setIsLoading(false)
+                return
+            }
+            if (deliveryError) {
+                setDeliveryError(deliveryError)
+                if (deliveryError.toLowerCase().includes("raio")) {
+                    setShowOutsideRadiusModal(true)
+                }
                 setIsLoading(false)
                 return
             }

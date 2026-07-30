@@ -42,15 +42,15 @@ export async function generateInvoiceAction(
         const partner = (purchase as any).partners || {}
         const partnerAddress = partner.address || ""
 
-        // Doc comes from stores (fiscal fields per-store)
-        const { data: storeDoc } = await admin
+        // Data comes from stores (fiscal fields, phone, logo)
+        const { data: storeData } = await admin
             .from("stores")
-            .select("cnpj, cpf")
+            .select("cnpj, cpf, phone, logo_url")
             .eq("partner_id", purchase.partner_id)
             .order("is_headquarters", { ascending: false })
             .limit(1)
             .maybeSingle()
-        const partnerDoc = storeDoc?.cnpj || storeDoc?.cpf || ""
+        const partnerDoc = storeData?.cnpj || storeData?.cpf || ""
 
         let customerDetails: { name: string; document: string | null; email: string | null } | null = null
         if (purchase.user_id) {
@@ -104,8 +104,8 @@ export async function generateInvoiceAction(
                 document: partnerDoc,
                 address: partnerAddress,
                 email: partner.email || null,
-                phone: partner.phone || null,
-                image_url: partner.store_image_url || null,
+                phone: storeData?.phone || partner.phone || null,
+                image_url: storeData?.logo_url || partner.store_image_url || null,
             },
             customerDetails,
             purchaseableDetails,

@@ -41,7 +41,7 @@ export default async function SelectErpPage() {
 
     // Only auto-redirect if the user has a single store that belongs to them
     if (storeAccess.length === 1 && !hasNonOwnAccess) {
-        redirect("/erp/dashboard")
+        redirect("/erp/inicio")
     }
 
     // Sort: own stores first, then others

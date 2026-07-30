@@ -1658,7 +1658,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         payment_method_fixed_fee_amount: paymentMethodFixedFeeAmount,
         store_credit_amount: paymentMethodStoreCreditAmount,
         coupon_id: couponIdToSave,
-        delivery_fee: effectiveDeliveryPayer === "seller" ? 0 : serverShippingCost,
+        delivery_fee: serverShippingCost,
         additional_costs: data.additionalCosts,
         notes: sanitizeNotes(data.notes),
         payment_method: paymentMethodSummary,
@@ -2495,7 +2495,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         payment_method_interest_amount: updatePaymentMethodInterestAmount,
         payment_method_fee_amount: updatePaymentMethodFeeAmount,
         payment_method_fixed_fee_amount: updatePaymentMethodFixedFeeAmount,
-        delivery_fee: updateEffectiveDeliveryPayer === "seller" ? 0 : updateServerShipping,
+        delivery_fee: updateServerShipping,
         delivery_payer: updateEffectiveDeliveryPayer,
         additional_costs: data.additionalCosts,
         notes: sanitizeNotes(data.notes),
@@ -3947,7 +3947,7 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
 
         const { data: linkedAppointment } = await supabase
             .from("appointments")
-            .select("id, status")
+            .select("id, status, store_id, price")
             .eq("marketplace_order_id", payload.orderId)
             .eq("partner_id", payload.partnerId)
             .maybeSingle()
@@ -3961,6 +3961,23 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
                 })
                 .eq("id", linkedAppointment.id)
                 .eq("partner_id", payload.partnerId)
+
+            try {
+                const { handleAppointmentItemsStockMovement } = await import("@/app/actions/erp/appointment-items")
+                await handleAppointmentItemsStockMovement({
+                    appointmentId: linkedAppointment.id,
+                    partnerId: payload.partnerId,
+                    oldStatus: linkedAppointment.status,
+                    newStatus: linkedAppointment.status,
+                    userId: user.id,
+                    storeId: linkedAppointment.store_id || null,
+                    paymentStatus: nextSituation === "paid" ? "paid" : "partially_paid",
+                    paidAmount: nextPaidAmount,
+                    price: Number(linkedAppointment.price || 0),
+                })
+            } catch (stockErr) {
+                console.error("[confirmAppointmentOrderPaymentAction] stock movement error:", stockErr)
+            }
         }
 
         await revalidateOrders(payload.partnerId)

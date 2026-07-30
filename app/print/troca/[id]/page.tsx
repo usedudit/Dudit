@@ -216,17 +216,16 @@ export default async function PrintTrocaPage({ params }: PageProps) {
                                     <div className="text-xs text-gray-600 space-y-1">
                                         <p className="font-bold text-sm text-brand-dark">{partnerHeader.fantasyName || partnerName}</p>
                                         {partnerHeader.legalName && <p>{partnerHeader.legalName}</p>}
-                                        <p className="whitespace-pre-wrap">{partnerAddress}</p>
                                         {partnerHeader.taxIdLine && <p>{partnerHeader.taxIdLine}</p>}
+                                        <p className="whitespace-pre-wrap">{partnerAddress}</p>
                                     </div>
                                 </div>
                                 <div>
                                     <h3 className="font-bold text-sm text-brand-dark mb-3">Dados do cliente</h3>
                                     <div className="text-xs text-gray-600 space-y-1">
                                         <p className="font-bold text-sm text-brand-dark">{returnRequest.customerName}</p>
-                                        {returnRequest.customerPhone && <p>Tel: {returnRequest.customerPhone}</p>}
-                                        {returnRequest.customerEmail && <p>Email: {returnRequest.customerEmail}</p>}
-                                        {returnRequest.customerAddress && <p>Endereço: {returnRequest.customerAddress}</p>}
+                                        {returnRequest.customerPhone && <p>{returnRequest.customerPhone}</p>}
+                                        {returnRequest.customerAddress && <p className="whitespace-pre-wrap">{returnRequest.customerAddress}</p>}
                                     </div>
                                 </div>
                             </div>
@@ -241,19 +240,19 @@ export default async function PrintTrocaPage({ params }: PageProps) {
                                         <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tl-xl border-b border-gray-100">
                                             Produto
                                         </th>
-                                        <th className="py-2.5 px-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider text-center w-16 border-b border-gray-100">
+                                        <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tl-xl border-b border-gray-100">
                                             Qtd
                                         </th>
-                                        <th className="py-2.5 px-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider text-right w-24 border-b border-gray-100">
+                                        <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tl-xl border-b border-gray-100">
                                             Preço Unit.
                                         </th>
-                                        <th className="py-2.5 px-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider text-right w-24 border-b border-gray-100">
+                                        <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tl-xl border-b border-gray-100">
                                             Preço Pago
                                         </th>
-                                        <th className="py-2.5 px-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider text-right w-24 border-b border-gray-100">
+                                        <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tl-xl border-b border-gray-100">
                                             Subtotal
                                         </th>
-                                        <th className="py-2.5 pl-4 pr-6 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tr-xl border-b border-gray-100">
+                                        <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tl-xl border-b border-gray-100">
                                             Motivo / Estado
                                         </th>
                                     </tr>
@@ -305,7 +304,7 @@ export default async function PrintTrocaPage({ params }: PageProps) {
                         {/* Observations block */}
                         {returnRequest.observations && (
                             <div className="px-8 mt-6">
-                                <div className="bg-[#f8f9fa] p-4 rounded-lg text-xs text-black">
+                                <div className="bg-brand-gray/40 p-4 rounded-lg text-xs text-black">
                                     <p className="font-bold text-[#113833] mb-1">Observações:</p>
                                     <p className="italic">"{returnRequest.observations}"</p>
                                 </div>
@@ -314,7 +313,7 @@ export default async function PrintTrocaPage({ params }: PageProps) {
 
                         {/* Financial block taking full width */}
                         <div className="px-8 mt-6">
-                            <div className="bg-[#f8f9fa] p-6 rounded-lg text-black space-y-2.5 w-full">
+                            <div className="bg-brand-gray/40 p-6 rounded-lg text-black space-y-2.5 w-full">
                                 {Number(returnRequest.refundValue || 0) > 0 && (
                                     <div className="flex justify-between text-xs">
                                         <span className="text-gray-500 font-medium">Valor Reembolsado</span>

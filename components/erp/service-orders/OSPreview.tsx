@@ -26,6 +26,7 @@ interface OSPreviewProps {
     secondaryColor?: string;
     partnerName?: string;
     partnerAddress?: string;
+    partnerPhone?: string;
     partnerAvatar?: string;
     printMode?: boolean;
     showDecoration?: boolean;
@@ -54,6 +55,7 @@ const OSPreview = ({
     secondaryColor = DEFAULT_SECONDARY,
     partnerName = 'Parceiro',
     partnerAddress = 'Endereço não cadastrado',
+    partnerPhone,
     partnerAvatar,
     printMode = false,
     showDecoration = true,
@@ -92,10 +94,7 @@ const OSPreview = ({
             const stateStr = addr.state || addr.uf || "";
             const line2 = `${neighStr ? `${neighStr} - ` : ""}${cityStr}${stateStr ? `/${stateStr}` : ""}`.trim();
 
-            const zipStr = addr.zip_code || addr.zipCode || "";
-            const line3 = zipStr ? `CEP: ${zipStr}` : "";
-
-            return [line1, line2, line3].filter(Boolean).join("\n");
+            return [line1, line2].filter(Boolean).join("\n");
         };
 
         const addresses = selectedCustomer.addresses;
@@ -119,10 +118,16 @@ const OSPreview = ({
         return null;
     }, [selectedCustomer]);
 
+    const partnerAddressFormatted = useMemo(() => {
+        if (!partnerAddress) return "";
+        const lines = partnerAddress.split('\n').filter(line => line.trim() && !line.trim().startsWith('CEP:'));
+        return lines.slice(0, 2).join('\n');
+    }, [partnerAddress]);
+
     // Build the visual rows representing either Services or Products
     const items = useMemo(() => {
         const rows: { type: 'service' | 'product'; name: string; qty: number; price: number; total: number }[] = [];
-        
+
         services.forEach(svc => {
             rows.push({
                 type: 'service',
@@ -280,7 +285,8 @@ const OSPreview = ({
                                                     <h3 className="font-bold text-sm text-brand-dark mb-3">Emitente</h3>
                                                     <div className="text-xs text-gray-600 space-y-1">
                                                         <p className="font-bold text-brand-dark">{partnerName}</p>
-                                                        <p className="whitespace-pre-wrap">{partnerAddress}</p>
+                                                        {partnerPhone && <p>{partnerPhone}</p>}
+                                                        <p className="whitespace-pre-wrap">{partnerAddressFormatted}</p>
                                                     </div>
                                                 </div>
                                                 <div>
@@ -350,7 +356,7 @@ const OSPreview = ({
                                 {page.hasTotals && (
                                     <div className="mt-auto">
                                         <div className="px-8 pb-6 flex justify-start">
-                                            <div className="w-full bg-[#f8f9fa] p-6 rounded-lg text-black">
+                                            <div className="w-full bg-brand-gray/40 p-6 rounded-lg text-black">
                                                 {totalServiceAmount > 0 && (
                                                     <div className="flex justify-between items-center text-xs mb-2">
                                                         <span className="text-gray-500 font-medium">Total de Serviços</span>
@@ -405,9 +411,9 @@ const OSPreview = ({
                                                 <div className="w-full border-t border-brand-border pt-6">
                                                     <div className="flex flex-col items-start">
                                                         <h4 className="font-bold text-xs mb-2 text-black">Assinatura do Cliente</h4>
-                                                        <img 
-                                                            src={buildImageUrl(signatureImageKey)} 
-                                                            alt="Assinatura" 
+                                                        <img
+                                                            src={buildImageUrl(signatureImageKey)}
+                                                            alt="Assinatura"
                                                             className="max-h-[80px] object-contain border border-gray-200 rounded p-1 bg-white"
                                                         />
                                                         {signedAt && (

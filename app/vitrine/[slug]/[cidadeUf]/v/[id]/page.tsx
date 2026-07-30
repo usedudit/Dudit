@@ -29,7 +29,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const addr = store.addresses
   const city = addr?.city || store.city || "Brasil"
   const state = addr?.state || store.state || "BR"
-  const logo = store.logo_url || store.image_url || store.partners?.store_image_url || 'https://img.dudit.com.br/static/Logo.png'
+  const logo = store.logo_url || store.partners?.store_image_url || 'https://img.dudit.com.br/static/Logo.png'
   const url = `https://dudit.com.br/vitrine/${store.slug || createSlug(sname)}/${createSlug(city)}-${createSlug(state)}/v/${store.id}`
 
   return {
@@ -93,7 +93,7 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
         }
       }
     }
-    const logo = store.logo_url || store.image_url || p?.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"
+    const logo = store.logo_url || p?.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"
     const image = firstImage || logo
     return { id: item.id, name: item.name, description: item.description, price: computedPrice, images: [image], itemType: 'plano', partners: p, frequency_type: item.frequency_type, frequency_interval: item.frequency_interval, created_at: item.created_at }
   })
@@ -146,7 +146,7 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
 
   const sname = store.name || p?.store_name || ""
   const sdesc = store.description || p?.store_description || ""
-  const logo = store.logo_url || store.image_url || p?.store_image_url || 'https://img.dudit.com.br/static/Logo.png'
+  const logo = store.logo_url || p?.store_image_url || 'https://img.dudit.com.br/static/Logo.png'
   const banner = store.banner_url || p?.banner_url || ""
   const storeRating = Number(store.rating ?? p?.rating ?? 0)
 

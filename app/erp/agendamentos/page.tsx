@@ -7,6 +7,7 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { scopeActiveOnly } from "@/lib/supabase/query-helpers"
+import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 
 export const dynamic = "force-dynamic"
 
@@ -37,7 +38,7 @@ async function loadCatalogs(partnerId: string, storeId?: string | null) {
       .limit(100),
     supabase
       .from("partners")
-      .select("user_id, stores(opening_hours)")
+      .select("user_id, opening_hours, stores(id, opening_hours)")
       .eq("id", partnerId)
       .single(),
     supabase
@@ -120,7 +121,12 @@ async function loadCatalogs(partnerId: string, storeId?: string | null) {
       resources: Array.isArray(s.resources) ? s.resources : [],
     })),
     unavailableTypes: unavailableRes.data || [],
-    openingHours: (partner as any)?.stores?.[0]?.opening_hours || (partner as any)?.opening_hours || null,
+    openingHours: (() => {
+      const stores = (partner as any)?.stores || []
+      const activeStore = storeId ? stores.find((s: any) => s.id === storeId) : null
+      const rawHours = activeStore?.opening_hours || stores[0]?.opening_hours || (partner as any)?.opening_hours || null
+      return rawHours ? normalizeOpeningHours(rawHours) : null
+    })(),
   }
 }
 

@@ -6,7 +6,7 @@ CREATE OR REPLACE FUNCTION create_initial_store_for_partner()
 RETURNS TRIGGER AS $$
 BEGIN
   -- Insere uma store inicial com o mesmo nome da loja do partner
-  INSERT INTO public.stores (partner_id, name, image_url)
+  INSERT INTO public.stores (partner_id, name, logo_url)
   VALUES (NEW.id, NEW.store_name, NEW.store_image_url);
   RETURN NEW;
 END;

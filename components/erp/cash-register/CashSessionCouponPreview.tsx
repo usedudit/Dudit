@@ -58,6 +58,12 @@ const formatShortDateTime = (iso: string) => {
 }
 
 export default function CashSessionCouponPreview({ data, type, printMode = false }: CashSessionCouponPreviewProps) {
+    const partnerAddressFormatted = data.partnerAddress
+        .split('\n')
+        .filter(line => line.trim() && !line.trim().startsWith('CEP:'))
+        .slice(0, 2)
+        .join('\n')
+
     return (
         <div
             className={`mx-auto bg-[#fffef5] text-black font-mono text-[11px] leading-snug shadow-md ${printMode ? "sale-receipt-thermal-print" : ""}`}
@@ -67,7 +73,7 @@ export default function CashSessionCouponPreview({ data, type, printMode = false
                 <div className="text-center mb-2">
                     <p className="font-bold text-[13px] uppercase tracking-tight">{data.partnerName}</p>
                     <p className="text-[10px] mt-0.5">{data.partnerDoc}</p>
-                    <p className="text-[9px] mt-1 leading-tight">{data.partnerAddress}</p>
+                    <p className="text-[9px] mt-1 leading-tight">{partnerAddressFormatted}</p>
                 </div>
 
                 <DashedLine className="my-1" />

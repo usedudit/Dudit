@@ -35,6 +35,7 @@ type SummaryProps = {
     showActionsMenu?: boolean
     isEmpty?: boolean
     emptyState?: ReactNode
+    deliveryBreakdown?: Record<string, unknown> | null
 }
 
 function POSOrderActionsMenu({
@@ -113,6 +114,7 @@ export const POSOrderSummaryContent = memo(function POSOrderSummaryContent({
     showActionsMenu = true,
     isEmpty = false,
     emptyState,
+    deliveryBreakdown,
 }: Omit<SummaryProps, "canReset" | "onReset">) {
     if (isEmpty) {
         return (
@@ -178,8 +180,11 @@ export const POSOrderSummaryContent = memo(function POSOrderSummaryContent({
                                 </button>
                             )}
                         </span>
-                        <span className="font-bold text-brand-dark dark:text-dark-heading">
-                            {shippingFee > 0 ? formatCurrency(shippingFee) : "Grátis"}
+                        <span className="font-bold text-brand-dark dark:text-dark-heading flex items-center gap-1.5">
+                            {(deliveryBreakdown?.deliveryPayer === "seller" || (shippingFee === 0 && (deliveryBreakdown?.originalFee || deliveryBreakdown?.deliverySubsidy)))
+                                ? <><span>{formatCurrency(Number(deliveryBreakdown?.originalFee || deliveryBreakdown?.deliverySubsidy || shippingFee || 0))}</span><Badge variant="orange">Subsidiado pela loja</Badge></>
+                                : shippingFee > 0 ? formatCurrency(shippingFee) : "Grátis"
+                            }
                         </span>
                     </div>
                 )}

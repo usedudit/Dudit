@@ -42,7 +42,7 @@ export default async function ERPReportsPage(props: {
     try {
         await requireMinimumPlan(partnerId, "crescer")
     } catch {
-        redirect("/erp/dashboard")
+        redirect("/erp/inicio")
     }
 
     const allAccess = await getAllUserPartnerAccess()

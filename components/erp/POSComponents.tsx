@@ -1,6 +1,6 @@
 import { TrashIcon, InfoIcon } from '@/lib/icons';
 import { formatCurrency, cn } from '@/lib/utils';
-import { Tooltip } from '@/components/reusable';
+import { Tooltip, Badge } from '@/components/reusable';
 
 // Scalloped edge specifically for the receipt bottom
 export const ReceiptScallopEdge = () => (
@@ -85,8 +85,9 @@ export const ReceiptContent = ({
     total,
     itemCount,
     pricingDetails = [],
+    deliveryBreakdown,
 }: any) => (
-    <div className="bg-brand-gray dark:bg-dark-border/50 rounded-t-2xl p-6 pb-12 flex flex-col relative h-full border border-brand-border dark:border-dark-border border-b-0">
+    <div className="bg-brand-gray dark:bg-dark-border/50 rounded-t-2xl p-6 pb-12 flex flex-col relative h-full border border-brand-border dark:dark-border dark:border-dark-border border-b-0">
         {/* Receipt Header */}
         <div className="mb-6 flex justify-between items-center">
             <h3 className="text-md font-bold text-brand-dark dark:text-dark-heading">Detalhes da Transação</h3>
@@ -135,6 +136,15 @@ export const ReceiptContent = ({
                         <span className="text-brand-inactive-text dark:text-dark-body font-medium">Entrega</span>
                         <span className="font-bold text-brand-dark dark:text-dark-heading">
                             {formatCurrency(shippingFee)}
+                        </span>
+                    </div>
+                )}
+                {(shippingFee === 0 && deliveryBreakdown?.deliveryPayer === "seller" && (deliveryBreakdown?.originalFee || deliveryBreakdown?.deliverySubsidy)) && (
+                    <div className="flex justify-between items-center text-sm">
+                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">Entrega</span>
+                        <span className="font-bold text-brand-dark dark:text-dark-heading flex items-center gap-1.5">
+                            {formatCurrency(Number(deliveryBreakdown?.originalFee || deliveryBreakdown?.deliverySubsidy || 0))}
+                            <Badge variant="orange">Subsidiado pela loja</Badge>
                         </span>
                     </div>
                 )}

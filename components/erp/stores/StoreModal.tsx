@@ -92,7 +92,7 @@ export function StoreModal({ isOpen, onClose, partnerId, store, sourceStore, onS
         setDescription(store.description || "")
         setWhatsappPhone(store.whatsapp_phone || store.phone || "")
 
-        const initialLogo = store.logo_url || store.image_url || null
+        const initialLogo = store.logo_url || null
         setImageUrl(initialLogo)
         setImagePreview(initialLogo ? getR2ImageUrl(initialLogo) : null)
         setTempImageFile(null)

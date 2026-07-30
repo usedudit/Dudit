@@ -634,11 +634,6 @@ export async function updatePartnerAction(partnerId: string, data: any) {
   }
 
   if (data.orderFlow !== undefined) {
-    const { getPartnerPlan } = await import("@/lib/services/subscription.service")
-    const plan = await getPartnerPlan(partnerId)
-    if (plan.slug === "free" && data.orderFlow !== "whatsapp") {
-      return { error: "Parceiros no plano gratuito podem receber pedidos apenas pelo WhatsApp." }
-    }
     updateData.order_flow = data.orderFlow
   }
 

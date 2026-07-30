@@ -49,7 +49,7 @@ const StoreGridCard = React.memo(
     onEdit,
     onDelete,
   }: StoreGridCardProps) => {
-    const logoUrl = getR2ImageUrl(store.logo_url || store.image_url)
+    const logoUrl = getR2ImageUrl(store.logo_url)
 
     return (
       <motion.div

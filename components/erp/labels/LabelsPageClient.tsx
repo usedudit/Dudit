@@ -45,7 +45,7 @@ export default function LabelsPageClient({ isFree }: LabelsPageClientProps) {
             <p className="text-muted-foreground">Crie e imprima etiquetas de produtos com código de barras</p>
           </div>
           <Button asChild variant="outline">
-            <Link href="/erp/dashboard" prefetch={false}>Voltar</Link>
+            <Link href="/erp/inicio" prefetch={false}>Voltar</Link>
           </Button>
         </div>
 

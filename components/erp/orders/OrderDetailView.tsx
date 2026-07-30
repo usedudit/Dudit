@@ -979,10 +979,13 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                     </span>} />
                                                             )}
 
-                                                            {Number(order.delivery_fee || 0) > 0 && (
+                                                            {(Number(order.delivery_fee || 0) > 0 || order.delivery_payer === "seller") && (
                                                                 <PaymentRow
                                                                     label="Valor da Entrega"
-                                                                    value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(order.delivery_fee)}</span>} />
+                                                                    value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm flex items-center gap-1.5">
+                                                                        {Number(order.delivery_fee || 0) > 0 ? formatCurrency(order.delivery_fee) : formatCurrency(Number(order.delivery_breakdown?.originalFee || order.delivery_breakdown?.deliverySubsidy || 0))}
+                                                                        {order.delivery_payer === "seller" && <Badge variant="orange">Subsidiado pela loja</Badge>}
+                                                                    </span>} />
                                                             )}
 
                                                             {Number(order.additional_costs || 0) > 0 && (
@@ -1450,10 +1453,13 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                 </span>} />
                                                         )}
 
-                                                        {Number(order.delivery_fee || 0) > 0 && (
+                                                        {(Number(order.delivery_fee || 0) > 0 || order.delivery_payer === "seller") && (
                                                             <PaymentRow
                                                                 label="Valor da Entrega"
-                                                                value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(order.delivery_fee)}</span>} />
+                                                                value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm flex items-center gap-1.5">
+                                                                    {Number(order.delivery_fee || 0) > 0 ? formatCurrency(order.delivery_fee) : formatCurrency(Number(order.delivery_breakdown?.originalFee || order.delivery_breakdown?.deliverySubsidy || 0))}
+                                                                    {order.delivery_payer === "seller" && <Badge variant="orange">Subsidiado pela loja</Badge>}
+                                                                </span>} />
                                                         )}
 
                                                         {Number(order.additional_costs || 0) > 0 && (

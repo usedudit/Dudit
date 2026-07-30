@@ -147,23 +147,43 @@ export async function createPartnerAction(data: CreatePartnerData) {
       console.error("[createPartnerAction] Failed to create default store:", storeError.message)
     }
 
-    // Inserir endereço na tabela addresses (se houver dados de endereço)
+    // Inicializar contadores de uso (usage_counters) para o parceiro
+    await supabaseAdmin
+      .from("usage_counters")
+      .insert({ partner_id: partner.id })
+      .select("partner_id")
+      .single()
+
+    // Inserir endereço na tabela addresses e linkar com a loja
     if (data.city || data.street || data.zipCode) {
-      await supabaseAdmin.from("addresses").insert({
-        partner_id: partner.id,
-        store_id: store?.id || null,
-        zip_code: data.zipCode || null,
-        street: data.street || null,
-        number: data.number || null,
-        complement: data.complement || null,
-        neighborhood: data.neighborhood || null,
-        city: data.city || null,
-        state: data.state || null,
-        country: "BR",
-        is_default: true,
-        latitude: coords?.lat || null,
-        longitude: coords?.lng || null,
-      })
+      const { data: addressData, error: addressError } = await supabaseAdmin
+        .from("addresses")
+        .insert({
+          partner_id: partner.id,
+          store_id: store?.id || null,
+          zip_code: data.zipCode || null,
+          street: data.street || null,
+          number: data.number || null,
+          complement: data.complement || null,
+          neighborhood: data.neighborhood || null,
+          city: data.city || null,
+          state: data.state || null,
+          country: "BR",
+          is_default: true,
+          latitude: coords?.lat || null,
+          longitude: coords?.lng || null,
+        })
+        .select("id")
+        .single()
+
+      if (addressError) {
+        console.error("[createPartnerAction] Failed to create address:", addressError.message)
+      } else if (store?.id && addressData?.id) {
+        await supabaseAdmin
+          .from("stores")
+          .update({ address_id: addressData.id })
+          .eq("id", store.id)
+      }
     }
 
     // Contas padrão (Caixa/Conta bancária) são gerenciadas por migrations/trigger no banco.
@@ -217,7 +237,7 @@ export async function createPartnerAction(data: CreatePartnerData) {
             // Garanta que esses nomes são os mesmos que estão entre {{ }} no Unosend
             full_name: data.storeName,
             store_name: data.storeName,
-            dashboard_url: "https://dudit.com.br/erp/dashboard"
+            dashboard_url: "https://dudit.com.br/erp/inicio"
           }
         })
 
@@ -233,7 +253,7 @@ export async function createPartnerAction(data: CreatePartnerData) {
     }
 
     // Revalidate only the specific paths affected by partner creation
-    revalidatePath("/erp/dashboard")
+    revalidatePath("/erp/inicio")
     revalidatePath("/erp")
 
     // Revalidate the cached partner status query

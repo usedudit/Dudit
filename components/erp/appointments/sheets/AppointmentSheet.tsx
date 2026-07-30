@@ -504,15 +504,22 @@ export const AppointmentSheet = ({
                         }
                     }
 
+                    const rawSvcPrice = (appointment as any)?.services?.[index]?.price;
+                    const effectivePrice = rawSvcPrice !== undefined && rawSvcPrice !== null
+                        ? Number(rawSvcPrice)
+                        : (serviceNames.length === 1 && appointment.price !== undefined && Number(appointment.price) > 0
+                            ? Number(appointment.price)
+                            : (catalogService ? catalogService.price : 0));
+
                     return catalogService ? {
                         ...catalogService,
-                        price: catalogService.price,
+                        price: effectivePrice,
                         staff: appointment.staff,
                         staffId: appointment.staffId,
                     } : {
                         id: String(990 + index),
                         name: name,
-                        price: 0,
+                        price: effectivePrice,
                         duration: Math.floor(appointment.duration / serviceNames.length),
                         staff: appointment.staff,
                         staffId: appointment.staffId,
@@ -1174,6 +1181,24 @@ export const AppointmentSheet = ({
                     if (orderData) {
                         setOrderNumber(orderData.orderNumber);
                         setOrderItems(orderData.items);
+
+                        const svcBookingItems = (orderData.items || []).filter((i: any) => i.lineType === 'service_booking');
+                        if (svcBookingItems.length > 0) {
+                            setSelectedServices(prevServices => {
+                                if (!prevServices || prevServices.length === 0) return prevServices;
+                                return prevServices.map((svc, idx) => {
+                                    const matchedItem = svcBookingItems.find((item: any) =>
+                                        (svc.id && item.serviceId === svc.id) ||
+                                        (item.productName && item.productName.trim() === svc.name?.trim())
+                                    ) || svcBookingItems[idx];
+                                    if (matchedItem && matchedItem.productPrice !== undefined) {
+                                        return { ...svc, price: Number(matchedItem.productPrice || 0) };
+                                    }
+                                    return svc;
+                                });
+                            });
+                        }
+
                         setMarketplaceOrderData({
                             totalAmount: orderData.totalAmount,
                             paymentMethod: orderData.paymentMethod || "",
@@ -1213,7 +1238,7 @@ export const AppointmentSheet = ({
         }
 
         const itemsNeedingEnrichment = selectedItems.filter(
-            (item: any) => item.usageType === 'consumed' && item.productId && item.stock == null && !fetchingProductIdsRef.current.has(item.productId)
+            (item: any) => item.productId && (item.stock == null || !item.image) && !fetchingProductIdsRef.current.has(item.productId)
         )
 
         if (itemsNeedingEnrichment.length === 0) {
@@ -1246,8 +1271,8 @@ export const AppointmentSheet = ({
                         }
                         return {
                             ...item,
-                            image: item.image || product.image,
-                            stock: stock,
+                            image: item.image || product.image || product.images?.[0],
+                            stock: stock ?? item.stock,
                             minStock: product.minStock,
                             sku: item.sku || product.sku,
                         }
@@ -2038,20 +2063,27 @@ export const AppointmentSheet = ({
                                             </button>
                                         </div>
                                         <div className="space-y-2">
-                                            {selectedItems.map((item: any) => (
-                                                <div key={item.key} className="flex items-center justify-between p-3 rounded-xl border border-brand-border dark:border-dark-border">
-                                                    <div className="flex items-center gap-3 min-w-0">
-                                                        <div className="w-8 h-8 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center">
-                                                            <Package size={14} className="text-brand-inactive-text" />
+                                            {selectedItems.map((item: any) => {
+                                                const itemImg = item.image || item.product?.image || item.product?.images?.[0];
+                                                return (
+                                                    <div key={item.key || item.id} className="flex items-center justify-between p-3 rounded-xl border border-brand-border dark:border-dark-border">
+                                                        <div className="flex items-center gap-3 min-w-0">
+                                                            <div className="w-8 h-8 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border">
+                                                                {itemImg ? (
+                                                                    <img src={getR2ImageUrl(itemImg, "thumbnail")} className="w-full h-full object-cover" alt="" />
+                                                                ) : (
+                                                                    <Package size={14} className="text-brand-inactive-text" />
+                                                                )}
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">{item.name}</p>
+                                                                <p className="text-[11px] text-brand-inactive-text">{item.serviceName} • {item.usageType === 'consumed' ? 'Consumido' : item.usageType === 'returnable' ? 'Retornável' : 'Referência'}</p>
+                                                            </div>
                                                         </div>
-                                                        <div className="min-w-0">
-                                                            <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">{item.name}</p>
-                                                            <p className="text-[11px] text-brand-inactive-text">{item.serviceName} • {item.usageType === 'consumed' ? 'Consumido' : item.usageType === 'returnable' ? 'Retornável' : 'Referência'}</p>
-                                                        </div>
+                                                        <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading shrink-0 ml-3">Qtd: {item.quantity}</span>
                                                     </div>
-                                                    <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading shrink-0 ml-3">Qtd: {item.quantity}</span>
-                                                </div>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                 )}
@@ -2124,11 +2156,12 @@ export const AppointmentSheet = ({
                                             {savedAppointmentItems.map((item: any) => {
                                                 const usageTypeLabel = item.usageType === 'consumed' ? 'Consumido' : item.usageType === 'returnable' ? 'Retornável' : 'Referência';
                                                 const usageTypeColor = item.usageType === 'consumed' ? 'text-red-600 bg-red-50 border-red-100' : item.usageType === 'returnable' ? 'text-blue-600 bg-blue-50 border-blue-100' : 'text-gray-500 bg-gray-50 border-gray-200';
+                                                const itemImg = item.image || item.product?.image || item.product?.images?.[0];
                                                 return (
                                                     <div key={item.id} className="flex items-center gap-4 p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
                                                         <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border">
-                                                            {item.product?.image ? (
-                                                                <img src={getR2ImageUrl(item.product.image, "thumbnail")} className="w-full h-full object-cover" alt="" />
+                                                            {itemImg ? (
+                                                                <img src={getR2ImageUrl(itemImg, "thumbnail")} className="w-full h-full object-cover" alt="" />
                                                             ) : (
                                                                 <Package size={18} className="text-brand-inactive-text" />
                                                             )}

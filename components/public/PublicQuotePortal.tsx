@@ -224,7 +224,7 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
     const customerAddressText = (() => {
         if (!selectedCustomer?.addresses?.length) return null
         const addr = selectedCustomer.addresses.find((a: any) => a.address_type === "primary" || a.is_default) || selectedCustomer.addresses[0]
-        return `${addr.street || ""}, ${addr.number || ""}${addr.complement ? ` - ${addr.complement}` : ""}\n${addr.neighborhood || ""} - ${addr.city || ""}/${addr.state || ""}\nCEP: ${addr.zip_code || ""}`
+        return `${addr.street || ""}, ${addr.number || ""}${addr.complement ? ` - ${addr.complement}` : ""}\n${addr.neighborhood || ""} - ${addr.city || ""}/${addr.state || ""}`
     })()
 
     // Items mapping for QuotePreview component
@@ -386,30 +386,31 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                                 <TabsContent value="Visualização" className="mt-0 focus-visible:outline-none h-full lg:hidden" forceMount>
                                     <div className={`${activeTab === "Visualização" ? "block" : "hidden"}`}>
                                         <div className="w-full h-[calc(100vh-220px)] bg-brand-gray dark:bg-dark-border/20 rounded-2xl overflow-hidden">
-                                            <QuotePreview
-                                                invoiceNumber={dataQuote.quote_number || "ORC-0000"}
-                                                quoteDate={dataQuote.issue_date || ""}
-                                                expiryDate={dataQuote.expiration_date || ""}
-                                                selectedCustomer={selectedCustomer}
-                                                quoteItems={mappedPreviewItems}
-                                                subtotal={Number(dataQuote.subtotal || 0)}
-                                                shippingNum={Number(dataQuote.shipping_cost || 0)}
-                                                otherCosts={Number(dataQuote.additional_costs || 0)}
-                                                discountValue={Number(dataQuote.discount_value || 0)}
-                                                total={Number(dataQuote.total || 0)}
-                                                note={dataQuote.notes || undefined}
-                                                primaryColor={previewMeta.primaryColor}
-                                                secondaryColor={previewMeta.secondaryColor}
-                                                quoteTitle={previewMeta.quoteTitle}
-                                                quoteSubtitle={previewMeta.quoteSubtitle}
-                                                showDecoration={previewMeta.showDecoration}
-                                                partnerName={partnerName}
-                                                partnerAddress={partnerAddress}
-                                                partnerAvatar={partnerLogo || undefined}
-                                                printMode={false}
-                                                showCustomerContact={false}
-                                                salespersonName={dataQuote.seller_name || undefined}
-                                            />
+<QuotePreview
+                                                 invoiceNumber={dataQuote.quote_number || "ORC-0000"}
+                                                 quoteDate={dataQuote.issue_date || ""}
+                                                 expiryDate={dataQuote.expiration_date || ""}
+                                                 selectedCustomer={selectedCustomer}
+                                                 quoteItems={mappedPreviewItems}
+                                                 subtotal={Number(dataQuote.subtotal || 0)}
+                                                 shippingNum={Number(dataQuote.shipping_cost || 0)}
+                                                 otherCosts={Number(dataQuote.additional_costs || 0)}
+                                                 discountValue={Number(dataQuote.discount_value || 0)}
+                                                 total={Number(dataQuote.total || 0)}
+                                                 note={dataQuote.notes || undefined}
+                                                 primaryColor={previewMeta.primaryColor}
+                                                 secondaryColor={previewMeta.secondaryColor}
+                                                 quoteTitle={previewMeta.quoteTitle}
+                                                 quoteSubtitle={previewMeta.quoteSubtitle}
+                                                 showDecoration={previewMeta.showDecoration}
+                                                 partnerName={partnerName}
+                                                 partnerAddress={partnerAddress}
+                                                 partnerPhone={partnerPhone}
+                                                 partnerAvatar={partnerLogo || undefined}
+                                                 printMode={false}
+                                                 showCustomerContact={false}
+                                                 salespersonName={dataQuote.seller_name || undefined}
+                                             />
                                         </div>
                                     </div>
                                 </TabsContent>

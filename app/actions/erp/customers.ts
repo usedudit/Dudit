@@ -687,7 +687,6 @@ export async function getCustomerOrdersAction(customerId: string) {
       mp_payment_id,
       created_at,
       situation,
-      payment_status,
       delivery_status,
       delivery_type,
       total_amount,

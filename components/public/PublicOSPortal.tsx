@@ -126,6 +126,7 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
 
     const partner = order?.partners || null
     const partnerName = partner?.name || "Parceiro"
+    const partnerPhone = partner?.phone || ""
     const partnerLogo = partner?.logo_url ? buildImageUrl(partner.logo_url) : null
     const partnerPlan = partner?.plan_tier || "free"
 
@@ -622,27 +623,28 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                             />
                                         )}
                                         <div className="w-full h-[calc(100vh-220px)] bg-brand-gray dark:bg-dark-border/20 rounded-2xl overflow-hidden">
-                                            <OSPreview
-                                                invoiceNumber={order.order_number}
-                                                orderDate={order.created_at}
-                                                expectedCompletionDate={order.expected_completion_date}
-                                                selectedCustomer={order.customer_snapshot}
-                                                services={services}
-                                                products={products}
-                                                totalServiceAmount={Number(order.total_service_amount || 0)}
-                                                totalProductAmount={Number(order.total_product_amount || 0)}
-                                                totalAmount={Number(order.total_amount || 0)}
-                                                description={order.description}
-                                                diagnosis={order.diagnosis}
-                                                signatureImageKey={order.signature_image_key}
-                                                signedAt={order.signed_at}
-                                                partnerName={partnerName}
-                                                partnerAddress={partner?.address || undefined}
-                                                partnerAvatar={partnerLogo || undefined}
-                                                printMode={false}
-                                                showCustomerContact={false}
-                                                salespersonName={order.assigned_user_name || undefined}
-                                            />
+<OSPreview
+                                                 invoiceNumber={order.order_number}
+                                                 orderDate={order.created_at}
+                                                 expectedCompletionDate={order.expected_completion_date}
+                                                 selectedCustomer={order.customer_snapshot}
+                                                 services={services}
+                                                 products={products}
+                                                 totalServiceAmount={Number(order.total_service_amount || 0)}
+                                                 totalProductAmount={Number(order.total_product_amount || 0)}
+                                                 totalAmount={Number(order.total_amount || 0)}
+                                                 description={order.description}
+                                                 diagnosis={order.diagnosis}
+                                                 signatureImageKey={order.signature_image_key}
+                                                 signedAt={order.signed_at}
+                                                 partnerName={partnerName}
+                                                 partnerAddress={partner?.address || undefined}
+                                                 partnerPhone={partnerPhone}
+                                                 partnerAvatar={partnerLogo || undefined}
+                                                 printMode={false}
+                                                 showCustomerContact={false}
+                                                 salespersonName={order.assigned_user_name || undefined}
+                                             />
                                         </div>
                                     </div>
                                 </TabsContent>
@@ -684,6 +686,7 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                 signedAt={order.signed_at}
                                 partnerName={partnerName}
                                 partnerAddress={partner?.address || undefined}
+                                partnerPhone={partnerPhone}
                                 partnerAvatar={partnerLogo || undefined}
                                 printMode={false}
                                 showCustomerContact={false}

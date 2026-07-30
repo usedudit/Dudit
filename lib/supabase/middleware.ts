@@ -401,6 +401,12 @@ export async function middleware(request: NextRequest) {
           const activePartnerId = request.cookies.get("active_partner_id")?.value
           const needsPartnerCheck = pathname.startsWith("/erp") && !!activePartnerId
 
+          // Only query account_deletions if the flag cookie exists — avoids an unnecessary
+          // DB call on every request for the 99.99% of users who never request deletion.
+          const hasDeletionFlag = request.cookies.get("x-account-deleting")?.value === "true"
+          const needsUserDeletionCheck = hasDeletionFlag && (isProtected || pathname.startsWith("/cart") || pathname.startsWith("/checkout"))
+          const needsPartnerDeletionCheck = hasDeletionFlag && needsPartnerCheck
+
           // Launch all queries in parallel
           const [profileResult, partnerResult, deletionResult, partnerDeletionResult] = await Promise.all([
             needsBanCheck
@@ -417,7 +423,7 @@ export async function middleware(request: NextRequest) {
                 .eq("id", activePartnerId!)
                 .maybeSingle()
               : Promise.resolve({ data: null }),
-            isProtected || pathname.startsWith("/cart") || pathname.startsWith("/checkout")
+            needsUserDeletionCheck
               ? supabase
                 .from("account_deletions")
                 .select("status, grace_period_ends_at")
@@ -425,7 +431,7 @@ export async function middleware(request: NextRequest) {
                 .not("status", "eq", "completed")
                 .maybeSingle()
               : Promise.resolve({ data: null }),
-            needsPartnerCheck
+            needsPartnerDeletionCheck
               ? supabase
                 .from("account_deletions")
                 .select("status, grace_period_ends_at")
@@ -459,6 +465,11 @@ export async function middleware(request: NextRequest) {
             const responseRedirect = NextResponse.redirect(selectErpUrl)
             responseRedirect.cookies.delete("active_partner_id")
             return responseRedirect
+          }
+
+          // Deletion completed — query returned nothing, clear the flag
+          if (hasDeletionFlag) {
+            response.cookies.set("x-account-deleting", "", { maxAge: 0, path: "/" })
           }
 
           // Process ban check result

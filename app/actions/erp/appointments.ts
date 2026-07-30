@@ -822,6 +822,7 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
             pricing_version: pricingResult.pricingVersion,
             notes: row.notes || null,
             created_by: user.id,
+            store_id: row.store_id || payload[i]?.storeId || null,
           })
           .select("id, order_number")
           .single()

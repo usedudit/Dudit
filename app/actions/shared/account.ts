@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache"
 import { requireUser } from "@/lib/auth/authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
-import { headers } from "next/headers"
+import { cookies, headers } from "next/headers"
 import { AccountDeletionService } from "@/lib/services/account-deletion.service"
 
 export async function deleteAccountAction(
@@ -47,6 +47,25 @@ export async function deleteAccountAction(
     if (!result.success) {
       return { error: result.error || "Erro ao registrar solicitação de exclusão." }
     }
+
+    // Clear session cookies so the middleware fast-fail catches the next request immediately
+    const cookieStore = await cookies()
+    const allCookies = cookieStore.getAll()
+    for (const c of allCookies) {
+      if (c.name.startsWith("sb-")) {
+        cookieStore.delete(c.name)
+      }
+    }
+    cookieStore.delete("active_partner_id")
+
+    // Set flag so middleware only queries account_deletions when necessary
+    cookieStore.set("x-account-deleting", "true", {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 7,
+      path: "/",
+    })
 
     revalidatePath("/erp/settings/subscription")
     return { success: true }

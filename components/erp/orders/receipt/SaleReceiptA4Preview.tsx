@@ -26,6 +26,10 @@ const SaleReceiptA4Preview = ({
     const secondaryColor = data.secondaryColor || QUOTE_PREVIEW_SECONDARY_COLOR
     const partnerName = data.partner.fantasyName
     const partnerAddress = data.partner.addressLine
+    const partnerAddressFormatted = partnerAddress
+        .split(', ')
+        .filter(part => !part.startsWith('CEP:'))
+        .join('\n')
     const partnerAvatar = data.partnerAvatar
 
     const quoteItems = data.items.map((item) => ({
@@ -141,8 +145,8 @@ const SaleReceiptA4Preview = ({
                                     <span className="text-white font-bold text-sm">{partnerName}</span>
                                 </div>
                                 <div>
-                                    <h1 className="text-3xl font-medium text-white">COMPROVANTE DE VENDA</h1>
-                                    <p className="text-white/80 text-xs tracking-widest font-light mt-1 uppercase">
+                                    <h1 className="text-2xl font-medium text-white">Comprovante de venda</h1>
+                                    <p className="text-white/80 text-xs tracking-widest font-light mt-1">
                                         Pedido #{data.orderNumber}
                                     </p>
                                 </div>
@@ -155,21 +159,15 @@ const SaleReceiptA4Preview = ({
                                     <div className="px-8 py-6">
                                         <div className="grid grid-cols-3 gap-4 border-b border-brand-border pb-6 w-full">
                                             <div className="flex flex-col">
-                                                <span className="text-xs text-brand-inactive-text font-medium uppercase tracking-wide mb-0.5">
-                                                    Pedido
-                                                </span>
+                                                <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Pedido</span>
                                                 <span className="font-bold text-sm text-brand-dark">{data.orderNumber}</span>
                                             </div>
                                             <div className="flex flex-col">
-                                                <span className="text-xs text-brand-inactive-text font-medium uppercase tracking-wide mb-0.5">
-                                                    Data
-                                                </span>
+                                                <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Data</span>
                                                 <span className="font-bold text-sm text-brand-dark">{saleDate}</span>
                                             </div>
                                             <div className="flex flex-col">
-                                                <span className="text-xs text-brand-inactive-text font-medium uppercase tracking-wide mb-0.5">
-                                                    Vendedor
-                                                </span>
+                                                <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Vendedor</span>
                                                 <span className="font-bold text-sm text-brand-dark">{data.sellerName}</span>
                                             </div>
                                         </div>
@@ -177,16 +175,17 @@ const SaleReceiptA4Preview = ({
                                     <div className="px-8 pb-6">
                                         <div className="grid grid-cols-2 gap-8">
                                             <div>
-                                                <h3 className="font-bold text-sm text-brand-dark mb-3">Emitente</h3>
+                                                <h3 className="font-bold text-sm text-brand-dark mb-3">Dados da empresa</h3>
                                                 <div className="text-xs text-gray-600 space-y-1">
-                                                    <p className="font-bold uppercase text-brand-dark">{data.partner.fantasyName}</p>
-                                                    <p>{data.partner.legalName}</p>
-                                                    <p className="whitespace-pre-wrap">{partnerAddress}</p>
-                                                    {data.partner.taxIdLine ? <p>{data.partner.taxIdLine}</p> : null}
+                                                    <p className="font-bold text-brand-dark">{data.partner.fantasyName}</p>
+                                                    {data.partner.legalName && data.partner.legalName !== data.partner.fantasyName && (
+                                                        <p>{data.partner.legalName}</p>
+                                                    )}
+                                                    <p className="whitespace-pre-wrap">{partnerAddressFormatted}</p>
                                                 </div>
                                             </div>
                                             <div>
-                                                <h3 className="font-bold text-sm text-brand-dark mb-3">Consumidor</h3>
+                                                <h3 className="font-bold text-sm text-brand-dark mb-3">Dados do cliente</h3>
                                                 <div className="text-xs text-gray-600 space-y-1">
                                                     <p className="font-bold text-brand-dark">{data.customerName}</p>
                                                 </div>
@@ -244,7 +243,7 @@ const SaleReceiptA4Preview = ({
                             {page.hasTotals && (
                                 <div className="mt-8">
                                     <div className="px-8 pb-6 flex justify-start">
-                                        <div className="w-full bg-[#f8f9fa] p-6 rounded-lg text-black space-y-2">
+                                        <div className="w-full bg-brand-gray/40 p-6 rounded-lg text-black space-y-2">
                                             <div className="flex justify-between items-center text-xs">
                                                 <span className="text-gray-500 font-medium">Subtotal</span>
                                                 <span className="font-bold">{formatCurrency(subtotal)}</span>
@@ -258,7 +257,7 @@ const SaleReceiptA4Preview = ({
                                             {data.methodDiscount > 0.009 && (
                                                 <div className="flex justify-between items-center text-xs">
                                                     <span className="text-gray-500 font-medium">Desconto de método</span>
-                                                    <span className="font-bold text-brand-red">
+                                                    <span className="font-bold text-brand-green">
                                                         -{formatCurrency(data.methodDiscount)}
                                                     </span>
                                                 </div>
@@ -266,7 +265,7 @@ const SaleReceiptA4Preview = ({
                                             {data.couponDiscount > 0.009 && (
                                                 <div className="flex justify-between items-center text-xs">
                                                     <span className="text-gray-500 font-medium">Desconto cupom</span>
-                                                    <span className="font-bold text-brand-red">
+                                                    <span className="font-bold text-brand-green">
                                                         -{formatCurrency(data.couponDiscount)}
                                                     </span>
                                                 </div>
@@ -274,7 +273,7 @@ const SaleReceiptA4Preview = ({
                                             {data.generalDiscount > 0.009 && (
                                                 <div className="flex justify-between items-center text-xs">
                                                     <span className="text-gray-500 font-medium">Desconto</span>
-                                                    <span className="font-bold text-brand-red">
+                                                    <span className="font-bold text-brand-green">
                                                         -{formatCurrency(data.generalDiscount)}
                                                     </span>
                                                 </div>
@@ -291,16 +290,16 @@ const SaleReceiptA4Preview = ({
                                                     <span className="font-bold">+{formatCurrency(data.methodInterest)}</span>
                                                 </div>
                                             )}
-{shippingNum > 0.009 && (
-                                                  <div className="flex justify-between items-center text-xs">
-                                                      <span className="text-gray-500 font-medium">
-                                                          {isDeliveryFree ? "Entrega (grátis)" : "Entrega"}
-                                                      </span>
-                                                      <span className={`font-bold ${isDeliveryFree ? 'text-brand-green' : ''}`}>
-                                                          {isDeliveryFree ? "Grátis" : formatCurrency(shippingNum)}
-                                                      </span>
-                                                  </div>
-                                              )}
+                                            {shippingNum > 0.009 && (
+                                                <div className="flex justify-between items-center text-xs">
+                                                    <span className="text-gray-500 font-medium">
+                                                        {isDeliveryFree ? "Entrega (subsidiado)" : "Entrega"}
+                                                    </span>
+                                                    <span className={`font-bold ${isDeliveryFree ? 'text-brand-green' : ''}`}>
+                                                        {isDeliveryFree ? `${formatCurrency(shippingNum)} (grátis)` : formatCurrency(shippingNum)}
+                                                    </span>
+                                                </div>
+                                            )}
                                             {data.change > 0.009 && (
                                                 <div className="flex justify-between items-center text-xs">
                                                     <span className="text-gray-500 font-medium">Troco</span>

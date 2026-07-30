@@ -28,10 +28,14 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
   // 0. Tenta obter a loja ativa (se o usuário selecionou uma)
   const activeStoreId = await getActiveStoreId();
 
+  // Store e queries de fallback
+  const STORE_SELECT = "id, name, slug, logo_url, image_url, banner_url, phone, is_showcase_active, partner_id, addresses!store_id!left(city, state)"
+
   // 1. Executa todas as consultas ao DB de forma paralela e agregada
   const [
     partnerRes,
-    storeRes,
+    storeByIdRes,
+    storeByPartnerRes,
     addressRes,
     paymentMethodsRes,
     productsCountRes,
@@ -51,18 +55,13 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
       .eq("id", partnerId)
       .single(),
     
-    // Loja associada (para URL pública com store_id) — prioriza a loja ativa se disponível
+    // Loja por ID ativo (pode não existir se o cookie estiver desatualizado)
     activeStoreId
-      ? supabase
-          .from("stores")
-          .select("id, name, slug, city, state, logo_url, image_url, banner_url, phone, is_showcase_active")
-          .eq("id", activeStoreId)
-          .maybeSingle()
-      : supabase
-          .from("stores")
-          .select("id, name, slug, city, state, logo_url, image_url, banner_url, phone, is_showcase_active")
-          .eq("partner_id", partnerId)
-          .maybeSingle(),
+      ? supabase.from("stores").select(STORE_SELECT).eq("id", activeStoreId).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+
+    // Fallback: sempre busca a primeira loja do parceiro
+    supabase.from("stores").select(STORE_SELECT).eq("partner_id", partnerId).maybeSingle(),
     
     supabase
       .from("addresses")
@@ -139,12 +138,18 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
       .limit(5)
   ]);
 
+  // 1b. Resolve a loja: prioriza a ativa, mas usa fallback da primeira do parceiro
+  const store = storeByIdRes?.data || storeByPartnerRes?.data;
+
+  if (!store) {
+    console.warn("[DASHBOARD] Nenhuma loja encontrada para o partner", partnerId);
+  }
+
   if (partnerRes.error || !partnerRes.data) {
     throw new Error("Parceiro não encontrado no sistema.");
   }
 
   const partner = partnerRes.data;
-  const store = storeRes.data;
   const businessInfo = normalizeBusinessInfo(partner.business_info);
 
   // 2. Determina variáveis auxiliares de Onboarding
@@ -239,23 +244,27 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
   };
 
   // 7. Gera a URL pública do perfil do vendedor (baseada na loja ativa)
-  const storeData = storeRes.data
   const firstAddress = Array.isArray(addressData) ? addressData[0] : addressData;
 
-  const storeSlug = storeData?.slug || (storeData?.name ? createSlug(storeData.name) : "");
-  const storeId = storeData?.id || "";
-  const storeCity = storeData?.city || firstAddress?.city;
-  const storeState = storeData?.state || firstAddress?.state;
+  const storeSlug = store?.slug || (store?.name ? createSlug(store.name) : "");
+  const storeId = store?.id || "";
+  const storeAddress = Array.isArray(store?.addresses) ? store.addresses[0] : store?.addresses;
+  const storeCity = storeAddress?.city || firstAddress?.city;
+  const storeState = storeAddress?.state || firstAddress?.state;
 
-  const partnerUrl = storeData && storeSlug && storeId
+  const partnerUrl = store && storeSlug && storeId
     ? getStoreUrl({
         id: storeId,
         slug: storeSlug,
-        name: storeData.name,
+        name: store.name,
         city: storeCity,
         state: storeState,
       })
     : "/";
+
+  if (!store && (addressData.length > 0 || partnerRes.data)) {
+    console.warn("[DASHBOARD] Loja não encontrada, partnerUrl será '/'", { partnerId, storeSlug, storeId });
+  }
 
   return {
     storeName: storeName,

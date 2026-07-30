@@ -27,7 +27,7 @@ const StoreListRow = React.memo(
     onEdit,
     onDelete,
   }: StoreListRowProps) => {
-    const logoUrl = getR2ImageUrl(store.logo_url || store.image_url)
+    const logoUrl = getR2ImageUrl(store.logo_url)
 
     return (
       <motion.tr

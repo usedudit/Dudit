@@ -34,7 +34,7 @@ export async function StorePage({ storeData }: { storeData: any }) {
         id: storeData.id,
         storeName: storeData.name || "Loja",
         storeDescription: storeData.description || "",
-        storeImageUrl: storeData.logo_url || storeData.image_url || null,
+        storeImageUrl: storeData.logo_url || null,
         profile_image_url: null,
         city: address?.city || storeData.city || "",
         state: address?.state || storeData.state || "",

@@ -47,7 +47,7 @@ function resolveResourcesFromServices(services: any[]): ItemEntry[] {
                     quantity: Number(res.quantity || 1),
                     usageType: res.usage_type || 'consumed',
                     serviceName: svc.name,
-                    image: res.image || null,
+                    image: res.image || res.product?.image || res.product?.images?.[0] || null,
                     sku: res.sku || null,
                     stock: res.stock,
                 })
@@ -125,14 +125,15 @@ export function AppointmentItemsStep({ items, onItemsChange, services, partnerPl
                     const willGoNegative = isConsumed && projectedStock < 0
                     const willGoBelowMin = isConsumed && minStock > 0 && projectedStock < minStock
 
+                    const itemImg = item.image || (item as any).product?.image || (item as any).product?.images?.[0]
                     return (
                         <div
                             key={item.key}
                             className={`flex items-center gap-4 p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface ${(willGoNegative || willGoBelowMin) && isAdvancedPlan ? 'border-amber-300 dark:border-amber-800/30 bg-amber-50/50 dark:bg-amber-900/10' : ''}`}
                         >
                             <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border">
-                                {item.image ? (
-                                    <img src={getR2ImageUrl(item.image, "thumbnail")} className="w-full h-full object-cover" alt="" />
+                                {itemImg ? (
+                                    <img src={getR2ImageUrl(itemImg, "thumbnail")} className="w-full h-full object-cover" alt="" />
                                 ) : (
                                     <Package size={18} className="text-brand-inactive-text" />
                                 )}

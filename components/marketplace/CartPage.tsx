@@ -602,26 +602,6 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                 {item.item_type === "service_booking" && getItemBooking(item) && (
                                                                                                     <p className="text-[12px] text-brand-inactive-text mt-0.5">{getItemBooking(item)}</p>
                                                                                                 )}
-                                                                                                {serviceAvailability[item.id]?.checked && !serviceAvailability[item.id]?.available && (
-                                                                                                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-brand-orange dark:text-orange-400 font-medium">
-                                                                                                        <span className="w-1.5 h-1.5 rounded-full bg-brand-orange shrink-0" />
-                                                                                                        <span>Este horário não está mais disponível</span>
-                                                                                                        <span className="text-brand-inactive-text/40">•</span>
-                                                                                                        <Link
-                                                                                                            href={getServiceUrl({ id: item.service_id, name: item.services?.name || item.booking_metadata?.serviceName }, data.partner)}
-                                                                                                            className="font-semibold text-brand-green hover:underline"
-                                                                                                        >
-                                                                                                            Remarcar
-                                                                                                        </Link>
-                                                                                                        <span className="text-brand-inactive-text/40">•</span>
-                                                                                                        <button
-                                                                                                            onClick={() => setDeleteModal({ open: true, cartItemId: item.id })}
-                                                                                                            className="font-semibold text-brand-red hover:underline"
-                                                                                                        >
-                                                                                                            Remover
-                                                                                                        </button>
-                                                                                                    </div>
-                                                                                                )}
 
                                                                                                 <div className="flex items-center justify-between mt-2">
                                                                                                     {isOutOfStock ? (
@@ -660,6 +640,27 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                             </div>
                                                                                                         )
                                                                                                     })()}
+
+                                                                                                    {serviceAvailability[item.id]?.checked && !serviceAvailability[item.id]?.available && (
+                                                                                                        <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-brand-orange dark:text-orange-400 font-medium">
+                                                                                                            <span className="w-1.5 h-1.5 rounded-full bg-brand-orange shrink-0" />
+                                                                                                            <span>Este horário não está mais disponível</span>
+                                                                                                            <span className="text-brand-inactive-text/40">•</span>
+                                                                                                            <Link
+                                                                                                                href={getServiceUrl({ id: item.service_id, name: item.services?.name || item.booking_metadata?.serviceName }, data.partner)}
+                                                                                                                className="font-semibold text-brand-green hover:underline"
+                                                                                                            >
+                                                                                                                Remarcar
+                                                                                                            </Link>
+                                                                                                            <span className="text-brand-inactive-text/40">•</span>
+                                                                                                            <button
+                                                                                                                onClick={() => setDeleteModal({ open: true, cartItemId: item.id })}
+                                                                                                                className="font-semibold text-brand-red hover:underline"
+                                                                                                            >
+                                                                                                                Remover
+                                                                                                            </button>
+                                                                                                        </div>
+                                                                                                    )}
                                                                                                 </div>
                                                                                             </div>
                                                                                         </div>
@@ -732,6 +733,15 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                     {item.item_type === "service_booking" && getItemBooking(item) && (
                                                                                                         <p className="text-[13px] text-brand-inactive-text mb-1">{getItemBooking(item)}</p>
                                                                                                     )}
+                                                                                                    {(() => {
+                                                                                                        const ctx = getItemPricingContext(item, partnerPromos)
+                                                                                                        return (
+                                                                                                            <div className="flex items-center gap-2">
+                                                                                                                <p className="text-[15px] font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(ctx.bestPrice)}</p>
+                                                                                                            </div>
+                                                                                                        )
+                                                                                                    })()}
+
                                                                                                     {serviceAvailability[item.id]?.checked && !serviceAvailability[item.id]?.available && (
                                                                                                         <div className="mt-1 mb-1 flex flex-wrap items-center gap-1.5 text-xs text-brand-orange dark:text-orange-400 font-medium">
                                                                                                             <span className="w-1.5 h-1.5 rounded-full bg-brand-orange shrink-0" />
@@ -752,14 +762,6 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                             </button>
                                                                                                         </div>
                                                                                                     )}
-                                                                                                    {(() => {
-                                                                                                        const ctx = getItemPricingContext(item, partnerPromos)
-                                                                                                        return (
-                                                                                                            <div className="flex items-center gap-2">
-                                                                                                                <p className="text-[15px] font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(ctx.bestPrice)}</p>
-                                                                                                            </div>
-                                                                                                        )
-                                                                                                    })()}
                                                                                                 </div>
 
                                                                                                 <div className="flex items-center justify-end gap-4">

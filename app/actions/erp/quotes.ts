@@ -691,7 +691,9 @@ async function saveQuoteSnapshot(supabase: any, quoteId: string, partnerId: stri
 
     let partnerAddressFormatted = "Endereço não cadastrado"
     if (partnerAddr) {
-        partnerAddressFormatted = `${partnerAddr.street}, ${partnerAddr.number}${partnerAddr.complement ? ` - ${partnerAddr.complement}` : ""}\n${partnerAddr.neighborhood} - ${partnerAddr.city}/${partnerAddr.state}\nCEP: ${partnerAddr.zip_code}`
+        const streetNumber = [partnerAddr.street, partnerAddr.number].filter(Boolean).join(", ")
+        const neighborhoodCityState = [partnerAddr.neighborhood, [partnerAddr.city, partnerAddr.state].filter(Boolean).join("/")].filter(Boolean).join(" - ")
+        partnerAddressFormatted = [streetNumber, neighborhoodCityState].filter(Boolean).join("\n")
     }
 
     let partnerEmail = null
@@ -1784,7 +1786,9 @@ export async function getPartnerAddressAction(partnerId: string) {
 
         if (!data) return successResponse(null)
 
-        const formattedAddress = `${data.street}, ${data.number}${data.complement ? ` - ${data.complement}` : ''}\n${data.neighborhood} - ${data.city}/${data.state}\nCEP: ${data.zip_code}`;
+        const streetNumber = [data.street, data.number].filter(Boolean).join(", ")
+        const neighborhoodCityState = [data.neighborhood, [data.city, data.state].filter(Boolean).join("/")].filter(Boolean).join(" - ")
+        const formattedAddress = [streetNumber, neighborhoodCityState].filter(Boolean).join("\n");
 
         return successResponse({
             ...data,
@@ -2255,7 +2259,9 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                     .eq("is_default", true)
                     .maybeSingle()
                 if (partnerAddr) {
-                    partnerAddressFormatted = `${partnerAddr.street}, ${partnerAddr.number}${partnerAddr.complement ? ` - ${partnerAddr.complement}` : ""}\n${partnerAddr.neighborhood} - ${partnerAddr.city}/${partnerAddr.state}\nCEP: ${partnerAddr.zip_code}`
+                    const streetNumber = [partnerAddr.street, partnerAddr.number].filter(Boolean).join(", ")
+                    const neighborhoodCityState = [partnerAddr.neighborhood, [partnerAddr.city, partnerAddr.state].filter(Boolean).join("/")].filter(Boolean).join(" - ")
+                    partnerAddressFormatted = [streetNumber, neighborhoodCityState].filter(Boolean).join("\n")
                 }
 
                 // Store already fetched above
@@ -2283,7 +2289,7 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                     total: Number(quote.total || 0),
                     partner: {
                         name: store?.name || "Parceiro",
-                        image_url: store?.image_url || store?.logo_url || null,
+                        image_url: store?.logo_url || null,
                         email: partnerEmail,
                         phone: store?.phone || null,
                         address: partnerAddressFormatted
@@ -2311,7 +2317,7 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                 }
                 if (!resolvedSnapshot.partner.image_url) {
                     const partnerObj = Array.isArray(quote.partners) ? quote.partners[0] : quote.partners
-                    resolvedSnapshot.partner.image_url = store?.image_url || store?.logo_url || null
+                    resolvedSnapshot.partner.image_url = store?.logo_url || null
                 }
             }
 

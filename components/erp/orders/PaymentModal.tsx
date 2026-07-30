@@ -247,6 +247,7 @@ export type PaymentModalProps = {
     allowDepositCharge?: boolean
     depositChargeAmount?: number
     depositPercentage?: number
+    deliveryBreakdown?: Record<string, unknown> | null
 }
 
 /** Mesmo texto em PDV e venda manual - importe nos pais para garantir paridade. */
@@ -275,6 +276,7 @@ const PaymentModal = ({
     allowDepositCharge = false,
     depositChargeAmount = 0,
     depositPercentage: propsDepositPercentage,
+    deliveryBreakdown,
 }: PaymentModalProps) => {
     const { toast } = useToast();
     const { selectedStore } = useStore();
@@ -1963,8 +1965,8 @@ const PaymentModal = ({
                             discountAmount={receiptView.discountAmount}
                             total={receiptView.total}
                             itemCount={receiptView.itemCount}
-                            customerName={customer?.name}
                             pricingDetails={receiptPricingDetails}
+                            deliveryBreakdown={deliveryBreakdown}
                         />
                     </div>
                 </div>
@@ -3173,6 +3175,7 @@ const PaymentModal = ({
                                         itemCount={receiptView.itemCount}
                                         customerName={customer?.name}
                                         pricingDetails={receiptPricingDetails}
+                                        deliveryBreakdown={deliveryBreakdown}
                                     />
                                 </div>
                             </motion.div>

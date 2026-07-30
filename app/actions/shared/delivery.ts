@@ -101,11 +101,9 @@ export async function upsertPartnerDeliveryConfigAction(input: {
   const normalized: DeliverySettings = {
     storeId: input.storeId || null,
     baseFee: Math.max(0, Number(input.settings.baseFee || 0)),
-    includedKm: capability.advancedEnabled ? Math.max(0, Number(input.settings.includedKm || 0)) : 0,
-    extraKmPrice: capability.advancedEnabled ? Math.max(0, Number(input.settings.extraKmPrice || 0)) : 0,
-    maxDeliveryKm: capability.advancedEnabled
-      ? (input.settings.maxDeliveryKm == null ? null : Math.max(0, Number(input.settings.maxDeliveryKm)))
-      : null,
+    includedKm: Math.max(0, Number(input.settings.includedKm || 0)),
+    extraKmPrice: Math.max(0, Number(input.settings.extraKmPrice || 0)),
+    maxDeliveryKm: input.settings.maxDeliveryKm == null ? null : Math.max(0, Number(input.settings.maxDeliveryKm)),
     isDeliveryEnabled: Boolean(input.settings.isDeliveryEnabled),
     isPickupEnabled: Boolean(input.settings.isPickupEnabled),
     freeDeliveryThreshold: input.settings.freeDeliveryThreshold == null ? null : Math.max(0, Number(input.settings.freeDeliveryThreshold)),
@@ -204,6 +202,7 @@ export async function quoteDeliveryFeeAction(input: {
   freeDeliveryCoupon?: boolean
   destinationCoords?: { lat: number; lng: number } | null
   orderSubtotal?: number
+  allowOutsideRadius?: boolean
 }) {
   const supabase = getAdminClient()
 
@@ -284,6 +283,26 @@ export async function quoteDeliveryFeeAction(input: {
     }
 
     if (!originCoords) {
+      let addrQuery = supabase
+        .from("addresses")
+        .select("id, street, number, neighborhood, city, state, zip_code")
+      if (input.storeId) {
+        addrQuery = addrQuery.eq("store_id", input.storeId)
+      } else {
+        addrQuery = addrQuery.eq("partner_id", input.partnerId)
+      }
+      const { data: textAddr } = await addrQuery.limit(1).maybeSingle()
+      if (textAddr) {
+        const fullAddrString = `${textAddr.street || ""}, ${textAddr.number || ""} - ${textAddr.neighborhood || ""}, ${textAddr.city || ""} - ${textAddr.state || ""}, ${textAddr.zip_code || ""}`
+        const geocoded = await geocodeAddress(fullAddrString)
+        if (geocoded) {
+          originCoords = geocoded
+          void supabase.from("addresses").update({ latitude: geocoded.lat, longitude: geocoded.lng }).eq("id", textAddr.id)
+        }
+      }
+    }
+
+    if (!originCoords) {
       return { success: false as const, error: "Endereço da loja incompleto para calcular entrega por distância." }
     }
 
@@ -313,6 +332,7 @@ export async function quoteDeliveryFeeAction(input: {
       rules,
       freeDeliveryCoupon: Boolean(input.freeDeliveryCoupon),
       orderSubtotal: input.orderSubtotal,
+      allowOutsideRadius: Boolean(input.allowOutsideRadius),
     })
 
     return {
@@ -321,11 +341,17 @@ export async function quoteDeliveryFeeAction(input: {
       fee: priced.fee,
       breakdown: priced.breakdown,
       capability,
+      isOutsideRadius: Boolean(priced.breakdown.isOutsideRadius),
+      maxDeliveryKm: priced.breakdown.maxDeliveryKm ?? settings.maxDeliveryKm,
+      outsideRadiusWarning: priced.breakdown.outsideRadiusWarning,
     }
   } catch (error: any) {
+    const isOutside = error.message?.toLowerCase().includes("raio") || false
     return {
       success: false as const,
       distanceKm,
+      isOutsideRadius: isOutside,
+      maxDeliveryKm: settings.maxDeliveryKm,
       error: error.message || "Erro ao calcular taxa de entrega",
     }
   }

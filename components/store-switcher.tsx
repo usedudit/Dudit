@@ -68,7 +68,7 @@ export function StoreSwitcher() {
                 showChevron={false}
             >
                 {stores.map((store) => {
-                    const storeImage = getR2ImageUrl(store.logo_url || store.image_url) || "/local-grocery-store.png"
+                    const storeImage = getR2ImageUrl(store.logo_url) || "/local-grocery-store.png"
 
                     return (
                         <DropdownItem

@@ -19,7 +19,7 @@ export default async function PainelPage() {
     const { partnerId, businessInfo } = context
 
     if (businessInfo?.mode !== "quick") {
-        redirect("/erp/dashboard")
+        redirect("/erp/inicio")
     }
 
     const result = await getQuickModeHomeDataAction(partnerId)

@@ -44,7 +44,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       url: canonicalUrl,
       images: [
         {
-          url: store.logo_url || store.image_url || 'https://img.dudit.com.br/static/Logo.png',
+          url: store.logo_url || 'https://img.dudit.com.br/static/Logo.png',
           width: 800,
           height: 600,
           alt: `Capa de ${storeName}`,
@@ -161,7 +161,7 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
     '@context': 'https://schema.org',
     '@type': ['Store', 'LocalBusiness', 'Organization'],
     name: store.name,
-    image: store.logo_url || store.image_url || 'https://img.dudit.com.br/static/Logo.png',
+    image: store.logo_url || 'https://img.dudit.com.br/static/Logo.png',
     description: store.description || '',
     address: {
       '@type': 'PostalAddress',
@@ -217,7 +217,7 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
     id: store.id,
     storeName: store.name || "Loja",
     storeDescription: store.description || "",
-    storeImageUrl: store.logo_url || store.image_url || null,
+    storeImageUrl: store.logo_url || null,
     profile_image_url: null,
     city: address?.city || store.city || "",
     state: address?.state || store.state || "",

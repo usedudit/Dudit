@@ -237,7 +237,7 @@ export function ServiceDetailsPageClient({
             store_name: storeName,
             city: address?.city || store?.city || p?.city || "Brasil",
             state: address?.state || store?.state || p?.state || "BR",
-            store_avatar: store?.logo_url || store?.image_url || p?.store_image_url || PLACEHOLDER,
+            store_avatar: store?.logo_url || p?.store_image_url || PLACEHOLDER,
             profile_image_url: store?.logo_url || p?.store_image_url || null,
             banner_url: store?.banner_url || p?.banner_url || null,
             opening_hours: store?.opening_hours || p?.opening_hours || null,

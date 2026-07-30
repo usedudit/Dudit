@@ -41,6 +41,11 @@ export default function SaleReceiptThermalPreview({
     const grossTotal = data.items.reduce((acc, item) => acc + item.totalPrice, 0)
     const isDeliveryFree = data.deliveryPayer === 'seller'
 
+    const partnerAddressFormatted = data.partner.addressLine
+        .split(', ')
+        .filter(part => !part.startsWith('CEP:'))
+        .join('\n')
+
     return (
         <div
             className={`mx-auto bg-[#fffef5] text-black font-mono text-[11px] leading-snug shadow-md ${printMode ? "sale-receipt-thermal-print" : ""
@@ -52,7 +57,7 @@ export default function SaleReceiptThermalPreview({
                 <div className="text-center mb-2">
                     <p className="font-bold text-[13px] uppercase tracking-tight">{data.partner.fantasyName}</p>
                     <p className="text-[10px] mt-0.5">{data.partner.legalName}</p>
-                    <p className="text-[9px] mt-1 leading-tight">{data.partner.addressLine}</p>
+                    <p className="text-[9px] mt-1 leading-tight">{partnerAddressFormatted}</p>
                     {data.partner.taxIdLine ? (
                         <p className="text-[9px] mt-1 leading-tight">{data.partner.taxIdLine}</p>
                     ) : null}
@@ -133,7 +138,7 @@ export default function SaleReceiptThermalPreview({
                         <Row left="Juros de método" right={`+${formatReceiptAmount(data.methodInterest)}`} />
                     )}
                     {data.shippingFee > 0.009 && (
-                        <Row left={isDeliveryFree ? "Entrega (grátis)" : "Entrega"} right={isDeliveryFree ? "Grátis" : formatReceiptAmount(data.shippingFee)} />
+                        <Row left={isDeliveryFree ? "Entrega (subsidiado)" : "Entrega"} right={isDeliveryFree ? `${formatReceiptAmount(data.shippingFee)} (grátis)` : formatReceiptAmount(data.shippingFee)} />
                     )}
                     {data.otherCosts > 0.009 && (
                         <Row left="Outros custos" right={formatReceiptAmount(data.otherCosts)} />

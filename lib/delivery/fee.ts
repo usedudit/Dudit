@@ -33,6 +33,9 @@ export type DeliveryBreakdown = {
   distanceKm: number
   originalFee?: number
   deliveryPayer?: "customer" | "seller"
+  isOutsideRadius?: boolean
+  maxDeliveryKm?: number | null
+  outsideRadiusWarning?: string
 }
 
 export type CalculateDeliveryFeeInput = {
@@ -42,6 +45,7 @@ export type CalculateDeliveryFeeInput = {
   rules: DeliveryFeeRule[]
   freeDeliveryCoupon?: boolean
   orderSubtotal?: number
+  allowOutsideRadius?: boolean
 }
 
 function roundMoney(value: number): number {
@@ -75,9 +79,14 @@ export function calculateDeliveryFee(input: CalculateDeliveryFeeInput): {
   const extraKmPrice = Math.max(0, Number(input.settings.extraKmPrice || 0))
   const maxDeliveryKm = input.settings.maxDeliveryKm == null ? null : Math.max(0, Number(input.settings.maxDeliveryKm))
 
-  if (maxDeliveryKm != null && distanceKm > maxDeliveryKm) {
+  const isOutsideRadius = maxDeliveryKm != null && distanceKm > maxDeliveryKm
+  if (isOutsideRadius && !input.allowOutsideRadius) {
     throw new Error("Endereço fora do raio máximo de entrega.")
   }
+
+  const outsideRadiusWarning = isOutsideRadius
+    ? `Endereço fora do raio máximo de entrega da loja (${distanceKm} km / Máximo: ${maxDeliveryKm} km).`
+    : undefined
 
   const freeDeliveryThreshold = input.settings.freeDeliveryThreshold == null ? null : Math.max(0, Number(input.settings.freeDeliveryThreshold))
   const orderSubtotal = input.orderSubtotal == null ? null : Math.max(0, Number(input.orderSubtotal))
@@ -94,6 +103,9 @@ export function calculateDeliveryFee(input: CalculateDeliveryFeeInput): {
         timeAdjustmentTotal: roundMoney(-baseFee),
         appliedRuleIds: input.freeDeliveryCoupon ? ["coupon:free_delivery"] : ["threshold:free_delivery"],
         distanceKm: roundMoney(distanceKm),
+        isOutsideRadius,
+        maxDeliveryKm,
+        outsideRadiusWarning,
       },
     }
   }
@@ -142,6 +154,9 @@ export function calculateDeliveryFee(input: CalculateDeliveryFeeInput): {
         distanceKm: roundMoney(distanceKm),
         originalFee: roundedFee,
         deliveryPayer: "seller",
+        isOutsideRadius,
+        maxDeliveryKm,
+        outsideRadiusWarning,
       },
     }
   }
@@ -158,6 +173,9 @@ export function calculateDeliveryFee(input: CalculateDeliveryFeeInput): {
       distanceKm: roundMoney(distanceKm),
       originalFee: roundedFee,
       deliveryPayer: "customer",
+      isOutsideRadius,
+      maxDeliveryKm,
+      outsideRadiusWarning,
     },
   }
 }

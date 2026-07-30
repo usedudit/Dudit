@@ -40,7 +40,6 @@ export type MarketplaceCheckoutContextResult =
         name: string
         slug: string | null
         logo_url: string | null
-        image_url: string | null
         address: Record<string, unknown> | null
         openingHours: any
       } | null
@@ -392,7 +391,6 @@ export async function getMarketplaceCheckoutContextAction(input: {
       name: (storeRowData as any).name,
       slug: (storeRowData as any).slug || null,
       logo_url: (storeRowData as any).logo_url || null,
-      image_url: (storeRowData as any).image_url || null,
       address: (storeAddress as Record<string, unknown>) || null,
       openingHours: (storeRowData as any).opening_hours || null,
     } : null,
@@ -407,7 +405,7 @@ export async function getMarketplaceCheckoutContextAction(input: {
       pixKey: pixMethod?.pix_key || null,
       pixKeyType: pixMethod?.pix_key_type || null,
       pickupPaymentPolicy: (partnerRow as any)?.pickup_payment_policy || "require_online_payment",
-      orderFlow: plan?.slug === "free" ? "whatsapp" : ((partnerRow as any)?.order_flow || "dudit"),
+      orderFlow: (partnerRow as any)?.order_flow || "dudit",
       planSlug: plan?.slug || "free",
     },
     delivery: {

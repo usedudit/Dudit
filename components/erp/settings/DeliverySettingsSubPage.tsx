@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Button, Input, FormDropdown, DefaultModal, MoneyInput, IconPlaceholder, TimePicker, FormSection, Accordion, Checkbox, ActionsDropdown, AlertModal } from "@/components/reusable"
+import { Button, Input, FormDropdown, DefaultModal, MoneyInput, IconPlaceholder, TimePicker, FormSection, Accordion, Checkbox, ActionsDropdown, AlertModal, Pagination } from "@/components/reusable"
 import { Switch } from "@/components/reusable/Switch"
 import { ChevronLeftIcon, ClockIcon, PlusIcon, SaveIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -12,9 +12,10 @@ import {
     upsertDeliveryFeeRuleAction,
     upsertPartnerDeliveryConfigAction,
 } from "@/app/actions/shared/delivery"
-import { getPickupPaymentPolicyAction, updatePickupPaymentPolicyAction } from "@/app/actions/partners/pickup-payment"
+
 import { planStarIconForTarget, usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { useNotification } from "@/hooks/use-notification"
+import { useMediaQuery } from "@/hooks"
 
 function toMinutes(time: string): number {
     const [h, m] = String(time || "00:00").split(":").map((v) => Number(v || 0))
@@ -65,12 +66,19 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
         isDeliveryEnabled: true,
         isPickupEnabled: true,
         freeDeliveryThreshold: "",
-        pickupPaymentPolicy: "require_online_payment" as "require_online_payment" | "allow_pickup_payment",
         deliveryPayer: "customer" as "customer" | "seller",
     })
     const [rules, setRules] = useState<any[]>([])
     const [isRuleModalOpen, setIsRuleModalOpen] = useState(false)
     const [newRule, setNewRule] = useState({ startTime: "18:00", endTime: "22:00", type: "fixed", value: "0" })
+    const [rulePage, setRulePage] = useState(1)
+    const isMobile = useMediaQuery("(max-width: 767px)")
+    const rulesPerPage = isMobile ? 4 : 6
+    const totalRulePages = Math.max(1, Math.ceil(rules.length / rulesPerPage))
+    const paginatedRules = useMemo(() => {
+        const start = (rulePage - 1) * rulesPerPage
+        return rules.slice(start, start + rulesPerPage)
+    }, [rules, rulesPerPage, rulePage])
 
     const handleBack = useCallback(() => onBack(), [onBack])
 
@@ -79,7 +87,6 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
     }, [])
 
     const isFree = planSlug === "free"
-    const isCrescer = planSlug === "crescer"
 
     async function reload() {
         setLoading(true)
@@ -95,25 +102,16 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
                 isDeliveryEnabled: Boolean(res.settings.isDeliveryEnabled),
                 isPickupEnabled: Boolean(res.settings.isPickupEnabled ?? true),
                 freeDeliveryThreshold: res.settings.freeDeliveryThreshold == null ? "" : String(res.settings.freeDeliveryThreshold),
-                pickupPaymentPolicy: "require_online_payment",
-            deliveryPayer: res.settings.deliveryPayer || "customer",
+                deliveryPayer: res.settings.deliveryPayer || "customer",
             })
             setChargeByDistance(Number(res.settings.extraKmPrice || 0) > 0 || res.settings.maxDeliveryKm != null)
             setRules(res.rules || [])
-            const pickupRes = await getPickupPaymentPolicyAction()
-            if (pickupRes.pickupPaymentPolicy) {
-                setSettings(s => ({ ...s, pickupPaymentPolicy: (pickupRes.pickupPaymentPolicy as "require_online_payment" | "allow_pickup_payment") }))
-            }
+            setRulePage(1)
         }
         setLoading(false)
     }
 
     useEffect(() => { void reload() }, [partnerId])
-
-    const upgradeHint = useMemo(
-        () => isCrescer ? "Desbloqueie cálculo por distância e horários com o plano Escalar" : null,
-        [isCrescer]
-    )
 
     if (loading) return <FadeIn className="p-6">Carregando configurações de entrega...</FadeIn>
 
@@ -173,12 +171,7 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
                                             },
                                         })
                                         if (res.success) {
-                                            const pickupRes = await updatePickupPaymentPolicyAction(settings.pickupPaymentPolicy)
-                                            if (!pickupRes.success) {
-                                                notifyError("Erro ao salvar", pickupRes.error || "Ocorreu um erro ao salvar política de pagamento na retirada.")
-                                            } else {
-                                                notifySuccess("Configurações salvas", "As configurações de entrega foram salvas com sucesso.")
-                                            }
+                                            notifySuccess("Configurações salvas", "As configurações de entrega foram salvas com sucesso.")
                                             await reload()
                                         } else {
                                             notifyError("Erro ao salvar", res.error || "Ocorreu um erro ao salvar as configurações.")
@@ -244,7 +237,7 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
                             {/* Distância */}
                             {settings.isDeliveryEnabled && (
                                 <div className="mt-8">
-                                    <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
+                                    <div className="border-t border-brand-border dark:border-dark-border w-full"></div>
                                     <Accordion
                                         title={
                                             <span className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mb-6 inline-flex items-center gap-2">
@@ -325,7 +318,7 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
                             {/* Regras por horário */}
                             {settings.isDeliveryEnabled && (
                                 <div className="mt-8">
-                                    <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
+                                    <div className="border-t border-brand-border dark:border-dark-border w-full"></div>
                                     <Accordion
                                         title={
                                             <span className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mb-6">
@@ -364,129 +357,183 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
                                                     subtitle="Adicione regras para alterar o valor da entrega em horários específicos."
                                                 />
                                             ) : (
-                                                <div className="w-full overflow-hidden bg-white dark:bg-dark-background">
-                                                    <div className="overflow-x-auto">
-                                                        <table className="w-full border-separate border-spacing-0">
-                                                            <thead>
-                                                                <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left rounded-l-lg">Início</th>
-                                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left">Fim</th>
-                                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left">Tipo</th>
-                                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left">Valor</th>
-                                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-center rounded-r-lg">Ações</th>
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody>
-                                                                {rules.map((rule) => {
-                                                                    const baseFeeNum = Number(settings.baseFee || 0);
-                                                                    const finalFee = rule.type === "fixed" ? (baseFeeNum + Number(rule.value || 0)) : (baseFeeNum * Number(rule.value || 0));
-                                                                    return (
-                                                                        <tr key={rule.id} className="group hover:bg-brand-gray/50 dark:hover:bg-dark-border/10 transition-colors bg-white dark:bg-dark-background">
-                                                                            <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-dark dark:text-dark-heading">{rule.startTime}</td>
-                                                                            <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-dark dark:text-dark-heading">{rule.endTime}</td>
-                                                                            <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-dark dark:text-dark-heading">
-                                                                                {rule.type === "fixed" ? "Acréscimo" : "Multiplicador"}
-                                                                            </td>
-                                                                            <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-bold text-brand-dark dark:text-dark-heading">
-                                                                                <div>{rule.type === "fixed" ? formatCurrency(rule.value) : `${rule.value}x`}</div>
-                                                                                <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5 font-normal">
-                                                                                    Taxa final = {formatCurrency(finalFee)}
-                                                                                </div>
-                                                                            </td>
-                                                                            <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-center">
-                                                                                <div className="flex justify-center" onClick={(e) => e.stopPropagation()}>
-                                                                                    <ActionsDropdown
-                                                                                        onEdit={() => {
-                                                                                            setEditingRule(rule)
-                                                                                            setNewRule({
-                                                                                                startTime: rule.startTime,
-                                                                                                endTime: rule.endTime,
-                                                                                                type: rule.type,
-                                                                                                value: String(rule.value),
-                                                                                            })
-                                                                                            setIsRuleModalOpen(true)
-                                                                                        }}
-                                                                                        onDelete={() => setRuleToDelete(rule)}
-                                                                                    />
-                                                                                </div>
-                                                                            </td>
-                                                                        </tr>
-                                                                    )
-                                                                })}
-                                                            </tbody>
-                                                        </table>
+                                                <>
+                                                    {/* Desktop Table */}
+                                                    <div className="hidden md:block w-full overflow-hidden bg-white dark:bg-dark-background">
+                                                        <div className="overflow-x-auto">
+                                                            <table className="w-full border-separate border-spacing-0">
+                                                                <thead>
+                                                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                                        <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left rounded-l-lg">Início</th>
+                                                                        <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left">Fim</th>
+                                                                        <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left">Tipo</th>
+                                                                        <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left">Valor</th>
+                                                                        <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-center rounded-r-lg">Ações</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody>
+                                                                    {paginatedRules.map((rule) => {
+                                                                        const baseFeeNum = Number(settings.baseFee || 0);
+                                                                        const finalFee = rule.type === "fixed" ? (baseFeeNum + Number(rule.value || 0)) : (baseFeeNum * Number(rule.value || 0));
+                                                                        return (
+                                                                            <tr key={rule.id} className="group hover:bg-brand-gray/50 dark:hover:bg-dark-border/10 transition-colors bg-white dark:bg-dark-background">
+                                                                                <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-dark dark:text-dark-heading">{rule.startTime}</td>
+                                                                                <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-dark dark:text-dark-heading">{rule.endTime}</td>
+                                                                                <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-dark dark:text-dark-heading">
+                                                                                    {rule.type === "fixed" ? "Acréscimo" : "Multiplicador"}
+                                                                                </td>
+                                                                                <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-bold text-brand-dark dark:text-dark-heading">
+                                                                                    <div>{rule.type === "fixed" ? formatCurrency(rule.value) : `${rule.value}x`}</div>
+                                                                                    <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5 font-normal">
+                                                                                        Taxa final = {formatCurrency(finalFee)}
+                                                                                    </div>
+                                                                                </td>
+                                                                                <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-center">
+                                                                                    <div className="flex justify-center" onClick={(e) => e.stopPropagation()}>
+                                                                                        <ActionsDropdown
+                                                                                            onEdit={() => {
+                                                                                                setEditingRule(rule)
+                                                                                                setNewRule({
+                                                                                                    startTime: rule.startTime,
+                                                                                                    endTime: rule.endTime,
+                                                                                                    type: rule.type,
+                                                                                                    value: String(rule.value),
+                                                                                                })
+                                                                                                setIsRuleModalOpen(true)
+                                                                                            }}
+                                                                                            onDelete={() => setRuleToDelete(rule)}
+                                                                                        />
+                                                                                    </div>
+                                                                                </td>
+                                                                            </tr>
+                                                                        )
+                                                                    })}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
                                                     </div>
-                                                </div>
+
+                                                    {/* Mobile Grid Cards */}
+                                                    <div className="md:hidden grid grid-cols-1 gap-4">
+                                                        {paginatedRules.map((rule) => {
+                                                            const baseFeeNum = Number(settings.baseFee || 0);
+                                                            const finalFee = rule.type === "fixed" ? (baseFeeNum + Number(rule.value || 0)) : (baseFeeNum * Number(rule.value || 0));
+                                                            return (
+                                                                <div key={rule.id} className="bg-white dark:bg-dark-surface rounded-xl border border-brand-border dark:border-dark-border p-4">
+                                                                    <div className="flex items-center justify-between mb-3">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <ClockIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
+                                                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{rule.startTime} - {rule.endTime}</span>
+                                                                        </div>
+                                                                        <ActionsDropdown
+                                                                            onEdit={() => {
+                                                                                setEditingRule(rule)
+                                                                                setNewRule({
+                                                                                    startTime: rule.startTime,
+                                                                                    endTime: rule.endTime,
+                                                                                    type: rule.type,
+                                                                                    value: String(rule.value),
+                                                                                })
+                                                                                setIsRuleModalOpen(true)
+                                                                            }}
+                                                                            onDelete={() => setRuleToDelete(rule)}
+                                                                        />
+                                                                    </div>
+                                                                    <div className="flex items-center justify-between">
+                                                                        <div className="flex flex-col">
+                                                                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Tipo</span>
+                                                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{rule.type === "fixed" ? "Acréscimo" : "Multiplicador"}</span>
+                                                                        </div>
+                                                                        <div className="flex flex-col text-right">
+                                                                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Valor</span>
+                                                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{rule.type === "fixed" ? formatCurrency(rule.value) : `${rule.value}x`}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="mt-2 pt-2 border-t border-brand-border dark:border-dark-border">
+                                                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body">Taxa final: <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(finalFee)}</span></span>
+                                                                    </div>
+                                                                </div>
+                                                            )
+                                                        })}
+                                                    </div>
+
+                                                    {totalRulePages > 1 && (
+                                                        <div className="mt-4">
+                                                            <Pagination
+                                                                currentPage={rulePage}
+                                                                totalPages={totalRulePages}
+                                                                onPageChange={setRulePage}
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </>
                                             )}
                                         </div>
                                     </Accordion>
                                 </div>
                             )}
+
+                            {/* Mobile/Tablet - Quem paga a entrega como FormSection */}
+                            <div className="lg:hidden">
+                                <FormSection title="Quem paga a entrega">
+                                    <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body -mt-4">Define se a taxa de entrega é repassada ao cliente ou absorvida pela loja</p>
+                                    <div className="flex gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setSettings(s => ({ ...s, deliveryPayer: "customer" }))}
+                                            className={`flex-1 px-3 py-2 text-sm font-bold rounded-lg border-2 transition-all ${settings.deliveryPayer === "customer"
+                                                ? "border-brand-dark dark:border-dark-heading bg-brand-dark/5 dark:bg-dark-border/30 text-brand-dark dark:text-dark-heading"
+                                                : "border-brand-border dark:border-dark-border text-brand-inactive-text dark:text-dark-body hover:border-brand-dark/30"
+                                                }`}
+                                        >
+                                            Cliente
+                                            <div className="text-[10px] font-normal opacity-70 mt-0.5">Repassa ao cliente</div>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setSettings(s => ({ ...s, deliveryPayer: "seller" }))}
+                                            className={`flex-1 px-3 py-2 text-sm font-bold rounded-lg border-2 transition-all ${settings.deliveryPayer === "seller"
+                                                ? "border-brand-dark dark:border-dark-heading bg-brand-dark/5 dark:bg-dark-border/30 text-brand-dark dark:text-dark-heading"
+                                                : "border-brand-border dark:border-dark-border text-brand-inactive-text dark:text-dark-body hover:border-brand-dark/30"
+                                                }`}
+                                        >
+                                            Vendedor
+                                            <div className="text-[10px] font-normal opacity-70 mt-0.5">Subsídio da loja</div>
+                                        </button>
+                                    </div>
+                                </FormSection>
+                            </div>
                         </div>
 
-                        {/* Sidebar Info (Optional) */}
-                        <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border space-y-6">
+                        {/* Sidebar - Desktop only */}
+                        <div className="hidden lg:block col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border space-y-6">
                             <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden">
                                 <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />
-                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4 mt-2">Dica Dudit</h3>
-                                <div className="space-y-4">
-                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                                        Configure corretamente o preço por KM extra para garantir que entregas mais distantes cubram seus custos de combustível e tempo.
-                                    </p>
-
-                                    {settings.isPickupEnabled && (
-                                        <>
-                                            <div className="border-t border-brand-border dark:border-dark-border" />
-                                            <div>
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <span className="font-bold text-md text-brand-dark dark:text-dark-heading">Pagamento na retirada</span>
-                                                        <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Cliente pode pagar ao retirar o pedido</span>
-                                                    </div>
-                                                    <Switch
-                                                        checked={isFree ? true : settings.pickupPaymentPolicy === "allow_pickup_payment"}
-                                                        onCheckedChange={(checked) => {
-                                                            if (isFree) return
-                                                            setSettings(s => ({ ...s, pickupPaymentPolicy: checked ? "allow_pickup_payment" : "require_online_payment" }))
-                                                        }}
-                                                        className={isFree ? "opacity-50 pointer-events-none" : ""}
-                                                    />
-                                                </div>
-                                            </div>
-                                        </>
-                                    )}
-
-                                    <div className="border-t border-brand-border dark:border-dark-border" />
-                                    <div>
-                                        <div className="flex flex-col gap-2">
-                                            <span className="font-bold text-md text-brand-dark dark:text-dark-heading">Quem paga a entrega</span>
-                                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Define se a taxa de entrega é repassada ao cliente ou absorvida pela loja</span>
-                                            <div className="flex gap-2 mt-1">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setSettings(s => ({ ...s, deliveryPayer: "customer" }))}
-                                                    className={`flex-1 px-3 py-2 text-sm font-bold rounded-lg border-2 transition-all ${settings.deliveryPayer === "customer"
-                                                        ? "border-brand-dark dark:border-dark-heading bg-brand-dark/5 dark:bg-dark-border/30 text-brand-dark dark:text-dark-heading"
-                                                        : "border-brand-border dark:border-dark-border text-brand-inactive-text dark:text-dark-body hover:border-brand-dark/30"
-                                                        }`}
-                                                >
-                                                    Cliente
-                                                    <div className="text-[10px] font-normal opacity-70 mt-0.5">Repassa ao cliente</div>
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setSettings(s => ({ ...s, deliveryPayer: "seller" }))}
-                                                    className={`flex-1 px-3 py-2 text-sm font-bold rounded-lg border-2 transition-all ${settings.deliveryPayer === "seller"
-                                                        ? "border-brand-dark dark:border-dark-heading bg-brand-dark/5 dark:bg-dark-border/30 text-brand-dark dark:text-dark-heading"
-                                                        : "border-brand-border dark:border-dark-border text-brand-inactive-text dark:text-dark-body hover:border-brand-dark/30"
-                                                        }`}
-                                                >
-                                                    Vendedor
-                                                    <div className="text-[10px] font-normal opacity-70 mt-0.5">Subsídio da loja</div>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
+                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4 mt-2">Quem paga a entrega</h3>
+                                <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed mb-4">Define se a taxa de entrega é repassada ao cliente ou absorvida pela loja</p>
+                                <div className="flex gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setSettings(s => ({ ...s, deliveryPayer: "customer" }))}
+                                        className={`flex-1 px-3 py-2 text-sm font-bold rounded-lg border-2 transition-all ${settings.deliveryPayer === "customer"
+                                            ? "border-brand-dark dark:border-dark-heading bg-brand-dark/5 dark:bg-dark-border/30 text-brand-dark dark:text-dark-heading"
+                                            : "border-brand-border dark:border-dark-border text-brand-inactive-text dark:text-dark-body hover:border-brand-dark/30"
+                                            }`}
+                                    >
+                                        Cliente
+                                        <div className="text-[10px] font-normal opacity-70 mt-0.5">Repassa ao cliente</div>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setSettings(s => ({ ...s, deliveryPayer: "seller" }))}
+                                        className={`flex-1 px-3 py-2 text-sm font-bold rounded-lg border-2 transition-all ${settings.deliveryPayer === "seller"
+                                            ? "border-brand-dark dark:border-dark-heading bg-brand-dark/5 dark:bg-dark-border/30 text-brand-dark dark:text-dark-heading"
+                                            : "border-brand-border dark:border-dark-border text-brand-inactive-text dark:text-dark-body hover:border-brand-dark/30"
+                                            }`}
+                                    >
+                                        Vendedor
+                                        <div className="text-[10px] font-normal opacity-70 mt-0.5">Subsídio da loja</div>
+                                    </button>
                                 </div>
                             </div>
                         </div>

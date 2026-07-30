@@ -124,6 +124,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
     const partnerName = selectedStore?.name || 'Sua Loja';
     const [partnerImage, setPartnerImage] = useState(selectedStore?.image_url || '');
     const [partnerAddress, setPartnerAddress] = useState('Endereço não informado');
+    const [partnerPhone, setPartnerPhone] = useState('');
 
     useEffect(() => {
         if (selectedStore?.image_url) setPartnerImage(selectedStore.image_url);
@@ -160,6 +161,12 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
             const res = await getPartnerAddressAction(partnerId);
             if (res.success && res.data?.formatted) {
                 setPartnerAddress(res.data.formatted);
+            }
+            // Fetch phone separately
+            const supabase = (await import("@/lib/supabase/browser-client")).supabaseBrowser;
+            const { data: store } = await supabase.from("stores").select("phone").eq("partner_id", partnerId).limit(1).maybeSingle();
+            if (store?.phone) {
+                setPartnerPhone(store.phone);
             }
         };
         fetchAddress();
@@ -832,6 +839,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                             quoteSubtitle={previewMeta.quoteSubtitle}
                                             partnerName={partnerName}
                                             partnerAddress={partnerAddress}
+                                            partnerPhone={partnerPhone}
                                             partnerAvatar={partnerAvatar}
                                             showDecoration={previewMeta.showDecoration}
                                             salespersonName={quote.user_profiles?.full_name || undefined}

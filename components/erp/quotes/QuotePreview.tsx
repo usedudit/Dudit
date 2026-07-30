@@ -24,6 +24,7 @@ interface QuotePreviewProps {
     quoteSubtitle?: string;
     partnerName?: string;
     partnerAddress?: string;
+    partnerPhone?: string;
     partnerAvatar?: string;
     printMode?: boolean;
     showDecoration?: boolean;
@@ -49,6 +50,7 @@ const QuotePreview = ({
     quoteSubtitle,
     partnerName = 'Parceiro',
     partnerAddress = 'Endereço não cadastrado',
+    partnerPhone,
     partnerAvatar,
     printMode = false,
     showDecoration = true,
@@ -62,6 +64,14 @@ const QuotePreview = ({
             secondary: secondaryColor
         };
     }, [primaryColor, secondaryColor]);
+
+    const partnerAddressFormatted = useMemo(() => {
+        if (!partnerAddress) return "";
+        // Parse the existing partner address (format: "Street, Number\nNeighborhood - City/State\nCEP: xxx")
+        // and reformat to: "Street, Number\nNeighborhood - City/State" (no CEP)
+        const lines = partnerAddress.split('\n').filter(line => line.trim() && !line.trim().startsWith('CEP:'));
+        return lines.slice(0, 2).join('\n');
+    }, [partnerAddress]);
 
     const customerAddressText = useMemo(() => {
         if (!selectedCustomer) return null;
@@ -87,10 +97,7 @@ const QuotePreview = ({
             const stateStr = addr.state || addr.uf || "";
             const line2 = `${neighStr ? `${neighStr} - ` : ""}${cityStr}${stateStr ? `/${stateStr}` : ""}`.trim();
 
-            const zipStr = addr.zip_code || addr.zipCode || "";
-            const line3 = zipStr ? `CEP: ${zipStr}` : "";
-
-            return [line1, line2, line3].filter(Boolean).join("\n");
+            return [line1, line2].filter(Boolean).join("\n");
         };
 
         const addresses = selectedCustomer.addresses;
@@ -251,7 +258,8 @@ const QuotePreview = ({
                                                     <h3 className="font-bold text-sm text-brand-dark mb-3">Dados da empresa</h3>
                                                     <div className="text-xs text-gray-600 space-y-1">
                                                         <p className="font-bold text-brand-dark">{partnerName}</p>
-                                                        <p className="whitespace-pre-wrap">{partnerAddress}</p>
+                                                        {partnerPhone && <p>{partnerPhone}</p>}
+                                                        <p className="whitespace-pre-wrap">{partnerAddressFormatted}</p>
                                                     </div>
                                                 </div>
                                                 <div>
@@ -277,10 +285,10 @@ const QuotePreview = ({
                                     <table className="w-full text-left border-separate border-spacing-0">
                                         <thead>
                                             <tr className="bg-brand-gray/40">
-                                                <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 tracking-wider rounded-tl-xl border-b border-gray-100">Item</th>
-                                                <th className="py-2.5 px-4 text-[11px] font-bold text-gray-400 tracking-wider text-center w-24 border-b border-gray-100">Qtd</th>
-                                                <th className="py-2.5 px-4 text-[11px] font-bold text-gray-400 tracking-wider text-right w-28 border-b border-gray-100">Preço</th>
-                                                <th className="py-2.5 pl-4 pr-6 text-[11px] font-bold text-gray-400 tracking-wider text-right w-32 rounded-tr-xl border-b border-gray-100">Total</th>
+                                                <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tl-xl border-b border-gray-100">Item</th>
+                                                <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tl-xl border-b border-gray-100">Qtd</th>
+                                                <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tl-xl border-b border-gray-100">Preço</th>
+                                                <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tl-xl border-b border-gray-100">Total</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -315,7 +323,7 @@ const QuotePreview = ({
                                 {page.hasTotals && (
                                     <div className="mt-8">
                                         <div className="px-8 pb-6 flex justify-start">
-                                            <div className="w-full bg-[#f8f9fa] p-6 rounded-lg text-black">
+                                            <div className="w-full bg-brand-gray/40 p-6 rounded-lg text-black">
                                                 <div className="flex justify-between items-center text-xs mb-2">
                                                     <span className="text-gray-500 font-medium">Subtotal</span>
                                                     <span className="font-bold">{formatCurrency(subtotal)}</span>

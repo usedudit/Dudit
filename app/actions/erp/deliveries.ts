@@ -47,6 +47,7 @@ function revalidateDeliveryDashboard(partnerId: string) {
   // @ts-ignore
   revalidateTag(DASHBOARD_TAGS.operations(partnerId), "max")
   revalidatePath("/erp/dashboard")
+  revalidatePath("/erp/inicio")
 }
 
 type SmartDeliverySuggestionOrder = {

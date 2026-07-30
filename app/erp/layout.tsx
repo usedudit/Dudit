@@ -31,6 +31,7 @@ import {
 import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { normalizeToRoutePermissions } from "@/lib/permissions/route-permissions"
 import { OfflineBanner } from "@/components/pwa/OfflineBanner"
+import { LimitStatusWidget } from "@/components/erp/LimitStatusWidget"
 import type { PartnerRole, PartnerRoutePermissions } from "@/lib/permissions/types"
 import type { RoleId } from "@/lib/permissions/rbac-types"
 
@@ -127,6 +128,7 @@ export default async function ERPLayout({
                       {children}
                     </div>
                   </div>
+                  <LimitStatusWidget />
                 </SidebarProvider>
               </StoreProvider>
             </PlanUpgradeProvider>

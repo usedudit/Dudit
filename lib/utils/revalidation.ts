@@ -203,6 +203,7 @@ export async function revalidateTransactions(partnerId: string) {
     }
     await safeRevalidateTag("transactions")
     revalidatePath("/erp/dashboard")
+    revalidatePath("/erp/inicio")
     revalidatePath("/erp/transactions")
     revalidatePath("/erp/contas-a-pagar")
     revalidatePath("/erp/contas-a-receber")

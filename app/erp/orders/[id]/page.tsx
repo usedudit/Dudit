@@ -49,7 +49,7 @@ function AuthContent() {
   // Handle direct redirection for verified partners
   useEffect(() => {
     if (verifiedParam === "true" && rawModeParam === "partner") {
-      router.push("/erp/dashboard")
+      router.push("/erp/inicio")
     }
   }, [verifiedParam, rawModeParam, router])
 

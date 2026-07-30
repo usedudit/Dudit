@@ -239,6 +239,8 @@ export interface FetchedRecurringPlanItem {
 
 export interface FetchedPartner {
     id: string
+    user_id: string
+    business_info: any
     store_name: string
     store_description: string | null
     store_image_url: string | null

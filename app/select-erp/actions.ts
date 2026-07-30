@@ -36,5 +36,5 @@ export async function selectErpAction(formData: FormData): Promise<void> {
         }
     }
     
-    redirect("/erp/dashboard")
+    redirect("/erp/inicio")
 }

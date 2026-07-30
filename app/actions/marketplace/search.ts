@@ -44,7 +44,7 @@ function normalizePlan(item: any) {
     const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
     const rawStore = Array.isArray(item.stores) ? item.stores[0] : item.stores
     const storeAddr = rawStore?.addresses?.[0] || rawPartner?.addresses?.[0]
-    const storeImage = rawStore?.logo_url || rawStore?.image_url
+    const storeImage = rawStore?.logo_url
     const partner = rawPartner ? {
         ...rawPartner,
         store_name: rawStore?.name,
@@ -629,7 +629,7 @@ async function _searchMarketplaceInternal(
 
                 const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
                 const rawStore = Array.isArray(item.stores) ? item.stores[0] : item.stores
-                const storeImage = rawStore?.logo_url || rawStore?.image_url
+                const storeImage = rawStore?.logo_url
                 const partner = rawPartner ? {
                     ...rawPartner,
                     store_name: rawStore?.name,
@@ -837,7 +837,7 @@ async function hydrateMarketplaceSearchHits(
         const rawStore = Array.isArray(item.stores) ? item.stores[0] : item.stores
         const storeId = rawStore?.id || rawPartner?.id
         const storeName = rawStore?.name || "Vendedor"
-        const storeImage = rawStore?.logo_url || rawStore?.image_url
+        const storeImage = rawStore?.logo_url
         const storeAddr = rawStore?.addresses?.[0]
         const storeCity = storeAddr?.city || null
         const storeState = storeAddr?.state || null
@@ -1228,7 +1228,7 @@ async function searchMarketplaceByCity(
         const rawStore = Array.isArray(item.stores) ? item.stores[0] : item.stores
         const storeId = rawStore?.id || rawPartner?.id
         const storeName = rawStore?.name || "Vendedor"
-        const storeImage = rawStore?.logo_url || rawStore?.image_url
+        const storeImage = rawStore?.logo_url
         const storeAddr = rawStore?.addresses?.[0]
         const storeCity = storeAddr?.city || null
         const storeState = storeAddr?.state || null
@@ -1263,7 +1263,7 @@ async function searchMarketplaceByCity(
         const rawStore = Array.isArray(item.stores) ? item.stores[0] : item.stores
         const storeId = rawStore?.id || rawPartner?.id
         const storeName = rawStore?.name || "Vendedor"
-        const storeImage = rawStore?.logo_url || rawStore?.image_url
+        const storeImage = rawStore?.logo_url
         const storeAddr = rawStore?.addresses?.[0]
         const storeCity = storeAddr?.city || null
         const storeState = storeAddr?.state || null

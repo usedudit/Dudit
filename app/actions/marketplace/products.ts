@@ -105,7 +105,7 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
       p.store_name = store.name
       p.slug = store.slug || p.slug || null
       p.store_description = store.description || p.store_description
-      p.store_image_url = store.logo_url || store.image_url || p.store_image_url
+      p.store_image_url = store.logo_url || p.store_image_url
       p.banner_url = store.banner_url || p.banner_url
       p.phone = store.phone || p.phone
       p.city = store.addresses?.[0]?.city || store.city || p.addresses?.[0]?.city || null

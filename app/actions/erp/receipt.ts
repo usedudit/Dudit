@@ -44,17 +44,14 @@ const getCachedPartnerReceiptHeader = (partnerId: string) => unstable_cache(
         if (!partner) throw new Error("Parceiro não encontrado")
 
         const addr = address || {}
-        const addressParts = [
-            [addr.street, addr.number].filter(Boolean).join(" "),
-            addr.neighborhood,
-            [addr.city, addr.state].filter(Boolean).join("/"),
-            addr.zip_code ? `CEP: ${addr.zip_code}` : null,
-        ].filter(Boolean)
+        const streetNumber = [addr.street, addr.number].filter(Boolean).join(", ")
+        const neighborhoodCityState = [addr.neighborhood, [addr.city, addr.state].filter(Boolean).join("/")].filter(Boolean).join(" - ")
+        const addressLine = [streetNumber, neighborhoodCityState].filter(Boolean).join("\n")
 
         const header: SaleReceiptPartnerHeader = {
             fantasyName: store?.name || "Estabelecimento",
             legalName: store?.description || store?.name || "Estabelecimento",
-            addressLine: addressParts.join(", ") || "Endereço não informado",
+            addressLine: addressLine || "Endereço não informado",
             taxIdLine: buildPartnerTaxIdLine({
                 cnpj: store?.cnpj,
                 stateRegistration: store?.inscricao_estadual,

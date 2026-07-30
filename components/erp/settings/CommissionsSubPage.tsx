@@ -105,6 +105,10 @@ export function CommissionsSubPage({ partnerId, onBack, planGate }: { partnerId:
         })
     }, [rows])
 
+    const hasOnlyOwner = useMemo(() => {
+        return rows.length > 0 && rows.every((r) => r.roleLabel === "Owner")
+    }, [rows])
+
     if (planGate) {
         return (
             <FadeIn>
@@ -204,7 +208,7 @@ export function CommissionsSubPage({ partnerId, onBack, planGate }: { partnerId:
                             <div className="flex justify-center p-12">
                                 <ThreeDotsLoader />
                             </div>
-                        ) : sortedRows.length === 0 ? (
+                        ) : sortedRows.length === 0 && !hasOnlyOwner ? (
                             <div className="flex flex-col items-center justify-center text-center min-h-[300px]">
                                 <IconPlaceholder
                                     placeholderType="image"
@@ -212,6 +216,16 @@ export function CommissionsSubPage({ partnerId, onBack, planGate }: { partnerId:
                                     imageAlt="Sem membros"
                                     title="Nenhuma configuração de comissão"
                                     subtitle="Adicione membros à sua equipe para configurar suas comissões."
+                                />
+                            </div>
+                        ) : hasOnlyOwner ? (
+                            <div className="flex flex-col items-center justify-center text-center min-h-[300px]">
+                                <IconPlaceholder
+                                    placeholderType="image"
+                                    imageSrc="https://img.dudit.com.br/static/mascots/Equipe.png"
+                                    imageAlt="Equipe"
+                                    title="Sua equipe"
+                                    subtitle="Você ainda não adicionou ninguém à sua equipe. Adicione membros para configurar comissões."
                                 />
                             </div>
                         ) : (

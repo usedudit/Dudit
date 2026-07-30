@@ -191,7 +191,7 @@ Não existe uma tela para ver "Usuários da Loja A" e adicionar/remover acessos.
 
 `ShowcaseSubPage.tsx` chama `updatePartnerAction()` que atualiza a tabela `partners`. Os campos como `store_image_url`, `banner_url`, `gallery`, `order_flow` estão na tabela `partners`.
 
-A `stores` table já tem: `image_url`, `banner_url`, `gallery`, `logo_url`, `whatsapp_phone`.
+A `stores` table já tem: `logo_url`, `banner_url`, `gallery`, `whatsapp_phone`.
 
 **Correção:** Migrar vitrine para per-store, salvando em `stores` ao invés de `partners`.
 

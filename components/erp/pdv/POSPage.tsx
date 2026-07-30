@@ -1684,6 +1684,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                                     isEmpty={cart.length === 0}
                                     appliedGiftProductIds={pricingResult.appliedGiftProductIds}
                                     onShowGifts={() => setIsGiftModalOpen(true)}
+                                    deliveryBreakdown={deliveryBreakdown}
                                     emptyState={
                                         <IconPlaceholder
                                             placeholderType="image"
@@ -1772,6 +1773,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                                 onOpenCreateProduct={() => setIsQuickProductSheetOpen(true)}
                                 onOpenNotes={handleOpenNotesSheet}
                                 showActionsMenu={cart.length > 0}
+                                deliveryBreakdown={deliveryBreakdown}
                             />
                         </div>
                     </BottomSheet>
@@ -1877,6 +1879,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                                 discountAmount={discountVal}
                                 headerSubtitle={PAYMENT_MODAL_HEADER_SUBTITLE}
                                 onConfirm={handleConfirmPayment}
+                                deliveryBreakdown={deliveryBreakdown}
                             />
                         )}
                     </AnimatePresence>

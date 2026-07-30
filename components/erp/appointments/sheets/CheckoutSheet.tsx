@@ -6,8 +6,9 @@ import { Button, Badge, Dropdown, DropdownItem } from '../../../reusable';
 import { NumpadModal, PaymentOptionCard } from '../Shared';
 import { ServiceItemCard } from '../ServiceItemCard';
 import { calculateOrderPricing } from "@/lib/services/pricing-engine"
+import { confirmAppointmentOrderPaymentAction } from "@/app/actions/erp/orders"
 
-const CheckoutSheet = ({ onClose, onComplete, initialData, onPaymentSuccess }: { onClose: () => void, onComplete: () => void, initialData: any, onPaymentSuccess?: () => void }) => {
+const CheckoutSheet = ({ onClose, onComplete, initialData, onPaymentSuccess, partnerId }: { onClose: () => void, onComplete: () => void, initialData: any, onPaymentSuccess?: () => void, partnerId?: string }) => {
     const [step, setStep] = useState<'summary' | 'processing' | 'receipt'>('summary');
     const [payments, setPayments] = useState<{ id: number, method: string, amount: number }[]>([
         { id: 1, method: 'Cartão de Crédito', amount: 0 }
@@ -81,14 +82,35 @@ const CheckoutSheet = ({ onClose, onComplete, initialData, onPaymentSuccess }: {
         setIsOthersInputOpen(false);
     }
 
-    const handlePay = () => {
+    const handlePay = async () => {
         setStep('processing');
-        setTimeout(() => {
+        try {
+            const orderId = initialData?.marketplaceOrderId || initialData?.saleId || initialData?.id;
+            const pId = partnerId || initialData?.partnerId;
+            if (orderId && pId) {
+                const isFull = isFullyPaid || totalPaid >= total - 0.01;
+                await confirmAppointmentOrderPaymentAction({
+                    orderId: orderId,
+                    partnerId: pId,
+                    paymentStatus: isFull ? 'paid' : 'partially_paid',
+                    paidAmount: totalPaid,
+                    paymentMethod: payments.map(p => p.method).join(', ') || 'Dinheiro',
+                    paymentBreakdown: payments.map(p => ({
+                        method: p.method,
+                        amount: p.amount,
+                    })),
+                    servicePrice: total,
+                    serviceName: services.map((s: any) => s.name).join(', '),
+                });
+            }
+        } catch (err) {
+            console.error("[CheckoutSheet] handlePay error:", err);
+        } finally {
             setStep('receipt');
             if (onPaymentSuccess) {
                 onPaymentSuccess();
             }
-        }, 2000);
+        }
     };
 
     const TicketIcon = () => <div className="border border-brand-dark rounded w-4 h-4 flex items-center justify-center text-[10px] font-bold">%</div>;

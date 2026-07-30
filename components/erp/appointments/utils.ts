@@ -284,7 +284,7 @@ export const getGridHoursRange = (currentDate: Date, openingHours: any) => {
             const toMin = parseInt(dConfig.to.split(':')[1], 10);
             if (!isNaN(fromHour) && !isNaN(toHour)) {
                 startHour = fromHour;
-                endHour = toMin > 0 ? toHour : toHour - 1;
+                endHour = toHour;
             }
         } else {
             // Fallback: union of all enabled days
@@ -296,11 +296,9 @@ export const getGridHoursRange = (currentDate: Date, openingHours: any) => {
                 if (cfg && cfg.enabled && cfg.from && cfg.to) {
                     const fHour = parseInt(cfg.from.split(':')[0], 10);
                     const tHour = parseInt(cfg.to.split(':')[0], 10);
-                    const tMin = parseInt(cfg.to.split(':')[1], 10);
                     if (!isNaN(fHour) && !isNaN(tHour)) {
                         if (fHour < minHour) minHour = fHour;
-                        const dayEnd = tMin > 0 ? tHour : tHour - 1;
-                        if (dayEnd > maxHour) maxHour = dayEnd;
+                        if (tHour > maxHour) maxHour = tHour;
                         hasOpenDays = true;
                     }
                 }

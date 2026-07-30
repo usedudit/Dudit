@@ -473,7 +473,7 @@ const productIds = Array.from(
         payment_method_fixed_fee_amount: paymentMethodFixedFeeAmount,
         payment_method_extra_amount: paymentMethodExtraAmount,
         coupon_id: draft?.coupon_id || null,
-        delivery_fee: (deliveryBreakdown?.deliveryPayer === "seller" || deliveryPayer === "seller") ? 0 : shippingFee,
+        delivery_fee: Number(deliveryBreakdown?.originalFee || shippingFee || 0),
         distance_km: distanceKm,
         delivery_breakdown: deliveryBreakdown,
         additional_costs: otherCosts,

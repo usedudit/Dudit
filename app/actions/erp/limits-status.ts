@@ -1,0 +1,89 @@
+"use server"
+
+import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
+import { getUsageCounters, getLimit, getPartnerPlan } from "@/lib/services/subscription.service"
+import { getNextPlanTarget } from "@/lib/subscription/limit-upgrade"
+import { getHardcodedPlan } from "@/lib/subscription/feature-labels"
+
+export interface LimitStatusItem {
+  key: string
+  label: string
+  current: number
+  limit: number | "unlimited"
+  percentage: number
+  isMonthly: boolean
+}
+
+export interface LimitStatusData {
+  items: LimitStatusItem[]
+  planSlug: string
+  planName: string
+  nextPlanSlug: string | null
+  nextPlanName: string | null
+}
+
+interface LimitConfig {
+  key: string
+  label: string
+  limitName: string
+  counterField: string
+  isMonthly: boolean
+}
+
+const LIMITS_CONFIG: LimitConfig[] = [
+  { key: "items", label: "Produtos", limitName: "items", counterField: "products_count", isMonthly: false },
+  { key: "monthly_orders", label: "Pedidos/mês", limitName: "monthly_orders", counterField: "orders_month_count", isMonthly: true },
+  { key: "monthly_appointments", label: "Agendamentos/mês", limitName: "monthly_appointments", counterField: "appointments_month_count", isMonthly: true },
+  { key: "monthly_quotes", label: "Orçamentos/mês", limitName: "monthly_quotes", counterField: "quotes_month_count", isMonthly: true },
+  { key: "monthly_service_orders", label: "Ordens de serviço/mês", limitName: "monthly_service_orders", counterField: "service_orders_month_count", isMonthly: true },
+  { key: "users", label: "Usuários", limitName: "users", counterField: "users_count", isMonthly: false },
+]
+
+export async function getLimitStatusAction(): Promise<LimitStatusData | null> {
+  try {
+    const context = await getCurrentPartnerContext()
+    if (!context?.partnerId) return null
+
+    const [counters, plan] = await Promise.all([
+      getUsageCounters(context.partnerId),
+      getPartnerPlan(context.partnerId),
+    ])
+
+    if (!counters) return null
+
+    const items: LimitStatusItem[] = []
+
+    for (const cfg of LIMITS_CONFIG) {
+      const limit = await getLimit(context.partnerId, cfg.limitName)
+      const current = (counters as any)[cfg.counterField] ?? 0
+
+      let percentage = 0
+      if (limit !== "unlimited" && limit > 0) {
+        percentage = Math.min(Math.round((current / limit) * 100), 100)
+      }
+
+      items.push({
+        key: cfg.key,
+        label: cfg.label,
+        current,
+        limit,
+        percentage,
+        isMonthly: cfg.isMonthly,
+      })
+    }
+
+    const nextSlug = getNextPlanTarget(plan.slug)
+    const nextName = nextSlug ? getHardcodedPlan(nextSlug).name : null
+
+    return {
+      items,
+      planSlug: plan.slug,
+      planName: getHardcodedPlan(plan.slug).name,
+      nextPlanSlug: nextSlug,
+      nextPlanName: nextName,
+    }
+  } catch (err) {
+    console.error("[LIMITS_STATUS] Error:", err)
+    return null
+  }
+}

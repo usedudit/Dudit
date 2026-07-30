@@ -138,7 +138,7 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
             await supabase.auth.signInWithOAuth({
                 provider: "google",
                 options: {
-                    redirectTo: `https://dudit.com.br/auth/callback?next=/erp/dashboard`,
+                    redirectTo: `https://dudit.com.br/auth/callback?next=/erp/inicio`,
                     queryParams: { access_type: "offline", prompt: "consent" },
                 },
             })
@@ -229,7 +229,7 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
             if (!isUserLoggedIn) {
                 const { data: signUp, error: signErr } = await supabase.auth.signUp({
                     email, password,
-                    options: { data: { full_name: generateNameFromEmail(email) }, emailRedirectTo: `${window.location.origin}/auth/callback?next=/erp/dashboard` },
+                    options: { data: { full_name: generateNameFromEmail(email) }, emailRedirectTo: `${window.location.origin}/auth/callback?next=/erp/inicio` },
                 })
                 if (signErr) throw signErr
                 if (signUp.user?.identities?.length === 0) throw new Error("Este email já está cadastrado.")
@@ -258,7 +258,7 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
             })
 
             if (!res.success) throw new Error(res.error)
-            router.push(isUserLoggedIn ? "/erp/dashboard" : `/auth/login?mode=verify-email&email=${encodeURIComponent(email)}`)
+            router.push(isUserLoggedIn ? "/erp/inicio" : `/auth/login?mode=verify-email&email=${encodeURIComponent(email)}`)
         } catch (e: any) {
             setError(e.message)
         } finally {

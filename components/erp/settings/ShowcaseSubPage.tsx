@@ -21,7 +21,7 @@ import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { getRandomDefaultBanner } from "@/lib/utils/banner"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { MessageCircle, Laptop, Lock } from "lucide-react"
+import { MessageCircle, Laptop } from "lucide-react"
 
 export const ShowcaseSubPage = ({
     store,
@@ -48,7 +48,7 @@ export const ShowcaseSubPage = ({
         bannerUrl: store.banner_url || "",
         isShowcaseActive: store.is_showcase_active ?? true,
         gallery: store.gallery || [],
-        orderFlow: planSlug === "free" ? "whatsapp" : (store.order_flow || "dudit"),
+        orderFlow: store.order_flow || "dudit",
     })
 
     const [initialState, setInitialState] = useState(() => ({
@@ -351,62 +351,34 @@ export const ShowcaseSubPage = ({
                                         <ListItem
                                             title="Gerenciar tudo na Dudit"
                                             description="Os clientes finalizam a compra pelo checkout da Dudit e você gerencia os pedidos e pagamentos pelo painel."
-                                            icon={<Laptop className={planSlug === "free" ? "text-brand-inactive-text" : "text-brand-green"} size={20} />}
-                                            onClick={() => {
-                                                if (planSlug !== "free") {
-                                                    setGeneralInfo({ ...generalInfo, orderFlow: "dudit" })
-                                                }
-                                            }}
+                                            icon={<Laptop className="text-brand-green" size={20} />}
+                                            onClick={() => setGeneralInfo({ ...generalInfo, orderFlow: "dudit" })}
                                             right={
-                                                planSlug === "free" ? (
-                                                    <Lock className="text-brand-inactive-text" size={16} />
-                                                ) : (
-                                                    <RadioButton
-                                                        name="orderFlow"
-                                                        value="dudit"
-                                                        checked={generalInfo.orderFlow === "dudit"}
-                                                        onChange={() => setGeneralInfo({ ...generalInfo, orderFlow: "dudit" })}
-                                                    />
-                                                )
+                                                <RadioButton
+                                                    name="orderFlow"
+                                                    value="dudit"
+                                                    checked={generalInfo.orderFlow === "dudit"}
+                                                    onChange={() => setGeneralInfo({ ...generalInfo, orderFlow: "dudit" })}
+                                                />
                                             }
-                                            className={`py-4 px-6 gap-4 ${planSlug === "free" ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}`}
+                                            className="py-4 px-6 gap-4 cursor-pointer"
                                         />
                                         <ListItem
                                             title="Receber apenas pelo WhatsApp"
                                             description="Ao finalizar o pedido, o cliente é redirecionado para o seu WhatsApp com a mensagem do pedido já estruturada."
                                             icon={<WhatsappIcon className="text-brand-green" size={20} />}
-                                            onClick={() => {
-                                                if (planSlug !== "free") {
-                                                    setGeneralInfo({ ...generalInfo, orderFlow: "whatsapp" })
-                                                }
-                                            }}
+                                            onClick={() => setGeneralInfo({ ...generalInfo, orderFlow: "whatsapp" })}
                                             right={
-                                                planSlug === "free" ? (
-                                                    <RadioButton
-                                                        name="orderFlow"
-                                                        value="whatsapp"
-                                                        checked={true}
-                                                        onChange={() => { }}
-                                                    />
-                                                ) : (
-                                                    <RadioButton
-                                                        name="orderFlow"
-                                                        value="whatsapp"
-                                                        checked={generalInfo.orderFlow === "whatsapp"}
-                                                        onChange={() => setGeneralInfo({ ...generalInfo, orderFlow: "whatsapp" })}
-                                                    />
-                                                )
+                                                <RadioButton
+                                                    name="orderFlow"
+                                                    value="whatsapp"
+                                                    checked={generalInfo.orderFlow === "whatsapp"}
+                                                    onChange={() => setGeneralInfo({ ...generalInfo, orderFlow: "whatsapp" })}
+                                                />
                                             }
-                                            className={`py-4 px-6 gap-4 ${planSlug === "free" ? "bg-brand-gray/30 dark:bg-dark-border/20 cursor-default" : "cursor-pointer"}`}
+                                            className="py-4 px-6 gap-4 cursor-pointer"
                                         />
                                     </div>
-                                    {planSlug === "free" && (
-                                        <div className="mt-3 p-3 bg-brand-gray/40 dark:bg-dark-border/30 rounded-xl flex items-center gap-2 border border-brand-border dark:border-dark-border">
-                                            <span className="text-[13px] text-brand-inactive-text dark:text-dark-body font-medium">
-                                                🔒 O checkout via Dudit está disponível nos planos <strong>Crescer</strong> e <strong>Escalar</strong>. No plano gratuito, os pedidos são recebidos apenas via WhatsApp.
-                                            </span>
-                                        </div>
-                                    )}
                                 </FormSection>
 
                                 {/* Banner da Vitrine */}

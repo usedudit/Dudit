@@ -71,6 +71,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     // Partner info for preview
     const partnerName = selectedStore?.name || 'Sua Loja';
     const [partnerAddress, setPartnerAddress] = useState('Endereço não informado');
+    const [partnerPhone, setPartnerPhone] = useState('');
     const [partnerImage, setPartnerImage] = useState(selectedStore?.image_url || '');
     const [isScrolled, setIsScrolled] = useState(false);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -98,7 +99,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
 
     const partnerAvatar = partnerImage ? getR2ImageUrl(partnerImage) : '';
 
-    // Fetch Partner Address
+    // Fetch Partner Address and Phone
     useEffect(() => {
         const fetchAddress = async () => {
             if (!partnerId) return;
@@ -106,6 +107,10 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
             if (res.success && res.data?.formatted) {
                 setPartnerAddress(res.data.formatted);
             }
+            // Also fetch phone from store
+            const supabase = (await import("@/lib/supabase/browser-client")).supabaseBrowser;
+            const { data: store } = await supabase.from("stores").select("phone").eq("partner_id", partnerId).limit(1).maybeSingle();
+            if (store?.phone) setPartnerPhone(store.phone);
         };
         fetchAddress();
     }, [partnerId]);
@@ -1222,6 +1227,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                                             quoteSubtitle={quoteSubtitle}
                                             partnerName={partnerName}
                                             partnerAddress={partnerAddress}
+                                            partnerPhone={partnerPhone}
                                             partnerAvatar={partnerAvatar}
                                             showDecoration={showDecoration}
                                             salespersonName={salespeople.find(s => s.id === salespersonId)?.name}

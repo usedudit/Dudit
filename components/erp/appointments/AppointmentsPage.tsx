@@ -494,6 +494,7 @@ const AppointmentsPage = ({
                     pricingUnit: payload.pricingUnit || selectedAppointment.pricingUnit,
                     notes: payload.notes ?? selectedAppointment.notes,
                     status: payload.status || selectedAppointment.status,
+                    services: payload.services,
                     storeId: storeId,
                 });
 
@@ -993,6 +994,7 @@ const AppointmentsPage = ({
                                 onClose={() => setIsCheckoutOpen(false)}
                                 onComplete={() => handleCloseCheckout(true)}
                                 initialData={draftData}
+                                partnerId={partnerId}
                             />
                         )}
                     </AnimatePresence>

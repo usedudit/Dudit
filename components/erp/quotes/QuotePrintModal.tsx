@@ -53,7 +53,7 @@ export default function QuotePrintModal({ isOpen, onClose, quoteId, partnerId }:
 
             const [quoteDetailsRes, storeRes, addressRes] = await Promise.all([
                 getQuoteDetailsAction(quoteId, partnerId),
-                supabase.from("stores").select("name, logo_url").eq("partner_id", partnerId).limit(1).maybeSingle(),
+                supabase.from("stores").select("name, logo_url, phone").eq("partner_id", partnerId).limit(1).maybeSingle(),
                 getPartnerAddressAction(partnerId),
             ])
 
@@ -68,6 +68,7 @@ export default function QuotePrintModal({ isOpen, onClose, quoteId, partnerId }:
             const rawAvatar = storeRes.data?.logo_url || selectedStore?.image_url || undefined
             const partnerAvatar = rawAvatar ? getR2ImageUrl(rawAvatar) : undefined
             const partnerAddress = addressRes.success && addressRes.data ? addressRes.data.formatted : undefined
+            const partnerPhone = storeRes.data?.phone || undefined
 
             const formattedItems = (quoteDetails.items || []).map((item: any) => ({
                 name: item.custom_name || item.products?.name || "Produto sem nome",
@@ -92,6 +93,7 @@ export default function QuotePrintModal({ isOpen, onClose, quoteId, partnerId }:
                 note: quoteDetails.notes || undefined,
                 partnerName,
                 partnerAddress,
+                partnerPhone,
                 partnerAvatar,
                 primaryColor: preview.primaryColor || undefined,
                 secondaryColor: preview.secondaryColor || undefined,
@@ -230,6 +232,7 @@ export default function QuotePrintModal({ isOpen, onClose, quoteId, partnerId }:
                                                 note={quoteData.note}
                                                 partnerName={quoteData.partnerName}
                                                 partnerAddress={quoteData.partnerAddress}
+                                                partnerPhone={quoteData.partnerPhone}
                                                 partnerAvatar={quoteData.partnerAvatar}
                                                 primaryColor={quoteData.primaryColor}
                                                 secondaryColor={quoteData.secondaryColor}

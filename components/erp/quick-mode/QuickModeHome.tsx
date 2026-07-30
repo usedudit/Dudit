@@ -31,6 +31,7 @@ import {
     XIcon,
     TelegramIcon,
     LinkedinIcon,
+    SparklesIcon,
 } from "@/lib/icons";
 import { Button, Badge, ListItem, FormSection, DefaultModal, InfoCard } from "@/components/reusable";
 import { Tooltip } from "@/components/reusable/Tooltip"
@@ -41,6 +42,9 @@ import { deleteServiceAction, duplicateServiceAction } from "@/app/actions/erp/s
 import AlertModal from "@/components/reusable/AlertModal";
 import { ERPPageHeader } from "@/components/erp/page-header-state";
 import { DashboardLayout } from "@/lib/dashboard-engine/types";
+import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal";
+import { PLAN_UPGRADE_MASCOTS } from "@/lib/subscription/plan-tier";
+import { getHardcodedPlan } from "@/lib/subscription/feature-labels";
 
 interface QuickModeHomeProps {
     data: DashboardLayout;
@@ -273,9 +277,9 @@ function ShortcutsCard({ shortcuts, sellsProducts, sellsServices }: {
                 variant="ghost"
                 size="sm"
                 className="w-full mt-2 text-brand-green font-bold"
-                onClick={() => router.push("/erp/dashboard")}
+                onClick={() => router.push("/erp/inicio")}
             >
-                Ver dashboard completo <ChevronRightIcon size={16} />
+                Ir para o início <ChevronRightIcon size={16} />
             </Button>
         </div>
     );
@@ -385,13 +389,12 @@ function ProgressCard({
                             return (
                                 <div
                                     key={st.id}
-                                    className={`h-full transition-all duration-300 ${
-                                        done
-                                            ? "bg-brand-green"
-                                            : active
-                                                ? "bg-brand-green/60"
-                                                : "bg-brand-gray dark:bg-dark-border"
-                                    }`}
+                                    className={`h-full transition-all duration-300 ${done
+                                        ? "bg-brand-green"
+                                        : active
+                                            ? "bg-brand-green/60"
+                                            : "bg-brand-gray dark:bg-dark-border"
+                                        }`}
                                     style={{ width: `${widthPercent}%` }}
                                 />
                             );
@@ -400,8 +403,8 @@ function ProgressCard({
                 </div>
             </div>
 
-            <div className="flex flex-row gap-4 flex-1 min-h-0">
-                <div className="flex flex-col justify-center gap-2 w-[200px] shrink-0">
+            <div className="flex flex-row gap-12 flex-1 min-h-0">
+                <div className="flex flex-col jstify-center gap-2 w-[400px] shrink-0 lg:border-r">
                     <p className="text-[11px] font-bold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body">
                         Etapa {currentStageIdx + 1} de {stages.length}
                     </p>
@@ -555,7 +558,7 @@ function ImportOptionsModal({
                                     description={opt.description}
                                     right={<ChevronRightIcon className="text-brand-inactive-text w-5 h-5 shrink-0" />}
                                     onClick={() => handleNavigate(opt.href)}
-                                    className="border-brand-border"
+                                    className="px-4 py-3 gap-4"
                                 />
                             ))}
                         </div>
@@ -572,7 +575,7 @@ function ImportOptionsModal({
                                     description={opt.description}
                                     right={<ChevronRightIcon className="text-brand-inactive-text w-5 h-5 shrink-0" />}
                                     onClick={() => handleNavigate(opt.href)}
-                                    className="border-brand-border"
+                                    className="px-4 py-3 gap-4"
                                 />
                             ))}
                         </div>
@@ -584,242 +587,75 @@ function ImportOptionsModal({
 }
 
 // ============================================
-// ADAPTIVE BOTTOM CARD (Plan / Integrations)
+// PLAN UPGRADE CARD
 // ============================================
 
-interface FeatureItem {
-    icon: React.ComponentType<any>;
-    title: string;
-    description: string;
-}
+function PlanUpgradeCard({ planSlug, onUpgrade }: { planSlug: string; onUpgrade: (target: "crescer" | "escalar") => void }) {
+    const nextSlug = planSlug === "free" ? "crescer" : planSlug === "crescer" ? "escalar" : null;
+    const [currentFeatureIdx, setCurrentFeatureIdx] = useState(0);
 
-function getFeatureList(sellsProducts: boolean, sellsServices: boolean, isQuickMode: boolean): FeatureItem[] {
-    const features: FeatureItem[] = [
-        { icon: StoreIcon, title: "Catálogo Digital", description: "Produtos e serviços com fotos e descrição" },
-        { icon: ShareIcon, title: "Perfil Compartilhável", description: "Compartilhe seu link em redes sociais" },
-        { icon: ShoppingCartIcon, title: "Pedidos Online", description: "Receba pedidos diretamente pelo sistema" },
-    ];
+    if (!nextSlug) return null;
 
-    if (sellsProducts) {
-        features.push(
-            { icon: Package, title: "Controle de Estoque", description: "Gerencie entrada e saída de produtos" },
-            { icon: UploadSheetIcon, title: "Importação em Massa", description: "Importe produtos via planilha" },
-        );
-    }
+    const planFeatures = getHardcodedPlan(nextSlug).features;
+    const planName = getHardcodedPlan(nextSlug).name;
+    const mascotSrc = PLAN_UPGRADE_MASCOTS[nextSlug as "crescer" | "escalar"];
 
-    if (sellsServices) {
-        features.push(
-            { icon: WrenchIcon, title: "Agendamento de Serviços", description: "Clientes agendam serviços online" },
-            { icon: BriefcaseIcon, title: "Ordem de Serviço", description: "Controle completo de OS" },
-        );
-    }
+    const descriptions: Record<string, string> = {
+        crescer: "Aumente seu limite de catálogo para 100 itens, receba pagamentos via Mercado Pago e ative cupons promocionais para vender mais.",
+        escalar: "Tenha itens e pedidos ilimitados, financeiro avançado com fluxo de caixa e DRE simplificado.",
+    };
 
-    if (isQuickMode) {
-        features.push(
-            { icon: QRCodeIcon, title: "QR Code do Perfil", description: "QR Code para vendas rápidas" },
-            { icon: LinkIcon, title: "Link de Vendas", description: "Venda direto pelo link do perfil" },
-        );
-    } else {
-        features.push(
-            { icon: CreditCardIcon, title: "Gestão Financeira", description: "Fluxo de caixa e controle financeiro" },
-            { icon: RocketIcon, title: "DRE Simplificado", description: "Demonstração de resultados automatizada" },
-        );
-    }
-
-    return features;
-}
-
-function AdaptiveBottomCard({
-    planSlug,
-    isQuickMode,
-    sellsProducts,
-    sellsServices,
-    isWhatsAppConnected,
-    isMercadoPagoConnected,
-}: {
-    planSlug: "free" | "crescer" | "escalar";
-    isQuickMode: boolean;
-    sellsProducts: boolean;
-    sellsServices: boolean;
-    isWhatsAppConnected: boolean;
-    isMercadoPagoConnected: boolean;
-}) {
-    const router = useRouter();
-    const features = useMemo(
-        () => getFeatureList(sellsProducts, sellsServices, isQuickMode),
-        [sellsProducts, sellsServices, isQuickMode]
-    );
-    const [currentSlide, setCurrentSlide] = useState(0);
-    const [currentFeature, setCurrentFeature] = useState(0);
-
-    const slides = useMemo(() => {
-        const s: string[] = [];
-        if (planSlug === "free") s.push("upgrade-crescer");
-        if (planSlug === "crescer" || planSlug === "escalar") s.push("integrations");
-        if (planSlug === "crescer") s.push("upgrade-escalar");
-        if (planSlug === "escalar" && isQuickMode) s.push("erp-mode");
-        return s;
-    }, [planSlug, isQuickMode]);
+    const badges: Record<string, string> = {
+        crescer: "RECURSO PREMIUM",
+        escalar: "GESTÃO COMPLETA",
+    };
 
     useEffect(() => {
-        if (slides.length <= 1) return;
-        setCurrentSlide(0);
+        if (planFeatures.length <= 1) return;
         const interval = setInterval(() => {
-            setCurrentSlide(prev => (prev + 1) % slides.length);
-        }, 7000);
+            setCurrentFeatureIdx((prev) => (prev + 1) % planFeatures.length);
+        }, 30000);
         return () => clearInterval(interval);
-    }, [slides.length]);
-
-    useEffect(() => {
-        if (features.length <= 1) return;
-        const interval = setInterval(() => {
-            setCurrentFeature(prev => (prev + 1) % features.length);
-        }, 5000);
-        return () => clearInterval(interval);
-    }, [features.length]);
-
-    const slideId = slides[currentSlide] || slides[0];
-
-    function renderSlideContent() {
-        switch (slideId) {
-            case "upgrade-crescer":
-                return (
-                    <div className="flex flex-col items-center text-center gap-3">
-                        <Badge variant="green" className="bg-brand-green border-none text-white px-3 py-1">
-                            RECURSO PREMIUM
-                        </Badge>
-                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">
-                            Ative o Plano Crescer
-                        </h3>
-                        <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                            Aumente seu limite de catálogo para 100 itens, receba pagamentos via Mercado Pago e ative cupons promocionais para vender mais.
-                        </p>
-                        <Button
-                            variant="default"
-                            size="sm"
-                            className="bg-brand-green hover:bg-brand-green/90 text-white border-none mt-1"
-                            onClick={() => router.push("/erp/settings")}
-                        >
-                            Ver Planos
-                        </Button>
-                    </div>
-                );
-            case "upgrade-escalar":
-                return (
-                    <div className="flex flex-col items-center text-center gap-3">
-                        <Badge variant="green" className="bg-brand-green border-none text-white px-3 py-1">
-                            GESTÃO COMPLETA
-                        </Badge>
-                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">
-                            Migre para o Plano Escalar
-                        </h3>
-                        <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                            Tenha itens e pedidos ilimitados, financeiro avançado com fluxo de caixa e DRE simplificado.
-                        </p>
-                        <Button
-                            variant="default"
-                            size="sm"
-                            className="bg-brand-green hover:bg-brand-green/90 text-white border-none mt-1"
-                            onClick={() => router.push("/erp/settings")}
-                        >
-                            Ver Planos
-                        </Button>
-                    </div>
-                );
-            case "integrations":
-                return (
-                    <div className="space-y-3">
-                        <ListItem
-                            icon={WhatsappIcon}
-                            title="WhatsApp Business"
-                            description={isWhatsAppConnected ? "Conectado e recebendo pedidos" : "Conecte para receber pedidos no WhatsApp"}
-                            right={
-                                <Badge variant={isWhatsAppConnected ? "green" : "gray"}>
-                                    {isWhatsAppConnected ? "Conectado" : "Desconectado"}
-                                </Badge>
-                            }
-                            onClick={() => router.push("/erp/integrations/whatsapp")}
-                            className="border-0 bg-transparent hover:bg-brand-gray/30 dark:hover:bg-dark-border/30 p-3"
-                        />
-                        <ListItem
-                            icon={CreditCardIcon}
-                            title="Mercado Pago"
-                            description={isMercadoPagoConnected ? "Recebendo pagamentos online" : "Conecte para receber via Pix, cartão e boleto"}
-                            right={
-                                <Badge variant={isMercadoPagoConnected ? "green" : "gray"}>
-                                    {isMercadoPagoConnected ? "Conectado" : "Desconectado"}
-                                </Badge>
-                            }
-                            onClick={() => router.push("/erp/settings?tab=formas-de-pagamento")}
-                            className="border-0 bg-transparent hover:bg-brand-gray/30 dark:hover:bg-dark-border/30 p-3"
-                        />
-                    </div>
-                );
-            case "erp-mode":
-                return (
-                    <div className="flex flex-col items-center text-center gap-3">
-                        <div className="w-12 h-12 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center">
-                            <RocketIcon size={24} className="text-brand-green" />
-                        </div>
-                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">
-                            Modo ERP Completo
-                        </h3>
-                        <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                            Dashboard financeiro, fluxo de caixa, DRE, controle de estoque e relatórios avançados.
-                        </p>
-                        <Button
-                            variant="default"
-                            size="sm"
-                            className="bg-brand-green hover:bg-brand-green/90 text-white border-none mt-1"
-                            onClick={() => router.push("/erp/dashboard")}
-                        >
-                            Ir para o Dashboard
-                        </Button>
-                    </div>
-                );
-            default:
-                return null;
-        }
-    }
+    }, [planFeatures.length]);
 
     return (
-        <div className={`bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 h-[280px] flex flex-col ${slides.length <= 1 ? '' : 'min-h-[280px]'}`}>
-            <div className="flex-1 flex flex-col justify-center">
-                {renderSlideContent()}
+        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 h-[280px] flex flex-row items-center gap-6">
+            <div className="flex-1 min-w-0">
+                <Badge variant="green" className="bg-brand-green border-none text-white px-3 py-1 mb-2 inline-block">
+                    {badges[nextSlug]}
+                </Badge>
+                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-1">
+                    Plano {planName}
+                </h3>
+                <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-4 leading-relaxed">
+                    {descriptions[nextSlug]}
+                </p>
+
+                <div className="flex items-center gap-3 min-h-[44px]">
+                    <div className="w-8 h-8 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center shrink-0">
+                        <SparklesIcon className="w-4 h-4 text-brand-green" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
+                            {planFeatures[currentFeatureIdx]}
+                        </p>
+                    </div>
+                </div>
             </div>
 
-            {features.length > 0 && (
-                <>
-                    <div className="border-t border-brand-border dark:border-dark-border my-4" />
-                    <div className="flex items-center gap-3 min-h-[44px]">
-                        <div className="w-8 h-8 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center shrink-0">
-                            {React.createElement(features[currentFeature].icon, {
-                                className: "w-4 h-4 text-brand-green",
-                            })}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">
-                                {features[currentFeature].title}
-                            </p>
-                            <p className="text-[11px] text-brand-inactive-text dark:text-dark-body truncate">
-                                {features[currentFeature].description}
-                            </p>
-                        </div>
-                    </div>
-                </>
-            )}
-
-            {slides.length > 1 && (
-                <div className="flex items-center justify-center gap-1.5 mt-3">
-                    {slides.map((_, idx) => (
-                        <button
-                            key={idx}
-                            onClick={() => setCurrentSlide(idx)}
-                            className={`w-1.5 h-1.5 rounded-full transition-all ${idx === currentSlide ? 'bg-brand-green w-4' : 'bg-brand-border dark:bg-dark-border'}`}
-                        />
-                    ))}
+            <div className="shrink-0 flex flex-col items-center gap-4">
+                <div className="w-[130px] h-[130px] flex items-center justify-center">
+                    <img src={mascotSrc} alt={planName} className="w-full h-full object-contain" />
                 </div>
-            )}
+                <Button
+                    variant="default"
+                    size="sm"
+                    className="bg-brand-green hover:bg-brand-green/90 text-white border-none rounded-full px-6"
+                    onClick={() => onUpgrade(nextSlug as "crescer" | "escalar")}
+                >
+                    Fazer upgrade
+                </Button>
+            </div>
         </div>
     );
 }
@@ -882,6 +718,7 @@ function ModeCard({ partnerId, onSuccess }: { partnerId: string; onSuccess: () =
 export default function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
     const router = useRouter();
     const { toast } = useToast();
+    const { openPlanUpgrade } = usePlanUpgrade();
     const [isDeleting, setIsDeleting] = useState<string | null>(null);
     const [showDeleteModal, setShowDeleteModal] = useState<any>(null);
     const [showImportModal, setShowImportModal] = useState(false);
@@ -1005,9 +842,9 @@ export default function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
                 )}
 
                 {/* Main Grid - Progress Card (2/3) + QR Code Card (1/3) */}
-                < div className="grid grid-cols-1 lg:grid-cols-12 gap-6" >
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                     {/* Progress/Onboarding Card - 2/3 width */}
-                    < div className="lg:col-span-8" >
+                    <div className="lg:col-span-8">
                         {
                             data.checklist && (
                                 <ProgressCard
@@ -1025,18 +862,11 @@ export default function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
                     </div>
                 </div>
 
-                {/* Adaptive Bottom Cards - Plan/Integrations, Shortcuts, Help */}
+                {/* Bottom Cards - Plan Upgrade, Shortcuts, Help */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* First Column: Adaptive Card + Mode Card (if quick mode) */}
+                    {/* First Column: Plan Upgrade Card + Mode Card (if quick mode) */}
                     <div className="flex flex-col gap-6">
-                        <AdaptiveBottomCard
-                            planSlug={data.planSlug}
-                            isQuickMode={data.isQuickMode}
-                            sellsProducts={data.sellsProducts}
-                            sellsServices={data.sellsServices}
-                            isWhatsAppConnected={data.integrations.find(i => i.id === "whatsapp")?.status === "connected"}
-                            isMercadoPagoConnected={data.integrations.find(i => i.id === "mercadopago")?.status === "connected"}
-                        />
+                        <PlanUpgradeCard planSlug={data.planSlug} onUpgrade={openPlanUpgrade} />
                         {data.isQuickMode && (
                             <ModeCard partnerId={partnerId} onSuccess={() => router.refresh()} />
                         )}

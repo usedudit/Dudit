@@ -754,6 +754,8 @@ export async function checkoutCartAction(
 
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(paymentMethod)
 
+  const targetStoreId = storeId || resolvedLines.find((l) => l.storeId)?.storeId || null
+
   // 1. Parallel independent reads block
   const [
     limitCheck,
@@ -771,7 +773,7 @@ export async function checkoutCartAction(
       .eq("user_id", user.id)
       .single(),
     productIds.length
-      ? adminClient.from("products").select("*").in("id", productIds).eq("store_id", storeId)
+      ? adminClient.from("products").select("*").in("id", productIds).eq("store_id", targetStoreId)
       : Promise.resolve({ data: [] as any[] }),
     adminClient
       .from("stores")
@@ -783,6 +785,7 @@ export async function checkoutCartAction(
     hasDeliveryLines && deliveryAddress
       ? quoteDeliveryFeeAction({
         partnerId,
+        storeId: targetStoreId,
         destinationAddress: deliveryAddress,
         freeDeliveryCoupon: false,
         orderSubtotal: totalAmount,

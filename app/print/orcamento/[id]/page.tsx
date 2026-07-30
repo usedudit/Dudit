@@ -50,7 +50,7 @@ export default async function PrintOrcamentoPage({ params }: PageProps) {
 
     // Fetch store logo and address details
     const [storeRes, addressRes] = await Promise.all([
-        supabase.from("stores").select("name, logo_url").eq("partner_id", quote.partner_id).limit(1).maybeSingle(),
+        supabase.from("stores").select("name, logo_url, phone").eq("partner_id", quote.partner_id).limit(1).maybeSingle(),
         getPartnerAddressAction(quote.partner_id)
     ])
 
@@ -58,6 +58,7 @@ export default async function PrintOrcamentoPage({ params }: PageProps) {
     const rawAvatar = storeRes.data?.logo_url || undefined
     const partnerAvatar = rawAvatar ? getR2ImageUrl(rawAvatar) : undefined
     const partnerAddress = addressRes.success && addressRes.data ? addressRes.data.formatted : undefined
+    const partnerPhone = storeRes.data?.phone || undefined
 
     const formattedItems = (quoteDetails.items || []).map((item: any) => ({
         name: item.custom_name || item.products?.name || "Produto sem nome",
@@ -91,6 +92,7 @@ export default async function PrintOrcamentoPage({ params }: PageProps) {
                 note={quoteDetails.notes || undefined}
                 partnerName={partnerName}
                 partnerAddress={partnerAddress}
+                partnerPhone={partnerPhone}
                 partnerAvatar={partnerAvatar}
                 printMode={true}
                 primaryColor={previewMeta.primaryColor}

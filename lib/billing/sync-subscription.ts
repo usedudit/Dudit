@@ -44,7 +44,7 @@ export async function syncSubscriptionToBilling(
         .select(`
             *,
             plan:plan_id (*),
-            partner:partner_id (id, document, email, phone, image_url, user_id),
+            partner:partner_id (id, document, email, user_id),
             stores(id, name)
         `)
         .eq("id", subscriptionId)

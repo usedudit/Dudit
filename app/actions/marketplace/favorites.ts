@@ -259,7 +259,7 @@ export async function getUserFavoritesAction(params?: {
                 const rawStore = Array.isArray(p.stores) ? p.stores[0] : p.stores
                 const storeId = rawStore?.id || rawPartner?.id
                 const storeName = rawStore?.name || "Vendedor"
-                const storeImage = rawStore?.logo_url || rawStore?.image_url || rawPartner?.store_image_url
+                const storeImage = rawStore?.logo_url || rawPartner?.store_image_url
                 const storeCity = rawStore?.addresses?.[0]?.city || rawPartner?.addresses?.[0]?.city || null
                 const storeState = rawStore?.addresses?.[0]?.state || rawPartner?.addresses?.[0]?.state || null
                 const partner = rawPartner
@@ -300,7 +300,7 @@ export async function getUserFavoritesAction(params?: {
                 const rawStore = Array.isArray(s.stores) ? s.stores[0] : s.stores
                 const storeId = rawStore?.id || rawPartner?.id
                 const storeName = rawStore?.name || "Vendedor"
-                const storeImage = rawStore?.logo_url || rawStore?.image_url || rawPartner?.store_image_url
+                const storeImage = rawStore?.logo_url || rawPartner?.store_image_url
                 const storeCity = rawStore?.addresses?.[0]?.city || rawPartner?.addresses?.[0]?.city || null
                 const storeState = rawStore?.addresses?.[0]?.state || rawPartner?.addresses?.[0]?.state || null
                 const partner = rawPartner

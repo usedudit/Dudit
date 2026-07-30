@@ -76,7 +76,6 @@ BEGIN
           ELSE stores.opening_hours
         END,
         logo_url = COALESCE(stores.logo_url, r.store_image_url),
-        image_url = COALESCE(stores.image_url, r.store_image_url),
         is_headquarters = true,
         updated_at = NOW()
       WHERE id = v_existing_store_id;
@@ -89,7 +88,6 @@ BEGIN
         description,
         opening_hours,
         logo_url,
-        image_url,
         is_headquarters,
         is_active
       ) VALUES (
@@ -98,7 +96,6 @@ BEGIN
         v_slug,
         r.store_description,
         COALESCE(r.opening_hours, '{}'::jsonb),
-        r.store_image_url,
         r.store_image_url,
         true,
         true
@@ -118,7 +115,7 @@ BEGIN
 
   INSERT INTO public.stores (
     partner_id, name, slug, description,
-    opening_hours, logo_url, image_url,
+    opening_hours, logo_url,
     is_headquarters, is_active
   ) VALUES (
     NEW.id,
@@ -126,7 +123,6 @@ BEGIN
     v_slug,
     NEW.store_description,
     COALESCE(NEW.opening_hours, '{}'::jsonb),
-    NEW.store_image_url,
     NEW.store_image_url,
     true,
     true

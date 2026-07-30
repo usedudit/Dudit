@@ -29,6 +29,14 @@ export function InvoicePreview({ data, printMode }: InvoicePreviewProps) {
     const primaryColor = QUOTE_PREVIEW_PRIMARY_COLOR
     const secondaryColor = QUOTE_PREVIEW_SECONDARY_COLOR
 
+    const partnerAddressFormatted = data.partner.address
+        ? data.partner.address
+            .split('\n')
+            .filter((line: string) => line.trim() && !line.trim().startsWith('CEP:'))
+            .slice(0, 2)
+            .join('\n')
+        : ""
+
     const { pages } = useMemo(() => {
         const items = data.items || []
         const totalRows = items.length
@@ -173,7 +181,8 @@ export function InvoicePreview({ data, printMode }: InvoicePreviewProps) {
                                     {data.partner.document && (
                                         <p className="text-xs text-gray-500">CNPJ/CPF: {formatDocument(data.partner.document)}</p>
                                     )}
-                                    <p className="text-xs text-gray-500">{data.partner.address}</p>
+                                    {data.partner.phone && <p className="text-xs text-gray-500">{data.partner.phone}</p>}
+                                    {partnerAddressFormatted && <p className="text-xs text-gray-500 whitespace-pre-wrap">{partnerAddressFormatted}</p>}
                                     {data.partner.email && <p className="text-xs text-gray-500">{data.partner.email}</p>}
                                 </div>
                                 <div>

@@ -83,7 +83,7 @@ async function _getMarketplaceService(serviceId: string, storeId?: string | null
     rawPartner.store_name = rawStore.name
     rawPartner.slug = rawStore.slug || rawPartner.slug || null
     rawPartner.store_description = rawStore.description || rawPartner.store_description
-    rawPartner.store_image_url = rawStore.logo_url || rawStore.image_url || rawPartner.store_image_url
+    rawPartner.store_image_url = rawStore.logo_url || rawPartner.store_image_url
     rawPartner.banner_url = rawStore.banner_url || rawPartner.banner_url
     rawPartner.phone = rawStore.phone || rawPartner.phone
     const addr = Array.isArray(rawStore.addresses) ? rawStore.addresses[0] : null
