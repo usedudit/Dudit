@@ -176,7 +176,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                     left={
                                         <UserProfileImage
                                             fullName={props.selectedCustomer.name || "Cliente"}
-                                            imageUrl={props.selectedCustomer.avatar_url || props.selectedCustomer.avatar}
+                                            imageUrl={props.selectedCustomer.image_url || props.selectedCustomer.avatar_url || props.selectedCustomer.avatar}
                                             className="w-10 h-10 text-base"
                                         />
                                     }
@@ -592,7 +592,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                     <div className="relative">
                                         <UserProfileImage
                                             fullName={props.selectedCustomer.name || "Cliente"}
-                                            imageUrl={props.selectedCustomer.avatar_url || props.selectedCustomer.avatar}
+                                            imageUrl={props.selectedCustomer.image_url || props.selectedCustomer.avatar_url || props.selectedCustomer.avatar}
                                             className="w-12 h-12 text-lg border border-white dark:border-dark-border"
                                         />
                                     </div>

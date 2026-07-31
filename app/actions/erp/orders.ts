@@ -1973,7 +1973,7 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
             if (!data.buyer_id) return null
             const { data: customerData } = await supabase
                 .from("customers")
-                .select("id, name, email, phone, addresses(*)")
+                .select("id, name, email, phone, image_url, addresses(*)")
                 .or(`id.eq.${data.buyer_id},user_id.eq.${data.buyer_id}`)
                 .eq("partner_id", partnerId)
                 .maybeSingle()
@@ -1989,7 +1989,7 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
                     if (email || phone) {
                         let query = supabase
                             .from("customers")
-                            .select("id, name, email, phone, addresses(*)")
+                            .select("id, name, email, phone, image_url, addresses(*)")
                             .eq("partner_id", partnerId)
 
                         if (email && phone) {
@@ -2108,7 +2108,7 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
         sale.customer_id
             ? supabase
                 .from("customers")
-                .select("id, name, email, phone, addresses(*)")
+                .select("id, name, email, phone, image_url, addresses(*)")
                 .eq("id", sale.customer_id)
                 .single()
                 .then((res: any) => res.data)
@@ -2965,6 +2965,19 @@ export async function updateOrdersStatusInBatchAction(payload: {
                     continue
                 }
                 processedCount += 1
+
+                // Log audit event for the cancelled order (visible to buyer in order history)
+                await logAuditEvent({
+                    partnerId: payload.partnerId,
+                    actorUserId: user.id,
+                    entityType: "order",
+                    entityId: order.id,
+                    actionType: "cancelled",
+                    changeLines: [payload.cancelReason?.trim() ? `Pedido cancelado: ${payload.cancelReason.trim()}` : "Pedido cancelado pelo vendedor."],
+                    source: "erp",
+                    storeId: order.store_id,
+                })
+
                 await syncCancelledOrderAppointmentsAndTransactions(supabase, order.id)
 
                 if (stockWasRestoredOnCancel) {

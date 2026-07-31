@@ -203,10 +203,10 @@ const getCancellationReason = (notes?: string | null) => {
 };
 
 const getClientTimelineSteps = (order: any) => {
-    const dateStrFull = formatFullDate(order.created_at);
-    const dateStrTime = formatTime(order.created_at);
-    const updateDateStr = order.updated_at ? formatFullDate(order.updated_at) : null;
-    const updateTimeStr = order.updated_at ? formatTime(order.updated_at) : null;
+    const createdIso = order.created_at;
+    const paymentIso = order.mp_date_approved || order.updated_at || order.created_at;
+    const updatedIso = order.updated_at || order.created_at;
+    const fmtStep = (iso?: string) => (iso ? { date: formatFullDate(iso), time: formatTime(iso), iso } : {});
 
     const isPaid = ["paid", "partially_paid"].includes(order.situation);
     const isCancelled = order.situation === "cancelled";
@@ -222,36 +222,33 @@ const getClientTimelineSteps = (order: any) => {
     const isDelivered = ["delivered", "pickup_available", "delivery_failed"].includes(order.delivery_status);
     const isPickup = order.delivery_type === "pickup";
 
-    const steps: { label: string; active: boolean; date?: string; time?: string; subLabel?: string | string[] }[] = [];
+    const steps: { label: string; active: boolean; date?: string; time?: string; iso?: string; subLabel?: string | string[] }[] = [];
 
     if (isCancelled) {
         const cancelReason = getCancellationReason(order.notes);
-        steps.push({ label: "Pedido Realizado", active: true, date: dateStrFull, time: dateStrTime });
+        steps.push({ label: "Pedido Realizado", active: true, ...fmtStep(createdIso) });
         steps.push({
             label: isPaid ? "Pago" : "Aguardando pagamento",
             active: true,
-            date: dateStrFull,
-            time: dateStrTime
+            ...fmtStep(isPaid ? paymentIso : createdIso)
         });
         steps.push({
             label: "Cancelado",
             active: true,
-            date: updateDateStr || dateStrFull,
-            time: updateTimeStr || dateStrTime,
+            ...fmtStep(updatedIso),
             subLabel: cancelReason ? [cancelReason] : ["O pedido foi cancelado."]
         });
         return steps;
     }
 
     // 1. First Step
-    steps.push({ label: "Pedido Realizado", active: true, date: dateStrFull, time: dateStrTime });
+    steps.push({ label: "Pedido Realizado", active: true, ...fmtStep(createdIso) });
 
     // 2. Second Step: Payment
     steps.push({
         label: isPaid ? "Pago" : "Aguardando pagamento",
         active: true,
-        date: isPaid ? (updateDateStr || dateStrFull) : undefined,
-        time: isPaid ? (updateTimeStr || dateStrTime) : undefined
+        ...fmtStep(isPaid ? paymentIso : createdIso)
     });
 
     if (hasOnlyServices) {
@@ -260,15 +257,13 @@ const getClientTimelineSteps = (order: any) => {
         steps.push({
             label: "Em andamento",
             active: isPaid && isPreparing,
-            date: isPaid && isPreparing ? (updateDateStr || dateStrFull) : undefined,
-            time: isPaid && isPreparing ? (updateTimeStr || dateStrTime) : undefined
+            ...fmtStep(isPaid && isPreparing ? updatedIso : undefined)
         });
         // 4. Concluído
         steps.push({
             label: "Concluído",
             active: isPaid && isDelivered && order.delivery_status === "delivered",
-            date: isPaid && isDelivered && order.delivery_status === "delivered" ? (updateDateStr || dateStrFull) : undefined,
-            time: isPaid && isDelivered && order.delivery_status === "delivered" ? (updateTimeStr || dateStrTime) : undefined
+            ...fmtStep(isPaid && isDelivered && order.delivery_status === "delivered" ? updatedIso : undefined)
         });
     } else if (hasMixedItems) {
         // Mixed order:
@@ -282,8 +277,7 @@ const getClientTimelineSteps = (order: any) => {
         steps.push({
             label: "Em progresso",
             active: isPaid && isPreparing,
-            date: isPaid && isPreparing ? (updateDateStr || dateStrFull) : undefined,
-            time: isPaid && isPreparing ? (updateTimeStr || dateStrTime) : undefined,
+            ...fmtStep(isPaid && isPreparing ? updatedIso : undefined),
             subLabel: [serviceText, productText]
         });
 
@@ -291,16 +285,14 @@ const getClientTimelineSteps = (order: any) => {
         steps.push({
             label: "Finalizado",
             active: isPaid && isSent,
-            date: isPaid && isSent ? (updateDateStr || dateStrFull) : undefined,
-            time: isPaid && isSent ? (updateTimeStr || dateStrTime) : undefined
+            ...fmtStep(isPaid && isSent ? updatedIso : undefined)
         });
 
         // 5. Concluído
         steps.push({
             label: "Concluído",
             active: isPaid && isDelivered && (order.delivery_status === "delivered" || order.delivery_status === "pickup_available"),
-            date: isPaid && isDelivered && (order.delivery_status === "delivered" || order.delivery_status === "pickup_available") ? (updateDateStr || dateStrFull) : undefined,
-            time: isPaid && isDelivered && (order.delivery_status === "delivered" || order.delivery_status === "pickup_available") ? (updateTimeStr || dateStrTime) : undefined
+            ...fmtStep(isPaid && isDelivered && (order.delivery_status === "delivered" || order.delivery_status === "pickup_available") ? updatedIso : undefined)
         });
     } else {
         // Standard product-only order:
@@ -308,16 +300,14 @@ const getClientTimelineSteps = (order: any) => {
         steps.push({
             label: "Em andamento",
             active: isPaid && isPreparing,
-            date: isPaid && isPreparing ? (updateDateStr || dateStrFull) : undefined,
-            time: isPaid && isPreparing ? (updateTimeStr || dateStrTime) : undefined
+            ...fmtStep(isPaid && isPreparing ? updatedIso : undefined)
         });
 
         // 4. Pronto para retirada / Enviado
         steps.push({
             label: isPickup ? "Pronto para retirada" : "Enviado",
             active: isPaid && isSent,
-            date: isPaid && isSent ? (updateDateStr || dateStrFull) : undefined,
-            time: isPaid && isSent ? (updateTimeStr || dateStrTime) : undefined
+            ...fmtStep(isPaid && isSent ? updatedIso : undefined)
         });
 
         // 5. Pedido retirado / Pedido entregue
@@ -328,8 +318,7 @@ const getClientTimelineSteps = (order: any) => {
         steps.push({
             label: finalLabel,
             active: isPaid && isDelivered && (order.delivery_status === "delivered" || order.delivery_status === "pickup_available" || order.delivery_status === "delivery_failed"),
-            date: isPaid && isDelivered ? (updateDateStr || dateStrFull) : undefined,
-            time: isPaid && isDelivered ? (updateTimeStr || dateStrTime) : undefined
+            ...fmtStep(isPaid && isDelivered ? updatedIso : undefined)
         });
     }
 
@@ -399,7 +388,7 @@ const ShippingDetailsModal = ({ isOpen, onClose, order }: { isOpen: boolean; onC
                                     <p className="mt-2">Recebedor: {order.customer_name || 'Usuário Dudit'}</p>
                                 </>
                             ) : (
-                                <p className="font-medium text-brand-dark dark:text-dark-heading">Retirada diretamente com a loja parceira ({order.partners?.name || order.partners?.store_name}).</p>
+                                <p className="font-medium text-brand-dark dark:text-dark-heading">Retirada diretamente com a loja parceira ({(() => { const s = Array.isArray(order.stores) ? order.stores[0] : order.stores; return s?.name || order.partners?.name || order.partners?.store_name || "Loja Parceira"; })()}).</p>
                             )}
                         </div>
                     </div>
@@ -518,7 +507,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
     const activeSteps = getClientTimelineSteps(order).filter(s => s.active);
     const historyEntries = activeSteps.map((step, idx) => {
-        const dateToUse = (idx === 0) ? order.created_at : (order.updated_at || order.created_at);
+        const dateToUse = step.iso || order.created_at;
         let changeLines: string[] = [];
         if (step.subLabel) {
             changeLines = Array.isArray(step.subLabel) ? step.subLabel : [step.subLabel];
@@ -616,13 +605,13 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const dateStrFull = formatFullDate(order.created_at);
     const dateStrTime = formatTime(order.created_at);
     const statusConfig = getStatusConfig(order.situation);
-    const store = order.stores || order.partners
-    const storeImage = store?.store_image_url || store?.logo_url
-        ? getR2ImageUrl(store?.store_image_url || store?.logo_url)
+    const store = Array.isArray(order.stores) ? order.stores[0] : order.stores
+    const storeImage = store?.logo_url
+        ? getR2ImageUrl(store.logo_url)
         : "https://img.dudit.com.br/static/Placeholder.png";
 
     const isDelivery = order.delivery_type === "delivery";
-    const sellerName = store?.store_name || store?.name || order.partners?.store_name || "Loja Parceira";
+    const sellerName = store?.name || order.partners?.name || order.partners?.store_name || "Loja Parceira";
     const totalAmount = Number(order.total_amount);
 
     const orderItems = order.order_items || [];
@@ -1082,11 +1071,11 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
                     let itemUrl = "";
                     if (isService) {
-                        itemUrl = getServiceUrl({ ...item.services, id: item.service_id }, order.partners);
+                        itemUrl = getServiceUrl({ ...item.services, id: item.service_id }, store);
                     } else if (isPlan) {
-                        itemUrl = getPlanUrl({ ...item.recurring_plans, id: item.recurring_plan_id }, order.partners);
+                        itemUrl = getPlanUrl({ ...item.recurring_plans, id: item.recurring_plan_id }, store);
                     } else if (item.product_id) {
-                        itemUrl = getProductUrl({ ...item.products, id: item.product_id }, order.partners);
+                        itemUrl = getProductUrl({ ...item.products, id: item.product_id }, store);
                     }
 
                     if (!itemUrl) {
@@ -1202,9 +1191,6 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                     <div className="text-left flex-1 min-w-0">
                         <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-3 flex-wrap">
                             <span>Pedido #{orderNumber}</span>
-                            {order.situation === "cancelled" && (
-                                <Badge variant="red">Cancelado</Badge>
-                            )}
                         </h1>
                         <p className="text-md text-brand-inactive-text mt-1">{dateStrFull}</p>
                     </div>
@@ -1332,11 +1318,11 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
                                                 let itemUrl = "";
                                                 if (isService) {
-                                                    itemUrl = getServiceUrl({ ...item.services, id: item.service_id }, order.partners);
+                                                    itemUrl = getServiceUrl({ ...item.services, id: item.service_id }, store);
                                                 } else if (isPlan) {
-                                                    itemUrl = getPlanUrl({ ...item.recurring_plans, id: item.recurring_plan_id }, order.partners);
+                                                    itemUrl = getPlanUrl({ ...item.recurring_plans, id: item.recurring_plan_id }, store);
                                                 } else if (item.product_id) {
-                                                    itemUrl = getProductUrl({ ...item.products, id: item.product_id }, order.partners);
+                                                    itemUrl = getProductUrl({ ...item.products, id: item.product_id }, store);
                                                 }
 
                                                 if (!itemUrl) {
@@ -1395,7 +1381,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                     />
                                                     <div className="flex flex-col justify-center">
                                                         <p className="text-md font-bold text-brand-dark dark:text-dark-heading">Retirada no estabelecimento</p>
-                                                        <p className="text-sm text-brand-inactive-text">{formatPartnerAddress(order.partners?.addresses)}</p>
+                                                        <p className="text-sm text-brand-inactive-text">{formatPartnerAddress(store?.addresses)}</p>
                                                     </div>
                                                 </div>
                                             )}
@@ -1411,12 +1397,12 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                         const fulfillmentLine = findFulfillmentLine(order, item);
                                                         const mode = item.fulfillment_mode || fulfillmentLine?.fulfillmentMode;
                                                         const isCustomerAddress = mode === "customer_location" || mode === "delivery";
-                                                        const storeAddr = order.stores?.addresses?.[0] || (order.stores as any);
+                                                        const storeAddr = store?.addresses?.[0] || store;
                                                         const address = isCustomerAddress
                                                             ? (order.delivery_address || "Endereço não informado")
                                                             : storeAddr?.street
                                                                 ? `${storeAddr.street || ""}, ${storeAddr.number || "S/N"}${storeAddr.neighborhood ? ` - ${storeAddr.neighborhood}` : ""}, ${storeAddr.city || ""} - ${storeAddr.state || ""}`.replace(/\s+/g, ' ').trim()
-                                                                : formatPartnerAddress(order.partners?.addresses);
+                                                                : formatPartnerAddress(store?.addresses);
 
                                                         const isServiceCancelled = order.situation === "cancelled";
                                                         const isSub = !!item.recurring_plan_id || item.line_type === "subscription";

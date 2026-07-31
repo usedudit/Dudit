@@ -731,7 +731,7 @@ async function saveQuoteSnapshot(supabase: any, quoteId: string, partnerId: stri
     if (quote.customer_id) {
         const { data: customer } = await supabase
             .from("customers")
-            .select("id, name, email, phone")
+            .select("id, name, email, phone, image_url")
             .eq("id", quote.customer_id)
             .maybeSingle()
 

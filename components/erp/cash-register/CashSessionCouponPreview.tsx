@@ -15,6 +15,7 @@ function DashedLine({ className = "my-1" }: { className?: string }) {
 type CashSessionCouponData = {
     partnerName: string
     partnerDoc: string
+    partnerPhone?: string | null
     partnerAddress: string
     sessionId: string
     status: "open" | "closed"
@@ -72,8 +73,9 @@ export default function CashSessionCouponPreview({ data, type, printMode = false
             <div className="px-3 py-4">
                 <div className="text-center mb-2">
                     <p className="font-bold text-[13px] uppercase tracking-tight">{data.partnerName}</p>
+                    {data.partnerPhone ? <p className="text-[9px] mt-0.5">{data.partnerPhone}</p> : null}
                     <p className="text-[10px] mt-0.5">{data.partnerDoc}</p>
-                    <p className="text-[9px] mt-1 leading-tight">{partnerAddressFormatted}</p>
+                    <p className="text-[9px] mt-1 leading-tight whitespace-pre-line">{partnerAddressFormatted}</p>
                 </div>
 
                 <DashedLine className="my-1" />

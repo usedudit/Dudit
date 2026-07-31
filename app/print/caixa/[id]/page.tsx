@@ -75,6 +75,7 @@ export default async function PrintCaixaPage({ params, searchParams }: PageProps
     const couponData = {
         partnerName: partnerHeader.fantasyName,
         partnerDoc: partnerHeader.taxIdLine,
+        partnerPhone: partnerHeader.phone || null,
         partnerAddress: partnerHeader.addressLine,
         sessionId: details.session.id,
         status: details.session.status,

@@ -2,6 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils';
+import { formatAddressParts } from '@/lib/utils/format-address';
 import { UserProfileImage } from '@/lib/utils/UserProfileImage';
 import { r2PublicConfig } from "@/lib/r2/r2-public";
 
@@ -73,34 +74,10 @@ const OSPreview = ({
     const customerAddressText = useMemo(() => {
         if (!selectedCustomer) return null;
 
-        const formatAddr = (addr: {
-            street?: string | null;
-            number?: string | number | null;
-            complement?: string | null;
-            neighborhood?: string | null;
-            city?: string | null;
-            state?: string | null;
-            uf?: string | null;
-            zip_code?: string | null;
-            zipCode?: string | null;
-        }) => {
-            const streetStr = addr.street || "";
-            const numStr = addr.number ? `, ${addr.number}` : "";
-            const compStr = addr.complement ? ` - ${addr.complement}` : "";
-            const line1 = `${streetStr}${numStr}${compStr}`.trim().replace(/^,/, "").trim();
-
-            const neighStr = addr.neighborhood || "";
-            const cityStr = addr.city || "";
-            const stateStr = addr.state || addr.uf || "";
-            const line2 = `${neighStr ? `${neighStr} - ` : ""}${cityStr}${stateStr ? `/${stateStr}` : ""}`.trim();
-
-            return [line1, line2].filter(Boolean).join("\n");
-        };
-
         const addresses = selectedCustomer.addresses;
         if (addresses && addresses.length > 0) {
             const primaryAddr = addresses.find((a: any) => a.address_type === "primary" || a.is_default) || addresses[0];
-            return formatAddr(primaryAddr);
+            return formatAddressParts(primaryAddr);
         }
 
         const street = selectedCustomer.address_street || selectedCustomer.street;
@@ -112,7 +89,7 @@ const OSPreview = ({
         const zipCode = selectedCustomer.address_zip_code || selectedCustomer.zipCode || selectedCustomer.zip_code;
 
         if (street || city || zipCode) {
-            return formatAddr({ street, number, complement, neighborhood, city, state, zip_code: zipCode });
+            return formatAddressParts({ street, number, complement, neighborhood, city, state, zip_code: zipCode });
         }
 
         return null;

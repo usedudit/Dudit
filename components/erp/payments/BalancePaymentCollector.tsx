@@ -37,6 +37,7 @@ type BalancePaymentCollectorProps = {
   lockedMethodLabel?: string | null
   lockedInstallments?: number | null
   onConfirmPayment?: () => void
+  onHeaderStateChange?: (state: { title: string; canGoBack: boolean; onGoBack: () => void }) => void
 }
 
 function buildFlatLeg(method: PartnerPaymentMethod, amount: number, installmentNumber = 1): PaymentBreakdownLeg {
@@ -63,6 +64,7 @@ export function BalancePaymentCollector({
   lockedMethodLabel,
   lockedInstallments,
   onConfirmPayment,
+  onHeaderStateChange,
 }: BalancePaymentCollectorProps) {
   const { selectedStore } = useStore()
   const { methods, isLoading } = usePaymentMethods(partnerId)
@@ -96,6 +98,39 @@ export function BalancePaymentCollector({
   const [showConfirmSaveModal, setShowConfirmSaveModal] = useState(false)
   const [showKeyInputs, setShowKeyInputs] = useState(false)
   const [savingPixKey, setSavingPixKey] = useState(false)
+
+  const isLocked = Boolean(lockedMethodLabel)
+
+  const getCollectorTitle = useCallback(() => {
+    if (isLocked) {
+      return `Receber saldo (${selectedMethod?.name || lockedMethodLabel})`
+    }
+    if (view === "methods") return "Método de Pagamento"
+    if (view === "method_type_select") return "Selecionar Método"
+    if (view === "split") return "Dividir Pagamento"
+    if (view === "split_method_select") return "Selecionar Método"
+    return selectedMethod?.name || "Registrar"
+  }, [isLocked, selectedMethod, lockedMethodLabel, view])
+
+  const canGoBack = !isLocked && view !== "methods"
+
+  const handleGoBack = useCallback(() => {
+    if (view === "method_type_select" || view === "split_method_select") {
+      setView(view === "split_method_select" ? "split" : "methods")
+      return
+    }
+    setView("methods")
+    setSelectedMethod(null)
+    onValidityChange?.(false)
+  }, [view, onValidityChange])
+
+  useEffect(() => {
+    onHeaderStateChange?.({
+      title: getCollectorTitle(),
+      canGoBack,
+      onGoBack: handleGoBack,
+    })
+  }, [view, selectedMethod, lockedMethodLabel, isLocked, canGoBack, getCollectorTitle, handleGoBack, onHeaderStateChange])
 
   useEffect(() => {
     if (lockedInstallments) {
@@ -159,8 +194,6 @@ export function BalancePaymentCollector({
       })
     }
   }, [view, selectedMethod])
-
-  const isLocked = Boolean(lockedMethodLabel)
 
   const emitLegs = useCallback(
     (legs: PaymentBreakdownLeg[]) => {
@@ -331,28 +364,6 @@ export function BalancePaymentCollector({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3 overflow-hidden mb-2">
-        {!isLocked && view !== "methods" && (
-          <button
-            onClick={() => {
-              if (view === "method_type_select" || view === "split_method_select") {
-                setView(view === "split_method_select" ? "split" : "methods")
-                return
-              }
-              setView("methods")
-              setSelectedMethod(null)
-              onValidityChange?.(false)
-            }}
-            className="w-10 h-10 rounded-full bg-gray-100 dark:bg-dark-border/50 flex items-center justify-center text-brand-dark dark:text-dark-heading hover:bg-gray-200 dark:hover:bg-dark-border transition-colors shrink-0"
-          >
-            <ChevronLeftIcon size={20} />
-          </button>
-        )}
-        <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading truncate">
-          {isLocked ? `Receber saldo (${selectedMethod?.name || lockedMethodLabel})` : (view === "methods" ? "Método de Pagamento" : selectedMethod?.name || "Registrar")}
-        </h2>
-      </div>
-
       {!isLocked && view === "methods" && (
         <PaymentMethodSelector
           availableMethodTypes={availableMethodTypes}

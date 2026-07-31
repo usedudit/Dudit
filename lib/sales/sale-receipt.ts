@@ -1,5 +1,6 @@
 import { formatDateTime } from "@/lib/utils"
 import { formatPaymentMethodLabel } from "@/lib/payments/payment-method"
+import { formatAddressParts, stripCep } from "@/lib/utils/format-address"
 
 export type SaleReceiptFormat = "thermal" | "a4"
 
@@ -23,6 +24,7 @@ export type SaleReceiptPartnerHeader = {
     legalName: string
     addressLine: string
     taxIdLine: string
+    phone?: string | null
 }
 
 export type SaleReceiptReturnPolicyBlock = {
@@ -34,6 +36,8 @@ export type SaleReceiptReturnPolicyBlock = {
 
 export type SaleReceiptData = {
     customerName: string
+    customerPhone?: string | null
+    customerAddress?: string | null
     orderNumber: string
     saleDateTime: string
     items: SaleReceiptItem[]
@@ -190,6 +194,22 @@ export function buildPaymentLinesFromBreakdown(
     return []
 }
 
+export function formatCustomerContact(order: any): { phone?: string | null; address?: string | null } {
+    const customers = order.customers || {}
+    const phone = customers.phone || order.customer_phone || order.customerPhone || null
+
+    const addresses = Array.isArray(customers.addresses) ? customers.addresses : []
+    let address: string | null = null
+    if (addresses.length > 0) {
+        const primary = addresses.find((a: any) => a.address_type === "primary" || a.is_default) || addresses[0]
+        address = formatAddressParts(primary)
+    }
+    if (!address && order.delivery_address) {
+        address = stripCep(String(order.delivery_address))
+    }
+    return { phone, address }
+}
+
 export function buildSaleReceiptFromOrder(
     order: any,
     partner: SaleReceiptPartnerHeader,
@@ -216,6 +236,7 @@ export function buildSaleReceiptFromOrder(
     const paid = Number(order.paid_amount || 0)
     const change = Math.max(0, paid - total)
     const policySnap = order.return_policy_snapshot
+    const customerContact = formatCustomerContact(order)
     const returnPolicyBlock =
         policySnap && policySnap.receipt_show_policy_block !== false
             ? {
@@ -228,6 +249,8 @@ export function buildSaleReceiptFromOrder(
 
 return {
           customerName: order.customers?.name || order.customer_name || "Consumidor final",
+          customerPhone: customerContact.phone,
+          customerAddress: customerContact.address,
           orderNumber: String(order.order_number || order.id || ""),
           saleDateTime: formatDateTime(order.created_at || order.order_date || new Date()),
           items: mapOrderItemsToReceiptItems(order.order_items || []),

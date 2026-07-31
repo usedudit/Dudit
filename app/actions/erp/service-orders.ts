@@ -318,7 +318,7 @@ async function getCustomerSnapshot(admin: any, customerId: string) {
   const [{ data: customer }, { data: address }] = await Promise.all([
     admin
       .from("customers")
-      .select("id, name, email, phone")
+      .select("id, name, email, phone, image_url")
       .eq("id", customerId)
       .single(),
     admin
@@ -337,6 +337,7 @@ async function getCustomerSnapshot(admin: any, customerId: string) {
     name: customer.name,
     email: customer.email,
     phone: customer.phone,
+    image_url: customer.image_url || null,
     city: address?.city || null,
     state: address?.state || null,
     zip_code: address?.zip_code || null,

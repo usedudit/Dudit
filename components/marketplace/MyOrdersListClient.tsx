@@ -196,8 +196,10 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { ord
                                     {filteredOrders.map((order: any) => {
                                         const statusConfig = getStatusConfig(order.situation);
                                         const StatusIcon = statusConfig.icon;
-                                        const storeImage = order.partners?.store_image_url
-                                            ? getR2ImageUrl(order.partners.store_image_url)
+                                        const storeObj = Array.isArray(order.stores) ? order.stores[0] : order.stores;
+                                        const sellerName = storeObj?.name || order.partners?.name || order.partners?.store_name || "Loja Parceira";
+                                        const storeImage = storeObj?.logo_url
+                                            ? getR2ImageUrl(storeObj.logo_url)
                                             : "https://img.dudit.com.br/static/Placeholder.png";
 
                                         const orderItems = order.order_items || [];
@@ -221,14 +223,14 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { ord
                                                         {/* Seller Image */}
                                                         <img
                                                             src={storeImage}
-                                                            alt={order.partners?.name || order.partners?.store_name || "Loja"}
+                                                            alt={sellerName}
                                                             className="w-10 h-10 rounded-full object-cover border border-brand-border dark:border-dark-border bg-white"
                                                         />
 
                                                         <div>
                                                             {/* Store Name Top */}
                                                             <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                                                                {order.partners?.name || order.partners?.store_name || "Loja Parceira"}
+                                                                {sellerName}
                                                                 {isStoreDeleted(order) && (
                                                                     <Tooltip text="Este negócio não está mais no Dudit">
                                                                         <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0 inline-block align-middle cursor-help" />
@@ -246,9 +248,6 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { ord
                                                             <div className="text-xs text-brand-inactive-text mt-0.5">
                                                                 <div className="flex items-center gap-1.5 flex-wrap">
                                                                     <span>Pedido #{order.order_number || order.id.slice(0, 8)}</span>
-                                                                    {order.situation === "cancelled" && (
-                                                                        <Badge variant="red" className="scale-90 px-1.5 py-0">Cancelado</Badge>
-                                                                    )}
                                                                     <span className="hidden lg:inline">•</span>
                                                                     <span className="hidden lg:inline">{formatFullDate(order.created_at)}</span>
                                                                 </div>
@@ -289,94 +288,94 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { ord
                                                             return Math.round(basePrice * itemDiscountRatio * 100) / 100
                                                         }
                                                         return (
-                                                    <div className="space-y-4">
-                                                        {order.order_items?.map((item: any) => {
-                                                            const discountedPrice = getDiscountedPrice(item)
-                                                            const itemImage = getPrimaryProductDisplayImage({
-                                                                images: item.products?.images || item.services?.images || null,
-                                                                video_thumbnail: item.products?.video_thumbnail || null,
-                                                                fallback_variant_image: item.product_variants?.variant_options?.image || null,
-                                                            });
+                                                            <div className="space-y-4">
+                                                                {order.order_items?.map((item: any) => {
+                                                                    const discountedPrice = getDiscountedPrice(item)
+                                                                    const itemImage = getPrimaryProductDisplayImage({
+                                                                        images: item.products?.images || item.services?.images || null,
+                                                                        video_thumbnail: item.products?.video_thumbnail || null,
+                                                                        fallback_variant_image: item.product_variants?.variant_options?.image || null,
+                                                                    });
 
-                                                            const isService = !!item.service_id || item.line_type === "service_booking";
-                                                            const isPlan = !!item.recurring_plan_id || item.line_type === "subscription";
+                                                                    const isService = !!item.service_id || item.line_type === "service_booking";
+                                                                    const isPlan = !!item.recurring_plan_id || item.line_type === "subscription";
 
-                                                            let itemUrl = "";
-                                                            if (isService) {
-                                                                itemUrl = getServiceUrl({ ...item.services, id: item.service_id }, order.partners);
-                                                            } else if (isPlan) {
-                                                                itemUrl = getPlanUrl({ ...item.recurring_plans, id: item.recurring_plan_id }, order.partners);
-                                                            } else if (item.product_id) {
-                                                                itemUrl = getProductUrl({ ...item.products, id: item.product_id }, order.partners);
-                                                            }
+                                                                    let itemUrl = "";
+                                                                    if (isService) {
+                                                                        itemUrl = getServiceUrl({ ...item.services, id: item.service_id }, storeObj);
+                                                                    } else if (isPlan) {
+                                                                        itemUrl = getPlanUrl({ ...item.recurring_plans, id: item.recurring_plan_id }, storeObj);
+                                                                    } else if (item.product_id) {
+                                                                        itemUrl = getProductUrl({ ...item.products, id: item.product_id }, storeObj);
+                                                                    }
 
-                                                            const cardContent = (
-                                                                <>
-                                                                    <div className="w-12 h-12 bg-white border border-brand-border dark:border-dark-border rounded-[8px] flex items-center justify-center shrink-0">
-                                                                        <img src={itemImage} alt={item.products?.name || item.services?.name || item.product_name} className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal rounded-[4px]" />
-                                                                    </div>
-                                                                    <div className="flex-1 min-w-0 flex flex-col justify-center">
-                                                                        <div className="flex justify-between items-start">
-                                                                            <div>
-                                                                                <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading mb-0.5 group-hover:text-brand-green transition-colors">
-                                                                                    {item.is_gift && <span className="text-brand-green font-bold">[BRINDE] </span>}{item.products?.name || item.services?.name || item.product_name}
-                                                                                </h4>
+                                                                    const cardContent = (
+                                                                        <>
+                                                                            <div className="w-12 h-12 bg-white border border-brand-border dark:border-dark-border rounded-[8px] flex items-center justify-center shrink-0">
+                                                                                <img src={itemImage} alt={item.products?.name || item.services?.name || item.product_name} className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal rounded-[4px]" />
+                                                                            </div>
+                                                                            <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                                                                <div className="flex justify-between items-start">
+                                                                                    <div>
+                                                                                        <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading mb-0.5 group-hover:text-brand-green transition-colors">
+                                                                                            {item.is_gift && <span className="text-brand-green font-bold">[BRINDE] </span>}{item.products?.name || item.services?.name || item.product_name}
+                                                                                        </h4>
 
-                                                                                {item.product_variants?.variant_name && (
-                                                                                    <div className="text-xs text-brand-inactive-text mt-0.5">
-                                                                                        {item.product_variants.variant_name}
+                                                                                        {item.product_variants?.variant_name && (
+                                                                                            <div className="text-xs text-brand-inactive-text mt-0.5">
+                                                                                                {item.product_variants.variant_name}
+                                                                                            </div>
+                                                                                        )}
+
+                                                                                        <div className="flex items-center gap-2 text-xs mt-1">
+                                                                                            <span className="text-brand-inactive-text">{formatProductQuantity(item.quantity, item.products?.unit)}</span>
+                                                                                            <span className="text-brand-border dark:text-dark-border">|</span>
+                                                                                            <span className="font-medium text-brand-dark dark:text-dark-heading">
+                                                                                                {(() => {
+                                                                                                    const basePrice = Number(item.product_price || 0)
+                                                                                                    if (item.is_gift) {
+                                                                                                        return (
+                                                                                                            <span className="flex items-center gap-1.5 inline-flex">
+                                                                                                                <span className="text-xs text-brand-inactive-text line-through font-normal">{formatCurrency(item.original_price || 0)}</span>
+                                                                                                                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">Grátis</span>
+                                                                                                            </span>
+                                                                                                        )
+                                                                                                    }
+                                                                                                    if (hasItemDiscount && Math.abs(basePrice - discountedPrice) > 0.005) {
+                                                                                                        return (
+                                                                                                            <span className="flex items-center gap-1.5 inline-flex">
+                                                                                                                <span className="text-xs text-brand-inactive-text line-through font-normal">{formatProductUnitPrice(basePrice, item.products?.unit)}</span>
+                                                                                                                <span className="text-xs font-bold text-brand-dark dark:text-dark-heading">{formatProductUnitPrice(discountedPrice, item.products?.unit)}</span>
+                                                                                                            </span>
+                                                                                                        )
+                                                                                                    }
+                                                                                                    return formatProductUnitPrice(basePrice, item.products?.unit)
+                                                                                                })()}
+                                                                                            </span>
+                                                                                        </div>
                                                                                     </div>
-                                                                                )}
-
-                                                                                <div className="flex items-center gap-2 text-xs mt-1">
-                                                                                    <span className="text-brand-inactive-text">{formatProductQuantity(item.quantity, item.products?.unit)}</span>
-                                                                                    <span className="text-brand-border dark:text-dark-border">|</span>
-                                                                                    <span className="font-medium text-brand-dark dark:text-dark-heading">
-                                                                                        {(() => {
-                                                                                            const basePrice = Number(item.product_price || 0)
-                                                                                            if (item.is_gift) {
-                                                                                                return (
-                                                                                                    <span className="flex items-center gap-1.5 inline-flex">
-                                                                                                        <span className="text-xs text-brand-inactive-text line-through font-normal">{formatCurrency(item.original_price || 0)}</span>
-                                                                                                        <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">Grátis</span>
-                                                                                                    </span>
-                                                                                                )
-                                                                                            }
-                                                                                            if (hasItemDiscount && Math.abs(basePrice - discountedPrice) > 0.005) {
-                                                                                                return (
-                                                                                                    <span className="flex items-center gap-1.5 inline-flex">
-                                                                                                        <span className="text-xs text-brand-inactive-text line-through font-normal">{formatProductUnitPrice(basePrice, item.products?.unit)}</span>
-                                                                                                        <span className="text-xs font-bold text-brand-dark dark:text-dark-heading">{formatProductUnitPrice(discountedPrice, item.products?.unit)}</span>
-                                                                                                    </span>
-                                                                                                )
-                                                                                            }
-                                                                                            return formatProductUnitPrice(basePrice, item.products?.unit)
-                                                                                        })()}
-                                                                                    </span>
                                                                                 </div>
                                                                             </div>
-                                                                        </div>
-                                                                    </div>
-                                                                </>
-                                                            );
+                                                                        </>
+                                                                    );
 
-                                                            if (!itemUrl) {
-                                                                return (
-                                                                    <div key={item.id} className="flex gap-4 p-2 -mx-2 rounded-lg transition-colors">
-                                                                        {cardContent}
-                                                                    </div>
-                                                                );
-                                                            }
+                                                                    if (!itemUrl) {
+                                                                        return (
+                                                                            <div key={item.id} className="flex gap-4 p-2 -mx-2 rounded-lg transition-colors">
+                                                                                {cardContent}
+                                                                            </div>
+                                                                        );
+                                                                    }
 
-                                                            return (
-                                                                <Link href={itemUrl} prefetch={true} key={item.id} className="flex gap-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800/50 p-2 -mx-2 rounded-lg transition-colors group">
-                                                                    {cardContent}
-                                                                </Link>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                )
-                                            })()}
+                                                                    return (
+                                                                        <Link href={itemUrl} prefetch={true} key={item.id} className="flex gap-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800/50 p-2 -mx-2 rounded-lg transition-colors group">
+                                                                            {cardContent}
+                                                                        </Link>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        )
+                                                    })()}
 
                                                     {/* Actions Footer */}
                                                     <div className="flex flex-row justify-between items-center gap-4 mt-8 pt-6 border-t border-brand-border dark:border-dark-border w-full flex-wrap">
@@ -397,9 +396,10 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { ord
                                                             )}
 
                                                             {order.situation === 'paid' && !isOrderFullyReviewed && reviewableItems.length > 0 && (
-                                                                <ReviewButton
+                                                                    <ReviewButton
                                                                     orderId={order.id}
                                                                     partnerId={order.partner_id}
+                                                                    storeId={order.store_id}
                                                                     items={order.order_items}
                                                                     userId={userId}
                                                                     reviewedItemsSet={reviewedItemsSet}

@@ -8,8 +8,8 @@ import { UserProfileImage } from "@/lib/utils/UserProfileImage";
 interface CustomerCardProps {
     customer?: {
         name?: string;
-        email?: string;
-        phone?: string;
+        email?: string | null;
+        phone?: string | null;
         [key: string]: any;
     } | null;
     address?: {
@@ -108,6 +108,9 @@ const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, billingA
     const resolvedEmail = customer?.email || (customer as any)?.contact_email || (customer as any)?.buyer_email || "";
     const resolvedPhone = customer?.phone || (customer as any)?.contact_phone || (customer as any)?.phone_fixed || (customer as any)?.phoneFixed || "";
 
+    // 2b. Resolve customer avatar: check multiple possible field names
+    const resolvedImageUrl = (customer as any)?.image_url || (customer as any)?.avatar_url || (customer as any)?.avatar || (customer as any)?.imageUrl || (customer as any)?.photo_url || (customer as any)?.profile_picture || null;
+
     const addressToUse = resolveAddress();
     const resolvedBillingAddress = resolveBillingAddress();
 
@@ -126,9 +129,7 @@ const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, billingA
             ? `${addr.city || ""}${(addr.state || addr.uf) ? ` - ${addr.state || addr.uf}` : ""}`
             : null;
 
-        const zipLine = addr.zipCode || addr.zip_code;
-
-        return [streetLine, cityLine, zipLine]
+        return [streetLine, cityLine]
             .filter(Boolean)
             .join("\n");
     };
@@ -164,6 +165,7 @@ const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, billingA
                         <div className="relative">
                             <UserProfileImage
                                 fullName={customer?.name || "Cliente"}
+                                imageUrl={resolvedImageUrl}
                                 className="w-10 h-10 text-base border border-white dark:border-dark-border"
                             />
                         </div>

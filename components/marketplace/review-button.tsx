@@ -13,6 +13,7 @@ import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-image
 interface ReviewButtonProps {
   orderId: string
   partnerId: string
+  storeId?: string | null
   items: any[]
   userId: string
   reviewedItemsSet?: Set<string>
@@ -21,6 +22,7 @@ interface ReviewButtonProps {
 export function ReviewButton({
   orderId,
   partnerId,
+  storeId,
   items,
   userId,
   reviewedItemsSet,
@@ -77,6 +79,7 @@ export function ReviewButton({
         return createReviewAction({
           orderId,
           partnerId,
+          storeId,
           productId: item.product_id || null,
           serviceId: item.service_id || null,
           rating: itemRating,

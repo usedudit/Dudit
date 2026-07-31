@@ -1,11 +1,12 @@
 "use client"
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
-import { SaveIcon, EditIcon, PlusIcon, TrashIcon, SearchIcon, UserIcon, Package, WrenchIcon } from "@/lib/icons"
-import { Button, Input, Checkbox, Badge, Tabs, TabsList, TabsTrigger, FormDropdown, FormTextarea, FormRadioGroup, DatePicker, FormSection, Pagination, Separator, MoneyInput, PercentageInput, IconPlaceholder } from "@/components/reusable"
+import { SaveIcon, EditIcon, PlusIcon, TrashIcon, SearchIcon, UserIcon, Package, WrenchIcon, TagIcon } from "@/lib/icons"
+import { Button, Input, Checkbox, Badge, Tabs, TabsList, TabsTrigger, FormDropdown, FormTextarea, FormRadioGroup, DatePicker, FormSection, Pagination, Separator, MoneyInput, PercentageInput, IconPlaceholder, UnsavedChangesDialog } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { useToast } from "@/hooks/use-toast"
 import { useSidebar } from "@/lib/sidebar-context"
+import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import {
     createCampaignAction,
     updateCampaignAction,
@@ -66,6 +67,7 @@ export default function PromotionFormPage({
     const { toast } = useToast()
     const { setHeaderOverride } = useSidebar()
     const [currentMode, setCurrentMode] = useState(initialMode)
+    const [createdCampaignId, setCreatedCampaignId] = useState<string | null>(null)
     const [isSaving, setIsSaving] = useState(false)
     const [activeTab, setActiveTab] = useState("general")
 
@@ -87,24 +89,36 @@ export default function PromotionFormPage({
     const [campActive, setCampActive] = useState(true)
     const [campCustIds, setCampCustIds] = useState<string[]>([])
     const [custSearch, setCustSearch] = useState("")
+    const [custPage, setCustPage] = useState(1)
 
-    // Subform Rule State (for adding/editing a promotion inside the tab)
+    // Subform Rule State
     const [editingRule, setEditingRule] = useState<any | null>(null)
 
-    // Sheet states for selected products/categories/services in the rule subform
+    // Selection states for scope items
     const [editingRuleProductIds, setEditingRuleProductIds] = useState<string[]>([])
     const [editingRuleCategoryIds, setEditingRuleCategoryIds] = useState<string[]>([])
     const [editingRuleServiceIds, setEditingRuleServiceIds] = useState<string[]>([])
     const [editingStoreIds, setEditingStoreIds] = useState<string[]>([])
+
+    // Sheet visibility states
     const [isProductsSheetOpen, setIsProductsSheetOpen] = useState(false)
     const [isCategoriesSheetOpen, setIsCategoriesSheetOpen] = useState(false)
     const [isServicesSheetOpen, setIsServicesSheetOpen] = useState(false)
     const [isGiftSheetOpen, setIsGiftSheetOpen] = useState(false)
     const [isCustomersSheetOpen, setIsCustomersSheetOpen] = useState(false)
 
-    // Pagination & Search states for selected items lists
+    // Search and pagination states for scope lists
     const [scopeSearch, setScopeSearch] = useState("")
     const [scopePage, setScopePage] = useState(1)
+
+    // Track dirty state for unsaved changes modal
+    const [isFormDirty, setIsFormDirty] = useState(false)
+
+    const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isFormDirty && !isReadOnly)
+
+    const handleHeaderBack = useCallback(() => {
+        handleNavigation(onBack)
+    }, [handleNavigation, onBack])
 
     const pageTitle = useMemo(() => {
         return currentMode === "add" ? "Nova Campanha de Marketing"
@@ -112,16 +126,14 @@ export default function PromotionFormPage({
                 : campName || "Campanha"
     }, [currentMode, campName])
 
-    const handleBack = useCallback(() => onBack?.(), [onBack])
-
     useEffect(() => {
         setHeaderOverride({
             title: pageTitle,
-            onBack: handleBack,
+            onBack: handleHeaderBack,
             isSubPage: true
         })
         return () => setHeaderOverride(null)
-    }, [pageTitle, handleBack, setHeaderOverride])
+    }, [pageTitle, handleHeaderBack, setHeaderOverride])
 
     const lastCampaignIdRef = useRef<string | undefined>(undefined)
     const lastModeRef = useRef<string | undefined>(undefined)
@@ -131,7 +143,7 @@ export default function PromotionFormPage({
         setCurrentMode(initialMode)
     }, [initialMode])
 
-    // Load data based on mode and campaign
+    // Load campaign data on mount / change
     useEffect(() => {
         const campaignId = campaign?.id
         const isNewCampaign = campaignId !== lastCampaignIdRef.current || currentMode !== lastModeRef.current
@@ -149,24 +161,23 @@ export default function PromotionFormPage({
                 setCampCustIds((campaign.campaign_customers || []).map((cc: any) => cc.customer_id))
 
                 const campPromos = promotions.filter(p => p.campaign_id === campaign.id)
-                let initialPromos = []
+                let initialRule = campPromos.length > 0 ? campPromos[0] : { is_active: true, priority: 0, promotion_type: 'discount', discount_type: 'percentage', apply_scope: 'entire_cart' }
+
                 if (currentMode === "duplicate") {
-                    initialPromos = campPromos.map(p => ({
-                        ...p,
+                    initialRule = {
+                        ...initialRule,
                         id: `temp_${Math.random()}`,
                         campaign_id: undefined,
-                        promotion_products: (p.promotion_products || []).map((prod: any) => prod.product_id || prod),
-                        promotion_categories: (p.promotion_categories || []).map((cat: any) => cat.category_id || cat),
-                        promotion_services: (p.promotion_services || []).map((serv: any) => serv.service_id || serv),
-                    }))
-                } else {
-                    initialPromos = campPromos
+                    }
                 }
-                if (initialPromos.length > 0) {
-                    setEditingRule(initialPromos[0])
-                } else {
-                    setEditingRule({ is_active: true, priority: 0, promotion_type: 'discount', discount_type: 'percentage', apply_scope: 'entire_cart' })
-                }
+
+                setEditingRule(initialRule)
+
+                // Initialize selection IDs
+                setEditingRuleProductIds((initialRule.promotion_products || []).map((p: any) => p.product_id || p))
+                setEditingRuleCategoryIds((initialRule.promotion_categories || []).map((c: any) => c.category_id || c))
+                setEditingRuleServiceIds((initialRule.promotion_services || []).map((s: any) => s.service_id || s))
+                setEditingStoreIds(initialRule.store_id ? [initialRule.store_id] : (campaign.store_id ? [campaign.store_id] : []))
             } else if (currentMode === "add") {
                 setCampName("")
                 setCampDesc("")
@@ -176,46 +187,28 @@ export default function PromotionFormPage({
                 setCampActive(true)
                 setCampCustIds([])
                 setEditingRule({ is_active: true, priority: 0, promotion_type: 'discount', discount_type: 'percentage', apply_scope: 'entire_cart' })
+                setEditingRuleProductIds([])
+                setEditingRuleCategoryIds([])
+                setEditingRuleServiceIds([])
+                setEditingStoreIds([])
             }
+            setIsFormDirty(false)
         }
     }, [currentMode, campaign, promotions])
 
-    // Reset selected lists pagination and search when active scope changes
-    useEffect(() => {
-        setScopeSearch("")
-        setScopePage(1)
-    }, [editingRule?.apply_scope, editingRule?.id])
+    // Mark form as dirty when state changes
+    const markDirty = useCallback(() => {
+        if (!isFormDirty) setIsFormDirty(true)
+    }, [isFormDirty])
 
-    // Update product/category/services selection sheets state when subform opens
-    useEffect(() => {
-        if (editingRule) {
-            setEditingRuleProductIds(
-                (editingRule.promotion_products || []).map((p: any) => p.product_id || p)
-            )
-            setEditingRuleCategoryIds(
-                (editingRule.promotion_categories || []).map((c: any) => c.category_id || c)
-            )
-            setEditingRuleServiceIds(
-                (editingRule.promotion_services || []).map((s: any) => s.service_id || s)
-            )
-            setEditingStoreIds(editingRule.promotion_store_ids || [])
-        } else {
-            setEditingRuleProductIds([])
-            setEditingRuleCategoryIds([])
-            setEditingRuleServiceIds([])
-            setEditingStoreIds([])
-        }
-    }, [editingRule])
-
-    // Save the overall Campaign + memory rules
-    const handleSaveCampaign = async (e: React.FormEvent) => {
-        e.preventDefault()
+    // Save the overall Campaign + Promotion Rule
+    const handleSaveCampaign = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault()
         if (!campName.trim()) {
             toast({ title: "Nome da campanha é obrigatório.", variant: "destructive" })
             return
         }
 
-        // Validate the promotion rule (since there is only one rule, it's always editingRule)
         if (editingRule) {
             if (editingRule.promotion_type === "buy_x_pay_y") {
                 if (!editingRule.buy_quantity || !editingRule.pay_quantity || Number(editingRule.buy_quantity) <= Number(editingRule.pay_quantity)) {
@@ -241,6 +234,7 @@ export default function PromotionFormPage({
 
         setIsSaving(true)
         try {
+            const derivedStoreId = editingStoreIds.length === 1 ? editingStoreIds[0] : null
             const payload = {
                 partnerId,
                 name: campName,
@@ -250,11 +244,14 @@ export default function PromotionFormPage({
                 endsAt: campEnds ? new Date(campEnds).toISOString() : null,
                 isActive: campActive,
                 customerIds: campScope === "specific" ? campCustIds : [],
+                storeId: derivedStoreId,
             }
 
-            if (currentMode === "edit") {
-                // 1. Save Campaign details
-                const res = await updateCampaignAction(campaign.id, payload)
+            const targetCampaignId = (currentMode === "edit" && campaign?.id) ? campaign.id : createdCampaignId
+
+            if (currentMode === "edit" || createdCampaignId) {
+                // 1. Update Campaign details
+                const res = await updateCampaignAction(targetCampaignId!, payload)
                 if (!res.success) {
                     toast({ title: "Erro ao salvar campanha.", description: res.error, variant: "destructive" })
                     setIsSaving(false)
@@ -273,7 +270,7 @@ export default function PromotionFormPage({
                     )
                     const promoPayload = {
                         partnerId,
-                        campaignId: campaign.id,
+                        campaignId: targetCampaignId!,
                         name: generatedName,
                         description: null,
                         promotionType: editingRule.promotion_type,
@@ -311,6 +308,7 @@ export default function PromotionFormPage({
                     }
                 }
 
+                setIsFormDirty(false)
                 toast({ title: "Campanha e regra salvas com sucesso." })
                 onBack()
             } else {
@@ -318,6 +316,8 @@ export default function PromotionFormPage({
                 const res = await createCampaignAction(payload)
                 if (res.success) {
                     const newCampaignId = res.id
+                    setCreatedCampaignId(newCampaignId)
+                    setCurrentMode("edit")
 
                     // Create Rule details
                     if (editingRule) {
@@ -367,6 +367,7 @@ export default function PromotionFormPage({
                         }
                     }
 
+                    setIsFormDirty(false)
                     toast({ title: "Campanha e regra salvas com sucesso." })
                     onBack()
                 } else {
@@ -442,6 +443,28 @@ export default function PromotionFormPage({
 
     const totalServicePages = Math.ceil(filteredSelectedServices.length / 5)
 
+    // Selected customers selectors & filters
+    const selectedCustomers = useMemo(() => {
+        return scopeData.customers.filter((c: any) => campCustIds.includes(c.id))
+    }, [scopeData.customers, campCustIds])
+
+    const filteredSelectedCustomers = useMemo(() => {
+        const term = custSearch.toLowerCase().trim()
+        if (!term) return selectedCustomers
+        return selectedCustomers.filter((c: any) =>
+            c.name.toLowerCase().includes(term) ||
+            String(c.email || "").toLowerCase().includes(term) ||
+            String(c.phone || "").toLowerCase().includes(term)
+        )
+    }, [selectedCustomers, custSearch])
+
+    const paginatedSelectedCustomers = useMemo(() => {
+        const start = (custPage - 1) * 5
+        return filteredSelectedCustomers.slice(start, start + 5)
+    }, [filteredSelectedCustomers, custPage])
+
+    const totalCustomerPages = Math.ceil(filteredSelectedCustomers.length / 5)
+
     const SidebarCard = ({ children, className = "", hasTopStrip = false }: { children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
         <div className={`bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
             {hasTopStrip && <div className="absolute top-0 left-0 w-full h-[3px] bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
@@ -449,6 +472,7 @@ export default function PromotionFormPage({
         </div>
     )
 
+    // Render list for selected products
     const renderSelectedProductsList = () => {
         return (
             <FormSection hasSeparator title="Produtos Específicos Elegíveis">
@@ -456,7 +480,7 @@ export default function PromotionFormPage({
                     <div className="flex flex-col sm:flex-row items-center gap-4 justify-between">
                         <div className="w-full sm:w-72">
                             <Input
-                                name="scopeSearch"
+                                name="scopeSearchProducts"
                                 placeholder="Buscar nos selecionados..."
                                 value={scopeSearch}
                                 onChange={(e) => {
@@ -468,24 +492,23 @@ export default function PromotionFormPage({
                                 prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
                                 label=""
                             />
-                            <Button variant="link" onClick={() => setIsProductsSheetOpen(true)} leftIcon={<PlusIcon size={16} />}>
-                                Selecionar Produtos
-                            </Button>
                         </div>
+                        <Button variant="link" type="button" onClick={() => setIsProductsSheetOpen(true)} leftIcon={<PlusIcon size={16} />}>
+                            Selecionar Produtos
+                        </Button>
                     </div>
 
                     {filteredSelectedProducts.length > 0 ? (
                         <>
                             {/* Desktop Table */}
-                            <div className="hidden md:block overflow-hidden bg-white dark:bg-dark-surface">
+                            <div className="hidden md:block overflow-hidden rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
                                 <table className="w-full text-left border-collapse text-sm">
                                     <thead>
-                                        <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                            <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 rounded-l-lg">Produto</th>
-                                            <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">SKU</th>
-                                            <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">Categoria</th>
-                                            <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">Preço</th>
-                                            <th className="p-3 font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-center pr-6 w-20 rounded-r-lg">Ações</th>
+                                        <tr className="bg-brand-gray dark:bg-dark-border/50 border-b border-brand-border dark:border-dark-border">
+                                            <th className="p-3 pl-6 font-semibold text-gray-500 dark:text-dark-body">Produto / SKU</th>
+                                            <th className="p-3 font-semibold text-gray-500 dark:text-dark-body">Preço</th>
+                                            <th className="p-3 font-semibold text-gray-500 dark:text-dark-body">Loja a que pertence</th>
+                                            <th className="p-3 font-semibold text-gray-500 dark:text-dark-body text-center pr-6 w-20">Ações</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -493,25 +516,35 @@ export default function PromotionFormPage({
                                             <tr key={prod.id} className="border-b border-brand-border dark:border-dark-border last:border-0 hover:bg-brand-gray/35 dark:hover:bg-dark-border/20 transition-colors">
                                                 <td className="p-3 pl-6">
                                                     <div className="flex items-center gap-3">
-                                                        <div className="w-8 h-8 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border overflow-hidden">
+                                                        <div className="w-9 h-9 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border overflow-hidden">
                                                             <img
                                                                 src={getR2ImageUrl(prod.image, "thumbnail")}
                                                                 alt=""
                                                                 className="w-full h-full object-cover"
                                                             />
                                                         </div>
-                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">{prod.name}</span>
+                                                        <div className="min-w-0">
+                                                            <p className="font-bold text-brand-dark dark:text-dark-heading">{prod.name}</p>
+                                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body font-mono">{prod.sku ? `SKU: ${prod.sku}` : "Sem SKU"}</p>
+                                                        </div>
                                                     </div>
                                                 </td>
-                                                <td className="p-3 text-brand-inactive-text dark:text-dark-body">{prod.sku || "-"}</td>
-                                                <td className="p-3 text-brand-inactive-text dark:text-dark-body">{prod.category || "-"}</td>
                                                 <td className="p-3 font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(prod.price)}</td>
+                                                <td className="p-3">
+                                                    <Badge variant="blue" className="whitespace-nowrap">
+                                                        {prod.storeName || "Toda a Rede"}
+                                                    </Badge>
+                                                </td>
                                                 <td className="p-3 text-center pr-6" onClick={(e) => e.stopPropagation()}>
                                                     <Button
-                                                        variant="outlinered"
+                                                        variant="outline"
+                                                        type="button"
                                                         size="icon"
-                                                        onClick={() => setEditingRuleProductIds(editingRuleProductIds.filter(id => id !== prod.id))}
-                                                        className="h-8 w-8"
+                                                        onClick={() => {
+                                                            markDirty()
+                                                            setEditingRuleProductIds(editingRuleProductIds.filter(id => id !== prod.id))
+                                                        }}
+                                                        className="text-red-500 hover:text-red-600 hover:bg-red-50 border-0 h-8 w-8"
                                                     >
                                                         <TrashIcon size={16} />
                                                     </Button>
@@ -522,12 +555,11 @@ export default function PromotionFormPage({
                                 </table>
                             </div>
 
-                            {/* Mobile/Tablet List */}
-                            <div className="md:hidden border border-brand-border dark:border-dark-border rounded-xl p-4 bg-white dark:bg-dark-surface space-y-3">
-                                {paginatedSelectedProducts.map((prod, idx) => (
-                                    <React.Fragment key={prod.id}>
-                                        {idx > 0 && <Separator className="my-2" />}
-                                        <div className="flex items-center justify-between gap-3">
+                            {/* Mobile/Tablet GridCard list */}
+                            <div className="md:hidden grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {paginatedSelectedProducts.map((prod) => (
+                                    <div key={prod.id} className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl p-4 flex flex-col justify-between space-y-3">
+                                        <div className="flex items-start justify-between gap-3">
                                             <div className="flex items-center gap-3 min-w-0">
                                                 <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border overflow-hidden">
                                                     <img
@@ -538,21 +570,29 @@ export default function PromotionFormPage({
                                                 </div>
                                                 <div className="min-w-0">
                                                     <p className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">{prod.name}</p>
-                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate">
-                                                        {prod.sku ? `SKU: ${prod.sku}` : "Sem SKU"} • {formatCurrency(prod.price)}
-                                                    </p>
+                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body font-mono truncate">{prod.sku ? `SKU: ${prod.sku}` : "Sem SKU"}</p>
                                                 </div>
                                             </div>
                                             <Button
                                                 variant="outline"
+                                                type="button"
                                                 size="icon"
-                                                onClick={() => setEditingRuleProductIds(editingRuleProductIds.filter(id => id !== prod.id))}
+                                                onClick={() => {
+                                                    markDirty()
+                                                    setEditingRuleProductIds(editingRuleProductIds.filter(id => id !== prod.id))
+                                                }}
                                                 className="text-red-500 hover:text-red-600 hover:bg-red-50 border-0 h-8 w-8 shrink-0"
                                             >
                                                 <TrashIcon size={16} />
                                             </Button>
                                         </div>
-                                    </React.Fragment>
+                                        <div className="flex items-center justify-between border-t border-brand-border dark:border-dark-border pt-2 text-xs">
+                                            <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(prod.price)}</span>
+                                            <Badge variant="blue" className="scale-90">
+                                                {prod.storeName || "Toda a Rede"}
+                                            </Badge>
+                                        </div>
+                                    </div>
                                 ))}
                             </div>
 
@@ -585,6 +625,7 @@ export default function PromotionFormPage({
         )
     }
 
+    // Render list for selected categories
     const renderSelectedCategoriesList = () => {
         return (
             <FormSection hasSeparator title="Categorias Específicas Elegíveis">
@@ -592,7 +633,7 @@ export default function PromotionFormPage({
                     <div className="flex flex-col sm:flex-row items-center gap-4 justify-between">
                         <div className="w-full sm:w-72">
                             <Input
-                                name="scopeSearch"
+                                name="scopeSearchCategories"
                                 placeholder="Buscar nos selecionados..."
                                 value={scopeSearch}
                                 onChange={(e) => {
@@ -604,10 +645,10 @@ export default function PromotionFormPage({
                                 prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
                                 label=""
                             />
-                            <Button variant="link" onClick={() => setIsCategoriesSheetOpen(true)} leftIcon={<PlusIcon size={16} />}>
-                                Selecionar Categorias
-                            </Button>
                         </div>
+                        <Button variant="link" type="button" onClick={() => setIsCategoriesSheetOpen(true)} leftIcon={<PlusIcon size={16} />}>
+                            Selecionar Categorias
+                        </Button>
                     </div>
 
                     {filteredSelectedCategories.length > 0 ? (
@@ -618,6 +659,7 @@ export default function PromotionFormPage({
                                     <thead>
                                         <tr className="bg-brand-gray dark:bg-dark-border/50 border-b border-brand-border dark:border-dark-border">
                                             <th className="p-3 pl-6 font-semibold text-gray-500 dark:text-dark-body">Categoria</th>
+                                            <th className="p-3 font-semibold text-gray-500 dark:text-dark-body">Loja a que pertence</th>
                                             <th className="p-3 font-semibold text-gray-500 dark:text-dark-body text-center pr-6 w-20">Ações</th>
                                         </tr>
                                     </thead>
@@ -625,11 +667,20 @@ export default function PromotionFormPage({
                                         {paginatedSelectedCategories.map((cat) => (
                                             <tr key={cat.id} className="border-b border-brand-border dark:border-dark-border last:border-0 hover:bg-brand-gray/35 dark:hover:bg-dark-border/20 transition-colors">
                                                 <td className="p-3 pl-6 font-bold text-brand-dark dark:text-dark-heading">{cat.name}</td>
+                                                <td className="p-3">
+                                                    <Badge variant="blue" className="whitespace-nowrap">
+                                                        {cat.storeName || "Toda a Rede"}
+                                                    </Badge>
+                                                </td>
                                                 <td className="p-3 text-center pr-6" onClick={(e) => e.stopPropagation()}>
                                                     <Button
                                                         variant="outline"
+                                                        type="button"
                                                         size="icon"
-                                                        onClick={() => setEditingRuleCategoryIds(editingRuleCategoryIds.filter(id => id !== cat.id))}
+                                                        onClick={() => {
+                                                            markDirty()
+                                                            setEditingRuleCategoryIds(editingRuleCategoryIds.filter(id => id !== cat.id))
+                                                        }}
                                                         className="text-red-500 hover:text-red-600 hover:bg-red-50 border-0 h-8 w-8"
                                                     >
                                                         <TrashIcon size={16} />
@@ -641,23 +692,29 @@ export default function PromotionFormPage({
                                 </table>
                             </div>
 
-                            {/* Mobile/Tablet List */}
-                            <div className="md:hidden border border-brand-border dark:border-dark-border rounded-xl p-4 bg-white dark:bg-dark-surface space-y-3">
-                                {paginatedSelectedCategories.map((cat, idx) => (
-                                    <React.Fragment key={cat.id}>
-                                        {idx > 0 && <Separator className="my-2" />}
-                                        <div className="flex items-center justify-between gap-3">
+                            {/* Mobile/Tablet GridCard list */}
+                            <div className="md:hidden grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {paginatedSelectedCategories.map((cat) => (
+                                    <div key={cat.id} className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl p-4 flex items-center justify-between gap-3">
+                                        <div className="min-w-0">
                                             <p className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">{cat.name}</p>
-                                            <Button
-                                                variant="outline"
-                                                size="icon"
-                                                onClick={() => setEditingRuleCategoryIds(editingRuleCategoryIds.filter(id => id !== cat.id))}
-                                                className="text-red-500 hover:text-red-600 hover:bg-red-50 border-0 h-8 w-8 shrink-0"
-                                            >
-                                                <TrashIcon size={16} />
-                                            </Button>
+                                            <Badge variant="blue" className="scale-90 mt-1">
+                                                {cat.storeName || "Toda a Rede"}
+                                            </Badge>
                                         </div>
-                                    </React.Fragment>
+                                        <Button
+                                            variant="outline"
+                                            type="button"
+                                            size="icon"
+                                            onClick={() => {
+                                                markDirty()
+                                                setEditingRuleCategoryIds(editingRuleCategoryIds.filter(id => id !== cat.id))
+                                            }}
+                                            className="text-red-500 hover:text-red-600 hover:bg-red-50 border-0 h-8 w-8 shrink-0"
+                                        >
+                                            <TrashIcon size={16} />
+                                        </Button>
+                                    </div>
                                 ))}
                             </div>
 
@@ -674,7 +731,7 @@ export default function PromotionFormPage({
                         </>
                     ) : (
                         <IconPlaceholder
-                            icon={Package}
+                            icon={TagIcon}
                             title="Nenhuma categoria selecionada"
                             subtitle="Selecione categorias para a promoção."
                             itemButton={{
@@ -690,6 +747,7 @@ export default function PromotionFormPage({
         )
     }
 
+    // Render list for selected services
     const renderSelectedServicesList = () => {
         return (
             <FormSection hasSeparator title="Serviços Específicos Elegíveis">
@@ -697,7 +755,7 @@ export default function PromotionFormPage({
                     <div className="flex flex-col sm:flex-row items-center gap-4 justify-between">
                         <div className="w-full sm:w-72">
                             <Input
-                                name="scopeSearch"
+                                name="scopeSearchServices"
                                 placeholder="Buscar nos selecionados..."
                                 value={scopeSearch}
                                 onChange={(e) => {
@@ -709,10 +767,10 @@ export default function PromotionFormPage({
                                 prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
                                 label=""
                             />
-                            <Button variant="link" onClick={() => setIsServicesSheetOpen(true)} leftIcon={<PlusIcon size={16} />}>
-                                Selecionar Serviços
-                            </Button>
                         </div>
+                        <Button variant="link" type="button" onClick={() => setIsServicesSheetOpen(true)} leftIcon={<PlusIcon size={16} />}>
+                            Selecionar Serviços
+                        </Button>
                     </div>
 
                     {filteredSelectedServices.length > 0 ? (
@@ -722,10 +780,9 @@ export default function PromotionFormPage({
                                 <table className="w-full text-left border-collapse text-sm">
                                     <thead>
                                         <tr className="bg-brand-gray dark:bg-dark-border/50 border-b border-brand-border dark:border-dark-border">
-                                            <th className="p-3 pl-6 font-semibold text-gray-500 dark:text-dark-body">Serviço</th>
-                                            <th className="p-3 font-semibold text-gray-500 dark:text-dark-body">SKU</th>
-                                            <th className="p-3 font-semibold text-gray-500 dark:text-dark-body">Categoria</th>
+                                            <th className="p-3 pl-6 font-semibold text-gray-500 dark:text-dark-body">Serviço / SKU</th>
                                             <th className="p-3 font-semibold text-gray-500 dark:text-dark-body">Preço</th>
+                                            <th className="p-3 font-semibold text-gray-500 dark:text-dark-body">Loja a que pertence</th>
                                             <th className="p-3 font-semibold text-gray-500 dark:text-dark-body text-center pr-6 w-20">Ações</th>
                                         </tr>
                                     </thead>
@@ -734,24 +791,34 @@ export default function PromotionFormPage({
                                             <tr key={serv.id} className="border-b border-brand-border dark:border-dark-border last:border-0 hover:bg-brand-gray/35 dark:hover:bg-dark-border/20 transition-colors">
                                                 <td className="p-3 pl-6">
                                                     <div className="flex items-center gap-3">
-                                                        <div className="w-8 h-8 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border overflow-hidden">
+                                                        <div className="w-9 h-9 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border overflow-hidden">
                                                             <img
                                                                 src={getR2ImageUrl(serv.image, "thumbnail")}
                                                                 alt=""
                                                                 className="w-full h-full object-cover"
                                                             />
                                                         </div>
-                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">{serv.name}</span>
+                                                        <div className="min-w-0">
+                                                            <p className="font-bold text-brand-dark dark:text-dark-heading">{serv.name}</p>
+                                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body font-mono">{serv.sku ? `SKU: ${serv.sku}` : "Sem SKU"}</p>
+                                                        </div>
                                                     </div>
                                                 </td>
-                                                <td className="p-3 text-brand-inactive-text dark:text-dark-body">{serv.sku || "-"}</td>
-                                                <td className="p-3 text-brand-inactive-text dark:text-dark-body">{serv.category || "-"}</td>
                                                 <td className="p-3 font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(serv.price)}</td>
+                                                <td className="p-3">
+                                                    <Badge variant="blue" className="whitespace-nowrap">
+                                                        {serv.storeName || "Toda a Rede"}
+                                                    </Badge>
+                                                </td>
                                                 <td className="p-3 text-center pr-6" onClick={(e) => e.stopPropagation()}>
                                                     <Button
                                                         variant="outline"
+                                                        type="button"
                                                         size="icon"
-                                                        onClick={() => setEditingRuleServiceIds(editingRuleServiceIds.filter(id => id !== serv.id))}
+                                                        onClick={() => {
+                                                            markDirty()
+                                                            setEditingRuleServiceIds(editingRuleServiceIds.filter(id => id !== serv.id))
+                                                        }}
                                                         className="text-red-500 hover:text-red-600 hover:bg-red-50 border-0 h-8 w-8"
                                                     >
                                                         <TrashIcon size={16} />
@@ -763,12 +830,11 @@ export default function PromotionFormPage({
                                 </table>
                             </div>
 
-                            {/* Mobile/Tablet List */}
-                            <div className="md:hidden border border-brand-border dark:border-dark-border rounded-xl p-4 bg-white dark:bg-dark-surface space-y-3">
-                                {paginatedSelectedServices.map((serv, idx) => (
-                                    <React.Fragment key={serv.id}>
-                                        {idx > 0 && <Separator className="my-2" />}
-                                        <div className="flex items-center justify-between gap-3">
+                            {/* Mobile/Tablet GridCard list */}
+                            <div className="md:hidden grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {paginatedSelectedServices.map((serv) => (
+                                    <div key={serv.id} className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl p-4 flex flex-col justify-between space-y-3">
+                                        <div className="flex items-start justify-between gap-3">
                                             <div className="flex items-center gap-3 min-w-0">
                                                 <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border overflow-hidden">
                                                     <img
@@ -779,21 +845,29 @@ export default function PromotionFormPage({
                                                 </div>
                                                 <div className="min-w-0">
                                                     <p className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">{serv.name}</p>
-                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate">
-                                                        {serv.sku ? `SKU: ${serv.sku}` : "Sem SKU"} • {formatCurrency(serv.price)}
-                                                    </p>
+                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body font-mono truncate">{serv.sku ? `SKU: ${serv.sku}` : "Sem SKU"}</p>
                                                 </div>
                                             </div>
                                             <Button
                                                 variant="outline"
+                                                type="button"
                                                 size="icon"
-                                                onClick={() => setEditingRuleServiceIds(editingRuleServiceIds.filter(id => id !== serv.id))}
+                                                onClick={() => {
+                                                    markDirty()
+                                                    setEditingRuleServiceIds(editingRuleServiceIds.filter(id => id !== serv.id))
+                                                }}
                                                 className="text-red-500 hover:text-red-600 hover:bg-red-50 border-0 h-8 w-8 shrink-0"
                                             >
                                                 <TrashIcon size={16} />
                                             </Button>
                                         </div>
-                                    </React.Fragment>
+                                        <div className="flex items-center justify-between border-t border-brand-border dark:border-dark-border pt-2 text-xs">
+                                            <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(serv.price)}</span>
+                                            <Badge variant="blue" className="scale-90">
+                                                {serv.storeName || "Toda a Rede"}
+                                            </Badge>
+                                        </div>
+                                    </div>
                                 ))}
                             </div>
 
@@ -826,15 +900,8 @@ export default function PromotionFormPage({
         )
     }
 
+    // Render list for selected customers
     const renderSelectedCustomersList = () => {
-        const selectedCustomers = scopeData.customers.filter((c: any) => campCustIds.includes(c.id))
-        const searched = custSearch.trim()
-            ? selectedCustomers.filter((c: any) =>
-                c.name.toLowerCase().includes(custSearch.toLowerCase()) ||
-                String(c.email || "").toLowerCase().includes(custSearch.toLowerCase())
-            )
-            : selectedCustomers
-
         return (
             <FormSection title="Clientes Elegíveis">
                 <div className="flex flex-col gap-4">
@@ -844,42 +911,113 @@ export default function PromotionFormPage({
                                 name="custSearch"
                                 placeholder="Buscar nos selecionados..."
                                 value={custSearch}
-                                onChange={(e) => setCustSearch(e.target.value)}
+                                onChange={(e) => {
+                                    setCustSearch(e.target.value)
+                                    setCustPage(1)
+                                }}
                                 className="mb-0"
                                 variant="full-rounded"
                                 prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
                                 label=""
                             />
                         </div>
-                        <Button variant="link" onClick={() => setIsCustomersSheetOpen(true)} leftIcon={<PlusIcon size={16} />}>
+                        <Button variant="link" type="button" onClick={() => setIsCustomersSheetOpen(true)} leftIcon={<PlusIcon size={16} />}>
                             Selecionar Clientes
                         </Button>
                     </div>
 
-                    {searched.length > 0 ? (
-                        <div className="border border-brand-border dark:border-dark-border rounded-xl bg-white dark:bg-dark-surface divide-y divide-brand-border dark:divide-dark-border">
-                            {searched.map((cust: any) => (
-                                <div key={cust.id} className="flex items-center justify-between gap-3 p-3.5">
-                                    <div className="flex items-center gap-3 min-w-0">
-                                        <div className="w-8 h-8 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
-                                            <UserIcon size={16} className="text-brand-inactive-text" />
+                    {filteredSelectedCustomers.length > 0 ? (
+                        <>
+                            {/* Desktop Table */}
+                            <div className="hidden md:block overflow-hidden rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
+                                <table className="w-full text-left border-collapse text-sm">
+                                    <thead>
+                                        <tr className="bg-brand-gray dark:bg-dark-border/50 border-b border-brand-border dark:border-dark-border">
+                                            <th className="p-3 pl-6 font-semibold text-gray-500 dark:text-dark-body">Cliente</th>
+                                            <th className="p-3 font-semibold text-gray-500 dark:text-dark-body">Contato</th>
+                                            <th className="p-3 font-semibold text-gray-500 dark:text-dark-body">Status</th>
+                                            <th className="p-3 font-semibold text-gray-500 dark:text-dark-body text-center pr-6 w-20">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {paginatedSelectedCustomers.map((cust: any) => (
+                                            <tr key={cust.id} className="border-b border-brand-border dark:border-dark-border last:border-0 hover:bg-brand-gray/35 dark:hover:bg-dark-border/20 transition-colors">
+                                                <td className="p-3 pl-6">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-9 h-9 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                                                            <UserIcon size={18} className="text-brand-inactive-text" />
+                                                        </div>
+                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">{cust.name}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="p-3 text-brand-inactive-text dark:text-dark-body">
+                                                    {cust.email || cust.phone || "-"}
+                                                </td>
+                                                <td className="p-3">
+                                                    <Badge variant={cust.status === "inactive" ? "gray" : "green"} className="whitespace-nowrap">
+                                                        {cust.status === "inactive" ? "Inativo" : "Ativo"}
+                                                    </Badge>
+                                                </td>
+                                                <td className="p-3 text-center pr-6" onClick={(e) => e.stopPropagation()}>
+                                                    <Button
+                                                        variant="outline"
+                                                        type="button"
+                                                        size="icon"
+                                                        onClick={() => {
+                                                            markDirty()
+                                                            setCampCustIds(campCustIds.filter((id: string) => id !== cust.id))
+                                                        }}
+                                                        className="text-red-500 hover:text-red-600 hover:bg-red-50 border-0 h-8 w-8"
+                                                    >
+                                                        <TrashIcon size={16} />
+                                                    </Button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {/* Mobile/Tablet GridCard list */}
+                            <div className="md:hidden grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {paginatedSelectedCustomers.map((cust: any) => (
+                                    <div key={cust.id} className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl p-4 flex items-center justify-between gap-3">
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                                                <UserIcon size={18} className="text-brand-inactive-text" />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">{cust.name}</p>
+                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate">{cust.email || cust.phone || "Sem contato"}</p>
+                                            </div>
                                         </div>
-                                        <div className="min-w-0">
-                                            <p className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">{cust.name}</p>
-                                            {cust.email && <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate">{cust.email}</p>}
-                                        </div>
+                                        <Button
+                                            variant="outline"
+                                            type="button"
+                                            size="icon"
+                                            onClick={() => {
+                                                markDirty()
+                                                setCampCustIds(campCustIds.filter((id: string) => id !== cust.id))
+                                            }}
+                                            className="text-red-500 hover:text-red-600 hover:bg-red-50 border-0 h-8 w-8 shrink-0"
+                                        >
+                                            <TrashIcon size={16} />
+                                        </Button>
                                     </div>
-                                    <Button
-                                        variant="outline"
-                                        size="icon"
-                                        onClick={() => setCampCustIds(campCustIds.filter((id: string) => id !== cust.id))}
-                                        className="text-red-500 hover:text-red-600 hover:bg-red-50 border-0 h-8 w-8 shrink-0"
-                                    >
-                                        <TrashIcon size={16} />
-                                    </Button>
+                                ))}
+                            </div>
+
+                            {/* Pagination */}
+                            {totalCustomerPages > 1 && (
+                                <div className="flex justify-center pt-2">
+                                    <Pagination
+                                        currentPage={custPage}
+                                        totalPages={totalCustomerPages}
+                                        onPageChange={setCustPage}
+                                    />
                                 </div>
-                            ))}
-                        </div>
+                            )}
+                        </>
                     ) : campCustIds.length === 0 ? (
                         <IconPlaceholder
                             icon={UserIcon}
@@ -895,7 +1033,7 @@ export default function PromotionFormPage({
                         <IconPlaceholder
                             icon={UserIcon}
                             title="Nenhum cliente encontrado"
-                            subtitle="Tente outro termo de busca ou selecione os cliente."
+                            subtitle="Tente outro termo de busca ou selecione os clientes."
                         />
                     )}
                 </div>
@@ -915,7 +1053,7 @@ export default function PromotionFormPage({
 
                                 {/* Back button - desktop only */}
                                 <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
-                                    <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
+                                    <Button variant="filled" type="button" onClick={handleHeaderBack} className="w-10 h-10 p-0 flex items-center justify-center">
                                         <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                     </Button>
                                 </div>
@@ -942,15 +1080,15 @@ export default function PromotionFormPage({
                                     {/* Desktop action buttons */}
                                     <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
                                         {isReadOnly ? (
-                                            <Button onClick={() => setCurrentMode("edit")} leftIcon={<EditIcon size={18} />}>
+                                            <Button type="button" onClick={() => setCurrentMode("edit")} leftIcon={<EditIcon size={18} />}>
                                                 Editar
                                             </Button>
                                         ) : (
                                             <>
-                                                <Button variant="outline" onClick={onBack} disabled={isSaving}>
+                                                <Button variant="outline" type="button" onClick={handleHeaderBack} disabled={isSaving}>
                                                     Cancelar
                                                 </Button>
-                                                <Button onClick={handleSaveCampaign} disabled={isSaving} leftIcon={<SaveIcon size={18} />}>
+                                                <Button type="button" onClick={() => handleSaveCampaign()} disabled={isSaving} leftIcon={<SaveIcon size={18} />}>
                                                     {isSaving ? "Salvando..." : "Salvar"}
                                                 </Button>
                                             </>
@@ -975,7 +1113,7 @@ export default function PromotionFormPage({
                                 {/* General Settings Tab */}
                                 {activeTab === "general" && (
                                     <FadeIn key="general" className="block">
-                                        <form onSubmit={handleSaveCampaign} className="grid grid-cols-12 gap-y-8 lg:gap-y-0">
+                                        <div className="grid grid-cols-12 gap-y-8 lg:gap-y-0">
                                             {/* Left Column */}
                                             <div className="col-span-12 lg:col-span-8 lg:pr-12 space-y-6">
                                                 <FormSection title="Dados Gerais">
@@ -983,7 +1121,10 @@ export default function PromotionFormPage({
                                                         label="Nome da Campanha"
                                                         name="campName"
                                                         value={campName}
-                                                        onChange={(e) => setCampName(e.target.value)}
+                                                        onChange={(e) => {
+                                                            markDirty()
+                                                            setCampName(e.target.value)
+                                                        }}
                                                         required
                                                         disabled={isReadOnly}
                                                         placeholder="Ex: Dia dos Namorados"
@@ -993,7 +1134,10 @@ export default function PromotionFormPage({
                                                         label="Descrição"
                                                         name="campDesc"
                                                         value={campDesc}
-                                                        onChange={(e) => setCampDesc(e.target.value)}
+                                                        onChange={(e) => {
+                                                            markDirty()
+                                                            setCampDesc(e.target.value)
+                                                        }}
                                                         disabled={isReadOnly}
                                                         placeholder="Descrição para controle interno ou exibição pública"
                                                     />
@@ -1002,7 +1146,10 @@ export default function PromotionFormPage({
                                                         label="Público da Campanha"
                                                         name="custScope"
                                                         value={campScope}
-                                                        onChange={(val) => setCampScope(val as "all" | "specific")}
+                                                        onChange={(val) => {
+                                                            markDirty()
+                                                            setCampScope(val as "all" | "specific")
+                                                        }}
                                                         disabled={isReadOnly}
                                                         options={[
                                                             { value: "all", label: "Todos os Clientes" },
@@ -1022,12 +1169,18 @@ export default function PromotionFormPage({
                                                         <DatePicker
                                                             label="Início da Vigência"
                                                             value={campStarts}
-                                                            onChange={(d) => setCampStarts(d ? d.toISOString() : "")}
+                                                            onChange={(d) => {
+                                                                markDirty()
+                                                                setCampStarts(d ? d.toISOString() : "")
+                                                            }}
                                                         />
                                                         <DatePicker
                                                             label="Fim da Vigência"
                                                             value={campEnds}
-                                                            onChange={(d) => setCampEnds(d ? d.toISOString() : "")}
+                                                            onChange={(d) => {
+                                                                markDirty()
+                                                                setCampEnds(d ? d.toISOString() : "")
+                                                            }}
                                                         />
                                                     </div>
                                                 </SidebarCard>
@@ -1037,20 +1190,26 @@ export default function PromotionFormPage({
                                                     <div className="space-y-4">
                                                         <Checkbox
                                                             checked={editingRule?.allow_coupon_combination || false}
-                                                            onChange={() => editingRule && setEditingRule({ ...editingRule, allow_coupon_combination: !editingRule.allow_coupon_combination })}
+                                                            onChange={() => {
+                                                                markDirty()
+                                                                if (editingRule) setEditingRule({ ...editingRule, allow_coupon_combination: !editingRule.allow_coupon_combination })
+                                                            }}
                                                             disabled={isReadOnly}
                                                             label="Permitir uso combinado com cupons de desconto"
                                                         />
                                                         <Checkbox
                                                             checked={campActive}
-                                                            onChange={() => setCampActive(!campActive)}
+                                                            onChange={() => {
+                                                                markDirty()
+                                                                setCampActive(!campActive)
+                                                            }}
                                                             disabled={isReadOnly}
                                                             label="Campanha ativa e disponível"
                                                         />
                                                     </div>
                                                 </div>
                                             </div>
-                                        </form>
+                                        </div>
                                     </FadeIn>
                                 )}
 
@@ -1059,17 +1218,17 @@ export default function PromotionFormPage({
                                     <FadeIn key="rules" className="block">
                                         <div className="space-y-6">
                                             {editingRule && (
-                                                /* Rule Form in Two Columns */
                                                 <div className="grid grid-cols-12 gap-y-8 lg:gap-y-0 animate-fadeIn">
-
                                                     {/* Left Column: Rule configuration */}
                                                     <div className="col-span-12 lg:col-span-8 lg:pr-12 space-y-6">
                                                         <FormSection title={editingRule.id && !editingRule.id.toString().startsWith("temp_") ? "Editar Regra de Promoção" : "Nova Regra de Promoção"}>
-                                                            {/* Tipo de Promoção */}
                                                             <FormDropdown
                                                                 label="Tipo de Promoção"
                                                                 value={editingRule.promotion_type || "discount"}
-                                                                setValue={(val) => setEditingRule({ ...editingRule, promotion_type: val })}
+                                                                setValue={(val) => {
+                                                                    markDirty()
+                                                                    setEditingRule({ ...editingRule, promotion_type: val })
+                                                                }}
                                                                 options={[
                                                                     { value: "discount", label: "Desconto Direto (Fixo ou %)" },
                                                                     { value: "buy_x_pay_y", label: "Leve X Pague Y (Ex: Leve 3 Pague 2)" },
@@ -1077,47 +1236,56 @@ export default function PromotionFormPage({
                                                                 ]}
                                                             />
 
-                                                            {/* Conditional configurations based on promotion type */}
                                                             {editingRule.promotion_type === "discount" && (
-                                                                <>
-                                                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                                                                        <FormDropdown
-                                                                            label="Tipo de Desconto"
-                                                                            value={editingRule.discount_type || "percentage"}
-                                                                            setValue={(val) => setEditingRule({ ...editingRule, discount_type: val })}
-                                                                            options={[
-                                                                                { value: "percentage", label: "Porcentagem (%)" },
-                                                                                { value: "fixed", label: "Valor Fixo (R$)" }
-                                                                            ]}
+                                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                                                                    <FormDropdown
+                                                                        label="Tipo de Desconto"
+                                                                        value={editingRule.discount_type || "percentage"}
+                                                                        setValue={(val) => {
+                                                                            markDirty()
+                                                                            setEditingRule({ ...editingRule, discount_type: val })
+                                                                        }}
+                                                                        options={[
+                                                                            { value: "percentage", label: "Porcentagem (%)" },
+                                                                            { value: "fixed", label: "Valor Fixo (R$)" }
+                                                                        ]}
+                                                                    />
+                                                                    {editingRule.discount_type === "percentage" ? (
+                                                                        <PercentageInput
+                                                                            label="Valor do Desconto"
+                                                                            name="discount_value"
+                                                                            required
+                                                                            placeholder="10"
+                                                                            value={editingRule.discount_value ?? ""}
+                                                                            onChange={(val) => {
+                                                                                markDirty()
+                                                                                setEditingRule({ ...editingRule, discount_value: val })
+                                                                            }}
                                                                         />
-                                                                        {editingRule.discount_type === "percentage" ? (
-                                                                            <PercentageInput
-                                                                                label="Valor do Desconto"
-                                                                                name="discount_value"
-                                                                                required
-                                                                                placeholder="10"
-                                                                                value={editingRule.discount_value ?? ""}
-                                                                                onChange={(val) => setEditingRule({ ...editingRule, discount_value: val })}
-                                                                            />
-                                                                        ) : (
-                                                                            <MoneyInput
-                                                                                label="Valor do Desconto"
-                                                                                name="discount_value"
-                                                                                required
-                                                                                placeholder="10.00"
-                                                                                value={editingRule.discount_value ?? ""}
-                                                                                onChange={(val) => setEditingRule({ ...editingRule, discount_value: val })}
-                                                                            />
-                                                                        )}
+                                                                    ) : (
                                                                         <MoneyInput
-                                                                            label="Teto de Desconto (Opcional)"
-                                                                            name="max_discount_amount"
-                                                                            placeholder="50.00"
-                                                                            value={editingRule.max_discount_amount ?? ""}
-                                                                            onChange={(val) => setEditingRule({ ...editingRule, max_discount_amount: val })}
+                                                                            label="Valor do Desconto"
+                                                                            name="discount_value"
+                                                                            required
+                                                                            placeholder="10.00"
+                                                                            value={editingRule.discount_value ?? ""}
+                                                                            onChange={(val) => {
+                                                                                markDirty()
+                                                                                setEditingRule({ ...editingRule, discount_value: val })
+                                                                            }}
                                                                         />
-                                                                    </div>
-                                                                </>
+                                                                    )}
+                                                                    <MoneyInput
+                                                                        label="Teto de Desconto (Opcional)"
+                                                                        name="max_discount_amount"
+                                                                        placeholder="50.00"
+                                                                        value={editingRule.max_discount_amount ?? ""}
+                                                                        onChange={(val) => {
+                                                                            markDirty()
+                                                                            setEditingRule({ ...editingRule, max_discount_amount: val })
+                                                                        }}
+                                                                    />
+                                                                </div>
                                                             )}
 
                                                             {editingRule.promotion_type === "buy_x_pay_y" && (
@@ -1130,7 +1298,10 @@ export default function PromotionFormPage({
                                                                         required
                                                                         placeholder="3"
                                                                         value={editingRule.buy_quantity ?? ""}
-                                                                        onChange={(e) => setEditingRule({ ...editingRule, buy_quantity: e.target.value === "" ? "" : parseInt(e.target.value) })}
+                                                                        onChange={(e) => {
+                                                                            markDirty()
+                                                                            setEditingRule({ ...editingRule, buy_quantity: e.target.value === "" ? "" : parseInt(e.target.value) })
+                                                                        }}
                                                                     />
                                                                     <Input
                                                                         label="Pague (Qtd a Pagar)"
@@ -1140,7 +1311,10 @@ export default function PromotionFormPage({
                                                                         required
                                                                         placeholder="2"
                                                                         value={editingRule.pay_quantity ?? ""}
-                                                                        onChange={(e) => setEditingRule({ ...editingRule, pay_quantity: e.target.value === "" ? "" : parseInt(e.target.value) })}
+                                                                        onChange={(e) => {
+                                                                            markDirty()
+                                                                            setEditingRule({ ...editingRule, pay_quantity: e.target.value === "" ? "" : parseInt(e.target.value) })
+                                                                        }}
                                                                     />
                                                                 </div>
                                                             )}
@@ -1190,12 +1364,16 @@ export default function PromotionFormPage({
                                                                                         </div>
                                                                                         <Button
                                                                                             variant="outline"
+                                                                                            type="button"
                                                                                             size="icon"
-                                                                                            onClick={() => setEditingRule({
-                                                                                                ...editingRule,
-                                                                                                gift_product_id: null,
-                                                                                                gift_service_id: null
-                                                                                            })}
+                                                                                            onClick={() => {
+                                                                                                markDirty()
+                                                                                                setEditingRule({
+                                                                                                    ...editingRule,
+                                                                                                    gift_product_id: null,
+                                                                                                    gift_service_id: null
+                                                                                                })
+                                                                                            }}
                                                                                             className="text-red-500 hover:text-red-600 hover:bg-red-50 border-0 h-8 w-8 shrink-0"
                                                                                         >
                                                                                             <TrashIcon size={16} />
@@ -1208,11 +1386,15 @@ export default function PromotionFormPage({
                                                                 </FormSection>
                                                             )}
 
-                                                            {/* Escopo de Aplicação */}
                                                             <FormDropdown
                                                                 label="Escopo de Aplicação"
                                                                 value={editingRule.apply_scope || "entire_cart"}
-                                                                setValue={(val) => setEditingRule({ ...editingRule, apply_scope: val })}
+                                                                setValue={(val) => {
+                                                                    markDirty()
+                                                                    setScopeSearch("")
+                                                                    setScopePage(1)
+                                                                    setEditingRule({ ...editingRule, apply_scope: val })
+                                                                }}
                                                                 options={[
                                                                     { value: "entire_cart", label: "Toda a Sacola" },
                                                                     { value: "specific_products", label: "Produtos Específicos" },
@@ -1238,14 +1420,20 @@ export default function PromotionFormPage({
                                                                     type="number"
                                                                     placeholder="0"
                                                                     value={editingRule.priority ?? 0}
-                                                                    onChange={(e) => setEditingRule({ ...editingRule, priority: parseInt(e.target.value) || 0 })}
+                                                                    onChange={(e) => {
+                                                                        markDirty()
+                                                                        setEditingRule({ ...editingRule, priority: parseInt(e.target.value) || 0 })
+                                                                    }}
                                                                 />
                                                                 <MoneyInput
                                                                     label="Mínimo de Compra (R$)"
                                                                     name="min_spend_amount"
                                                                     placeholder="0.00"
                                                                     value={editingRule.min_spend_amount ?? ""}
-                                                                    onChange={(val) => setEditingRule({ ...editingRule, min_spend_amount: val })}
+                                                                    onChange={(val) => {
+                                                                        markDirty()
+                                                                        setEditingRule({ ...editingRule, min_spend_amount: val })
+                                                                    }}
                                                                 />
                                                                 <Input
                                                                     label="Limite Global de Usos"
@@ -1254,7 +1442,10 @@ export default function PromotionFormPage({
                                                                     min="0"
                                                                     placeholder="Sem limite"
                                                                     value={editingRule.usage_limit ?? ""}
-                                                                    onChange={(e) => setEditingRule({ ...editingRule, usage_limit: e.target.value === "" ? "" : parseInt(e.target.value) })}
+                                                                    onChange={(e) => {
+                                                                        markDirty()
+                                                                        setEditingRule({ ...editingRule, usage_limit: e.target.value === "" ? "" : parseInt(e.target.value) })
+                                                                    }}
                                                                 />
                                                                 <Input
                                                                     label="Limite de Usos por Cliente"
@@ -1263,7 +1454,10 @@ export default function PromotionFormPage({
                                                                     min="0"
                                                                     placeholder="Sem limite"
                                                                     value={editingRule.usage_limit_per_customer ?? ""}
-                                                                    onChange={(e) => setEditingRule({ ...editingRule, usage_limit_per_customer: e.target.value === "" ? "" : parseInt(e.target.value) })}
+                                                                    onChange={(e) => {
+                                                                        markDirty()
+                                                                        setEditingRule({ ...editingRule, usage_limit_per_customer: e.target.value === "" ? "" : parseInt(e.target.value) })
+                                                                    }}
                                                                 />
                                                             </div>
                                                         </SidebarCard>
@@ -1278,7 +1472,10 @@ export default function PromotionFormPage({
                                                                     <label className="flex items-center gap-3 cursor-pointer">
                                                                         <Checkbox
                                                                             checked={editingStoreIds.length === 0}
-                                                                            onChange={() => setEditingStoreIds([])}
+                                                                            onChange={() => {
+                                                                                markDirty()
+                                                                                setEditingStoreIds([])
+                                                                            }}
                                                                         />
                                                                         <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">Todas as lojas</span>
                                                                     </label>
@@ -1287,6 +1484,7 @@ export default function PromotionFormPage({
                                                                             <Checkbox
                                                                                 checked={editingStoreIds.includes(store.id)}
                                                                                 onChange={(checked) => {
+                                                                                    markDirty()
                                                                                     if (checked) {
                                                                                         setEditingStoreIds((prev) => [...prev, store.id])
                                                                                     } else {
@@ -1314,6 +1512,7 @@ export default function PromotionFormPage({
                     <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
                         {isReadOnly ? (
                             <Button
+                                type="button"
                                 onClick={() => setCurrentMode("edit")}
                                 className="flex-1 h-12"
                                 leftIcon={<EditIcon size={18} />}
@@ -1324,14 +1523,16 @@ export default function PromotionFormPage({
                             <>
                                 <Button
                                     variant="outline"
-                                    onClick={onBack}
+                                    type="button"
+                                    onClick={handleHeaderBack}
                                     disabled={isSaving}
                                     className="flex-1 h-12"
                                 >
                                     Cancelar
                                 </Button>
                                 <Button
-                                    onClick={handleSaveCampaign}
+                                    type="button"
+                                    onClick={() => handleSaveCampaign()}
                                     disabled={isSaving}
                                     className="flex-1 h-12"
                                     leftIcon={<SaveIcon size={18} />}
@@ -1341,16 +1542,18 @@ export default function PromotionFormPage({
                             </>
                         )}
                     </div>
-                </Tabs >
+                </Tabs>
 
                 {/* Conditional selector sheets */}
-                < SelectPromotionProductsSheet
+                <SelectPromotionProductsSheet
                     isOpen={isProductsSheetOpen}
-                    onClose={() => setIsProductsSheetOpen(false)
-                    }
+                    onClose={() => setIsProductsSheetOpen(false)}
                     products={scopeData.products}
                     selectedIds={editingRuleProductIds}
+                    stores={scopeData.stores || []}
+                    selectedStoreIds={editingStoreIds}
                     onToggle={(id) => {
+                        markDirty()
                         if (editingRuleProductIds.includes(id)) {
                             setEditingRuleProductIds(editingRuleProductIds.filter((pId) => pId !== id))
                         } else {
@@ -1359,13 +1562,14 @@ export default function PromotionFormPage({
                     }}
                 />
 
-                < SelectPromotionCategoriesSheet
+                <SelectPromotionCategoriesSheet
                     isOpen={isCategoriesSheetOpen}
                     onClose={() => setIsCategoriesSheetOpen(false)}
                     categories={scopeData.categories}
                     serviceCategories={scopeData.serviceCategories || []}
                     selectedIds={editingRuleCategoryIds}
                     onToggle={(id) => {
+                        markDirty()
                         if (editingRuleCategoryIds.includes(id)) {
                             setEditingRuleCategoryIds(editingRuleCategoryIds.filter((cId) => cId !== id))
                         } else {
@@ -1379,7 +1583,10 @@ export default function PromotionFormPage({
                     onClose={() => setIsServicesSheetOpen(false)}
                     services={scopeData.services}
                     selectedIds={editingRuleServiceIds}
+                    stores={scopeData.stores || []}
+                    selectedStoreIds={editingStoreIds}
                     onToggle={(id) => {
+                        markDirty()
                         if (editingRuleServiceIds.includes(id)) {
                             setEditingRuleServiceIds(editingRuleServiceIds.filter((sId) => sId !== id))
                         } else {
@@ -1395,6 +1602,7 @@ export default function PromotionFormPage({
                     services={scopeData.services}
                     selectedId={editingRule?.gift_product_id || editingRule?.gift_service_id || null}
                     onSelect={(id, type) => {
+                        markDirty()
                         setEditingRule({
                             ...editingRule,
                             gift_product_id: type === "product" ? id : null,
@@ -1409,6 +1617,7 @@ export default function PromotionFormPage({
                     partnerId={partnerId}
                     selectedCustomerIds={campCustIds}
                     onSelect={(customer) => {
+                        markDirty()
                         if (campCustIds.includes(customer.id)) {
                             setCampCustIds(campCustIds.filter((cId) => cId !== customer.id))
                         } else {
@@ -1417,7 +1626,12 @@ export default function PromotionFormPage({
                     }}
                 />
 
-            </div >
-        </FadeIn >
+                <UnsavedChangesDialog
+                    open={showConfirmDialog}
+                    onConfirm={confirmNavigation}
+                    onCancel={cancelNavigation}
+                />
+            </div>
+        </FadeIn>
     )
 }

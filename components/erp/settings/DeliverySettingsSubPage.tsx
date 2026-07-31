@@ -193,7 +193,7 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
                 <div className="max-w-[1300px] mx-auto p-4 md:p-8 pt-6">
                     <div className="grid grid-cols-12 gap-y-8 lg:gap-y-0 relative">
                         {/* Main Content */}
-                        <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-12">
+                        <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-4">
                             {/* Geral */}
                             <FormSection title="Configurações Gerais">
                                 <div className="space-y-6">
@@ -242,13 +242,13 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
                                     <div className="border-t border-brand-border dark:border-dark-border w-full"></div>
                                     <Accordion
                                         title={
-                                            <span className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mb-6 inline-flex items-center gap-2">
+                                            <span className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading inline-flex items-center gap-2">
                                                 Distância e Entrega
                                                 {isFree && <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />}
                                             </span>
                                         }
                                         defaultOpen={true}
-                                        triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5 text-left"
+                                        triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5 mt-6 text-left"
                                     >
                                         <div className="space-y-6 pb-4">
                                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -323,7 +323,7 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
                                     <div className="border-t border-brand-border dark:border-dark-border w-full"></div>
                                     <Accordion
                                         title={
-                                            <span className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mb-6">
+                                            <span className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading">
                                                 Regras por Horário
                                                 {!advancedEnabled && (
                                                     <img src={planStarIconForTarget("escalar")!} alt="" className="w-4 h-4 object-contain" />
@@ -331,7 +331,7 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
                                             </span>
                                         }
                                         defaultOpen={false}
-                                        triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5 text-left"
+                                        triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5 mt-6 text-left"
                                         onToggle={(isOpen) => {
                                             if (isOpen && !advancedEnabled) {
                                                 openPlanUpgrade("escalar")

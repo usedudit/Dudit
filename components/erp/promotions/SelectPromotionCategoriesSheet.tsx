@@ -2,14 +2,13 @@
 
 import React, { useMemo, useState } from "react"
 import { SearchIcon, PlusIcon, XIcon, CheckCircleIcon, TagIcon } from "@/lib/icons"
-import { Badge, Button, Input, IconPlaceholder, Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/reusable"
+import { Badge, Button, Input, IconPlaceholder, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
 
 const Div = (props: any) => React.createElement("div", props)
 const Header = (props: any) => React.createElement("header", props)
-const Footer = (props: any) => React.createElement("footer", props)
 const H2 = (props: any) => React.createElement("h2", props)
 const Span = (props: any) => React.createElement("span", props)
 const P = (props: any) => React.createElement("p", props)
@@ -18,6 +17,8 @@ export interface ScopeCategory {
   id: string
   name: string
   isActive?: boolean
+  storeIds?: string[] | null
+  storeName?: string | null
 }
 
 interface SelectPromotionCategoriesSheetProps {
@@ -58,18 +59,19 @@ function CategoryList({ items, selectedIds, onToggle }: { items: ScopeCategory[]
               disabled
                 ? undefined
                 : (e: React.KeyboardEvent) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault()
-                    onToggle(category.id)
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault()
+                      onToggle(category.id)
+                    }
                   }
-                }
             }
-            className={`group flex items-center gap-4 border-b border-brand-border p-3.5 transition-colors last:border-0 dark:border-dark-border ${disabled
-              ? "cursor-not-allowed opacity-55"
-              : isSelected
+            className={`group flex items-center gap-4 border-b border-brand-border p-3.5 transition-colors last:border-0 dark:border-dark-border ${
+              disabled
+                ? "cursor-not-allowed opacity-55"
+                : isSelected
                 ? "bg-brand-primary/5 dark:bg-brand-primary/10"
                 : "cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-border/40"
-              }`}
+            }`}
           >
             <Div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-brand-border bg-brand-gray text-brand-inactive-text dark:border-dark-border dark:bg-dark-border">
               <TagIcon size={20} />
@@ -81,6 +83,9 @@ function CategoryList({ items, selectedIds, onToggle }: { items: ScopeCategory[]
                 </Span>
                 <Badge variant={category.isActive === false ? "gray" : "green"} className="whitespace-nowrap scale-90 shrink-0">
                   {category.isActive === false ? "Inativo" : "Ativo"}
+                </Badge>
+                <Badge variant="blue" className="whitespace-nowrap scale-90 shrink-0">
+                  {category.storeName || "Toda a Rede"}
                 </Badge>
                 {isSelected && (
                   <Badge variant="green" className="whitespace-nowrap scale-90 shrink-0">
@@ -141,7 +146,7 @@ export default function SelectPromotionCategoriesSheet({
     <Div className="flex h-full flex-col bg-white dark:bg-dark-surface">
       <Header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
         <H2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Selecionar Categorias</H2>
-        <Button variant="filled" onClick={onClose} size="icon">
+        <Button variant="filled" type="button" onClick={onClose} size="icon">
           <XIcon className="h-5 w-5" />
         </Button>
       </Header>
@@ -190,7 +195,7 @@ export default function SelectPromotionCategoriesSheet({
 
       <footer className="shrink-0 border-t border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface">
         <div className="flex items-center gap-3">
-          <Button variant="outline" className="h-12 w-full" onClick={onClose}>
+          <Button variant="outline" type="button" className="h-12 w-full" onClick={onClose}>
             Fechar
           </Button>
         </div>
@@ -213,7 +218,9 @@ export default function SelectPromotionCategoriesSheet({
         onClick={onClose}
       >
         <Div
-          className={`fixed right-4 top-4 bottom-4 z-[81] w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
+          className={`fixed right-4 top-4 bottom-4 z-[81] w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${
+            isOpen ? "translate-x-0" : "translate-x-[120%]"
+          }`}
           onClick={(e: { stopPropagation: () => any }) => e.stopPropagation()}
         >
           {content}

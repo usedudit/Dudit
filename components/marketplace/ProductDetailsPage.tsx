@@ -1319,42 +1319,72 @@ export function ProductDetailsPageClient({
                             {/* Delivery Option if configured */}
                             {deliveryConfig?.settings?.isDeliveryEnabled ? (
                                 <>
-                                    <div className="flex justify-between items-start py-4">
-                                        <div>
-                                            <p className="text-sm text-brand-dark font-medium leading-snug">Entrega pelo vendedor</p>
-                                            {deliveryLoading ? (
-                                                <p className="text-xs text-brand-inactive-text animate-pulse">Calculando...</p>
-                                            ) : (deliveryError && deliveryError !== "Entrega não disponível no plano atual.") ? (
-                                                <p className="text-xs text-red-500">{deliveryError}</p>
-                                            ) : calculatedAddress ? (
-                                                <p className="text-xs text-brand-green font-medium">Para {calculatedAddress}</p>
-                                            ) : (
-                                                <p className="text-xs text-brand-inactive-text">Informe seu CEP para calcular</p>
-                                            )}
-                                        </div>
-                                        <div className="text-right">
-                                            {deliveryLoading ? (
-                                                <div className="w-4 h-4 border-2 border-brand-green border-t-transparent rounded-full animate-spin ml-auto" />
-                                            ) : (deliveryBreakdown?.deliveryPayer === "seller" || deliveryConfig?.settings?.deliveryPayer === "seller") ? (
-                                                <div className="flex flex-col items-end">
-                                                    {deliveryBreakdown?.originalFee != null && Number(deliveryBreakdown.originalFee) > 0 && (
-                                                        <span className="text-xs line-through text-brand-inactive-text font-normal">
-                                                            {formatMoney(Number(deliveryBreakdown.originalFee))}
-                                                        </span>
+                                    {(() => {
+                                        const freeThreshold = Number(deliveryConfig?.settings?.freeDeliveryThreshold ?? deliveryConfig?.settings?.free_delivery_threshold ?? 0)
+                                        const currentPrice = pricing.total || Number(product.price || 0)
+                                        const isFreeByThreshold = freeThreshold > 0 && currentPrice >= freeThreshold
+                                        const diffFree = freeThreshold > 0 && currentPrice < freeThreshold ? freeThreshold - currentPrice : 0
+
+                                        return (
+                                            <div className="flex justify-between items-start py-4">
+                                                <div>
+                                                    <p className="text-sm text-brand-dark font-medium leading-snug">Entrega pelo vendedor</p>
+                                                    {deliveryLoading ? (
+                                                        <p className="text-xs text-brand-inactive-text animate-pulse">Calculando...</p>
+                                                    ) : (deliveryError && deliveryError !== "Entrega não disponível no plano atual.") ? (
+                                                        <p className="text-xs text-red-500">{deliveryError}</p>
+                                                    ) : calculatedAddress ? (
+                                                        <div>
+                                                            <p className="text-xs text-brand-green font-medium">Para {calculatedAddress}</p>
+                                                            {diffFree > 0 && (
+                                                                <p className="text-[11px] text-brand-inactive-text mt-0.5">
+                                                                    Falta <strong className="text-brand-green">{formatMoney(diffFree)}</strong> para entrega grátis nesta loja
+                                                                </p>
+                                                            )}
+                                                            {isFreeByThreshold && (
+                                                                <p className="text-[11px] text-brand-green font-semibold mt-0.5">
+                                                                    Entrega grátis ativada para esta compra
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <div>
+                                                            <p className="text-xs text-brand-inactive-text">Informe seu CEP para calcular</p>
+                                                            {diffFree > 0 && (
+                                                                <p className="text-[11px] text-brand-inactive-text mt-0.5">
+                                                                    Falta <strong className="text-brand-green">{formatMoney(diffFree)}</strong> para entrega grátis nesta loja
+                                                                </p>
+                                                            )}
+                                                        </div>
                                                     )}
-                                                    <span className="text-sm font-bold text-brand-green">Grátis (Pago pela loja)</span>
                                                 </div>
-                                            ) : deliveryFee !== null ? (
-                                                <p className={`text-sm font-bold ${deliveryFee > 0 ? "text-brand-dark" : "text-brand-green"}`}>
-                                                    {deliveryFee > 0 ? formatMoney(deliveryFee) : "Grátis"}
-                                                </p>
-                                            ) : deliveryError === "Entrega não disponível no plano atual." ? (
-                                                <p className="text-sm font-bold text-brand-dark">A combinar</p>
-                                            ) : (
-                                                <p className="text-sm font-semibold text-brand-inactive-text">-</p>
-                                            )}
-                                        </div>
-                                    </div>
+                                                <div className="text-right">
+                                                    {deliveryLoading ? (
+                                                        <div className="w-4 h-4 border-2 border-brand-green border-t-transparent rounded-full animate-spin ml-auto" />
+                                                    ) : (deliveryBreakdown?.deliveryPayer === "seller" || deliveryConfig?.settings?.deliveryPayer === "seller") ? (
+                                                        <div className="flex flex-col items-end">
+                                                            {deliveryBreakdown?.originalFee != null && Number(deliveryBreakdown.originalFee) > 0 && (
+                                                                <span className="text-xs line-through text-brand-inactive-text font-normal">
+                                                                    {formatMoney(Number(deliveryBreakdown.originalFee))}
+                                                                </span>
+                                                            )}
+                                                            <span className="text-sm font-bold text-brand-green">Grátis (Pago pela loja)</span>
+                                                        </div>
+                                                    ) : isFreeByThreshold || (deliveryFee !== null && deliveryFee === 0) ? (
+                                                        <span className="text-sm font-bold text-brand-green">Grátis</span>
+                                                    ) : deliveryFee !== null ? (
+                                                        <p className="text-sm font-bold text-brand-dark">
+                                                            {formatMoney(deliveryFee)}
+                                                        </p>
+                                                    ) : deliveryError === "Entrega não disponível no plano atual." ? (
+                                                        <p className="text-sm font-bold text-brand-dark">A combinar</p>
+                                                    ) : (
+                                                        <p className="text-sm font-semibold text-brand-inactive-text">-</p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )
+                                    })()}
 
                                     {(deliveryConfig?.settings?.isPickupEnabled !== false) && <Separator className="opacity-60" />}
                                 </>

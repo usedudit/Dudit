@@ -316,7 +316,7 @@ export async function getMarketplaceRecurringPlanAction(planId: string) {
           addresses (id, street, number, neighborhood, city, state, zip_code),
           payment_methods (*)
         ),
-        stores(id, name, logo_url, banner_url),
+        stores(id, name, logo_url, banner_url, rating, vendas_totais),
         recurring_plan_items(
           id, item_type, product_id, variant_id, service_id, quantity, unit_price,
           products:product_id(id, name, price, images),
@@ -367,6 +367,8 @@ export async function getMarketplaceRecurringPlanAction(planId: string) {
       store_image_url: rawStore?.logo_url,
       banner_url: rawStore?.banner_url,
       store_avatar: rawStore?.logo_url || "https://img.dudit.com.br/static/Placeholder.png",
+      rating: rawStore?.rating ?? rawPartner?.rating ?? 0,
+      vendas_totais: rawStore?.vendas_totais ?? rawPartner?.vendas_totais ?? 0,
     } : {}
     const planImages = Array.isArray(data.images) && data.images.length > 0
       ? data.images

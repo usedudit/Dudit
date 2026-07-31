@@ -129,17 +129,36 @@ async function handler(request: NextRequest) {
     }
 
     // Montar requisição para a API do MP
+    const rawFirstName = (paymentFormData.payer?.first_name || paymentFormData.payer?.firstName || "").trim();
+    const rawLastName = (paymentFormData.payer?.last_name || paymentFormData.payer?.lastName || "").trim();
+
+    let firstName = rawFirstName;
+    let lastName = rawLastName;
+
+    if (!firstName && !lastName) {
+      firstName = "Cliente";
+    } else if (firstName && !lastName && firstName.includes(" ")) {
+      const parts = firstName.split(/\s+/);
+      firstName = parts[0];
+      lastName = parts.slice(1).join(" ");
+    }
+
+    const payerEmail = (paymentFormData.payer?.email || "").trim() || user.email;
+    const identificationNumber = paymentFormData.payer?.identification?.number ? String(paymentFormData.payer.identification.number).replace(/\D/g, "") : "";
+
     const mpPaymentRequest: Record<string, any> = {
       transaction_amount: amount,
       payment_method_id: paymentFormData.payment_method_id,
       payer: {
-        email: paymentFormData.payer?.email || user.email,
-        first_name: paymentFormData.payer?.first_name || "Cliente",
-        last_name: paymentFormData.payer?.last_name || "ERP",
-        identification: {
-          type: paymentFormData.payer?.identification?.type || "CPF",
-          number: paymentFormData.payer?.identification?.number,
-        },
+        email: payerEmail,
+        first_name: firstName,
+        ...(lastName ? { last_name: lastName } : {}),
+        ...(identificationNumber ? {
+          identification: {
+            type: paymentFormData.payer?.identification?.type || (identificationNumber.length > 11 ? "CNPJ" : "CPF"),
+            number: identificationNumber,
+          },
+        } : {}),
         ...(paymentFormData.payer?.address ? {
           address: {
             zip_code: paymentFormData.payer.address.zipCode || paymentFormData.payer.address.zip_code || "",

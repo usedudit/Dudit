@@ -19,9 +19,9 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
   const adminClient = await createAdminClient()
   const orderSelect = `
     id, order_number, situation, delivery_status, total_amount, amount_paid, subtotal_original, discount_total, shipping_total,
-    delivery_fee, discount_amount, payment_method_discount_amount, payment_method_extra_amount, payment_breakdown, checkout_fulfillment, created_at, payment_method,
+    delivery_fee, discount_amount, payment_method_discount_amount, payment_method_extra_amount, payment_breakdown, checkout_fulfillment, created_at, updated_at, payment_method,
     payment_provider, delivery_type, delivery_address, customer_name,
-    partner_id, buyer_id, mp_payment_id, return_policy_snapshot, payment_expires_at,
+    partner_id, store_id, buyer_id, mp_payment_id, return_policy_snapshot, payment_expires_at,
     mp_date_approved, notes,
     partners(id, is_active),
     stores!left(id, name, logo_url, banner_url, description, phone, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state)),
@@ -34,9 +34,9 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
   `
   const fallbackOrderSelect = `
     id, order_number, situation, delivery_status, total_amount, amount_paid, subtotal_original, discount_total, shipping_total,
-    delivery_fee, discount_amount, payment_method_discount_amount, payment_method_extra_amount, payment_breakdown, checkout_fulfillment, created_at, payment_method,
+    delivery_fee, discount_amount, payment_method_discount_amount, payment_method_extra_amount, payment_breakdown, checkout_fulfillment, created_at, updated_at, payment_method,
     payment_provider, delivery_type, delivery_address, customer_name,
-    partner_id, buyer_id, mp_payment_id, return_policy_snapshot, payment_expires_at,
+    partner_id, store_id, buyer_id, mp_payment_id, return_policy_snapshot, payment_expires_at,
     mp_date_approved, notes,
     partners(id, is_active),
     stores!left(id, name, logo_url, banner_url, description, phone, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state)),

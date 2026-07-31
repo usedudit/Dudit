@@ -424,6 +424,26 @@ export function CheckoutPageClient() {
         installments: 1,
     })
 
+    // Track previous address and deliveryType to detect changes and clear deliveryError
+    const prevDeliveryAddressRef = useRef<string>(formData.deliveryAddress)
+    const prevDeliveryTypeRef = useRef<string>(formData.deliveryType)
+
+    // Clear deliveryError when address changes or switching to pickup
+    useEffect(() => {
+        if (prevDeliveryAddressRef.current !== formData.deliveryAddress) {
+            prevDeliveryAddressRef.current = formData.deliveryAddress
+            setDeliveryError(null)
+            setShowOutsideRadiusModal(false)
+        }
+        if (prevDeliveryTypeRef.current !== formData.deliveryType) {
+            prevDeliveryTypeRef.current = formData.deliveryType
+            if (formData.deliveryType === "pickup") {
+                setDeliveryError(null)
+                setShowOutsideRadiusModal(false)
+            }
+        }
+    }, [formData.deliveryAddress, formData.deliveryType])
+
     const [mobileStep, setMobileStep] = useState<1 | 2>(1)
     const [showReviewModal, setShowReviewModal] = useState(false)
     const [showNotesModal, setShowNotesModal] = useState(false)
@@ -954,6 +974,7 @@ export function CheckoutPageClient() {
 
 
 
+    // Effect 1: Delivery fee quote + Checkout amounts - ONLY recalculate on address/deliveryType changes
     useEffect(() => {
         let active = true
 
@@ -1023,7 +1044,33 @@ export function CheckoutPageClient() {
                 setCheckoutAmounts(null)
                 setCheckoutAmountsLoading(false)
             }
+        }, 300)
 
+        return () => {
+            active = false
+            window.clearTimeout(timer)
+        }
+    }, [
+        partnerId,
+        formData.deliveryAddress,
+        hasFreeDeliveryCoupon,
+        productDeliveryQuoteActive,
+        orderSubtotal,
+        cartItemIds,
+        checkoutContext,
+        formData.deliveryType,
+        couponCode,
+        payDepositOnly,
+        depositAvailable,
+        refreshTrigger,
+        selectedAddress,
+    ])
+
+    // Effect 2: Payment preview - ONLY recalculate on payment method/installments changes
+    useEffect(() => {
+        let active = true
+
+        const timer = window.setTimeout(async () => {
             if (!active) return
 
             // Payment preview
@@ -1060,26 +1107,11 @@ export function CheckoutPageClient() {
         }
     }, [
         partnerId,
-        formData.deliveryAddress,
-        hasFreeDeliveryCoupon,
-        productDeliveryQuoteActive,
-        orderSubtotal,
-        cartItemIds,
-        checkoutContext,
-        formData.deliveryType,
-        couponCode,
-        payDepositOnly,
-        depositAvailable,
-        refreshTrigger,
         shouldPreviewTraditionalPayment,
         paymentOption,
         formData.paymentMethod,
         formData.installments,
         checkoutChargeTotal,
-        isPickup,
-        deliveryFee,
-        deliverySettings,
-        selectedAddress,
     ])
 
     useEffect(() => {
@@ -2569,39 +2601,55 @@ export function CheckoutPageClient() {
                                                         transition={{ duration: 0.2 }}
                                                         className="mb-4"
                                                     >
-                                                        {!formData.paymentMethod ? (
-                                                            <ListItem
-                                                                icon={MoneyIcon}
-                                                                title="Selecione o meio de pagamento"
-                                                                description="Clique para escolher como deseja pagar"
-                                                                className="!border-none !bg-transparent !shadow-none !px-0 py-3 hover:!bg-transparent hover:!border-none"
-                                                                right={
-                                                                    <Button variant="link" onClick={() => setShowPaymentModal(true)}>Selecionar</Button>
-                                                                }
-                                                            />
+                                                        {deliveryError ? (
+                                                            <InfoCard message="Corrija o endereço de entrega ou selecione Retirada no local antes de escolher a forma de pagamento." color="red" />
                                                         ) : (
-                                                            <ListItem
-                                                                icon={
-                                                                    selectedStorefrontMethod?.type === "pix" ? <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-5 h-5 object-contain" /> :
-                                                                        selectedStorefrontMethod?.type === "credit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
-                                                                            selectedStorefrontMethod?.type === "debit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/DebitCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
-                                                                                MoneyIcon
-                                                                }
-                                                                title={selectedStorefrontMethod ? (paymentTypeLabelMap[selectedStorefrontMethod.type] || selectedStorefrontMethod.type) : "Carregando..."}
-                                                                description={
-                                                                    selectedStorefrontMethod?.type === "pix" ? "Pagamento instantâneo via Pix" :
-                                                                        selectedStorefrontMethod?.type.includes("card") ? "Pagamento com maquininha" :
-                                                                            wantsChange ? `Dinheiro (Troco para R$ ${payWithAmount?.toFixed(2).replace('.', ',')})` :
-                                                                                wantsChange === false ? "Dinheiro (Valor exato)" : "Pagamento em dinheiro"
-                                                                }
-                                                                className="!border-none !bg-transparent !shadow-none !px-0 py-3 hover:!bg-transparent hover:!border-none"
-                                                                right={
-                                                                    <Button variant="link" onClick={() => setShowPaymentModal(true)}>Trocar</Button>
-                                                                }
-                                                            />
-                                                        )}
-                                                        {renderChangeSection()}
-                                                        {selectedStorefrontMethod?.cardBrand && (
+                                                            <>
+                                                                {!formData.paymentMethod ? (
+                                                                    <ListItem
+                                                                        icon={MoneyIcon}
+                                                                        title="Selecione o meio de pagamento"
+                                                                        description="Clique para escolher como deseja pagar"
+                                                                        className="!border-none !bg-transparent !shadow-none !px-0 py-3 hover:!bg-transparent hover:!border-none"
+                                                                        right={
+                                                                            <Button variant="link" onClick={() => {
+                                                                                if (deliveryError) {
+                                                                                    setShowOutsideRadiusModal(true)
+                                                                                } else {
+                                                                                    setShowPaymentModal(true)
+                                                                                }
+                                                                            }}>Selecionar</Button>
+                                                                        }
+                                                                    />
+                                                                ) : (
+                                                                    <ListItem
+                                                                        icon={
+                                                                            selectedStorefrontMethod?.type === "pix" ? <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-5 h-5 object-contain" /> :
+                                                                                selectedStorefrontMethod?.type === "credit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
+                                                                                    selectedStorefrontMethod?.type === "debit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/DebitCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
+                                                                                        MoneyIcon
+                                                                        }
+                                                                        title={selectedStorefrontMethod ? (paymentTypeLabelMap[selectedStorefrontMethod.type] || selectedStorefrontMethod.type) : "Carregando..."}
+                                                                        description={
+                                                                            selectedStorefrontMethod?.type === "pix" ? "Pagamento instantâneo via Pix" :
+                                                                                selectedStorefrontMethod?.type.includes("card") ? "Pagamento com maquininha" :
+                                                                                    wantsChange ? `Dinheiro (Troco para R$ ${payWithAmount?.toFixed(2).replace('.', ',')})` :
+                                                                                        wantsChange === false ? "Dinheiro (Valor exato)" : "Pagamento em dinheiro"
+                                                                        }
+                                                                        className="!border-none !bg-transparent !shadow-none !px-0 py-3 hover:!bg-transparent hover:!border-none"
+                                                                        right={
+                                                                            <Button variant="link" onClick={() => {
+                                                                                if (deliveryError) {
+                                                                                    setShowOutsideRadiusModal(true)
+                                                                                } else {
+                                                                                    setShowPaymentModal(true)
+                                                                                }
+                                                                            }}>Trocar</Button>
+                                                                        }
+                                                                    />
+                                                                )}
+                                                                {renderChangeSection()}
+                                                                {selectedStorefrontMethod?.cardBrand && (
                                                             <div className="mt-4">
                                                                 <span className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Bandeiras aceitas</span>
                                                                 <div className="flex flex-wrap gap-2">
@@ -2640,11 +2688,13 @@ export function CheckoutPageClient() {
                                                                 />
                                                             </div>
                                                         )}
-                                                    </motion.div>
+                                                    </>
                                                 )}
-                                            </AnimatePresence>
-                                        </>
-                                    ) : (
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </>
+                            ) : (
                                         <>
                                             <div className="flex gap-3 mb-6">
                                                 <div className="w-1 rounded-full bg-brand-border dark:bg-dark-border shrink-0" />
@@ -3861,7 +3911,7 @@ export function CheckoutPageClient() {
             <DefaultModal
                 isOpen={showOutsideRadiusModal}
                 onClose={() => setShowOutsideRadiusModal(false)}
-                title="Endereço Indisponível"
+                title="Entrega Indisponível"
                 maxWidth="sm"
             >
                 <div className="flex flex-col items-center justify-center text-center p-4 pt-0">

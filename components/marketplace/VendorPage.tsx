@@ -646,8 +646,9 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         return sum / calculatedReviewsCount
     }, [reviews, calculatedReviewsCount])
 
-    const displayRating = calculatedReviewsCount > 0 ? calculatedAverageRating : (partner.rating || 0)
-    const displayReviewsCount = calculatedReviewsCount > 0 ? calculatedReviewsCount : (stats.reviewsCount || 0)
+    const hasEnoughReviews = calculatedReviewsCount >= 3
+    const displayRating = hasEnoughReviews ? calculatedAverageRating : 0
+    const displayReviewsCount = hasEnoughReviews ? calculatedReviewsCount : 0
 
     const pathname = usePathname()
     const [activeTag, setActiveTag] = useState("todos")

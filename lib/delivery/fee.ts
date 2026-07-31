@@ -32,10 +32,14 @@ export type DeliveryBreakdown = {
   appliedRuleIds: string[]
   distanceKm: number
   originalFee?: number
+  deliverySubsidy?: number
   deliveryPayer?: "customer" | "seller"
   isOutsideRadius?: boolean
   maxDeliveryKm?: number | null
   outsideRadiusWarning?: string
+  isFreeByThreshold?: boolean
+  freeDeliveryThreshold?: number | null
+  freeDeliveryReason?: "threshold" | "coupon"
 }
 
 export type CalculateDeliveryFeeInput = {
@@ -87,34 +91,12 @@ export function calculateDeliveryFee(input: CalculateDeliveryFeeInput): {
 
   const isOutsideRadius = effectiveMaxKm != null && distanceKm > effectiveMaxKm
   if (isOutsideRadius && !input.allowOutsideRadius) {
-    throw new Error("Endereço fora do raio máximo de entrega.")
+    throw new Error("Endereço fora do raio máximo de entrega do vendedor.")
   }
 
   const outsideRadiusWarning = isOutsideRadius
     ? `Endereço fora do raio máximo de entrega da loja (${distanceKm} km / Máximo: ${effectiveMaxKm} km).`
     : undefined
-
-  const freeDeliveryThreshold = input.settings.freeDeliveryThreshold == null ? null : Math.max(0, Number(input.settings.freeDeliveryThreshold))
-  const orderSubtotal = input.orderSubtotal == null ? null : Math.max(0, Number(input.orderSubtotal))
-  const isFreeByThreshold = freeDeliveryThreshold !== null && orderSubtotal !== null && orderSubtotal >= freeDeliveryThreshold
-
-  if (input.freeDeliveryCoupon || isFreeByThreshold) {
-    return {
-      fee: 0,
-      breakdown: {
-        baseFee: roundMoney(baseFee),
-        distanceFee: 0,
-        timeFixedAdjustments: 0,
-        timeMultiplierFactor: 1,
-        timeAdjustmentTotal: roundMoney(-baseFee),
-        appliedRuleIds: input.freeDeliveryCoupon ? ["coupon:free_delivery"] : ["threshold:free_delivery"],
-        distanceKm: roundMoney(distanceKm),
-        isOutsideRadius,
-        maxDeliveryKm: effectiveMaxKm,
-        outsideRadiusWarning,
-      },
-    }
-  }
 
   let fee = baseFee
   const extraDistanceKm = Math.max(0, distanceKm - includedKm)
@@ -146,6 +128,36 @@ export function calculateDeliveryFee(input: CalculateDeliveryFeeInput): {
   fee = Math.max(0, fee)
   const roundedFee = roundMoney(fee)
   const preTimeFee = baseFee + distanceFee
+
+  const freeDeliveryThreshold = input.settings.freeDeliveryThreshold == null ? null : Math.max(0, Number(input.settings.freeDeliveryThreshold))
+  const orderSubtotal = input.orderSubtotal == null ? null : Math.max(0, Number(input.orderSubtotal))
+  const isFreeByThreshold = freeDeliveryThreshold !== null && orderSubtotal !== null && orderSubtotal >= freeDeliveryThreshold
+
+  if (input.freeDeliveryCoupon || isFreeByThreshold) {
+    return {
+      fee: 0,
+      breakdown: {
+        baseFee: roundMoney(baseFee),
+        distanceFee: roundMoney(distanceFee),
+        timeFixedAdjustments: roundMoney(timeFixedAdjustments),
+        timeMultiplierFactor: roundMoney(timeMultiplierFactor),
+        timeAdjustmentTotal: roundMoney(roundedFee - preTimeFee),
+        appliedRuleIds: input.freeDeliveryCoupon
+          ? ["coupon:free_delivery", ...activeRules.map((r) => r.id)]
+          : ["threshold:free_delivery", ...activeRules.map((r) => r.id)],
+        distanceKm: roundMoney(distanceKm),
+        originalFee: roundedFee,
+        deliverySubsidy: roundedFee,
+        deliveryPayer: "seller",
+        isOutsideRadius,
+        maxDeliveryKm: effectiveMaxKm,
+        outsideRadiusWarning,
+        isFreeByThreshold: Boolean(isFreeByThreshold),
+        freeDeliveryThreshold,
+        freeDeliveryReason: input.freeDeliveryCoupon ? "coupon" : "threshold",
+      },
+    }
+  }
 
   if (input.settings.deliveryPayer === "seller") {
     return {

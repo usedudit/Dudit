@@ -13,7 +13,6 @@ import {
   TagIcon,
   PackageReceiveIcon,
   WrenchIcon,
-  MailIcon,
   CadastrosIcon,
   ClockIcon,
 } from "@/lib/icons"

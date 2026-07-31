@@ -17,6 +17,7 @@ type ShippingCustomerDetails = {
     email?: string | null
     phone?: string | null
     cpf?: string | null
+    image_url?: string | null
     address?: {
         zipCode?: string
         street?: string
@@ -234,7 +235,7 @@ export default function POSShippingSheet({
 
                         {hasSelectedCustomer && customerDetails && (
                             <CustomerCard
-                                customer={{ name: customerDetails.name || "", email: customerDetails.email || "", phone: customerDetails.phone || "" }}
+                                customer={{ name: customerDetails.name || "", email: customerDetails.email || "", phone: customerDetails.phone || "", image_url: customerDetails.image_url || null }}
                                 address={customerDetails.address || null}
                                 showMap={hasStreet}
                                 chrome="minimal"

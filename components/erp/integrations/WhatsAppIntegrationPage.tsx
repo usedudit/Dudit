@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useCallback, useRef, useEffect } from "react"
+import { useState, useCallback, useRef, useEffect } from "react"
 import Link from "next/link"
 import { Button, Badge, Input, InfoCard, FormSection, ListItem, IconPlaceholder } from "@/components/reusable"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/reusable"
@@ -372,11 +372,6 @@ export function WhatsAppIntegrationPage({
                                                     Ativo
                                                 </Badge>
                                             )}
-                                            {storeId && (
-                                                <Badge variant="orange">
-                                                    Store-level
-                                                </Badge>
-                                            )}
                                         </h1>
 
                                         <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
@@ -430,7 +425,7 @@ export function WhatsAppIntegrationPage({
                                                     <FormSection title="Integração WhatsApp">
                                                         <ListItem
                                                             className="border-none bg-transparent hover:border-none p-0 cursor-default pointer-events-none"
-                                                            icon="https://img.dudit.com.br/static/icons/WhatsApp.png"
+                                                            icon={<img src="https://img.dudit.com.br/static/icons/WhatsApp.png" alt="WhatsApp" className="object-contain" />}
                                                             title={
                                                                 evoStatus === "connected"
                                                                     ? (evoPhoneNumber || evoConnection?.phoneNumber || "WhatsApp Conectado")
@@ -438,10 +433,7 @@ export function WhatsAppIntegrationPage({
                                                             }
                                                             description={
                                                                 <div className="flex items-center gap-2 mt-1">
-                                                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body">Status:</span>
-                                                                    <Badge variant={STATUS_BADGE_MAP[evoStatus] || "gray"}>
-                                                                        {STATUS_LABELS[evoStatus] || evoStatus}
-                                                                    </Badge>
+                                                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body">Status: {STATUS_LABELS[evoStatus] || evoStatus}</span>
                                                                 </div>
                                                             }
                                                         />

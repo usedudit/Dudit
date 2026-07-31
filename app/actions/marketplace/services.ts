@@ -44,6 +44,7 @@ async function _getMarketplaceService(serviceId: string, storeId?: string | null
         id, name, slug, description, logo_url, banner_url,
         phone, opening_hours, gallery,
         is_showcase_active, business_info,
+        rating, vendas_totais,
         addresses!store_id!left(city, state, latitude, longitude)
       )
     `)

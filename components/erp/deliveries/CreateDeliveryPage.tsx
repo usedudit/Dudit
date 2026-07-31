@@ -60,7 +60,16 @@ type OrderPickerItem = {
     deliveryFee?: number
     distanceKm?: number | null
     deliveryBreakdown?: Record<string, any> | null
-    customer?: { id: string | null; name: string; email?: string | null; phone?: string | null } | null
+    customer?: { id: string | null; name: string; email?: string | null; phone?: string | null; image_url?: string | null } | null
+    customerAddress?: {
+        street?: string
+        number?: string
+        complement?: string
+        neighborhood?: string
+        city?: string
+        state?: string
+        zipCode?: string
+    } | null
     address?: string
     orderSource?: string | null
     items?: Array<{
@@ -790,11 +799,12 @@ export default function CreateDeliveryPage({
 
                                     <CustomerCard
                                         customer={{
+                                            ...(activeOrder.customer || {}),
                                             name: activeOrder.customer?.name || "Cliente",
                                             email: activeOrder.customer?.email || "",
                                             phone: activeOrder.customer?.phone || "",
                                         }}
-                                        address={buildCustomerAddress(activeOrder.address)}
+                                        address={activeOrder.customerAddress || buildCustomerAddress(activeOrder.address)}
                                         showMap={false}
                                         chrome="minimal"
                                     />

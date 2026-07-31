@@ -40,18 +40,44 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
     // Optimistic overrides for instant UI feedback (selection + quantity)
     const [optimisticItems, setOptimisticItems] = useState<Record<string, { selected?: boolean; quantity?: number }>>({})
 
+    const hasOnlyServices = (items: any[]) => {
+        const selected = (items || []).filter((item: any) => getItemSelected(item))
+        return selected.length > 0 && selected.every((item: any) => item.item_type === "service_booking")
+    }
+
     const renderPromoBanners = (storeKey: string, partnerItemsTotal: number) => {
-        const promos = itemsByPartner[storeKey]?.promotions || []
+        const partnerData = itemsByPartner[storeKey]
+        const promos = partnerData?.promotions || []
         const pendingPromos = promos.filter((p: any) =>
             p.minSpendAmount &&
             p.minSpendAmount > partnerItemsTotal &&
             p.promotionType === "gift"
         )
 
-        if (pendingPromos.length === 0) return null
+        const settings = partnerData?.deliverySettings
+        const freeDeliveryThreshold = settings?.free_delivery_threshold != null ? Number(settings.free_delivery_threshold) : 0
+        const isFreeDeliveryEligible = freeDeliveryThreshold > 0 && partnerItemsTotal > 0 && !hasOnlyServices(partnerData?.items || [])
+        const diffFreeDelivery = isFreeDeliveryEligible ? freeDeliveryThreshold - partnerItemsTotal : 0
+        const showFreeDeliveryBanner = isFreeDeliveryEligible && diffFreeDelivery > 0
+
+        if (pendingPromos.length === 0 && !showFreeDeliveryBanner) return null
 
         return (
             <div className="mt-4 space-y-3">
+                {showFreeDeliveryBanner && (
+                    <div className="bg-gradient-to-r from-emerald-500/5 to-emerald-500/10 dark:from-emerald-950/10 dark:to-emerald-900/10 p-4 rounded-xl border border-emerald-500/15 dark:border-emerald-500/20 space-y-2">
+                        <div className="flex justify-between items-center text-xs font-semibold text-brand-dark dark:text-dark-heading">
+                            <span>Falta <strong className="text-brand-green">{formatCurrency(diffFreeDelivery)}</strong> para você ter Entrega Grátis nesta loja!</span>
+                            <span className="text-brand-green">{Math.min(100, Math.round((partnerItemsTotal / freeDeliveryThreshold) * 100))}%</span>
+                        </div>
+                        <div className="w-full bg-brand-gray dark:bg-zinc-800 h-2 rounded-full overflow-hidden">
+                            <div
+                                className="bg-brand-green h-full rounded-full transition-all duration-500 ease-out"
+                                style={{ width: `${Math.min(100, (partnerItemsTotal / freeDeliveryThreshold) * 100)}%` }}
+                            />
+                        </div>
+                    </div>
+                )}
                 {pendingPromos.map((promo: any) => {
                     const diff = promo.minSpendAmount - partnerItemsTotal
                     const pct = Math.min(100, (partnerItemsTotal / promo.minSpendAmount) * 100)
@@ -367,7 +393,8 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
     const { success: notifySuccess, error: notifyError } = useNotification()
 
     const getPartnerDeliveryFee = (partnerData: any, selectedItemsTotal: number = 0) => {
-        const settings = partnerData.deliverySettings
+        if (hasOnlyServices(partnerData?.items || [])) return 0
+        const settings = partnerData?.deliverySettings
         if (!settings || settings.is_delivery_enabled === false || settings.delivery_payer === "seller") return 0
         if (settings.free_delivery_threshold != null && Number(settings.free_delivery_threshold) > 0 && selectedItemsTotal >= Number(settings.free_delivery_threshold)) {
             return 0
@@ -406,7 +433,8 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
             }))
 
     const getDeliveryLabel = (partnerData: any, selectedItemsTotal: number = 0) => {
-        const settings = partnerData.deliverySettings
+        if (hasOnlyServices(partnerData?.items || [])) return null
+        const settings = partnerData?.deliverySettings
         if (!settings) return "A combinar"
         if (settings.delivery_payer === "seller") {
             const fee = Number(settings.base_fee || 0)
@@ -421,7 +449,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
             return settings.is_pickup_enabled !== false ? "Apenas retirada (Grátis)" : "Indisponível"
         }
         if (settings.free_delivery_threshold != null && Number(settings.free_delivery_threshold) > 0 && selectedItemsTotal >= Number(settings.free_delivery_threshold)) {
-            return "Grátis (Promoção)"
+            return <span className="text-brand-green font-semibold">Grátis (Entrega grátis ativada)</span>
         }
         const fee = Number(settings.base_fee || 0)
         return fee > 0 ? formatCurrency(fee) : "A combinar"
@@ -841,10 +869,12 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                         <span className="text-brand-inactive-text">Total dos itens</span>
                                                                         <span className="font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(partnerItemsTotal)}</span>
                                                                     </div>
-                                                                    <div className="flex justify-between items-center text-sm">
-                                                                        <span className="text-brand-inactive-text">Entrega</span>
-                                                                        <span className="text-brand-green font-semibold">{getDeliveryLabel(data, partnerItemsTotal)}</span>
-                                                                    </div>
+                                                                    {getDeliveryLabel(data, partnerItemsTotal) !== null && (
+                                                                        <div className="flex justify-between items-center text-sm">
+                                                                            <span className="text-brand-inactive-text">Entrega</span>
+                                                                            <span className="text-brand-green font-semibold">{getDeliveryLabel(data, partnerItemsTotal)}</span>
+                                                                        </div>
+                                                                    )}
                                                                     <div className="h-[1px] bg-brand-border dark:bg-dark-border w-full" />
                                                                     <div className="flex justify-between items-center text-base font-bold text-brand-dark dark:text-dark-heading">
                                                                         <span>Total</span>
@@ -889,10 +919,12 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                         <span className="text-brand-inactive-text">Total dos itens</span>
                                                                         <span className="text-brand-dark dark:text-dark-heading">{formatCurrency(partnerItemsTotal)}</span>
                                                                     </div>
-                                                                    <div className="flex justify-between items-center text-sm font-medium">
-                                                                        <span className="text-brand-inactive-text">Entrega</span>
-                                                                        <span className="text-brand-green font-semibold">{getDeliveryLabel(data, partnerItemsTotal)}</span>
-                                                                    </div>
+                                                                    {getDeliveryLabel(data, partnerItemsTotal) !== null && (
+                                                                        <div className="flex justify-between items-center text-sm font-medium">
+                                                                            <span className="text-brand-inactive-text">Entrega</span>
+                                                                            <span className="text-brand-green font-semibold">{getDeliveryLabel(data, partnerItemsTotal)}</span>
+                                                                        </div>
+                                                                    )}
                                                                     <div className="h-[1px] bg-brand-border dark:bg-dark-border w-full" />
                                                                     <div className="flex justify-between items-center font-bold text-xl text-brand-dark dark:text-dark-heading">
                                                                         <span>Total Geral</span>

@@ -982,12 +982,22 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                     </span>} />
                                                             )}
 
-                                                            {(Number(order.delivery_fee || 0) > 0 || order.delivery_payer === "seller") && (
+                                                            {(Number(order.delivery_fee || 0) > 0 || order.delivery_payer === "seller" || Number(order.delivery_breakdown?.originalFee || order.delivery_breakdown?.deliverySubsidy || 0) > 0) && (
                                                                 <PaymentRow
                                                                     label="Valor da Entrega"
-                                                                    value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm flex items-center gap-1.5">
-                                                                        {Number(order.delivery_fee || 0) > 0 ? formatCurrency(order.delivery_fee) : formatCurrency(Number(order.delivery_breakdown?.originalFee || order.delivery_breakdown?.deliverySubsidy || 0))}
-                                                                        {order.delivery_payer === "seller" && <Badge variant="orange">Subsidiado pela loja</Badge>}
+                                                                    value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm flex items-center gap-1.5 flex-wrap">
+                                                                        {Number(order.delivery_fee || 0) > 0
+                                                                            ? formatCurrency(order.delivery_fee)
+                                                                            : formatCurrency(Number(order.delivery_breakdown?.originalFee || order.delivery_breakdown?.deliverySubsidy || 0))}
+                                                                        {Number(order.delivery_fee || 0) === 0 && (
+                                                                            <Badge variant="orange">Frete Grátis (Subsidiado pela loja)</Badge>
+                                                                        )}
+                                                                        {Number(order.delivery_fee || 0) > 0 && order.delivery_payer === "seller" && (
+                                                                            <Badge variant="orange">Subsidiado pela loja</Badge>
+                                                                        )}
+                                                                        {Number(order.delivery_breakdown?.distanceKm || 0) > 0 && (
+                                                                            <span className="text-xs text-brand-muted font-normal">({order.delivery_breakdown.distanceKm} km)</span>
+                                                                        )}
                                                                     </span>} />
                                                             )}
 
@@ -1225,7 +1235,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                 left={
                                                                     <UserProfileImage
                                                                         fullName={customerObj.name || "Cliente"}
-                                                                        imageUrl={customerObj.avatar}
+                                                                        imageUrl={customerObj.image_url || customerObj.avatar_url || customerObj.avatar}
                                                                         className="w-10 h-10 text-base"
                                                                     />
                                                                 }
@@ -1456,12 +1466,22 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                 </span>} />
                                                         )}
 
-                                                        {(Number(order.delivery_fee || 0) > 0 || order.delivery_payer === "seller") && (
+                                                        {(Number(order.delivery_fee || 0) > 0 || order.delivery_payer === "seller" || Number(order.delivery_breakdown?.originalFee || order.delivery_breakdown?.deliverySubsidy || 0) > 0) && (
                                                             <PaymentRow
                                                                 label="Valor da Entrega"
-                                                                value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm flex items-center gap-1.5">
-                                                                    {Number(order.delivery_fee || 0) > 0 ? formatCurrency(order.delivery_fee) : formatCurrency(Number(order.delivery_breakdown?.originalFee || order.delivery_breakdown?.deliverySubsidy || 0))}
-                                                                    {order.delivery_payer === "seller" && <Badge variant="orange">Subsidiado pela loja</Badge>}
+                                                                value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm flex items-center gap-1.5 flex-wrap">
+                                                                    {Number(order.delivery_fee || 0) > 0
+                                                                        ? formatCurrency(order.delivery_fee)
+                                                                        : formatCurrency(Number(order.delivery_breakdown?.originalFee || order.delivery_breakdown?.deliverySubsidy || 0))}
+                                                                    {Number(order.delivery_fee || 0) === 0 && (
+                                                                        <Badge variant="orange">Frete Grátis (Subsidiado pela loja)</Badge>
+                                                                    )}
+                                                                    {Number(order.delivery_fee || 0) > 0 && order.delivery_payer === "seller" && (
+                                                                        <Badge variant="orange">Subsidiado pela loja</Badge>
+                                                                    )}
+                                                                    {Number(order.delivery_breakdown?.distanceKm || 0) > 0 && (
+                                                                        <span className="text-xs text-brand-muted font-normal">({order.delivery_breakdown.distanceKm} km)</span>
+                                                                    )}
                                                                 </span>} />
                                                         )}
 

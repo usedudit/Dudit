@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
     Button,
     InfoCard,
@@ -7,6 +7,11 @@ import {
 import {
     CheckCircleIcon,
     XIcon,
+    ChevronLeftIcon,
+    ChevronRightIcon,
+    FileIcon,
+    MoneyIcon,
+    PrinterIcon,
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from "@/components/ui/use-toast";
@@ -26,6 +31,7 @@ import { formatCurrency, formatDate, formatTime } from '@/lib/utils';
 import type { PaymentBreakdownLeg } from '@/components/erp/payments/shared/payment-utils';
 import { UserProfileImage } from '@/lib/utils/UserProfileImage';
 import { ReceiptScallopEdge } from '../POSComponents';
+import SaleReceiptPrintModal from '@/components/erp/orders/receipt/SaleReceiptPrintModal';
 
 const DEPOSIT_STATUS_LABELS: Record<string, string> = {
     pending: "Sinal pendente",
@@ -43,6 +49,21 @@ interface PaymentStatusModalProps {
     partnerId: string;
     onSuccess?: () => void;
 }
+
+const SuccessActionCard = React.memo(({ icon: Icon, label, onClick }: { icon: any, label: string, onClick?: () => void }) => (
+    <div
+        className="flex items-center gap-3 p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20 cursor-pointer transition-colors group"
+        onClick={onClick}
+    >
+        <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-dark-border/50 flex items-center justify-center shrink-0 group-hover:bg-white dark:group-hover:bg-dark-surface">
+            <Icon size={18} className="text-brand-dark dark:text-dark-heading" />
+        </div>
+        <div className="flex-1">
+            <span className="font-bold text-sm text-brand-dark dark:text-dark-heading block">{label}</span>
+        </div>
+        <ChevronRightIcon size={16} className="text-brand-inactive-text" />
+    </div>
+));
 
 function normalizeBreakdown(order: any): PaymentBreakdownLeg[] {
     if (Array.isArray(order.payment_breakdown) && order.payment_breakdown.length > 0) {
@@ -144,6 +165,17 @@ export default function PaymentStatusModal({
     const [syncing, setSyncing] = useState(false);
     const [pendingLegs, setPendingLegs] = useState<PaymentBreakdownLeg[]>([]);
     const [canSubmitBalance, setCanSubmitBalance] = useState(false);
+    const [printOrderId, setPrintOrderId] = useState<string | null>(null);
+    const [currentOrder, setCurrentOrder] = useState<any>(order);
+    const [collectorHeader, setCollectorHeader] = useState<{
+        title: string;
+        canGoBack: boolean;
+        onGoBack: () => void;
+    }>({
+        title: 'Receber saldo',
+        canGoBack: false,
+        onGoBack: () => {},
+    });
     const [successSnapshot, setSuccessSnapshot] = useState<{
         displayOrderTotal: number;
         totalPaid: number;
@@ -155,11 +187,13 @@ export default function PaymentStatusModal({
 
     useEffect(() => {
         if (isOpen) {
+            setCurrentOrder(order);
             setPendingLegs([]);
             setCanSubmitBalance(false);
             setPaymentStatus('input');
             setErrorMessage('');
             setSuccessSnapshot(null);
+            setPrintOrderId(null);
             const id = setTimeout(() => setIsAnimating(true), 50);
             return () => clearTimeout(id);
         } else {
@@ -174,15 +208,18 @@ export default function PaymentStatusModal({
         }, 200);
     };
 
-    const breakdown = order ? normalizeBreakdown(order) : [];
-    const depositSummary = order ? getOrderDepositSummary(order) : null;
-    const totalOrder = order ? getOrderTotalAmount(order) : 0;
-    const totalPaid = order ? getOrderPaidAmount(order) : 0;
-    const totalRemaining = order ? getOrderRemainingBalance(order) : 0;
-    const frozen = order ? isOrderFinanciallyFrozen(order) : false;
-    const displayId = order
-        ? order.order_number || `#${String(order.id || order.originalId || "").substring(0, 8)}`
-        : "";
+    const targetOrder = currentOrder || order;
+    const breakdown = targetOrder ? normalizeBreakdown(targetOrder) : [];
+    const depositSummary = targetOrder ? getOrderDepositSummary(targetOrder) : null;
+    const totalOrder = targetOrder ? getOrderTotalAmount(targetOrder) : 0;
+    const totalPaid = targetOrder ? getOrderPaidAmount(targetOrder) : 0;
+    const totalRemaining = targetOrder ? getOrderRemainingBalance(targetOrder) : 0;
+    const frozen = targetOrder ? isOrderFinanciallyFrozen(targetOrder) : false;
+
+    const displayOrderNumber = useMemo(() => {
+        if (!targetOrder) return "";
+        return targetOrder.order_number ?? targetOrder.orderNumber ?? targetOrder.number ?? `#${String(targetOrder.id || targetOrder.originalId || "").substring(0, 8)}`;
+    }, [targetOrder]);
 
     const cashEntry = Array.isArray(breakdown)
         ? breakdown.find((entry: any) => {
@@ -190,16 +227,16 @@ export default function PaymentStatusModal({
             return m === "cash" || m === "dinheiro";
         })
         : null;
-    const wantsChange = (cashEntry as any)?.wantsChange ?? String(order?.payment_method || "").toLowerCase().includes("troco para");
+    const wantsChange = (cashEntry as any)?.wantsChange ?? String(targetOrder?.payment_method || "").toLowerCase().includes("troco para");
     const payWithAmount = (cashEntry as any)?.payWithAmount ?? (() => {
-        const match = String(order?.payment_method || "").match(/troco para R\$\s*([\d,.]+)/i)
+        const match = String(targetOrder?.payment_method || "").match(/troco para R\$\s*([\d,.]+)/i)
         if (match) {
             const cleanNum = match[1].replace(/\./g, "").replace(',', '.')
             return Number(cleanNum)
         }
         return null;
     })();
-    const cashChangeAmount = wantsChange && payWithAmount ? payWithAmount - Number(order?.total_amount || 0) : 0;
+    const cashChangeAmount = wantsChange && payWithAmount ? payWithAmount - Number(targetOrder?.total_amount || 0) : 0;
 
     const lockedMethod = useMemo(() => {
         const paidLeg = breakdown.find((leg) => {
@@ -210,7 +247,7 @@ export default function PaymentStatusModal({
         });
         if (paidLeg?.method) return paidLeg.method;
 
-        const mainMethod = order?.payment_method;
+        const mainMethod = targetOrder?.payment_method;
         if (mainMethod) {
             const norm = mainMethod.toLowerCase();
             if (!norm.includes('não definido') && !norm.includes('metodo nao definido') && !norm.includes('pendente') && !norm.includes('não informado') && !norm.includes('nao informado')) {
@@ -218,7 +255,7 @@ export default function PaymentStatusModal({
             }
         }
         return null;
-    }, [order, breakdown]);
+    }, [targetOrder, breakdown]);
 
     const lockedInstallments = useMemo(() => {
         const matchingLeg = breakdown.find((leg) => {
@@ -236,22 +273,22 @@ export default function PaymentStatusModal({
     );
 
     const receiptCart = useMemo(() => {
-        const items = order?.order_items || order?.items || [];
+        const items = targetOrder?.order_items || targetOrder?.items || [];
         return items.map((item: any) => ({
             name: item.products?.name || item.product_name || item.name || "Item",
             quantity: Number(item.quantity || 1),
             unitPrice: Number(item.product_price || item.unit_price || item.unitPrice || 0),
         }));
-    }, [order]);
+    }, [targetOrder]);
 
     const onLegsReady = useCallback((legs: PaymentBreakdownLeg[]) => {
         setPendingLegs(legs);
     }, []);
 
-    if (!order || !isOpen) return null;
+    if (!targetOrder || !isOpen) return null;
 
     const handleSyncMpPayment = async () => {
-        const targetOrderId = order.id || order.originalId;
+        const targetOrderId = targetOrder.id || targetOrder.originalId;
         if (!targetOrderId) return;
         setSyncing(true);
         try {
@@ -281,10 +318,10 @@ export default function PaymentStatusModal({
         }
     };
 
-    const isFullyPaid = order?.situation === "paid" || totalRemaining <= 0.009;
+    const isFullyPaid = targetOrder?.situation === "paid" || totalRemaining <= 0.009;
 
     const handleSubmit = async () => {
-        const targetOrderId = order.id || order.originalId;
+        const targetOrderId = targetOrder.id || targetOrder.originalId;
         if (isFullyPaid) {
             toast({ title: "Aviso", description: "Este pedido já está pago.", variant: "warning" });
             return;
@@ -352,6 +389,14 @@ export default function PaymentStatusModal({
             });
 
             if (res.success) {
+                const updated = {
+                    ...targetOrder,
+                    paid_amount: nextPaidAmount,
+                    paidAmount: nextPaidAmount,
+                    situation: nextSituation,
+                    payment_breakdown: updatedBreakdown,
+                };
+                setCurrentOrder(updated);
                 setSuccessSnapshot({
                     displayOrderTotal: totalOrder,
                     totalPaid: nextPaidAmount,
@@ -391,17 +436,17 @@ export default function PaymentStatusModal({
                     <div className="flex items-center justify-between mb-8">
                         <div className="flex items-center gap-4">
                             <UserProfileImage
-                                fullName={order.customer_name || 'Consumidor Final'}
+                                fullName={targetOrder.customer_name || 'Consumidor Final'}
                                 className="w-12 h-12 text-white font-medium text-lg shrink-0"
                             />
                             <div className="flex flex-col overflow-hidden">
-                                <span className="font-bold text-lg text-brand-dark dark:text-dark-heading leading-tight truncate max-w-[180px]">{order.customer_name || 'Consumidor Final'}</span>
+                                <span className="font-bold text-lg text-brand-dark dark:text-dark-heading leading-tight truncate max-w-[180px]">{targetOrder.customer_name || 'Consumidor Final'}</span>
                                 <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium mt-0.5">Venda de Itens</span>
                             </div>
                         </div>
                         <div className="flex flex-col items-end text-right justify-center">
-                            <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium">{formatDate(new Date(order.created_at || Date.now()))}</span>
-                            <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium mt-0.5">{formatTime(new Date(order.created_at || Date.now()))}</span>
+                            <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium">{formatDate(new Date(targetOrder.created_at || Date.now()))}</span>
+                            <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium mt-0.5">{formatTime(new Date(targetOrder.created_at || Date.now()))}</span>
                         </div>
                     </div>
 
@@ -412,7 +457,7 @@ export default function PaymentStatusModal({
                             totalPaid={totalPaid}
                             totalRemaining={totalRemaining}
                             itemCount={receiptCart.length}
-                            customerName={order.customer_name}
+                            customerName={targetOrder.customer_name}
                         />
                     </div>
                 </div>
@@ -422,7 +467,19 @@ export default function PaymentStatusModal({
                     {/* Header */}
                     {paymentStatus === 'input' && (
                         <div className="px-6 py-6 md:px-10 md:pt-10 flex items-center justify-between shrink-0">
-                            <div className="flex-1" />
+                            <div className="flex items-center gap-3 overflow-hidden">
+                                {collectorHeader.canGoBack && (
+                                    <button
+                                        onClick={collectorHeader.onGoBack}
+                                        className="w-10 h-10 rounded-full bg-gray-100 dark:bg-dark-border/50 flex items-center justify-center text-brand-dark dark:text-dark-heading hover:bg-gray-200 dark:hover:bg-dark-border transition-colors shrink-0"
+                                    >
+                                        <ChevronLeftIcon size={20} />
+                                    </button>
+                                )}
+                                <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading truncate">
+                                    {collectorHeader.title}
+                                </h2>
+                            </div>
                             <button onClick={handleSafeClose} className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 dark:bg-dark-border/50 text-brand-dark dark:text-dark-heading hover:bg-gray-200 transition-colors">
                                 <XIcon size={20} />
                             </button>
@@ -462,7 +519,7 @@ export default function PaymentStatusModal({
 
                                     <DepositReceiptsSection
                                         legs={breakdown}
-                                        onSyncMp={order.mp_payment_id || order.payment_provider === "Mercado Pago" ? handleSyncMpPayment : undefined}
+                                        onSyncMp={targetOrder.mp_payment_id || targetOrder.payment_provider === "Mercado Pago" ? handleSyncMpPayment : undefined}
                                         syncing={syncing}
                                     />
 
@@ -476,6 +533,7 @@ export default function PaymentStatusModal({
                                             lockedMethodLabel={lockedMethod}
                                             lockedInstallments={lockedInstallments}
                                             onConfirmPayment={handleSubmit}
+                                            onHeaderStateChange={setCollectorHeader}
                                         />
                                     ) : isFullyPaid ? (
                                         <div className="my-auto py-10">
@@ -503,8 +561,11 @@ export default function PaymentStatusModal({
                                     transition={standardTransition}
                                     className="w-full h-full flex flex-col items-center justify-center p-8 text-center my-auto"
                                 >
-                                    <div className="h-12 w-12 animate-spin rounded-full border-4 border-brand-border border-t-brand-green mb-4 shrink-0" />
-                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-1">Processando recebimento...</h3>
+                                    <div className="w-32 h-32 rounded-full bg-gradient-to-tr from-brand-green to-[#10b981] flex items-center justify-center mb-6 relative">
+                                        <div className="absolute inset-0 rounded-full bg-white opacity-20 animate-ping"></div>
+                                        <MoneyIcon size={56} className="text-white" />
+                                    </div>
+                                    <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading mb-2">Processando recebimento...</h2>
                                     <p className="text-brand-inactive-text dark:text-dark-body text-sm">Por favor, aguarde enquanto registramos o pagamento.</p>
                                 </motion.div>
                             )}
@@ -545,7 +606,7 @@ export default function PaymentStatusModal({
                                         </div>
                                         <div>
                                             <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">
-                                                Venda nº {displayId}
+                                                Venda nº {displayOrderNumber}
                                             </h2>
                                             <p className="text-brand-inactive-text dark:text-dark-body font-medium text-md">Recebimento concluído com sucesso</p>
                                         </div>
@@ -565,24 +626,39 @@ export default function PaymentStatusModal({
                                     <div className="flex flex-col sm:flex-row gap-8 sm:gap-12 mb-10 mt-4 border-l-4 border-brand-dark dark:border-dark-heading pl-6">
                                         <div>
                                             <span className="block text-md font-medium text-brand-inactive-text dark:text-dark-body mb-1">Total da venda</span>
-                                            <div className="text-3xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(successSnapshot?.displayOrderTotal || 0)}</div>
+                                            <div className="text-3xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(successSnapshot?.displayOrderTotal || totalOrder)}</div>
                                         </div>
                                         <div>
                                             <span className="block text-md font-medium text-brand-inactive-text dark:text-dark-body mb-1">Total recebido</span>
-                                            <div className="text-3xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(successSnapshot?.totalPaid || 0)}</div>
+                                            <div className="text-3xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(successSnapshot?.totalPaid || totalPaid)}</div>
                                         </div>
                                     </div>
 
-                                    <div className="grid grid-cols-1 gap-4 mb-8">
-                                        <div className="border border-brand-border dark:border-dark-border rounded-2xl p-5 flex items-center gap-4 bg-brand-gray dark:bg-dark-border/30">
-                                            <div className="w-10 h-10 rounded-full bg-brand-primary/10 flex items-center justify-center text-brand-primary shrink-0">
-                                                <CheckCircleIcon className="w-5 h-5" />
-                                            </div>
-                                            <div className="flex flex-col">
-                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">Recebimento registrado</span>
-                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">O status do pedido foi atualizado com sucesso no ERP.</span>
+                                    {successSnapshot?.paymentBreakdown && successSnapshot.paymentBreakdown.length > 1 && (
+                                        <div className="mb-6 border-t border-brand-border dark:border-dark-border pt-4">
+                                            <span className="block text-md font-medium text-brand-inactive-text dark:text-dark-body mb-3">Formas de pagamento</span>
+                                            <div className="space-y-2">
+                                                {successSnapshot.paymentBreakdown.map((entry: any, i: number) => (
+                                                    <div key={i} className="flex justify-between items-center py-1">
+                                                        <span className="text-sm text-brand-dark dark:text-dark-heading">{entry.method}</span>
+                                                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(entry.amount)}</span>
+                                                    </div>
+                                                ))}
                                             </div>
                                         </div>
+                                    )}
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+                                        <SuccessActionCard
+                                            icon={FileIcon}
+                                            label="Imprimir recibo"
+                                            onClick={() => setPrintOrderId(targetOrder.id || targetOrder.originalId)}
+                                        />
+                                        <SuccessActionCard
+                                            icon={PrinterIcon}
+                                            label="Imprimir NFC-e"
+                                            onClick={() => setPrintOrderId(targetOrder.id || targetOrder.originalId)}
+                                        />
                                     </div>
                                 </motion.div>
                             )}
@@ -632,6 +708,14 @@ export default function PaymentStatusModal({
                     )}
                 </div>
             </div>
+
+            {printOrderId && (
+                <SaleReceiptPrintModal
+                    isOpen={!!printOrderId}
+                    onClose={() => setPrintOrderId(null)}
+                    orderId={printOrderId}
+                />
+            )}
         </div>
     );
 }

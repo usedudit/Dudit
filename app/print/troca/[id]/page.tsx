@@ -5,6 +5,7 @@ import { requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
 import { getPartnerReceiptHeaderAction } from "@/app/actions/erp/receipt"
 import { notFound, redirect } from "next/navigation"
 import { formatCurrency, formatDate } from "@/lib/utils"
+import { stripCep } from "@/lib/utils/format-address"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { QUOTE_PREVIEW_PRIMARY_COLOR, QUOTE_PREVIEW_SECONDARY_COLOR } from "@/lib/quotes/quote-preview-theme"
 import PrintLayout from "@/components/erp/shared/PrintLayout"
@@ -106,12 +107,14 @@ export default async function PrintTrocaPage({ params }: PageProps) {
         legalName: "",
         addressLine: "",
         taxIdLine: "",
+        phone: "",
     }
     const partnerName = storeRes.data?.name || partnerRes.data?.store_name || "Parceiro"
     const rawAvatar = storeRes.data?.logo_url || partnerRes.data?.store_image_url || undefined
     const partnerAvatar = rawAvatar ? getR2ImageUrl(rawAvatar) : undefined
 
     const partnerAddress = partnerHeader.addressLine || "Endereço não cadastrado"
+    const customerAddress = returnRequest.customerAddress ? stripCep(String(returnRequest.customerAddress)) : undefined
 
     const isExchange = returnRequest.desiredResolution === "exchange" || returnRequest.approvedResolution === "exchange"
     const title = isExchange ? "COMPROVANTE DE TROCA" : "COMPROVANTE DE DEVOLUÇÃO"
@@ -205,6 +208,7 @@ export default async function PrintTrocaPage({ params }: PageProps) {
                                     <div className="text-xs text-gray-600 space-y-1">
                                         <p className="font-bold text-sm text-brand-dark">{partnerHeader.fantasyName || partnerName}</p>
                                         {partnerHeader.legalName && <p>{partnerHeader.legalName}</p>}
+                                        {partnerHeader.phone && <p>{partnerHeader.phone}</p>}
                                         {partnerHeader.taxIdLine && <p>{partnerHeader.taxIdLine}</p>}
                                         <p className="whitespace-pre-wrap">{partnerAddress}</p>
                                     </div>
@@ -214,7 +218,7 @@ export default async function PrintTrocaPage({ params }: PageProps) {
                                     <div className="text-xs text-gray-600 space-y-1">
                                         <p className="font-bold text-sm text-brand-dark">{returnRequest.customerName}</p>
                                         {returnRequest.customerPhone && <p>{returnRequest.customerPhone}</p>}
-                                        {returnRequest.customerAddress && <p className="whitespace-pre-wrap">{returnRequest.customerAddress}</p>}
+                                        {customerAddress && <p className="whitespace-pre-wrap">{customerAddress}</p>}
                                     </div>
                                 </div>
                             </div>

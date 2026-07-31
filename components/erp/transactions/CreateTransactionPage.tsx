@@ -25,6 +25,7 @@ import DefaultModal from "@/components/reusable/DefaultModal"
 import AlertModal from "@/components/reusable/AlertModal"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 import SelectCustomerSheet from "@/components/erp/clientes/SelectCustomerSheet"
+import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { FadeIn } from "@/components/animations/FadeIn"
 import {
@@ -260,7 +261,7 @@ export default function CreateTransactionPage({
     const [contactRows, setContactRows] = useState<TransactionContactRow[]>([])
     const [contactsLoading, setContactsLoading] = useState(false)
     const [selectedContactId, setSelectedContactId] = useState<string | undefined>(undefined)
-    const [selectedCustomer, setSelectedCustomer] = useState<{ id: string; name: string } | null>(null)
+    const [selectedCustomer, setSelectedCustomer] = useState<{ id: string; name: string; email?: string | null; phone?: string | null; avatar_url?: string | null } | null>(null)
     const [customerSheetOpen, setCustomerSheetOpen] = useState(false)
     const [fieldErrors, setFieldErrors] = useState<Set<string>>(() => new Set())
     const [showDiscardModal, setShowDiscardModal] = useState(false)
@@ -1664,8 +1665,13 @@ export default function CreateTransactionPage({
                     <div className="mt-4">
                         {contactType === "customer" ? (
                             selectedCustomer ? (
-                                <div className="rounded-xl border border-brand-border dark:border-dark-border p-3 flex items-center justify-between gap-2">
-                                    <div className="min-w-0">
+                                <div className="rounded-xl border border-brand-border dark:border-dark-border p-3 flex items-center gap-3">
+                                    <UserProfileImage
+                                        fullName={selectedCustomer.name || "Cliente"}
+                                        imageUrl={selectedCustomer.avatar_url}
+                                        className="w-10 h-10 shrink-0 text-base"
+                                    />
+                                    <div className="min-w-0 flex-1">
                                         <p className="text-xs text-brand-inactive-text dark:text-dark-body">Cliente</p>
                                         <p className="font-semibold text-sm text-brand-dark dark:text-dark-heading truncate">
                                             {selectedCustomer.name}
@@ -2160,8 +2166,8 @@ export default function CreateTransactionPage({
                 <SelectCustomerSheet
                     isOpen={customerSheetOpen}
                     onClose={() => setCustomerSheetOpen(false)}
-                    onSelect={(c: { id: string; name: string }) =>
-                        setSelectedCustomer({ id: c.id, name: c.name || "Cliente" })
+                    onSelect={(c: any) =>
+                        setSelectedCustomer({ id: c.id, name: c.name || "Cliente", email: c.email || null, phone: c.phone || null, avatar_url: c.avatar_url || null })
                     }
                     partnerId={partnerId}
                 />

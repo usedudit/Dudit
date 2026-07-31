@@ -75,6 +75,15 @@ export function ReportModal({
                 "other"
             ];
         }
+        if (targetType === "review") {
+            return [
+                "inappropriate_content",
+                "spam_or_misleading",
+                "harassment_or_hate",
+                "scam_or_fraud",
+                "other"
+            ];
+        }
         // Para products, services, rental_items, etc
         return [
             "counterfeit",
@@ -115,7 +124,7 @@ export function ReportModal({
                 </div>
 
                 <h4 className="text-brand-dark dark:text-dark-heading text-xl font-bold mb-2 text-center">
-                    Comunicar algo errado sobre este {targetType === "partner" ? "vendedor" : "produto"}
+                    Comunicar algo errado sobre {targetType === "partner" ? "este vendedor" : targetType === "review" ? "esta avaliação" : "este produto"}
                 </h4>
                 <p className="text-brand-inactive-text dark:text-dark-body text-[15px] mb-8 text-center leading-relaxed">
                     Percebeu algo que não parece correto em <strong>{targetName}</strong>? Conte para nós. Seu relato é anônimo e será analisado pela nossa equipe.

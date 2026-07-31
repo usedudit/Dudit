@@ -636,7 +636,7 @@ export async function getPOSInitialDataAction(partnerId: string, storeId?: strin
     const [customersRes, accountsRes, paymentMethodsRes] = await Promise.all([
         supabase
             .from("customers")
-            .select("id, name")
+            .select("id, name, image_url")
             .eq("partner_id", partnerId)
             .order("name")
             .limit(120),
@@ -660,7 +660,7 @@ export async function getPOSInitialDataAction(partnerId: string, storeId?: strin
         success: true as const,
         data: {
             products,
-            customers: customersRes.error ? [] : (customersRes.data || []).map((c: any) => ({ id: c.id, name: c.name, avatar_url: null })),
+            customers: customersRes.error ? [] : (customersRes.data || []).map((c: any) => ({ id: c.id, name: c.name, avatar_url: c.image_url || null })),
             financeAccounts: accountsRes.error ? [] : (accountsRes.data || []),
             preSales: draftsRes.error ? [] : (draftsRes.data || []),
             paymentMethods: filteredMethods,
@@ -1342,7 +1342,7 @@ export async function getPOSCustomerDetailsAction(input: {
     const [{ data: customer, error: customerError }, { data: address }] = await Promise.all([
         supabase
             .from("customers")
-            .select("id, name, email, phone, cpf")
+            .select("id, name, email, phone, cpf, image_url")
             .eq("partner_id", input.partnerId)
             .eq("id", input.customerId)
             .single(),
@@ -1377,6 +1377,7 @@ export async function getPOSCustomerDetailsAction(input: {
             email: customer.email || null,
             phone: customer.phone || null,
             cpf: plainCpf,
+            image_url: customer.image_url || null,
             address: address ? {
                 zipCode: address.zip_code || "",
                 street: address.street || "",

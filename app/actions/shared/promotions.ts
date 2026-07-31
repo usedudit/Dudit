@@ -248,12 +248,8 @@ export async function listCampaignsAction(
     .order("created_at", { ascending: false })
     .range(from, to)
 
-  if (params?.storeId !== undefined) {
-    if (params.storeId === null) {
-      query = query.is("store_id", null)
-    } else {
-      query = query.eq("store_id", params.storeId)
-    }
+  if (params?.storeId !== undefined && params?.storeId !== null) {
+    query = query.or(`store_id.is.null,store_id.eq.${params.storeId}`)
   }
 
   if (params?.search?.trim()) {
@@ -390,6 +386,7 @@ export async function updateCampaignAction(campaignId: string, input: z.infer<ty
       starts_at: data.startsAt || null,
       ends_at: data.endsAt || null,
       is_active: data.isActive,
+      store_id: data.storeId || null,
     })
     .eq("id", campaignId)
     .eq("partner_id", data.partnerId)
@@ -1211,25 +1208,25 @@ export async function getPromotionScopeDataAction(partnerId: string) {
   const [{ data: products }, { data: services }, { data: categories }, { data: serviceCategories }, { data: customers }, { data: stores }] = await Promise.all([
     supabase
       .from("products")
-      .select("id, name, category:product_categories!category_id(name), category_id, price, sku, images, is_active")
+      .select("id, name, category:product_categories!category_id(name), category_id, price, sku, images, is_active, store_id, store_ids")
       .eq("partner_id", partnerId)
       .order("name")
       .limit(200),
     supabase
       .from("services")
-      .select("id, name, category:service_categories!category_id(name), category_id, price, sku, images, is_active")
+      .select("id, name, category:service_categories!category_id(name), category_id, price, sku, images, is_active, store_id, store_ids")
       .eq("partner_id", partnerId)
       .order("name")
       .limit(200),
     supabase
       .from("product_categories")
-      .select("id, name, is_active")
+      .select("id, name, is_active, store_ids")
       .eq("partner_id", partnerId)
       .is("parent_id", null)
       .order("name"),
     supabase
       .from("service_categories")
-      .select("id, name, is_active")
+      .select("id, name, is_active, store_ids")
       .eq("partner_id", partnerId)
       .is("parent_id", null)
       .order("name"),
@@ -1246,6 +1243,19 @@ export async function getPromotionScopeDataAction(partnerId: string) {
       .order("name"),
   ])
 
+  const storeMap = new Map<string, string>((stores || []).map((s: any) => [s.id, s.name]))
+
+  const resolveStoreName = (storeId?: string | null, storeIds?: string[] | null) => {
+    if (storeIds && storeIds.length > 0) {
+      const names = storeIds.map((id) => storeMap.get(id)).filter(Boolean)
+      return names.length > 0 ? names.join(", ") : "Toda a Rede"
+    }
+    if (storeId) {
+      return storeMap.get(storeId) || "Toda a Rede"
+    }
+    return "Toda a Rede"
+  }
+
   return {
     success: true,
     products: (products || []).map((p: any) => ({
@@ -1257,6 +1267,9 @@ export async function getPromotionScopeDataAction(partnerId: string) {
       sku: p.sku,
       image: Array.isArray(p.images) ? p.images[0] || null : null,
       isActive: Boolean(p.is_active),
+      storeId: p.store_id || null,
+      storeIds: Array.isArray(p.store_ids) ? p.store_ids : (p.store_id ? [p.store_id] : []),
+      storeName: resolveStoreName(p.store_id, p.store_ids),
     })),
     services: (services || []).map((s: any) => ({
       id: s.id,
@@ -1267,16 +1280,23 @@ export async function getPromotionScopeDataAction(partnerId: string) {
       sku: s.sku,
       image: Array.isArray(s.images) ? s.images[0] || null : null,
       isActive: Boolean(s.is_active),
+      storeId: s.store_id || null,
+      storeIds: Array.isArray(s.store_ids) ? s.store_ids : (s.store_id ? [s.store_id] : []),
+      storeName: resolveStoreName(s.store_id, s.store_ids),
     })),
     categories: (categories || []).map((c: any) => ({
       id: c.id,
       name: c.name,
       isActive: Boolean(c.is_active),
+      storeIds: Array.isArray(c.store_ids) ? c.store_ids : [],
+      storeName: resolveStoreName(null, c.store_ids),
     })),
     serviceCategories: (serviceCategories || []).map((c: any) => ({
       id: c.id,
       name: c.name,
       isActive: Boolean(c.is_active),
+      storeIds: Array.isArray(c.store_ids) ? c.store_ids : [],
+      storeName: resolveStoreName(null, c.store_ids),
     })),
     customers: (customers || []).map((c: any) => ({
       id: c.id,

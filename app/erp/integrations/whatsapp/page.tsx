@@ -4,6 +4,7 @@ import { requireMinimumPlan } from "@/lib/auth/authorization"
 import { checkPermission } from "@/lib/permissions/access"
 import { getWhatsappIntegrationAction } from "@/app/actions/whatsapp"
 import { WhatsAppIntegrationPage } from "@/components/erp/integrations/WhatsAppIntegrationPage"
+import { FadeIn } from "@/components/animations/FadeIn"
 
 export default async function WhatsappIntegrationRoute() {
   const context = await getCurrentPartnerContext()
@@ -24,10 +25,12 @@ export default async function WhatsappIntegrationRoute() {
     : { allConnections: [], templates: [] }
 
   return (
-    <WhatsAppIntegrationPage
-      storeId={context.activeStoreId}
-      initialAllConnections={initialData.allConnections}
-      initialTemplates={initialData.templates}
-    />
+    <FadeIn className="p-4">
+      <WhatsAppIntegrationPage
+        storeId={context.activeStoreId}
+        initialAllConnections={initialData.allConnections}
+        initialTemplates={initialData.templates}
+      />
+    </FadeIn>
   )
 }

@@ -190,7 +190,7 @@ export async function fetchPartnerCustomersBucket(explicitPartnerId?: string): P
   const supabase = await getSupabaseServerClient()
   const { data, error } = await supabase
     .from("customers")
-    .select("id, name, email, phone")
+    .select("id, name, email, phone, image_url")
     .eq("partner_id", partnerId)
     .eq("status", "ativo")
     .order("name", { ascending: true })
@@ -201,7 +201,13 @@ export async function fetchPartnerCustomersBucket(explicitPartnerId?: string): P
     return []
   }
 
-  return (data || []) as PartnerCustomerBucketItem[]
+  return (data || []).map((c: any) => ({
+    id: String(c.id),
+    name: String(c.name || ""),
+    email: c.email ?? null,
+    phone: c.phone ?? null,
+    avatar_url: c.image_url || null,
+  }))
 }
 
 export type PartnerSupplierBucketItem = {

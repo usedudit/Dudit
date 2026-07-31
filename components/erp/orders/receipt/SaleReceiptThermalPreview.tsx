@@ -41,11 +41,6 @@ export default function SaleReceiptThermalPreview({
     const grossTotal = data.items.reduce((acc, item) => acc + item.totalPrice, 0)
     const isDeliveryFree = data.deliveryPayer === 'seller'
 
-    const partnerAddressFormatted = data.partner.addressLine
-        .split(', ')
-        .filter(part => !part.startsWith('CEP:'))
-        .join('\n')
-
     return (
         <div
             className={`mx-auto bg-[#fffef5] text-black font-mono text-[11px] leading-snug shadow-md ${printMode ? "sale-receipt-thermal-print" : ""
@@ -57,7 +52,10 @@ export default function SaleReceiptThermalPreview({
                 <div className="text-center mb-2">
                     <p className="font-bold text-[13px] uppercase tracking-tight">{data.partner.fantasyName}</p>
                     <p className="text-[10px] mt-0.5">{data.partner.legalName}</p>
-                    <p className="text-[9px] mt-1 leading-tight">{partnerAddressFormatted}</p>
+                    {data.partner.phone ? <p className="text-[9px] mt-0.5">{data.partner.phone}</p> : null}
+                    {data.partner.addressLine ? (
+                        <p className="text-[9px] mt-1 leading-tight whitespace-pre-line">{data.partner.addressLine}</p>
+                    ) : null}
                     {data.partner.taxIdLine ? (
                         <p className="text-[9px] mt-1 leading-tight">{data.partner.taxIdLine}</p>
                     ) : null}
@@ -69,6 +67,12 @@ export default function SaleReceiptThermalPreview({
                 <p className="text-[10px]">
                     <span className="font-bold">Cliente:</span> {data.customerName}
                 </p>
+                {data.customerPhone ? (
+                    <p className="text-[10px]">{data.customerPhone}</p>
+                ) : null}
+                {data.customerAddress ? (
+                    <p className="text-[10px] whitespace-pre-line">{data.customerAddress}</p>
+                ) : null}
                 <div className="flex justify-between text-[10px] font-bold mb-1">
                     <span>Nº DO PEDIDO: {data.orderNumber}</span>
                     <span>{data.saleDateTime}</span>

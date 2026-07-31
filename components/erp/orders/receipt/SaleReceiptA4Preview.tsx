@@ -26,10 +26,6 @@ const SaleReceiptA4Preview = ({
     const secondaryColor = data.secondaryColor || QUOTE_PREVIEW_SECONDARY_COLOR
     const partnerName = data.partner.fantasyName
     const partnerAddress = data.partner.addressLine
-    const partnerAddressFormatted = partnerAddress
-        .split(', ')
-        .filter(part => !part.startsWith('CEP:'))
-        .join('\n')
     const partnerAvatar = data.partnerAvatar
 
     const quoteItems = data.items.map((item) => ({
@@ -181,13 +177,16 @@ const SaleReceiptA4Preview = ({
                                                     {data.partner.legalName && data.partner.legalName !== data.partner.fantasyName && (
                                                         <p>{data.partner.legalName}</p>
                                                     )}
-                                                    <p className="whitespace-pre-wrap">{partnerAddressFormatted}</p>
+                                                    {data.partner.phone && <p>{data.partner.phone}</p>}
+                                                    <p className="whitespace-pre-wrap">{partnerAddress}</p>
                                                 </div>
                                             </div>
                                             <div>
                                                 <h3 className="font-bold text-sm text-brand-dark mb-3">Dados do cliente</h3>
                                                 <div className="text-xs text-gray-600 space-y-1">
                                                     <p className="font-bold text-brand-dark">{data.customerName}</p>
+                                                    {data.customerPhone && <p>{data.customerPhone}</p>}
+                                                    {data.customerAddress && <p className="whitespace-pre-wrap">{data.customerAddress}</p>}
                                                 </div>
                                             </div>
                                         </div>

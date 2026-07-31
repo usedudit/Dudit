@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from "react"
 import { SearchIcon, PlusIcon, XIcon, CheckCircleIcon, BoxIcon } from "@/lib/icons"
-import { Badge, Button, Input, IconPlaceholder } from "@/components/reusable"
+import { Badge, Button, Input, IconPlaceholder, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
@@ -11,7 +11,6 @@ import { formatCurrency } from "@/lib/utils/formatters"
 
 const Div = (props: any) => React.createElement("div", props)
 const Header = (props: any) => React.createElement("header", props)
-const Footer = (props: any) => React.createElement("footer", props)
 const H2 = (props: any) => React.createElement("h2", props)
 const Span = (props: any) => React.createElement("span", props)
 const P = (props: any) => React.createElement("p", props)
@@ -27,6 +26,9 @@ export interface ScopeItem {
   sku?: string | null
   category?: string | null
   price?: number | null
+  storeId?: string | null
+  storeIds?: string[] | null
+  storeName?: string | null
 }
 
 interface SelectPromotionServicesSheetProps {
@@ -36,6 +38,8 @@ interface SelectPromotionServicesSheetProps {
   selectedIds: string[]
   onToggle: (id: string) => void
   isLoading?: boolean
+  stores?: Array<{ id: string; name: string }>
+  selectedStoreIds?: string[]
 }
 
 function ServiceRowSkeleton() {
@@ -57,13 +61,41 @@ export default function SelectPromotionServicesSheet({
   selectedIds,
   onToggle,
   isLoading = false,
+  stores = [],
+  selectedStoreIds = [],
 }: SelectPromotionServicesSheetProps) {
   const [search, setSearch] = useState("")
+  const [storeTab, setStoreTab] = useState("all")
   const isMobile = useMediaQuery("(max-width: 768px)")
+
+  const availableStores = useMemo(() => {
+    if (!selectedStoreIds || selectedStoreIds.length === 0) return stores
+    return stores.filter((s) => selectedStoreIds.includes(s.id))
+  }, [stores, selectedStoreIds])
 
   const filteredServices = useMemo(() => {
     const term = search.trim().toLowerCase()
-    const sorted = [...services].sort((a, b) => {
+
+    let list = services.filter((item) => {
+      if (selectedStoreIds && selectedStoreIds.length > 0) {
+        const itemStores = item.storeIds && item.storeIds.length > 0 ? item.storeIds : item.storeId ? [item.storeId] : []
+        if (itemStores.length > 0) {
+          const match = itemStores.some((id) => selectedStoreIds.includes(id))
+          if (!match) return false
+        }
+      }
+
+      if (storeTab !== "all") {
+        const itemStores = item.storeIds && item.storeIds.length > 0 ? item.storeIds : item.storeId ? [item.storeId] : []
+        if (itemStores.length > 0 && !itemStores.includes(storeTab)) {
+          return false
+        }
+      }
+
+      return true
+    })
+
+    const sorted = [...list].sort((a, b) => {
       const aInactive = a.isActive === false ? 1 : 0
       const bInactive = b.isActive === false ? 1 : 0
       if (aInactive !== bInactive) return aInactive - bInactive
@@ -79,16 +111,31 @@ export default function SelectPromotionServicesSheet({
         String(item.sku || "").toLowerCase().includes(term)
       )
     })
-  }, [services, search])
+  }, [services, search, storeTab, selectedStoreIds])
 
   const content = (
     <Div className="flex h-full flex-col bg-white dark:bg-dark-surface">
       <Header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
         <H2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Selecionar Serviços</H2>
-        <Button variant="filled" onClick={onClose} size="icon">
+        <Button variant="filled" type="button" onClick={onClose} size="icon">
           <XIcon className="h-5 w-5" />
         </Button>
       </Header>
+
+      {availableStores.length > 1 && (
+        <Div className="z-10 shrink-0 border-b border-brand-border bg-white px-6 pt-3 dark:border-dark-border dark:bg-dark-surface overflow-x-auto">
+          <Tabs value={storeTab} onValueChange={setStoreTab}>
+            <TabsList className="bg-transparent p-0 gap-4 justify-start border-b-0">
+              <TabsTrigger value="all">Todas as Lojas</TabsTrigger>
+              {availableStores.map((s) => (
+                <TabsTrigger key={s.id} value={s.id}>
+                  {s.name}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+        </Div>
+      )}
 
       <Div className="z-10 shrink-0 border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
         <Input
@@ -127,23 +174,26 @@ export default function SelectPromotionServicesSheet({
                     disabled
                       ? undefined
                       : (e: React.KeyboardEvent) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault()
-                          onToggle(service.id)
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault()
+                            onToggle(service.id)
+                          }
                         }
-                      }
                   }
-                  className={`group flex items-center gap-4 border-b border-brand-border p-3.5 transition-colors last:border-0 dark:border-dark-border ${disabled
-                    ? "cursor-not-allowed opacity-55"
-                    : isSelected
+                  className={`group flex items-center gap-4 border-b border-brand-border p-3.5 transition-colors last:border-0 dark:border-dark-border ${
+                    disabled
+                      ? "cursor-not-allowed opacity-55"
+                      : isSelected
                       ? "bg-brand-primary/5 dark:bg-brand-primary/10"
                       : "cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-border/40"
-                    }`}
+                  }`}
                 >
                   <Img
                     src={imageUrl}
                     alt={service.name}
-                    className={`h-12 w-12 shrink-0 rounded-full border border-brand-border dark:border-dark-border ${service.image ? "object-cover" : "object-contain"}`}
+                    className={`h-12 w-12 shrink-0 rounded-full border border-brand-border dark:border-dark-border ${
+                      service.image ? "object-cover" : "object-contain"
+                    }`}
                   />
                   <Div className="min-w-0 flex-1">
                     <Div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -152,6 +202,9 @@ export default function SelectPromotionServicesSheet({
                       </Span>
                       <Badge variant={service.isActive === false ? "gray" : "green"} className="whitespace-nowrap scale-90 shrink-0">
                         {service.isActive === false ? "Inativo" : "Ativo"}
+                      </Badge>
+                      <Badge variant="blue" className="whitespace-nowrap scale-90 shrink-0">
+                        {service.storeName || "Toda a Rede"}
                       </Badge>
                     </Div>
                     <P className="truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body">
@@ -182,7 +235,7 @@ export default function SelectPromotionServicesSheet({
             <IconPlaceholder
               icon={BoxIcon}
               title="Nenhum serviço encontrado"
-              subtitle="Tente outro termo de busca."
+              subtitle="Tente outro termo de busca ou troque a aba de loja."
             />
           </Div>
         )}
@@ -190,7 +243,7 @@ export default function SelectPromotionServicesSheet({
 
       <footer className="shrink-0 border-t border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface">
         <Div className="flex items-center gap-3">
-          <Button variant="outline" className="h-12 w-full" onClick={onClose}>
+          <Button variant="outline" type="button" className="h-12 w-full" onClick={onClose}>
             Fechar
           </Button>
         </Div>
@@ -213,7 +266,9 @@ export default function SelectPromotionServicesSheet({
         onClick={onClose}
       >
         <Div
-          className={`fixed right-4 top-4 bottom-4 z-[81] w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
+          className={`fixed right-4 top-4 bottom-4 z-[81] w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${
+            isOpen ? "translate-x-0" : "translate-x-[120%]"
+          }`}
           onClick={(e: { stopPropagation: () => any }) => e.stopPropagation()}
         >
           {content}

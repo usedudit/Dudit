@@ -550,7 +550,9 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                                             name: detail.contactCard.name,
                                                             email: detail.contactCard.email ?? undefined,
                                                             phone: detail.contactCard.phone ?? undefined,
+                                                            image_url: detail.contactCard.image_url ?? undefined,
                                                         }}
+                                                        address={detail.contactCard.address || undefined}
                                                         showMap={false}
                                                     />
                                                 </div>
@@ -609,7 +611,9 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                     name: detail.contactCard.name,
                                     email: detail.contactCard.email ?? undefined,
                                     phone: detail.contactCard.phone ?? undefined,
+                                    image_url: detail.contactCard.image_url ?? undefined,
                                 }}
+                                address={detail.contactCard?.address || undefined}
                                 showMap={false}
                             />
                         ) : (

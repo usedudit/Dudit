@@ -24,7 +24,7 @@ export interface ArchivePayload {
   deleted_by: null
   deleted_reason: null
   status: string
-  is_active: boolean
+  is_active?: boolean
 }
 
 /**
@@ -59,7 +59,6 @@ export function buildSoftDeletePayload(userId: string, reason?: string | null): 
     deleted_by: userId,
     deleted_reason: reason || null,
     status: "deleted",
-    is_active: false,
   }
 }
 
@@ -72,7 +71,6 @@ export function buildRestorePayload(status: "ativo" | "active" = "ativo"): Resto
     deleted_by: null,
     deleted_reason: null,
     status,
-    is_active: true,
   }
 }
 
@@ -85,6 +83,5 @@ export function buildArchivePayload(status: "arquivado" | "archived" = "arquivad
     deleted_by: null,
     deleted_reason: null,
     status,
-    is_active: false,
   }
 }

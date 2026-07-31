@@ -605,6 +605,7 @@ export default function CreateReturnPage({
                     name: customer.name,
                     email: customer.email || "",
                     phone: customer.phone || "",
+                    image_url: customer.image_url || customer.avatar_url || null,
                 }
             }
         })
@@ -1875,7 +1876,7 @@ export default function CreateReturnPage({
                                     <div className="sticky top-6">
                                         {selectedOrder ? (
                                             <CustomerCard
-                                                customer={{
+                                                customer={selectedOrder.customer || {
                                                     name: selectedOrder.customer_name || selectedOrder.customer?.name || "Cliente",
                                                     email: selectedOrder.customer?.email || "",
                                                     phone: selectedOrder.customer?.phone || "",

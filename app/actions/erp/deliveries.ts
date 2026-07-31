@@ -710,6 +710,21 @@ export async function fetchDeliveryOrderBucketAction(partnerId: string) {
     return []
   }
 
+  const buyerIds = Array.from(new Set((data || [])
+    .map((order: any) => order.buyer_id)
+    .filter(Boolean)))
+
+  let customerMap = new Map<string, any>()
+  if (buyerIds.length > 0) {
+    const { data: customerRows } = await supabase
+      .from("customers")
+      .select("id, name, email, phone, image_url, street, number, complement, neighborhood, city, state, zip_code")
+      .in("id", buyerIds)
+    for (const row of customerRows || []) {
+      customerMap.set(String(row.id), row)
+    }
+  }
+
   return (data || [])
     .filter((order: any) => {
       const situation = String(order.situation || "").toLowerCase()
@@ -745,12 +760,30 @@ export async function fetchDeliveryOrderBucketAction(partnerId: string) {
       distanceKm: order.distance_km == null ? null : Number(order.distance_km),
       deliveryBreakdown: order.delivery_breakdown || null,
       orderDate: order.created_at || null,
-      customer: {
-        id: order.buyer_id || null,
-        name: order.customer_name || "Consumidor final",
-        email: null,
-        phone: null,
-      },
+      customer: (() => {
+        const cust = order.buyer_id ? customerMap.get(String(order.buyer_id)) : null
+        return {
+          id: order.buyer_id || null,
+          name: order.customer_name || cust?.name || "Consumidor final",
+          email: cust?.email || null,
+          phone: cust?.phone || null,
+          image_url: cust?.image_url || null,
+        }
+      })(),
+      customerAddress: (() => {
+        const cust = order.buyer_id ? customerMap.get(String(order.buyer_id)) : null
+        if (!cust) return null
+        if (!cust.street && !cust.city) return null
+        return {
+          street: cust.street || "",
+          number: cust.number || "",
+          complement: cust.complement || "",
+          neighborhood: cust.neighborhood || "",
+          city: cust.city || "",
+          state: cust.state || "",
+          zipCode: cust.zip_code || "",
+        }
+      })(),
       address: formatAddress(order) || "",
       orderSource: order.order_source || "Manual",
       items: order.order_items || [],
@@ -1153,6 +1186,21 @@ export async function getERPDeliveryDetailsAction(deliveryId: string, partnerId:
     data?.delivery_person_id ? [String(data.delivery_person_id)] : [],
   )
 
+  const buyerIds = Array.from(new Set((data?.delivery_orders || [])
+    .map((doItem: any) => doItem?.orders?.buyer_id)
+    .filter(Boolean)))
+
+  let customerMap = new Map<string, any>()
+  if (buyerIds.length > 0) {
+    const { data: customerRows } = await supabase
+      .from("customers")
+      .select("id, name, email, phone, image_url, street, number, complement, neighborhood, city, state, zip_code")
+      .in("id", buyerIds)
+    for (const row of customerRows || []) {
+      customerMap.set(String(row.id), row)
+    }
+  }
+
   const hydrated = {
     ...data,
     delivery_orders: (data?.delivery_orders || []).map((doItem: any) => {
@@ -1161,12 +1209,29 @@ export async function getERPDeliveryDetailsAction(deliveryId: string, partnerId:
       const subtotalValue = Number((order.order_items || []).reduce((acc: number, item: any) => {
         return acc + Number(item?.subtotal ?? (Number(item?.quantity || 0) * Number(item?.product_price || 0)))
       }, 0))
+      const cust = order.buyer_id ? customerMap.get(String(order.buyer_id)) : null
       return {
         ...doItem,
         orders: {
           ...order,
           subtotal_value: subtotalValue,
           coupon_discount_amount: Number(order.discount_amount || 0),
+          customer: cust ? {
+            id: cust.id,
+            name: cust.name,
+            email: cust.email || null,
+            phone: cust.phone || null,
+            image_url: cust.image_url || null,
+          } : null,
+          customerAddress: cust?.street || cust?.city ? {
+            street: cust.street || "",
+            number: cust.number || "",
+            complement: cust.complement || "",
+            neighborhood: cust.neighborhood || "",
+            city: cust.city || "",
+            state: cust.state || "",
+            zipCode: cust.zip_code || "",
+          } : null,
         }
       }
     }),

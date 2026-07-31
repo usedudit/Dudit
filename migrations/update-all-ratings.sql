@@ -1,5 +1,6 @@
--- Script to recalculate all product and partner ratings based on existing reviews
+-- Script to recalculate all product and store ratings based on existing reviews
 -- Run this if you need to fix ratings after data migration or cleanup
+-- NOTE: rating lives on stores.rating (moved from partners.rating in 20260729)
 
 -- Update all product ratings based on their reviews
 UPDATE products p
@@ -15,20 +16,32 @@ WHERE EXISTS (
   AND r.rating IS NOT NULL
 );
 
--- Update all partner ratings based on all reviews of their products
-UPDATE partners pt
+-- Update all store ratings based on store-specific reviews
+UPDATE stores s
 SET rating = (
   SELECT AVG(r.rating)::numeric(3,2)
   FROM reviews r
-  INNER JOIN products p ON r.product_id = p.id
-  WHERE p.partner_id = pt.id
+  WHERE r.store_id = s.id
   AND r.rating IS NOT NULL
 )
 WHERE EXISTS (
-  SELECT 1 
+  SELECT 1 FROM reviews r 
+  WHERE r.store_id = s.id 
+  AND r.rating IS NOT NULL
+);
+
+-- Store ratings fallback: partner-level reviews (no store_id)
+UPDATE stores s
+SET rating = (
+  SELECT AVG(r.rating)::numeric(3,2)
   FROM reviews r
-  INNER JOIN products p ON r.product_id = p.id
-  WHERE p.partner_id = pt.id 
+  WHERE r.store_id IS NULL
+  AND r.partner_id = s.partner_id
+  AND r.rating IS NOT NULL
+)
+WHERE NOT EXISTS (
+  SELECT 1 FROM reviews r 
+  WHERE r.store_id = s.id 
   AND r.rating IS NOT NULL
 );
 
@@ -42,14 +55,13 @@ OR NOT EXISTS (
   AND r.rating IS NOT NULL
 );
 
--- Reset ratings to 0 for partners with no reviews
-UPDATE partners
+-- Reset ratings to 0 for stores with no reviews
+UPDATE stores
 SET rating = 0
 WHERE rating IS NULL
 OR NOT EXISTS (
   SELECT 1 
   FROM reviews r
-  INNER JOIN products p ON r.product_id = p.id
-  WHERE p.partner_id = partners.id 
+  WHERE (r.store_id = stores.id OR r.partner_id = stores.partner_id)
   AND r.rating IS NOT NULL
 );

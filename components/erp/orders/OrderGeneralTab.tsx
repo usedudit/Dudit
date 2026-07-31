@@ -993,7 +993,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                             left={
                                 <UserProfileImage
                                     fullName={selectedCustomer.name || "Cliente"}
-                                    imageUrl={selectedCustomer.avatar}
+                                    imageUrl={selectedCustomer.image_url || selectedCustomer.avatar_url || selectedCustomer.avatar}
                                     className="w-10 h-10 text-base"
                                 />
                             }

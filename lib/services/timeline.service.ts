@@ -68,7 +68,7 @@ interface LogAuditEventInput {
   actionType: ActionType | string
   changeLines: string[]
   metadata?: Record<string, unknown> | null
-  source?: "system" | "webhook" | "manual" | "marketplace"
+  source?: "system" | "webhook" | "manual" | "marketplace" | "erp"
   storeId?: string | null
   storeName?: string | null
   partnerName?: string | null

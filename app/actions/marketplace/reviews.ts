@@ -189,7 +189,7 @@ async function updateStoreRating(supabase: any, storeId: string) {
     .eq("store_id", storeId)
     .not("rating", "is", null)
 
-  if (!reviews || reviews.length === 0) {
+  if (!reviews || reviews.length < 3) {
     await supabase.from("stores").update({ rating: 0 }).eq("id", storeId)
     return
   }
@@ -287,6 +287,11 @@ export async function createReviewAction(data: {
     const { revalidateTag } = await import("next/cache")
     revalidateTag("partner-reviews", "max")
     revalidateTag(`partner-${data.partnerId}`, "max")
+    if (data.storeId) {
+      revalidateTag(`store-${data.storeId}`, "max")
+      revalidateTag("store-reviews", "max")
+      revalidateTag("store-stats", "max")
+    }
   } catch (revalError) {
     console.error("[Reviews] Failed to revalidate partner details:", revalError)
   }
@@ -424,6 +429,11 @@ export async function deleteReviewAction(reviewId: string, csrf_token?: string) 
     const { revalidateTag } = await import("next/cache")
     revalidateTag("partner-reviews", "max")
     revalidateTag(`partner-${review.partner_id}`, "max")
+    if (review.store_id) {
+      revalidateTag(`store-${review.store_id}`, "max")
+      revalidateTag("store-reviews", "max")
+      revalidateTag("store-stats", "max")
+    }
   } catch (revalError) {
     console.error("[Reviews] Failed to revalidate partner details:", revalError)
   }

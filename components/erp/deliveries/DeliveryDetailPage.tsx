@@ -669,12 +669,12 @@ export default function DeliveryDetailPage({
                                         <div className="border-t border-brand-border dark:border-dark-border w-full" />
 
                                         <CustomerCard
-                                            customer={{
+                                            customer={order.customer || {
                                                 name: order.customer_name || "Cliente",
                                                 email: "",
                                                 phone: "",
                                             }}
-                                            address={order.delivery_address ? parseAddressString(order.delivery_address) : null}
+                                            address={order.customerAddress || (order.delivery_address ? parseAddressString(order.delivery_address) : null)}
                                             showMap={false}
                                             chrome="minimal"
                                         />
@@ -777,10 +777,23 @@ export default function DeliveryDetailPage({
                                             </span>
                                         </div>
 
-                                        {Number(order.delivery_fee || 0) > 0 && (
+                                        {(Number(order.delivery_fee || 0) > 0 || order.delivery_payer === "seller" || Number(order.delivery_breakdown?.originalFee || order.delivery_breakdown?.deliverySubsidy || 0) > 0) && (
                                             <div className="flex justify-between items-center text-sm">
                                                 <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valor da Entrega</span>
-                                                <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(order.delivery_fee)}</span>
+                                                <span className="text-brand-dark dark:text-dark-heading font-bold text-sm flex items-center gap-1.5 flex-wrap">
+                                                    {Number(order.delivery_fee || 0) > 0
+                                                        ? formatCurrency(order.delivery_fee)
+                                                        : formatCurrency(Number(order.delivery_breakdown?.originalFee || order.delivery_breakdown?.deliverySubsidy || 0))}
+                                                    {Number(order.delivery_fee || 0) === 0 && (
+                                                        <span className="text-xs font-semibold text-orange-600 bg-orange-100 dark:bg-orange-950/40 dark:text-orange-400 px-2 py-0.5 rounded-full">Frete Grátis</span>
+                                                    )}
+                                                    {Number(order.delivery_fee || 0) > 0 && order.delivery_payer === "seller" && (
+                                                        <span className="text-xs font-semibold text-orange-600 bg-orange-100 dark:bg-orange-950/40 dark:text-orange-400 px-2 py-0.5 rounded-full">Subsidiado</span>
+                                                    )}
+                                                    {Number(order.delivery_breakdown?.distanceKm || 0) > 0 && (
+                                                        <span className="text-xs text-brand-muted font-normal">({order.delivery_breakdown.distanceKm} km)</span>
+                                                    )}
+                                                </span>
                                             </div>
                                         )}
 

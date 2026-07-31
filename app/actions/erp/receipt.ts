@@ -24,12 +24,12 @@ const getCachedPartnerReceiptHeader = (partnerId: string, storeId?: string) => u
             storeId
                 ? supabase
                     .from("stores")
-                    .select("id, name, description, cnpj, cpf, crt, contribuinte, inscricao_estadual, ie_isento, inscricao_municipal")
+                    .select("id, name, description, cnpj, cpf, crt, contribuinte, inscricao_estadual, ie_isento, inscricao_municipal, phone")
                     .eq("id", storeId)
                     .maybeSingle()
                 : supabase
                     .from("stores")
-                    .select("id, name, description, cnpj, cpf, crt, contribuinte, inscricao_estadual, ie_isento, inscricao_municipal")
+                    .select("id, name, description, cnpj, cpf, crt, contribuinte, inscricao_estadual, ie_isento, inscricao_municipal, phone")
                     .eq("partner_id", partnerId)
                     .order("is_headquarters", { ascending: false })
                     .limit(1)
@@ -95,7 +95,7 @@ const getCachedPartnerReceiptHeader = (partnerId: string, storeId?: string) => u
         }
 
         const addr = addrData || {}
-        const streetNumber = [addr.street, addr.number].filter(Boolean).join(", ")
+        const streetNumber = [addr.street, addr.number !== null && addr.number !== undefined && String(addr.number).trim() !== "" ? addr.number : null].filter(Boolean).join(", ")
         const neighborhoodCityState = [addr.neighborhood, [addr.city, addr.state].filter(Boolean).join("/")].filter(Boolean).join(" - ")
         const addressLine = [streetNumber, neighborhoodCityState].filter(Boolean).join("\n")
 
@@ -109,6 +109,7 @@ const getCachedPartnerReceiptHeader = (partnerId: string, storeId?: string) => u
                 municipalRegistration: store?.inscricao_municipal,
                 ieIsento: store?.ie_isento,
             }),
+            phone: store?.phone || null,
         }
 
         return header

@@ -204,6 +204,7 @@ function normalizeCustomerForCard(customer: any) {
         name: customer.name,
         email: customer.email || null,
         phone: customer.phone || null,
+        image_url: customer.image_url || customer.avatar_url || customer.avatar || customer.imageUrl || null,
         addresses: primaryAddress
             ? [{
                 address_type: "primary",

@@ -17,6 +17,7 @@ import { getNextPlanTarget, isPlanLimitReachedError } from "@/lib/subscription/l
 import { useErpExport } from "@/hooks/use-erp-export"
 import ExportSelectionModal from "@/components/erp/export/ExportSelectionModal"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
+import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 
 // Actions
 import {
@@ -996,14 +997,7 @@ export default function ServicesPage({
                 />
             )}
 
-            {actionModal.open && (
-                <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center">
-                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl flex flex-col items-center gap-4">
-                        <div className="w-8 h-8 border-4 border-brand-primary border-t-transparent rounded-full animate-spin"></div>
-                        <p className="text-brand-dark dark:text-dark-heading font-medium">{actionModal.text}</p>
-                    </div>
-                </div>
-            )}
+            <SavingStatusModal isOpen={actionModal.open} text={actionModal.text || "Salvando..."} />
 
             <FilterSheet
                 isOpen={modals.filter}

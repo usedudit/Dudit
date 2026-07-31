@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from "react"
 import { SearchIcon, PlusIcon, XIcon, CheckCircleIcon, BoxIcon } from "@/lib/icons"
-import { Badge, Button, Input, IconPlaceholder } from "@/components/reusable"
+import { Badge, Button, Input, IconPlaceholder, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
@@ -11,7 +11,6 @@ import { formatCurrency } from "@/lib/utils/formatters"
 
 const Div = (props: any) => React.createElement("div", props)
 const Header = (props: any) => React.createElement("header", props)
-const Footer = (props: any) => React.createElement("footer", props)
 const H2 = (props: any) => React.createElement("h2", props)
 const Span = (props: any) => React.createElement("span", props)
 const P = (props: any) => React.createElement("p", props)
@@ -27,6 +26,9 @@ export interface ScopeItem {
   sku?: string | null
   category?: string | null
   price?: number | null
+  storeId?: string | null
+  storeIds?: string[] | null
+  storeName?: string | null
 }
 
 interface SelectPromotionProductsSheetProps {
@@ -36,6 +38,8 @@ interface SelectPromotionProductsSheetProps {
   selectedIds: string[]
   onToggle: (id: string) => void
   isLoading?: boolean
+  stores?: Array<{ id: string; name: string }>
+  selectedStoreIds?: string[]
 }
 
 function ProductRowSkeleton() {
@@ -57,13 +61,44 @@ export default function SelectPromotionProductsSheet({
   selectedIds,
   onToggle,
   isLoading = false,
+  stores = [],
+  selectedStoreIds = [],
 }: SelectPromotionProductsSheetProps) {
   const [search, setSearch] = useState("")
+  const [storeTab, setStoreTab] = useState("all")
   const isMobile = useMediaQuery("(max-width: 768px)")
+
+  // Filter available store tabs based on campaign selected stores if any
+  const availableStores = useMemo(() => {
+    if (!selectedStoreIds || selectedStoreIds.length === 0) return stores
+    return stores.filter((s) => selectedStoreIds.includes(s.id))
+  }, [stores, selectedStoreIds])
 
   const filteredProducts = useMemo(() => {
     const term = search.trim().toLowerCase()
-    const sorted = [...products].sort((a, b) => {
+
+    let list = products.filter((item) => {
+      // If campaign has specific store selected, check item store
+      if (selectedStoreIds && selectedStoreIds.length > 0) {
+        const itemStores = item.storeIds && item.storeIds.length > 0 ? item.storeIds : item.storeId ? [item.storeId] : []
+        if (itemStores.length > 0) {
+          const match = itemStores.some((id) => selectedStoreIds.includes(id))
+          if (!match) return false
+        }
+      }
+
+      // Filter by active store tab in sheet
+      if (storeTab !== "all") {
+        const itemStores = item.storeIds && item.storeIds.length > 0 ? item.storeIds : item.storeId ? [item.storeId] : []
+        if (itemStores.length > 0 && !itemStores.includes(storeTab)) {
+          return false
+        }
+      }
+
+      return true
+    })
+
+    const sorted = [...list].sort((a, b) => {
       const aInactive = a.isActive === false ? 1 : 0
       const bInactive = b.isActive === false ? 1 : 0
       if (aInactive !== bInactive) return aInactive - bInactive
@@ -79,16 +114,31 @@ export default function SelectPromotionProductsSheet({
         String(item.sku || "").toLowerCase().includes(term)
       )
     })
-  }, [products, search])
+  }, [products, search, storeTab, selectedStoreIds])
 
   const content = (
     <Div className="flex h-full flex-col bg-white dark:bg-dark-surface">
       <Header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
         <H2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Selecionar Produtos</H2>
-        <Button variant="filled" onClick={onClose} size="icon">
+        <Button variant="filled" type="button" onClick={onClose} size="icon">
           <XIcon className="h-5 w-5" />
         </Button>
       </Header>
+
+      {availableStores.length > 1 && (
+        <Div className="z-10 shrink-0 border-b border-brand-border bg-white px-6 pt-3 dark:border-dark-border dark:bg-dark-surface overflow-x-auto">
+          <Tabs value={storeTab} onValueChange={setStoreTab}>
+            <TabsList className="bg-transparent p-0 gap-4 justify-start border-b-0">
+              <TabsTrigger value="all">Todas as Lojas</TabsTrigger>
+              {availableStores.map((s) => (
+                <TabsTrigger key={s.id} value={s.id}>
+                  {s.name}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+        </Div>
+      )}
 
       <Div className="z-10 shrink-0 border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
         <Input
@@ -127,23 +177,26 @@ export default function SelectPromotionProductsSheet({
                     disabled
                       ? undefined
                       : (e: React.KeyboardEvent) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault()
-                          onToggle(product.id)
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault()
+                            onToggle(product.id)
+                          }
                         }
-                      }
                   }
-                  className={`group flex items-center gap-4 border-b border-brand-border p-3.5 transition-colors last:border-0 dark:border-dark-border ${disabled
-                    ? "cursor-not-allowed opacity-55"
-                    : isSelected
+                  className={`group flex items-center gap-4 border-b border-brand-border p-3.5 transition-colors last:border-0 dark:border-dark-border ${
+                    disabled
+                      ? "cursor-not-allowed opacity-55"
+                      : isSelected
                       ? "bg-brand-primary/5 dark:bg-brand-primary/10"
                       : "cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-border/40"
-                    }`}
+                  }`}
                 >
                   <Img
                     src={imageUrl}
                     alt={product.name}
-                    className={`h-12 w-12 shrink-0 rounded-full border border-brand-border dark:border-dark-border ${product.image ? "object-cover" : "object-contain"}`}
+                    className={`h-12 w-12 shrink-0 rounded-full border border-brand-border dark:border-dark-border ${
+                      product.image ? "object-cover" : "object-contain"
+                    }`}
                   />
                   <Div className="min-w-0 flex-1">
                     <Div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -152,6 +205,9 @@ export default function SelectPromotionProductsSheet({
                       </Span>
                       <Badge variant={product.isActive === false ? "gray" : "green"} className="whitespace-nowrap scale-90 shrink-0">
                         {product.isActive === false ? "Inativo" : "Ativo"}
+                      </Badge>
+                      <Badge variant="blue" className="whitespace-nowrap scale-90 shrink-0">
+                        {product.storeName || "Toda a Rede"}
                       </Badge>
                     </Div>
                     <P className="truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body">
@@ -182,7 +238,7 @@ export default function SelectPromotionProductsSheet({
             <IconPlaceholder
               icon={BoxIcon}
               title="Nenhum produto encontrado"
-              subtitle="Tente outro termo de busca."
+              subtitle="Tente outro termo de busca ou troque a aba de loja."
             />
           </Div>
         )}
@@ -190,7 +246,7 @@ export default function SelectPromotionProductsSheet({
 
       <footer className="shrink-0 border-t border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface">
         <div className="flex items-center gap-3">
-          <Button variant="outline" className="h-12 w-full" onClick={onClose}>
+          <Button variant="outline" type="button" className="h-12 w-full" onClick={onClose}>
             Fechar
           </Button>
         </div>
@@ -213,7 +269,9 @@ export default function SelectPromotionProductsSheet({
         onClick={onClose}
       >
         <Div
-          className={`fixed right-4 top-4 bottom-4 z-[81] w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
+          className={`fixed right-4 top-4 bottom-4 z-[81] w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${
+            isOpen ? "translate-x-0" : "translate-x-[120%]"
+          }`}
           onClick={(e: { stopPropagation: () => any }) => e.stopPropagation()}
         >
           {content}

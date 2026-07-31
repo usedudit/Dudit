@@ -59,6 +59,11 @@ const getFormattedMethodLabel = (name: string, type?: string | null) => {
     return formatPaymentMethodLabel(name, type);
 };
 
+const getCustomerCredit = (cust: any) => {
+    if (!cust) return 0;
+    return Math.max(0, Number(cust.store_credit ?? cust.storeCredit ?? cust.credit ?? cust.customer_credit ?? cust.store_credit_amount ?? cust.balance ?? 0));
+};
+
 
 
 import { CompactPaymentStatusAlert } from '@/components/erp/payments/shared/CompactPaymentStatusAlert';
@@ -398,7 +403,8 @@ const PaymentModal = ({
     const handleSendDepositWhatsApp = () => {
         if (!depositMpPixData || !customer?.phone) return;
         const formattedAmount = formatCurrency(depositChargeAmount);
-        const messageText = `Olá, *${customer?.name || "Cliente"}*! 🌟\n\n` +
+        const customerName = (customer?.name || customer?.full_name || customer?.fullName || customer?.customer_name || "").trim();
+        const messageText = `Olá, *${customerName || "Cliente"}*! 🌟\n\n` +
             `Aqui está o código Pix Copia e Cola para o pagamento do sinal do seu pedido no valor de *${formattedAmount}*:\n\n` +
             `\`${depositMpPixData.qrCode}\`\n\n` +
             `Assim que realizar o pagamento, nosso sistema irá confirmar de forma automática! 😉`;
@@ -418,13 +424,33 @@ const PaymentModal = ({
         }
         setGeneratingDepositPix(true);
         try {
+            const customerName = (customer?.name || customer?.full_name || customer?.fullName || customer?.customer_name || "").trim();
+            const nameParts = customerName ? customerName.split(/\s+/) : [];
+            const firstName = nameParts[0] || undefined;
+            const lastName = nameParts.slice(1).join(" ") || undefined;
+            const customerEmail = (customer?.email || customer?.customer_email || customer?.user?.email || "").trim();
+            const customerCpfCnpj = String(customer?.cpf_cnpj || customer?.cpf || customer?.cnpj || customer?.doc || "").replace(/\D/g, "");
+
             const res = await fetchJSONWithCSRF<any>("/api/mercadopago/process-erp-payment", {
                 method: "POST",
                 body: {
-                    paymentFormData: { payment_method_id: "pix" },
+                    paymentFormData: {
+                        payment_method_id: "pix",
+                        payer: {
+                            email: customerEmail || undefined,
+                            first_name: firstName,
+                            last_name: lastName,
+                            ...(customerCpfCnpj ? {
+                                identification: {
+                                    type: customerCpfCnpj.length > 11 ? "CNPJ" : "CPF",
+                                    number: customerCpfCnpj,
+                                }
+                            } : {}),
+                        }
+                    },
                     partnerId,
                     amount: depositChargeAmount,
-                    description: `Sinal - ${customer?.name || "Cliente"}`,
+                    description: `Sinal - ${customerName || "Cliente"}`,
                 },
             });
             if (res?.pixData?.qrCode) {
@@ -460,7 +486,6 @@ const PaymentModal = ({
     const [splitSelectedType, setSplitSelectedType] = useState<string | null>(null);
     const [paymentCalculation, setPaymentCalculation] = useState<any | null>(null);
     const [installmentOptions, setInstallmentOptions] = useState<any[]>([]);
-    const [feeBearerOverride, setFeeBearerOverride] = useState<"merchant" | "customer" | null>(null);
     const [isPaymentCalculationLoading, setIsPaymentCalculationLoading] = useState(false);
     const [isSplitPreviewLoading, setIsSplitPreviewLoading] = useState(false);
     const lastOptionsConfigRef = useRef<{ methodId: string | null; feeBearer: string | null; amount: number | null }>({ methodId: null, feeBearer: null, amount: null });
@@ -508,7 +533,6 @@ const PaymentModal = ({
         setInstallmentOptions([]);
         setIsPaymentCalculationLoading(false);
         setIsPixGenerated(false);
-        setFeeBearerOverride(null);
         setWantsChange(false);
         setPayWithAmount(0);
         setSplitSelectedType(null);
@@ -543,7 +567,8 @@ const PaymentModal = ({
     const availableMethodTypes = useMemo(() => {
         const types = new Set(activeMethods.map((m: PartnerPaymentMethod) => normalizeMethodType(m.type)));
         types.add("cash"); // Always allow cash
-        if (customer && Number(customer.store_credit || customer.storeCredit || 0) > 0.009) {
+        const hasCustomer = Boolean(customer && (customer.id || customer.name || customer.email || customer.cpf_cnpj));
+        if (hasCustomer) {
             types.add("store_credit");
         }
         return types;
@@ -676,23 +701,16 @@ const PaymentModal = ({
 
         if (restoredMethodId) {
             setSelectedMethodId(restoredMethodId);
-            const matchingObj = activeMethods.find((m: PartnerPaymentMethod) => m.id === restoredMethodId);
-            if (matchingObj) {
-                setFeeBearerOverride((matchingObj.fee_bearer || 'merchant') as 'merchant' | 'customer');
-            }
         } else if (matchingMethods.length === 1) {
             setSelectedMethodId(matchingMethods[0].id);
-            setFeeBearerOverride((matchingMethods[0].fee_bearer || 'merchant') as 'merchant' | 'customer');
         } else if (matchingMethods.length > 1) {
             const exactMatch = matchingMethods.find((m: PartnerPaymentMethod) =>
                 normalizePaymentMethodLabel(m.name) === normalizedOriginal
             );
             if (exactMatch) {
                 setSelectedMethodId(exactMatch.id);
-                setFeeBearerOverride((exactMatch.fee_bearer || 'merchant') as 'merchant' | 'customer');
             } else {
                 setSelectedMethodId(matchingMethods[0].id);
-                setFeeBearerOverride((matchingMethods[0].fee_bearer || 'merchant') as 'merchant' | 'customer');
             }
         }
 
@@ -790,10 +808,11 @@ const PaymentModal = ({
                 return;
             }
 
-            const nameParts = (customer?.name || "").trim().split(/\s+/);
+            const customerName = (customer?.name || customer?.full_name || customer?.fullName || customer?.customer_name || "").trim();
+            const nameParts = customerName ? customerName.split(/\s+/) : [];
             const firstName = nameParts[0] || "Cliente";
-            const lastName = nameParts.slice(1).join(" ") || "ERP";
-            const email = customer?.email || "";
+            const lastName = nameParts.slice(1).join(" ") || "";
+            const email = customer?.email || customer?.customer_email || customer?.user?.email || "";
 
             const rawAddress = customer?.address || customer?.addresses?.[0] || null;
             const address = rawAddress ? {
@@ -1081,12 +1100,14 @@ const PaymentModal = ({
             ? Math.max(0, Number(calcBaseAmount || 0))
             : chargeTarget;
 
-        // Only compute full installment options when method or fee bearer changes
+        const currentMethod = selectedMethodId ? activeMethods.find((m: any) => m.id === selectedMethodId) : null;
+        const feeBearer = (currentMethod?.fee_bearer || "merchant") as "merchant" | "customer";
+
+        // Only compute full installment options when method or amount changes
         const shouldComputeOptions = selectedMethodId !== lastOptionsConfigRef.current.methodId
-            || feeBearerOverride !== lastOptionsConfigRef.current.feeBearer
             || base !== lastOptionsConfigRef.current.amount;
         if (shouldComputeOptions) {
-            lastOptionsConfigRef.current = { methodId: selectedMethodId, feeBearer: feeBearerOverride, amount: base };
+            lastOptionsConfigRef.current = { methodId: selectedMethodId, feeBearer, amount: base };
         }
 
         setIsPaymentCalculationLoading(true);
@@ -1094,7 +1115,7 @@ const PaymentModal = ({
             originalAmount: base,
             paymentMethodId: selectedMethodId,
             installmentNumber,
-            ...(feeBearerOverride ? { feeBearer: feeBearerOverride } : {}),
+            feeBearer,
             includeInstallmentOptions: shouldComputeOptions,
         }).then((res: any) => {
             if (!active) return;
@@ -1121,7 +1142,7 @@ const PaymentModal = ({
         return () => {
             active = false;
         };
-    }, [selectedMethodId, installments, chargeTarget, view, editingPaymentIndex, calcBaseAmount, feeBearerOverride]);
+    }, [selectedMethodId, installments, chargeTarget, view, editingPaymentIndex, calcBaseAmount, activeMethods]);
 
 
     const handleQuickDenomination = (val: number) => {
@@ -1526,7 +1547,7 @@ const PaymentModal = ({
             setPayments(newPayments);
             setPaymentCalculation(null);
             setSelectedMethodId(method.id);
-            setFeeBearerOverride((method.fee_bearer || "merchant") as "merchant" | "customer");
+            userManuallyChangedRef.current = false;
             setInstallments(String(newPayments[editingPaymentIndex]?.installmentNumber || 1));
             const normalizedType = normalizeMethodType(method.type);
             setView(getTargetViewForMethodType(normalizedType));
@@ -1555,7 +1576,7 @@ const PaymentModal = ({
         if (methodsOfType.length === 1) {
             const only = methodsOfType[0];
             setSelectedMethodId(only.id);
-            setFeeBearerOverride((only.fee_bearer || "merchant") as "merchant" | "customer");
+            userManuallyChangedRef.current = false;
             setPaymentCalculation(null);
             setView(getTargetViewForMethodType(methodType));
             return;
@@ -1941,7 +1962,7 @@ const PaymentModal = ({
                         <div className="flex items-center gap-4">
                             <UserProfileImage
                                 fullName={customer?.name || 'Consumidor Final'}
-                                imageUrl={customer?.avatar_url || customer?.avatarUrl || customer?.image}
+                                imageUrl={customer?.image_url || customer?.avatar_url || customer?.avatarUrl || customer?.image}
                                 className="w-12 h-12 text-white font-medium text-lg shrink-0"
                             />
                             <div className="flex flex-col overflow-hidden">
@@ -2026,7 +2047,7 @@ const PaymentModal = ({
                                                 <div className="flex items-center gap-4">
                                                     <UserProfileImage
                                                         fullName={customer?.name || 'Consumidor Final'}
-                                                        imageUrl={customer?.avatar_url || customer?.avatarUrl || customer?.image}
+                                                        imageUrl={customer?.image_url || customer?.avatar_url || customer?.avatarUrl || customer?.image}
                                                         className="w-12 h-12 text-white font-medium text-lg shrink-0"
                                                     />
                                                     <div className="flex flex-col overflow-hidden">
@@ -2116,7 +2137,7 @@ const PaymentModal = ({
                                                         {availableMethodTypes.has("store_credit") && (
                                                             <PaymentMethodCard
                                                                 icon={TagIcon}
-                                                                label="Vale-compra"
+                                                                label="Crédito do cliente"
                                                                 disabled={isMarketplaceOrder}
                                                                 onClick={() => openMethodTypeSelection("store_credit")}
                                                             />
@@ -2221,19 +2242,7 @@ const PaymentModal = ({
                                                     </button>
                                                 ))}
                                             </div>
-                                            {selectedMethodObj && selectedMethodHasPaymentCost && !isMarketplaceOrder && (
-                                                <div className="w-full max-w-sm mt-4">
-                                                    <FormDropdown
-                                                        label="Quem paga taxa/juros?"
-                                                        value={feeBearerOverride || selectedMethodObj.fee_bearer || "merchant"}
-                                                        setValue={(v: any) => setFeeBearerOverride(v)}
-                                                        options={[
-                                                            { value: "merchant", label: "Empresa (absorve)" },
-                                                            { value: "customer", label: "Cliente (acrescenta no valor)" },
-                                                        ]}
-                                                    />
-                                                </div>
-                                            )}
+                                            <></>
                                             {isSinglePricingBusy && (
                                                 <div className="mb-4 flex items-center gap-2 text-sm font-medium text-brand-inactive-text">
                                                     <div className="h-4 w-4 animate-spin rounded-full border-2 border-brand-border border-t-brand-green" />
@@ -2252,20 +2261,20 @@ const PaymentModal = ({
                                                 )}
                                                 <CompactPaymentStatusAlert totalPaid={compactAlertPaid} totalNeed={compactAlertNeed} />
                                                 <div className="bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-900/30 rounded-xl p-4 text-sm mb-2 text-center w-full">
-                                                    <span className="font-semibold text-brand-dark dark:text-dark-heading">Saldo do Vale-compra disponível: </span>
-                                                    <span className="font-bold text-brand-green">{formatCurrency(customer?.store_credit || customer?.storeCredit || 0)}</span>
+                                                    <span className="font-semibold text-brand-dark dark:text-dark-heading">Saldo de Crédito disponível: </span>
+                                                    <span className="font-bold text-brand-green">{formatCurrency(getCustomerCredit(customer))}</span>
                                                 </div>
                                                 <div className="min-w-0 flex-1">
                                                     <PaymentAmountLabel
-                                                        label="Valor do vale-compra a utilizar"
+                                                        label="Valor do crédito a utilizar"
                                                         calculation={paymentCalculation}
                                                         baseAllocated={calcBaseAmount}
                                                     />
                                                     <MoneyInput
                                                         value={paymentBaseAmount}
                                                         onChange={(val: any) => {
-                                                            const maxCredit = Number(customer?.store_credit || customer?.storeCredit || 0);
-                                                            const num = Math.min(maxCredit, Number(val || 0));
+                                                            const maxCredit = getCustomerCredit(customer);
+                                                            const num = maxCredit > 0 ? Math.min(maxCredit, Number(val || 0)) : Number(val || 0);
                                                             handlePaymentBaseAmountChange(num);
                                                         }}
                                                         className="font-bold text-lg"
@@ -2295,17 +2304,7 @@ const PaymentModal = ({
                                                     />
                                                 </div>
 
-                                                {selectedMethodObj && selectedMethodHasPaymentCost && !isMarketplaceOrder && (
-                                                    <FormDropdown
-                                                        label="Quem paga taxa/juros?"
-                                                        value={feeBearerOverride || selectedMethodObj.fee_bearer || "merchant"}
-                                                        setValue={(v: any) => setFeeBearerOverride(v)}
-                                                        options={[
-                                                            { value: "merchant", label: "Empresa (absorve)" },
-                                                            { value: "customer", label: "Cliente (acrescenta no valor)" },
-                                                        ]}
-                                                    />
-                                                )}
+                                                <></>
                                                 {isSinglePricingBusy && (
                                                     <div className="flex items-center gap-2 text-sm font-medium text-brand-inactive-text">
                                                         <div className="h-4 w-4 animate-spin rounded-full border-2 border-brand-border border-t-brand-green" />
@@ -2454,7 +2453,10 @@ const PaymentModal = ({
                                                         <FormDropdown
                                                             label="Parcelas"
                                                             value={String(installments)}
-                                                            setValue={(value) => setInstallments(value)}
+                                                            setValue={(value) => {
+                                                                userManuallyChangedRef.current = false;
+                                                                setInstallments(value);
+                                                            }}
                                                             options={
                                                                 (() => {
                                                                     if (installmentOptions.length > 0) {
@@ -2478,17 +2480,6 @@ const PaymentModal = ({
                                                             }
                                                         />
                                                     )
-                                                )}
-                                                {selectedMethodObj && selectedMethodHasPaymentCost && !isMarketplaceOrder && (
-                                                    <FormDropdown
-                                                        label="Quem paga taxa/juros?"
-                                                        value={feeBearerOverride || selectedMethodObj.fee_bearer || "merchant"}
-                                                        setValue={(v: any) => setFeeBearerOverride(v)}
-                                                        options={[
-                                                            { value: "merchant", label: "Empresa (absorve)" },
-                                                            { value: "customer", label: "Cliente (acrescenta no valor)" },
-                                                        ]}
-                                                    />
                                                 )}
                                                 {isSinglePricingBusy && (
                                                     <div className="flex items-center gap-2 text-sm font-medium text-brand-inactive-text">
@@ -2650,12 +2641,12 @@ const PaymentModal = ({
                                                         {availableMethodTypes.has("store_credit") && (
                                                             <PaymentMethodCard
                                                                 icon={TagIcon}
-                                                                label="Vale-compra"
+                                                                label="Crédito do cliente"
                                                                 disabled={isMarketplaceOrder}
                                                                 onClick={() => {
-                                                                    const customerCredit = Number(customer?.store_credit || customer?.storeCredit || 0);
+                                                                    const customerCredit = getCustomerCredit(customer);
                                                                     const remainingToPay = Math.max(0, chargeTarget - splitBaseSum);
-                                                                    const defaultAmt = Math.min(customerCredit, remainingToPay);
+                                                                    const defaultAmt = customerCredit > 0 ? Math.min(customerCredit, remainingToPay) : remainingToPay;
                                                                     const newLeg = {
                                                                         id: Date.now(),
                                                                         method: "store_credit",
@@ -2751,7 +2742,7 @@ const PaymentModal = ({
                                                                 onClick={() => {
                                                                     setPaymentCalculation(null);
                                                                     setSelectedMethodId(method.id);
-                                                                    setFeeBearerOverride((method.fee_bearer || "merchant") as "merchant" | "customer");
+                                                                    userManuallyChangedRef.current = false;
                                                                     setView(targetView);
                                                                 }}
                                                             />

@@ -230,6 +230,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
         email?: string | null
         phone?: string | null
         cpf?: string | null
+        image_url?: string | null
         address?: {
             zipCode?: string
             street?: string
@@ -1314,6 +1315,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                 email: selected.email || null,
                 phone: selected.phone || null,
                 cpf: (selected as any).cpf || null,
+                image_url: (selected as any).image_url || (selected as any).avatar_url || null,
                 address: addr ? {
                     zipCode: addr.zipCode || addr.zip_code || "",
                     street: addr.street || "",

@@ -2408,7 +2408,23 @@ export type TransactionDetailPayload = {
     paidAmount?: number | null
     amount: number
     ledgerDirection: ERPTransaction["ledgerDirection"]
-    contactCard: { title: string; name: string; email: string | null; phone: string | null; isCustomer?: boolean }
+    contactCard: {
+        title: string
+        name: string
+        email: string | null
+        phone: string | null
+        isCustomer?: boolean
+        image_url?: string | null
+        address?: {
+            street?: string
+            number?: string
+            complement?: string
+            neighborhood?: string
+            city?: string
+            state?: string
+            zipCode?: string
+        } | null
+    }
     canEdit: boolean
     /** Quando false, a UI não exibe a linha "Data de vencimento" (ex.: vendas PDV/pedido sem vencimento). */
     showDueDateRow: boolean
@@ -2976,7 +2992,7 @@ export async function getTransactionDetailsAction(
             if (ord?.buyer_id) {
                 const { data: cust } = await supabase
                     .from("customers")
-                    .select("name, email, phone")
+                    .select("name, email, phone, image_url, street, number, complement, neighborhood, city, state, zip_code")
                     .eq("id", ord.buyer_id)
                     .eq("partner_id", partnerId)
                     .maybeSingle()
@@ -2985,6 +3001,16 @@ export async function getTransactionDetailsAction(
                     name: cust?.name || ord.customer_name || "Cliente",
                     email: cust?.email ?? null,
                     phone: cust?.phone ?? null,
+                    image_url: cust?.image_url ?? null,
+                    address: cust?.street || cust?.city ? {
+                        street: cust?.street,
+                        number: cust?.number,
+                        complement: cust?.complement,
+                        neighborhood: cust?.neighborhood,
+                        city: cust?.city,
+                        state: cust?.state,
+                        zipCode: cust?.zip_code,
+                    } : null,
                     isCustomer: true,
                 }
             } else {
@@ -3002,7 +3028,7 @@ export async function getTransactionDetailsAction(
             if (posSaleCustomerId) {
                 const { data: cust } = await supabase
                     .from("customers")
-                    .select("name, email, phone")
+                    .select("name, email, phone, image_url, street, number, complement, neighborhood, city, state, zip_code")
                     .eq("id", posSaleCustomerId)
                     .eq("partner_id", partnerId)
                     .maybeSingle()
@@ -3011,6 +3037,16 @@ export async function getTransactionDetailsAction(
                     name: cust?.name || "Cliente",
                     email: cust?.email ?? null,
                     phone: cust?.phone ?? null,
+                    image_url: cust?.image_url ?? null,
+                    address: cust?.street || cust?.city ? {
+                        street: cust?.street,
+                        number: cust?.number,
+                        complement: cust?.complement,
+                        neighborhood: cust?.neighborhood,
+                        city: cust?.city,
+                        state: cust?.state,
+                        zipCode: cust?.zip_code,
+                    } : null,
                     isCustomer: true,
                 }
             } else {
@@ -3026,7 +3062,7 @@ export async function getTransactionDetailsAction(
             const effectiveCustomerId = row.customer_id || row.contact_id
             const { data: cust } = await supabase
                 .from("customers")
-                .select("name, email, phone")
+                .select("name, email, phone, image_url, street, number, complement, neighborhood, city, state, zip_code")
                 .eq("id", effectiveCustomerId)
                 .eq("partner_id", partnerId)
                 .maybeSingle()
@@ -3035,6 +3071,16 @@ export async function getTransactionDetailsAction(
                 name: cust?.name || "Cliente",
                 email: cust?.email ?? null,
                 phone: cust?.phone ?? null,
+                image_url: cust?.image_url ?? null,
+                address: cust?.street || cust?.city ? {
+                    street: cust?.street,
+                    number: cust?.number,
+                    complement: cust?.complement,
+                    neighborhood: cust?.neighborhood,
+                    city: cust?.city,
+                    state: cust?.state,
+                    zipCode: cust?.zip_code,
+                } : null,
                 isCustomer: true,
             }
         } else if (row.contact_id && row.transaction_contacts?.name) {

@@ -160,7 +160,16 @@ export async function getOrderFinancialBreakdownAction(orderId: string, partnerI
   totalInterest = mergedInterest
 
   // ── Delivery subsidy ──
-  const deliverySubsidy = deliveryPayer === "seller" ? deliveryFee : 0
+  const deliveryBreakdownObj: any = order.delivery_breakdown || {}
+  const calculatedOriginalFee = Math.max(0, Number(deliveryBreakdownObj.originalFee || deliveryBreakdownObj.deliverySubsidy || 0))
+  let deliverySubsidy = 0
+
+  if (deliveryPayer === "seller") {
+    deliverySubsidy = calculatedOriginalFee > 0 ? calculatedOriginalFee : deliveryFee
+  } else if (calculatedOriginalFee > 0 && deliveryFee === 0) {
+    // Free delivery threshold or coupon granted to customer, absorbed by seller
+    deliverySubsidy = calculatedOriginalFee
+  }
 
   // ── Seller commission (from snapshot, 0 = no commission or pre-snapshot) ──
   const sellerCommission = Math.max(0, Number(order.seller_commission_amount || 0))
