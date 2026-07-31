@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Button, Input, FormDropdown, DefaultModal, MoneyInput, IconPlaceholder, TimePicker, FormSection, Accordion, Checkbox, ActionsDropdown, AlertModal, Pagination } from "@/components/reusable"
+import { Button, Input, FormDropdown, DefaultModal, MoneyInput, IconPlaceholder, TimePicker, FormSection, Accordion, Checkbox, ActionsDropdown, AlertModal, Pagination, ThreeDotsLoader } from "@/components/reusable"
 import { Switch } from "@/components/reusable/Switch"
 import { ChevronLeftIcon, ClockIcon, PlusIcon, SaveIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -113,7 +113,9 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
 
     useEffect(() => { void reload() }, [partnerId])
 
-    if (loading) return <FadeIn className="p-6">Carregando configurações de entrega...</FadeIn>
+    if (loading) return <div className="flex h-[calc(100vh-65px)] w-full items-center justify-center">
+        <ThreeDotsLoader />
+    </div>
 
     return (
         <FadeIn className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden relative transition-colors duration-500 ease-in-out">

@@ -159,7 +159,9 @@ export function CommissionsSubPage({ partnerId, onBack, planGate }: { partnerId:
         )
     }
 
-    if (loading) return <FadeIn className="p-6">Carregando comissões...</FadeIn>
+    if (loading) return <div className="flex h-[calc(100vh-65px)] w-full items-center justify-center">
+        <ThreeDotsLoader />
+    </div>
 
     return (
         <FadeIn>

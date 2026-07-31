@@ -155,22 +155,27 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
         };
     }, [quote?.metadata]);
 
+    const storeId = selectedStore?.id || quote?.store_id;
+
     useEffect(() => {
         const fetchAddress = async () => {
             if (!partnerId) return;
-            const res = await getPartnerAddressAction(partnerId);
+            const res = await getPartnerAddressAction(partnerId, storeId);
             if (res.success && res.data?.formatted) {
                 setPartnerAddress(res.data.formatted);
             }
             // Fetch phone separately
             const supabase = (await import("@/lib/supabase/browser-client")).supabaseBrowser;
-            const { data: store } = await supabase.from("stores").select("phone").eq("partner_id", partnerId).limit(1).maybeSingle();
+            const storeQuery = storeId
+                ? supabase.from("stores").select("phone").eq("id", storeId).maybeSingle()
+                : supabase.from("stores").select("phone").eq("partner_id", partnerId).limit(1).maybeSingle();
+            const { data: store } = await storeQuery;
             if (store?.phone) {
                 setPartnerPhone(store.phone);
             }
         };
         fetchAddress();
-    }, [partnerId]);
+    }, [partnerId, storeId]);
 
     const [activeTab, setActiveTab] = useState('Dados Gerais');
     const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
@@ -377,7 +382,10 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
         return () => setHeaderOverride(null);
     }, [pageTitle, onBack, setHeaderOverride]);
 
-    if (loading) return <div className="h-full flex items-center justify-center bg-white dark:bg-dark-surface"><ThreeDotsLoader /></div>;
+    if (loading) return <div className="flex h-[calc(100vh-65px)] w-full items-center justify-center">
+        <ThreeDotsLoader />
+    </div>
+
     if (!quote) return null;
 
     const statusInfo = getStatusInfo(quote.status);

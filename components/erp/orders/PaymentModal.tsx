@@ -2178,21 +2178,17 @@ const PaymentModal = ({
                                                     />
                                                 </div>
                                                 <div className="flex items-center space-x-2 mt-2 select-none">
-                                                    <input
+                                                    <Checkbox
                                                         id="needs-change-checkbox"
-                                                        type="checkbox"
+                                                        label="Precisa de troco?"
                                                         checked={wantsChange}
-                                                        onChange={(e) => {
-                                                            setWantsChange(e.target.checked);
-                                                            if (e.target.checked && payWithAmount <= paymentBaseAmount) {
+                                                        onChange={(val: any) => {
+                                                            const isChecked = typeof val === "boolean" ? val : Boolean(val?.target?.checked);
+                                                            setWantsChange(isChecked);
+                                                            if (isChecked && payWithAmount <= paymentBaseAmount) {
                                                                 setPayWithAmount(paymentBaseAmount);
                                                             }
-                                                        }}
-                                                        className="h-4 w-4 rounded border-brand-border text-brand-primary focus:ring-brand-primary"
-                                                    />
-                                                    <label htmlFor="needs-change-checkbox" className="text-sm font-semibold text-brand-dark dark:text-dark-heading cursor-pointer">
-                                                        Precisa de troco?
-                                                    </label>
+                                                        }} />
                                                 </div>
                                                 {wantsChange && (
                                                     <div className="mt-3 space-y-3 animate-fade-in">

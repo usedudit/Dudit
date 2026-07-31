@@ -77,15 +77,21 @@ export function calculateDeliveryFee(input: CalculateDeliveryFeeInput): {
   const baseFee = Math.max(0, Number(input.settings.baseFee || 0))
   const includedKm = Math.max(0, Number(input.settings.includedKm || 0))
   const extraKmPrice = Math.max(0, Number(input.settings.extraKmPrice || 0))
-  const maxDeliveryKm = input.settings.maxDeliveryKm == null ? null : Math.max(0, Number(input.settings.maxDeliveryKm))
+  const maxDeliveryKmSetting = input.settings.maxDeliveryKm == null || Number(input.settings.maxDeliveryKm) <= 0
+    ? null
+    : Math.max(0, Number(input.settings.maxDeliveryKm))
 
-  const isOutsideRadius = maxDeliveryKm != null && distanceKm > maxDeliveryKm
+  const effectiveMaxKm = maxDeliveryKmSetting != null
+    ? maxDeliveryKmSetting
+    : (includedKm > 0 ? includedKm : null)
+
+  const isOutsideRadius = effectiveMaxKm != null && distanceKm > effectiveMaxKm
   if (isOutsideRadius && !input.allowOutsideRadius) {
     throw new Error("Endereço fora do raio máximo de entrega.")
   }
 
   const outsideRadiusWarning = isOutsideRadius
-    ? `Endereço fora do raio máximo de entrega da loja (${distanceKm} km / Máximo: ${maxDeliveryKm} km).`
+    ? `Endereço fora do raio máximo de entrega da loja (${distanceKm} km / Máximo: ${effectiveMaxKm} km).`
     : undefined
 
   const freeDeliveryThreshold = input.settings.freeDeliveryThreshold == null ? null : Math.max(0, Number(input.settings.freeDeliveryThreshold))
@@ -104,7 +110,7 @@ export function calculateDeliveryFee(input: CalculateDeliveryFeeInput): {
         appliedRuleIds: input.freeDeliveryCoupon ? ["coupon:free_delivery"] : ["threshold:free_delivery"],
         distanceKm: roundMoney(distanceKm),
         isOutsideRadius,
-        maxDeliveryKm,
+        maxDeliveryKm: effectiveMaxKm,
         outsideRadiusWarning,
       },
     }
@@ -155,7 +161,7 @@ export function calculateDeliveryFee(input: CalculateDeliveryFeeInput): {
         originalFee: roundedFee,
         deliveryPayer: "seller",
         isOutsideRadius,
-        maxDeliveryKm,
+        maxDeliveryKm: effectiveMaxKm,
         outsideRadiusWarning,
       },
     }
@@ -174,7 +180,7 @@ export function calculateDeliveryFee(input: CalculateDeliveryFeeInput): {
       originalFee: roundedFee,
       deliveryPayer: "customer",
       isOutsideRadius,
-      maxDeliveryKm,
+      maxDeliveryKm: effectiveMaxKm,
       outsideRadiusWarning,
     },
   }

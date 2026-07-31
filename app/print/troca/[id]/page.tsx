@@ -54,10 +54,10 @@ export default async function PrintTrocaPage({ params }: PageProps) {
 
     const supabase = getAdminClient()
 
-    // Find partner_id from return_requests table
+    // Find partner_id and store_id from return_requests table
     const { data: requestData } = await supabase
         .from("return_requests")
-        .select("partner_id")
+        .select("partner_id, store_id")
         .eq("id", id)
         .maybeSingle()
 
@@ -66,6 +66,7 @@ export default async function PrintTrocaPage({ params }: PageProps) {
     }
 
     const partnerId = requestData.partner_id
+    const storeId = requestData.store_id || undefined
 
     // Verify authorized access to view return details
     try {
@@ -88,14 +89,16 @@ export default async function PrintTrocaPage({ params }: PageProps) {
         )
     }
     const returnRequest = returnRes.data as any
+    const effectiveStoreId = storeId || returnRequest.store_id || undefined
 
     // Fetch partner metadata, store avatar and address details
     const [headerRes, storeRes] = await Promise.all([
-        getPartnerReceiptHeaderAction(partnerId),
-        supabase.from("stores").select("id, name, logo_url, addresses!store_id!left(street, number, complement, neighborhood, city, state, zip_code)").eq("partner_id", partnerId).limit(1).maybeSingle()
+        getPartnerReceiptHeaderAction(partnerId, effectiveStoreId),
+        effectiveStoreId
+            ? supabase.from("stores").select("id, name, logo_url").eq("id", effectiveStoreId).maybeSingle()
+            : supabase.from("stores").select("id, name, logo_url").eq("partner_id", partnerId).limit(1).maybeSingle()
     ])
     const storeData = storeRes.data
-    const addressRes = { data: storeData?.addresses?.[0] || null }
     const partnerRes = { data: { store_name: storeData?.name, store_image_url: storeData?.logo_url } }
 
     const partnerHeader = headerRes.success && headerRes.data ? headerRes.data : {
@@ -108,21 +111,7 @@ export default async function PrintTrocaPage({ params }: PageProps) {
     const rawAvatar = storeRes.data?.logo_url || partnerRes.data?.store_image_url || undefined
     const partnerAvatar = rawAvatar ? getR2ImageUrl(rawAvatar) : undefined
 
-    const partnerAddress = (() => {
-        const addr = addressRes.data
-        if (!addr) return partnerHeader.addressLine || "Endereço não cadastrado"
-        const streetStr = addr.street || "";
-        const numStr = addr.number ? `, ${addr.number}` : "";
-        const compStr = addr.complement ? ` - ${addr.complement}` : "";
-        const line1 = `${streetStr}${numStr}${compStr}`.trim().replace(/^,/, "").trim();
-
-        const neighStr = addr.neighborhood || "";
-        const cityStr = addr.city || "";
-        const stateStr = addr.state || "";
-        const line2 = `${neighStr ? `${neighStr} - ` : ""}${cityStr}${stateStr ? `/${stateStr}` : ""}`.trim();
-
-        return [line1, line2].filter(Boolean).join("\n");
-    })()
+    const partnerAddress = partnerHeader.addressLine || "Endereço não cadastrado"
 
     const isExchange = returnRequest.desiredResolution === "exchange" || returnRequest.approvedResolution === "exchange"
     const title = isExchange ? "COMPROVANTE DE TROCA" : "COMPROVANTE DE DEVOLUÇÃO"

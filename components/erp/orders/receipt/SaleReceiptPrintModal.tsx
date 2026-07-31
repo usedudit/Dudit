@@ -68,9 +68,11 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, orderId }: Sale
                 return
             }
 
+            const storeId = selectedStore?.id
+
             const [orderRes, headerRes] = await Promise.all([
                 getOrderDetailsAction(orderId, partnerId),
-                getPartnerReceiptHeaderAction(partnerId),
+                getPartnerReceiptHeaderAction(partnerId, storeId),
             ])
 
             if (cancelled) return

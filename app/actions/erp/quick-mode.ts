@@ -155,7 +155,7 @@ export async function getOnboardingStatusAction(partnerId: string) {
         // 1. Fetch Store Data
         const { data: store, error: storeError } = await supabase
             .from("stores")
-            .select("id, name, phone, category_id, logo_url, banner_url, opening_hours, is_showcase_active, addresses(*)")
+            .select("id, name, phone, category_id, logo_url, banner_url, opening_hours, is_showcase_active, addresses!store_id(*)")
             .eq("partner_id", partnerId)
             .order("is_headquarters", { ascending: false })
             .limit(1)

@@ -32,10 +32,12 @@ export default async function PrintReciboPage({ params, searchParams }: PageProp
     let partnerId = ""
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
 
+    let storeId: string | undefined = undefined
+
     // Check orders table
     const orderQuery = supabase
         .from("orders")
-        .select("partner_id")
+        .select("partner_id, store_id")
     
     if (isUuid) {
         orderQuery.eq("id", id)
@@ -47,11 +49,12 @@ export default async function PrintReciboPage({ params, searchParams }: PageProp
 
     if (orderData?.partner_id) {
         partnerId = orderData.partner_id
+        storeId = orderData.store_id || undefined
     } else {
         // Fallback check sales table
         const saleQuery = supabase
             .from("sales")
-            .select("partner_id")
+            .select("partner_id, store_id")
         
         if (isUuid) {
             saleQuery.eq("id", id)
@@ -63,6 +66,7 @@ export default async function PrintReciboPage({ params, searchParams }: PageProp
 
         if (saleData?.partner_id) {
             partnerId = saleData.partner_id
+            storeId = saleData.store_id || undefined
         }
     }
 
@@ -91,11 +95,16 @@ export default async function PrintReciboPage({ params, searchParams }: PageProp
         )
     }
     const order = orderRes.data
+    if (!storeId && order.store_id) {
+        storeId = order.store_id
+    }
 
     // Fetch partner header and logo details
     const [headerRes, storeRes] = await Promise.all([
-        getPartnerReceiptHeaderAction(partnerId),
-        supabase.from("stores").select("logo_url").eq("partner_id", partnerId).limit(1).maybeSingle()
+        getPartnerReceiptHeaderAction(partnerId, storeId),
+        storeId
+            ? supabase.from("stores").select("logo_url").eq("id", storeId).maybeSingle()
+            : supabase.from("stores").select("logo_url").eq("partner_id", partnerId).limit(1).maybeSingle()
     ])
 
     const partnerHeader = headerRes.success && headerRes.data ? headerRes.data : {

@@ -54,7 +54,7 @@ const StockMovementListItem = React.memo(
                             </div>
                             <div className="flex flex-col text-left min-w-0">
                                 <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate max-w-[150px] leading-tight mb-0.5">
-                                    {movement.displayId}
+                                    {movement.displayId ? movement.displayId.slice(0, 8) : movement.id.slice(0, 8)}
                                 </span>
                                 <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
                                     {movement.parcelSubtitle != null && String(movement.parcelSubtitle).length > 0

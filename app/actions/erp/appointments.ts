@@ -182,7 +182,7 @@ async function createAppointmentSaleAndSyncGoals(params: {
   if (params.appointment.marketplace_order_id) {
     const { data: orderData } = await params.supabase
       .from("orders")
-      .select("payment_method_discount_amount, payment_method_extra_amount, payment_method, payment_method_id")
+      .select("payment_method_discount_amount, payment_method_extra_amount, payment_method")
       .eq("id", params.appointment.marketplace_order_id)
       .eq("partner_id", params.partnerId)
       .maybeSingle()
@@ -191,7 +191,7 @@ async function createAppointmentSaleAndSyncGoals(params: {
       orderDiscount = Number(orderData.payment_method_discount_amount || 0)
       orderExtra = Number(orderData.payment_method_extra_amount || 0)
       orderPaymentMethod = orderData.payment_method || null
-      orderPaymentMethodId = orderData.payment_method_id || null
+      orderPaymentMethodId = (orderData as any).payment_method_id || null
     }
   }
 
@@ -1614,7 +1614,7 @@ export async function getAppointmentDetailsDataAction(params: {
       // 1. Finance accounts
       supabase
         .from("finance_accounts")
-        .select("id, is_active, account_type")
+        .select("id, is_active, type")
         .eq("partner_id", partnerId),
         
       // 2. Partner plan
@@ -1666,8 +1666,8 @@ export async function getAppointmentDetailsDataAction(params: {
     let defaultFinanceAccountId = null
     if (financeAccountsRes.data) {
       const active = financeAccountsRes.data.filter((a: any) => a.is_active !== false)
-      const bankAcct = active.find((a: any) => a.account_type === 'bank')
-      const cashAcct = active.find((a: any) => a.account_type === 'cash')
+      const bankAcct = active.find((a: any) => a.type === 'bank' || a.account_type === 'bank')
+      const cashAcct = active.find((a: any) => a.type === 'cash' || a.account_type === 'cash')
       defaultFinanceAccountId = bankAcct?.id || cashAcct?.id || active[0]?.id || null
     }
 

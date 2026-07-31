@@ -924,7 +924,7 @@ export async function getServiceOrderByTokenAction(
     let { data: row, error } = await admin
       .from("service_orders")
       .select(`
-        id, order_number, status, title, description, diagnosis, expected_completion_date, completed_at,
+        id, store_id, order_number, status, title, description, diagnosis, expected_completion_date, completed_at,
         total_service_amount, total_product_amount, total_amount, signature_image_key, signed_at,
         customer_snapshot, created_at, sale_id, specifications, metadata, lockout_until, partner_id, assigned_user_id,
         public_token, payment_status, paid_amount, payment_method, priority, estimated_hours, expected_completion_time,
@@ -940,7 +940,7 @@ export async function getServiceOrderByTokenAction(
       const { data: byId } = await admin
         .from("service_orders")
         .select(`
-          id, order_number, status, title, description, diagnosis, expected_completion_date, completed_at,
+          id, store_id, order_number, status, title, description, diagnosis, expected_completion_date, completed_at,
           total_service_amount, total_product_amount, total_amount, signature_image_key, signed_at,
           customer_snapshot, created_at, sale_id, specifications, metadata, lockout_until, partner_id, assigned_user_id,
           public_token, payment_status, paid_amount, payment_method, priority, estimated_hours, expected_completion_time,
@@ -963,15 +963,33 @@ export async function getServiceOrderByTokenAction(
       }
     }
 
+    const fetchAddress = async () => {
+      if (row.store_id) {
+        const { data } = await admin.from("addresses").select("street, number, complement, neighborhood, city, state, zip_code, is_default").eq("store_id", row.store_id)
+        if (data && data.length > 0) return { data }
+      }
+      if (row.partner_id) {
+        const { data } = await admin.from("addresses").select("street, number, complement, neighborhood, city, state, zip_code, is_default").eq("partner_id", row.partner_id).order("is_default", { ascending: false })
+        if (data && data.length > 0) return { data }
+      }
+      if (row.partner_id) {
+        const { data: stores } = await admin.from("stores").select("id").eq("partner_id", row.partner_id)
+        const sIds = (stores || []).map((s: any) => s.id)
+        if (sIds.length > 0) {
+          const { data } = await admin.from("addresses").select("street, number, complement, neighborhood, city, state, zip_code, is_default").in("store_id", sIds)
+          if (data && data.length > 0) return { data }
+        }
+      }
+      return { data: [] }
+    }
+
     const [services, products, attachments, historyRes, saleRes, addressRes] = await Promise.all([
       admin.from("service_order_services").select("*").eq("service_order_id", row.id).order("sort_order"),
       admin.from("service_order_products").select("*").eq("service_order_id", row.id).order("sort_order"),
       admin.from("service_order_attachments").select("file_name, file_key, file_type, file_size, category, created_at").eq("service_order_id", row.id).order("created_at", { ascending: false }),
       admin.from("audit_logs").select("id, action_type, change_lines, created_at").eq("entity_type", "service_order").eq("entity_id", row.id).order("created_at", { ascending: false }).limit(50),
       row.sale_id ? admin.from("sales").select("id, sale_number, total_amount, discount_amount, final_amount, paid_amount, payment_status, status, created_at").eq("id", row.sale_id).single() : Promise.resolve({ data: null }),
-      row.store_id
-        ? admin.from("addresses").select("street, number, complement, neighborhood, city, state, zip_code, is_default").eq("store_id", row.store_id)
-        : admin.from("stores").select("addresses!store_id!left(street, number, complement, neighborhood, city, state, zip_code, is_default)").eq("partner_id", row.partner_id).limit(1).then((res: any) => ({ data: res.data?.[0]?.addresses || [] })),
+      fetchAddress(),
     ])
 
     const customerName = (row.customer_snapshot as any)?.name || null

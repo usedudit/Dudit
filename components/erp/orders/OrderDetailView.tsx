@@ -251,7 +251,10 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
         loadHistory()
     }, [activeTab, historyLoaded, orderId, partnerId, notifyError])
 
-    if (loading) return <div className="h-full flex items-center justify-center bg-white dark:bg-dark-surface min-h-[400px]"><ThreeDotsLoader /></div>
+    if (loading) return <div className="flex h-[calc(100vh-65px)] w-full items-center justify-center">
+        <ThreeDotsLoader />
+    </div>
+
     if (!order) return null
 
     const pageTitle = `Pedido ${order.order_number}`
@@ -934,9 +937,9 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                     {Array.isArray(mpFeeDetails) && mpFeeDetails.length > 0 && mpFeeDetails.map((fd, i) => {
                                                                         const feeTypeLabel = fd.type === "mercadopago_fee" ? "Taxa MP"
                                                                             : fd.type === "installment_fee" ? "Taxa de Parcelamento"
-                                                                            : fd.type === "coupon_fee" ? "Taxa de Cupom"
-                                                                            : fd.type === "application_fee" ? "Taxa de Aplicação"
-                                                                            : fd.type || `Taxa ${i + 1}`
+                                                                                : fd.type === "coupon_fee" ? "Taxa de Cupom"
+                                                                                    : fd.type === "application_fee" ? "Taxa de Aplicação"
+                                                                                        : fd.type || `Taxa ${i + 1}`
                                                                         return (
                                                                             <PaymentRow
                                                                                 key={i}

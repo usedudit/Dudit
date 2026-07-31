@@ -1,9 +1,6 @@
 -- ============================================================================
 -- Fase 10.11 — Corrige NULLIF → COALESCE na função finalize_pos_sale (9 params)
--- ============================================================================
--- A função de 9 parâmetros (criada na f107) ainda usa NULLIF(v, 0) no INSERT
--- das colunas NOT NULL payment_method_*. Isso gera NULL quando valor = 0,
--- violando a constraint. Troca para COALESCE(NULLIF(v, 0), 0).
+--              + Restaura criação de cash_movements, transactions e status
 -- ============================================================================
 
 BEGIN;
@@ -46,29 +43,27 @@ DECLARE
     v_fee_total NUMERIC := 0;
     v_fixed_fee_total NUMERIC := 0;
     v_breakdown_total NUMERIC := 0;
-    v_original_amount_total NUMERIC;
+    v_original_amount_total NUMERIC := 0;
     v_stock_items JSONB := '[]'::JSONB;
-    v_stock_item JSONB;
     v_stock_movement_result JSON;
     v_stock_movement_id UUID;
-    v_fulfillment_count INT := 0;
-    v_service_count INT := 0;
-    v_credit_sale_id UUID;
-    v_installment JSONB;
-    v_installment_count INT;
-    v_grace_days INT;
-    v_first_payment_date TIMESTAMPTZ;
-    v_due_date TIMESTAMPTZ;
+    v_tx_id UUID;
+    v_entry_amount NUMERIC;
+    v_entry_pm_id UUID;
+    v_payment_line INT := 0;
+    v_now TIMESTAMPTZ := now();
 BEGIN
     -- Validate cash session belongs to partner and is open
-    PERFORM 1
-    FROM public.cash_sessions cs
-    WHERE cs.id = p_cash_session_id
-      AND cs.partner_id = p_partner_id
-      AND cs.status = 'open'
-    FOR UPDATE;
-    IF NOT FOUND THEN
-        RAISE EXCEPTION 'Caixa inválido ou já fechado.';
+    IF p_cash_session_id IS NOT NULL THEN
+        PERFORM 1
+        FROM public.cash_sessions cs
+        WHERE cs.id = p_cash_session_id
+          AND cs.partner_id = p_partner_id
+          AND cs.status = 'open'
+        FOR UPDATE;
+        IF NOT FOUND THEN
+            RAISE EXCEPTION 'Caixa inválido ou já fechado.';
+        END IF;
     END IF;
 
     -- Fetch the pre-sale / draft
@@ -96,24 +91,14 @@ BEGIN
 
         v_subtotal := v_subtotal + (v_up * v_qty);
 
-        IF (v_item->>'isPromotional')::bool IS TRUE OR (v_item->>'is_promotional')::bool IS TRUE THEN
-            -- promotional handled in final amount calc
-        ELSE
+        IF (v_item->>'isPromotional')::bool IS NOT TRUE AND (v_item->>'is_promotional')::bool IS NOT TRUE THEN
             v_discount_total := v_discount_total + (v_discount * v_qty);
-        END IF;
-
-        IF (v_item->>'lineType' IN ('product', 'simple')) OR (v_item->>'line_type' IN ('product', 'simple')) OR (v_item->>'productId') IS NOT NULL OR (v_item->>'product_id') IS NOT NULL THEN
-            v_fulfillment_count := v_fulfillment_count + 1;
-        END IF;
-
-        IF (v_item->>'lineType') = 'service' OR (v_item->>'line_type') = 'service' OR (v_item->>'serviceId') IS NOT NULL OR (v_item->>'service_id') IS NOT NULL THEN
-            v_service_count := v_service_count + 1;
         END IF;
     END LOOP;
 
     v_final_amount := GREATEST(v_subtotal - v_discount_total, 0);
     v_shipping_fee := COALESCE(v_draft.shipping_fee, 0);
-    v_other_costs := COALESCE(v_draft.additional_costs, 0);
+    v_other_costs := COALESCE(v_draft.other_costs, 0);
     v_final_amount := v_final_amount + v_shipping_fee + v_other_costs;
 
     v_final_amount_adjusted := v_final_amount;
@@ -181,8 +166,6 @@ BEGIN
         v_subtotal, v_discount, v_final_amount_adjusted, v_clamped_paid,
         v_payment_status, v_payment_status,
         p_finance_account_id, p_cash_session_id, COALESCE(v_draft.notes, ''), p_user_id,
-        -- FIX: COALESCE(NULLIF(v, 0), 0) — NULLIF returns NULL when = 0, but
-        -- columns are NOT NULL (f106). COALESCE converts back to 0.
         COALESCE(NULLIF(v_interest_total, 0), 0),
         COALESCE(NULLIF(v_fee_total, 0), 0),
         COALESCE(NULLIF(v_fixed_fee_total, 0), 0)
@@ -254,6 +237,107 @@ BEGIN
             WHERE id = v_stock_movement_id;
         END IF;
     END IF;
+
+    -- ── Create financial transactions ─────────────────────────────────────────
+    IF v_clamped_paid > 0 THEN
+        INSERT INTO public.transactions (
+            partner_id, store_id,
+            description, category,
+            customer_id, contact_type,
+            amount, due_date, payment_date, transaction_date,
+            status, notes, payment_type,
+            original_amount, interest_amount, fee_amount, discount_amount,
+            transaction_type, origin, reference_note, account_id,
+            payment_method_id, created_by_user_id
+        ) VALUES (
+            p_partner_id, p_store_id,
+            v_sale_number, 'Vendas',
+            v_draft.customer_id, 'customer',
+            v_clamped_paid, NULL, v_now, v_now,
+            'paid', NULL,
+            COALESCE(p_payment_method, 'Não informado'),
+            v_original_amount_total,
+            NULLIF(v_interest_total, 0),
+            NULLIF(v_fee_total + v_fixed_fee_total, 0),
+            NULLIF(v_discount_total, 0),
+            'income', 'system', v_sale_id::text, p_finance_account_id,
+            NULL, p_user_id
+        ) RETURNING id INTO v_tx_id;
+
+        -- Create transaction_payments (one per breakdown entry)
+        IF p_payment_breakdown IS NOT NULL AND jsonb_array_length(p_payment_breakdown) > 0 THEN
+            v_payment_line := 0;
+            FOR v_entry IN SELECT * FROM jsonb_array_elements(p_payment_breakdown)
+            LOOP
+                v_payment_line := v_payment_line + 1;
+                v_entry_amount := ROUND(GREATEST(COALESCE((v_entry->>'amount')::numeric, (v_entry->>'effectiveAmount')::numeric, 0), 0), 2);
+                IF v_entry_amount > 0 THEN
+                    v_entry_pm_id := NULLIF(v_entry->>'paymentMethodId', '')::uuid;
+                    DECLARE
+                        v_entry_adj_type TEXT := COALESCE(v_entry->>'adjustmentType', 'none');
+                        v_entry_received NUMERIC := ROUND(GREATEST(COALESCE((v_entry->>'amountReceived')::numeric, 0), 0), 2);
+                        v_entry_interest NUMERIC := ROUND(GREATEST(COALESCE((v_entry->>'interestAmount')::numeric, 0), 0), 2);
+                        v_entry_fee NUMERIC := ROUND(GREATEST(COALESCE((v_entry->>'feeAmount')::numeric, 0), 0), 2);
+                        v_entry_fixed_fee NUMERIC := ROUND(GREATEST(COALESCE((v_entry->>'fixedFeeAmount')::numeric, 0), 0), 2);
+                        v_entry_discount NUMERIC := 0;
+                        v_entry_bearer TEXT := COALESCE(v_entry->>'feeBearer', 'merchant');
+                    BEGIN
+                        IF v_entry_adj_type = 'discount' THEN
+                            v_entry_discount := ROUND(GREATEST(COALESCE((v_entry->>'adjustmentAmount')::numeric, 0), 0), 2);
+                        END IF;
+
+                        INSERT INTO public.transaction_payments (
+                            partner_id, transaction_id, amount, base_amount,
+                            interest_amount, fee_amount, discount_amount, fee_bearer,
+                            payment_method_id,
+                            created_by_user_id, created_at, idempotency_key
+                        ) VALUES (
+                            p_partner_id, v_tx_id, v_entry_amount, v_entry_received,
+                            v_entry_interest, v_entry_fee + v_entry_fixed_fee, v_entry_discount, v_entry_bearer,
+                            v_entry_pm_id,
+                            p_user_id, v_now,
+                            p_partner_id::text || ':' || v_sale_id::text || ':line' || v_payment_line::text || ':' || COALESCE(v_entry_pm_id::text, 'none')
+                        );
+                    END;
+                END IF;
+            END LOOP;
+        END IF;
+
+        -- ── Create cash_movements for all payment methods in active cash session ──────────
+        IF p_cash_session_id IS NOT NULL THEN
+            IF p_payment_breakdown IS NOT NULL AND jsonb_array_length(p_payment_breakdown) > 0 THEN
+                FOR v_entry IN SELECT * FROM jsonb_array_elements(p_payment_breakdown)
+                LOOP
+                    v_entry_amount := ROUND(GREATEST(COALESCE((v_entry->>'amount')::numeric, (v_entry->>'effectiveAmount')::numeric, 0), 0), 2);
+                    IF v_entry_amount > 0 THEN
+                        v_entry_pm_id := NULLIF(v_entry->>'paymentMethodId', '')::uuid;
+                        INSERT INTO public.cash_movements (
+                            partner_id, store_id, cash_session_id, type, description,
+                            payment_method_id, amount, reference_id, created_by_user_id, created_at
+                        ) VALUES (
+                            p_partner_id, p_store_id, p_cash_session_id, 'sale',
+                            'Venda PDV #' || v_sale_number || ' - ' || COALESCE(v_entry->>'method', p_payment_method, 'PDV'),
+                            v_entry_pm_id, ABS(v_entry_amount), v_sale_id, p_user_id, v_now
+                        ) ON CONFLICT DO NOTHING;
+                    END IF;
+                END LOOP;
+            ELSE
+                INSERT INTO public.cash_movements (
+                    partner_id, store_id, cash_session_id, type, description,
+                    payment_method_id, amount, reference_id, created_by_user_id, created_at
+                ) VALUES (
+                    p_partner_id, p_store_id, p_cash_session_id, 'sale',
+                    'Venda PDV #' || v_sale_number || ' - ' || COALESCE(p_payment_method, 'PDV'),
+                    NULL, ABS(v_clamped_paid), v_sale_id, p_user_id, v_now
+                ) ON CONFLICT DO NOTHING;
+            END IF;
+        END IF;
+    END IF;
+
+    -- ── Update pre_sale status to completed ─────────────────────────────────
+    UPDATE public.pre_sales
+    SET status = 'completed', completed_sale_id = v_sale_id, updated_at = v_now
+    WHERE id = p_pre_sale_id;
 
     RETURN QUERY SELECT v_sale_id;
 END;

@@ -1768,30 +1768,67 @@ export async function getQuoteDetailsAction(quoteId: string, partnerId: string) 
 
 // ─── GET PARTNER ADDRESS ───────────────────────────────────────────────────
 
-export async function getPartnerAddressAction(partnerId: string) {
+export async function getPartnerAddressAction(partnerId: string, storeId?: string) {
     try {
         const supabase = await getSupabaseServerClient()
 
-        const { data, error } = await supabase
-            .from("addresses")
-            .select("*")
-            .eq("partner_id", partnerId)
-            .eq("is_default", true)
-            .maybeSingle()
+        let addrData: any = null
 
-        if (error) {
-            console.error("[getPartnerAddressAction] Error:", error)
-            return errorResponse("Erro ao buscar endereço do parceiro")
+        // 1. Check store_id address if storeId provided
+        if (storeId) {
+            const { data: sAddr } = await supabase
+                .from("addresses")
+                .select("*")
+                .eq("store_id", storeId)
+                .limit(1)
+                .maybeSingle()
+            if (sAddr && (sAddr.street || sAddr.city)) {
+                addrData = sAddr
+            }
         }
 
-        if (!data) return successResponse(null)
+        // 2. Check default or any address for partner_id
+        if (!addrData && partnerId) {
+            const { data: pAddr } = await supabase
+                .from("addresses")
+                .select("*")
+                .eq("partner_id", partnerId)
+                .order("is_default", { ascending: false })
+                .limit(1)
+                .maybeSingle()
+            if (pAddr && (pAddr.street || pAddr.city)) {
+                addrData = pAddr
+            }
+        }
 
-        const streetNumber = [data.street, data.number].filter(Boolean).join(", ")
-        const neighborhoodCityState = [data.neighborhood, [data.city, data.state].filter(Boolean).join("/")].filter(Boolean).join(" - ")
-        const formattedAddress = [streetNumber, neighborhoodCityState].filter(Boolean).join("\n");
+        // 3. Check any store address for partner_id
+        if (!addrData && partnerId) {
+            const { data: partnerStores } = await supabase
+                .from("stores")
+                .select("id")
+                .eq("partner_id", partnerId)
+            const sIds = (partnerStores || []).map((s) => s.id)
+            if (sIds.length > 0) {
+                const { data: fallbackStoreAddr } = await supabase
+                    .from("addresses")
+                    .select("*")
+                    .in("store_id", sIds)
+                    .limit(1)
+                    .maybeSingle()
+                if (fallbackStoreAddr && (fallbackStoreAddr.street || fallbackStoreAddr.city)) {
+                    addrData = fallbackStoreAddr
+                }
+            }
+        }
+
+        if (!addrData) return successResponse(null)
+
+        const streetNumber = [addrData.street, addrData.number].filter(Boolean).join(", ")
+        const neighborhoodCityState = [addrData.neighborhood, [addrData.city, addrData.state].filter(Boolean).join("/")].filter(Boolean).join(" - ")
+        const formattedAddress = [streetNumber, neighborhoodCityState].filter(Boolean).join("\n")
 
         return successResponse({
-            ...data,
+            ...addrData,
             formatted: formattedAddress
         })
     } catch (err: any) {
@@ -2167,7 +2204,7 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
             // Fetch store details to resolve partner name/logo override
             const { data: store } = await admin
                 .from("stores")
-                .select("name, image_url, logo_url, phone")
+                .select("name, logo_url, phone")
                 .eq("partner_id", quote.partner_id)
                 .limit(1)
                 .maybeSingle()

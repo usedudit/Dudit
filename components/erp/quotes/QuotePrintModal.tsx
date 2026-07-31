@@ -50,11 +50,14 @@ export default function QuotePrintModal({ isOpen, onClose, quoteId, partnerId }:
         async function load() {
             setLoading(true)
             const supabase = (await import("@/lib/supabase/browser-client")).supabaseBrowser
+            const storeId = selectedStore?.id
 
             const [quoteDetailsRes, storeRes, addressRes] = await Promise.all([
                 getQuoteDetailsAction(quoteId, partnerId),
-                supabase.from("stores").select("name, logo_url, phone").eq("partner_id", partnerId).limit(1).maybeSingle(),
-                getPartnerAddressAction(partnerId),
+                storeId
+                    ? supabase.from("stores").select("name, logo_url, phone").eq("id", storeId).maybeSingle()
+                    : supabase.from("stores").select("name, logo_url, phone").eq("partner_id", partnerId).limit(1).maybeSingle(),
+                getPartnerAddressAction(partnerId, storeId),
             ])
 
             if (cancelled || !quoteDetailsRes?.success || !quoteDetailsRes.data) {

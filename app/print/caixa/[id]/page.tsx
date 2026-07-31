@@ -27,7 +27,7 @@ export default async function PrintCaixaPage({ params, searchParams }: PageProps
 
     const { data: session } = await supabase
         .from("cash_sessions")
-        .select("partner_id")
+        .select("partner_id, store_id")
         .eq("id", id)
         .maybeSingle()
 
@@ -36,6 +36,7 @@ export default async function PrintCaixaPage({ params, searchParams }: PageProps
     }
 
     const partnerId = session.partner_id
+    const storeId = session.store_id
 
     try {
         await requirePartnerAccessWithPermission(partnerId, "pdv", "view", user)
@@ -49,7 +50,7 @@ export default async function PrintCaixaPage({ params, searchParams }: PageProps
 
     const [detailsRes, headerRes] = await Promise.all([
         getCashSessionDetailsAction(partnerId, id),
-        getPartnerReceiptHeaderAction(partnerId),
+        getPartnerReceiptHeaderAction(partnerId, storeId || undefined),
     ])
 
     if (!detailsRes.success || !detailsRes.data) {

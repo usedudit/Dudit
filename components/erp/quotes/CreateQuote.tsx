@@ -103,17 +103,21 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     useEffect(() => {
         const fetchAddress = async () => {
             if (!partnerId) return;
-            const res = await getPartnerAddressAction(partnerId);
+            const storeId = selectedStore?.id;
+            const res = await getPartnerAddressAction(partnerId, storeId);
             if (res.success && res.data?.formatted) {
                 setPartnerAddress(res.data.formatted);
             }
             // Also fetch phone from store
             const supabase = (await import("@/lib/supabase/browser-client")).supabaseBrowser;
-            const { data: store } = await supabase.from("stores").select("phone").eq("partner_id", partnerId).limit(1).maybeSingle();
+            const storeQuery = storeId
+                ? supabase.from("stores").select("phone").eq("id", storeId).maybeSingle()
+                : supabase.from("stores").select("phone").eq("partner_id", partnerId).limit(1).maybeSingle();
+            const { data: store } = await storeQuery;
             if (store?.phone) setPartnerPhone(store.phone);
         };
         fetchAddress();
-    }, [partnerId]);
+    }, [partnerId, selectedStore?.id]);
 
     // Salesperson State
     const [salespersonId, setSalespersonId] = useState<string>('');

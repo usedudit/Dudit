@@ -29,7 +29,7 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
   const activeStoreId = await getActiveStoreId();
 
   // Store e queries de fallback
-  const STORE_SELECT = "id, name, slug, logo_url, image_url, banner_url, phone, is_showcase_active, partner_id, addresses!store_id!left(city, state)"
+  const STORE_SELECT = "id, name, slug, logo_url, banner_url, phone, is_showcase_active, partner_id, addresses!store_id!left(city, state)"
 
   // 1. Executa todas as consultas ao DB de forma paralela e agregada
   const [
@@ -66,7 +66,7 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
     supabase
       .from("addresses")
       .select("city, state")
-      .or(`partner_id.eq.${partnerId},store_id.in.(select id from stores where partner_id = '${partnerId}')`)
+      .eq("partner_id", partnerId)
       .limit(1),
 
     // Métodos de Pagamento (para validar Pix)

@@ -133,6 +133,7 @@ import {
     MinusSignIcon,
     ReloadIcon as ReloadIcon01,
     CheckmarkCircle01Icon,
+    Tick01Icon,
     ShoppingBag01Icon,
     PlusMinus01Icon,
     ArrowTurnBackwardIcon as ArrowTurnBackwardIcon01,
@@ -232,8 +233,8 @@ export const VideoIcon = CreateIcon(Video01Icon)
 // STATUS / FEEDBACK
 // ============================
 
-export const Check = CreateIcon(MenuSquare01)
-export const CheckIcon = CreateIcon(MenuSquare01)
+export const Check = CreateIcon(Tick01Icon)
+export const CheckIcon = CreateIcon(Tick01Icon)
 export const CheckCircleIcon = CreateIcon(CheckmarkCircle01Icon)
 export const LikeIcon = CreateIcon(ThumbsUpIcon)
 export const PlayIcon = CreateIcon(PlayIcon01)

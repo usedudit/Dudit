@@ -2,12 +2,12 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { toast } from '@/hooks/use-notification';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { ChevronLeftIcon, XIcon, SearchIcon, CheckCircleIcon, ChevronRightIcon, PlusIcon, CalendarIcon, CheckIcon, ClockIcon, RepeatIcon, ArrowRightIcon, ChevronDownIcon, UserIcon, ThreeDotsIcon, Package } from '@/lib/icons';
+import { ChevronLeftIcon, XIcon, SearchIcon, ChevronRightIcon, PlusIcon, CalendarIcon, CheckIcon, ClockIcon, RepeatIcon, ArrowRightIcon, ChevronDownIcon, UserIcon, ThreeDotsIcon, Package } from '@/lib/icons';
 import { Button, Input, Dropdown, DropdownItem, AlertModal, DatePicker, TimePicker, FormTextarea, ThreeDotsLoader, IconPlaceholder, Spinner, EmailInput, PhoneInput, Checkbox, MoneyInput, InfoCard, Badge, Tabs, TabsList, TabsTrigger, TabsContent, QuantitySelector, DefaultModal } from '@/components/reusable';
-import { getAvailableTimeSlotsAction, getAppointmentOrderDataAction, getAppointmentDetailsDataAction } from '@/app/actions/erp/appointments';
+import { getAvailableTimeSlotsAction, getAppointmentDetailsDataAction } from '@/app/actions/erp/appointments';
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
-import { getAppointmentItemsAction, fetchProductsByIdsAction, getPartnerPlanAction } from '@/app/actions/erp/appointment-items';
+import { fetchProductsByIdsAction } from '@/app/actions/erp/appointment-items';
 import { AppointmentItemsStep, resolveResourcesFromServices } from './AppointmentItemsStep';
 import AddItemSheet from './AddItemSheet';
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
@@ -21,13 +21,10 @@ import { useMediaQuery } from '@/components/erp/hooks';
 import BottomSheet from '@/components/BottomSheet';
 import Portal from '@/components/Portal';
 import { UserProfileImage } from '@/lib/utils/UserProfileImage';
-import SelectCustomerSheet from '@/components/erp/clientes/SelectCustomerSheet';
 import { createPOSCustomerQuickAction } from '@/app/actions/erp/pdv';
 import { fetchPartnerCustomersBucket } from '@/app/actions/erp/client-loaders';
 import { createServiceAction } from '@/app/actions/erp/servicos';
 import { getFulfillmentModeLabel, getPaymentStatusLabel, getSalesChannelLabel } from '@/lib/orders/status';
-import { getFinanceAccountsAction } from '@/app/actions/erp/finance-accounts';
-import { pickBankThenCashDefaultFinanceAccountId } from '@/lib/finance-utils';
 import { useCSRFToken } from '@/hooks/use-csrf-token';
 
 export const AppointmentSheet = ({
@@ -1314,7 +1311,7 @@ export const AppointmentSheet = ({
 
     const statusOptions = mode === 'create'
         ? VIEW_STATUS_OPTIONS.filter(opt => opt.value !== 'Concluído' && opt.value !== 'Ausência')
-        : VIEW_STATUS_OPTIONS;
+        : VIEW_STATUS_OPTIONS.filter(opt => opt.value !== 'Pago');
 
     const calendarMonthYear = useMemo(() => {
         const formatted = baseCalDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
@@ -1514,7 +1511,7 @@ export const AppointmentSheet = ({
                                     <Input
                                         label=""
                                         name="serviceSearch"
-                                        placeholder="Buscar serviço"
+                                        placeholder="Buscar serviço..."
                                         value={serviceSearch}
                                         onChange={(e) => setServiceSearch(e.target.value)}
                                         prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
@@ -1523,7 +1520,6 @@ export const AppointmentSheet = ({
                                     />
                                 </div>
                                 <Button
-                                    variant="filled"
                                     onClick={() => {
                                         setNewServiceName("");
                                         setNewServicePrice(0);
@@ -1533,7 +1529,7 @@ export const AppointmentSheet = ({
                                         setServiceDurationError(null);
                                         setIsNewServiceSheetOpen(true);
                                     }}
-                                    className="h-11 w-11 shrink-0 rounded-full p-0 flex items-center justify-center bg-brand-primary hover:bg-brand-primary/95 text-white"
+                                    className="h-[42px] w-[42px]"
                                     type="button"
                                 >
                                     <PlusIcon className="h-5 w-5" />
@@ -1681,14 +1677,14 @@ export const AppointmentSheet = ({
                                         <div className="flex justify-between items-center mb-4 px-1">
                                             <h3 className="font-bold text-brand-dark dark:text-dark-heading">{calendarMonthYear}</h3>
                                             <div className="flex gap-4">
-                                                <button onClick={() => handleDateNav('prev')} className="text-brand-inactive-text hover:text-brand-dark"><ChevronLeftIcon size={16} /></button>
-                                                <button onClick={() => handleDateNav('next')} className="text-brand-dark dark:text-dark-heading"><ChevronRightIcon size={16} /></button>
+                                                <button onClick={() => handleDateNav('prev')} className="text-brand-inactive-text dark:text-dark-heading"><ChevronLeftIcon size={16} /></button>
+                                                <button onClick={() => handleDateNav('next')} className="text-brand-inactive-text dark:text-dark-heading"><ChevronRightIcon size={16} /></button>
                                             </div>
                                         </div>
                                         <div className="flex justify-between items-center text-center">
                                             {dates.map((d, i) => (
                                                 <div key={i} className="flex flex-col gap-2 cursor-pointer group items-center" onClick={() => handleSelectDay(d.fullDate)}>
-                                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all ${d.active ? 'bg-brand-dark text-white' : 'text-brand-dark dark:text-dark-heading border border-gray-200 dark:border-gray-700 hover:border-brand-dark'}`}>
+                                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all ${d.active ? 'bg-brand-dark text-white' : 'text-brand-dark dark:text-dark-heading border border-brand-border dark:border-dark-border hover:border-brand-dark/30 dark:hover:border-brand-gray/30'}`}>
                                                         {d.num}
                                                     </div>
                                                     <span className={`text-xs font-medium ${d.active ? 'text-brand-dark dark:text-dark-heading' : 'text-brand-inactive-text'}`}>{d.day}</span>
@@ -1701,9 +1697,9 @@ export const AppointmentSheet = ({
                                         <div className="flex justify-between items-center mb-4 px-1">
                                             <h3 className="font-bold text-brand-dark dark:text-dark-heading">Horários disponíveis</h3>
                                             <Button
-                                                variant="outline"
+                                                variant="link"
                                                 className="h-8"
-                                                leftIcon={<CalendarIcon size={12} />}
+                                                leftIcon={<CalendarIcon size={18} className="hidden lg:block" />}
                                                 onClick={handleEnterSelectionMode}
                                             >
                                                 Escolha no calendário
@@ -1728,10 +1724,10 @@ export const AppointmentSheet = ({
                                                     <button
                                                         key={i}
                                                         onClick={() => { setSelectedTimeSlot(slot); setEditTime(slot); }}
-                                                        className={`w-full p-3 rounded-xl border text-sm font-bold transition-all flex justify-between items-center ${selectedTimeSlot === slot ? 'border-brand-dark bg-brand-dark text-white' : 'border-brand-border dark:border-dark-border hover:border-gray-300 text-brand-dark dark:text-dark-heading'}`}
+                                                        className={`w-full p-3 rounded-xl border text-sm font-bold transition-all flex justify-between items-center ${selectedTimeSlot === slot ? 'border-brand-dark border-brand-green text-white' : 'border-brand-border dark:border-dark-border hover:border-brand-dark/30 dark:hover:border-brand-gray/30 text-brand-dark dark:text-dark-heading'}`}
                                                     >
                                                         {slot}
-                                                        {selectedTimeSlot === slot && <CheckIcon size={16} />}
+                                                        {selectedTimeSlot === slot && <CheckIcon size={18} />}
                                                     </button>
                                                 ))
                                             )}
@@ -1819,7 +1815,7 @@ export const AppointmentSheet = ({
                                                         <span className="text-xs text-brand-inactive-text truncate">{client.email || client.phone || 'Cliente'}</span>
                                                     </div>
                                                 </div>
-                                                {isSelected && <CheckCircleIcon size={18} className="text-brand-green shrink-0" />}
+                                                {isSelected && <CheckIcon size={18} className="text-brand-green shrink-0" />}
                                             </div>
                                         );
                                     })
@@ -1895,7 +1891,7 @@ export const AppointmentSheet = ({
                                                 trigger={
                                                     <button
                                                         disabled={isLocked}
-                                                        className={`flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 dark:border-dark-border text-brand-dark dark:text-dark-heading rounded-full text-sm font-bold shadow-sm transition-colors hover:bg-gray-50 dark:hover:bg-dark-border ${isLocked ? 'opacity-70 cursor-not-allowed' : ''}`}
+                                                        className={`flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 text-brand-dark rounded-full text-sm font-bold transition-colors hover:bg-gray-50 ${isLocked ? 'opacity-70 cursor-not-allowed' : ''}`}
                                                     >
                                                         {status}
                                                         {!isLocked && <ChevronDownIcon size={14} className="text-brand-inactive-text" />}
@@ -2336,7 +2332,7 @@ export const AppointmentSheet = ({
                                             <Spinner size={18} />
                                         </span>
                                     ) : currentView === 'summary' ? (
-                                        <span className="flex items-center gap-2">Agendar <CheckCircleIcon size={18} /></span>
+                                        <span className="flex items-center gap-2">Agendar</span>
                                     ) : currentView === 'edit-service' ? (
                                         'Aplicar'
                                     ) : (
@@ -2767,17 +2763,17 @@ export const AppointmentSheet = ({
                                         setSelectedClient(client);
                                         setIsClientOverlayOpen(false);
                                     }}
-                                    className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${isSelected ? 'border-brand-green bg-green-50/5' : 'border-brand-border dark:border-dark-border hover:border-gray-300 dark:hover:border-gray-600'
+                                    className={`flex items-center justify-between p-3.5 cursor-pointer transition-all ${isSelected ? 'rounded-xl border border-brand-green bg-green-50/5' : 'border-b last:border-0 border-brand-border dark:border-dark-border hover:border-gray-300 dark:hover:border-gray-600'
                                         }`}
                                 >
                                     <div className="flex items-center gap-3">
-                                        <UserProfileImage fullName={client.name || "Cliente"} imageUrl={client.avatar_url || client.avatar} className="w-8 h-8 shrink-0 text-[10px]" />
+                                        <UserProfileImage fullName={client.name || "Cliente"} imageUrl={client.avatar_url || client.avatar} className="h-12 w-12 shrink-0 text-lg" />
                                         <div className="flex flex-col min-w-0">
-                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{client.name}</span>
-                                            <span className="text-xs text-brand-inactive-text truncate">{client.email || client.phone || 'Cliente'}</span>
+                                            <span className="truncate text-sm font-bold text-brand-dark dark:text-dark-heading">{client.name}</span>
+                                            <span className="truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body">{client.email || client.phone || 'Cliente'}</span>
                                         </div>
                                     </div>
-                                    {isSelected && <CheckCircleIcon size={18} className="text-brand-green shrink-0" />}
+                                    {isSelected && <CheckIcon size={18} className="text-brand-green shrink-0" />}
                                 </div>
                             );
                         })

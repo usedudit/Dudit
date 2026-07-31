@@ -52,7 +52,7 @@ export const getPartnerByUserIdCached = cache(async (userId: string) => {
 
     const { data: store } = await supabase
         .from("stores")
-        .select("id, name, description, logo_url, banner_url, opening_hours, phone, person_type, cnpj, cpf, addresses(*)")
+        .select("id, name, description, logo_url, banner_url, opening_hours, phone, person_type, cnpj, cpf, addresses!store_id(*)")
         .eq("partner_id", partner.id)
         .order("is_headquarters", { ascending: false })
         .limit(1)

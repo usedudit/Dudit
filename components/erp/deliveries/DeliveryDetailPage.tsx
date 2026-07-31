@@ -233,7 +233,10 @@ export default function DeliveryDetailPage({
         }
     }
 
-    if (loading) return <div className="h-full flex items-center justify-center"><ThreeDotsLoader /></div>
+    if (loading) return <div className="flex h-[calc(100vh-65px)] w-full items-center justify-center">
+        <ThreeDotsLoader />
+    </div>
+
     if (!delivery) {
         return (
             <div className="h-full flex flex-col items-center justify-center p-6 text-center">
@@ -721,7 +724,7 @@ export default function DeliveryDetailPage({
                                                                         SKU: {itemSku}
                                                                     </div>
                                                                     <div className="text-[11px] text-brand-inactive-text dark:text-dark-body">
-                                                                         {formatQuantityWithUnit(item.quantity, item.unit)} • {formatUnitPriceWithUnit(itemPrice, item.unit)}
+                                                                        {formatQuantityWithUnit(item.quantity, item.unit)} • {formatUnitPriceWithUnit(itemPrice, item.unit)}
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -804,11 +807,11 @@ export default function DeliveryDetailPage({
 
                                         {paymentMethodDiscountAmount > 0 && (
                                             <div className="flex justify-between items-center text-sm">
-                                                 <span className="text-brand-inactive-text dark:text-dark-body font-medium">
-                                                     {order.payment_method === "exchange" ? "Crédito de troca" :
-                                                      order.payment_method === "store_credit" ? "Vale-compra" :
-                                                      "Desconto do Método"}
-                                                 </span>
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">
+                                                    {order.payment_method === "exchange" ? "Crédito de troca" :
+                                                        order.payment_method === "store_credit" ? "Vale-compra" :
+                                                            "Desconto do Método"}
+                                                </span>
                                                 <span className="text-brand-green font-bold">- {formatCurrency(paymentMethodDiscountAmount)}</span>
                                             </div>
                                         )}

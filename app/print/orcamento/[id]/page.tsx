@@ -23,7 +23,7 @@ export default async function PrintOrcamentoPage({ params }: PageProps) {
     const supabase = getAdminClient()
     const { data: quote } = await supabase
         .from("quotes")
-        .select("partner_id")
+        .select("partner_id, store_id")
         .eq("id", id)
         .maybeSingle()
 
@@ -48,10 +48,14 @@ export default async function PrintOrcamentoPage({ params }: PageProps) {
         notFound()
     }
 
+    const storeId = quote.store_id || quoteDetails.store_id || undefined
+
     // Fetch store logo and address details
     const [storeRes, addressRes] = await Promise.all([
-        supabase.from("stores").select("name, logo_url, phone").eq("partner_id", quote.partner_id).limit(1).maybeSingle(),
-        getPartnerAddressAction(quote.partner_id)
+        storeId
+            ? supabase.from("stores").select("name, logo_url, phone").eq("id", storeId).maybeSingle()
+            : supabase.from("stores").select("name, logo_url, phone").eq("partner_id", quote.partner_id).limit(1).maybeSingle(),
+        getPartnerAddressAction(quote.partner_id, storeId)
     ])
 
     const partnerName = storeRes.data?.name || "Parceiro"

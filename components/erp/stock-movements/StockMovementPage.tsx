@@ -297,7 +297,7 @@ const StockMovementPageContent = ({ partnerId, storeId, movements: initialMoveme
 
             return {
                 id: mov.id,
-                displayId: `${mov.id.split('-')[0].toUpperCase()}-${mov.id.slice(-4).toUpperCase()}`,
+                displayId: mov.id.split('-')[0].toUpperCase(),
                 date: `${dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}, ${dateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
                 rawDate: dateObj.getTime(),
                 items_count,

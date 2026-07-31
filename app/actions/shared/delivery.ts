@@ -242,8 +242,12 @@ export async function quoteDeliveryFeeAction(input: {
     return { success: false as const, error: "Entrega desativada para esta loja." }
   }
 
+  const effectiveMaxKm = (settings.maxDeliveryKm != null && settings.maxDeliveryKm > 0)
+    ? settings.maxDeliveryKm
+    : (settings.includedKm > 0 ? settings.includedKm : null)
+
   const shouldCalculateDistance = (
-    settings.maxDeliveryKm != null ||
+    effectiveMaxKm != null ||
     settings.extraKmPrice > 0 ||
     settings.includedKm > 0
   )
@@ -342,7 +346,7 @@ export async function quoteDeliveryFeeAction(input: {
       breakdown: priced.breakdown,
       capability,
       isOutsideRadius: Boolean(priced.breakdown.isOutsideRadius),
-      maxDeliveryKm: priced.breakdown.maxDeliveryKm ?? settings.maxDeliveryKm,
+      maxDeliveryKm: priced.breakdown.maxDeliveryKm ?? effectiveMaxKm,
       outsideRadiusWarning: priced.breakdown.outsideRadiusWarning,
     }
   } catch (error: any) {
@@ -351,7 +355,7 @@ export async function quoteDeliveryFeeAction(input: {
       success: false as const,
       distanceKm,
       isOutsideRadius: isOutside,
-      maxDeliveryKm: settings.maxDeliveryKm,
+      maxDeliveryKm: effectiveMaxKm,
       error: error.message || "Erro ao calcular taxa de entrega",
     }
   }

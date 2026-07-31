@@ -106,7 +106,7 @@ export function StoreProvider({
       } catch {
         const { data: resData, error } = await supabase
           .from("stores")
-          .select("*, addresses!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default)")
+          .select("*, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default)")
           .eq("partner_id", partnerId)
           .order("created_at", { ascending: true })
         if (error) throw error

@@ -38,7 +38,7 @@ async function loadCatalogs(partnerId: string, storeId?: string | null) {
       .limit(100),
     supabase
       .from("partners")
-      .select("user_id, opening_hours, stores(id, opening_hours)")
+      .select("user_id, stores(id, opening_hours)")
       .eq("id", partnerId)
       .single(),
     supabase

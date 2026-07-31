@@ -279,6 +279,22 @@ BEGIN
 
   v_movement_id := (v_movement->>'id')::UUID;
 
+  IF v_movement_id IS NOT NULL THEN
+    DECLARE
+      v_order_number TEXT;
+    BEGIN
+      SELECT order_number INTO v_order_number
+      FROM public.orders
+      WHERE id = p_order_id;
+
+      UPDATE public.stock_movements
+      SET
+        order_id = p_order_id,
+        reference_name = 'Pedido #' || COALESCE(v_order_number, p_order_id::TEXT)
+      WHERE id = v_movement_id;
+    END;
+  END IF;
+
   RETURN jsonb_build_object('success', true, 'items_count', jsonb_array_length(p_items), 'movement_id', v_movement_id);
 END;
 $$;
