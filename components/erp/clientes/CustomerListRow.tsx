@@ -20,6 +20,8 @@ interface CustomerListItemProps {
   onSelect: (id: string) => void
   onEdit: (customer: any) => void
   onDelete: (customer: any) => void
+  onArchive?: (customer: any) => void
+  onUnarchive?: (customer: any) => void
   onDetails: (customer: any) => void
   /** Prefetch handlers for hover/touch-based entity preloading */
   onPrefetchMouseEnter?: () => void
@@ -36,6 +38,8 @@ const CustomerListItem = React.memo(
     onSelect,
     onEdit,
     onDelete,
+    onArchive,
+    onUnarchive,
     onDetails,
     onPrefetchMouseEnter,
     onPrefetchMouseLeave,
@@ -100,12 +104,14 @@ const CustomerListItem = React.memo(
             </span>
           )
 
-        case "status":
+        case "status": {
+          const isArchived = customer.status === "arquivado" || customer.status === "archived"
           return (
-            <Badge variant={customer.status === 'ativo' ? "green" : customer.status === 'inativo' ? "gray" : "red"}>
-              {customer.status === 'ativo' ? "Ativo" : customer.status === 'inativo' ? "Inativo" : "Bloqueado"}
+            <Badge variant={isArchived ? "orange" : customer.status === 'ativo' ? "green" : customer.status === 'inativo' ? "gray" : "red"}>
+              {isArchived ? "Arquivado" : customer.status === 'ativo' ? "Ativo" : customer.status === 'inativo' ? "Inativo" : "Bloqueado"}
             </Badge>
           )
+        }
 
         case "last_order":
           return (
@@ -114,7 +120,8 @@ const CustomerListItem = React.memo(
             </span>
           )
 
-        case "actions":
+        case "actions": {
+          const isArchived = customer.status === "arquivado" || customer.status === "archived"
           return (
             <div
               className="flex justify-center action-btn"
@@ -123,9 +130,12 @@ const CustomerListItem = React.memo(
               <ActionsDropdown
                 onEdit={() => onEdit(customer)}
                 onDelete={() => onDelete(customer)}
+                onArchive={!isArchived && onArchive ? () => onArchive(customer) : undefined}
+                onUnarchive={isArchived && onUnarchive ? () => onUnarchive(customer) : undefined}
               />
             </div>
           )
+        }
 
         default:
           return null

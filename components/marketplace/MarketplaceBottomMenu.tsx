@@ -5,16 +5,18 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useSupabase } from "@/providers/supabase-provider"
 import {
-    HomeIcon, SearchIcon, Package, MenuIcon, UserIcon, StoreIcon, HeartIcon, StarIcon, HelpCircleIcon, ChevronRightIcon, LogoutIcon, InfoIcon, MoneyIcon, FileTextIcon, ShieldIcon
+    HomeIcon, SearchIcon, Package, MenuIcon, UserIcon, StoreIcon, HeartIcon, StarIcon, HelpCircleIcon, ChevronRightIcon, LogoutIcon, InfoIcon, MoneyIcon, FileTextIcon, ShieldIcon, EditIcon, TrashIcon
 } from "@/lib/icons"
 import BottomSheet from "@/components/BottomSheet"
 import { getUserInitials, getAvatarColor } from "@/lib/utils/UserProfileImage"
+import { useCollectionDetailMenu } from "@/lib/collection-detail-menu"
 
 export function MarketplaceBottomMenu() {
     const pathname = usePathname()
     const { user, supabase } = useSupabase()
     const [isMenuOpen, setIsMenuOpen] = useState(false)
     const [citySlug, setCitySlug] = useState<string | null>(null)
+    const collectionMenu = useCollectionDetailMenu()
 
     // Detect city slug on client side for the Home tab
     useEffect(() => {
@@ -51,6 +53,8 @@ export function MarketplaceBottomMenu() {
     if (isExcluded) return null
 
     const homePath = citySlug ? `/${citySlug}` : "/"
+
+    const isCollectionDetailOwner = !!collectionMenu?.isOwner && pathname?.startsWith("/colecoes/")
 
     const userName = user?.email?.split("@")[0] || "Visitante"
     const fullName = user?.email?.split("@")[0] || "Visitante"
@@ -114,48 +118,69 @@ export function MarketplaceBottomMenu() {
     return (
         <>
             {/* Bottom Nav Bar */}
-            <nav
-                className="lg:hidden print:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-dark-background/95 border-t border-gray-100 dark:border-dark-border shadow-[0_-4px_24px_rgba(0,0,0,0.06)] backdrop-blur-md pb-[calc(env(safe-area-inset-bottom,0px))] h-[60px] flex justify-around items-center"
-            >
-                <Link
-                    href="/"
-                    prefetch={false}
-                    className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all duration-200 ${isHomeActive ? "text-brand-green font-bold" : "text-brand-dark font-medium"
-                        }`}
+            {isCollectionDetailOwner ? (
+                <nav
+                    className="lg:hidden print:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-dark-background/95 border-t border-gray-100 dark:border-dark-border shadow-[0_-4px_24px_rgba(0,0,0,0.06)] backdrop-blur-md pb-[calc(env(safe-area-inset-bottom,0px))] h-[60px] flex items-center justify-center gap-3 px-4"
                 >
-                    <HomeIcon size={22} className={isHomeActive ? "text-brand-green" : "text-brand-dark"} />
-                    <span className="text-[11px] mt-1">Início</span>
-                </Link>
+                    <button
+                        onClick={collectionMenu.onEdit}
+                        className="flex-1 h-10 max-w-[180px] flex items-center justify-center gap-2 rounded-full border border-brand-border dark:border-dark-border text-brand-dark dark:text-white text-[14px] font-semibold hover:bg-gray-50 dark:hover:bg-dark-border/40 transition-colors"
+                    >
+                        <EditIcon size={18} />
+                        Editar
+                    </button>
+                    <button
+                        onClick={collectionMenu.onDelete}
+                        className="flex-1 h-10 max-w-[180px] flex items-center justify-center gap-2 rounded-full border border-red-200 dark:border-red-900 text-brand-red text-[14px] font-semibold hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                    >
+                        <TrashIcon size={18} />
+                        Excluir
+                    </button>
+                </nav>
+            ) : (
+                <nav
+                    className="lg:hidden print:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-dark-background/95 border-t border-gray-100 dark:border-dark-border shadow-[0_-4px_24px_rgba(0,0,0,0.06)] backdrop-blur-md pb-[calc(env(safe-area-inset-bottom,0px))] h-[60px] flex justify-around items-center"
+                >
+                    <Link
+                        href="/"
+                        prefetch={false}
+                        className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all duration-200 ${isHomeActive ? "text-brand-green font-bold" : "text-brand-dark font-medium"
+                            }`}
+                    >
+                        <HomeIcon size={22} className={isHomeActive ? "text-brand-green" : "text-brand-dark"} />
+                        <span className="text-[11px] mt-1">Início</span>
+                    </Link>
 
-                <Link
-                    href="/explorar"
-                    prefetch={false}
-                    className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all duration-200 ${isExploreActive ? "text-brand-green font-bold" : "text-brand-dark font-medium"
-                        }`}
-                >
-                    <SearchIcon size={22} className={isExploreActive ? "text-brand-green" : "text-brand-dark"} />
-                    <span className="text-[11px] mt-1">Explorar</span>
-                </Link>
+                    <Link
+                        href="/explorar"
+                        prefetch={false}
+                        className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all duration-200 ${isExploreActive ? "text-brand-green font-bold" : "text-brand-dark font-medium"
+                            }`}
+                    >
+                        <SearchIcon size={22} className={isExploreActive ? "text-brand-green" : "text-brand-dark"} />
+                        <span className="text-[11px] mt-1">Explorar</span>
+                    </Link>
 
-                <Link
-                    href="/pedidos"
-                    prefetch={false}
-                    className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all duration-200 ${isOrdersActive ? "text-brand-green font-bold" : "text-brand-dark font-medium"
-                        }`}
-                >
-                    <Package size={22} className={isOrdersActive ? "text-brand-green" : "text-brand-dark"} />
-                    <span className="text-[11px] mt-1">Pedidos</span>
-                </Link>
+                    <Link
+                        href="/pedidos"
+                        prefetch={false}
+                        className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all duration-200 ${isOrdersActive ? "text-brand-green font-bold" : "text-brand-dark font-medium"
+                            }`}
+                    >
+                        <Package size={22} className={isOrdersActive ? "text-brand-green" : "text-brand-dark"} />
+                        <span className="text-[11px] mt-1">Pedidos</span>
+                    </Link>
 
-                <button
-                    onClick={() => setIsMenuOpen(true)}
-                    className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all duration-200 ${isMenuOpen ? "text-brand-green font-bold" : "text-brand-dark font-medium"
-                        }`}
-                >
-                    <MenuIcon size={22} className={isMenuOpen ? "text-brand-green" : "text-brand-dark"} />
-                    <span className="text-[11px] mt-1">Menu</span>
-                </button>
-            </nav>
+                    <button
+                        onClick={() => setIsMenuOpen(true)}
+                        className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all duration-200 ${isMenuOpen ? "text-brand-green font-bold" : "text-brand-dark font-medium"
+                            }`}
+                    >
+                        <MenuIcon size={22} className={isMenuOpen ? "text-brand-green" : "text-brand-dark"} />
+                        <span className="text-[11px] mt-1">Menu</span>
+                    </button>
+                </nav>
+            )}
 
             {/* Menu Overlay Drawer */}
             <BottomSheet isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)}>

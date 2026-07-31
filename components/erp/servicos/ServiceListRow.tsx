@@ -20,6 +20,8 @@ interface ServiceListItemProps {
     onEdit: (service: any) => void
     onDuplicate: (service: any) => void
     onDelete: (service: any) => void
+    onArchive?: (service: any) => void
+    onUnarchive?: (service: any) => void
     onDetails: (service: any) => void
     onShare: (service: any) => void
     /** Prefetch handlers for hover/touch-based entity preloading */
@@ -37,6 +39,8 @@ const ServiceListItem = React.memo(
         onEdit,
         onDuplicate,
         onDelete,
+        onArchive,
+        onUnarchive,
         onDetails,
         onShare,
         onPrefetchMouseEnter,
@@ -96,14 +100,17 @@ const ServiceListItem = React.memo(
                         </span>
                     )
 
-                case "status":
+                case "status": {
+                    const isArchived = service.status === "arquivado" || service.status === "archived"
                     return (
-                        <Badge variant={service.is_active ? "green" : "red"}>
-                            {service.is_active ? "Ativo" : "Inativo"}
+                        <Badge variant={isArchived ? "orange" : service.is_active ? "green" : "red"}>
+                            {isArchived ? "Arquivado" : service.is_active ? "Ativo" : "Inativo"}
                         </Badge>
                     )
+                }
 
-                case "actions":
+                case "actions": {
+                    const isArchived = service.status === "arquivado" || service.status === "archived"
                     return (
                         <div
                             className="flex justify-center action-btn"
@@ -113,10 +120,13 @@ const ServiceListItem = React.memo(
                                 onEdit={() => onEdit(service)}
                                 onDuplicate={() => onDuplicate(service)}
                                 onDelete={() => onDelete(service)}
+                                onArchive={!isArchived && onArchive ? () => onArchive(service) : undefined}
+                                onUnarchive={isArchived && onUnarchive ? () => onUnarchive(service) : undefined}
                                 onShare={() => onShare(service)}
                             />
                         </div>
                     )
+                }
 
                 default:
                     return null

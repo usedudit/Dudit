@@ -8,7 +8,7 @@ export interface Service {
   duration_minutes: number | null
   images: string[] | null
   is_active: boolean
-  status?: "ativo" | "inativo" | "arquivado" | "excluido"
+  status?: "ativo" | "inativo" | "arquivado" | "excluido" | "active" | "inactive" | "archived" | "deleted"
   rating: number
   category: string | null
   category_id: string | null

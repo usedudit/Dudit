@@ -12,6 +12,8 @@ interface CustomerGridCardProps {
     onSelect: () => void
     onEdit: () => void
     onDelete: () => void
+    onArchive?: () => void
+    onUnarchive?: () => void
     onDetails: () => void
     /** Prefetch handlers for hover/touch-based entity preloading */
     onPrefetchMouseEnter?: () => void
@@ -27,6 +29,8 @@ const CustomerGridCard = React.memo(
         onSelect,
         onEdit,
         onDelete,
+        onArchive,
+        onUnarchive,
         onDetails,
         onPrefetchMouseEnter,
         onPrefetchMouseLeave,
@@ -64,12 +68,17 @@ const CustomerGridCard = React.memo(
                                 >
                                     <span className="truncate">{customer.name}</span>
                                 </h3>
-                                <Tooltip text={`Status: ${customer.status === 'ativo' ? "Ativo" : customer.status === 'inativo' ? "Inativo" : "Bloqueado"}`}>
-                                    <Badge
-                                        variant={customer.status === 'ativo' ? "green" : customer.status === 'inativo' ? "gray" : "red"}
-                                        className="whitespace-nowrap scale-90 shrink-0"
-                                    />
-                                </Tooltip>
+                                {(() => {
+                                    const isArchived = customer.status === "arquivado" || customer.status === "archived"
+                                    return (
+                                        <Tooltip text={`Status: ${isArchived ? "Arquivado" : customer.status === 'ativo' ? "Ativo" : customer.status === 'inativo' ? "Inativo" : "Bloqueado"}`}>
+                                            <Badge
+                                                variant={isArchived ? "orange" : customer.status === 'ativo' ? "green" : customer.status === 'inativo' ? "gray" : "red"}
+                                                className="whitespace-nowrap scale-90 shrink-0"
+                                            />
+                                        </Tooltip>
+                                    )
+                                })()}
                                 {(() => {
                                     const bdayInfo = checkBirthday(customer.birth_date)
                                     return showBirthdayBadge && bdayInfo && (bdayInfo.isToday || bdayInfo.isUpcoming) ? (
@@ -128,10 +137,17 @@ const CustomerGridCard = React.memo(
                             className="shrink-0"
                             onClick={(e) => e.stopPropagation()}
                         >
-                            <ActionsDropdown
-                                onEdit={onEdit}
-                                onDelete={onDelete}
-                            />
+                            {(() => {
+                                const isArchived = customer.status === "arquivado" || customer.status === "archived"
+                                return (
+                                    <ActionsDropdown
+                                        onEdit={onEdit}
+                                        onDelete={onDelete}
+                                        onArchive={!isArchived ? onArchive : undefined}
+                                        onUnarchive={isArchived ? onUnarchive : undefined}
+                                    />
+                                )
+                            })()}
                         </div>
                     </div>
                 </div>

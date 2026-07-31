@@ -93,6 +93,7 @@ interface ActionsDropdownProps {
   onPrint?: () => void
   onEmail?: () => void
   onArchive?: () => void
+  onUnarchive?: () => void
   onCancel?: () => void
   onPaymentStatus?: () => void
   onDeliveryStatus?: () => void
@@ -114,6 +115,7 @@ export const ActionsDropdown: React.FC<ActionsDropdownProps> = ({
   onPrint,
   onEmail,
   onArchive,
+  onUnarchive,
   onCancel,
   onPaymentStatus,
   onDeliveryStatus,
@@ -174,6 +176,11 @@ export const ActionsDropdown: React.FC<ActionsDropdownProps> = ({
     {onArchive && (
       <DropdownItem onClick={onArchive} className="text-brand-orange dark:text-brand-orange">
         <ArchiveIcon size={18} /> Arquivar
+      </DropdownItem>
+    )}
+    {onUnarchive && (
+      <DropdownItem onClick={onUnarchive} className="text-brand-green dark:text-brand-green">
+        <ArchiveIcon size={18} /> Desarquivar
       </DropdownItem>
     )}
     {onDelete && (

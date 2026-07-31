@@ -26,6 +26,8 @@ import {
     createProductVariantsBatchAction,
     updateProductAction,
     deleteProductAction,
+    archiveProductAction,
+    unarchiveProductAction,
     deleteProductsInBatchAction,
     toggleProductsStatusAction,
     getProductWithDetailsAction,
@@ -222,7 +224,7 @@ export default function ProductsPage({
         initialNextCursor,
         initialHasMore,
         fetchPageFn: async ({ cursor }) => {
-            const res = await getERPProductsPageAction(partnerId, { cursor, limit: 100, storeId: storeId || undefined })
+            const res = await getERPProductsPageAction(partnerId, { cursor, limit: 100, storeId: storeId || undefined, filters: { includeArchived: true } })
             if (!res.success) throw new Error(res.error || "Erro ao carregar produtos.")
             return { items: res.items as (Product & { id: string })[], nextCursor: res.nextCursor, hasMore: res.hasMore }
         },
@@ -292,7 +294,7 @@ export default function ProductsPage({
         hasCostPrice: false,
         isOnPromotion: false,
     })
-    const [activeTab, setActiveTab] = useState<"all" | "normal" | "low" | "out_of_stock">("all")
+    const [activeTab, setActiveTab] = useState<"all" | "normal" | "low" | "out_of_stock" | "archived">("all")
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null)
     const [isSaving, setIsSaving] = useState(false)
     const [confirmations, setConfirmations] = useState({
@@ -353,16 +355,21 @@ export default function ProductsPage({
     const isFiltered = search.length > 0 || hasActiveFilters
 
     const tabCounts = useMemo(() => {
-        const all = products.length
-        let normal = 0, low = 0, out_of_stock = 0
+        let normal = 0, low = 0, out_of_stock = 0, archived = 0, allActive = 0
         for (const p of products) {
+            const isArchived = p.status === "arquivado" || p.status === "archived"
+            if (isArchived) {
+                archived++
+                continue
+            }
+            allActive++
             const stock = p.stock_quantity ?? (p as any).stock ?? 0
             const label = getStockStatus(stock, p.min_stock ?? undefined).label
             if (label === "Normal") normal++
             else if (label === "Baixo") low++
             else if (label === "Esgotado") out_of_stock++
         }
-        return { all, normal, low, out_of_stock }
+        return { all: allActive, normal, low, out_of_stock, archived }
     }, [products])
 
     const handleExport = useCallback(() => {
@@ -413,7 +420,7 @@ export default function ProductsPage({
         const hasPromotion = products.some((p) => p.is_on_promotion === true)
 
         const sections: FilterSectionConfig[] = [
-            { id: "status", title: "Status", type: "checkbox-list", options: ["Ativo", "Inativo"] },
+            { id: "status", title: "Status", type: "checkbox-list", options: ["Ativo", "Inativo", "Arquivado"] },
             { id: "priceRange", title: "Preço", type: "range", rangeConfig: { minKey: "minPrice", maxKey: "maxPrice" } },
         ]
 
@@ -436,12 +443,19 @@ export default function ProductsPage({
             const minPrice = filters.priceRange.min ? Number.parseFloat(filters.priceRange.min) : 0
             const maxPrice = filters.priceRange.max ? Number.parseFloat(filters.priceRange.max) : Number.POSITIVE_INFINITY
 
-            let tabMatch = true
-            if (activeTab === "normal") tabMatch = stockInfo.label === "Normal"
-            else if (activeTab === "low") tabMatch = stockInfo.label === "Baixo"
-            else if (activeTab === "out_of_stock") tabMatch = stockInfo.label === "Esgotado"
+            const isArchived = p.status === "arquivado" || p.status === "archived"
 
-            const statusLabel = p.is_active ? "Ativo" : "Inativo"
+            let tabMatch = true
+            if (activeTab === "archived") {
+                tabMatch = isArchived
+            } else {
+                if (isArchived) tabMatch = false
+                else if (activeTab === "normal") tabMatch = stockInfo.label === "Normal"
+                else if (activeTab === "low") tabMatch = stockInfo.label === "Baixo"
+                else if (activeTab === "out_of_stock") tabMatch = stockInfo.label === "Esgotado"
+            }
+
+            const statusLabel = isArchived ? "Arquivado" : p.is_active ? "Ativo" : "Inativo"
             const statusMatch = filters.status.length === 0 || filters.status.includes(statusLabel)
 
             const categoryMatch = filters.categories.length === 0 || filters.categories.includes((p.category || "") as any)
@@ -458,7 +472,7 @@ export default function ProductsPage({
                 productTypeMatch &&
                 hasCostPriceMatch &&
                 isOnPromotionMatch &&
-                (p.name.toLowerCase().includes(term) || p.sku?.toLowerCase().includes(term)) &&
+                (p.name?.toLowerCase().includes(term) || p.sku?.toLowerCase().includes(term)) &&
                 (filters.stocks.length === 0 || filters.stocks.includes(stockLabel)) &&
                 p.price >= minPrice &&
                 p.price <= maxPrice
@@ -603,6 +617,45 @@ export default function ProductsPage({
                 notifyError(isPermission ? "Sem permissão" : "Erro", result.error || "Erro ao excluir produto")
             }
             setConfirmations((p) => ({ ...p, delete: false }))
+        }
+    }
+
+    const handleArchiveProduct = async (product: Product) => {
+        try {
+            setActionModal({ open: true, text: "Arquivando produto..." })
+            const res = await archiveProductAction(product.id)
+            if (res.error) {
+                notifyError("Erro ao arquivar", res.error)
+            } else {
+                notifySuccess("Produto arquivado", `O produto "${product.name}" foi arquivado.`)
+                afterMutation()
+            }
+        } catch (e: any) {
+            notifyError("Erro", e.message || "Erro ao arquivar")
+        } finally {
+            setActionModal({ open: false, text: "" })
+        }
+    }
+
+    const handleUnarchiveProduct = async (product: Product) => {
+        try {
+            setActionModal({ open: true, text: "Desarquivando produto..." })
+            const res = await unarchiveProductAction(product.id)
+            if (res.error) {
+                if (isPlanLimitReachedError(res.error)) {
+                    const target = getNextPlanTarget(planSlug)
+                    if (target) openPlanUpgrade(target)
+                } else {
+                    notifyError("Erro ao desarquivar", res.error)
+                }
+            } else {
+                notifySuccess("Produto reativado", `O produto "${product.name}" foi desarquivado com sucesso.`)
+                afterMutation()
+            }
+        } catch (e: any) {
+            notifyError("Erro", e.message || "Erro ao desarquivar")
+        } finally {
+            setActionModal({ open: false, text: "" })
         }
     }
 
@@ -964,6 +1017,8 @@ export default function ProductsPage({
                                                                     onEdit={() => handleEditProduct(product)}
                                                                     onDetails={() => handleDetailsProduct(product)}
                                                                     onDelete={() => handleDeleteProduct(product)}
+                                                                    onArchive={() => handleArchiveProduct(product)}
+                                                                    onUnarchive={() => handleUnarchiveProduct(product)}
                                                                     onDuplicate={() => handleDuplicateProduct(product)}
                                                                     onShare={() => setSharingProduct(product)}
                                                                     onPrefetchMouseEnter={prefetch.onMouseEnter}
@@ -1040,6 +1095,8 @@ export default function ProductsPage({
                                                                                 onEdit={handleEditProduct}
                                                                                 onDetails={handleDetailsProduct}
                                                                                 onDelete={handleDeleteProduct}
+                                                                                onArchive={handleArchiveProduct}
+                                                                                onUnarchive={handleUnarchiveProduct}
                                                                                 onDuplicate={handleDuplicateProduct}
                                                                                 onShare={(prod) => setSharingProduct(prod)}
                                                                                 suppliers={[]}

@@ -18,7 +18,8 @@ import { syncToExploreRedis, removeFromExploreRedis } from "@/lib/redis-sync"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import { EMPTY_VIDEO_METADATA, normalizeVideoMetadata } from "@/lib/video/shared"
 import { ALLOWED_VIDEO_MIME_TYPES, MAX_FILE_SIZE, MAX_VIDEO_FILE_SIZE } from "@/lib/r2/config"
-import { buildSoftDeletePayload, buildRestorePayload, scopeActiveOnly } from "@/lib/supabase/query-helpers"
+import { buildSoftDeletePayload, buildRestorePayload, buildArchivePayload, scopeActiveOnly, scopeArchivedOnly } from "@/lib/supabase/query-helpers"
+import { checkLimit } from "@/lib/services/subscription.service"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 
 import { headers } from "next/headers"
@@ -86,14 +87,16 @@ export async function getERPServicesPageAction(
 
         let q = supabase
             .from("services")
-            .select("id, name, category_id, subcategory_id, price, cost_price, is_active, sku, images, unit, duration_minutes, created_at, description, service_categories!category_id(name)")
+            .select("id, name, category_id, subcategory_id, price, cost_price, is_active, status, sku, images, unit, duration_minutes, created_at, description, service_categories!category_id(name)")
             .eq("partner_id", partnerId)
 
         if (options?.storeId) {
             q = q.eq("store_id", options.storeId)
         }
 
-        if (!options?.filters?.includeArchived) {
+        if (options?.filters?.status === "archived" || options?.filters?.tab === "archived" || options?.filters?.status === "arquivado") {
+            q = scopeArchivedOnly(q)
+        } else if (!options?.filters?.includeArchived) {
             q = scopeActiveOnly(q)
         }
 
@@ -403,7 +406,7 @@ export async function deleteServiceAction(serviceId: string, reason?: string | n
             entityType: "service",
             entityId: serviceId,
             actionType: "deleted",
-            changeLines: [`Arquivou o serviço: ${existing.name} (SKU: ${existing.sku || 'N/A'})`],
+            changeLines: [`Deletou o serviço: ${existing.name} (SKU: ${existing.sku || 'N/A'})`],
             metadata: {
                 ip_address: ip,
                 deleted_reason: reason || "Nenhum motivo informado",
@@ -432,12 +435,10 @@ export async function restoreServiceAction(serviceId: string): Promise<ActionRes
 
         await requirePermission(existing.partner_id, "services", "edit", user)
 
-        // 1. Explicit restore update
-        const payload = buildRestorePayload()
+        const payload = buildRestorePayload("ativo")
         const { error } = await admin.from("services").update(payload).eq("id", serviceId)
         if (error) return errorResponse(error.message)
 
-        // 2. Fetch IP and write to audit logs
         const reqHeaders = await headers()
         const ip = reqHeaders.get("x-forwarded-for") || "127.0.0.1"
 
@@ -453,6 +454,86 @@ export async function restoreServiceAction(serviceId: string): Promise<ActionRes
                 name: existing.name,
                 sku: existing.sku
             },
+            source: "manual"
+        })
+
+        revalidatePath("/erp/servicos")
+        return successResponse({ restored: true })
+    } catch (error: any) {
+        return errorResponse(error.message)
+    }
+}
+
+export async function archiveServiceAction(serviceId: string): Promise<ActionResponse<any>> {
+    try {
+        await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+        const user = await requireUser()
+        if (!user) return errorResponse("Não autenticado")
+
+        const admin = getAdminClient()
+        const { data: existing, error: fetchError } = await admin.from("services").select("partner_id, sku, name").eq("id", serviceId).single()
+        if (fetchError || !existing) return errorResponse("Serviço não encontrado")
+
+        await requirePermission(existing.partner_id, "services", "edit", user)
+
+        const payload = buildArchivePayload("arquivado")
+        const { error } = await admin.from("services").update(payload).eq("id", serviceId)
+        if (error) return errorResponse(error.message)
+
+        const reqHeaders = await headers()
+        const ip = reqHeaders.get("x-forwarded-for") || "127.0.0.1"
+
+        await logAuditEvent({
+            partnerId: existing.partner_id,
+            actorUserId: user.id,
+            entityType: "service",
+            entityId: serviceId,
+            actionType: "updated",
+            changeLines: [`Arquivou o serviço: ${existing.name} (SKU: ${existing.sku || 'N/A'})`],
+            metadata: { ip_address: ip, name: existing.name, sku: existing.sku },
+            source: "manual"
+        })
+
+        await removeFromExploreRedis(serviceId, "servico")
+        revalidatePath("/erp/servicos")
+        return successResponse({ archived: true })
+    } catch (error: any) {
+        return errorResponse(error.message)
+    }
+}
+
+export async function unarchiveServiceAction(serviceId: string): Promise<ActionResponse<any>> {
+    try {
+        await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+        const user = await requireUser()
+        if (!user) return errorResponse("Não autenticado")
+
+        const admin = getAdminClient()
+        const { data: existing, error: fetchError } = await admin.from("services").select("partner_id, sku, name").eq("id", serviceId).single()
+        if (fetchError || !existing) return errorResponse("Serviço não encontrado")
+
+        await requirePermission(existing.partner_id, "services", "edit", user)
+
+        const limitCheck = await checkLimit(existing.partner_id, "services")
+        if (!limitCheck.allowed) {
+            return errorResponse(limitCheck.message || "Limite de serviços do seu plano atingido. Faça upgrade para reativar este item.")
+        }
+
+        const payload = buildRestorePayload("ativo")
+        const { error } = await admin.from("services").update(payload).eq("id", serviceId)
+        if (error) return errorResponse(error.message)
+
+        const reqHeaders = await headers()
+        const ip = reqHeaders.get("x-forwarded-for") || "127.0.0.1"
+
+        await logAuditEvent({
+            partnerId: existing.partner_id,
+            actorUserId: user.id,
+            entityType: "service",
+            entityId: serviceId,
+            actionType: "updated",
+            changeLines: [`Desarquivou/Reativou o serviço: ${existing.name} (SKU: ${existing.sku || 'N/A'})`],
+            metadata: { ip_address: ip, name: existing.name, sku: existing.sku },
             source: "manual"
         })
 

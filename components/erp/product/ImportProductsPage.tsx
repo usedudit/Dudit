@@ -511,7 +511,7 @@ export function ImportProductsPage({ partnerId }: ImportProductsPageProps) {
                                 <div className="flex-none mb-6">
                                     <ProductPageControls
                                         activeTab={activeTab}
-                                        setActiveTab={setActiveTab}
+                                        setActiveTab={(tab) => setActiveTab(tab as any)}
                                         search={search}
                                         onSearchChange={setSearch}
                                         viewMode={viewMode}

@@ -8,6 +8,7 @@ export interface SoftDeletePayload {
   deleted_by: string
   deleted_reason: string | null
   status: string
+  is_active?: boolean
 }
 
 export interface RestorePayload {
@@ -15,6 +16,15 @@ export interface RestorePayload {
   deleted_by: null
   deleted_reason: null
   status: string
+  is_active?: boolean
+}
+
+export interface ArchivePayload {
+  deleted_at: null
+  deleted_by: null
+  deleted_reason: null
+  status: string
+  is_active: boolean
 }
 
 /**
@@ -26,19 +36,18 @@ export function scopeActiveOnly<T extends { is: (col: string, val: null) => any 
 }
 
 /**
- * Scopes a query to only return archived (deleted) records.
- * Equivalent to appending: WHERE deleted_at IS NOT NULL
+ * Scopes a query to only return archived (plan-archived or manually archived) records.
+ * Equivalent to appending: WHERE deleted_at IS NULL AND status IN ('archived', 'arquivado')
  */
-export function scopeArchivedOnly<T extends { not: (col: string, operator: string, val: null) => any }>(query: T): T {
-  return query.not("deleted_at", "is", null)
+export function scopeArchivedOnly<T extends { is: (col: string, val: null) => any; in: (col: string, vals: string[]) => any }>(query: T): T {
+  return query.is("deleted_at", null).in("status", ["archived", "arquivado"])
 }
 
 /**
- * Scopes a query to include all records, including archived (deleted) ones.
- * Used explicitly for readability.
+ * Scopes a query to include all non-deleted records, including archived ones.
  */
-export function scopeWithArchived<T>(query: T): T {
-  return query
+export function scopeWithArchived<T extends { is: (col: string, val: null) => any }>(query: T): T {
+  return query.is("deleted_at", null)
 }
 
 /**
@@ -49,18 +58,33 @@ export function buildSoftDeletePayload(userId: string, reason?: string | null): 
     deleted_at: new Date().toISOString(),
     deleted_by: userId,
     deleted_reason: reason || null,
-    status: "archived",
+    status: "deleted",
+    is_active: false,
   }
 }
 
 /**
  * Helper to build a standardized restore payload.
  */
-export function buildRestorePayload(): RestorePayload {
+export function buildRestorePayload(status: "ativo" | "active" = "ativo"): RestorePayload {
   return {
     deleted_at: null,
     deleted_by: null,
     deleted_reason: null,
-    status: "active",
+    status,
+    is_active: true,
+  }
+}
+
+/**
+ * Helper to build a standardized archive payload (plan limits or manual archive).
+ */
+export function buildArchivePayload(status: "arquivado" | "archived" = "arquivado"): ArchivePayload {
+  return {
+    deleted_at: null,
+    deleted_by: null,
+    deleted_reason: null,
+    status,
+    is_active: false,
   }
 }

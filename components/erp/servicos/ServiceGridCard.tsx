@@ -12,6 +12,8 @@ interface ServiceGridCardProps {
     onSelect: () => void
     onEdit: () => void
     onDelete: () => void
+    onArchive?: () => void
+    onUnarchive?: () => void
     onDuplicate: () => void
     onDetails: () => void
     onShare: () => void
@@ -28,6 +30,8 @@ const ServiceGridCard = React.memo(
         onSelect,
         onEdit,
         onDelete,
+        onArchive,
+        onUnarchive,
         onDuplicate,
         onDetails,
         onShare,
@@ -79,12 +83,17 @@ const ServiceGridCard = React.memo(
                                 >
                                     <span className="truncate">{service.name}</span>
                                 </h3>
-                                <Tooltip text={service.is_active ? "Status: Ativo" : "Status: Inativo"}>
-                                    <Badge
-                                        variant={service.is_active ? "green" : "red"}
-                                        className="whitespace-nowrap scale-90 shrink-0"
-                                    />
-                                </Tooltip>
+                                {(() => {
+                                    const isArchived = service.status === "arquivado" || service.status === "archived"
+                                    return (
+                                        <Tooltip text={isArchived ? "Status: Arquivado" : service.is_active ? "Status: Ativo" : "Status: Inativo"}>
+                                            <Badge
+                                                variant={isArchived ? "orange" : service.is_active ? "green" : "red"}
+                                                className="whitespace-nowrap scale-90 shrink-0"
+                                            />
+                                        </Tooltip>
+                                    )
+                                })()}
                             </div>
 
                             {/* Checkbox com stopPropagation para não abrir os detalhes ao clicar */}
@@ -141,12 +150,19 @@ const ServiceGridCard = React.memo(
                             className="shrink-0"
                             onClick={(e) => e.stopPropagation()}
                         >
-                            <ActionsDropdown
-                                onEdit={onEdit}
-                                onDuplicate={onDuplicate}
-                                onDelete={onDelete}
-                                onShare={onShare}
-                            />
+                            {(() => {
+                                const isArchived = service.status === "arquivado" || service.status === "archived"
+                                return (
+                                    <ActionsDropdown
+                                        onEdit={onEdit}
+                                        onDuplicate={onDuplicate}
+                                        onDelete={onDelete}
+                                        onArchive={!isArchived ? onArchive : undefined}
+                                        onUnarchive={isArchived ? onUnarchive : undefined}
+                                        onShare={onShare}
+                                    />
+                                )
+                            })()}
                         </div>
                     </div>
                 </div>

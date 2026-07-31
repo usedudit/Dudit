@@ -22,7 +22,7 @@ import CustomerGridCard from "./CustomerGridCard"
 import CustomerPageControls from "./CustomerPageControls"
 import CustomerDetailPage from "./CustomerDetailPage"
 import NewCustomerPage from "./NewCustomerPage"
-import { deleteCustomersInBatchAction, toggleCustomersStatusAction } from "@/app/actions/erp/customers"
+import { deleteCustomersInBatchAction, toggleCustomersStatusAction, archiveCustomerAction, unarchiveCustomerAction } from "@/app/actions/erp/customers"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { formatCurrency, formatDate } from "@/lib/utils"
 
@@ -113,7 +113,7 @@ export default function CustomersPage({
         initialNextCursor,
         initialHasMore,
         fetchPageFn: async ({ cursor }) => {
-            const res = await getERPCustomersPageAction(partnerId, { cursor, limit: 100 })
+            const res = await getERPCustomersPageAction(partnerId, { cursor, limit: 100, filters: { includeArchived: true } })
             if (!res.success) throw new Error(res.error || "Erro ao carregar clientes.")
             return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
         },
@@ -142,7 +142,7 @@ export default function CustomersPage({
     }, [closeEntity])
 
     // ── UI State (non-URL) ────────────────────────────────────────────
-    const [activeTab, setActiveTab] = useState<"Todos" | "Ativo" | "Inativo" | "Bloqueado">("Todos")
+    const [activeTab, setActiveTab] = useState<"Todos" | "Ativo" | "Inativo" | "Bloqueado" | "Arquivado">("Todos")
     const [viewMode, setViewModeState] = useState<"list" | "grid">(isMobile ? "grid" : "list")
     const effectiveViewMode = isTablet ? "grid" : viewMode
     const [page, setPage] = useState(1)
@@ -228,12 +228,17 @@ export default function CustomersPage({
                 return nameMatch || emailMatch || phoneMatch
             })
             .filter((c: any) => {
-                const statusLabel = c.status === 'bloqueado' ? "Bloqueado" : (c.status === 'inativo' ? "Inativo" : "Ativo")
+                const isArchived = c.status === "arquivado" || c.status === "archived"
+                const statusLabel = isArchived ? "Arquivado" : (c.status === 'bloqueado' ? "Bloqueado" : (c.status === 'inativo' ? "Inativo" : "Ativo"))
 
                 let tabMatch = true
-                if (activeTab === "Ativo") tabMatch = statusLabel === "Ativo"
-                else if (activeTab === "Inativo") tabMatch = statusLabel === "Inativo"
-                else if (activeTab === "Bloqueado") tabMatch = statusLabel === "Bloqueado"
+                if (activeTab === "Arquivado") tabMatch = isArchived
+                else {
+                    if (isArchived) tabMatch = false
+                    else if (activeTab === "Ativo") tabMatch = statusLabel === "Ativo"
+                    else if (activeTab === "Inativo") tabMatch = statusLabel === "Inativo"
+                    else if (activeTab === "Bloqueado") tabMatch = statusLabel === "Bloqueado"
+                }
 
                 const filterMatch = filters.status.length === 0 || filters.status.includes(statusLabel)
 
@@ -329,15 +334,20 @@ export default function CustomersPage({
     const hasCustomers = (rawCustomers?.length || 0) > 0
 
     const tabCounts = useMemo(() => {
-        if (!rawCustomers) return { Todos: 0, Ativo: 0, Inativo: 0, Bloqueado: 0 }
-        let Todos = rawCustomers.length, Ativo = 0, Inativo = 0, Bloqueado = 0
+        if (!rawCustomers) return { Todos: 0, Ativo: 0, Inativo: 0, Bloqueado: 0, Arquivado: 0 }
+        let Ativo = 0, Inativo = 0, Bloqueado = 0, Arquivado = 0, TodosActive = 0
         for (const c of rawCustomers) {
             const status = (c as any).status
+            if (status === "arquivado" || status === "archived") {
+                Arquivado++
+                continue
+            }
+            TodosActive++
             if (status === "bloqueado") Bloqueado++
             else if (status === "inativo") Inativo++
             else Ativo++
         }
-        return { Todos, Ativo, Inativo, Bloqueado }
+        return { Todos: TodosActive, Ativo, Inativo, Bloqueado, Arquivado }
     }, [rawCustomers])
 
     const handleExport = useCallback(() => {
@@ -358,6 +368,42 @@ export default function CustomersPage({
     const handleEditCustomer = (customer: any) => openEntity('edit', customer.originalId || customer.id)
     const handleDetailsCustomer = (customer: any) => openEntity('view', customer.originalId || customer.id)
     const handleDeleteCustomer = (customer: any) => setCustomerToDelete(customer)
+
+    const handleArchiveCustomer = async (customer: any) => {
+        try {
+            setIsDeletingCustomer(true)
+            const idToArchive = customer.originalId || customer.id
+            const res = await archiveCustomerAction(idToArchive)
+            if (res.error) {
+                toast({ title: "Erro ao arquivar", description: res.error, variant: "destructive" })
+            } else {
+                toast({ title: "Cliente arquivado com sucesso." })
+                afterMutation()
+            }
+        } catch (e: any) {
+            toast({ title: "Erro", description: e.message || "Erro ao arquivar", variant: "destructive" })
+        } finally {
+            setIsDeletingCustomer(false)
+        }
+    }
+
+    const handleUnarchiveCustomer = async (customer: any) => {
+        try {
+            setIsDeletingCustomer(true)
+            const idToUnarchive = customer.originalId || customer.id
+            const res = await unarchiveCustomerAction(idToUnarchive)
+            if (res.error) {
+                toast({ title: "Erro ao desarquivar", description: res.error, variant: "destructive" })
+            } else {
+                toast({ title: "Cliente reativado com sucesso." })
+                afterMutation()
+            }
+        } catch (e: any) {
+            toast({ title: "Erro", description: e.message || "Erro ao desarquivar", variant: "destructive" })
+        } finally {
+            setIsDeletingCustomer(false)
+        }
+    }
     const handleSelectRow = (id: string) => {
         setSelection((p) => {
             const s = new Set(p.ids)
@@ -575,6 +621,8 @@ export default function CustomersPage({
                                                                 onDetails={() => handleDetailsCustomer(c)}
                                                                 onEdit={() => handleEditCustomer(c)}
                                                                 onDelete={() => handleDeleteCustomer(c)}
+                                                                onArchive={() => handleArchiveCustomer(c)}
+                                                                onUnarchive={() => handleUnarchiveCustomer(c)}
                                                                 onPrefetchMouseEnter={prefetch.onMouseEnter}
                                                                 onPrefetchMouseLeave={prefetch.onMouseLeave}
                                                                 onPrefetchTouchStart={prefetch.onTouchStart}
@@ -648,6 +696,8 @@ export default function CustomersPage({
                                                                             onSelect={handleSelectRow}
                                                                             onEdit={handleEditCustomer}
                                                                             onDelete={handleDeleteCustomer}
+                                                                            onArchive={handleArchiveCustomer}
+                                                                            onUnarchive={handleUnarchiveCustomer}
                                                                             onDetails={handleDetailsCustomer}
                                                                             onPrefetchMouseEnter={prefetch.onMouseEnter}
                                                                             onPrefetchMouseLeave={prefetch.onMouseLeave}

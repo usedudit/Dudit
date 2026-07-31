@@ -33,8 +33,8 @@ interface FilterState {
 }
 
 interface ServicePageControlsProps {
-    activeTab: "all" | "active" | "inactive"
-    setActiveTab: (tab: "all" | "active" | "inactive") => void
+    activeTab: "all" | "active" | "inactive" | "archived"
+    setActiveTab: (tab: "all" | "active" | "inactive" | "archived") => void
     search: string
     onSearchChange: (value: string) => void
     onOpenFilter: () => void
@@ -46,7 +46,7 @@ interface ServicePageControlsProps {
     viewMode: "list" | "grid"
     onViewModeChange: (mode: "list" | "grid") => void
     hasActiveFilters: boolean
-    tabCounts?: { all: number; active: number; inactive: number }
+    tabCounts?: { all: number; active: number; inactive: number; archived: number }
 }
 
 const ServicePageControls: React.FC<ServicePageControlsProps> = ({
@@ -81,11 +81,11 @@ const ServicePageControls: React.FC<ServicePageControlsProps> = ({
         checkFilterScroll()
         window.addEventListener("resize", checkFilterScroll)
         return () => window.removeEventListener("resize", checkFilterScroll)
-    }, [checkFilterScroll, filters])
+    }, [checkFilterScroll])
 
     const renderGroupedBadge = (label: string, items: string[], key: string, icon?: any) => {
         if (!items || items.length === 0) return null
-        const displayValue = items.length <= 3 ? items.join(", ") : `${items.slice(0, 3).join(", ")}...`
+        const displayValue = items.length === 1 ? items[0] : `${items[0]} +${items.length - 1}`
         const fullValue = items.join(", ")
 
         return (
@@ -95,7 +95,8 @@ const ServicePageControls: React.FC<ServicePageControlsProps> = ({
                 icon={icon}
                 value={displayValue}
                 tooltip={`${label}: ${fullValue}`}
-                onRemove={() => setFilters((prev: FilterState): FilterState => ({ ...prev, [key]: [] }))}
+                // @ts-ignore
+                onRemove={() => setFilters((prev) => ({ ...prev, [key]: [] }))}
             />
         )
     }
@@ -144,7 +145,7 @@ const ServicePageControls: React.FC<ServicePageControlsProps> = ({
             <div className="mb-6 px-4 md:px-8">
                 <Tabs
                     value={activeTab}
-                    onValueChange={(val) => setActiveTab(val as "all" | "active" | "inactive")}
+                    onValueChange={(val) => setActiveTab(val as "all" | "active" | "inactive" | "archived")}
                 >
                     <TabsList className="px-0">
                         <TabsTrigger value="all" icon={PackageIcon} badge={tabCounts && <TabCountBadge count={tabCounts.all} variant="gray" />}>
@@ -155,6 +156,9 @@ const ServicePageControls: React.FC<ServicePageControlsProps> = ({
                         </TabsTrigger>
                         <TabsTrigger value="inactive" icon={InfoIcon} badge={tabCounts && <TabCountBadge count={tabCounts.inactive} variant="gray" />}>
                             Inativos
+                        </TabsTrigger>
+                        <TabsTrigger value="archived" icon={InfoIcon} badge={tabCounts && <TabCountBadge count={tabCounts.archived} variant="orange" />}>
+                            Arquivados
                         </TabsTrigger>
                     </TabsList>
                 </Tabs>

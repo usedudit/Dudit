@@ -13,6 +13,7 @@ import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { useEntityPage } from "@/hooks/use-entity-page"
 import { usePermissions } from "@/lib/permission-context"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
+import { getNextPlanTarget, isPlanLimitReachedError } from "@/lib/subscription/limit-upgrade"
 import { useErpExport } from "@/hooks/use-erp-export"
 import ExportSelectionModal from "@/components/erp/export/ExportSelectionModal"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
@@ -20,6 +21,8 @@ import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSh
 // Actions
 import {
     deleteServiceAction,
+    archiveServiceAction,
+    unarchiveServiceAction,
     deleteServicesInBatchAction,
     toggleServicesStatusAction,
     batchUpdateServicesAction,
@@ -179,7 +182,7 @@ export default function ServicesPage({
         initialNextCursor,
         initialHasMore,
         fetchPageFn: async ({ cursor }) => {
-            const res = await getERPServicesPageAction(partnerId, { cursor, limit: 100, storeId: storeId || undefined })
+            const res = await getERPServicesPageAction(partnerId, { cursor, limit: 100, storeId: storeId || undefined, filters: { includeArchived: true } })
             if (!res.success) throw new Error(res.error || "Erro ao carregar serviços.")
             return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
         },
@@ -262,7 +265,7 @@ export default function ServicesPage({
     const [viewMode, setViewModeState] = useState<"list" | "grid">(isMobile ? "grid" : "list")
     const [scrollState, setScrollState] = useState({ left: false, right: false })
     const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
-    const [activeTab, setActiveTab] = useState<"all" | "active" | "inactive">("all")
+    const [activeTab, setActiveTab] = useState<"all" | "active" | "inactive" | "archived">("all")
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null)
     const [bulkEditModal, setBulkEditModal] = useState({ isOpen: false })
     const [confirmations, setConfirmations] = useState({
@@ -297,7 +300,7 @@ export default function ServicesPage({
         const hasDuration = services.some((s) => s.duration_minutes !== null && s.duration_minutes !== undefined && s.duration_minutes > 0)
 
         const sections: FilterSectionConfig[] = [
-            { id: "status", title: "Status", type: "checkbox-list", options: ["Ativo", "Inativo"] },
+            { id: "status", title: "Status", type: "checkbox-list", options: ["Ativo", "Inativo", "Arquivado"] },
             { id: "priceRange", title: "Preço", type: "range", rangeConfig: { minKey: "minPrice", maxKey: "maxPrice" } },
         ]
 
@@ -312,13 +315,18 @@ export default function ServicesPage({
     const [modals, setModals] = useState({ filter: false })
 
     const tabCounts = useMemo(() => {
-        const all = services.length
-        let active = 0, inactive = 0
+        let active = 0, inactive = 0, archived = 0, allActive = 0
         for (const s of services) {
+            const isArchived = s.status === "arquivado" || s.status === "archived"
+            if (isArchived) {
+                archived++
+                continue
+            }
+            allActive++
             if (s.is_active) active++
             else inactive++
         }
-        return { all, active, inactive }
+        return { all: allActive, active, inactive, archived }
     }, [services])
 
     const handleExport = useCallback(() => {
@@ -365,11 +373,18 @@ export default function ServicesPage({
             const minDuration = filters.durationRange.min ? Number.parseFloat(filters.durationRange.min) : 0
             const maxDuration = filters.durationRange.max ? Number.parseFloat(filters.durationRange.max) : Number.POSITIVE_INFINITY
 
-            let tabMatch = true
-            if (activeTab === "active") tabMatch = s.is_active === true
-            else if (activeTab === "inactive") tabMatch = s.is_active === false
+            const isArchived = s.status === "arquivado" || s.status === "archived"
 
-            const statusLabel = s.is_active ? "Ativo" : "Inativo"
+            let tabMatch = true
+            if (activeTab === "archived") {
+                tabMatch = isArchived
+            } else {
+                if (isArchived) tabMatch = false
+                else if (activeTab === "active") tabMatch = s.is_active === true
+                else if (activeTab === "inactive") tabMatch = s.is_active === false
+            }
+
+            const statusLabel = isArchived ? "Arquivado" : s.is_active ? "Ativo" : "Inativo"
             const statusMatch = filters.status.length === 0 || filters.status.includes(statusLabel)
 
             const categoryMatch = filters.categories.length === 0 || filters.categories.includes((s.service_categories?.name || "") as any)
@@ -477,6 +492,46 @@ export default function ServicesPage({
                 })
             }
             setConfirmations((p) => ({ ...p, delete: false }))
+        }
+    }
+
+    const handleArchiveService = async (service: any) => {
+        try {
+            setActionModal({ open: true, text: "Arquivando serviço..." })
+            const res = await archiveServiceAction(service.id)
+            if (!res.success) {
+                toast({ title: "Erro ao arquivar", description: (res as any).error, variant: "destructive" })
+            } else {
+                toast({ title: "Serviço arquivado" })
+                afterMutation()
+            }
+        } catch (e: any) {
+            toast({ title: "Erro", description: e.message || "Erro ao arquivar", variant: "destructive" })
+        } finally {
+            setActionModal({ open: false, text: "" })
+        }
+    }
+
+    const handleUnarchiveService = async (service: any) => {
+        try {
+            setActionModal({ open: true, text: "Desarquivando serviço..." })
+            const res = await unarchiveServiceAction(service.id)
+            if (!res.success) {
+                const errStr = (res as any).error
+                if (isPlanLimitReachedError(errStr)) {
+                    const target = getNextPlanTarget(planSlug)
+                    if (target) openPlanUpgrade(target)
+                } else {
+                    toast({ title: "Erro ao desarquivar", description: errStr, variant: "destructive" })
+                }
+            } else {
+                toast({ title: "Serviço reativado" })
+                afterMutation()
+            }
+        } catch (e: any) {
+            toast({ title: "Erro", description: e.message || "Erro ao desarquivar", variant: "destructive" })
+        } finally {
+            setActionModal({ open: false, text: "" })
         }
     }
 
@@ -752,6 +807,8 @@ export default function ServicesPage({
                                                                     onEdit={() => handleEditService(service)}
                                                                     onDuplicate={() => handleDuplicateService(service)}
                                                                     onDelete={() => handleDeleteService(service)}
+                                                                    onArchive={() => handleArchiveService(service)}
+                                                                    onUnarchive={() => handleUnarchiveService(service)}
                                                                     onDetails={() => handleDetailsService(service)}
                                                                     onShare={() => setSharingService(service)}
                                                                     onPrefetchMouseEnter={prefetch.onMouseEnter}
@@ -827,6 +884,8 @@ export default function ServicesPage({
                                                                                 onEdit={handleEditService}
                                                                                 onDuplicate={handleDuplicateService}
                                                                                 onDelete={handleDeleteService}
+                                                                                onArchive={handleArchiveService}
+                                                                                onUnarchive={handleUnarchiveService}
                                                                                 onDetails={handleDetailsService}
                                                                                 onShare={(srv) => setSharingService(srv)}
                                                                                 onPrefetchMouseEnter={prefetch.onMouseEnter}

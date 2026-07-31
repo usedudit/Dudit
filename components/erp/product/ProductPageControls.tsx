@@ -41,8 +41,8 @@ interface FilterState {
 }
 
 interface ProductPageControlsProps {
-    activeTab: "all" | "normal" | "low" | "out_of_stock"
-    setActiveTab: (tab: "all" | "normal" | "low" | "out_of_stock") => void
+    activeTab: "all" | "normal" | "low" | "out_of_stock" | "archived"
+    setActiveTab: (tab: "all" | "normal" | "low" | "out_of_stock" | "archived") => void
     search: string
     onSearchChange: (value: string) => void
     onOpenFilter: () => void
@@ -58,7 +58,7 @@ interface ProductPageControlsProps {
     onOpenCamera?: () => void
     onOpenReplenishment?: () => void
     hasEscalarPlan?: boolean
-    tabCounts?: { all: number; normal: number; low: number; out_of_stock: number }
+    tabCounts?: { all: number; normal: number; low: number; out_of_stock: number; archived: number }
 }
 
 const ProductPageControls: React.FC<ProductPageControlsProps> = ({
@@ -195,7 +195,7 @@ const ProductPageControls: React.FC<ProductPageControlsProps> = ({
             <div className="mb-6 px-4 md:px-8">
                 <Tabs
                     value={activeTab}
-                    onValueChange={(val) => setActiveTab(val as "all" | "normal" | "low" | "out_of_stock")}
+                    onValueChange={(val) => setActiveTab(val as "all" | "normal" | "low" | "out_of_stock" | "archived")}
                 >
                     <TabsList className="px-0">
                         <TabsTrigger value="all" icon={PackageIcon} badge={tabCounts && <TabCountBadge count={tabCounts.all} variant="gray" />}>
@@ -209,6 +209,9 @@ const ProductPageControls: React.FC<ProductPageControlsProps> = ({
                         </TabsTrigger>
                         <TabsTrigger value="out_of_stock" icon={OutProductsIcon} badge={tabCounts && <TabCountBadge count={tabCounts.out_of_stock} variant="red" />}>
                             Esgotado
+                        </TabsTrigger>
+                        <TabsTrigger value="archived" icon={BoxIcon} badge={tabCounts && <TabCountBadge count={tabCounts.archived} variant="orange" />}>
+                            Arquivados
                         </TabsTrigger>
                     </TabsList>
                 </Tabs>

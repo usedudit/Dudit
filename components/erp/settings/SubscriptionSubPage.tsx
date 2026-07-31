@@ -830,7 +830,7 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
                             <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-xs text-amber-700 dark:text-amber-300">
                                 <AlertTriangleIcon size={14} className="shrink-0 mt-0.5" />
                                 <span>
-                                    Recursos exclusivos do plano atual podem ficar indisponíveis após o downgrade. Verifique se seus dados estão dentro dos limites do novo plano.
+                                    Recursos exclusivos do plano atual podem ficar indisponíveis após o downgrade. Produtos, serviços e clientes que excederem os limites do novo plano serão arquivados (nunca excluídos) e você poderá reativá-los a qualquer momento.
                                 </span>
                             </div>
                         </div>

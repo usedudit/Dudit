@@ -113,10 +113,10 @@ const StockMovementPageControls: React.FC<StockMovementPageControlsProps> = ({
                         <TabsTrigger value="all" icon={ArrowUpDownIcon} badge={tabCounts && <TabCountBadge count={tabCounts.all} variant="gray" />}>
                             Todas
                         </TabsTrigger>
-                        <TabsTrigger value="in" icon={ArrowUpIcon} badge={tabCounts && <TabCountBadge count={tabCounts.in} variant="green" />}>
+                        <TabsTrigger value="in" icon={ArrowDownIcon} badge={tabCounts && <TabCountBadge count={tabCounts.in} variant="green" />}>
                             Entradas
                         </TabsTrigger>
-                        <TabsTrigger value="out" icon={ArrowDownIcon} badge={tabCounts && <TabCountBadge count={tabCounts.out} variant="red" />}>
+                        <TabsTrigger value="out" icon={ArrowUpIcon} badge={tabCounts && <TabCountBadge count={tabCounts.out} variant="red" />}>
                             Saídas
                         </TabsTrigger>
                     </TabsList>

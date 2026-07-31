@@ -25,7 +25,7 @@ import { checkLimit, canUseFeature, increment_usage_counter, decrement_usage_cou
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import { EMPTY_VIDEO_METADATA, normalizeVideoMetadata, type VideoType } from "@/lib/video/shared"
 import { ALLOWED_VIDEO_MIME_TYPES, MAX_FILE_SIZE, MAX_VIDEO_FILE_SIZE } from "@/lib/r2/config"
-import { buildSoftDeletePayload, buildRestorePayload, scopeActiveOnly } from "@/lib/supabase/query-helpers"
+import { buildSoftDeletePayload, buildRestorePayload, buildArchivePayload, scopeActiveOnly, scopeArchivedOnly } from "@/lib/supabase/query-helpers"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { headers } from "next/headers"
 
@@ -215,7 +215,7 @@ export async function deleteProductAction(productId: string, reason?: string | n
             entityType: "product",
             entityId: productId,
             actionType: "deleted",
-            changeLines: [`Arquivou o produto: ${product.name} (SKU: ${product.sku || 'N/A'})`],
+            changeLines: [`Deletou o produto: ${product.name} (SKU: ${product.sku || 'N/A'})`],
             metadata: {
                 ip_address: ip,
                 deleted_reason: reason || "Nenhum motivo informado",
@@ -241,7 +241,7 @@ export async function restoreProductAction(productId: string) {
         const admin = getAdminClient()
 
         // 1. Explicit restore update
-        const payload = buildRestorePayload()
+        const payload = buildRestorePayload("ativo")
         const restoreResult = await admin.from("products").update(payload).eq("id", productId)
         if (restoreResult.error) return { error: restoreResult.error.message }
 
@@ -273,6 +273,73 @@ export async function restoreProductAction(productId: string) {
     }
 }
 
+export async function archiveProductAction(productId: string) {
+    try {
+        const product = await fetchProductAndVerifyOwnership(productId, "edit", "id, partner_id, sku, name")
+        const user = await requireUser()
+        const admin = getAdminClient()
+
+        const payload = buildArchivePayload("arquivado")
+        const { error } = await admin.from("products").update(payload).eq("id", productId)
+        if (error) return { error: error.message }
+
+        const reqHeaders = await headers()
+        const ip = reqHeaders.get("x-forwarded-for") || "127.0.0.1"
+
+        await logAuditEvent({
+            partnerId: product.partner_id,
+            actorUserId: user.id,
+            entityType: "product",
+            entityId: productId,
+            actionType: "updated",
+            changeLines: [`Arquivou o produto: ${product.name} (SKU: ${product.sku || 'N/A'})`],
+            metadata: { ip_address: ip, name: product.name, sku: product.sku },
+            source: "manual"
+        })
+
+        await invalidateProductCache(productId, product.partner_id, 'delete')
+        return { success: true }
+    } catch (error: any) {
+        return { error: error.message }
+    }
+}
+
+export async function unarchiveProductAction(productId: string) {
+    try {
+        const product = await fetchProductAndVerifyOwnership(productId, "edit", "id, partner_id, sku, name")
+        const user = await requireUser()
+        const admin = getAdminClient()
+
+        const limitCheck = await checkLimit(product.partner_id, "items")
+        if (!limitCheck.allowed) {
+            return { error: limitCheck.message || "Limite de produtos do seu plano atingido. Faça upgrade para reativar este item." }
+        }
+
+        const payload = buildRestorePayload("ativo")
+        const { error } = await admin.from("products").update(payload).eq("id", productId)
+        if (error) return { error: error.message }
+
+        const reqHeaders = await headers()
+        const ip = reqHeaders.get("x-forwarded-for") || "127.0.0.1"
+
+        await logAuditEvent({
+            partnerId: product.partner_id,
+            actorUserId: user.id,
+            entityType: "product",
+            entityId: productId,
+            actionType: "updated",
+            changeLines: [`Desarquivou/Reativou o produto: ${product.name} (SKU: ${product.sku || 'N/A'})`],
+            metadata: { ip_address: ip, name: product.name, sku: product.sku },
+            source: "manual"
+        })
+
+        await invalidateProductCache(productId, product.partner_id, 'update')
+        return { success: true }
+    } catch (error: any) {
+        return { error: error.message }
+    }
+}
+
 // ============================================================================
 // COMPREHENSIVE ACTIONS (Otimizadas com novos campos)
 // ============================================================================
@@ -285,7 +352,6 @@ export async function createProductComprehensiveAction(data: {
     description?: string
     sku?: string
     gtin?: string
-    barcode?: string
     brand?: string
     category?: string
     categoryId?: string | null
@@ -536,14 +602,8 @@ const productData = {
 
             const productPayload = {
                 ...productData,
-                ncm: fiscalData.ncm,
-                cest: fiscalData.cest,
-                barcode: data.barcode || data.gtin || null,
-                weight: logisticsData.weight_gross,
-                height: logisticsData.height,
-                width: logisticsData.width,
-                length: logisticsData.length,
-                is_active: data.isActive !== false,
+                ...fiscalData,
+                ...logisticsData,
             }
 
             const result = await supabase.rpc(
@@ -2027,14 +2087,16 @@ export async function getERPProductsPageAction(
 
         let q = supabase
             .from("products")
-            .select("id, name, stock_quantity, price, promotional_price, min_stock, is_active, sku, images, unit, created_at, variants:product_variants(count), show_in_marketplace, moderation_status, category_id, category:product_categories!category_id(name), brand_id, brand:brands!brand_id(name)")
+            .select("id, name, stock_quantity, price, promotional_price, min_stock, is_active, status, sku, images, unit, created_at, variants:product_variants(count), show_in_marketplace, moderation_status, category_id, category:product_categories!category_id(name), brand_id, brand:brands!brand_id(name)")
             .eq("partner_id", partnerId)
 
         if (options?.storeId) {
             q = q.eq("store_id", options.storeId)
         }
 
-        if (!options?.filters?.includeArchived) {
+        if (options?.filters?.status === "archived" || options?.filters?.tab === "archived" || options?.filters?.status === "arquivado") {
+            q = scopeArchivedOnly(q)
+        } else if (!options?.filters?.includeArchived) {
             q = scopeActiveOnly(q)
         }
 

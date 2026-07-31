@@ -7,7 +7,7 @@ import Pagination from '@/components/reusable/Pagination';
 import { useNotification } from '@/hooks/use-notification';
 import { ReviewsSection } from '@/components/marketplace/ReviewsSection';
 import IconPlaceholder from '@/components/reusable/IconPlaceholder';
-import { getCustomerOrdersAction, deleteCustomerAction, getCustomerStoreCreditsAction } from '@/app/actions/erp/customers';
+import { getCustomerOrdersAction, deleteCustomerAction, archiveCustomerAction, unarchiveCustomerAction, getCustomerStoreCreditsAction } from '@/app/actions/erp/customers';
 import { getAddressesAction } from '@/app/actions/shared/addresses';
 import { UserProfileImage } from '@/lib/utils/UserProfileImage';
 import { useMediaQuery } from '../hooks';
@@ -430,6 +430,40 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
         }
     }
 
+    const handleArchive = async () => {
+        try {
+            setIsDeleting(true)
+            const res = await archiveCustomerAction(realCustomerId)
+            if (res?.error) {
+                notifyError("Erro ao arquivar: " + res.error)
+            } else {
+                notifySuccess("Cliente arquivado com sucesso!")
+                onBack()
+            }
+        } catch (e: any) {
+            notifyError("Erro ao arquivar cliente.")
+        } finally {
+            setIsDeleting(false)
+        }
+    }
+
+    const handleUnarchive = async () => {
+        try {
+            setIsDeleting(true)
+            const res = await unarchiveCustomerAction(realCustomerId)
+            if (res?.error) {
+                notifyError("Erro ao desarquivar: " + res.error)
+            } else {
+                notifySuccess("Cliente reativado com sucesso!")
+                onBack()
+            }
+        } catch (e: any) {
+            notifyError("Erro ao desarquivar cliente.")
+        } finally {
+            setIsDeleting(false)
+        }
+    }
+
     return (
         <FadeIn>
             <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
@@ -452,9 +486,14 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                     <div className="flex flex-col gap-1 overflow-hidden min-w-0">
                                         <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
                                             <span className="hidden md:inline truncate">{customer.name}</span>
-                                            <Badge variant={customer.status === 'ativo' ? 'green' : customer.status === 'inativo' ? 'gray' : 'red'} className="whitespace-nowrap scale-90 shrink-0">
-                                                {customer.status === 'ativo' ? 'Ativo' : customer.status === 'inativo' ? 'Inativo' : 'Bloqueado'}
-                                            </Badge>
+                                            {(() => {
+                                                const isArchived = customer.status === "arquivado" || customer.status === "archived"
+                                                return (
+                                                    <Badge variant={isArchived ? "orange" : customer.status === 'ativo' ? 'green' : customer.status === 'inativo' ? 'gray' : 'red'} className="whitespace-nowrap scale-90 shrink-0">
+                                                        {isArchived ? "Arquivado" : customer.status === 'ativo' ? 'Ativo' : customer.status === 'inativo' ? 'Inativo' : 'Bloqueado'}
+                                                    </Badge>
+                                                )
+                                            })()}
                                         </h1>
 
                                         <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
@@ -464,9 +503,16 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
 
                                     {/* Desktop action buttons */}
                                     <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                        <ActionsDropdown
-                                            onDelete={() => setShowDeleteModal(true)}
-                                        />
+                                        {(() => {
+                                            const isArchived = customer.status === "arquivado" || customer.status === "archived"
+                                            return (
+                                                <ActionsDropdown
+                                                    onArchive={!isArchived ? handleArchive : undefined}
+                                                    onUnarchive={isArchived ? handleUnarchive : undefined}
+                                                    onDelete={() => setShowDeleteModal(true)}
+                                                />
+                                            )
+                                        })()}
                                         <Button className='whitespace-nowrap' onClick={() => onEdit?.({ ...customer, originalId: realCustomerId })} leftIcon={<EditIcon size={18} />}>
                                             Editar cliente
                                         </Button>

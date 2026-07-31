@@ -22,6 +22,8 @@ interface ProductListItemProps {
     onEdit: (product: Product) => void
     onDuplicate: (product: Product) => void
     onDelete: (product: Product) => void
+    onArchive?: (product: Product) => void
+    onUnarchive?: (product: Product) => void
     onDetails: (product: Product) => void
     onShare: (product: Product) => void
     suppliers: any[]
@@ -40,6 +42,8 @@ const ProductListItem = React.memo(
         onEdit,
         onDuplicate,
         onDelete,
+        onArchive,
+        onUnarchive,
         onDetails,
         onShare,
         onPrefetchMouseEnter,
@@ -171,14 +175,17 @@ const ProductListItem = React.memo(
                         </div>
                     )
 
-                case "status":
+                case "status": {
+                    const isArchived = product.status === "arquivado" || product.status === "archived"
                     return (
-                        <Badge variant={product.is_active ? "green" : "red"}>
-                            {product.is_active ? "Ativo" : "Inativo"}
+                        <Badge variant={isArchived ? "orange" : product.is_active ? "green" : "red"}>
+                            {isArchived ? "Arquivado" : product.is_active ? "Ativo" : "Inativo"}
                         </Badge>
                     )
+                }
 
-                case "actions":
+                case "actions": {
+                    const isArchived = product.status === "arquivado" || product.status === "archived"
                     return (
                         <div
                             className="flex justify-center action-btn"
@@ -188,10 +195,13 @@ const ProductListItem = React.memo(
                                 onEdit={() => onEdit(product)}
                                 onDuplicate={() => onDuplicate(product)}
                                 onDelete={() => onDelete(product)}
+                                onArchive={!isArchived && onArchive ? () => onArchive(product) : undefined}
+                                onUnarchive={isArchived && onUnarchive ? () => onUnarchive(product) : undefined}
                                 onShare={() => onShare(product)}
                             />
                         </div>
                     )
+                }
 
                 default:
                     return null

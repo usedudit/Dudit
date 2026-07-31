@@ -14,6 +14,8 @@ interface ProductGridCardProps {
     onSelect: () => void
     onEdit: () => void
     onDelete: () => void
+    onArchive?: () => void
+    onUnarchive?: () => void
     onDuplicate: () => void
     onDetails: () => void
     onShare: () => void
@@ -30,6 +32,8 @@ const ProductGridCard = React.memo(
         onSelect,
         onEdit,
         onDelete,
+        onArchive,
+        onUnarchive,
         onDuplicate,
         onDetails,
         onShare,
@@ -86,12 +90,17 @@ const ProductGridCard = React.memo(
                                         </Tooltip>
                                     )}
                                 </h3>
-                                <Tooltip text={product.is_active ? "Ativo" : "Inativo"}>
-                                    <Badge
-                                        variant={product.is_active ? "green" : "red"}
-                                        className="whitespace-nowrap scale-90 shrink-0"
-                                    />
-                                </Tooltip>
+                                {(() => {
+                                    const isArchived = product.status === "arquivado" || product.status === "archived"
+                                    return (
+                                        <Tooltip text={isArchived ? "Arquivado" : product.is_active ? "Ativo" : "Inativo"}>
+                                            <Badge
+                                                variant={isArchived ? "orange" : product.is_active ? "green" : "red"}
+                                                className="whitespace-nowrap scale-90 shrink-0"
+                                            />
+                                        </Tooltip>
+                                    )
+                                })()}
                             </div>
 
                             {/* Checkbox com stopPropagation para não abrir os detalhes ao clicar */}
@@ -200,12 +209,19 @@ const ProductGridCard = React.memo(
                             className="shrink-0"
                             onClick={(e) => e.stopPropagation()}
                         >
-                            <ActionsDropdown
-                                onEdit={onEdit}
-                                onDuplicate={onDuplicate}
-                                onDelete={onDelete}
-                                onShare={onShare}
-                            />
+                            {(() => {
+                                const isArchived = product.status === "arquivado" || product.status === "archived"
+                                return (
+                                    <ActionsDropdown
+                                        onEdit={onEdit}
+                                        onDuplicate={onDuplicate}
+                                        onDelete={onDelete}
+                                        onArchive={!isArchived ? onArchive : undefined}
+                                        onUnarchive={isArchived ? onUnarchive : undefined}
+                                        onShare={onShare}
+                                    />
+                                )
+                            })()}
                         </div>
                     </div>
                 </div>

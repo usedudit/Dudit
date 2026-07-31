@@ -23,8 +23,8 @@ interface FilterState {
 }
 
 interface CustomerPageControlsProps {
-    activeTab: "Todos" | "Ativo" | "Inativo" | "Bloqueado"
-    setActiveTab: (tab: "Todos" | "Ativo" | "Inativo" | "Bloqueado") => void
+    activeTab: "Todos" | "Ativo" | "Inativo" | "Bloqueado" | "Arquivado"
+    setActiveTab: (tab: "Todos" | "Ativo" | "Inativo" | "Bloqueado" | "Arquivado") => void
     search: string
     onSearchChange: (value: string) => void
     onOpenFilter: () => void
@@ -35,7 +35,7 @@ interface CustomerPageControlsProps {
     viewMode: "list" | "grid"
     onViewModeChange: (mode: "list" | "grid") => void
     hasActiveFilters: boolean
-    tabCounts?: { Todos: number; Ativo: number; Inativo: number; Bloqueado: number }
+    tabCounts?: { Todos: number; Ativo: number; Inativo: number; Bloqueado: number; Arquivado: number }
 }
 
 const CustomerPageControls: React.FC<CustomerPageControlsProps> = ({
@@ -104,6 +104,9 @@ const CustomerPageControls: React.FC<CustomerPageControlsProps> = ({
                         </TabsTrigger>
                         <TabsTrigger value="Bloqueado" icon={BlockedIcon} badge={tabCounts && <TabCountBadge count={tabCounts.Bloqueado} variant="red" />}>
                             Bloqueados
+                        </TabsTrigger>
+                        <TabsTrigger value="Arquivado" icon={InfoIcon} badge={tabCounts && <TabCountBadge count={tabCounts.Arquivado} variant="orange" />}>
+                            Arquivados
                         </TabsTrigger>
                     </TabsList>
                 </Tabs>

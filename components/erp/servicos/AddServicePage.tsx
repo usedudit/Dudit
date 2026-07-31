@@ -8,7 +8,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { useStore } from "@/lib/store-context"
 import { useSidebar } from "@/lib/sidebar-context"
-import { createServiceAction, updateServiceAction, deleteServiceAction } from "@/app/actions/erp/servicos"
+import { createServiceAction, updateServiceAction, deleteServiceAction, archiveServiceAction, unarchiveServiceAction } from "@/app/actions/erp/servicos"
 import { createServiceCategoryAction, getServiceMetadataAction } from "@/app/actions/erp/service-metadata"
 import { generateSKUBase } from "@/lib/utils/code-generators"
 import { useNotification } from "@/hooks/use-notification"
@@ -480,6 +480,32 @@ export const AddServicePage: FC<AddServicePageProps> = ({
         toast({ title: "Duplicando serviço", description: "Edite e salve o novo serviço." })
     }, [serviceData, setMode, toast])
 
+    const handleArchiveService = useCallback(async () => {
+        if (!serviceData.id) return
+        setIsSavingService(true)
+        const res = await archiveServiceAction(serviceData.id)
+        setIsSavingService(false)
+        if (!res.success) {
+            toast({ title: "Erro ao arquivar", description: (res as any).error, variant: "destructive" })
+        } else {
+            toast({ title: "Serviço arquivado com sucesso." })
+            onClose?.()
+        }
+    }, [serviceData.id, toast, onClose])
+
+    const handleUnarchiveService = useCallback(async () => {
+        if (!serviceData.id) return
+        setIsSavingService(true)
+        const res = await unarchiveServiceAction(serviceData.id)
+        setIsSavingService(false)
+        if (!res.success) {
+            toast({ title: "Erro ao desarquivar", description: (res as any).error, variant: "destructive" })
+        } else {
+            toast({ title: "Serviço desarquivado e reativado." })
+            onClose?.()
+        }
+    }, [serviceData.id, toast, onClose])
+
     const dateCreated = serviceData.created_at ? new Date(serviceData.created_at).toLocaleDateString("pt-BR") : "N/A"
     const enterEditMode = useCallback(() => { setInternalMode("edit"); setMode("edit") }, [setMode])
 
@@ -540,11 +566,18 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                                             </>
                                         ) : (
                                             <>
-                                                <ActionsDropdown
-                                                    onDuplicate={handleDuplicateService}
-                                                    onShare={() => setShowShareModal(true)}
-                                                    onDelete={() => setShowDeleteModal(true)}
-                                                />
+                                                {(() => {
+                                                    const isArchived = serviceData.status === "arquivado" || serviceData.status === "archived"
+                                                    return (
+                                                        <ActionsDropdown
+                                                            onDuplicate={handleDuplicateService}
+                                                            onShare={() => setShowShareModal(true)}
+                                                            onArchive={!isArchived ? handleArchiveService : undefined}
+                                                            onUnarchive={isArchived ? handleUnarchiveService : undefined}
+                                                            onDelete={() => setShowDeleteModal(true)}
+                                                        />
+                                                    )
+                                                })()}
                                                 <Button onClick={enterEditMode} className="whitespace-nowrap" disabled={isLoadingDetails} leftIcon={<EditIcon size={18} />}>
                                                     Editar serviço
                                                 </Button>

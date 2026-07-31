@@ -15,6 +15,8 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { sanitizeNotes } from "@/lib/input-validator"
 import { createAddressAction } from "@/app/actions/shared/addresses"
 import { validateCPF, validateCNPJ, validateEmail, validatePhoneBR, validateURL, validateCEP } from "@/lib/input-validator"
+import { buildSoftDeletePayload, buildRestorePayload, buildArchivePayload, scopeActiveOnly, scopeArchivedOnly } from "@/lib/supabase/query-helpers"
+import { checkLimit } from "@/lib/services/subscription.service"
 
 async function prepareEncryptedCpf(
   supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
@@ -286,7 +288,8 @@ export async function deleteCustomerAction(customerId: string, csrf_token?: stri
 
   await requirePermission(partnerId, "customers", "delete", user)
 
-  const { error } = await supabase.from("customers").delete().eq("id", customerId)
+  const payload = buildSoftDeletePayload(user.id)
+  const { error } = await supabase.from("customers").update(payload).eq("id", customerId)
 
   if (error) {
     return { error: error.message }
@@ -295,7 +298,7 @@ export async function deleteCustomerAction(customerId: string, csrf_token?: stri
   revalidateCustomers(partnerId)
   revalidatePath("/erp/customers")
 
-  redirect("/erp/customers")
+  return { success: true }
 }
 
 export async function updateComprehensiveCustomerAction(data: {
@@ -786,10 +789,14 @@ export async function getPartnerCustomersAction(partnerId: string, currentStoreI
 
     const supabase = await getSupabaseServerClient()
 
-    const { data: customers, error } = await supabase
+    let q = supabase
       .from("customers")
       .select("id, name, email, phone, cpf, status, store_credit, created_at, partner_id, person_type, birth_date, image_url")
       .eq("partner_id", partnerId)
+
+    q = scopeActiveOnly(q)
+
+    const { data: customers, error } = await q
       .order("created_at", { ascending: false })
       .limit(500)
 
@@ -842,9 +849,10 @@ export async function deleteCustomersInBatchAction(customerIds: string[]) {
   const partnerId = partnerIds[0]
   await requirePermission(partnerId, "customers", "delete", user)
 
+  const payload = buildSoftDeletePayload(user.id)
   const { error } = await supabase
     .from("customers")
-    .delete()
+    .update(payload)
     .in("id", customerIds)
     .eq("partner_id", partnerId)
 
@@ -853,6 +861,49 @@ export async function deleteCustomersInBatchAction(customerIds: string[]) {
   }
 
   revalidateCustomers(partnerId)
+  revalidatePath("/erp/customers")
+  return { success: true }
+}
+
+export async function archiveCustomerAction(customerId: string) {
+  const user = await requireUser()
+  if (!user) return { error: "Não autenticado" }
+
+  const supabase = await getSupabaseServerClient()
+  const { data: customer } = await supabase.from("customers").select("partner_id, name").eq("id", customerId).single()
+  if (!customer) return { error: "Cliente não encontrado" }
+
+  await requirePermission(customer.partner_id, "customers", "edit", user)
+
+  const payload = buildArchivePayload("arquivado")
+  const { error } = await supabase.from("customers").update(payload).eq("id", customerId)
+  if (error) return { error: error.message }
+
+  revalidateCustomers(customer.partner_id)
+  revalidatePath("/erp/customers")
+  return { success: true }
+}
+
+export async function unarchiveCustomerAction(customerId: string) {
+  const user = await requireUser()
+  if (!user) return { error: "Não autenticado" }
+
+  const supabase = await getSupabaseServerClient()
+  const { data: customer } = await supabase.from("customers").select("partner_id, name").eq("id", customerId).single()
+  if (!customer) return { error: "Cliente não encontrado" }
+
+  await requirePermission(customer.partner_id, "customers", "edit", user)
+
+  const limitCheck = await checkLimit(customer.partner_id, "customers")
+  if (!limitCheck.allowed) {
+    return { error: limitCheck.message || "Limite de clientes do seu plano atingido. Faça upgrade para reativar este cliente." }
+  }
+
+  const payload = buildRestorePayload("ativo")
+  const { error } = await supabase.from("customers").update(payload).eq("id", customerId)
+  if (error) return { error: error.message }
+
+  revalidateCustomers(customer.partner_id)
   revalidatePath("/erp/customers")
   return { success: true }
 }
@@ -910,7 +961,7 @@ const ERP_CUSTOMERS_PAGE_SIZE = 100
 
 export async function getERPCustomersPageAction(
   partnerId: string,
-  options?: { cursor?: ERPCustomerListCursor | null; storeId?: string | null; limit?: number },
+  options?: { cursor?: ERPCustomerListCursor | null; storeId?: string | null; limit?: number; filters?: any },
 ): Promise<
   | { success: true; items: any[]; nextCursor: ERPCustomerListCursor | null; hasMore: boolean }
   | { success: false; error: string }
@@ -925,8 +976,14 @@ export async function getERPCustomersPageAction(
 
     let q = supabase
       .from("customers")
-      .select("id, partner_id, name, email, phone, phone_fixed, status, store_credit, created_at, cpf, person_type, cnpj, birth_date, user_id, image_url")
+      .select("id, partner_id, name, email, phone, phone_fixed, status, is_active, store_credit, created_at, cpf, person_type, cnpj, birth_date, user_id, image_url")
       .eq("partner_id", partnerId)
+
+    if (options?.filters?.status === "archived" || options?.filters?.tab === "archived" || options?.filters?.status === "arquivado") {
+      q = scopeArchivedOnly(q)
+    } else if (!options?.filters?.includeArchived) {
+      q = scopeActiveOnly(q)
+    }
 
     if (cursor) {
       q = q.or(buildCustomersKeysetOrFilter(cursor))

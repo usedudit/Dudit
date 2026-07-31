@@ -9,7 +9,7 @@ import { useNotification } from "@/hooks/use-notification"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { useStore } from "@/lib/store-context"
 import { useSidebar } from "@/lib/sidebar-context"
-import { createProductComprehensiveAction, updateProductComprehensiveAction, deleteProductAction, createProductVariantsBatchAction } from "@/app/actions/erp/products"
+import { createProductComprehensiveAction, updateProductComprehensiveAction, deleteProductAction, archiveProductAction, unarchiveProductAction, createProductVariantsBatchAction } from "@/app/actions/erp/products"
 import { createCategoryAction, createBrandAction, createLocationAction } from "@/app/actions/erp/product-metadata"
 import { generateSKUBase } from "@/lib/utils/code-generators"
 import { useProductMetadata } from "@/lib/product-metadata-context"
@@ -750,6 +750,37 @@ const AddProductPage: FC<AddProductPageProps> = ({
     const handleShareProduct = useCallback(() => {
         setShowShareModal(true)
     }, [])
+
+    const handleArchiveProduct = useCallback(async () => {
+        if (!productData.id) return
+        setIsSavingProduct(true)
+        const res = await archiveProductAction(productData.id)
+        setIsSavingProduct(false)
+        if (res.error) {
+            notifyError(res.error)
+        } else {
+            notifySuccess("Produto arquivado com sucesso.")
+            onClose?.()
+        }
+    }, [productData.id, notifySuccess, notifyError, onClose])
+
+    const handleUnarchiveProduct = useCallback(async () => {
+        if (!productData.id) return
+        setIsSavingProduct(true)
+        const res = await unarchiveProductAction(productData.id)
+        setIsSavingProduct(false)
+        if (res.error) {
+            if (isPlanLimitReachedError(res.error)) {
+                const target = getNextPlanTarget(planSlug)
+                if (target) openPlanUpgrade(target)
+            } else {
+                notifyError(res.error)
+            }
+        } else {
+            notifySuccess("Produto desarquivado e reativado.")
+            onClose?.()
+        }
+    }, [productData.id, planSlug, openPlanUpgrade, notifySuccess, notifyError, onClose])
     const dateCreated = productData.created_at
         ? new Date(productData.created_at).toLocaleDateString("pt-BR")
         : "N/A"
@@ -830,11 +861,18 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                             </>
                                         ) : (
                                             <>
-                                                <ActionsDropdown
-                                                    onDuplicate={handleDuplicateProduct}
-                                                    onShare={handleShareProduct}
-                                                    onDelete={() => setShowDeleteModal(true)}
-                                                />
+                                                {(() => {
+                                                    const isArchived = productData.status === "arquivado" || productData.status === "archived"
+                                                    return (
+                                                        <ActionsDropdown
+                                                            onDuplicate={handleDuplicateProduct}
+                                                            onShare={handleShareProduct}
+                                                            onArchive={!isArchived ? handleArchiveProduct : undefined}
+                                                            onUnarchive={isArchived ? handleUnarchiveProduct : undefined}
+                                                            onDelete={() => setShowDeleteModal(true)}
+                                                        />
+                                                    )
+                                                })()}
                                                 <Button onClick={enterEditMode} className="whitespace-nowrap" leftIcon={<EditIcon size={18} />} disabled={isLoadingDetails}>
                                                     Editar produto
                                                 </Button>

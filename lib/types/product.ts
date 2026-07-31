@@ -12,7 +12,7 @@ export interface Product {
   subcategory: string | null
   subcategory_id: string | null
   is_active: boolean
-  status?: "ativo" | "inativo" | "arquivado" | "excluido"
+  status?: "ativo" | "inativo" | "arquivado" | "excluido" | "active" | "inactive" | "archived" | "deleted"
   sku: string | null
   rating: number
   images: string[] | null
