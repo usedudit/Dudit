@@ -166,8 +166,8 @@ import { normalizePermissions } from "@/lib/permissions/rbac-normalize"
 // We load access by userId using the service role; userId is always resolved from
 // getCurrentUser() outside this scope, so rows cannot cross users.
 
-const getCachedUserAccess = (userId: string) => unstable_cache(
-    async () => {
+const fetchUserAccessStatic = unstable_cache(
+    async (userId: string) => {
         const admin = createAdminClient()
         const template = await getPermissionTemplate()
 
@@ -253,12 +253,14 @@ const getCachedUserAccess = (userId: string) => unstable_cache(
 
         return records
     },
-    [TAGS.userAccess(userId)],
+    ["user-access-records-static"],
     {
-        tags: [TAGS.userAccess(userId)],
+        tags: ["user-access"],
         revalidate: 900 // 15 mins (strictly short TTL)
     }
 );
+
+const getCachedUserAccess = async (userId: string) => fetchUserAccessStatic(userId)
 
 import type { User } from "@supabase/supabase-js"
 
@@ -299,7 +301,7 @@ export const getAllUserPartnerAccess = cache(async (resolvedUser?: any): Promise
     const user = resolvedUser || await getCurrentUser()
     if (!user) return []
 
-    const records = await getCachedUserAccess(user.id)();
+    const records = await getCachedUserAccess(user.id);
     return records;
 })
 

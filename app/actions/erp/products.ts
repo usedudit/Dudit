@@ -1890,69 +1890,70 @@ const fetchVariantAggregates = async (productIds: string[]) => {
     return map
 }
 
-export const getCachedProducts = async (partnerId: string) => {
-    return unstable_cache(
-        async () => {
-            const supabase = getAdminClient()
-            const { data, error } = await supabase
-                .from("products")
-                .select("id, name, stock_quantity, price, promotional_price, min_stock, is_active, sku, images, unit, created_at, variants:product_variants(count), show_in_marketplace, moderation_status, category_id, category:product_categories!category_id(name), brand_id, brand:brands!brand_id(name)")
-                .eq("partner_id", partnerId)
-                .limit(100)
-                .order("created_at", { ascending: false })
-            if (error) throw error
-            const rows = (data || []).map((p: any) => ({
-                ...p,
-                category: p.category?.name || null,
-                brand: p.brand?.name || null
-            }))
-            const withVariants = rows.filter((p: any) => {
-                const count = Array.isArray(p.variants) ? p.variants[0]?.count ?? p.variants.length : 0
-                return count > 0
-            })
-            if (withVariants.length > 0) {
-                const aggregates = await fetchVariantAggregates(withVariants.map((p: any) => p.id))
-                for (const p of rows) {
-                    const agg = aggregates[p.id]
-                    if (agg) {
-                        p.variant_min_price = agg.variant_min_price
-                        p.variant_max_price = agg.variant_max_price
-                        p.variant_total_stock = agg.variant_total_stock
-                    }
+const fetchProductsStatic = unstable_cache(
+    async (partnerId: string) => {
+        const supabase = getAdminClient()
+        const { data, error } = await supabase
+            .from("products")
+            .select("id, name, stock_quantity, price, promotional_price, min_stock, is_active, sku, images, unit, created_at, variants:product_variants(count), show_in_marketplace, moderation_status, category_id, category:product_categories!category_id(name), brand_id, brand:brands!brand_id(name)")
+            .eq("partner_id", partnerId)
+            .limit(100)
+            .order("created_at", { ascending: false })
+        if (error) throw error
+        const rows = (data || []).map((p: any) => ({
+            ...p,
+            category: p.category?.name || null,
+            brand: p.brand?.name || null
+        }))
+        const withVariants = rows.filter((p: any) => {
+            const count = Array.isArray(p.variants) ? p.variants[0]?.count ?? p.variants.length : 0
+            return count > 0
+        })
+        if (withVariants.length > 0) {
+            const aggregates = await fetchVariantAggregates(withVariants.map((p: any) => p.id))
+            for (const p of rows) {
+                const agg = aggregates[p.id]
+                if (agg) {
+                    p.variant_min_price = agg.variant_min_price
+                    p.variant_max_price = agg.variant_max_price
+                    p.variant_total_stock = agg.variant_total_stock
                 }
             }
-            return rows
-        },
-        [TAGS.products(partnerId)],
-        { tags: [TAGS.products(partnerId)] }
-    )()
-}
+        }
+        return rows
+    },
+    ["cached-products-by-partner-id"],
+    { tags: ["products"], revalidate: 300 }
+)
 
-export const getCachedProductById = async (productId: string) => {
-    return unstable_cache(
-        async () => {
-            const supabase = getAdminClient()
-            const { data: product, error } = await supabase
-                .from("products")
-                .select("*, category:product_categories!category_id(name), subcategory:product_categories!subcategory_id(name), brand:brands!brand_id(name), location:storage_locations!location_id(name), variants:product_variants(*)")
-                .eq("id", productId)
-                .single()
-            if (error) throw error
-            if (product) {
-                return {
-                    ...product,
-                    category: product.category?.name || null,
-                    subcategory: product.subcategory?.name || null,
-                    brand: product.brand?.name || null,
-                    location: product.location?.name || null
-                }
+export const getCachedProducts = async (partnerId: string) => fetchProductsStatic(partnerId)
+
+const fetchProductByIdStatic = unstable_cache(
+    async (productId: string) => {
+        const supabase = getAdminClient()
+        const { data: product, error } = await supabase
+            .from("products")
+            .select("*, category:product_categories!category_id(name), subcategory:product_categories!subcategory_id(name), brand:brands!brand_id(name), location:storage_locations!location_id(name), variants:product_variants(*)")
+            .eq("id", productId)
+            .single()
+        if (error) throw error
+        if (product) {
+            return {
+                ...product,
+                category: product.category?.name || null,
+                subcategory: product.subcategory?.name || null,
+                brand: product.brand?.name || null,
+                location: product.location?.name || null
             }
-            return product
-        },
-        [`product-details-${productId}`],
-        { tags: [TAGS.product(productId)] }
-    )()
-}
+        }
+        return product
+    },
+    ["cached-product-by-id-static"],
+    { tags: ["products"], revalidate: 300 }
+)
+
+export const getCachedProductById = async (productId: string) => fetchProductByIdStatic(productId)
+
 
 export async function getProductWithDetailsAction(productId: string) {
     try {
