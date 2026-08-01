@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useRef, useMemo, useCallback, memo } from "react"
-import { HeartIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ShieldIcon, InfoIcon, EditIcon, TagIcon } from "@/lib/icons"
+import { HeartIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ShieldIcon, InfoIcon, EditIcon, TagIcon, ClockIcon, EnergyIcon } from "@/lib/icons"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
@@ -81,11 +81,11 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
             prefetch={false}
             className={`flex flex-col group cursor-pointer active:scale-[0.98] transition-all duration-300 ${className}`}
         >
-            <div className="relative w-full aspect-[16/7] rounded-[16px] overflow-hidden bg-gray-100 mb-3 shrink-0 transition-all duration-300">
+            <div className="relative w-full aspect-[16/7] rounded-[16px] overflow-hidden bg-gray-100 mb-3 shrink-0">
                 <img
                     src={bannerImage}
                     alt={storeName}
-                    className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
+                    className="w-full h-full object-cover"
                     loading="lazy"
                 />
                 <div className="absolute inset-0" />
@@ -104,7 +104,7 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
                         </h3>
                         {showRating && (
                             <div className="flex items-center gap-0.5 shrink-0 ml-0.5">
-                                <StarIcon size={12} className="text-brand-green fill-brand-green" />
+                                <StarIcon size={10} className="text-brand-green fill-brand-green" />
                                 <span className="text-xs font-bold text-brand-dark">{Number(vitrine.rating ?? partner.rating).toFixed(1)}</span>
                             </div>
                         )}
@@ -286,9 +286,10 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
     const rawPartnerImage = partner?.store_avatar || partner?.store_image_url || partner?.profile_image_url || null
     const partnerImageUrl = rawPartnerImage ? getR2ImageUrl(rawPartnerImage) : null
     const partnerId = partner?.id || null
-    const sellerCity = partner?.city || (product.partners as any)?.city || null
-    const sellerState = partner?.state || (product.partners as any)?.state || null
     const sellerName = partner?.store_name || (product.partners as any)?.store_name || 'Vendedor'
+    const sellerCategory = (product as any).category as string | null | undefined
+    const sellerSubcategory = (product as any).subcategoryName as string | null | undefined
+    const sellerLabel = sellerSubcategory || sellerCategory || null
 
     const preloadedPromos = (product as any)._promotions || preloadedPromotions
 
@@ -360,7 +361,7 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
     const badgeLabel = (product as any)._badgeLabel as string | undefined
     const badgeVariant = (product as any)._badgeVariant as string | undefined
     const timeLeft = (product as any)._timeLeft as string | undefined
-    const socialProof = (product as any)._socialProof as string | undefined
+    const salesCount = Number((product as any)._sales ?? (product as any).sales_last_30_days ?? (product as any).sales ?? 0) || 0
 
     return (
         <div className={`relative group/card h-full shrink-0 ${className}`}>
@@ -391,16 +392,31 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
                             </div>
                         )}
                         {timeLeft && (
-                            <Badge variant="orange" icon={null} className="whitespace-nowrap">{timeLeft}</Badge>
+                            <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[10px] font-semibold uppercase text-white shadow-sm tracking-wider whitespace-nowrap bg-[#ffa503]`}>
+                                <EnergyIcon className="w-3 h-3 shrink-0" />
+                                {timeLeft}
+                            </div>
                         )}
                         {badgeLabel && badgeVariant === "green" && (
-                            <Badge variant="green" icon={null} className="whitespace-nowrap">{badgeLabel}</Badge>
+                            <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[10px] font-semibold uppercase text-white shadow-sm tracking-wider whitespace-nowrap bg-brand-dark`}>
+                                {badgeLabel}
+                            </div>
                         )}
                         {badgeLabel && badgeVariant === "purple" && (
-                            <Badge variant="purple" icon={null} className="whitespace-nowrap">{badgeLabel}</Badge>
+                            <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[10px] font-semibold uppercase text-white shadow-sm tracking-wider whitespace-nowrap bg-purple-600`}>
+                                {badgeLabel}
+                            </div>
                         )}
                         {badgeLabel && badgeVariant === "blue" && (
-                            <Badge variant="blue" icon={null} className="whitespace-nowrap">{badgeLabel}</Badge>
+                            <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[10px] font-semibold uppercase text-white shadow-sm tracking-wider whitespace-nowrap bg-[#2968c8]`}>
+                                {badgeLabel}
+                            </div>
+                        )}
+                        {badgeLabel && badgeVariant === "red" && (
+                            <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[10px] font-semibold uppercase text-white shadow-sm tracking-wider whitespace-nowrap bg-[#e11d48]`}>
+                                <ClockIcon className="w-3 h-3 shrink-0" />
+                                {badgeLabel}
+                            </div>
                         )}
                     </div>
                     {itemType !== "plano" && (
@@ -418,9 +434,15 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
                 </div>
 
                 <div className="px-1">
-                    <h3 className="text-sm md:text-[15px] font-normal text-brand-dark line-clamp-2 min-h-[2.5em] mb-1">
+                    <h3 className="text-sm md:text-[15px] font-normal text-brand-dark line-clamp-2 min-h-[2.5em] mb-0.5">
                         {product.name}
                     </h3>
+
+                    {salesCount > 0 && (
+                        <p className="text-[11px] text-brand-inactive-text leading-tight mb-1">
+                            {salesCount} vendidos
+                        </p>
+                    )}
 
                     <div className="flex justify-between items-center">
                         <div className="flex flex-col">
@@ -447,16 +469,10 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
                         {(product.rating ?? 0) > 0 && (
                             <div className="flex items-center gap-0.5">
                                 <StarIcon size={12} className="text-brand-green fill-brand-green" />
-                                <span className="text-[11px] font-bold text-brand-dark">{product.rating}</span>
+                                <span className="text-[11px] font-bold text-brand-dark">{Number(product.rating).toFixed(1)}</span>
                             </div>
                         )}
                     </div>
-
-                    {socialProof && (
-                        <p className="text-[11px] text-brand-inactive-text mt-1 leading-tight truncate">
-                            {socialProof}
-                        </p>
-                    )}
 
                     {showSeller && <div className="border-t border-gray-100 my-2" />}
 
@@ -470,11 +486,13 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
                             <p className="text-[11px] md:text-xs text-brand-dark font-medium truncate leading-tight">
                                 {sellerName}
                             </p>
-                            <p className="text-[11px] text-gray-500 font-normal truncate">
-                                {sellerCity ? `${sellerCity}${sellerState ? ` - ${sellerState}` : ''}` : ''}
-                                {distance && sellerCity ? ' • ' : ''}
-                                {distance}
-                            </p>
+                            {(sellerLabel || distance) && (
+                                <p className="text-[11px] text-gray-500 font-normal truncate">
+                                    {sellerLabel && <span>{sellerLabel}</span>}
+                                    {sellerLabel && distance && <span className="w-1 h-1 rounded-full bg-brand-inactive-text inline-block mx-1 align-middle" />}
+                                    {distance && <span>{distance}</span>}
+                                </p>
+                            )}
                         </div>
                     </div>}
                 </div>
@@ -551,7 +569,7 @@ export const ProductCarousel: React.FC<ProductCarouselProps> = ({
                                         {(store.rating ?? 0) > 0 && (
                                             <div className="flex items-center justify-center gap-1 mt-1">
                                                 <StarIcon size={12} className="text-brand-green fill-brand-green" />
-                                                <span className="text-xs font-bold text-brand-dark">{store.rating}</span>
+                                                <span className="text-xs font-bold text-brand-dark">{Number(store.rating).toFixed(1)}</span>
                                             </div>
                                         )}
                                     </div>

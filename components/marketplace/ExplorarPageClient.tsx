@@ -23,6 +23,8 @@ import { useInfiniteList } from "@/hooks/use-infinite-list"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { getProductDisplayImages } from "@/lib/utils/product-display-images"
 import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images"
+import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { StarIcon } from "@/lib/icons"
 import { getStoreUrl, getPlanUrl, getProductUrl, getServiceUrl } from "@/lib/utils/url-generator"
 import { formatCurrency } from "@/lib/utils"
 import { SponsoredAdsCarousel } from "@/components/marketplace/ads/SponsoredAdsCarousel"
@@ -30,7 +32,7 @@ import { SponsoredAdsSearchInline } from "@/components/marketplace/ads/Sponsored
 import type { SponsoredAd } from "@/lib/ads/types"
 import citiesData from "@/lib/data/cities.json"
 import { useLocationRedirect } from "@/hooks/use-location-redirect"
-import { getMarketplaceCategoriesClient } from "@/lib/data/marketplace-categories-client"
+import { getMarketplaceCategoriesClient, getMarketplaceServiceCategoriesClient, getMarketplacePartnerCategoriesClient } from "@/lib/data/marketplace-categories-client"
 import { parseMarketplaceType } from "@/lib/types/marketplace"
 import { ExplorarMobileControls } from "./ExplorarMobileControls"
 import { ExplorarHeaderSection } from "./ExplorarHeaderSection"
@@ -145,11 +147,26 @@ export function ExplorarPageClient({
     const [moreDistantItems, setMoreDistantItems] = useState<any[]>(initialMoreDistantItems)
 
     const [dbCategories, setDbCategories] = useState<{ id?: string; name: string; icon_url: string | null }[]>([])
+    const [dbServiceCategories, setDbServiceCategories] = useState<{ id?: string; name: string; icon_url: string | null }[]>([])
+    const [dbPartnerCategories, setDbPartnerCategories] = useState<{ id?: string; name: string; icon_url: string | null }[]>([])
     const [viewMode, setViewMode] = useState<ViewMode>("grid")
 
     const categoriesList = useMemo(() => {
+        if (currentType === "servicos") {
+            return dbServiceCategories.length > 0 ? dbServiceCategories : FALLBACK_CATEGORIES
+        }
+        if (currentType === "vitrines") {
+            return dbPartnerCategories.length > 0 ? dbPartnerCategories : FALLBACK_CATEGORIES
+        }
+        if (currentType === "tudo") {
+            const merged = [...dbCategories]
+            for (const sc of dbServiceCategories) {
+                if (!merged.some(c => c.name === sc.name)) merged.push(sc)
+            }
+            return merged.length > 0 ? merged : FALLBACK_CATEGORIES
+        }
         return dbCategories.length > 0 ? dbCategories : FALLBACK_CATEGORIES
-    }, [dbCategories])
+    }, [dbCategories, dbServiceCategories, dbPartnerCategories, currentType])
 
     const categoriesLoadedRef = useRef(false)
 
@@ -160,6 +177,16 @@ export function ExplorarPageClient({
         getMarketplaceCategoriesClient(null).then(cats => {
             if (cats && cats.length > 0) {
                 setDbCategories(cats)
+            }
+        })
+        getMarketplaceServiceCategoriesClient(null).then(cats => {
+            if (cats && cats.length > 0) {
+                setDbServiceCategories(cats)
+            }
+        })
+        getMarketplacePartnerCategoriesClient(null).then(cats => {
+            if (cats && cats.length > 0) {
+                setDbPartnerCategories(cats)
             }
         })
     }, [])
@@ -915,45 +942,73 @@ export function ExplorarPageClient({
 
     const renderListRow = (item: any) => {
         const partner = Array.isArray(item.partners) ? item.partners[0] : item.partners
-        const imageUrl = item.itemType === "loja"
-            ? (item.images?.[0] || partner?.banner_url || partner?.store_avatar || "https://img.dudit.com.br/static/Placeholder.png")
+        const isStore = item.itemType === "loja"
+        const showPrice = !isStore && item.show_price_in_store !== false
+        const city = partner?.city || item.city || ""
+        const state = partner?.state || item.state || ""
+        const distance = partner?.distance_km_formatted || item.distance_km_formatted || null
+        const rawLogo = partner?.store_avatar || partner?.store_image_url || item.logo_url || null
+        const storeLogoUrl = rawLogo && !String(rawLogo).includes("Placeholder.png") ? getR2ImageUrl(rawLogo) : null
+
+        const imageUrl = isStore
+            ? (storeLogoUrl || partner?.banner_url || "https://img.dudit.com.br/static/Placeholder.png")
             : getPrimaryProductDisplayImage(item)
-        const showPrice = item.itemType !== "loja" && item.show_price_in_store !== false
 
         return (
             <Link
                 key={`${item.itemType}-${item.id}`}
                 href={getItemUrl(item)}
                 prefetch={false}
-                className="group grid grid-cols-[112px_1fr] gap-4 border-b border-gray-100 py-4 last:border-b-0 sm:grid-cols-[220px_1fr] hover:bg-gray-50/60"
+                className="group grid grid-cols-[112px_1fr] gap-4 border-t border-gray-100 py-4 sm:grid-cols-[220px_1fr] hover:bg-gray-50/60"
             >
-                <div className="relative aspect-[4/3] overflow-hidden rounded-lg bg-brand-gray sm:aspect-[16/10]">
-                    <img src={imageUrl} alt={item.name} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]" loading="lazy" />
+                <div className="relative aspect-square overflow-hidden rounded-lg bg-brand-gray">
+                    <img src={imageUrl} alt={item.name} className="h-full w-full object-cover" loading="lazy" />
                 </div>
                 <div className="min-w-0 py-1">
-                    <h3 className="line-clamp-2 text-base font-bold text-brand-dark sm:text-lg">{item.name}</h3>
-                    {item.itemType !== "loja" && (
-                        <div className="mt-2">
-                            {showPrice ? (
-                                <div className="flex flex-wrap items-baseline gap-2">
-                                    {item.originalPrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(item.originalPrice)}</span>}
-                                    <span className="text-lg font-bold text-brand-dark">{formatCurrency(item.price || 0)}</span>
+                    {isStore ? (
+                        <>
+                            <div className="flex items-center gap-2">
+                                <h3 className="line-clamp-2 text-base font-bold text-brand-dark sm:text-lg">{item.name}</h3>
+                                {(item.rating ?? 0) > 0 && (
+                                    <span className="flex items-center gap-1 text-xs font-bold text-brand-dark shrink-0">
+                                        <StarIcon size={12} className="text-brand-green fill-brand-green" />
+                                        {Number(item.rating).toFixed(1)}
+                                    </span>
+                                )}
+                            </div>
+                            {(item.category || item.subcategoryName) && (
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                    {item.category && <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-bold text-brand-dark">{item.category}</span>}
+                                    {item.subcategoryName && <span className="rounded-full bg-[#ecfdf5] px-2.5 py-1 text-[11px] font-bold text-brand-green">{item.subcategoryName}</span>}
                                 </div>
-                            ) : (
-                                <span className="text-sm font-bold text-brand-dark">Preco sob consulta</span>
                             )}
-                        </div>
-                    )}
-                    <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium text-brand-inactive-text">
-                        {(partner?.name || partner?.store_name) && <span className="font-bold text-brand-dark">{partner.name || partner.store_name}</span>}
-                        {(item.rating ?? 0) > 0 && <span>{Number(item.rating).toFixed(1)} estrela</span>}
-                        {partner?.city && <span>{partner.city}{partner.state ? ` - ${partner.state}` : ""}</span>}
-                    </div>
-                    {(item.category || item.subcategoryName) && (
-                        <div className="mt-3 flex flex-wrap gap-2">
-                            {item.category && <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-bold text-brand-dark">{item.category}</span>}
-                            {item.subcategoryName && <span className="rounded-full bg-[#ecfdf5] px-2.5 py-1 text-[11px] font-bold text-brand-green">{item.subcategoryName}</span>}
-                        </div>
+                            <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium text-brand-inactive-text">
+                                {city && <span>{city}{state ? ` - ${state}` : ""}</span>}
+                                {city && distance && <span className="w-1 h-1 rounded-full bg-brand-inactive-text" />}
+                                {distance && <span className="font-medium">{distance}</span>}
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <h3 className="line-clamp-2 text-base font-bold text-brand-dark sm:text-lg">{item.name}</h3>
+                            <div className="mt-2">
+                                {showPrice ? (
+                                    <div className="flex flex-wrap items-baseline gap-2">
+                                        {item.originalPrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(item.originalPrice)}</span>}
+                                        <span className="text-lg font-bold text-brand-dark">{formatCurrency(item.price || 0)}</span>
+                                    </div>
+                                ) : (
+                                    <span className="text-sm font-bold text-brand-dark">Preco sob consulta</span>
+                                )}
+                            </div>
+                            <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium text-brand-inactive-text">
+                                {(partner?.name || partner?.store_name) && <span className="font-bold text-brand-dark">{partner.name || partner.store_name}</span>}
+                                {(item.rating ?? 0) > 0 && <span>{Number(item.rating).toFixed(1)} estrela</span>}
+                                {city && <span>{city}{state ? ` - ${state}` : ""}</span>}
+                                {city && distance && <span className="w-1 h-1 rounded-full bg-brand-inactive-text" />}
+                                {distance && <span className="font-medium">{distance}</span>}
+                            </div>
+                        </>
                     )}
                 </div>
             </Link>

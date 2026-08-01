@@ -30,20 +30,10 @@ export function ExplorarViewControls({
     activeFilterChips = [],
 }: ExplorarViewControlsProps) {
     return (
-        <div className="flex items-center justify-end mb-6">
-            <div className="flex items-center gap-3">
-                {/* Filter toggle button */}
-                <Button
-                    variant="filled"
-                    size="sm"
-                    onClick={onToggleFilters}
-                    className="h-[42px]"
-                >
-                    {sidebarCollapsed ? "Filtros" : "Ocultar filtros"}
-                </Button>
-
-                {/* Active filter badges */}
-                <AnimatePresence>
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+            {/* Active filter badges (left side) */}
+            <AnimatePresence>
+                <div className="flex flex-wrap items-center gap-2">
                     {activeFilterChips.map((chip) => (
                         <motion.div
                             key={chip.key}
@@ -64,7 +54,19 @@ export function ExplorarViewControls({
                             </Badge>
                         </motion.div>
                     ))}
-                </AnimatePresence>
+                </div>
+            </AnimatePresence>
+
+            <div className="flex items-center gap-3">
+                {/* Filter toggle button */}
+                <Button
+                    variant="filled"
+                    size="sm"
+                    onClick={onToggleFilters}
+                    className="h-[42px]"
+                >
+                    {sidebarCollapsed ? "Filtros" : "Ocultar filtros"}
+                </Button>
 
                 <div className="h-[42px] w-px bg-gray-100" />
 

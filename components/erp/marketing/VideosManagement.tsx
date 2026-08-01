@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { getPartnerCommunityVideos, createCommunityVideo, updateCommunityVideo, deleteCommunityVideo, type CommunityVideoItem } from "@/app/actions/marketplace/community-videos"
 import { Button, IconPlaceholder, ThreeDotsLoader, AlertModal } from "@/components/reusable"
+import { useStore } from "@/lib/store-context"
 import Pagination from "@/components/reusable/Pagination"
 import { ERPPageHeader } from "@/components/erp/page-header-state"
 import { PlusIcon } from "@/lib/icons"
@@ -37,6 +38,7 @@ const COLUMNS = [
 export default function VideosManagement() {
     const { toast } = useToast()
     const { businessInfo, planSlug, partnerId } = usePermissions()
+    const { selectedStore } = useStore()
     const { openPlanUpgrade } = usePlanUpgrade()
     const isMobile = useMediaQuery("(max-width: 767px)")
     const isTablet = useMediaQuery("(max-width: 1024px)")
@@ -140,6 +142,7 @@ export default function VideosManagement() {
                 videoUrl: data.video_url,
                 videoThumbnail: data.video_thumbnail,
                 duration: data.duration,
+                storeId: selectedStore?.id || null,
                 linkedItemType,
                 linkedItemId,
             })

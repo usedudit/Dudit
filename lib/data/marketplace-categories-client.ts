@@ -50,3 +50,55 @@ export async function getCategoryPathClient(categoryId: string) {
 
   return path.join(" > ")
 }
+
+/**
+ * Client-side fetcher for marketplace service categories.
+ */
+export async function getMarketplaceServiceCategoriesClient(parentId: string | null = null) {
+  const supabase = createClient()
+
+  let query = supabase
+    .from("marketplace_service_categories")
+    .select("id, name, icon_url, parent_id")
+    .order("name")
+
+  if (parentId) {
+    query = query.eq("parent_id", parentId)
+  } else {
+    query = query.is("parent_id", null)
+  }
+
+  const { data, error } = await query
+  if (error) {
+    console.error("Error fetching marketplace service categories:", error)
+    return []
+  }
+
+  return data || []
+}
+
+/**
+ * Client-side fetcher for marketplace partner (store) categories.
+ */
+export async function getMarketplacePartnerCategoriesClient(parentId: string | null = null) {
+  const supabase = createClient()
+
+  let query = supabase
+    .from("marketplace_partner_categories")
+    .select("id, name, icon_url, parent_id")
+    .order("name")
+
+  if (parentId) {
+    query = query.eq("parent_id", parentId)
+  } else {
+    query = query.is("parent_id", null)
+  }
+
+  const { data, error } = await query
+  if (error) {
+    console.error("Error fetching marketplace partner categories:", error)
+    return []
+  }
+
+  return data || []
+}

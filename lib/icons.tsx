@@ -152,7 +152,8 @@ import {
     Clock04Icon,
     ClockCheckIcon as ClockCheckIcon01,
     ClockArrowUpIcon as ClockArrowUpIcon01,
-    Video01Icon
+    Video01Icon,
+    EnergyIcon as EnergyIcon01
 } from "@hugeicons/core-free-icons"
 
 
@@ -368,6 +369,7 @@ export const FileTextIcon = CreateIcon(File02Icon01)
 export const RocketIcon = CreateIcon(Rocket01Icon)
 export const BriefcaseIcon = CreateIcon(Briefcase01Icon)
 export const KeyIcon = CreateIcon(Key01Icon)
+export const EnergyIcon = CreateIcon(EnergyIcon01)
 
 // ============================
 // SYSTEM / MISC

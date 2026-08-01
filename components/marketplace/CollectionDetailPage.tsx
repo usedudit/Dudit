@@ -4,7 +4,7 @@ import { useState, useEffect, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { Card } from "@/components/ui/card"
 import { Button, DefaultModal, Input, FormTextarea, FormSection } from "@/components/reusable"
-import { ChevronLeftIcon, EditIcon, TrashIcon } from "@/lib/icons"
+import { ChevronLeftIcon, EditIcon, TrashIcon, ChevronDownIcon } from "@/lib/icons"
 import { ItemCard } from "@/components/marketplace/shared-components"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { MarketplaceHeader } from "./MarketplaceHeader"
@@ -12,6 +12,7 @@ import { MarketplaceFooter } from "./MarketplaceFooter"
 import { useSupabase } from "@/providers/supabase-provider"
 import { useToast } from "@/hooks/use-toast"
 import { registerCollectionDetailMenu } from "@/lib/collection-detail-menu"
+import { getRandomDefaultBanner } from "@/lib/utils/banner"
 
 interface CollectionDetailProps {
     collection: any
@@ -24,6 +25,8 @@ export function CollectionDetailPage({ collection }: CollectionDetailProps) {
     const [items, setItems] = useState<any[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
+    const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
+    const [collectionBanner] = useState(() => getRandomDefaultBanner())
 
     // Edit modal state
     const [isEditModalOpen, setIsEditModalOpen] = useState(false)
@@ -122,6 +125,15 @@ export function CollectionDetailPage({ collection }: CollectionDetailProps) {
     return (
         <>
             <MarketplaceHeader simpleTitle={collection.name} />
+            {/* Collection Banner */}
+            <div className="relative w-full h-48 lg:h-64 overflow-hidden">
+                <img
+                    src={collectionBanner}
+                    alt={collection.name}
+                    className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+            </div>
             <div className="min-h-screen bg-white pt-[40px] lg:pt-[110px] font-sans flex flex-col">
                 <div className="container mx-auto px-4 max-w-[1400px] w-full mt-12 lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">
 
@@ -149,9 +161,9 @@ export function CollectionDetailPage({ collection }: CollectionDetailProps) {
                                             className="w-6 h-6 border border-brand-border shrink-0 bg-gray-50"
                                         />
                                         <span className="font-medium text-brand-dark dark:text-dark-heading whitespace-nowrap">{authorName}</span>
-                                        <span className="text-brand-inactive-text">|</span>
+                                        <span className="text-brand-inactive-text">•</span>
                                         <span className="whitespace-nowrap">{collection.items_count} {collection.items_count === 1 ? "item" : "itens"}</span>
-                                        <span className="text-brand-inactive-text">|</span>
+                                        <span className="text-brand-inactive-text">•</span>
                                         <span className="whitespace-nowrap">{collection.views_count} {collection.views_count === 1 ? "visualização" : "visualizações"}</span>
                                     </div>
                                 </div>
@@ -203,9 +215,21 @@ export function CollectionDetailPage({ collection }: CollectionDetailProps) {
                     {collection.description && (
                         <div className="mb-8 animate-fade-in">
                             <FormSection title="Descrição">
-                                <p className="text-sm text-brand-inactive-text dark:text-dark-body whitespace-pre-wrap leading-relaxed">
-                                    {collection.description}
-                                </p>
+                                <div className={`relative ${!isDescriptionExpanded ? "max-h-[150px] overflow-hidden" : ""}`}>
+                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body whitespace-pre-wrap leading-relaxed">
+                                        {collection.description}
+                                    </p>
+                                    {!isDescriptionExpanded && collection.description.length > 200 && (
+                                        <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-white to-transparent dark:from-gray-900 dark:to-transparent" />
+                                    )}
+                                </div>
+                                {collection.description.length > 200 && (
+                                    <button onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+                                        className="flex items-center gap-1 text-brand-green font-bold text-sm mt-3 hover:underline">
+                                        {isDescriptionExpanded ? "Ver menos" : "Ver mais"}
+                                        <ChevronDownIcon size={16} className={`transition-transform ${isDescriptionExpanded ? "rotate-180" : ""}`} />
+                                    </button>
+                                )}
                             </FormSection>
                         </div>
                     )}

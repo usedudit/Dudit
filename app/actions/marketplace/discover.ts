@@ -66,12 +66,15 @@ interface RawProduct {
     promotional_price?: number
     images?: any
     rating?: number
+    stock_quantity?: number
+    stock_available?: number
     views_last_30_days?: number
     sales_last_7_days?: number
     sales_last_30_days?: number
     favorites_count?: number
     condition?: string
     created_at?: string
+    marketplace_category?: any
     partners?: any
     stores?: any
 }
@@ -363,7 +366,7 @@ function applyTierSort<T>(
 
 // ─── Product query fields ───────────────────────────────────────────────────
 
-const BASE_FIELDS = `id, name, price, promotional_price, images, rating`
+const BASE_FIELDS = `id, name, price, promotional_price, images, rating, stock_quantity, stock_available, marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name))`
 const STATS_FIELDS = `views_last_30_days, sales_last_7_days, sales_last_30_days, favorites_count`
 
 const PARTNER_JOIN = `partners!inner(
@@ -403,6 +406,12 @@ function processProduct(item: RawProduct, extra?: Record<string, any>) {
         }
         : null
 
+    const rawCategory: any = Array.isArray(item.marketplace_category)
+        ? item.marketplace_category[0]
+        : item.marketplace_category
+    const categoryName = rawCategory?.parent?.name || rawCategory?.name || null
+    const subcategoryName = rawCategory?.parent ? rawCategory?.name : null
+
     return {
         id: item.id,
         name: item.name,
@@ -410,14 +419,36 @@ function processProduct(item: RawProduct, extra?: Record<string, any>) {
         originalPrice: item.promotional_price ? Number(item.price) : undefined,
         images: item.images || [],
         rating: item.rating,
+        category: categoryName,
+        subcategoryName,
         partners: partner,
         itemType: "produto" as const,
         created_at: item.created_at,
         _views: item.views_last_30_days ?? 0,
         _salesWeek: item.sales_last_7_days ?? 0,
         _sales: item.sales_last_30_days ?? 0,
+        _stock: Number(item.stock_quantity ?? item.stock_available ?? 0),
         _favs: item.favorites_count ?? 0,
         ...extra,
+    }
+}
+
+// ─── Urgency badges (Últimos N) ────────────────────────────────────────────
+// Random but deterministic per day so the same products don't always show them.
+
+function applyUrgencyBadges(sections: HomeSection[], ctx: DiscoverCtx) {
+    const seed = dailySeed(ctx.userId)
+    for (const section of sections) {
+        for (const item of section.items) {
+            const it = item as any
+            if (it._badgeLabel) continue
+            if (it.itemType !== "produto") continue
+            const stock = Number(it._stock ?? 0)
+            if (stock > 0 && stock <= 5 && hashSeed(seed, `${it.id}-last-items`) % 100 < 40) {
+                it._badgeLabel = `Últimos ${stock}`
+                it._badgeVariant = "red"
+            }
+        }
     }
 }
 
@@ -484,14 +515,7 @@ async function fetchTrending(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         return null
     }
 
-    const items = scoped.slice(0, 20).map(item => {
-        const raw = item as RawProduct
-        const proof: string[] = []
-        if ((raw.views_last_30_days ?? 0) >= 10) proof.push(`${raw.views_last_30_days} visualizações`)
-        if ((raw.sales_last_30_days ?? 0) > 0) proof.push(`${raw.sales_last_30_days} vendidos no mês`)
-        if ((raw.favorites_count ?? 0) > 0) proof.push(`${raw.favorites_count} favoritaram`)
-        return processProduct(raw, { _socialProof: proof.join(" • ") })
-    })
+    const items = scoped.slice(0, 20).map(item => processProduct(item as RawProduct))
 
     return {
         id: "trending",
@@ -1092,14 +1116,7 @@ async function fetchBestSellers(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<
         return null
     }
 
-    const items = scoped.slice(0, 20).map(item => {
-        const raw = item as RawProduct
-        return processProduct(raw, {
-            _socialProof: (raw.sales_last_30_days ?? 0) > 0
-                ? `${raw.sales_last_30_days} vendidos no último mês`
-                : undefined,
-        })
-    })
+    const items = scoped.slice(0, 20).map(item => processProduct(item as RawProduct))
 
     return {
         id: "bestSellers",
@@ -1158,10 +1175,7 @@ async function fetchTopRated(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
 
     const items = scoped.slice(0, 20).map(item => {
         const raw = item as RawProduct
-        return processProduct(raw, {
-            _badgeLabel: (raw.rating ?? 0) >= 4.5 ? "★★★" : "★",
-            _badgeVariant: "blue",
-        })
+        return processProduct(raw)
     })
 
     return {
@@ -1289,14 +1303,7 @@ async function fetchMostViewed(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
         return null
     }
 
-    const items = scoped.slice(0, 20).map(item => {
-        const raw = item as RawProduct
-        return processProduct(raw, {
-            _socialProof: (raw.views_last_30_days ?? 0) > 0
-                ? `${raw.views_last_30_days} visualizações nos últimos 30 dias`
-                : undefined,
-        })
-    })
+    const items = scoped.slice(0, 20).map(item => processProduct(item as RawProduct))
 
     return {
         id: "mostViewed",
@@ -1321,7 +1328,7 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
 
     let { data, error } = await supabase
         .from("services")
-        .select(`id, name, price, images, rating, ${PARTNER_JOIN}`)
+        .select(`id, name, price, images, rating, marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)), ${PARTNER_JOIN}`)
         .eq("is_active", true)
         .eq("show_in_marketplace", true)
         .in("partner_id", allIds)
@@ -1381,12 +1388,20 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
             }
             : null
 
+        const rawCategory: any = Array.isArray(item.marketplace_category)
+            ? item.marketplace_category[0]
+            : item.marketplace_category
+        const categoryName = rawCategory?.parent?.name || rawCategory?.name || null
+        const subcategoryName = rawCategory?.parent ? rawCategory?.name : null
+
         return {
             id: item.id,
             name: item.name,
             price: Number(item.price || 0),
             images: item.images || [],
             rating: item.rating,
+            category: categoryName,
+            subcategoryName,
             partners: partner,
             itemType: "servico" as const,
         }
@@ -1850,6 +1865,9 @@ async function getHomeSectionsUncached(ctx: DiscoverCtx): Promise<HomeSection[]>
     }
 
     const result = finalSections.slice(0, 6)
+
+    // ─── Randomized urgency badges (Últimos N) ──────────────────────────
+    applyUrgencyBadges(result, ctx)
 
     // ─── Batch fetch promotions for all items across all sections ────────
     const partnerIds = new Set<string>()

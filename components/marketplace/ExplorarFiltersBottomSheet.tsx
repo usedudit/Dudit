@@ -2,10 +2,19 @@
 
 import { useState, useEffect } from "react"
 import BottomSheet from "@/components/BottomSheet"
-import { Button, Checkbox, Input } from "@/components/reusable"
+import { Button, Checkbox, Input, FormDropdown } from "@/components/reusable"
 import { Check, MapPin } from "lucide-react"
 import { Separator } from "@/components/reusable/Separator"
 import type { FilterConfig, PageMode } from "./contextual-filters"
+
+const RADIUS_OPTIONS = [
+    { value: "", label: "Toda a cidade (sem limite)" },
+    { value: "5", label: "Até 5 km" },
+    { value: "10", label: "Até 10 km" },
+    { value: "25", label: "Até 25 km" },
+    { value: "50", label: "Até 50 km" },
+    { value: "100", label: "Até 100 km" },
+]
 
 interface ExplorarFiltersBottomSheetProps {
     isOpen: boolean
@@ -108,19 +117,12 @@ export function ExplorarFiltersBottomSheet({
                 {/* Raio de busca */}
                 {filterConfig.showRadius !== false && ((selectedCitySlug && selectedCitySlug !== "brasil" && !selectedCitySlug.startsWith("estado-")) || !!userProfile) && onRadiusChange && (
                     <section>
-                        <h4 className="mb-3 text-sm font-bold text-brand-dark">Raio de busca</h4>
-                        <select
-                            value={selectedRadius || ""}
-                            onChange={(e) => onRadiusChange(e.target.value ? Number(e.target.value) : null)}
-                            className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-semibold text-brand-dark hover:border-brand-green focus:border-brand-green focus:outline-none transition-colors bg-white cursor-pointer"
-                        >
-                            <option value="">Toda a cidade (sem limite)</option>
-                            <option value="5">Até 5 km</option>
-                            <option value="10">Até 10 km</option>
-                            <option value="25">Até 25 km</option>
-                            <option value="50">Até 50 km</option>
-                            <option value="100">Até 100 km</option>
-                        </select>
+                        <FormDropdown
+                            label="Raio de busca"
+                            value={String(selectedRadius || "")}
+                            setValue={(v) => onRadiusChange(v ? Number(v) : null)}
+                            options={RADIUS_OPTIONS}
+                        />
                     </section>
                 )}
 
@@ -154,7 +156,7 @@ export function ExplorarFiltersBottomSheet({
                         <h4 className="mb-3 text-sm font-bold text-brand-dark">
                             {pageMode === "category" ? "Subcategorias" : "Categorias"}
                         </h4>
-                        <div className="max-h-[200px] space-y-2 overflow-y-auto scrollbar-none" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                        <div className="space-y-2">
                             {activeCategoriesList.map((cat) => {
                                 const isSelected = selectedCategories.includes(cat.name)
                                 return (

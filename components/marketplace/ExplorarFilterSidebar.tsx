@@ -35,6 +35,15 @@ interface ExplorarFilterSidebarProps {
     collapsed?: boolean
 }
 
+const RADIUS_OPTIONS = [
+    { value: "", label: "Toda a cidade (sem limite)" },
+    { value: "5", label: "Até 5 km" },
+    { value: "10", label: "Até 10 km" },
+    { value: "25", label: "Até 25 km" },
+    { value: "50", label: "Até 50 km" },
+    { value: "100", label: "Até 100 km" },
+]
+
 export function ExplorarFilterSidebar({
     selectedCitySlug,
     formatCitySlug,
@@ -74,7 +83,7 @@ export function ExplorarFilterSidebar({
             }}
         >
             <div className="w-[280px]">
-                <div className="sticky top-[128px] space-y-6 py-5 px-5 max-h-[calc(100vh-140px)] overflow-y-hidden">
+                <div className="sticky top-[128px] space-y-6 py-5 px-5 max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
                 {/* Header */}
                 <div className="flex items-center justify-between gap-3 pb-0">
                     <h2 className="text-base font-bold text-brand-dark">Filtros</h2>
@@ -110,25 +119,20 @@ export function ExplorarFilterSidebar({
                 {/* Raio de busca */}
                 {filterConfig.showRadius !== false && ((selectedCitySlug && selectedCitySlug !== "brasil" && !selectedCitySlug.startsWith("estado-")) || !!userProfile) && onRadiusChange && (
                     <section>
-                        <h3 className="mb-3 text-sm font-bold text-brand-dark">Raio de busca</h3>
-                        <select
-                            value={selectedRadius || ""}
-                            onChange={(e) => onRadiusChange(e.target.value ? Number(e.target.value) : null)}
-                            className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-semibold text-brand-dark hover:border-brand-green focus:border-brand-green focus:outline-none transition-colors bg-white cursor-pointer"
-                        >
-                            <option value="">Toda a cidade (sem limite)</option>
-                            <option value="5">Até 5 km</option>
-                            <option value="10">Até 10 km</option>
-                            <option value="25">Até 25 km</option>
-                            <option value="50">Até 50 km</option>
-                            <option value="100">Até 100 km</option>
-                        </select>
+                        <Separator className="my-6" />
+                        <FormDropdown
+                            label="Raio de busca"
+                            value={String(selectedRadius || "")}
+                            setValue={(v) => onRadiusChange(v ? Number(v) : null)}
+                            options={RADIUS_OPTIONS}
+                        />
                     </section>
                 )}
 
                 {/* Type Section */}
                 {filterConfig.showType !== false && (
                     <section>
+                        <Separator className="my-6" />
                         <FormDropdown
                             label="Tipo"
                             value={currentType}
@@ -141,10 +145,11 @@ export function ExplorarFilterSidebar({
                 {/* Categories Section */}
                 {filterConfig.showCategory !== false && activeCategoriesList.length > 0 && (
                     <section>
+                        <Separator className="my-6" />
                         <h3 className="mb-3 text-sm font-bold text-brand-dark">
                             {pageMode === "category" ? "Subcategorias" : "Categorias"}
                         </h3>
-                        <div className="space-y-2 max-h-[200px] overflow-y-auto scrollbar-none" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                        <div className="space-y-2">
                             {activeCategoriesList.map((cat) => {
                                 const isSelected = selectedCategories.includes(cat.name)
                                 return (
@@ -176,6 +181,7 @@ export function ExplorarFilterSidebar({
                 {/* Price Section */}
                 {filterConfig.showPrice !== false && (
                     <section>
+                        <Separator className="my-6" />
                         <h3 className="mb-3 text-sm font-bold text-brand-dark">Preço</h3>
                         <div className="grid grid-cols-2 gap-2">
                             <MoneyInput
@@ -197,6 +203,7 @@ export function ExplorarFilterSidebar({
                 {/* Sort Section */}
                 {filterConfig.showSort !== false && (
                     <section>
+                        <Separator className="my-6" />
                         <FormDropdown
                             label="Ordenar"
                             value={sortBy}
@@ -209,6 +216,7 @@ export function ExplorarFilterSidebar({
                 {/* Promo Section */}
                 {filterConfig.showPromo !== false && (
                     <section>
+                        <Separator className="my-6" />
                         <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-50 transition-colors">
                             <Checkbox
                                 checked={promoOn}

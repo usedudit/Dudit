@@ -34,10 +34,10 @@ async function _getLinkedItemData(type: string, id: string, storeId?: string): P
     let q = supabase
       .from("products")
       .select(`
-        id, name, price, promotional_price, images, rating, show_price_in_store,
+        id, name, slug, price, promotional_price, images, rating, show_price_in_store,
         partner_id,
         partners!partner_id(id),
-        stores(id, name, logo_url)
+        stores(id, name, logo_url, city, state)
       `)
       .eq("id", id)
     if (storeId) q = q.eq("store_id", storeId)
@@ -50,6 +50,9 @@ async function _getLinkedItemData(type: string, id: string, storeId?: string): P
 
     let p: any = product.partners
     if (Array.isArray(p)) p = p[0]
+
+    const store = Array.isArray(product.stores) ? product.stores[0] : product.stores
+    const urlPartner = store || p || { id: product.partner_id }
 
     const partnerId = p?.id || product.partner_id
     const promotions = partnerId ? await listActivePromotionsForMarketplaceAction(partnerId) : []
@@ -64,7 +67,7 @@ async function _getLinkedItemData(type: string, id: string, storeId?: string): P
       id: product.id,
       name: product.name,
       imageUrl,
-      url: getProductUrl(product, p || { id: partnerId }),
+      url: getProductUrl(product, urlPartner),
       displayPrice: pricing.bestPrice,
       referencePrice: pricing.referencePrice || null,
       discountPercent: pricing.discountPercent,
@@ -79,10 +82,10 @@ async function _getLinkedItemData(type: string, id: string, storeId?: string): P
     let q = supabase
       .from("services")
       .select(`
-        id, name, price, promotional_price, images, rating, show_price_in_store,
+        id, name, slug, price, promotional_price, images, rating, show_price_in_store,
         partner_id,
         partners!partner_id(id),
-        stores(id, name, logo_url)
+        stores(id, name, logo_url, city, state)
       `)
       .eq("id", id)
     if (storeId) q = q.eq("store_id", storeId)
@@ -95,6 +98,9 @@ async function _getLinkedItemData(type: string, id: string, storeId?: string): P
 
     let p: any = service.partners
     if (Array.isArray(p)) p = p[0]
+
+    const store = Array.isArray(service.stores) ? service.stores[0] : service.stores
+    const urlPartner = store || p || { id: service.partner_id }
 
     const partnerId = p?.id || service.partner_id
     const promotions = partnerId ? await listActivePromotionsForMarketplaceAction(partnerId) : []
@@ -113,7 +119,7 @@ async function _getLinkedItemData(type: string, id: string, storeId?: string): P
       id: service.id,
       name: service.name,
       imageUrl,
-      url: getServiceUrl(service, p || { id: partnerId }),
+      url: getServiceUrl(service, urlPartner),
       displayPrice: pricing.bestPrice,
       referencePrice: pricing.referencePrice || null,
       discountPercent: pricing.discountPercent,
