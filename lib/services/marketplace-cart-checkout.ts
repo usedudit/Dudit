@@ -74,7 +74,7 @@ export async function priceMarketplaceCartCheckout(
 
   const targetStoreId = resolvedLines.find((l) => l.storeId)?.storeId || null
 
-  if (hasDeliveryLines && params.deliveryAddress) {
+  if (hasDeliveryLines && params.deliveryAddress && params.deliveryType === "delivery") {
     const quote = await quoteDeliveryFeeAction({
       partnerId,
       storeId: targetStoreId,

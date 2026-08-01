@@ -215,8 +215,6 @@ export async function quoteDeliveryFeeAction(input: {
   let rulesQuery = supabase.from("delivery_fee_rules").select("*").eq("partner_id", input.partnerId).eq("is_active", true)
   if (input.storeId) {
     rulesQuery = rulesQuery.or(`store_id.eq.${input.storeId},store_id.is.null`)
-  } else {
-    rulesQuery = rulesQuery.is("store_id", null)
   }
 
   const [settingsRow, { data: rulesRows }, { data: store }] = await Promise.all([

@@ -113,17 +113,23 @@ export async function getOrderFinancialBreakdownAction(orderId: string, partnerI
   const feeLines: { method: string; fee: number }[] = []
   const fixedFeeLines: { method: string; fee: number }[] = []
 
+  const hasBreakdown = paymentBreakdown.length > 0
+
   // Use breakdown for per-method display, stored columns for totals
   for (const entry of paymentBreakdown) {
     const method = String(entry.method || "").toLowerCase().trim()
-    const bearer = String(entry.feeBearer || "merchant")
+    const bearer = String(entry.feeBearer || "merchant").toLowerCase().trim()
+    const isCustomerBearer = bearer === "customer" || bearer === "buyer"
+    const adjType = String(entry.adjustmentType || "").toLowerCase().trim()
+
+    // Payment method discount applies ONLY if merchant absorbs it (not customer-repassed fee/interest)
     const pmDiscount = Math.max(0, Number(entry.paymentMethodDiscountAmount || 0))
-    if (pmDiscount > 0) {
+    if (pmDiscount > 0 && !isCustomerBearer && (adjType === "discount" || adjType === "" || adjType === "none")) {
       totalBreakdownMethodDiscount += pmDiscount
     }
 
-    // Only merchant-borne fees are costs for the business
-    if (bearer !== "merchant") continue
+    // Only merchant-borne fees/interest are costs for the business
+    if (isCustomerBearer) continue
 
     const pFee = Math.max(0, Number(entry.feeAmount || 0))
     const fFee = Math.max(0, Number(entry.fixedFeeAmount || 0))
@@ -142,19 +148,22 @@ export async function getOrderFinancialBreakdownAction(orderId: string, partnerI
     }
   }
 
-  const finalMethodDiscount = Math.max(totalBreakdownMethodDiscount, storedMethodDiscount)
+  // Use breakdown values when available, fallback to stored columns when no breakdown
+  const finalMethodDiscount = hasBreakdown
+    ? totalBreakdownMethodDiscount
+    : storedMethodDiscount
 
-  // Merge stored columns as safety net (breakdown values take priority,
-  // stored columns fill gaps when breakdown has 0 for a specific category)
-  const mergedFee = Math.max(totalPercentageFees, storedMethodFee)
-  const mergedFixedFee = Math.max(totalFixedFees, storedMethodFixedFee)
-  const mergedInterest = Math.max(totalInterest, storedMethodInterest)
-  if (mergedFee > totalPercentageFees && storedMethodFee > 0) {
-    feeLines.push({ method: "pagamento", fee: storedMethodFee })
+  const mergedFee = hasBreakdown ? totalPercentageFees : storedMethodFee
+  const mergedFixedFee = hasBreakdown ? totalFixedFees : storedMethodFixedFee
+  const mergedInterest = hasBreakdown ? totalInterest : storedMethodInterest
+
+  if (mergedFee > 0 && feeLines.length === 0) {
+    feeLines.push({ method: "pagamento", fee: mergedFee })
   }
-  if (mergedFixedFee > totalFixedFees && storedMethodFixedFee > 0) {
-    fixedFeeLines.push({ method: "pagamento", fee: storedMethodFixedFee })
+  if (mergedFixedFee > 0 && fixedFeeLines.length === 0) {
+    fixedFeeLines.push({ method: "pagamento", fee: mergedFixedFee })
   }
+
   totalPercentageFees = mergedFee
   totalFixedFees = mergedFixedFee
   totalInterest = mergedInterest

@@ -782,7 +782,7 @@ export async function checkoutCartAction(
       .order("is_headquarters", { ascending: false })
       .limit(1)
       .maybeSingle(),
-    hasDeliveryLines && deliveryAddress
+    hasDeliveryLines && deliveryAddress && orderDelivery === "delivery"
       ? quoteDeliveryFeeAction({
         partnerId,
         storeId: targetStoreId,
@@ -817,7 +817,7 @@ export async function checkoutCartAction(
   let deliveryFee = 0
   let distanceKm: number | null = null
   let deliveryBreakdown: Record<string, unknown> | null = null
-  if (hasDeliveryLines && deliveryAddress) {
+  if (hasDeliveryLines && deliveryAddress && orderDelivery === "delivery") {
     if (!deliveryQuote.success) return { error: (deliveryQuote as any).error }
     deliveryFee = Number(deliveryQuote.fee || 0)
     distanceKm = Number(deliveryQuote.distanceKm || 0)

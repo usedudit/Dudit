@@ -471,11 +471,7 @@ export function CheckoutPageClient() {
     const [pickupEnabled, setPickupEnabled] = useState(true)
     const [deliveryFee, setDeliveryFee] = useState(0)
     const [deliveryDistanceKm, setDeliveryDistanceKm] = useState<number | null>(null)
-    const [deliveryBreakdown, setDeliveryBreakdown] = useState<{
-        baseFee: number
-        distanceFee: number
-        timeAdjustmentTotal: number
-    } | null>(null)
+    const [deliveryBreakdown, setDeliveryBreakdown] = useState<Record<string, any> | null>(null)
     const [deliverySettings, setDeliverySettings] = useState<any>(null)
     const [storefrontMethods, setStorefrontMethods] = useState<StorefrontPaymentMethod[]>([])
     const [storefrontMethodsLoading, setStorefrontMethodsLoading] = useState(true)
@@ -997,11 +993,7 @@ export function CheckoutPageClient() {
                     setDeliveryError(null)
                     setDeliveryFee(Number(quote.fee || 0))
                     setDeliveryDistanceKm(Number(quote.distanceKm || 0))
-                    setDeliveryBreakdown({
-                        baseFee: Number(quote.breakdown.baseFee || 0),
-                        distanceFee: Number(quote.breakdown.distanceFee || 0),
-                        timeAdjustmentTotal: Number(quote.breakdown.timeAdjustmentTotal || 0),
-                    })
+                    setDeliveryBreakdown((quote.breakdown as Record<string, any>) || null)
                 } else {
                     setDeliveryError(quote.error)
                     if (quote.error?.toLowerCase().includes("raio")) {
@@ -1535,11 +1527,16 @@ export function CheckoutPageClient() {
                         </span>
                     </div>
                 )}
-                {showDeliveryFeeRow && !isPickup && deliveryBreakdown && (deliveryBreakdown.distanceFee > 0 || deliveryBreakdown.timeAdjustmentTotal > 0) && (
+                {showDeliveryFeeRow && !isPickup && deliveryBreakdown && (Number(deliveryBreakdown.distanceFee) > 0 || (deliveryBreakdown.timeAdjustmentTotal != null && Number(deliveryBreakdown.timeAdjustmentTotal) !== 0)) && (
                     <div className="space-y-1 text-xs text-brand-inactive-text">
-                        {deliveryBreakdown.baseFee > 0 && <div className="flex justify-between"><span>Taxa base</span><span>{formatCurrency(deliveryBreakdown.baseFee)}</span></div>}
-                        {deliveryBreakdown.distanceFee > 0 && <div className="flex justify-between"><span>Distância {deliveryDistanceKm != null ? `(${deliveryDistanceKm.toFixed(2)} km)` : ""}</span><span>{formatCurrency(deliveryBreakdown.distanceFee)}</span></div>}
-                        {deliveryBreakdown.timeAdjustmentTotal > 0 && <div className="flex justify-between"><span>Ajuste horário</span><span>{formatCurrency(deliveryBreakdown.timeAdjustmentTotal)}</span></div>}
+                        {Number(deliveryBreakdown.baseFee) > 0 && <div className="flex justify-between"><span>Taxa base</span><span>{formatCurrency(Number(deliveryBreakdown.baseFee))}</span></div>}
+                        {Number(deliveryBreakdown.distanceFee) > 0 && <div className="flex justify-between"><span>Distância {deliveryDistanceKm != null ? `(${deliveryDistanceKm.toFixed(2)} km)` : ""}</span><span>{formatCurrency(Number(deliveryBreakdown.distanceFee))}</span></div>}
+                        {deliveryBreakdown.timeAdjustmentTotal != null && Number(deliveryBreakdown.timeAdjustmentTotal) !== 0 && (
+                            <div className="flex justify-between">
+                                <span>Ajuste horário</span>
+                                <span>{Number(deliveryBreakdown.timeAdjustmentTotal) > 0 ? `+${formatCurrency(Number(deliveryBreakdown.timeAdjustmentTotal))}` : formatCurrency(Number(deliveryBreakdown.timeAdjustmentTotal))}</span>
+                            </div>
+                        )}
                     </div>
                 )}
                 {isPickup && preparationEstimate && (preparationEstimate.preparationTimeMinutes > 0 || preparationEstimate.readyAt.getTime() > preparationEstimate.now.getTime()) && (

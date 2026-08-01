@@ -714,6 +714,8 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
     const paymentMethodName = getPaymentTypeLabel();
     const isMercadoPago = order.payment_provider === "Mercado Pago";
+    const isPixPayment = paymentMethodName.toLowerCase().includes("pix");
+    const canRetryPixPayment = order.situation === "pending" && isMercadoPago && isPixPayment;
     const PaymentIconEl = (() => {
         const icons: React.ReactNode[] = [];
         if (isMercadoPago) {
@@ -856,7 +858,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     };
 
     const handlePixClick = async () => {
-        if (order.situation !== "pending" || paymentMethodName !== "Pix") return;
+        if (!canRetryPixPayment) return;
         try {
             setLoadingPayment(true);
             const response = await fetch("/api/orders/retry-payment", {
@@ -1456,7 +1458,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                     <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(totalAmount)}</span>
                                                 }
                                             />
-                                            {order.situation === "pending" && order.payment_expires_at && (
+                                            {canRetryPixPayment && order.payment_expires_at && (
                                                 <InfoCard message={`O pagamento expira em ${formatFullDate(order.payment_expires_at)}.`} color='orange' rightElement={<Button variant='link' onClick={handlePixClick}>Pagar agora</Button>} />
                                             )}
                                         </div>

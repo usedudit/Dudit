@@ -1570,10 +1570,18 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     let paymentMethodStoreCreditAmount = 0
     for (const entry of sanitizedPaymentBreakdown) {
         const m = String(entry.method || "").toLowerCase().trim()
-        paymentMethodInterestAmount = Math.max(0, paymentMethodInterestAmount + Number(entry.interestAmount || 0))
-        paymentMethodFeeAmount = Math.max(0, paymentMethodFeeAmount + Number(entry.feeAmount || 0))
-        paymentMethodFixedFeeAmount = Math.max(0, paymentMethodFixedFeeAmount + Number(entry.fixedFeeAmount || 0))
-        breakdownPaymentMethodDiscountAmount = Math.max(0, breakdownPaymentMethodDiscountAmount + Number(entry.paymentMethodDiscountAmount || 0))
+        const bearer = String(entry.feeBearer || "merchant").toLowerCase().trim()
+        const isCustomerBearer = bearer === "customer" || bearer === "buyer"
+        const adjType = String(entry.adjustmentType || "").toLowerCase().trim()
+
+        if (!isCustomerBearer) {
+            paymentMethodInterestAmount = Math.max(0, paymentMethodInterestAmount + Number(entry.interestAmount || 0))
+            paymentMethodFeeAmount = Math.max(0, paymentMethodFeeAmount + Number(entry.feeAmount || 0))
+            paymentMethodFixedFeeAmount = Math.max(0, paymentMethodFixedFeeAmount + Number(entry.fixedFeeAmount || 0))
+            if (adjType === "discount" || adjType === "" || adjType === "none") {
+                breakdownPaymentMethodDiscountAmount = Math.max(0, breakdownPaymentMethodDiscountAmount + Number(entry.paymentMethodDiscountAmount || 0))
+            }
+        }
         if (m === "store_credit" || m === "store-credit" || m.includes("vale-compra") || m.includes("vale_compra") || m.includes("crédito")) {
             paymentMethodStoreCreditAmount = Math.max(0, paymentMethodStoreCreditAmount + Number(entry.amount || entry.effectiveAmount || 0))
         }
@@ -2456,10 +2464,18 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     let updatePaymentMethodFixedFeeAmount = 0
     let updateBreakdownPaymentMethodDiscountAmount = 0
     for (const entry of sanitizedPaymentBreakdown) {
-        updatePaymentMethodInterestAmount = Math.max(0, updatePaymentMethodInterestAmount + Number(entry.interestAmount || 0))
-        updatePaymentMethodFeeAmount = Math.max(0, updatePaymentMethodFeeAmount + Number(entry.feeAmount || 0))
-        updatePaymentMethodFixedFeeAmount = Math.max(0, updatePaymentMethodFixedFeeAmount + Number(entry.fixedFeeAmount || 0))
-        updateBreakdownPaymentMethodDiscountAmount = Math.max(0, updateBreakdownPaymentMethodDiscountAmount + Number(entry.paymentMethodDiscountAmount || 0))
+        const bearer = String(entry.feeBearer || "merchant").toLowerCase().trim()
+        const isCustomerBearer = bearer === "customer" || bearer === "buyer"
+        const adjType = String(entry.adjustmentType || "").toLowerCase().trim()
+
+        if (!isCustomerBearer) {
+            updatePaymentMethodInterestAmount = Math.max(0, updatePaymentMethodInterestAmount + Number(entry.interestAmount || 0))
+            updatePaymentMethodFeeAmount = Math.max(0, updatePaymentMethodFeeAmount + Number(entry.feeAmount || 0))
+            updatePaymentMethodFixedFeeAmount = Math.max(0, updatePaymentMethodFixedFeeAmount + Number(entry.fixedFeeAmount || 0))
+            if (adjType === "discount" || adjType === "" || adjType === "none") {
+                updateBreakdownPaymentMethodDiscountAmount = Math.max(0, updateBreakdownPaymentMethodDiscountAmount + Number(entry.paymentMethodDiscountAmount || 0))
+            }
+        }
     }
     const updatePaymentMethodDiscountAmount = updateBreakdownPaymentMethodDiscountAmount > 0
         ? updateBreakdownPaymentMethodDiscountAmount
