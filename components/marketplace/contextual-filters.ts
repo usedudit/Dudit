@@ -69,6 +69,36 @@ export const SECTION_FILTERS: Record<string, SectionFilterMapping> = {
         icon: "📈",
         config: { showCategory: true, showPrice: true, showSort: true, showRadius: true },
     },
+    products: {
+        label: "Produtos",
+        icon: "🛍️",
+        config: { showCategory: true, showPrice: true, showSort: true, showRadius: true },
+    },
+    businesses: {
+        label: "Negócios",
+        icon: "🏢",
+        config: { showCategory: true, showPrice: true, showSort: true, showRadius: true },
+    },
+    "well-rated": {
+        label: "Bem avaliados",
+        icon: "⭐",
+        config: { showCategory: true, showPrice: true, showSort: true, showRadius: true },
+    },
+    "on-offer": {
+        label: "Em oferta",
+        icon: "🎯",
+        config: { showCategory: true, showSort: true, showRadius: true },
+    },
+    "high-demand": {
+        label: "Em alta",
+        icon: "🔥",
+        config: { showCategory: true, showPrice: true, showSort: true, showRadius: true },
+    },
+    "newly-announced": {
+        label: "Novos anunciados",
+        icon: "🆕",
+        config: { showCategory: true, showPrice: true, showSort: true, showRadius: true },
+    },
 }
 
 export function getFilterConfig(sectionId: string | null, pageMode: PageMode): FilterConfig {

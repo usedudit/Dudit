@@ -110,18 +110,12 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
                         )}
                     </div>
                     <div className="flex items-center gap-1.5 text-[13px] text-brand-inactive-text mt-0.5">
-                        {!hideCity && city && (
-                            <span className="truncate">{city}{state ? ` - ${state}` : ""}</span>
-                        )}
-                        {!hideCity && city && distance && (
-                            <span className="w-1 h-1 rounded-full bg-brand-inactive-text" />
-                        )}
                         {distance && (
                             <span className="font-medium">{distance}</span>
                         )}
                         {category && (
                             <>
-                                {(distance || (!hideCity && city)) && (
+                                {distance && (
                                     <span className="w-1 h-1 rounded-full bg-brand-inactive-text" />
                                 )}
                                 <span className="font-medium truncate">{category}</span>
@@ -486,11 +480,9 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
                             <p className="text-[11px] md:text-xs text-brand-dark font-medium truncate leading-tight">
                                 {sellerName}
                             </p>
-                            {(sellerLabel || distance) && (
+                            {distance && (
                                 <p className="text-[11px] text-gray-500 font-normal truncate">
-                                    {sellerLabel && <span>{sellerLabel}</span>}
-                                    {sellerLabel && distance && <span className="w-1 h-1 rounded-full bg-brand-inactive-text inline-block mx-1 align-middle" />}
-                                    {distance && <span>{distance}</span>}
+                                    {distance}
                                 </p>
                             )}
                         </div>

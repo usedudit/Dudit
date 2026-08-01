@@ -334,6 +334,12 @@ export default async function ExplorarPage({
         promos: "🎯 Promoções especiais",
         "most-viewed": "💬 Mais visualizados",
         popular: "🔥 Populares",
+        products: "🛍️ Produtos",
+        businesses: "🏢 Negócios",
+        "well-rated": "⭐ Bem avaliados",
+        "on-offer": "🎯 Em oferta",
+        "high-demand": "🔥 Em alta",
+        "newly-announced": "🆕 Novos anunciados",
     }
     const sectionTitle = section ? sectionTitles[section] || "Explorar" : undefined
 

@@ -152,21 +152,17 @@ export function ExplorarPageClient({
     const [viewMode, setViewMode] = useState<ViewMode>("grid")
 
     const categoriesList = useMemo(() => {
-        if (currentType === "servicos") {
-            return dbServiceCategories.length > 0 ? dbServiceCategories : FALLBACK_CATEGORIES
-        }
-        if (currentType === "vitrines") {
-            return dbPartnerCategories.length > 0 ? dbPartnerCategories : FALLBACK_CATEGORIES
-        }
-        if (currentType === "tudo") {
-            const merged = [...dbCategories]
-            for (const sc of dbServiceCategories) {
-                if (!merged.some(c => c.name === sc.name)) merged.push(sc)
-            }
-            return merged.length > 0 ? merged : FALLBACK_CATEGORIES
-        }
-        return dbCategories.length > 0 ? dbCategories : FALLBACK_CATEGORIES
-    }, [dbCategories, dbServiceCategories, dbPartnerCategories, currentType])
+        const newCategories = [
+            { name: "Produtos", icon_url: "https://img.dudit.com.br/static/categories/products/Produtos.png" },
+            { name: "Serviços", icon_url: "https://img.dudit.com.br/static/categories/products/Servicos.png" },
+            { name: "Negócios", icon_url: "https://img.dudit.com.br/static/categories/products/Negocios.png" },
+            { name: "Bem avaliados", icon_url: "https://img.dudit.com.br/static/categories/products/Bem-avaliados.png" },
+            { name: "Em oferta", icon_url: "https://img.dudit.com.br/static/categories/products/Em-oferta.png" },
+            { name: "Em alta", icon_url: "https://img.dudit.com.br/static/categories/products/Em-alta.png" },
+            { name: "Novos anunciados", icon_url: "https://img.dudit.com.br/static/categories/products/Novos-anunciados.png" },
+        ]
+        return newCategories
+    }, [])
 
     const categoriesLoadedRef = useRef(false)
 
@@ -514,6 +510,44 @@ export function ExplorarPageClient({
             return { vitrinesDestaque: [], dataToFilter: list }
         }
 
+        if (currentType === 'negocios') {
+            const list = normalizedInitialResults.filter(r => r.itemType === 'loja')
+            return { vitrinesDestaque: [], dataToFilter: list }
+        }
+
+        if (currentType === 'bem-avaliados') {
+            const allItems = normalizedInitialResults.filter(r => r.itemType !== 'loja')
+            const sortedItems = [...allItems]
+                .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+                .slice(0, 20)
+            return { vitrinesDestaque: [], dataToFilter: sortedItems }
+        }
+
+        if (currentType === 'em-oferta') {
+            const list = normalizedInitialResults.filter(r => r.itemType !== 'loja' && r.originalPrice !== undefined && r.originalPrice > r.price)
+            return { vitrinesDestaque: [], dataToFilter: list }
+        }
+
+        if (currentType === 'em-alta') {
+            const allItems = normalizedInitialResults.filter(r => r.itemType !== 'loja')
+            const sortedItems = [...allItems]
+                .sort((a, b) => (b.sales_last_30_days || 0) - (a.sales_last_30_days || 0))
+                .slice(0, 20)
+            return { vitrinesDestaque: [], dataToFilter: sortedItems }
+        }
+
+        if (currentType === 'novos-anunciados') {
+            const allItems = normalizedInitialResults.filter(r => r.itemType !== 'loja')
+            const sortedItems = [...allItems]
+                .sort((a, b) => {
+                    const dateA = new Date(a.created_at || 0)
+                    const dateB = new Date(b.created_at || 0)
+                    return dateB.getTime() - dateA.getTime()
+                })
+                .slice(0, 20)
+            return { vitrinesDestaque: [], dataToFilter: sortedItems }
+        }
+
         if (currentType === 'tudo') {
             const vitrines = normalizedInitialResults.filter(r => r.itemType === 'loja')
             const sortedVitrines = [...vitrines]
@@ -654,14 +688,14 @@ export function ExplorarPageClient({
     }, [filteredResults, selectedCategories])
 
     const promoProducts = useMemo(() => {
-        if (currentType !== 'produtos') return []
+        if (currentType !== 'produtos' && currentType !== 'em-oferta') return []
         return filteredResults.filter(p => p.originalPrice !== undefined && p.originalPrice > p.price).slice(0, 20)
     }, [filteredResults, currentType])
 
     const showFeaturedSections = currentType === 'tudo' && selectedCategories.length === 0 && !query && !selectedSection && rawItems.length > 0
 
     const pageMode = useMemo((): PageMode => {
-        if (query || currentType !== 'tudo') return "search"
+        if (query || (currentType !== 'tudo' && currentType !== 'em-alta' && currentType !== 'novos-anunciados')) return "search"
         if (selectedSection) return "section-detail"
         if (selectedCategories.length > 0) return "category"
         return "sections"
@@ -821,6 +855,11 @@ export function ExplorarPageClient({
         if (currentType === "servicos") return `Serviços${citySuffix}`
         if (currentType === "planos") return `Assinaturas e Planos${citySuffix}`
         if (currentType === "vitrines") return `Lojas e Vitrines${citySuffix}`
+        if (currentType === "negocios") return `Negócios${citySuffix}`
+        if (currentType === "bem-avaliados") return `Bem avaliados${citySuffix}`
+        if (currentType === "em-oferta") return `Em oferta${citySuffix}`
+        if (currentType === "em-alta") return `Em alta${citySuffix}`
+        if (currentType === "novos-anunciados") return `Novos anunciados${citySuffix}`
         return `Itens${citySuffix}`
     }, [query, currentType, selectedCategories, selectedCitySlug, selectedSection])
 
@@ -841,6 +880,21 @@ export function ExplorarPageClient({
         }
         if (currentType === "vitrines") {
             return `Nenhuma loja cadastrada em <strong class='text-brand-dark'>${cityNameOnly}</strong> ainda. Crie sua vitrine - é gratuito e sem comissão!`
+        }
+        if (currentType === "negocios") {
+            return `Nenhum negócio cadastrado em <strong class='text-brand-dark'>${cityNameOnly}</strong> ainda. Seja o primeiro a vender aqui - é gratuito e sem comissão!`
+        }
+        if (currentType === "bem-avaliados") {
+            return `Nenhum item bem avaliado cadastrado em <strong class='text-brand-dark'>${cityNameOnly}</strong> ainda. Seja o primeiro a vender aqui - é gratuito e sem comissão!`
+        }
+        if (currentType === "em-oferta") {
+            return `Nenhum item em oferta cadastrado em <strong class='text-brand-dark'>${cityNameOnly}</strong> ainda. Seja o primeiro a vender aqui - é gratuito e sem comissão!`
+        }
+        if (currentType === "em-alta") {
+            return `Nenhum item em alta cadastrado em <strong class='text-brand-dark'>${cityNameOnly}</strong> ainda. Seja o primeiro a vender aqui - é gratuito e sem comissão!`
+        }
+        if (currentType === "novos-anunciados") {
+            return `Nenhum item novo cadastrado em <strong class='text-brand-dark'>${cityNameOnly}</strong> ainda. Seja o primeiro a vender aqui - é gratuito e sem comissão!`
         }
         return `Nenhum vendedor cadastrado em <strong class='text-brand-dark'>${cityNameOnly}</strong> ainda. Seja o primeiro ou convide quem você conhece!`
     }, [currentType, selectedCitySlug, query, selectedCategories])
@@ -867,9 +921,12 @@ export function ExplorarPageClient({
     const typeOptions = [
         { value: "tudo", label: "Tudo" },
         { value: "produtos", label: "Produtos" },
-        { value: "servicos", label: "Servicos" },
-        { value: "planos", label: "Assinaturas" },
-        { value: "vitrines", label: "Lojas" },
+        { value: "servicos", label: "Serviços" },
+        { value: "negocios", label: "Negócios" },
+        { value: "bem-avaliados", label: "Bem avaliados" },
+        { value: "em-oferta", label: "Em oferta" },
+        { value: "em-alta", label: "Em alta" },
+        { value: "novos-anunciados", label: "Novos anunciados" },
     ]
 
     const sortOptions: { value: SortOption; label: string }[] = [
@@ -959,7 +1016,7 @@ export function ExplorarPageClient({
                 key={`${item.itemType}-${item.id}`}
                 href={getItemUrl(item)}
                 prefetch={false}
-                className="group grid grid-cols-[112px_1fr] gap-4 border-t border-gray-100 py-4 sm:grid-cols-[220px_1fr] hover:bg-gray-50/60"
+                className="group grid grid-cols-[80px_1fr] gap-3 border-t border-gray-100 py-3 sm:grid-cols-[180px_1fr] hover:bg-gray-50/60"
             >
                 <div className="relative aspect-square overflow-hidden rounded-lg bg-brand-gray">
                     <img src={imageUrl} alt={item.name} className="h-full w-full object-cover" loading="lazy" />
@@ -977,12 +1034,12 @@ export function ExplorarPageClient({
                                 )}
                             </div>
                             {(item.category || item.subcategoryName) && (
-                                <div className="mt-2 flex flex-wrap gap-2">
-                                    {item.category && <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-bold text-brand-dark">{item.category}</span>}
-                                    {item.subcategoryName && <span className="rounded-full bg-[#ecfdf5] px-2.5 py-1 text-[11px] font-bold text-brand-green">{item.subcategoryName}</span>}
+                                <div className="mt-1 flex flex-wrap gap-1">
+                                    {item.category && <span className="text-xs font-medium text-brand-dark">{item.category}</span>}
+                                    {item.subcategoryName && <span className="text-xs font-medium text-brand-green">{item.subcategoryName}</span>}
                                 </div>
                             )}
-                            <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium text-brand-inactive-text">
+                            <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium text-brand-inactive-text">
                                 {city && <span>{city}{state ? ` - ${state}` : ""}</span>}
                                 {city && distance && <span className="w-1 h-1 rounded-full bg-brand-inactive-text" />}
                                 {distance && <span className="font-medium">{distance}</span>}
@@ -991,22 +1048,28 @@ export function ExplorarPageClient({
                     ) : (
                         <>
                             <h3 className="line-clamp-2 text-base font-bold text-brand-dark sm:text-lg">{item.name}</h3>
-                            <div className="mt-2">
+                            <div className="mt-1">
                                 {showPrice ? (
                                     <div className="flex flex-wrap items-baseline gap-2">
                                         {item.originalPrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(item.originalPrice)}</span>}
-                                        <span className="text-lg font-bold text-brand-dark">{formatCurrency(item.price || 0)}</span>
+                                        <span className="text-base font-bold text-brand-dark">{formatCurrency(item.price || 0)}</span>
                                     </div>
                                 ) : (
-                                    <span className="text-sm font-bold text-brand-dark">Preco sob consulta</span>
+                                    <span className="text-xs font-bold text-brand-dark">Preco sob consulta</span>
                                 )}
                             </div>
-                            <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium text-brand-inactive-text">
-                                {(partner?.name || partner?.store_name) && <span className="font-bold text-brand-dark">{partner.name || partner.store_name}</span>}
-                                {(item.rating ?? 0) > 0 && <span>{Number(item.rating).toFixed(1)} estrela</span>}
-                                {city && <span>{city}{state ? ` - ${state}` : ""}</span>}
-                                {city && distance && <span className="w-1 h-1 rounded-full bg-brand-inactive-text" />}
-                                {distance && <span className="font-medium">{distance}</span>}
+                            <div className="mt-2 flex items-center gap-2">
+                                {partner?.store_name && (
+                                    <>
+                                        <span className="text-xs font-bold text-brand-dark">{partner.store_name}</span>
+                                        {distance && (
+                                            <>
+                                                <span className="w-1 h-1 rounded-full bg-brand-inactive-text" />
+                                                <span className="text-xs font-medium text-brand-inactive-text">{distance}</span>
+                                            </>
+                                        )}
+                                    </>
+                                )}
                             </div>
                         </>
                     )}
@@ -1188,7 +1251,7 @@ export function ExplorarPageClient({
                                 <h2 className="text-lg lg:text-2xl font-medium text-brand-dark mb-4">Categorias</h2>
                                 <div className="flex gap-4 overflow-x-auto scrollbar-none snap-x snap-mandatory pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                                     {(categoriesList || []).map((cat) => {
-                                        const catSlug = Object.keys(CATEGORY_SLUG_MAP).find(key => CATEGORY_SLUG_MAP[key] === cat.name)
+                                        const catSlug = cat.name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")
                                         return (
                                             <button
                                                 key={cat.name}
@@ -1209,8 +1272,7 @@ export function ExplorarPageClient({
                                 </div>
                             </div>
 
-                            {/* 2. BANNER PADRÃO (HOMEPAGE) */}
-                            <HeroBanner height={200} />
+
 
                             {/* 3. VÍDEOS DA COMUNIDADE */}
                             {showCommunityVideos && (
@@ -1257,14 +1319,22 @@ export function ExplorarPageClient({
                     {renderCategoryDiscoverSections()}
 
                     <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-                        {/* SIDEBAR (Desktop only) - contextualizado */}
-                        <ExplorarFilterSidebar
-                            userProfile={userProfile}
-                            selectedCitySlug={selectedCitySlug}
-                            formatCitySlug={formatCitySlug}
-                            onCitySelect={() => setIsCityModalOpen(true)}
-                            currentType={currentType}
-                            typeOptions={[
+                            {/* SIDEBAR (Desktop only) - contextualizado */}
+                            <ExplorarFilterSidebar
+                                userProfile={userProfile}
+                                selectedCitySlug={selectedCitySlug}
+                                formatCitySlug={formatCitySlug}
+                                onCitySelect={() => setIsCityModalOpen(true)}
+                                currentType={currentType}
+                                typeOptions={[
+                                    { value: "produtos", label: "Produtos" },
+                                    { value: "servicos", label: "Serviços" },
+                                    { value: "negocios", label: "Negócios" },
+                                    { value: "bem-avaliados", label: "Bem avaliados" },
+                                    { value: "em-oferta", label: "Em oferta" },
+                                    { value: "em-alta", label: "Em alta" },
+                                    { value: "novos-anunciados", label: "Novos anunciados" },
+                                ]}
                                 { value: "tudo", label: "Tudo" },
                                 { value: "produtos", label: "Produtos" },
                                 { value: "servicos", label: "Serviços" },
