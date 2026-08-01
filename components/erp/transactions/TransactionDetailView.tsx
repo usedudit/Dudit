@@ -8,6 +8,7 @@ import { TransactionHistoryTab } from "./TransactionHistoryTab"
 import { TransactionContactCard } from "./TransactionContactCard"
 import { TransactionGoalCard } from "./TransactionGoalCard"
 import { useNotification } from "@/hooks/use-notification"
+import { useSidebar } from "@/lib/sidebar-context"
 import { GenericAttachmentsTab } from "../shared/GenericAttachmentsTab"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { formatCurrency, formatQuantityWithUnit, formatUnitPriceWithUnit } from "@/lib/utils"
@@ -43,6 +44,17 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
     const { error: notifyError } = useNotification()
 
     const handleBack = useCallback(() => onBack(), [onBack])
+
+    const { setHeaderOverride } = useSidebar()
+
+    useEffect(() => {
+        setHeaderOverride({
+            title: detail?.headerTitle || "Detalhes da transação",
+            onBack: handleBack,
+            isSubPage: true
+        })
+        return () => setHeaderOverride(null)
+    }, [detail?.headerTitle, handleBack, setHeaderOverride])
 
     const handleScroll = useCallback(() => {
         if (scrollContainerRef.current) {

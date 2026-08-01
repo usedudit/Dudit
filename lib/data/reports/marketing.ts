@@ -42,7 +42,7 @@ const getCachedMarketingData = cache(async (partnerId: string, period: Period = 
           .limit(500),
         supabase
           .from("coupons")
-          .select("id, code, max_uses, discount_type, discount_value, is_active")
+          .select("id, code, usage_limit, discount_type, discount_value, is_active")
           .eq("partner_id", partnerId)
           .eq("is_active", true)
           .limit(200),

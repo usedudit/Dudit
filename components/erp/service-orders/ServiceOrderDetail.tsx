@@ -21,6 +21,7 @@ import {
 import { SERVICE_ORDER_STATUS_META, type ServiceOrderStatus } from "@/lib/types/service-order"
 import { r2PublicConfig } from "@/lib/r2/r2-public"
 import { useToast } from "@/hooks/use-toast"
+import { useSidebar } from "@/lib/sidebar-context"
 import { usePermissions } from "@/lib/permission-context"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
@@ -112,13 +113,24 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
         }
     }, [])
 
-    const handleBack = () => {
+    const handleBack = useCallback(() => {
         if (onBack) {
             onBack()
         } else {
             window.location.href = "/erp/service-orders"
         }
-    }
+    }, [onBack])
+
+    const { setHeaderOverride } = useSidebar()
+
+    useEffect(() => {
+        setHeaderOverride({
+            title: `OS #${order.order_number}`,
+            onBack: handleBack,
+            isSubPage: true
+        })
+        return () => setHeaderOverride(null)
+    }, [order.order_number, handleBack, setHeaderOverride])
 
     const statusMeta = SERVICE_ORDER_STATUS_META[order.status as ServiceOrderStatus]
     const availableTransitions = STATUS_TRANSITIONS[order.status] || []

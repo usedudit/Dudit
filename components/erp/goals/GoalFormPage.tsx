@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState, useCallback } from "react"
+import { useMemo, useState, useCallback, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { FadeIn } from "@/components/animations/FadeIn"
 import {
@@ -20,6 +20,7 @@ import {
 import { ChevronLeftIcon, PlusIcon, SaveIcon, TargetIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
+import { useSidebar } from "@/lib/sidebar-context"
 import { upsertSalesGoalAction } from "@/app/actions/erp/goals"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { createFinanceAccountAction } from "@/app/actions/erp/finance-accounts"
@@ -118,6 +119,17 @@ export default function GoalFormPage({ partnerId, mode, sellers, accounts, initi
   const isDirty = currentSnapshot !== initialSnapshot
   const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isDirty)
   const handleBack = useCallback(() => handleNavigation(onBack), [handleNavigation, onBack])
+
+  const { setHeaderOverride } = useSidebar()
+
+  useEffect(() => {
+    setHeaderOverride({
+      title: pageTitle,
+      onBack: handleBack,
+      isSubPage: true
+    })
+    return () => setHeaderOverride(null)
+  }, [pageTitle, handleBack, setHeaderOverride])
 
   const assignedSellerNames = useMemo(
     () => sellers.filter((seller) => form.assignedUserIds.includes(seller.id)).map((seller) => seller.name),

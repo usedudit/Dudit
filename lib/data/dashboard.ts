@@ -374,7 +374,7 @@ async function getCachedProducts(partnerId: string, storeId = ""): Promise<Produ
       async () => {
         const supabase = createAdminClient()
         const [products, orders, items] = await Promise.all([
-          scopeActiveOnly(supabase.from("products").select("id, name, stock_quantity, unit, category, price, is_active").eq("partner_id", partnerId)).limit(300),
+          scopeActiveOnly(supabase.from("products").select("id, name, stock_quantity, unit, category:product_categories!category_id(name), price, is_active").eq("partner_id", partnerId)).limit(300),
           supabase.from("orders").select("id, total_amount, situation, created_at").eq("partner_id", partnerId).gte("created_at", `${addDays(getTodayYmdSaoPaulo(), -29)}T00:00:00`).order("created_at", { ascending: false }).limit(400),
           supabase.from("order_items").select("product_name, quantity, created_at, orders!inner(partner_id)").eq("orders.partner_id", partnerId).gte("created_at", `${addDays(getTodayYmdSaoPaulo(), -29)}T00:00:00`).limit(600),
         ])
@@ -390,7 +390,10 @@ async function getCachedProducts(partnerId: string, storeId = ""): Promise<Produ
         const sold = new Map<string, number>()
         for (const item of itemRows) sold.set(item.product_name || "Produto", (sold.get(item.product_name || "Produto") || 0) + money(item.quantity || 0))
         const category = new Map<string, number>()
-        for (const p of productRows) category.set(p.category || "Sem categoria", (category.get(p.category || "Sem categoria") || 0) + 1)
+        for (const p of productRows) {
+          const catName = (p.category as any)?.name || "Sem categoria"
+          category.set(catName, (category.get(catName) || 0) + 1)
+        }
         const hours = new Map<string, number>()
         for (const order of orderRows) {
           const { hour } = getDateComponents(order.created_at)

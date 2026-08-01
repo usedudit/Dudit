@@ -37,6 +37,7 @@ const CouponSchema = z.object({
     serviceIds: z.array(z.string().uuid()).optional().default([]),
     customerIds: z.array(z.string().uuid()).optional().default([]),
     storeIds: z.array(z.string().uuid()).optional().default([]),
+    storeId: z.string().uuid().nullable().optional(),
 }).superRefine((data, ctx) => {
     if (data.discountType === "free_shipping" && data.discountValue !== null) {
         ctx.addIssue({
@@ -86,19 +87,7 @@ export async function listCouponsAction(partnerId: string, params?: { search?: s
     if (params?.type && ["percentage", "fixed", "free_shipping"].includes(params.type)) query = query.eq("discount_type", params.type)
 
     if (params?.storeId) {
-        const { count: hasStores } = await supabase
-            .from("coupon_stores")
-            .select("*", { count: "exact", head: true })
-
-        if (hasStores && hasStores > 0) {
-            const { data: valid } = await supabase
-                .from("coupon_stores")
-                .select("coupon_id")
-                .eq("store_id", params.storeId)
-
-            const validIds = (valid || []).map((r: { coupon_id: string }) => r.coupon_id)
-            query = query.in("id", validIds.length > 0 ? validIds : ["__none__"])
-        }
+        query = query.or(`store_id.is.null,store_id.eq.${params.storeId}`)
     }
 
     const { data, error, count } = await query
@@ -133,6 +122,7 @@ export async function createCouponAction(input: z.infer<typeof CouponSchema>) {
             ends_at: data.endsAt,
             is_active: data.isActive,
             customer_scope: data.customerScope,
+            store_id: data.storeId || (data.storeIds && data.storeIds.length > 0 ? data.storeIds[0] : null),
             is_automatic: data.isAutomatic,
         })
         .select("id")
@@ -152,10 +142,6 @@ export async function createCouponAction(input: z.infer<typeof CouponSchema>) {
     }
     if (data.customerScope === "specific" && data.customerIds.length > 0) {
         await supabase.from("coupon_customers").insert(data.customerIds.map((id) => ({ coupon_id: couponId, customer_id: id })))
-    }
-
-    if (data.storeIds.length > 0) {
-        await setCouponStores(couponId, data.storeIds)
     }
 
     await revalidateCoupons(data.partnerId)
@@ -196,6 +182,7 @@ export async function updateCouponAction(couponId: string, input: z.infer<typeof
             ends_at: data.endsAt,
             is_active: data.isActive,
             customer_scope: data.customerScope,
+            store_id: data.storeId || (data.storeIds && data.storeIds.length > 0 ? data.storeIds[0] : null),
             is_automatic: data.isAutomatic,
         })
         .eq("id", couponId)
@@ -220,8 +207,6 @@ export async function updateCouponAction(couponId: string, input: z.infer<typeof
     if (data.customerScope === "specific" && data.customerIds.length > 0) {
         await supabase.from("coupon_customers").insert(data.customerIds.map((id) => ({ coupon_id: couponId, customer_id: id })))
     }
-
-    await setCouponStores(couponId, data.storeIds)
 
     await revalidateCoupons(data.partnerId)
     return { success: true }

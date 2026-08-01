@@ -12,6 +12,7 @@ import { useMediaQuery } from '@/components/erp/hooks';
 import { useRouter } from 'next/navigation';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { FadeIn } from '@/components/animations/FadeIn';
+import { useSidebar } from '@/lib/sidebar-context';
 import SavingStatusModal from '@/components/reusable/SavingStatusModal';
 import { KPICard } from '@/components/erp/dashboard/cards/KPICard';
 import { fetchCSRFTokenSingleton } from '@/hooks/use-csrf-token';
@@ -39,6 +40,17 @@ export const SupplierDetailPage = ({ supplier, onBack, onEdit }: Props) => {
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
     const handleBack = useCallback(() => onBack(), [onBack]);
+
+    const { setHeaderOverride } = useSidebar();
+
+    useEffect(() => {
+        setHeaderOverride({
+            title: supplier?.name || "Detalhes do fornecedor",
+            onBack: handleBack,
+            isSubPage: true
+        })
+        return () => setHeaderOverride(null)
+    }, [supplier?.name, handleBack, setHeaderOverride])
 
     const handleScroll = useCallback(() => {
         if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5);

@@ -630,19 +630,7 @@ export async function listPromotionsAction(partnerId: string, campaignId?: strin
   }
 
   if (storeId) {
-    const { count: hasStores } = await supabase
-      .from("promotion_stores")
-      .select("*", { count: "exact", head: true })
-
-    if (hasStores && hasStores > 0) {
-      const { data: valid } = await supabase
-        .from("promotion_stores")
-        .select("promotion_id")
-        .eq("store_id", storeId)
-
-      const validIds = (valid || []).map((r: { promotion_id: string }) => r.promotion_id)
-      query = query.in("id", validIds.length > 0 ? validIds : ["__none__"])
-    }
+    query = query.or(`store_id.is.null,store_id.eq.${storeId}`)
   }
 
   const { data, error } = await query
@@ -1208,13 +1196,13 @@ export async function getPromotionScopeDataAction(partnerId: string) {
   const [{ data: products }, { data: services }, { data: categories }, { data: serviceCategories }, { data: customers }, { data: stores }] = await Promise.all([
     supabase
       .from("products")
-      .select("id, name, category:product_categories!category_id(name), category_id, price, sku, images, is_active, store_id, store_ids")
+      .select("id, name, category:product_categories!category_id(name), category_id, price, sku, images, is_active, store_id")
       .eq("partner_id", partnerId)
       .order("name")
       .limit(200),
     supabase
       .from("services")
-      .select("id, name, category:service_categories!category_id(name), category_id, price, sku, images, is_active, store_id, store_ids")
+      .select("id, name, category:service_categories!category_id(name), category_id, price, sku, images, is_active, store_id")
       .eq("partner_id", partnerId)
       .order("name")
       .limit(200),
@@ -1268,8 +1256,8 @@ export async function getPromotionScopeDataAction(partnerId: string) {
       image: Array.isArray(p.images) ? p.images[0] || null : null,
       isActive: Boolean(p.is_active),
       storeId: p.store_id || null,
-      storeIds: Array.isArray(p.store_ids) ? p.store_ids : (p.store_id ? [p.store_id] : []),
-      storeName: resolveStoreName(p.store_id, p.store_ids),
+      storeIds: p.store_id ? [p.store_id] : [],
+      storeName: resolveStoreName(p.store_id),
     })),
     services: (services || []).map((s: any) => ({
       id: s.id,
@@ -1281,8 +1269,8 @@ export async function getPromotionScopeDataAction(partnerId: string) {
       image: Array.isArray(s.images) ? s.images[0] || null : null,
       isActive: Boolean(s.is_active),
       storeId: s.store_id || null,
-      storeIds: Array.isArray(s.store_ids) ? s.store_ids : (s.store_id ? [s.store_id] : []),
-      storeName: resolveStoreName(s.store_id, s.store_ids),
+      storeIds: s.store_id ? [s.store_id] : [],
+      storeName: resolveStoreName(s.store_id),
     })),
     categories: (categories || []).map((c: any) => ({
       id: c.id,

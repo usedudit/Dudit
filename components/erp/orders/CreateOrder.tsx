@@ -19,6 +19,7 @@ import { useProductBucket } from "../hooks"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useDebouncedRefresh } from "@/hooks/use-debounced-refresh"
 import { useStore } from "@/lib/store-context"
+import { useSidebar } from "@/lib/sidebar-context"
 import PaymentModal, { PAYMENT_MODAL_HEADER_SUBTITLE } from "./PaymentModal"
 import { useCSRFToken } from "@/hooks/use-csrf-token"
 import {
@@ -770,13 +771,25 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5)
     }, [])
 
-    const handleBack = () => {
+    const handleBack = useCallback(() => {
         if (isDirty) {
             setShowAlertModal(true)
         } else {
             onBack()
         }
-    }
+    }, [isDirty, onBack])
+
+    const { setHeaderOverride } = useSidebar()
+    const pageTitle = editOrderId ? "Editar pedido" : "Novo pedido"
+
+    useEffect(() => {
+        setHeaderOverride({
+            title: pageTitle,
+            onBack: handleBack,
+            isSubPage: true
+        })
+        return () => setHeaderOverride(null)
+    }, [pageTitle, handleBack, setHeaderOverride])
 
     const getItemMaxQuantity = useCallback((item: any) => {
         if (!item || item.isManual || item.allowSellWithoutStock) return undefined

@@ -30,14 +30,14 @@ const getCachedReturnsData = cache(async (partnerId: string, period: Period = "m
       const [periodReturnsResult, prevReturnsResult, ordersResult, prevOrdersResult] = await Promise.all([
         supabase
           .from("return_requests")
-          .select("id, customer_name_snapshot, reason_code, status, refund_amount, total_amount, created_at")
+          .select("id, customer_name_snapshot, reason, customer_reason, status, refund_amount, order_total_snapshot, created_at")
           .eq("partner_id", partnerId)
           .gte("created_at", `${from}T00:00:00`)
           .order("created_at", { ascending: false })
           .limit(300),
         supabase
           .from("return_requests")
-          .select("id, customer_name_snapshot, reason_code, status, refund_amount, total_amount, created_at")
+          .select("id, customer_name_snapshot, reason, customer_reason, status, refund_amount, order_total_snapshot, created_at")
           .eq("partner_id", partnerId)
           .gte("created_at", `${previousFrom}T00:00:00`)
           .lt("created_at", `${from}T00:00:00`)
@@ -68,11 +68,11 @@ const getCachedReturnsData = cache(async (partnerId: string, period: Period = "m
       const returnRate = totalOrders > 0 ? Math.round((returnCount / totalOrders) * 100) : 0
       const previousReturnRate = prevOrdersCount > 0 ? Math.round((prevReturns.length / prevOrdersCount) * 100) : 0
 
-      const totalRefunded = periodReturns.reduce((a: number, r: any) => a + money(r.refund_amount ?? r.total_amount), 0)
+      const totalRefunded = periodReturns.reduce((a: number, r: any) => a + money(r.refund_amount ?? r.order_total_snapshot), 0)
 
       const byReason = new Map<string, number>()
       for (const r of periodReturns) {
-        const reason = r.reason_code || "Outro"
+        const reason = r.reason || r.customer_reason || "Outro"
         byReason.set(reason, (byReason.get(reason) || 0) + 1)
       }
 
@@ -154,8 +154,8 @@ const getCachedReturnsData = cache(async (partnerId: string, period: Period = "m
         recentReturns: periodReturns.slice(0, 8).map((r: any) => ({
           id: r.id,
           customer: r.customer_name_snapshot || "Cliente",
-          reason: reasonLabels[r.reason_code] || r.reason_code,
-          amount: brl(money(r.refund_amount ?? r.total_amount)),
+          reason: reasonLabels[r.reason] || r.reason || r.customer_reason || "Outro",
+          amount: brl(money(r.refund_amount ?? r.order_total_snapshot)),
           status: statusLabels[r.status] || r.status,
           date: new Date(r.created_at).toLocaleDateString("pt-BR"),
         })),

@@ -29,6 +29,7 @@ import { NumberInputWithCheckbox } from "@/components/reusable/Inputs/NumberInpu
 import { ChevronLeftIcon, SaveIcon, EditIcon, UserIcon, StoreIcon } from "@/lib/icons"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { useNotification } from "@/hooks/use-notification"
+import { useSidebar } from "@/lib/sidebar-context"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { motion, AnimatePresence } from "framer-motion"
 import { createComprehensiveCustomerAction, updateComprehensiveCustomerAction, getCustomerByIdAction } from "@/app/actions/erp/customers"
@@ -421,6 +422,17 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
 
     const pageTitle = customerId ? "Editar cliente" : "Novo cliente"
     const isEditLoadingLocked = Boolean(customerId && isLoadingData)
+
+    const { setHeaderOverride } = useSidebar()
+
+    useEffect(() => {
+        setHeaderOverride({
+            title: pageTitle,
+            onBack: handleBack,
+            isSubPage: true
+        })
+        return () => setHeaderOverride(null)
+    }, [pageTitle, handleBack, setHeaderOverride])
 
     return (
         <FadeIn>

@@ -14,6 +14,7 @@ import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { getDeliveryStatusMeta, getPaymentStatusMeta, getDeliveryStatusLabel } from "@/lib/orders/status"
 import { toast } from "@/hooks/use-notification"
+import { useSidebar } from "@/lib/sidebar-context"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
@@ -121,6 +122,17 @@ export default function DeliveryDetailPage({
     const mounted = useRef(true)
 
     const handleBack = useCallback(() => onBack(), [onBack])
+
+    const { setHeaderOverride } = useSidebar()
+
+    useEffect(() => {
+        setHeaderOverride({
+            title: `Entrega ${delivery?.delivery_number ? `#${delivery.delivery_number}` : ""}`,
+            onBack: handleBack,
+            isSubPage: true
+        })
+        return () => setHeaderOverride(null)
+    }, [delivery?.delivery_number, handleBack, setHeaderOverride])
 
     const handleScroll = useCallback(() => {
         if (scrollContainerRef.current) {

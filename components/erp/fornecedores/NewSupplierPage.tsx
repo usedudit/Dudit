@@ -30,6 +30,7 @@ import { NumberInputWithCheckbox } from "@/components/reusable/Inputs/NumberInpu
 import { ChevronLeftIcon, SaveIcon, EditIcon, UserIcon, StoreIcon } from "@/lib/icons"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { useNotification } from "@/hooks/use-notification"
+import { useSidebar } from "@/lib/sidebar-context"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { motion, AnimatePresence } from "framer-motion"
 import { createComprehensiveSupplierAction, updateComprehensiveSupplierAction, getSupplierByIdAction } from "@/app/actions/erp/suppliers"
@@ -329,6 +330,17 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
 
     const pageTitle = supplierId ? "Editar fornecedor" : "Novo fornecedor"
     const isEditLoadingLocked = Boolean(supplierId && isLoadingData)
+
+    const { setHeaderOverride } = useSidebar()
+
+    useEffect(() => {
+        setHeaderOverride({
+            title: pageTitle,
+            onBack: handleBack,
+            isSubPage: true
+        })
+        return () => setHeaderOverride(null)
+    }, [pageTitle, handleBack, setHeaderOverride])
 
     return (
         <FadeIn>

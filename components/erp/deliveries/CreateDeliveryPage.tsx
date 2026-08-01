@@ -4,6 +4,7 @@ import { useMemo, useRef, useState, useCallback, useEffect } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { toast } from "@/hooks/use-notification"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
+import { useSidebar } from "@/lib/sidebar-context"
 import { UnsavedChangesDialog } from "@/components/reusable/UnsavedChangesDialog"
 
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -174,6 +175,17 @@ export default function CreateDeliveryPage({
     const handleScroll = useCallback(() => {
         if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5)
     }, [])
+
+    const { setHeaderOverride } = useSidebar()
+
+    useEffect(() => {
+        setHeaderOverride({
+            title: "Nova entrega",
+            onBack: handleBack,
+            isSubPage: true
+        })
+        return () => setHeaderOverride(null)
+    }, [handleBack, setHeaderOverride])
 
     const orderPicker = usePickerBucket<OrderPickerItem>(
         () => fetchDeliveryOrderBucketAction(partnerId) as Promise<OrderPickerItem[]>,

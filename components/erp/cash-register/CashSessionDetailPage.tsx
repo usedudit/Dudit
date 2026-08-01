@@ -7,6 +7,7 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency } from "@/lib/utils"
 import { closeCashSessionAction, createCashMovementAction, getCashSessionCloseSummaryAction, getCashSessionDetailsAction, reverseCashMovementAction } from "@/app/actions/erp/cash-register"
 import { useNotification } from "@/hooks/use-notification"
+import { useSidebar } from "@/lib/sidebar-context"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { downloadPdf } from "@/lib/pdf/download"
 import { ChevronLeftIcon, MoneyIcon, CreditCardIcon, QRCodeIcon, MoreHorizontalIcon, MoneyBagIcon, ShoppingCartIcon, ArrowUpDownIcon, ArrowDownIcon, ArrowUpIcon, EyeIcon, ReturnIcon, CheckCircleIcon } from "@/lib/icons"
@@ -51,6 +52,19 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
     const [activeTab, setActiveTab] = useState<"summary" | "movements" | "returns">("summary")
 
     const handleBack = useCallback(() => onBack?.(), [onBack])
+
+    const { setHeaderOverride } = useSidebar()
+
+    useEffect(() => {
+        const sessionId = details?.session?.id
+        const title = sessionId ? `Caixa ${sessionId.slice(0, 8).toUpperCase()}` : "Detalhes do caixa"
+        setHeaderOverride({
+            title,
+            onBack: handleBack,
+            isSubPage: true
+        })
+        return () => setHeaderOverride(null)
+    }, [details?.session?.id, handleBack, setHeaderOverride])
     const session = details?.session
     const isOpen = session?.status === "open"
     const [isScrolled, setIsScrolled] = useState(false)

@@ -8,6 +8,7 @@ import DefaultModal from "@/components/reusable/DefaultModal"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import Pagination from "@/components/reusable/Pagination"
 import { useNotification } from "@/hooks/use-notification"
+import { useSidebar } from "@/lib/sidebar-context"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useRouter } from "next/navigation"
@@ -722,6 +723,17 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
     const [historyLoaded, setHistoryLoaded] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const { success: notifySuccess, error: notifyError } = useNotification()
+    const { setHeaderOverride } = useSidebar()
+
+    useEffect(() => {
+        const numero = preview?.invoice?.numero
+        setHeaderOverride({
+            title: numero ? `NF-e ${numero}` : "Importar XML",
+            onBack,
+            isSubPage: true
+        })
+        return () => setHeaderOverride(null)
+    }, [preview?.invoice?.numero, onBack, setHeaderOverride])
 
     const handleScroll = useCallback(() => {
         if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5)

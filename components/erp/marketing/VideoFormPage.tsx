@@ -8,6 +8,7 @@ import CommunityVideoUploadSection from "./CommunityVideoUploadSection"
 import SelectVideoProductSheet from "./SelectVideoProductSheet"
 import SelectVideoServiceSheet from "./SelectVideoServiceSheet"
 import { ChevronLeftIcon, LinkIcon } from "@/lib/icons"
+import { useSidebar } from "@/lib/sidebar-context"
 import type { VideoMetadata } from "@/lib/video/shared"
 
 interface VideoFormPageProps {
@@ -109,6 +110,18 @@ export default function VideoFormPage({ video, onSave, onBack, isLoading, partne
     }
 
     const handleBack = useCallback(() => onBack?.(), [onBack])
+
+    const pageTitle = readOnly ? (video?.title || "Vídeo") : isEditing ? "Editar Vídeo" : "Novo Vídeo"
+    const { setHeaderOverride } = useSidebar()
+
+    useEffect(() => {
+        setHeaderOverride({
+            title: pageTitle,
+            onBack: handleBack,
+            isSubPage: true
+        })
+        return () => setHeaderOverride(null)
+    }, [pageTitle, handleBack, setHeaderOverride])
 
     return (
         <FadeIn>

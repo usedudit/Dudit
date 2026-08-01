@@ -25,6 +25,7 @@ import {
     Pagination
 } from "@/components/reusable"
 import { usePermissions } from "@/lib/permission-context"
+import { useSidebar } from "@/lib/sidebar-context"
 
 import { getOrderDetailsAction, getOrderHistoryAction } from "@/app/actions/erp/orders"
 import { getOrderDeliverySummaryAction } from "@/app/actions/erp/deliveries"
@@ -159,6 +160,17 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const { error: notifyError } = useNotification()
 
     const handleBack = useCallback(() => onBack(), [onBack])
+
+    const { setHeaderOverride } = useSidebar()
+
+    useEffect(() => {
+        setHeaderOverride({
+            title: order?.order_number ? `Pedido ${order.order_number}` : "Detalhes do pedido",
+            onBack: handleBack,
+            isSubPage: true
+        })
+        return () => setHeaderOverride(null)
+    }, [order?.order_number, handleBack, setHeaderOverride])
 
     const handleScroll = useCallback(() => {
         if (scrollContainerRef.current) {

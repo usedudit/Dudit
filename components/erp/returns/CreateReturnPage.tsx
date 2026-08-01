@@ -42,6 +42,7 @@ import ProductImagesSection from "@/components/erp/product/ProductImagesSection"
 import ImageCropperModal from "@/components/ImageCropperModal"
 import { useNotification } from "@/hooks/use-notification"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
+import { useSidebar } from "@/lib/sidebar-context"
 import { UnsavedChangesDialog } from "@/components/reusable/UnsavedChangesDialog"
 import SelectCustomerSheet from "@/components/erp/clientes/SelectCustomerSheet"
 
@@ -275,6 +276,22 @@ export default function CreateReturnPage({
 
     const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isDirty)
     const handleBack = useCallback(() => handleNavigation(onBack), [handleNavigation, onBack])
+
+    const { setHeaderOverride } = useSidebar()
+
+    useEffect(() => {
+        const title = mode === "create"
+            ? "Nova devolução"
+            : mode === "edit"
+                ? `Editar devolução DVL-${returnRequest?.id.slice(0, 6).toUpperCase()}`
+                : `Detalhes da devolução DVL-${returnRequest?.id.slice(0, 6).toUpperCase()}`
+        setHeaderOverride({
+            title,
+            onBack: handleBack,
+            isSubPage: true
+        })
+        return () => setHeaderOverride(null)
+    }, [mode, returnRequest?.id, handleBack, setHeaderOverride])
 
     // Load return events for edit/view modes
     useEffect(() => {

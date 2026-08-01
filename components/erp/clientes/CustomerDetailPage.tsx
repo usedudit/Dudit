@@ -19,6 +19,7 @@ import { usePlanUpgrade, planStarIconForTarget } from '@/components/erp/subscrip
 import { fetchCSRFTokenSingleton } from '@/hooks/use-csrf-token';
 import { hasMinimumPlan } from '@/lib/subscription/plan-tier';
 import { usePermissions } from '@/lib/permission-context';
+import { useSidebar } from '@/lib/sidebar-context';
 import SavingStatusModal from '@/components/reusable/SavingStatusModal';
 import { KPICard } from '@/components/erp/dashboard/cards/KPICard';
 
@@ -52,6 +53,17 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
     const handleBack = useCallback(() => onBack(), [onBack]);
+
+    const { setHeaderOverride } = useSidebar();
+
+    useEffect(() => {
+        setHeaderOverride({
+            title: customer?.name || "Detalhes do cliente",
+            onBack: handleBack,
+            isSubPage: true
+        })
+        return () => setHeaderOverride(null)
+    }, [customer?.name, handleBack, setHeaderOverride])
 
     const handleScroll = useCallback(() => {
         if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5);

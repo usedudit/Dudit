@@ -13,6 +13,7 @@ import { ChevronLeftIcon, SaveIcon, PlusIcon, TrashIcon, WrenchIcon, PackageIcon
 import { formatCurrency } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
+import { useSidebar } from "@/lib/sidebar-context"
 import { UnsavedChangesDialog } from "@/components/reusable/UnsavedChangesDialog"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { AnimatePresence, motion } from "framer-motion"
@@ -241,6 +242,17 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
     const isDirty = !saving && currentSnapshot !== initialSnapshot
     const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isDirty)
     const handleBack = useCallback(() => handleNavigation(onBack), [handleNavigation, onBack])
+
+    const { setHeaderOverride } = useSidebar()
+
+    useEffect(() => {
+        setHeaderOverride({
+            title: editData ? `Editar OS #${editData.order_number}` : "Nova Ordem de Serviço",
+            onBack: handleBack,
+            isSubPage: true
+        })
+        return () => setHeaderOverride(null)
+    }, [editData, handleBack, setHeaderOverride])
 
     const [showCustomerSheet, setShowCustomerSheet] = useState(false)
     const [showServiceSheet, setShowServiceSheet] = useState(false)

@@ -1,10 +1,11 @@
 "use client"
 
-import React, { useState, useCallback } from "react"
+import React, { useState, useCallback, useEffect } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { ActionsDropdown, Badge, Button, FormSection, Tabs, TabsContent, TabsList, TabsTrigger, ThreeDotsLoader } from "@/components/reusable"
 import { ChevronLeftIcon, EditIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { useSidebar } from "@/lib/sidebar-context"
 import {
     CouponRelations,
     CouponRow,
@@ -62,6 +63,17 @@ export default function CouponDetailPage({
     const [activeTab, setActiveTab] = useState("summary")
 
     const handleBack = useCallback(() => onBack(), [onBack])
+
+    const { setHeaderOverride } = useSidebar()
+
+    useEffect(() => {
+        setHeaderOverride({
+            title: coupon?.code || "Detalhes do cupom",
+            onBack: handleBack,
+            isSubPage: true
+        })
+        return () => setHeaderOverride(null)
+    }, [coupon?.code, handleBack, setHeaderOverride])
 
     return (
         <FadeIn>

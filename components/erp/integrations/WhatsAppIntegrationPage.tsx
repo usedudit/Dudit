@@ -25,6 +25,7 @@ import {
     type WhatsappTemplateView,
 } from "@/app/actions/whatsapp"
 import { motion, AnimatePresence } from "framer-motion"
+import { useSidebar } from "@/lib/sidebar-context"
 
 // ─── Status labels ───────────────────────────────────────────────────────────
 
@@ -82,6 +83,17 @@ export function WhatsAppIntegrationPage({
     const [isLoading, setIsLoading] = useState(false)
     const [activeTab, setActiveTab] = useState("evolution")
     const [testPhone, setTestPhone] = useState("")
+
+    const { setHeaderOverride } = useSidebar()
+
+    useEffect(() => {
+        setHeaderOverride({
+            title: "WhatsApp API",
+            onBack: () => { window.location.href = "/erp/settings?tab=integracoes" },
+            isSubPage: true
+        })
+        return () => setHeaderOverride(null)
+    }, [setHeaderOverride])
 
     // Evolution-specific state (simplified - no manual config)
     const [evoStatus, setEvoStatus] = useState<string>("disconnected")

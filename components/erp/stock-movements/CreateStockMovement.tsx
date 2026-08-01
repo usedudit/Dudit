@@ -38,6 +38,7 @@ import { createBatchStockMovementAction } from '@/app/actions/erp/stock-movement
 import { fetchPartnerProductsBucket } from '@/app/actions/erp/client-loaders';
 import { useNotification } from '@/hooks/use-notification';
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
+import { useSidebar } from "@/lib/sidebar-context"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { motion, AnimatePresence } from "framer-motion"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
@@ -173,6 +174,17 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
     }, [isDirty])
 
     const handleBack = useCallback(() => handleAttemptNav(onBack), [handleAttemptNav, onBack])
+
+    const { setHeaderOverride } = useSidebar()
+
+    useEffect(() => {
+        setHeaderOverride({
+            title: "Nova movimentação",
+            onBack: handleBack,
+            isSubPage: true
+        })
+        return () => setHeaderOverride(null)
+    }, [handleBack, setHeaderOverride])
 
     const confirmNavigation = useCallback(() => {
         nextAction?.()

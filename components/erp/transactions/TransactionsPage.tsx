@@ -28,6 +28,7 @@ import { getFinancialTransactionsAction, getTransactionDetailsAction, type Trans
 import { cancelPendingTransactionAction } from "@/app/actions/erp/transactions"
 import { getPaymentMethodsAction } from "@/app/actions/erp/payment-methods"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
+import { useSidebar } from "@/lib/sidebar-context"
 import { useNotification } from "@/hooks/use-notification"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { useEntityPage } from "@/hooks/use-entity-page"
@@ -848,6 +849,23 @@ export default function TransactionsPage({
     const handleCloseTransactionDetail = useCallback(() => {
         closeEntity()
     }, [closeEntity])
+
+    const handleCloseInstallmentDetail = useCallback(() => {
+        closeEntity()
+        setInstallmentDetail(null)
+    }, [closeEntity])
+
+    const { setHeaderOverride } = useSidebar()
+
+    useEffect(() => {
+        if (!(isViewing && entityState.entityType === "installment")) return
+        setHeaderOverride({
+            title: "Detalhes do parcelamento",
+            onBack: handleCloseInstallmentDetail,
+            isSubPage: true
+        })
+        return () => setHeaderOverride(null)
+    }, [isViewing, entityState.entityType, handleCloseInstallmentDetail, setHeaderOverride])
 
     const handleEditFromTransactionDetail = useCallback(
         (id: string) => {

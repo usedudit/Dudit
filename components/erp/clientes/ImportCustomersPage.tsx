@@ -6,6 +6,7 @@ import { Button, Checkbox, Spinner, SelectionBanner, Pagination, IconPlaceholder
 import { ChevronLeftIcon, UploadIcon, CheckCircleIcon, SearchIcon } from "@/lib/icons"
 import { useDropzone } from "react-dropzone"
 import { useNotification } from "@/hooks/use-notification"
+import { useSidebar } from "@/lib/sidebar-context"
 import { uploadPlanilhaAction, confirmImportAction, applyMappingAction } from "@/app/actions/erp/spreadsheet-import"
 import type { ColumnMapping } from "@/lib/erp/import/types"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -254,6 +255,18 @@ export function ImportCustomersPage({ partnerId }: ImportCustomersPageProps) {
     const handleScroll = useCallback(() => {
         if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5)
     }, [])
+
+    const { setHeaderOverride } = useSidebar()
+
+    useEffect(() => {
+        const title = step === "upload" ? "Importar Clientes" : step === "mapping" ? "Revisar Mapeamento" : fileName
+        setHeaderOverride({
+            title,
+            onBack: () => step === "upload" ? router.push("/erp/products") : setStep("upload"),
+            isSubPage: true
+        })
+        return () => setHeaderOverride(null)
+    }, [step, fileName, router, setHeaderOverride])
 
     const checkScroll = useCallback(() => {
         if (!tableContainerRef.current) return

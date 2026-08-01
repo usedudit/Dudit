@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useMemo, useState, useCallback } from "react"
+import React, { useMemo, useState, useCallback, useEffect } from "react"
 import { AnimatePresence } from "framer-motion"
 import {
     Badge,
@@ -39,6 +39,7 @@ import {
     getCouponPrimaryMeta,
 } from "@/lib/types/coupon"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
+import { useSidebar } from "@/lib/sidebar-context"
 
 interface CouponFormPageProps {
     partnerId: string
@@ -266,6 +267,17 @@ export default function CouponFormPage({
     const pageTitle = mode === "edit" ? "Editar cupom" : "Novo cupom"
     const dateFromValue = form.startsAt ? new Date(`${form.startsAt}T12:00:00`) : undefined
     const dateToValue = form.endsAt ? new Date(`${form.endsAt}T12:00:00`) : undefined
+
+    const { setHeaderOverride } = useSidebar()
+
+    useEffect(() => {
+        setHeaderOverride({
+            title: pageTitle,
+            onBack: handleBack,
+            isSubPage: true
+        })
+        return () => setHeaderOverride(null)
+    }, [pageTitle, handleBack, setHeaderOverride])
 
     const applyScopeActionLabel = form.applyScope === "products"
         ? "Selecionar produtos"
@@ -647,39 +659,6 @@ export default function CouponFormPage({
                                             )}
                                         </div>
                                     </SidebarCard>
-
-                                    {scopeData.stores.length > 0 && (
-                                        <SidebarCard>
-                                            <h3 className="font-bold text-brand-dark dark:text-dark-heading mb-6">Lojas</h3>
-                                            <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-4">
-                                                Selecione as lojas onde este cupom será válido. Se nenhuma for selecionada, vale para todas as lojas.
-                                            </p>
-                                            <div className="space-y-3 max-h-[240px] overflow-y-auto">
-                                                <label className="flex items-center gap-3 cursor-pointer">
-                                                    <Checkbox
-                                                        checked={relations.storeIds.length === 0}
-                                                        onChange={() => setSelectedStoreIds([])}
-                                                    />
-                                                    <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">Todas as lojas</span>
-                                                </label>
-                                                {scopeData.stores.map((store) => (
-                                                    <label key={store.id} className="flex items-center gap-3 cursor-pointer pl-2">
-                                                        <Checkbox
-                                                            checked={relations.storeIds.includes(store.id)}
-                                                            onChange={(checked) => {
-                                                                if (checked) {
-                                                                    setSelectedStoreIds((prev) => [...prev, store.id])
-                                                                } else {
-                                                                    setSelectedStoreIds((prev) => prev.filter((id) => id !== store.id))
-                                                                }
-                                                            }}
-                                                        />
-                                                        <span className="text-sm text-brand-dark dark:text-dark-heading">{store.name}</span>
-                                                    </label>
-                                                ))}
-                                            </div>
-                                        </SidebarCard>
-                                    )}
                                 </div>
                             </div>
                         </div>

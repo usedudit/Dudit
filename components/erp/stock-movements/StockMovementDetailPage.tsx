@@ -11,6 +11,7 @@ import {
 import { Button, ThreeDotsLoader, AlertModal, InfoCard, Badge } from '@/components/reusable';
 import { FadeIn } from '@/components/animations/FadeIn';
 import { useNotification } from '@/hooks/use-notification';
+import { useSidebar } from "@/lib/sidebar-context"
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
 import { formatQuantityWithUnit } from '@/lib/utils/formatters';
 import { undoStockMovementAction } from '@/app/actions/erp/stock-movements';
@@ -67,6 +68,19 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
     const [activeTab, setActiveTab] = useState('details');
 
     const handleBack = useCallback(() => onBack(), [onBack]);
+
+    const { setHeaderOverride } = useSidebar();
+
+    useEffect(() => {
+        const displayId = movement?.displayId
+        const title = displayId ? displayId.slice(0, 8) : "Movimentação de estoque"
+        setHeaderOverride({
+            title,
+            onBack: handleBack,
+            isSubPage: true
+        })
+        return () => setHeaderOverride(null)
+    }, [movement, handleBack, setHeaderOverride])
 
     const handleScroll = useCallback(() => {
         if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5);

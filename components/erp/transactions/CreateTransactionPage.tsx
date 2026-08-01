@@ -27,6 +27,7 @@ import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 import SelectCustomerSheet from "@/components/erp/clientes/SelectCustomerSheet"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
+import { useSidebar } from "@/lib/sidebar-context"
 import { FadeIn } from "@/components/animations/FadeIn"
 import {
     SaveIcon,
@@ -437,6 +438,18 @@ export default function CreateTransactionPage({
             onBack()
         }
     }, [isDirty, onBack])
+
+    const { setHeaderOverride } = useSidebar()
+    const pageTitle = isRecurringTemplateEdit ? "Editar recorrência" : isEditMode ? "Editar transação" : "Nova transação"
+
+    useEffect(() => {
+        setHeaderOverride({
+            title: pageTitle,
+            onBack: handleBack,
+            isSubPage: true
+        })
+        return () => setHeaderOverride(null)
+    }, [pageTitle, handleBack, setHeaderOverride])
 
     const confirmDiscard = useCallback(() => {
         setShowDiscardModal(false)
