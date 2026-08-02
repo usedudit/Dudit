@@ -3,21 +3,16 @@
 import { useState, useMemo, useRef, useEffect, useCallback, Fragment } from "react"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { MarketplaceFooter } from "./MarketplaceFooter"
-import { ItemCard, VitrineCard, HeroBanner, HorizontalCarousel } from "./shared-components"
-import { IconPlaceholder, Button, DefaultModal, RadioButton, SkeletonLoader } from "@/components/reusable"
-import { MoneyInput } from "@/components/reusable/Inputs/MoneyInput"
+import { ItemCard, VitrineCard, HorizontalCarousel } from "./shared-components"
+import { IconPlaceholder, DefaultModal, SkeletonLoader } from "@/components/reusable"
 import { useRouter, useSearchParams, usePathname, useParams } from "next/navigation"
 import { CommunityVideosCarousel } from "./CommunityVideosCarousel"
 import {
-    ArrowLeft,
-    ChevronLeft,
-    ChevronRight,
     MapPin,
     Check,
-    SlidersHorizontal,
 } from "lucide-react"
 import Link from "next/link"
-import { applySellerDiversity, calcCategoryBrowseScore, sortByTrendingScore } from "@/lib/marketplace/ranking"
+import { applySellerDiversity, calcCategoryBrowseScore } from "@/lib/marketplace/ranking"
 import { searchMarketplace, type MarketplaceListCursor } from "@/app/actions/marketplace/search"
 import { useInfiniteList } from "@/hooks/use-infinite-list"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
@@ -27,13 +22,11 @@ import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { StarIcon } from "@/lib/icons"
 import { getStoreUrl, getPlanUrl, getProductUrl, getServiceUrl } from "@/lib/utils/url-generator"
 import { formatCurrency } from "@/lib/utils"
-import { SponsoredAdsCarousel } from "@/components/marketplace/ads/SponsoredAdsCarousel"
 import { SponsoredAdsSearchInline } from "@/components/marketplace/ads/SponsoredAdsSlot"
 import type { SponsoredAd } from "@/lib/ads/types"
 import citiesData from "@/lib/data/cities.json"
 import { useLocationRedirect } from "@/hooks/use-location-redirect"
 import { getMarketplaceCategoriesClient, getMarketplaceServiceCategoriesClient, getMarketplacePartnerCategoriesClient } from "@/lib/data/marketplace-categories-client"
-import { parseMarketplaceType } from "@/lib/types/marketplace"
 import { ExplorarMobileControls } from "./ExplorarMobileControls"
 import { ExplorarHeaderSection } from "./ExplorarHeaderSection"
 import { ExplorarViewControls } from "./ExplorarViewControls"
@@ -41,7 +34,7 @@ import { ExplorarFilterSidebar } from "./ExplorarFilterSidebar"
 import { ExplorarFiltersBottomSheet } from "./ExplorarFiltersBottomSheet"
 import { ExplorarSortBottomSheet } from "./ExplorarSortBottomSheet"
 import { ExploreContentSkeleton } from "./explorar-skeleton"
-import { CATEGORY_SLUG_MAP, FALLBACK_CATEGORIES, COMMON_CITY_ACCENTS } from "./explorar-constants"
+import { CATEGORY_SLUG_MAP, COMMON_CITY_ACCENTS } from "./explorar-constants"
 import type { SortOption, ViewMode } from "./explorar-constants"
 import { getFilterConfig, getSortOptionsForMode, type PageMode } from "./contextual-filters"
 
@@ -63,11 +56,6 @@ interface ExplorarPageClientProps {
     isStateRoute?: boolean
     communityVideos?: any[]
 }
-
-;
-
-
-
 
 export function ExplorarPageClient({
     initialResults = [],
@@ -152,7 +140,7 @@ export function ExplorarPageClient({
     const [viewMode, setViewMode] = useState<ViewMode>("grid")
 
     const categoriesList = useMemo(() => {
-        const newCategories = [
+        const newCategories: { name: string; icon_url: string | null }[] = [
             { name: "Produtos", icon_url: "https://img.dudit.com.br/static/categories/products/Produtos.png" },
             { name: "Serviços", icon_url: "https://img.dudit.com.br/static/categories/products/Servicos.png" },
             { name: "Negócios", icon_url: "https://img.dudit.com.br/static/categories/products/Negocios.png" },
@@ -1319,25 +1307,22 @@ export function ExplorarPageClient({
                     {renderCategoryDiscoverSections()}
 
                     <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-                            {/* SIDEBAR (Desktop only) - contextualizado */}
-                            <ExplorarFilterSidebar
-                                userProfile={userProfile}
-                                selectedCitySlug={selectedCitySlug}
-                                formatCitySlug={formatCitySlug}
-                                onCitySelect={() => setIsCityModalOpen(true)}
-                                currentType={currentType}
-                                typeOptions={[
-                                    { value: "produtos", label: "Produtos" },
-                                    { value: "servicos", label: "Serviços" },
-                                    { value: "negocios", label: "Negócios" },
-                                    { value: "bem-avaliados", label: "Bem avaliados" },
-                                    { value: "em-oferta", label: "Em oferta" },
-                                    { value: "em-alta", label: "Em alta" },
-                                    { value: "novos-anunciados", label: "Novos anunciados" },
-                                ]}
+                        {/* SIDEBAR (Desktop only) - contextualizado */}
+                        <ExplorarFilterSidebar
+                            userProfile={userProfile}
+                            selectedCitySlug={selectedCitySlug}
+                            formatCitySlug={formatCitySlug}
+                            onCitySelect={() => setIsCityModalOpen(true)}
+                            currentType={currentType}
+                            typeOptions={[
                                 { value: "tudo", label: "Tudo" },
                                 { value: "produtos", label: "Produtos" },
                                 { value: "servicos", label: "Serviços" },
+                                { value: "negocios", label: "Negócios" },
+                                { value: "bem-avaliados", label: "Bem avaliados" },
+                                { value: "em-oferta", label: "Em oferta" },
+                                { value: "em-alta", label: "Em alta" },
+                                { value: "novos-anunciados", label: "Novos anunciados" },
                                 { value: "planos", label: "Assinaturas" },
                                 { value: "vitrines", label: "Lojas" },
                             ]}
@@ -1706,8 +1691,6 @@ export function ExplorarPageClient({
                     )}
                 </div>
             </DefaultModal>
-
-
 
             {/* 2. CATEGORY MODAL (SHOWN ONLY WHEN TOP CATEGORIES SLIDER IS HIDDEN) */}
             <DefaultModal

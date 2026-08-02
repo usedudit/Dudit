@@ -527,7 +527,7 @@ function ItemsCarousel({ title, items, partner, onSeeAll, sectionId, promotions 
             <div ref={ref} className="flex gap-4 lg:gap-5 overflow-x-auto scrollbar-hide snap-x snap-mandatory pb-3">
                 {items.slice(0, 20).map(item => (
                     <div key={item.id} className="snap-start">
-                        <ItemCard product={normalizeItemForCard(item, partner)} showSeller={false} promotions={promotions} />
+                        <ItemCard product={normalizeItemForCard(item, partner)} showSeller={false} promotions={promotions} hideSalesCount />
                     </div>
                 ))}
             </div>
@@ -1321,6 +1321,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                                     className="w-full"
                                                     promotions={partnerPromotions}
                                                     hidePromoBadge={isCampaignView}
+                                                    hideSalesCount
                                                 />
                                             ))}
                                         </div>
@@ -1368,6 +1369,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                                                 showSeller={false}
                                                                 promotions={partnerPromotions}
                                                                 hidePromoBadge={true}
+                                                                hideSalesCount
                                                                 className="w-[145px] md:w-[175px] bg-white p-2.5 rounded-xl border border-gray-100 shadow-sm"
                                                             />
                                                         </div>
@@ -1383,7 +1385,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                                 title="Produtos destacados"
                                                 items={featuredItems}
                                                 renderItem={(item) => (
-                                                    <ItemCard product={normalizeItemForCard(item, partner)} showSeller={false} promotions={partnerPromotions} />
+                                                    <ItemCard product={normalizeItemForCard(item, partner)} showSeller={false} promotions={partnerPromotions} hideSalesCount />
                                                 )}
                                                 itemWidthClass="w-[200px] md:w-[230px]"
                                             />
@@ -1395,7 +1397,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                                 title={group.name}
                                                 items={group.items.slice(0, 20)}
                                                 renderItem={(item) => (
-                                                    <ItemCard product={normalizeItemForCard(item, partner)} showSeller={false} promotions={partnerPromotions} />
+                                                    <ItemCard product={normalizeItemForCard(item, partner)} showSeller={false} promotions={partnerPromotions} hideSalesCount />
                                                 )}
                                                 onSeeAll={() => openCategory(group.id)}
                                                 itemWidthClass="w-[200px] md:w-[230px]"

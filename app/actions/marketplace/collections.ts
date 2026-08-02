@@ -9,6 +9,7 @@ import { TAGS } from "@/lib/utils/revalidation-tags"
 import { safeRevalidateTag } from "@/lib/utils/revalidation"
 import { moderateProductContent } from "@/lib/moderation/product-moderation"
 import { filterMarketplaceVisibleProducts, filterMarketplaceVisibleServices } from "@/lib/resolve-marketplace-visibility"
+import { AVATAR_COLORS, getBannerUrlByColor } from "@/lib/utils/avatar"
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -34,10 +35,14 @@ export async function createCollection(name: string, description?: string): Prom
       return { success: false, error: moderation.error || "Conteúdo não aprovado" }
     }
 
+    // Pick random color and matching banner (like stores/partners)
+    const randomColor = AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)]
+    const bannerUrl = getBannerUrlByColor(randomColor)
+
     const supabase = await getSupabaseServerClient()
     const { data, error } = await supabase
       .from("collections")
-      .insert({ name: name.trim(), description: description?.trim() || null, author_id: user.id })
+      .insert({ name: name.trim(), description: description?.trim() || null, author_id: user.id, cover_url: bannerUrl, banner_color: randomColor })
       .select("id")
       .single()
 

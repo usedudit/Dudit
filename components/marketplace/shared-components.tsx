@@ -233,6 +233,7 @@ interface ItemCardProps {
     showSeller?: boolean
     promotions?: any[]
     hidePromoBadge?: boolean
+    hideSalesCount?: boolean
     className?: string
 }
 
@@ -256,7 +257,7 @@ function getCachedPartnerPromotions(partnerId: string) {
     return promotionsCache[partnerId]
 }
 
-export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, showSeller = true, className = "w-[200px] md:w-[230px]", promotions: preloadedPromotions, hidePromoBadge }) => {
+export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, showSeller = true, className = "w-[200px] md:w-[230px]", promotions: preloadedPromotions, hidePromoBadge, hideSalesCount }) => {
     const { user } = useSupabase()
     const router = useRouter()
     const { isFavorited, toggleFavorite } = useFavorites()
@@ -432,7 +433,7 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
                         {product.name}
                     </h3>
 
-                    {salesCount > 0 && (
+                    {!hideSalesCount && salesCount > 0 && (
                         <p className="text-[11px] text-brand-inactive-text leading-tight mb-1">
                             {salesCount} vendidos
                         </p>
@@ -480,9 +481,11 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
                             <p className="text-[11px] md:text-xs text-brand-dark font-medium truncate leading-tight">
                                 {sellerName}
                             </p>
-                            {distance && (
+                            {(sellerLabel || distance) && (
                                 <p className="text-[11px] text-gray-500 font-normal truncate">
-                                    {distance}
+                                    {sellerLabel && <span>{sellerLabel}</span>}
+                                    {sellerLabel && distance && <span className="w-1 h-1 rounded-full bg-brand-inactive-text inline-block mx-1 align-middle" />}
+                                    {distance && <span>{distance}</span>}
                                 </p>
                             )}
                         </div>

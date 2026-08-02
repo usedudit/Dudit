@@ -2,9 +2,8 @@
 
 import { useState, useEffect, useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { Card } from "@/components/ui/card"
-import { Button, DefaultModal, Input, FormTextarea, FormSection } from "@/components/reusable"
-import { ChevronLeftIcon, EditIcon, TrashIcon, ChevronDownIcon } from "@/lib/icons"
+import { Button, DefaultModal, Input, FormTextarea, FormSection, IconPlaceholder, ThreeDotsLoader } from "@/components/reusable"
+import { ChevronLeftIcon, EditIcon, TrashIcon, ChevronDownIcon, CollectionsIcon } from "@/lib/icons"
 import { ItemCard } from "@/components/marketplace/shared-components"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { MarketplaceHeader } from "./MarketplaceHeader"
@@ -12,7 +11,6 @@ import { MarketplaceFooter } from "./MarketplaceFooter"
 import { useSupabase } from "@/providers/supabase-provider"
 import { useToast } from "@/hooks/use-toast"
 import { registerCollectionDetailMenu } from "@/lib/collection-detail-menu"
-import { getRandomDefaultBanner } from "@/lib/utils/banner"
 
 interface CollectionDetailProps {
     collection: any
@@ -26,7 +24,6 @@ export function CollectionDetailPage({ collection }: CollectionDetailProps) {
     const [isLoading, setIsLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
-    const [collectionBanner] = useState(() => getRandomDefaultBanner())
 
     // Edit modal state
     const [isEditModalOpen, setIsEditModalOpen] = useState(false)
@@ -125,15 +122,6 @@ export function CollectionDetailPage({ collection }: CollectionDetailProps) {
     return (
         <>
             <MarketplaceHeader simpleTitle={collection.name} />
-            {/* Collection Banner */}
-            <div className="relative w-full h-48 lg:h-64 overflow-hidden">
-                <img
-                    src={collectionBanner}
-                    alt={collection.name}
-                    className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
-            </div>
             <div className="min-h-screen bg-white pt-[40px] lg:pt-[110px] font-sans flex flex-col">
                 <div className="container mx-auto px-4 max-w-[1400px] w-full mt-12 lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">
 
@@ -238,16 +226,22 @@ export function CollectionDetailPage({ collection }: CollectionDetailProps) {
                     <FormSection title={`Itens (${isLoading ? "..." : items.length})`}>
                         {isLoading ? (
                             <div className="flex items-center justify-center py-12">
-                                <div className="w-6 h-6 border-2 border-brand-green border-t-transparent rounded-full animate-spin" />
+                                <ThreeDotsLoader />
                             </div>
                         ) : error ? (
-                            <Card className="p-12 text-center">
-                                <p className="text-red-500">{error}</p>
-                            </Card>
+                            <IconPlaceholder
+                                placeholderType="image"
+                                imageSrc="https://img.dudit.com.br/static/mascots/Ops.png"
+                                imageAlt="Erro"
+                                title="Ops! Algo deu errado"
+                                subtitle="Não foi possível carregar a coleção. Tente novamente mais tarde."
+                            />
                         ) : items.length === 0 ? (
-                            <Card className="p-12 text-center">
-                                <p className="text-brand-inactive-text">Esta coleção está vazia</p>
-                            </Card>
+                            <IconPlaceholder
+                                icon={CollectionsIcon}
+                                title="Coleção vazia"
+                                subtitle="Esta coleção está vazia. Tente adicionar itens a ela"
+                            />
                         ) : (
                             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                                 {items.map((item: any) => (

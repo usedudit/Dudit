@@ -2,7 +2,7 @@
 
 import React from "react"
 import Link from "next/link"
-import { UserProfileImage } from "@/lib/utils/UserProfileImage"
+import { UserProfileImage, getAvatarColor } from "@/lib/utils/UserProfileImage"
 
 interface CollectionCardProps {
   collection: {
@@ -10,6 +10,7 @@ interface CollectionCardProps {
     name: string
     description?: string | null
     cover_url?: string | null
+    banner_color?: string | null
     items_count: number
     views_count: number
     author?: { id: string; full_name?: string | null; avatar_url?: string | null } | null
@@ -20,6 +21,8 @@ interface CollectionCardProps {
 
 export function CollectionCard({ collection, className = "w-[270px] sm:w-[320px]" }: CollectionCardProps) {
   const authorName = collection.author?.full_name || "Usuário"
+  // Use saved banner_color for avatar background, fallback to computed color from name
+  const avatarBgColor = collection.banner_color || getAvatarColor(collection.name)
 
   return (
     <Link
@@ -50,8 +53,8 @@ export function CollectionCard({ collection, className = "w-[270px] sm:w-[320px]
       <div className="flex items-center gap-3 px-1">
         <UserProfileImage
           fullName={collection.name}
-          imageUrl={collection.cover_url || null}
-          className="w-10 h-10 border border-brand-border shrink-0 bg-gray-50"
+          imageUrl={null}
+          className={`w-10 h-10 border border-brand-border shrink-0 ${avatarBgColor}`}
         />
         <div className="flex-1 min-w-0">
           <h3 className="font-bold text-brand-dark text-sm truncate">

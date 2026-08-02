@@ -53,6 +53,7 @@ interface PromotionFormPageProps {
     campaign?: any
     scopeData: { products: any[]; services: any[]; categories: any[]; serviceCategories: any[]; customers: any[]; stores?: { id: string; name: string; isActive: boolean }[] }
     promotions: any[]
+    storeId?: string | null
     onBack: () => void
 }
 
@@ -62,6 +63,7 @@ export default function PromotionFormPage({
     campaign,
     scopeData,
     promotions,
+    storeId,
     onBack,
 }: PromotionFormPageProps) {
     const { toast } = useToast()
@@ -79,6 +81,14 @@ export default function PromotionFormPage({
     }, [])
 
     const isReadOnly = currentMode === "details"
+
+    // A promoção nunca pode ficar sem loja nem valer para todas as lojas.
+    // Usa a loja ativa do contexto; se não houver, usa a primeira loja ativa disponível.
+    const effectiveStoreId = useMemo(() => {
+        if (storeId) return storeId
+        const activeStores = (scopeData.stores || []).filter((s: any) => s.isActive)
+        return activeStores.length > 0 ? activeStores[0].id : null
+    }, [storeId, scopeData.stores])
 
     // Campaign Form State
     const [campName, setCampName] = useState("")
@@ -177,7 +187,7 @@ export default function PromotionFormPage({
                 setEditingRuleProductIds((initialRule.promotion_products || []).map((p: any) => p.product_id || p))
                 setEditingRuleCategoryIds((initialRule.promotion_categories || []).map((c: any) => c.category_id || c))
                 setEditingRuleServiceIds((initialRule.promotion_services || []).map((s: any) => s.service_id || s))
-                setEditingStoreIds(initialRule.store_id ? [initialRule.store_id] : (campaign.store_id ? [campaign.store_id] : []))
+                setEditingStoreIds(effectiveStoreId ? [effectiveStoreId] : [])
             } else if (currentMode === "add") {
                 setCampName("")
                 setCampDesc("")
@@ -190,11 +200,17 @@ export default function PromotionFormPage({
                 setEditingRuleProductIds([])
                 setEditingRuleCategoryIds([])
                 setEditingRuleServiceIds([])
-                setEditingStoreIds([])
+                setEditingStoreIds(effectiveStoreId ? [effectiveStoreId] : [])
             }
             setIsFormDirty(false)
         }
-    }, [currentMode, campaign, promotions])
+    }, [currentMode, campaign])
+
+    // Garante que a promoção fique sempre vinculada à loja resolvida,
+    // mesmo que o scopeData (com a lista de lojas) carregue depois do formulário abrir.
+    useEffect(() => {
+        setEditingStoreIds(effectiveStoreId ? [effectiveStoreId] : [])
+    }, [effectiveStoreId])
 
     // Mark form as dirty when state changes
     const markDirty = useCallback(() => {
@@ -206,6 +222,11 @@ export default function PromotionFormPage({
         if (e) e.preventDefault()
         if (!campName.trim()) {
             toast({ title: "Nome da campanha é obrigatório.", variant: "destructive" })
+            return
+        }
+
+        if (!effectiveStoreId) {
+            toast({ title: "Erro", description: "Não foi possível determinar uma loja para a promoção. Selecione uma loja no menu do ERP.", variant: "destructive" })
             return
         }
 
@@ -1461,43 +1482,6 @@ export default function PromotionFormPage({
                                                                 />
                                                             </div>
                                                         </SidebarCard>
-
-                                                        {scopeData.stores && scopeData.stores.length > 0 && (
-                                                            <SidebarCard hasTopStrip={true}>
-                                                                <h3 className="text-[15px] font-bold text-brand-dark dark:text-dark-heading mb-5">Lojas</h3>
-                                                                <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-4">
-                                                                    Selecione as lojas onde esta promoção será válida. Se nenhuma for selecionada, vale para todas as lojas.
-                                                                </p>
-                                                                <div className="space-y-3 max-h-[240px] overflow-y-auto">
-                                                                    <label className="flex items-center gap-3 cursor-pointer">
-                                                                        <Checkbox
-                                                                            checked={editingStoreIds.length === 0}
-                                                                            onChange={() => {
-                                                                                markDirty()
-                                                                                setEditingStoreIds([])
-                                                                            }}
-                                                                        />
-                                                                        <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">Todas as lojas</span>
-                                                                    </label>
-                                                                    {(scopeData.stores || []).map((store: any) => (
-                                                                        <label key={store.id} className="flex items-center gap-3 cursor-pointer pl-2">
-                                                                            <Checkbox
-                                                                                checked={editingStoreIds.includes(store.id)}
-                                                                                onChange={(checked) => {
-                                                                                    markDirty()
-                                                                                    if (checked) {
-                                                                                        setEditingStoreIds((prev) => [...prev, store.id])
-                                                                                    } else {
-                                                                                        setEditingStoreIds((prev) => prev.filter((id) => id !== store.id))
-                                                                                    }
-                                                                                }}
-                                                                            />
-                                                                            <span className="text-sm text-brand-dark dark:text-dark-heading">{store.name}</span>
-                                                                        </label>
-                                                                    ))}
-                                                                </div>
-                                                            </SidebarCard>
-                                                        )}
                                                     </div>
                                                 </div>
                                             )}

@@ -14,6 +14,7 @@ interface Collection {
   name: string
   description?: string | null
   cover_url?: string | null
+  banner_color?: string | null
   items_count: number
   views_count: number
   author?: { id: string; full_name?: string | null; avatar_url?: string | null } | null

@@ -153,7 +153,8 @@ import {
     ClockCheckIcon as ClockCheckIcon01,
     ClockArrowUpIcon as ClockArrowUpIcon01,
     Video01Icon,
-    EnergyIcon as EnergyIcon01
+    EnergyIcon as EnergyIcon01,
+    CollectionsBookmarkIcon
 } from "@hugeicons/core-free-icons"
 
 
@@ -206,7 +207,7 @@ export const ChevronsUpDown = CreateIcon(MenuSquare01)
 export const AdjustIcon = CreateIcon(PlusMinus01Icon)
 export const ReturnIcon = CreateIcon(ArrowTurnBackwardIcon01)
 export const AnalyticsIcon = CreateIcon(AnalyticsUpIcon)
-
+export const CollectionsIcon = CreateIcon(CollectionsBookmarkIcon)
 
 // ============================
 // ACTIONS
