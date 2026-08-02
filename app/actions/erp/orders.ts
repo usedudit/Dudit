@@ -2453,9 +2453,40 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
 
     couponDiscountAmount = updatePricingResult.couponDiscountAmount
     let updateServerTotal = updatePricingResult.finalTotal
-    const updateBreakdownTotal = sanitizedPaymentBreakdown.reduce((s, e) => s + e.amount, 0)
-    const hasUpdateBreakdown = sanitizedPaymentBreakdown.length > 0
-    const updateFinalTotal = hasUpdateBreakdown ? updateBreakdownTotal : (Number(data.totalAmount) || updateServerTotal)
+    let adjustedPaymentBreakdown = sanitizedPaymentBreakdown
+
+    const isUnpaidOrder = currentOrder.situation !== 'paid' && currentOrder.situation !== 'partially_paid'
+
+    if (isUnpaidOrder && adjustedPaymentBreakdown.length > 0) {
+        if (adjustedPaymentBreakdown.length === 1) {
+            adjustedPaymentBreakdown = [{
+                ...adjustedPaymentBreakdown[0],
+                amount: updateServerTotal,
+                effectiveAmount: updateServerTotal,
+                amountReceived: updateServerTotal,
+            }]
+        } else {
+            const oldSum = adjustedPaymentBreakdown.reduce((s, e) => s + e.amount, 0)
+            if (oldSum > 0 && Math.abs(oldSum - updateServerTotal) > 0.009) {
+                const ratio = updateServerTotal / oldSum
+                adjustedPaymentBreakdown = adjustedPaymentBreakdown.map((e) => {
+                    const newAmount = Math.round(e.amount * ratio * 100) / 100
+                    return {
+                        ...e,
+                        amount: newAmount,
+                        effectiveAmount: Math.round((e.effectiveAmount ?? e.amount) * ratio * 100) / 100,
+                        amountReceived: Math.round((e.amountReceived ?? e.amount) * ratio * 100) / 100,
+                    }
+                })
+            }
+        }
+    }
+
+    const updateBreakdownTotal = adjustedPaymentBreakdown.reduce((s, e) => s + e.amount, 0)
+    const hasUpdateBreakdown = adjustedPaymentBreakdown.length > 0
+    const updateFinalTotal = isUnpaidOrder
+        ? updateServerTotal
+        : (hasUpdateBreakdown ? updateBreakdownTotal : (Number(data.totalAmount) || updateServerTotal))
     const updatePricingBase = hasUpdateBreakdown ? updateServerTotal : Math.max(updateServerTotal, updateFinalTotal)
     const updatePaymentMethodExtraAmount = Math.max(0, updateFinalTotal - updatePricingBase)
     // Extract individual adjustment totals from payment breakdown for separate columns
@@ -2463,7 +2494,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     let updatePaymentMethodFeeAmount = 0
     let updatePaymentMethodFixedFeeAmount = 0
     let updateBreakdownPaymentMethodDiscountAmount = 0
-    for (const entry of sanitizedPaymentBreakdown) {
+    for (const entry of adjustedPaymentBreakdown) {
         const bearer = String(entry.feeBearer || "merchant").toLowerCase().trim()
         const isCustomerBearer = bearer === "customer" || bearer === "buyer"
         const adjType = String(entry.adjustmentType || "").toLowerCase().trim()
@@ -2479,9 +2510,8 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     }
     const updatePaymentMethodDiscountAmount = updateBreakdownPaymentMethodDiscountAmount > 0
         ? updateBreakdownPaymentMethodDiscountAmount
-        : Math.max(0, updatePricingBase - updateFinalTotal)
+        : (isUnpaidOrder ? 0 : Math.max(0, updatePricingBase - updateFinalTotal))
     updateServerTotal = updateFinalTotal
-    const adjustedPaymentBreakdown = sanitizedPaymentBreakdown
     const paymentMethodSummary = buildPaymentMethodSummary(adjustedPaymentBreakdown, data.paymentMethod)
     const paymentState = resolvePaymentState({
         requestedStatus: data.paymentStatus,
@@ -3548,14 +3578,14 @@ export async function updateOrdersStatusInBatchAction(payload: {
             const sysMsg = situation === "paid"
                 ? `Oba! O pagamento de alguns pedidos seus em ${storeName} foi aprovado. 🎉`
                 : situation === "partially_paid"
-                ? `Olá! Recebemos um pagamento parcial de alguns pedidos seus em ${storeName}.`
-                : `Olá! O pagamento de alguns pedidos seus em ${storeName} está pendente.`
+                    ? `Olá! Recebemos um pagamento parcial de alguns pedidos seus em ${storeName}.`
+                    : `Olá! O pagamento de alguns pedidos seus em ${storeName} está pendente.`
             const partnerTitle = situation === "paid" ? "💰 Pagamento confirmado!" : situation === "partially_paid" ? "💳 Pagamento parcial recebido" : "⏳ Pagamento pendente"
             const partnerMsg = situation === "paid"
                 ? `Sucesso! O pagamento de ${currentOrders?.length || 0} pedidos foi confirmado.`
                 : situation === "partially_paid"
-                ? `${currentOrders?.length || 0} pedidos receberam pagamento parcial.`
-                : `${currentOrders?.length || 0} pedidos estão com pagamento pendente.`;
+                    ? `${currentOrders?.length || 0} pedidos receberam pagamento parcial.`
+                    : `${currentOrders?.length || 0} pedidos estão com pagamento pendente.`;
 
             // System notification consolidated via Central Resolver (In-App + External Channel)
             (async () => {
@@ -3604,17 +3634,17 @@ export async function updateOrdersStatusInBatchAction(payload: {
             const sysMsg = deliveryStatus === "delivered"
                 ? `Tudo certo! Alguns pedidos seus em ${storeName} foram entregues.`
                 : deliveryStatus === "sent"
-                ? `Olá! Alguns pedidos seus em ${storeName} foram enviados para entrega.`
-                : deliveryStatus === "pickup_available"
-                ? `Olá! Alguns pedidos seus em ${storeName} estão prontos para retirada.`
-                : `Olá! Alguns pedidos seus em ${storeName} estão sendo preparados.`
+                    ? `Olá! Alguns pedidos seus em ${storeName} foram enviados para entrega.`
+                    : deliveryStatus === "pickup_available"
+                        ? `Olá! Alguns pedidos seus em ${storeName} estão prontos para retirada.`
+                        : `Olá! Alguns pedidos seus em ${storeName} estão sendo preparados.`
             const partnerMsg = deliveryStatus === "delivered"
                 ? `${currentOrders?.length || 0} pedidos foram entregues.`
                 : deliveryStatus === "sent"
-                ? `${currentOrders?.length || 0} pedidos foram enviados para entrega.`
-                : deliveryStatus === "pickup_available"
-                ? `${currentOrders?.length || 0} pedidos estão prontos para retirada.`
-                : `${currentOrders?.length || 0} pedidos estão em preparação.`;
+                    ? `${currentOrders?.length || 0} pedidos foram enviados para entrega.`
+                    : deliveryStatus === "pickup_available"
+                        ? `${currentOrders?.length || 0} pedidos estão prontos para retirada.`
+                        : `${currentOrders?.length || 0} pedidos estão em preparação.`;
 
             // System notification consolidated via Central Resolver (In-App + External Channel)
             (async () => {

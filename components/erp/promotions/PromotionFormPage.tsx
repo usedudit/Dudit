@@ -130,6 +130,14 @@ export default function PromotionFormPage({
         handleNavigation(onBack)
     }, [handleNavigation, onBack])
 
+    // Mantém a referência mais recente sem forçar re-renders do header.
+    // Evita loop infinito: handleNavigation é recriado a cada render, o que
+    // faria o useEffect abaixo rodar repetidamente e chamar setHeaderOverride.
+    const handleHeaderBackRef = useRef(handleHeaderBack)
+    useEffect(() => {
+        handleHeaderBackRef.current = handleHeaderBack
+    }, [handleHeaderBack])
+
     const pageTitle = useMemo(() => {
         return currentMode === "add" ? "Nova Campanha de Marketing"
             : currentMode === "duplicate" ? "Duplicar Campanha"
@@ -139,11 +147,11 @@ export default function PromotionFormPage({
     useEffect(() => {
         setHeaderOverride({
             title: pageTitle,
-            onBack: handleHeaderBack,
+            onBack: () => handleHeaderBackRef.current(),
             isSubPage: true
         })
         return () => setHeaderOverride(null)
-    }, [pageTitle, handleHeaderBack, setHeaderOverride])
+    }, [pageTitle, setHeaderOverride])
 
     const lastCampaignIdRef = useRef<string | undefined>(undefined)
     const lastModeRef = useRef<string | undefined>(undefined)

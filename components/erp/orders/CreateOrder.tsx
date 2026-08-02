@@ -1200,6 +1200,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             finalDeliveryStatus = deliveryMethod === "pickup" ? "pickup_available" : "not_sent";
         } else if (paymentOverrides?.deliveryStatus) {
             finalDeliveryStatus = paymentOverrides.deliveryStatus;
+        } else if (editOrderId) {
+            finalDeliveryStatus = deliveryStatus;
         } else {
             finalDeliveryStatus = deliveryMethod === "pickup" ? "delivered" : deliveryStatus;
         }
@@ -1981,7 +1983,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                             amountDue={editOrderId && remainingAmount > 0.009 ? remainingAmount : undefined}
                             existingPaidAmount={editOrderId ? originalPaidAmount : 0}
                             existingPaymentBreakdown={editOrderId ? originalPaymentBreakdown : []}
-                            lockPaymentCompletion={Boolean(editOrderId && remainingAmount > 0.009 && !isMarketplaceOrder)}
+                            lockPaymentCompletion={false}
                             isMarketplaceOrder={isMarketplaceOrder}
                             role={role}
                             originalPaymentMethod={originalPaymentMethod}

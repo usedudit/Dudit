@@ -20,45 +20,24 @@ export async function getQuickModeHomeDataAction(partnerId: string) {
 
         const supabase = createAdminClient()
 
-        // 1. Fetch Partner Mode to verify
-        const { data: partner, error: partnerError } = await supabase
-            .from("partners")
-            .select("business_info")
-            .eq("id", partnerId)
-            .single()
-
-        if (partnerError || !partner) throw new Error("Parceiro não encontrado")
-
-        const { data: store } = await supabase
-            .from("stores")
-            .select("name")
-            .eq("partner_id", partnerId)
-            .order("is_headquarters", { ascending: false })
-            .limit(1)
-            .maybeSingle()
-
-        const businessInfo = normalizeBusinessInfo(partner.business_info)
-
-        // 2. Fetch Stats
-        // - Active items (products + services)
-        // - Received orders
-        // - Views (mocked for now)
-
-        const [productsCount, servicesCount, ordersCount] = await Promise.all([
+        // Single parallel batch for all partner-scoped queries after authorization is validated
+        const [
+            partnerRes,
+            storeRes,
+            productsCountRes,
+            servicesCountRes,
+            ordersCountRes,
+            recentProductsRes,
+            recentServicesRes,
+            recentOrdersRes
+        ] = await Promise.all([
+            supabase.from("partners").select("business_info").eq("id", partnerId).single(),
+            supabase.from("stores").select("name").eq("partner_id", partnerId).order("is_headquarters", { ascending: false }).limit(1).maybeSingle(),
             scopeActiveOnly(supabase.from("products").select("id", { count: "exact", head: true }).eq("partner_id", partnerId).eq("is_active", true)),
             scopeActiveOnly(supabase.from("services").select("id", { count: "exact", head: true }).eq("partner_id", partnerId).eq("is_active", true)),
-            supabase.from("orders").select("id", { count: "exact", head: true }).eq("partner_id", partnerId)
-        ])
-
-        const stats = {
-            activeItems: (productsCount.count || 0) + (servicesCount.count || 0),
-            receivedOrders: ordersCount.count || 0,
-        }
-
-        // 3. Fetch Recent Items (Products + Services merged)
-        const [recentProducts, recentServices] = await Promise.all([
+            supabase.from("orders").select("id", { count: "exact", head: true }).eq("partner_id", partnerId),
             scopeActiveOnly(supabase.from("products")
-                .select("id, name, price, images, is_active, created_at, type:id") // type trick to identify
+                .select("id, name, price, images, is_active, created_at, type:id")
                 .eq("partner_id", partnerId))
                 .order("created_at", { ascending: false })
                 .limit(4),
@@ -66,29 +45,39 @@ export async function getQuickModeHomeDataAction(partnerId: string) {
                 .select("id, name, price, images, is_active, created_at, type:id")
                 .eq("partner_id", partnerId))
                 .order("created_at", { ascending: false })
-                .limit(4)
+                .limit(4),
+            supabase.from("orders")
+                .select("id, order_number, customer_name, total_amount, situation, created_at, delivery_status")
+                .eq("partner_id", partnerId)
+                .order("created_at", { ascending: false })
+                .limit(5)
         ])
 
+        if (partnerRes.error || !partnerRes.data) throw new Error("Parceiro não encontrado")
+
+        const partner = partnerRes.data
+        const store = storeRes.data
+        const businessInfo = normalizeBusinessInfo(partner.business_info)
+
+        const stats = {
+            activeItems: (productsCountRes.count || 0) + (servicesCountRes.count || 0),
+            receivedOrders: ordersCountRes.count || 0,
+        }
+
         const items = [
-            ...(recentProducts.data || []).map((p: any) => ({ ...p, itemType: 'product' })),
-            ...(recentServices.data || []).map((s: any) => ({ ...s, itemType: 'service' }))
+            ...(recentProductsRes.data || []).map((p: any) => ({ ...p, itemType: 'product' })),
+            ...(recentServicesRes.data || []).map((s: any) => ({ ...s, itemType: 'service' }))
         ].sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
             .slice(0, 8)
 
-        // 4. Fetch Recent Orders
-        const { data: recentOrders } = await supabase
-            .from("orders")
-            .select("id, order_number, customer_name, total_amount, situation, created_at, delivery_status")
-            .eq("partner_id", partnerId)
-            .order("created_at", { ascending: false })
-            .limit(5)
+        const recentOrders = recentOrdersRes.data || []
 
         return {
             success: true,
             data: {
                 stats,
                 items,
-                recentOrders: recentOrders || [],
+                recentOrders,
                 storeName: store?.name || "",
                 businessInfo
             }

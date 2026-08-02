@@ -84,7 +84,7 @@ export const AddressTab: React.FC<AddressTabProps> = ({
     isPaidOrder = false,
     role = "OPERATOR",
 }) => {
-    const selectedStatusMeta = getDeliveryStatusMeta(deliveryMethod === "pickup" ? "delivered" : deliveryStatus)
+    const selectedStatusMeta = getDeliveryStatusMeta(deliveryStatus)
 
     const isAddressLocked = isPaidOrder || role === 'DELIVERY'
     const isDeliveryLocked = originalDeliveryStatus === 'delivered' || role === 'DELIVERY'
@@ -180,10 +180,10 @@ export const AddressTab: React.FC<AddressTabProps> = ({
                                 />
                                 <FormDropdown
                                     label="Status"
-                                    value={deliveryMethod === "pickup" ? "delivered" : deliveryStatus}
+                                    value={deliveryStatus}
                                     setValue={(val: any) => setDeliveryStatus(val)}
                                     options={deliveryStatusOptions}
-                                    disabled={deliveryMethod === "pickup" || isDeliveryLocked}
+                                    disabled={isDeliveryLocked}
                                 />
                                 <DatePicker
                                     label="Data de saída"

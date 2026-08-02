@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 
 export function useUnsavedChanges(isDirty: boolean) {
@@ -107,7 +107,7 @@ export function useUnsavedChanges(isDirty: boolean) {
     }
   }, [])
 
-  const confirmNavigation = () => {
+  const confirmNavigation = useCallback(() => {
     isNavigatingRef.current = true
     setShowConfirmDialog(false)
     if (pendingNavigation) {
@@ -119,14 +119,17 @@ export function useUnsavedChanges(isDirty: boolean) {
     } else {
       router.back()
     }
-  }
+  }, [pendingNavigation, router])
 
-  const cancelNavigation = () => {
+  const cancelNavigation = useCallback(() => {
     setShowConfirmDialog(false)
     setPendingNavigation(null)
-  }
+  }, [])
 
-  const handleNavigation = (path?: string | (() => void)) => {
+  // Memoized to keep a stable identity. A new function every render would
+  // make callers' useCallback(handleBack) unstable, causing effects like
+  // setHeaderOverride to re-run every render -> React error #185 (infinite loop).
+  const handleNavigation = useCallback((path?: string | (() => void)) => {
     if (isDirtyRef.current) {
       setPendingNavigation(() => path || null)
       setShowConfirmDialog(true)
@@ -143,7 +146,7 @@ export function useUnsavedChanges(isDirty: boolean) {
       router.back()
     }
     return true
-  }
+  }, [router])
 
   return {
     showConfirmDialog,
