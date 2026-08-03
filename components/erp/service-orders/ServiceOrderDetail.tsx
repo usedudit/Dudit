@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { ShareModal } from "@/components/marketplace/ShareModal"
 import { Button, Badge, Tabs, TabsList, TabsTrigger, TabsContent, ThreeDotsLoader, ActionsDropdown, DropdownItem, FormSection, ListItem, IconPlaceholder, AlertModal } from "@/components/reusable"
 import CustomerCard from "@/components/reusable/CustomerCard"
-import PaymentModal from "@/components/erp/orders/PaymentModal"
 import { ChevronLeftIcon, WrenchIcon, UserIcon, CalendarIcon, FileIcon, CheckCircleIcon, ClockIcon, EditIcon, PackageIcon } from "@/lib/icons"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -16,7 +15,6 @@ import {
     updateServiceOrderStatusAction,
     assignServiceOrderAction,
     getServiceOrderDetailsAction,
-    confirmServiceOrderPaymentAction,
 } from "@/app/actions/erp/service-orders"
 import { SERVICE_ORDER_STATUS_META, type ServiceOrderStatus } from "@/lib/types/service-order"
 import { r2PublicConfig } from "@/lib/r2/r2-public"
@@ -25,6 +23,7 @@ import { useSidebar } from "@/lib/sidebar-context"
 import { usePermissions } from "@/lib/permission-context"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
+import { useRouter } from "next/navigation"
 
 const CDN_URL = r2PublicConfig.cdnUrl || "https://img.dudit.com.br"
 
@@ -66,11 +65,11 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
     const { toast } = useToast()
     const { planSlug } = usePermissions()
     const { openPlanUpgrade } = usePlanUpgrade()
+    const router = useRouter()
     const [activeTab, setActiveTab] = useState("summary")
     const [order, setOrder] = useState(data)
     const [loading, setLoading] = useState(false)
     const [showSignature, setShowSignature] = useState(false)
-    const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
     const [teamMembers, setTeamMembers] = useState<any[]>([])
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -208,63 +207,6 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
         }
         return Number(order.discount_value || 0)
     }, [subtotal, order.discount_value, order.discount_type])
-
-    const cart = useMemo(() => {
-        const list: any[] = []
-            ; (order.services || []).forEach((s: any) => {
-                list.push({
-                    id: s.id,
-                    productId: null,
-                    variantId: null,
-                    name: s.service_name || "Mão de Obra",
-                    unitPrice: Number(svcPrice(s)),
-                    quantity: Number(s.quantity || 1),
-                    isService: true,
-                })
-            })
-            ; (order.products || []).forEach((p: any) => {
-                list.push({
-                    id: p.id,
-                    productId: p.product_id,
-                    variantId: p.variant_id || null,
-                    name: p.product_name || "Produto",
-                    unitPrice: Number(prodPrice(p)),
-                    quantity: Number(p.quantity || 1),
-                    isService: false,
-                })
-            })
-        return list
-    }, [order.services, order.products])
-
-    const handleConfirmPayment = async (paymentData: any) => {
-        try {
-            const res = await confirmServiceOrderPaymentAction({
-                serviceOrderId: order.id,
-                partnerId,
-                paymentStatus: paymentData.paymentStatus,
-                paidAmount: paymentData.paidAmount,
-                paymentMethod: paymentData.paymentMethod,
-                paymentBreakdown: paymentData.paymentBreakdown,
-                paymentProvider: paymentData.paymentProvider,
-                mpPaymentId: paymentData.mpPaymentId,
-                financeAccountId: paymentData.financeAccountId,
-                notes: paymentData.notes,
-            })
-
-            if (res.success) {
-                const detailsRes = await getServiceOrderDetailsAction(order.id, partnerId)
-                if (detailsRes.success) {
-                    setOrder(detailsRes.data)
-                }
-                onMutation?.()
-                return { success: true, orderNumber: res.orderNumber || order.order_number }
-            } else {
-                return { error: res.error || "Erro ao processar pagamento" }
-            }
-        } catch (err: any) {
-            return { error: err.message || "Erro inesperado" }
-        }
-    }
 
     function svcPrice(s: any) {
         return s.service_price !== undefined ? s.service_price : (s.price || 0)
@@ -626,9 +568,9 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                             <span className="font-bold text-2xl text-brand-dark dark:text-dark-heading tracking-tight">{formatCurrency(order.total_amount || 0)}</span>
                                                         </div>
 
-                                                        {order.payment_status !== "paid" && (
+                                                        {order.payment_status !== "paid" && order.order_id && (
                                                             <div className="pt-4 flex justify-end">
-                                                                <Button onClick={() => setIsPaymentModalOpen(true)} className="w-full md:w-auto">
+                                                                <Button onClick={() => router.push(`/erp/orders?edit=${order.order_id}&payment=1`)} className="w-full md:w-auto">
                                                                     Registrar Pagamento
                                                                 </Button>
                                                             </div>
@@ -1044,26 +986,6 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                     onClose={() => setShowSignature(false)}
                 />
             )
-            }
-
-            {
-                isPaymentModalOpen && (
-                    <PaymentModal
-                        isOpen={isPaymentModalOpen}
-                        onClose={() => setIsPaymentModalOpen(false)}
-                        cart={cart}
-                        customer={order.customer_snapshot}
-                        partnerId={partnerId}
-                        shippingFee={0}
-                        otherCosts={Number(order.other_costs || 0)}
-                        discountAmount={discountAmount + Number(order.coupon_discount_amount || 0)}
-                        headerSubtitle="Recebimento de Ordem de Serviço"
-                        amountDue={order.total_amount - (order.paid_amount || 0)}
-                        existingPaidAmount={order.paid_amount || 0}
-                        existingPaymentBreakdown={order.payment_breakdown ? (typeof order.payment_breakdown === 'string' ? JSON.parse(order.payment_breakdown) : order.payment_breakdown) : []}
-                        onConfirm={handleConfirmPayment}
-                    />
-                )
             }
 
             {

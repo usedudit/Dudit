@@ -1955,6 +1955,12 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
             .update({ payment_status: paymentState.situation })
             .eq("marketplace_order_id", order.id)
             .eq("partner_id", partnerId)
+
+        await supabase
+            .from("service_orders")
+            .update({ payment_status: paymentState.situation })
+            .eq("order_id", order.id)
+            .eq("partner_id", partnerId)
     }
 
     await invalidateInventoryItems(partnerId, stockItems)
@@ -2670,6 +2676,12 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             .from("appointments")
             .update({ payment_status: paymentState.situation })
             .eq("marketplace_order_id", orderId)
+            .eq("partner_id", data.partnerId)
+
+        await supabase
+            .from("service_orders")
+            .update({ payment_status: paymentState.situation })
+            .eq("order_id", orderId)
             .eq("partner_id", data.partnerId)
     }
 

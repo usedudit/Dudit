@@ -306,6 +306,40 @@ export async function createServiceOrderAction(
       } catch { }
     }
 
+    // Create linked order in orders table (mirror appointments flow)
+    const orderRefNote = `service_order:${data.id}:order`
+    const { data: linkedOrder, error: linkedOrderErr } = await admin
+      .from("orders")
+      .insert({
+        partner_id: partnerId,
+        store_id: storeId,
+        buyer_id: input.customer_id || null,
+        customer_name: (data.customer_snapshot as any)?.name || null,
+        total_amount: 0,
+        subtotal_value: 0,
+        discount_value: input.discount_value || 0,
+        discount_type: input.discount_type || "fixed",
+        discount_amount: 0,
+        additional_costs: input.other_costs || 0,
+        paid_amount: 0,
+        situation: "pending",
+        delivery_status: "not_sent",
+        delivery_type: "pickup",
+        order_source: "admin_service_order",
+        payment_method: null,
+        notes: orderRefNote,
+        created_at: new Date().toISOString(),
+        created_by: user.id,
+      })
+      .select("id")
+      .single()
+
+    if (linkedOrderErr || !linkedOrder?.id) {
+      throw new Error("Falha ao criar pedido vinculado à OS")
+    }
+
+    await admin.from("service_orders").update({ order_id: linkedOrder.id }).eq("id", data.id)
+
     await recalcTotals(admin, data.id)
     revalidatePath("/erp/service-orders")
     return { success: true, data, orderNumber }
@@ -854,18 +888,18 @@ export async function deleteServiceOrderAction(
 async function recalcTotals(admin: any, serviceOrderId: string) {
   const { data: order } = await admin
     .from("service_orders")
-    .select("discount_value, discount_type, coupon_discount_amount, other_costs")
+    .select("discount_value, discount_type, coupon_discount_amount, other_costs, order_id")
     .eq("id", serviceOrderId)
     .single()
 
   const { data: services } = await admin
     .from("service_order_services")
-    .select("total_price")
+    .select("service_id, service_name, service_price, quantity, total_price")
     .eq("service_order_id", serviceOrderId)
 
   const { data: products } = await admin
     .from("service_order_products")
-    .select("total_price")
+    .select("product_id, variant_id, product_name, unit_price, quantity, total_price")
     .eq("service_order_id", serviceOrderId)
 
   const totalService = (services || []).reduce((sum: number, s: any) => sum + Number(s.total_price || 0), 0)
@@ -896,6 +930,62 @@ async function recalcTotals(admin: any, serviceOrderId: string) {
       total_amount: finalTotal,
     })
     .eq("id", serviceOrderId)
+
+  // Sync linked order (mirror appointments flow)
+  const linkedOrderId = order?.order_id
+  if (linkedOrderId) {
+    const orderItems = [
+      ...(services || []).map((s: any) => ({
+        order_id: linkedOrderId,
+        product_id: s.service_id || null,
+        variant_id: null,
+        product_name: s.service_name || "Mão de Obra",
+        product_price: Number(s.service_price || 0),
+        quantity: Number(s.quantity || 1),
+        subtotal: Number(s.total_price || 0),
+        line_type: "service_booking",
+        fulfillment_mode: "on_site",
+        service_id: s.service_id || null,
+        is_gift: false,
+        original_price: null,
+        is_promotional: false,
+        promotion_id: null,
+      })),
+      ...(products || []).map((p: any) => ({
+        order_id: linkedOrderId,
+        product_id: p.product_id || null,
+        variant_id: p.variant_id || null,
+        product_name: p.product_name || "Produto",
+        product_price: Number(p.unit_price || 0),
+        quantity: Number(p.quantity || 1),
+        subtotal: Number(p.total_price || 0),
+        line_type: "product",
+        fulfillment_mode: "delivery",
+        service_id: null,
+        is_gift: false,
+        original_price: null,
+        is_promotional: false,
+        promotion_id: null,
+      })),
+    ]
+
+    await admin.from("order_items").delete().eq("order_id", linkedOrderId)
+    if (orderItems.length > 0) {
+      await admin.from("order_items").insert(orderItems)
+    }
+
+    await admin
+      .from("orders")
+      .update({
+        subtotal_value: subtotal,
+        total_amount: finalTotal,
+        discount_value: discVal,
+        discount_type: discType,
+        discount_amount: discountAmount,
+        additional_costs: otherCosts,
+      })
+      .eq("id", linkedOrderId)
+  }
 }
 
 export async function ensurePublicTokenAction(partnerId: string, serviceOrderId: string): Promise<string | null> {
@@ -1554,106 +1644,74 @@ export async function confirmServiceOrderPaymentAction(payload: {
       await admin.from("service_orders").update({ sale_id: saleId }).eq("id", order.id)
     }
 
-    // 5. Create or sync orders entry so the sale appears in the orders page
-    const orderRefNote = `service_order:${order.id}:order`
-    const { data: existingOrder } = await supabase
-      .from("orders")
-      .select("id")
-      .eq("partner_id", payload.partnerId)
-      .eq("notes", orderRefNote)
-      .limit(1)
-      .maybeSingle()
+    // 5. Sync linked orders entry (use order.order_id instead of notes lookup)
+    const linkedOrderId = order.order_id
+    if (!linkedOrderId) {
+      throw new Error("Pedido vinculado não encontrado. A OS deve ter um pedido associado.")
+    }
 
     const paymentMethodSummary = payload.paymentMethod
       ? [{ method: payload.paymentMethod, amount: payload.paidAmount }]
       : []
 
-    let orderId: string | null = existingOrder?.id || null
+    const { error: orderUpdateErr } = await supabase
+      .from("orders")
+      .update({
+        total_amount: finalAmount,
+        subtotal_value: subtotal,
+        discount_value: order.discount_value || 0,
+        discount_type: order.discount_type || "fixed",
+        discount_amount: discountAmount,
+        payment_method_discount_amount: paymentMethodDiscountAmount,
+        payment_method_extra_amount: paymentMethodExtraAmount,
+        additional_costs: otherCosts,
+        paid_amount: payload.paidAmount,
+        situation: saleStatus,
+        payment_method: payload.paymentMethod || null,
+        payment_breakdown: JSON.stringify(paymentMethodSummary),
+      })
+      .eq("id", linkedOrderId)
 
-    if (!orderId) {
-      const orderNumber = saleNumber || `OS-${String(order.id).slice(0, 8).toUpperCase()}`
+    if (orderUpdateErr) throw orderUpdateErr
 
-      const { data: newOrder, error: orderInsertErr } = await supabase
-        .from("orders")
-        .insert({
-          partner_id: payload.partnerId,
-          order_number: orderNumber,
-          customer_name: (order.customer_snapshot as any)?.name || null,
-          buyer_id: order.customer_id || null,
-          total_amount: finalAmount,
-          subtotal_value: subtotal,
-          discount_value: order.discount_value || 0,
-          discount_type: order.discount_type || "fixed",
-          discount_amount: discountAmount,
-          payment_method_discount_amount: paymentMethodDiscountAmount,
-          payment_method_extra_amount: paymentMethodExtraAmount,
-          additional_costs: otherCosts,
-          paid_amount: payload.paidAmount,
-          situation: saleStatus,
-          delivery_status: "not_sent",
-          delivery_type: "pickup",
-          order_source: "admin_service_order",
-          payment_method: payload.paymentMethod || null,
-          payment_breakdown: JSON.stringify(paymentMethodSummary),
-          notes: orderRefNote,
-          created_at: new Date().toISOString(),
-          created_by: user.id,
-        })
-        .select("id")
-        .single()
-
-      if (orderInsertErr) throw orderInsertErr
-      orderId = newOrder?.id || null
-    } else {
-      const { error: orderUpdateErr } = await supabase
-        .from("orders")
-        .update({
-          total_amount: finalAmount,
-          subtotal_value: subtotal,
-          discount_value: order.discount_value || 0,
-          discount_type: order.discount_type || "fixed",
-          discount_amount: discountAmount,
-          payment_method_discount_amount: paymentMethodDiscountAmount,
-          payment_method_extra_amount: paymentMethodExtraAmount,
-          additional_costs: otherCosts,
-          paid_amount: payload.paidAmount,
-          situation: saleStatus,
-          payment_method: payload.paymentMethod || null,
-          payment_breakdown: JSON.stringify(paymentMethodSummary),
-        })
-        .eq("id", orderId)
-
-      if (orderUpdateErr) throw orderUpdateErr
-    }
-
-    // Sync order_items from services and products
-    if (orderId && (orderServices.length > 0 || orderProducts.length > 0)) {
+    // Sync order_items from services and products (use correct columns: product_price/subtotal)
+    if (linkedOrderId && (orderServices.length > 0 || orderProducts.length > 0)) {
       const orderItems = [
         ...orderServices.map((s: any) => ({
-          order_id: orderId,
-          partner_id: payload.partnerId,
-          product_id: null,
+          order_id: linkedOrderId,
+          product_id: s.service_id || null,
           variant_id: null,
           product_name: s.service_name || "Mão de Obra",
-          unit_price: Number(s.service_price || 0),
+          product_price: Number(s.service_price || 0),
           quantity: Number(s.quantity || 1),
-          total_price: Number(s.total_price || 0),
+          subtotal: Number(s.total_price || 0),
           line_type: "service_booking" as const,
+          fulfillment_mode: "on_site",
+          service_id: s.service_id || null,
+          is_gift: false,
+          original_price: null,
+          is_promotional: false,
+          promotion_id: null,
         })),
         ...orderProducts.map((p: any) => ({
-          order_id: orderId,
-          partner_id: payload.partnerId,
+          order_id: linkedOrderId,
           product_id: p.product_id,
           variant_id: p.variant_id || null,
           product_name: p.product_name || "Produto",
-          unit_price: Number(p.unit_price || 0),
+          product_price: Number(p.unit_price || 0),
           quantity: Number(p.quantity || 1),
-          total_price: Number(p.total_price || 0),
+          subtotal: Number(p.total_price || 0),
           line_type: "product" as const,
+          fulfillment_mode: "delivery",
+          service_id: null,
+          is_gift: false,
+          original_price: null,
+          is_promotional: false,
+          promotion_id: null,
         })),
       ]
 
-      await supabase.from("order_items").delete().eq("order_id", orderId)
+      await supabase.from("order_items").delete().eq("order_id", linkedOrderId)
       const { error: itemsErr } = await supabase.from("order_items").insert(orderItems)
       if (itemsErr) throw itemsErr
     }
