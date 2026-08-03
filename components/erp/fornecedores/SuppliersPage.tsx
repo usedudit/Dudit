@@ -34,6 +34,7 @@ import {
 import { FadeIn } from "@/components/animations/FadeIn"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { useErpExport } from "@/hooks/use-erp-export"
+import { useStore } from "@/lib/store-context"
 import ExportSelectionModal from "@/components/erp/export/ExportSelectionModal"
 
 interface Supplier {
@@ -48,6 +49,7 @@ interface Supplier {
     status: string
     supplier_code: string
     created_at: string
+    image_url: string | null
 }
 
 interface FilterState {
@@ -230,6 +232,7 @@ export default function SuppliersPage({
                 status: s.status || "ativo",
                 supplier_code: s.supplier_code || "",
                 created_at: s.created_at,
+                image_url: s.image_url || s.imageUrl || s.avatar_url || null,
             }))
 
         const result = [...filtered]
@@ -300,14 +303,16 @@ export default function SuppliersPage({
         })
     }
 
+    const { selectedStore } = useStore()
+
     const handleExport = useCallback(() => {
         void exportData({
             partnerId,
             module: "suppliers",
             format: "xlsx",
-            filters: { search: debouncedSearch, activeTab, status: filters.status },
+            filters: { storeId: selectedStore?.id || null, search: debouncedSearch, activeTab, status: filters.status },
         }, { selectedIds: selection.ids, totalCount: filteredSuppliers.length })
-    }, [exportData, partnerId, debouncedSearch, activeTab, filters.status, selection.ids, filteredSuppliers.length])
+    }, [exportData, partnerId, selectedStore?.id, debouncedSearch, activeTab, filters.status, selection.ids, filteredSuppliers.length])
 
     const handleClearFilters = () => {
         setSearch("")

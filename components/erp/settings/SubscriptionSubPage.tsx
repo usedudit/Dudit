@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { Button, DefaultModal, FormTextarea, InfoCard } from "@/components/reusable"
+import { Button, DefaultModal, AlertModal } from "@/components/reusable"
 import { Input as FormInput } from "@/components/reusable/Input"
-import { createClient } from "@/lib/supabase/client"
+import Portal from "@/components/Portal"
 import {
     CheckCircleIcon,
     ChevronLeftIcon,
@@ -12,7 +12,6 @@ import {
     XIcon,
 } from "@/lib/icons"
 import {
-    Crown,
     Zap,
     Loader2,
     ArrowUpRight,
@@ -236,6 +235,7 @@ interface SubscriptionData {
         pending_plan_id: string | null
         trial_end: string | null
         payment_provider: string
+        next_payment_date?: string | null
     } | null
     usage: Record<string, number>
 }
@@ -246,94 +246,21 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
     const [loading, setLoading] = useState(true)
     const [actionLoading, setActionLoading] = useState<string | null>(null)
 
-    // Modal state for Upgrade Plan
-    const [plansModalOpen, setPlansModalOpen] = useState(false)
-
-    // Account deletion states
-    const [userId, setUserId] = useState<string | null>(null)
-    const [deleteStep, setDeleteStep] = useState<"none" | "reason" | "confirm" | "success">("none")
-    const [customReason, setCustomReason] = useState("")
-    const [isDeleting, setIsDeleting] = useState(false)
-    const [dryRunReport, setDryRunReport] = useState<any>(null)
-    const [loadingDryRun, setLoadingDryRun] = useState(false)
-    const [confirmText, setConfirmText] = useState("")
-    const [activeSubModalOpen, setActiveSubModalOpen] = useState(false)
-
-    const handleContinueToConfirm = async () => {
-        setLoadingDryRun(true)
-        try {
-            const { getCSRFToken } = await import("@/lib/utils/fetch-with-csrf")
-            const token = await getCSRFToken()
-            const { getAccountDeletionDryRunAction } = await import("@/app/actions/shared/account")
-            const res = await getAccountDeletionDryRunAction(token)
-            if (res.success && res.report) {
-                setDryRunReport(res.report)
-                setDeleteStep("confirm")
-            } else {
-                toast.error(res.error || "Não foi possível carregar o resumo da conta.")
-            }
-        } catch (err) {
-            toast.error("Erro ao carregar o resumo da conta.")
-        } finally {
-            setLoadingDryRun(false)
-        }
-    }
+    // Wrapper state for Upgrade Plan
+    const [plansOpen, setPlansOpen] = useState(false)
+    const [plansVisible, setPlansVisible] = useState(false)
+    const [plansAnimating, setPlansAnimating] = useState(false)
 
     useEffect(() => {
-        const fetchUser = async () => {
-            try {
-                const supabase = createClient()
-                const { data: { user } } = await supabase.auth.getUser()
-                if (user) {
-                    setUserId(user.id)
-                }
-            } catch (e) {
-                console.error("Error fetching user", e)
-            }
+        if (plansOpen) {
+            setPlansVisible(true)
+            const id = setTimeout(() => setPlansAnimating(true), 50)
+            return () => clearTimeout(id)
         }
-        fetchUser()
-    }, [])
-
-    const handleDeleteAccount = async () => {
-        if (!userId) {
-            toast.error("Usuário não carregado.")
-            return
-        }
-
-        if (confirmText !== "EXCLUIR") {
-            toast.error("Por favor, digite EXCLUIR para confirmar.")
-            return
-        }
-
-        setIsDeleting(true)
-        try {
-            const { getCSRFToken } = await import("@/lib/utils/fetch-with-csrf")
-            const token = await getCSRFToken()
-            const finalReason = customReason.trim() || null
-
-            const { deleteAccountAction } = await import("@/app/actions/shared/account")
-            const res = await deleteAccountAction(userId, finalReason, token)
-
-            if (res.error) {
-                if (res.error === "active_subscription") {
-                    setDeleteStep("none")
-                    setActiveSubModalOpen(true)
-                } else {
-                    toast.error(res.error)
-                }
-                return
-            }
-
-            // On success, sign out and redirect immediately
-            const supabase = createClient()
-            await supabase.auth.signOut()
-            window.location.href = "/auth/login?deleted=true"
-        } catch (e: any) {
-            toast.error("Ocorreu um erro ao excluir a conta.")
-        } finally {
-            setIsDeleting(false)
-        }
-    }
+        setPlansAnimating(false)
+        const id = setTimeout(() => setPlansVisible(false), 200)
+        return () => clearTimeout(id)
+    }, [plansOpen])
 
     // Modal states
     const [subscribeModal, setSubscribeModal] = useState<{ open: boolean; planId: string; planName: string }>({
@@ -351,6 +278,7 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
     })
 
     const [cancelModal, setCancelModal] = useState(false)
+    const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false)
     const [billingCycle, setBillingCycle] = useState<"monthly" | "annually">("annually")
 
     const [isScrolled, setIsScrolled] = useState(false)
@@ -509,6 +437,7 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
 
             toast.success(result.data?.message || "Assinatura cancelada com sucesso.")
             setCancelModal(false)
+            setCancelConfirmOpen(false)
             loadData()
         } catch {
             toast.error("Erro inesperado. Tente novamente.")
@@ -525,14 +454,18 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
         ["active", "trialing", "past_due"].includes(subData.subscription.status) &&
         currentPlanSlug !== "free"
 
+    const nextInvoiceDate = subData?.subscription?.next_payment_date
+        ?? subData?.subscription?.current_period_end
+        ?? (subData?.subscription?.status === "trialing" ? subData.subscription.trial_end : null)
+
     return (
         <FadeIn>
             <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
                 <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
 
                     {/* Sticky Header */}
-                    <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white/90 dark:bg-dark-surface/90 backdrop-blur-md border-b transition-all duration-500 ease-in-out mb-6">
-                        <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 py-4">
+                    <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out">
+                        <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
 
                             {/* Back button - desktop only */}
                             <div className={`absolute -left-12 top-3 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
@@ -542,7 +475,7 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
                             </div>
 
                             {/* Title row */}
-                            <div className="flex items-start justify-between">
+                            <div className="hidden md:flex items-start justify-between">
                                 <div className="flex flex-col gap-1 overflow-hidden min-w-0">
                                     <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
                                         <span className="truncate">Minha Assinatura</span>
@@ -556,8 +489,8 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
                         </div>
                     </div>
 
-                    {/* Main Content Body */}
-                    <div className="px-3 md:px-6 max-w-[1300px] mx-auto min-h-[400px]">
+                    {/* Content Body */}
+                    <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
 
                         {/* Top 2 Cards: Current Plan & Next Invoices (Equal Size & Side-by-Side) */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10 items-stretch">
@@ -567,7 +500,7 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
                                 <div>
                                     <div className="flex items-center justify-between mb-4">
                                         <span className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body">
-                                            Current Plan
+                                            Plano Atual
                                         </span>
                                         {subData?.subscription?.status === "active" && (
                                             <span className="bg-brand-green/10 text-brand-green text-xs font-bold px-3 py-1 rounded-full">
@@ -591,7 +524,7 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
                                             {subData ? (currentPlanPrice > 0 ? formatCurrency(currentPlanPrice) : "Grátis") : "..."}
                                         </span>
                                         {currentPlanPrice > 0 && (
-                                            <span className="text-xs text-brand-inactive-text font-normal">/month</span>
+                                            <span className="text-xs text-brand-inactive-text font-normal">/mês</span>
                                         )}
                                     </div>
 
@@ -602,27 +535,27 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
                                                 className="text-red-500 border-red-200 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-900/20 text-xs md:text-sm h-11 px-4 font-semibold"
                                                 onClick={() => setCancelModal(true)}
                                             >
-                                                Cancel Plan
+                                                Cancelar Plano
                                             </Button>
                                         )}
 
                                         <Button
                                             variant="default"
                                             className="bg-brand-green text-white hover:bg-brand-green/90 text-xs md:text-sm font-bold h-11 px-6"
-                                            onClick={() => setPlansModalOpen(true)}
+                                            onClick={() => setPlansOpen(true)}
                                         >
-                                            Upgrade Plan
+                                            Alterar Plano
                                         </Button>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Card 2: Next Invoices */}
+                            {/* Card 2: Próxima Fatura */}
                             <div className="rounded-3xl p-6 md:p-8 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border flex flex-col justify-between shadow-sm relative">
                                 <div>
                                     <div className="flex items-center justify-between mb-4">
                                         <span className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body">
-                                            Next Invoices
+                                            Próxima Fatura
                                         </span>
                                     </div>
 
@@ -633,18 +566,27 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
 
                                 <div className="space-y-3 pt-6 border-t border-brand-border dark:border-dark-border mt-auto">
                                     <div className="flex items-center justify-between text-xs md:text-sm">
-                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">Plan Type</span>
+                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">Plano</span>
                                         <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                            {subData ? `Plano ${getHardcodedPlan(subData.plan.slug).name} (${billingCycle === "annually" ? "Anual" : "Mensal"})` : "—"}
+                                            {subData ? `Plano ${getHardcodedPlan(subData.plan.slug).name}` : "—"}
                                         </span>
                                     </div>
 
                                     <div className="flex items-center justify-between text-xs md:text-sm">
-                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">Next Invoice</span>
+                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">Vencimento</span>
                                         <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                            {subData?.subscription?.current_period_end ? formatDate(subData.subscription.current_period_end) : "—"}
+                                            {nextInvoiceDate ? formatDate(nextInvoiceDate) : "—"}
                                         </span>
                                     </div>
+
+                                    {subData?.subscription?.cancel_at_period_end && nextInvoiceDate && (
+                                        <div className="flex items-center justify-between text-xs md:text-sm">
+                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Acesso até</span>
+                                            <span className="font-bold text-red-500">
+                                                {formatDate(nextInvoiceDate)}
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -652,87 +594,83 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
                         {/* Billing History Section */}
                         <div className="mb-10">
                             <h3 className="text-lg md:text-xl font-bold text-brand-dark dark:text-dark-heading mb-4 px-1">
-                                Billing History
+                                Histórico de Faturas
                             </h3>
                             <BillingPage showTitle={false} />
                         </div>
-
-                        {/* Excluir Conta Section */}
-                        {!loading && subData && (
-                            <div className="mt-12 p-6 rounded-2xl border border-red-200 dark:border-red-900/40 bg-red-50/20 dark:bg-red-950/10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                <div className="space-y-1">
-                                    <h4 className="text-sm font-bold text-red-600 dark:text-red-400 flex items-center gap-2">
-                                        Excluir conta definitivamente
-                                    </h4>
-                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                        Esta ação inicia o processo de exclusão de todos os seus dados e encerramento da empresa na Dudit.
-                                    </p>
-                                </div>
-                                <Button
-                                    variant="outline"
-                                    className="text-red-600 border-red-200 hover:bg-red-600 hover:text-white dark:border-red-900 dark:hover:bg-red-950 text-sm font-bold shrink-0"
-                                    onClick={() => setDeleteStep("reason")}
-                                >
-                                    Excluir conta
-                                </Button>
-                            </div>
-                        )}
                     </div>
                 </div>
 
-                {/* ─── Upgrade Plan Modal (DefaultModal) ───────────────────────── */}
-                <DefaultModal
-                    isOpen={plansModalOpen}
-                    onClose={() => setPlansModalOpen(false)}
-                    title="Planos de Assinatura"
-                >
-                    <div className="py-2">
-                        <p className="text-sm text-brand-inactive-text dark:text-dark-body text-center mb-6">
-                            Escolha o plano ideal para as necessidades do seu negócio. Cancele ou altere a qualquer momento.
-                        </p>
+                {/* ─── Upgrade Plan Wrapper (full-screen, like print modals) ─── */}
+                {plansVisible && (
+                    <Portal>
+                        <div
+                            className={`fixed inset-0 z-[130] flex flex-col bg-black/60 transition-opacity duration-200 ${plansAnimating ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+                        >
+                            <div className="relative flex flex-col w-full h-full bg-white dark:bg-dark-background">
+                                {/* Header */}
+                                <div className="shrink-0 flex items-center justify-between px-4 md:px-6 py-4 border-b border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
+                                    <h2 className="text-lg md:text-xl font-bold text-brand-dark dark:text-dark-heading">
+                                        Planos de Assinatura
+                                    </h2>
+                                    <Button variant="filled" onClick={() => setPlansOpen(false)} className="w-10 h-10 p-0 flex items-center justify-center shrink-0">
+                                        <XIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                    </Button>
+                                </div>
 
-                        {/* Billing Toggle */}
-                        <BillingToggle value={billingCycle} onChange={setBillingCycle} />
+                                {/* Content */}
+                                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                                    <div className="px-4 md:px-6 py-6 max-w-[1300px] mx-auto">
+                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body text-center mb-6">
+                                            Escolha o plano ideal para as necessidades do seu negócio. Cancele ou altere a qualquer momento.
+                                        </p>
 
-                        {/* Plans Grid */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch my-6 max-h-[60vh] overflow-y-auto pr-1 custom-scrollbar">
-                            {loading ? (
-                                <>
-                                    <PlanCardSkeleton />
-                                    <PlanCardSkeleton />
-                                    <PlanCardSkeleton />
-                                </>
-                            ) : (
-                                plans.map((plan) => {
-                                    const isCurrent = subData?.plan?.id === plan.id
-                                    const isDowngrade = plan.price < currentPlanPrice && currentPlanSlug !== "free"
-                                    const isPopular = plan.slug === "crescer"
+                                        {/* Billing Toggle */}
+                                        <BillingToggle value={billingCycle} onChange={setBillingCycle} />
 
-                                    return (
-                                        <PlanCard
-                                            key={plan.id}
-                                            slug={plan.slug}
-                                            name={getHardcodedPlan(plan.slug).name}
-                                            objective={getHardcodedPlan(plan.slug).objective}
-                                            price={plan.price}
-                                            features={getHardcodedPlan(plan.slug).features}
-                                            limits={getHardcodedPlan(plan.slug).limits}
-                                            popular={isPopular}
-                                            isCurrent={isCurrent}
-                                            isDowngrade={isDowngrade}
-                                            isLoading={actionLoading === plan.id}
-                                            billingCycle={billingCycle}
-                                            onAction={() => {
-                                                setPlansModalOpen(false)
-                                                handlePlanAction(plan)
-                                            }}
-                                        />
-                                    )
-                                })
-                            )}
+                                        {/* Plans Grid */}
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch my-6">
+                                            {loading ? (
+                                                <>
+                                                    <PlanCardSkeleton />
+                                                    <PlanCardSkeleton />
+                                                    <PlanCardSkeleton />
+                                                </>
+                                            ) : (
+                                                plans.map((plan) => {
+                                                    const isCurrent = subData?.plan?.id === plan.id
+                                                    const isDowngrade = plan.price < currentPlanPrice && currentPlanSlug !== "free"
+                                                    const isPopular = plan.slug === "crescer"
+
+                                                    return (
+                                                        <PlanCard
+                                                            key={plan.id}
+                                                            slug={plan.slug}
+                                                            name={getHardcodedPlan(plan.slug).name}
+                                                            objective={getHardcodedPlan(plan.slug).objective}
+                                                            price={plan.price}
+                                                            features={getHardcodedPlan(plan.slug).features}
+                                                            limits={getHardcodedPlan(plan.slug).limits}
+                                                            popular={isPopular}
+                                                            isCurrent={isCurrent}
+                                                            isDowngrade={isDowngrade}
+                                                            isLoading={actionLoading === plan.id}
+                                                            billingCycle={billingCycle}
+                                                            onAction={() => {
+                                                                setPlansOpen(false)
+                                                                handlePlanAction(plan)
+                                                            }}
+                                                        />
+                                                    )
+                                                })
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                </DefaultModal>
+                    </Portal>
+                )}
 
                 {/* ─── Subscribe Dialog ─────────────────────────────────── */}
                 <Dialog
@@ -861,237 +799,63 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
                     </DialogContent>
                 </Dialog>
 
-                {/* ─── Cancel Subscription Dialog ──────────────────────── */}
-                <Dialog
-                    open={cancelModal}
-                    onOpenChange={(open) => {
-                        if (!open && !actionLoading) setCancelModal(false)
+                {/* ─── Cancel Subscription Modal (DefaultModal) ─────────── */}
+                <DefaultModal
+                    isOpen={cancelModal}
+                    onClose={() => {
+                        if (!actionLoading) setCancelModal(false)
                     }}
+                    title="Cancelar assinatura"
                 >
-                    <DialogContent className="sm:max-w-md">
-                        <DialogHeader>
-                            <DialogTitle className="flex items-center gap-2 text-red-600">
-                                <XIcon size={20} />
-                                Cancelar assinatura
-                            </DialogTitle>
-                            <DialogDescription>
-                                Tem certeza? Ao cancelar sua assinatura do plano <strong>{subData?.plan.name}</strong>, você voltará para o plano Grátis e perderá acesso aos recursos premium.
-                            </DialogDescription>
-                        </DialogHeader>
-
-                        <div className="py-2">
-                            <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-xs text-red-600 dark:text-red-300">
-                                <AlertTriangleIcon size={14} className="shrink-0 mt-0.5" />
-                                <span>
-                                    Esta ação não pode ser desfeita instantaneamente. Para reativar, será necessário criar uma nova assinatura.
-                                </span>
+                    <div className="space-y-5 py-2">
+                        <div className="flex items-start gap-3 p-4 rounded-2xl bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30">
+                            <AlertTriangleIcon size={20} className="text-red-500 shrink-0 mt-0.5" />
+                            <div className="space-y-1">
+                                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                    Poxa, que pena!
+                                </p>
+                                <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                                    Você vai perder os recursos do plano <strong>{subData?.plan.name}</strong> e voltar para o plano Grátis. Se mudar de ideia depois, é só assinar novamente.
+                                </p>
                             </div>
                         </div>
 
-                        <DialogFooter>
+                        <div className="flex flex-col sm:flex-row gap-3 pt-2">
                             <Button
                                 variant="outline"
+                                className="flex-1 h-12 font-bold"
                                 onClick={() => setCancelModal(false)}
                                 disabled={!!actionLoading}
                             >
-                                Não, manter plano
+                                Manter meu plano
                             </Button>
                             <Button
-                                className="bg-red-600 text-white hover:bg-red-700"
-                                onClick={handleCancel}
-                                disabled={!!actionLoading}
-                            >
-                                {actionLoading === "cancel" ? (
-                                    <>
-                                        <Loader2 size={16} className="animate-spin mr-2" />
-                                        Cancelando...
-                                    </>
-                                ) : (
-                                    "Sim, cancelar assinatura"
-                                )}
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
-
-                {/* Account Deletion Flow Modal */}
-                <DefaultModal
-                    isOpen={deleteStep !== "none" && deleteStep !== "success"}
-                    onClose={() => {
-                        if (!isDeleting) {
-                            setDeleteStep("none")
-                            setCustomReason("")
-                        }
-                    }}
-                    title={deleteStep === "confirm" ? "Confirmar encerramento da conta" : "O que fez você decidir encerrar sua conta?"}
-                >
-                    {deleteStep === "reason" && (
-                        <div className="space-y-6 pt-2 pb-4">
-                            <p className="text-sm text-brand-dark dark:text-dark-body">
-                                Antes de continuar, queremos apenas garantir que você saiba exatamente o que acontecerá. Ao confirmar, iniciaremos o processo de encerramento da sua conta. Durante as próximas 48 horas você poderá cancelar essa decisão. Depois desse período, a exclusão será definitiva e não poderá ser revertida.
-                            </p>
-
-                            <div className="space-y-2">
-                                <FormTextarea
-                                    label="Sua resposta (opcional)"
-                                    placeholder="Seu feedback ajuda a melhorar a Dudit."
-                                    value={customReason}
-                                    onChange={(e: any) => setCustomReason(e.target.value)}
-                                    maxLength={500}
-                                    showCharacterCount
-                                    name="observacoes"
-                                    className="min-h-[120px]"
-                                />
-                            </div>
-
-                            <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-brand-border dark:border-dark-border">
-                                <Button
-                                    variant="outline"
-                                    onClick={() => setDeleteStep("none")}
-                                    disabled={loadingDryRun}
-                                >
-                                    Cancelar
-                                </Button>
-                                <Button
-                                    variant="default"
-                                    onClick={handleContinueToConfirm}
-                                    disabled={loadingDryRun}
-                                    className="bg-brand-green text-white hover:bg-brand-green/90"
-                                >
-                                    {loadingDryRun ? "Carregando..." : "Continuar"}
-                                </Button>
-                            </div>
-                        </div>
-                    )}
-
-                    {deleteStep === "confirm" && (
-                        <div className="space-y-6 pt-2 pb-4 max-h-[65vh] overflow-y-auto pr-2 custom-scrollbar">
-                            <div className="flex items-start">
-                                <InfoCard
-                                    title="Essa decisão é sua."
-                                    message="Ao confirmar, sua assinatura será cancelada e iniciaremos o encerramento da sua conta. Você terá 48 horas para desistir a qualquer momento."
-                                    className="flex-1"
-                                    color="red"
-                                />
-                            </div>
-
-                            {/* SUA CONTA HOJE */}
-                            {dryRunReport && (
-                                <div className="space-y-3">
-                                    <h4 className="text-xs font-bold text-brand-inactive-text uppercase tracking-wider">
-                                        Sua conta hoje
-                                    </h4>
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                        {dryRunReport.customersCount > 0 && (
-                                            <div className="p-3 rounded-2xl border border-brand-border dark:border-dark-border bg-brand-gray/20 dark:bg-dark-surface/50 text-center">
-                                                <span className="block text-lg font-extrabold text-brand-dark dark:text-dark-heading">
-                                                    {dryRunReport.customersCount}
-                                                </span>
-                                                <span className="text-[11px] text-brand-inactive-text font-medium">
-                                                    Clientes cadastrados
-                                                </span>
-                                            </div>
-                                        )}
-                                        {dryRunReport.productsCount > 0 && (
-                                            <div className="p-3 rounded-2xl border border-brand-border dark:border-dark-border bg-brand-gray/20 dark:bg-dark-surface/50 text-center">
-                                                <span className="block text-lg font-extrabold text-brand-dark dark:text-dark-heading">
-                                                    {dryRunReport.productsCount}
-                                                </span>
-                                                <span className="text-[11px] text-brand-inactive-text font-medium">
-                                                    Produtos
-                                                </span>
-                                            </div>
-                                        )}
-                                        {dryRunReport.servicesCount > 0 && (
-                                            <div className="p-3 rounded-2xl border border-brand-border dark:border-dark-border bg-brand-gray/20 dark:bg-dark-surface/50 text-center">
-                                                <span className="block text-lg font-extrabold text-brand-dark dark:text-dark-heading">
-                                                    {dryRunReport.servicesCount}
-                                                </span>
-                                                <span className="text-[11px] text-brand-inactive-text font-medium">
-                                                    Serviços
-                                                </span>
-                                            </div>
-                                        )}
-                                        {dryRunReport.ordersCount > 0 && (
-                                            <div className="p-3 rounded-2xl border border-brand-border dark:border-dark-border bg-brand-gray/20 dark:bg-dark-surface/50 text-center">
-                                                <span className="block text-lg font-extrabold text-brand-dark dark:text-dark-heading">
-                                                    {dryRunReport.ordersCount}
-                                                </span>
-                                                <span className="text-[11px] text-brand-inactive-text font-medium">
-                                                    Pedidos realizados
-                                                </span>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* CONFIRMAÇÃO POR ESCRITO */}
-                            <div className="py-4 border-t border-brand-border dark:border-dark-border text-center space-y-3">
-                                <p className="text-xs font-bold text-red-600 dark:text-red-400">
-                                    Atenção: Esta ação é definitiva e removerá todos os seus dados.
-                                </p>
-                                <p className="text-xs text-brand-inactive-text">
-                                    Digite <strong className="text-brand-dark dark:text-dark-heading">EXCLUIR</strong> abaixo para confirmar.
-                                </p>
-                                <input
-                                    type="text"
-                                    value={confirmText}
-                                    onChange={(e) => setConfirmText(e.target.value)}
-                                    placeholder="EXCLUIR"
-                                    className="w-full max-w-[200px] mx-auto text-center uppercase tracking-wider font-bold h-10 border border-brand-border dark:border-dark-border rounded-xl bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading text-sm focus:outline-none focus:ring-1 focus:ring-red-500"
-                                />
-                            </div>
-
-                            {/* FOOTER ACTIONS */}
-                            <div className="flex flex-col sm:flex-row gap-3 mt-4 pt-4 border-t border-brand-border dark:border-dark-border">
-                                <Button
-                                    variant="outline"
-                                    onClick={() => setDeleteStep("none")}
-                                    disabled={isDeleting}
-                                    className="flex-1 h-12 font-bold"
-                                >
-                                    Desistir
-                                </Button>
-                                <Button
-                                    variant="default"
-                                    onClick={handleDeleteAccount}
-                                    disabled={isDeleting || confirmText !== "EXCLUIR"}
-                                    className="flex-1 h-12 bg-red-600 hover:bg-red-700 text-white font-bold"
-                                >
-                                    {isDeleting ? "Excluindo..." : "Confirmar exclusão"}
-                                </Button>
-                            </div>
-                        </div>
-                    )}
-                </DefaultModal>
-
-                {/* Modal para Assinatura Ativa (Bloqueio de Exclusão) */}
-                <DefaultModal
-                    isOpen={activeSubModalOpen}
-                    onClose={() => setActiveSubModalOpen(false)}
-                    title="Assinatura Ativa Detectada"
-                >
-                    <div className="space-y-4 py-2">
-                        <p className="text-sm text-brand-dark dark:text-dark-body">
-                            Você possui uma assinatura ativa da plataforma. Cancele sua assinatura antes de excluir sua conta.
-                        </p>
-                        <div className="flex justify-end gap-3 pt-4 border-t border-brand-border dark:border-dark-border">
-                            <Button variant="outline" onClick={() => setActiveSubModalOpen(false)}>
-                                Voltar
-                            </Button>
-                            <Button
-                                className="bg-red-600 hover:bg-red-700 text-white font-bold"
+                                className="flex-1 h-12 bg-red-600 hover:bg-red-700 text-white font-bold"
                                 onClick={() => {
-                                    setActiveSubModalOpen(false)
-                                    setCancelModal(true)
+                                    setCancelModal(false)
+                                    setCancelConfirmOpen(true)
                                 }}
+                                disabled={!!actionLoading}
                             >
                                 Cancelar assinatura
                             </Button>
                         </div>
                     </div>
                 </DefaultModal>
+
+                {/* ─── Cancel Subscription Confirmation (AlertModal) ────── */}
+                <AlertModal
+                    isOpen={cancelConfirmOpen}
+                    onClose={() => setCancelConfirmOpen(false)}
+                    onConfirm={handleCancel}
+                    title="Confirmar cancelamento"
+                    message="Tem certeza que quer cancelar sua assinatura? Você perderá o acesso aos recursos do plano atual."
+                    variant="danger"
+                    confirmText="Sim, cancelar"
+                    cancelText="Não, manter"
+                    isLoading={actionLoading === "cancel"}
+                    disabled={!!actionLoading}
+                />
             </div>
         </FadeIn>
     )

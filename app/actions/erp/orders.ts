@@ -1596,6 +1596,12 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         requestedStatus: data.paymentStatus,
         totalAmount: serverTotalAmount,
         paidAmount: data.paidAmount,
+        fallbackPaidAmount:
+            data.paymentStatus === "paid"
+                ? serverTotalAmount
+                : data.paymentStatus === "partially_paid"
+                    ? Number(data.paidAmount || 0)
+                    : 0,
     })
 
     let deliveryAddressStr = ""
@@ -1890,13 +1896,22 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         )
     }
 
-    if (paymentState.paidAmount > 0.009 && paymentState.situation === "paid") {
+    if (paymentState.paidAmount > 0.009) {
+        const finalBreakdown = (adjustedPaymentBreakdown && adjustedPaymentBreakdown.length > 0)
+            ? adjustedPaymentBreakdown
+            : [{
+                method: data.paymentMethod && data.paymentMethod !== "Método não definido" ? data.paymentMethod : "Dinheiro",
+                amount: paymentState.paidAmount,
+                amountReceived: paymentState.paidAmount,
+                effectiveAmount: paymentState.paidAmount,
+            }]
+
         await createFinancialTransactionsForReceivedAmount(supabase, {
             orderId: order.id,
             orderNumber: order.order_number,
             partnerId,
             totalAmount: Number(order.total_amount || 0),
-            newBreakdown: adjustedPaymentBreakdown,
+            newBreakdown: finalBreakdown,
             oldBreakdown: [],
             customerId: order.customer_id || order.buyer_id || null,
             customerName: order.customer_name,
@@ -1905,6 +1920,20 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
             paymentMethod: paymentMethodSummary || data.paymentMethod || "Método não definido",
         })
     }
+
+    const { syncReceivableForOrder } = await import("@/lib/services/transaction.service")
+    await syncReceivableForOrder(supabase, {
+        order_number: order.order_number,
+        partner_id: partnerId,
+        total_amount: Number(order.total_amount || 0),
+        paid_amount: Number(paymentState.paidAmount || 0),
+        situation: paymentState.situation,
+        payment_method: paymentMethodSummary || data.paymentMethod,
+        customer_id: order.customer_id || order.buyer_id || null,
+        customer_name: order.customer_name,
+        finance_account_id: order.finance_account_id || data.financeAccountId,
+        order_source: order.order_source || "manual",
+    })
 
     if (paymentState.situation === "paid") {
         await fulfillMarketplaceOrderIfNeeded(supabase, order.id)
@@ -2059,8 +2088,12 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
         const additionalCosts = Math.max(0, Number((data as any).additional_costs || 0))
         const baseBeforePaymentMethod = Math.max(0, subtotalValue - manualDiscount - couponDiscount + shippingCost + additionalCosts)
         const finalTotal = Math.max(0, Number((data as any).total_amount || 0))
-        const paymentMethodDiscountAmount = Math.max(0, Math.round((baseBeforePaymentMethod - finalTotal) * 100) / 100)
-        const paymentMethodExtraAmount = Math.max(0, Math.round((finalTotal - baseBeforePaymentMethod) * 100) / 100)
+        const paymentMethodDiscountAmount = (data as any).payment_method_discount_amount != null
+            ? Number((data as any).payment_method_discount_amount)
+            : Math.max(0, Math.round((baseBeforePaymentMethod - finalTotal) * 100) / 100)
+        const paymentMethodExtraAmount = (data as any).payment_method_extra_amount != null
+            ? Number((data as any).payment_method_extra_amount)
+            : Math.max(0, Math.round((finalTotal - baseBeforePaymentMethod) * 100) / 100)
 
         const isRefunded = Array.isArray(data.return_requests) && data.return_requests.some((req: any) => {
             const isApprovedOrResolved = ["APPROVED", "RESOLVED"].includes(req.status)
@@ -2148,8 +2181,12 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
     }, 0))
     const baseBeforePaymentMethod = Math.max(0, subtotalValue - Math.max(0, manualDiscount) - Math.max(0, couponDiscount) + Math.max(0, shippingCost) + Math.max(0, otherCosts))
     const finalTotal = Math.max(0, Number(sale.final_amount || 0))
-    const paymentMethodDiscountAmount = Math.max(0, Math.round((baseBeforePaymentMethod - finalTotal) * 100) / 100)
-    const paymentMethodExtraAmount = Math.max(0, Math.round((finalTotal - baseBeforePaymentMethod) * 100) / 100)
+    const paymentMethodDiscountAmount = sale.payment_method_discount_amount != null
+        ? Number(sale.payment_method_discount_amount)
+        : Math.max(0, Math.round((baseBeforePaymentMethod - finalTotal) * 100) / 100)
+    const paymentMethodExtraAmount = sale.payment_method_extra_amount != null
+        ? Number(sale.payment_method_extra_amount)
+        : Math.max(0, Math.round((finalTotal - baseBeforePaymentMethod) * 100) / 100)
     const ref =
         (sale.sale_number && String(sale.sale_number).trim()) ||
         String(sale.id || "").replace(/-/g, "").slice(0, 8).toUpperCase()
@@ -2449,8 +2486,6 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         return { success: true, noChanges: true }
     }
 
-
-
     couponDiscountAmount = updatePricingResult.couponDiscountAmount
     let updateServerTotal = updatePricingResult.finalTotal
     let adjustedPaymentBreakdown = sanitizedPaymentBreakdown
@@ -2577,13 +2612,22 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     const orderError = orderUpdateResult.error
     if (orderError) return { error: orderError.message }
 
-    if (paymentState.paidAmount > (currentOrder.paid_amount || 0) + 0.009 && paymentState.situation === "paid") {
+    if (paymentState.paidAmount > (currentOrder.paid_amount || 0) + 0.009) {
+        const finalBreakdown = (adjustedPaymentBreakdown && adjustedPaymentBreakdown.length > 0)
+            ? adjustedPaymentBreakdown
+            : [{
+                method: data.paymentMethod && data.paymentMethod !== "Método não definido" ? data.paymentMethod : (currentOrder.payment_method || "Dinheiro"),
+                amount: paymentState.paidAmount,
+                amountReceived: paymentState.paidAmount,
+                effectiveAmount: paymentState.paidAmount,
+            }]
+
         await createFinancialTransactionsForReceivedAmount(supabase, {
             orderId: orderId,
             orderNumber: currentOrder.order_number || orderId,
             partnerId: data.partnerId,
             totalAmount: Number(updateServerTotal || 0),
-            newBreakdown: adjustedPaymentBreakdown,
+            newBreakdown: finalBreakdown,
             oldBreakdown: currentOrder.payment_breakdown || [],
             customerId: data.customerId || null,
             customerName: data.customerName || null,
@@ -2592,6 +2636,20 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             paymentMethod: paymentMethodSummary || data.paymentMethod || currentOrder.payment_method || "Método não definido",
         })
     }
+
+    const { syncReceivableForOrder } = await import("@/lib/services/transaction.service")
+    await syncReceivableForOrder(supabase, {
+        order_number: currentOrder.order_number || orderId,
+        partner_id: data.partnerId,
+        total_amount: Number(updateServerTotal || 0),
+        paid_amount: Number(paymentState.paidAmount || 0),
+        situation: paymentState.situation,
+        payment_method: paymentMethodSummary || data.paymentMethod || currentOrder.payment_method,
+        customer_id: data.customerId || currentOrder.buyer_id || null,
+        customer_name: data.customerName || currentOrder.customer_name,
+        finance_account_id: data.financeAccountId || currentOrder.finance_account_id,
+        order_source: currentOrder.order_source || "manual",
+    })
 
     if (currentOrder.situation !== "paid" && paymentState.situation === "paid") {
         await fulfillMarketplaceOrderIfNeeded(supabase, orderId)
@@ -3025,6 +3083,14 @@ export async function updateOrdersStatusInBatchAction(payload: {
                 })
 
                 await syncCancelledOrderAppointmentsAndTransactions(supabase, order.id)
+                const { syncReceivableForOrder } = await import("@/lib/services/transaction.service")
+                await syncReceivableForOrder(supabase, {
+                    order_number: order.order_number || order.id,
+                    partner_id: payload.partnerId,
+                    total_amount: 0,
+                    paid_amount: 0,
+                    situation: "cancelled",
+                })
 
                 if (stockWasRestoredOnCancel) {
                     const restoreResult = await createOrderStockMovement({
@@ -3331,6 +3397,20 @@ export async function updateOrdersStatusInBatchAction(payload: {
                     createdByUserId: user.id,
                 })
             }
+
+            const { syncReceivableForOrder } = await import("@/lib/services/transaction.service")
+            await syncReceivableForOrder(supabase, {
+                order_number: order.order_number || order.id,
+                partner_id: payload.partnerId,
+                total_amount: Number(order.total_amount || 0),
+                paid_amount: Number(paymentState.paidAmount || 0),
+                situation: paymentState.situation,
+                payment_method: nextPaymentMethod || order.payment_method,
+                customer_id: order.customer_id || order.buyer_id || null,
+                customer_name: order.customer_name,
+                finance_account_id: order.finance_account_id,
+                order_source: order.order_source || "manual",
+            })
         }
         if (paymentProcessedCount === 0) {
             return { error: "Nenhum pedido elegível para alteração de pagamento." }

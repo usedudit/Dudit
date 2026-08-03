@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Button, Checkbox, Spinner, SelectionBanner, Pagination, IconPlaceholder, Badge, Input, FormDropdown } from "@/components/reusable"
+import { Button, Checkbox, Spinner, SelectionBanner, Pagination, IconPlaceholder, Badge, Input, Combobox } from "@/components/reusable"
 import { ChevronLeftIcon, UploadIcon, CheckCircleIcon, SearchIcon } from "@/lib/icons"
 import { useDropzone } from "react-dropzone"
 import { useNotification } from "@/hooks/use-notification"
@@ -60,6 +60,14 @@ function MappingRow({
         badgeLabel = "Baixo"
     }
 
+    const comboboxOptions = useMemo(() => [
+        { value: "", label: "- Não importar -" },
+        ...availableFields.map((f) => ({
+            value: f.name,
+            label: `${f.label}${f.required ? " *" : ""}`,
+        })),
+    ], [availableFields])
+
     return (
         <tr className="hover:bg-brand-gray/30 dark:hover:bg-dark-border/10 transition-colors">
             <td className="py-4 px-4 align-middle">
@@ -69,24 +77,26 @@ function MappingRow({
                             {col.headerIndex + 1}
                         </span>
                     </div>
-                    <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
-                        {col.header}
-                    </span>
+                    <div className="flex flex-col gap-0.5 min-w-0">
+                        <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
+                            {col.header}
+                        </span>
+                        {col.sampleValues && col.sampleValues.length > 0 && (
+                            <span className="text-[11px] text-brand-inactive-text dark:text-dark-body truncate max-w-[220px]" title={col.sampleValues.join(", ")}>
+                                Exemplo: {col.sampleValues.slice(0, 2).join(", ")}
+                            </span>
+                        )}
+                    </div>
                 </div>
             </td>
             <td className="py-4 px-4 align-middle">
                 <div className="w-full max-w-xs">
-                    <FormDropdown
+                    <Combobox
                         value={col.field || ""}
-                        setValue={(newVal) => onMappingChange(col.headerIndex, newVal || null)}
-                        options={[
-                            { value: "", label: "- Não importar -" },
-                            ...availableFields.map((f) => ({
-                                value: f.name,
-                                label: `${f.label}${f.required ? " *" : ""}`,
-                            })),
-                        ]}
+                        onChange={(newVal) => onMappingChange(col.headerIndex, newVal || null)}
+                        options={comboboxOptions}
                         placeholder="- Não importar -"
+                        searchPlaceholder="Buscar campo..."
                     />
                 </div>
             </td>
@@ -130,8 +140,16 @@ function MappingMobileItem({
         badgeLabel = "Baixo"
     }
 
+    const comboboxOptions = useMemo(() => [
+        { value: "", label: "- Não importar -" },
+        ...availableFields.map((f) => ({
+            value: f.name,
+            label: `${f.label}${f.required ? " *" : ""}`,
+        })),
+    ], [availableFields])
+
     return (
-        <div className="p-4 space-y-3">
+        <div className="p-4 space-y-3 border-b border-brand-border dark:border-dark-border last:border-0">
             <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 min-w-0">
                     <div className="w-6 h-6 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
@@ -139,9 +157,16 @@ function MappingMobileItem({
                             {col.headerIndex + 1}
                         </span>
                     </div>
-                    <h4 className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">
-                        {col.header}
-                    </h4>
+                    <div className="flex flex-col min-w-0">
+                        <h4 className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">
+                            {col.header}
+                        </h4>
+                        {col.sampleValues && col.sampleValues.length > 0 && (
+                            <span className="text-[10px] text-brand-inactive-text dark:text-dark-body truncate max-w-[200px]">
+                                Ex: {col.sampleValues.slice(0, 2).join(", ")}
+                            </span>
+                        )}
+                    </div>
                 </div>
                 {col.field ? (
                     <Badge variant={badgeVariant}>{badgeLabel}</Badge>
@@ -152,17 +177,12 @@ function MappingMobileItem({
 
             <div className="flex flex-col gap-1">
                 <span className="text-[10px] text-brand-inactive-text dark:text-dark-body uppercase font-bold tracking-wider">Campo no Sistema</span>
-                <FormDropdown
+                <Combobox
                     value={col.field || ""}
-                    setValue={(newVal) => onMappingChange(col.headerIndex, newVal || null)}
-                    options={[
-                        { value: "", label: "- Não importar -" },
-                        ...availableFields.map((f) => ({
-                            value: f.name,
-                            label: `${f.label}${f.required ? " *" : ""}`,
-                        })),
-                    ]}
+                    onChange={(newVal) => onMappingChange(col.headerIndex, newVal || null)}
+                    options={comboboxOptions}
                     placeholder="- Não importar -"
+                    searchPlaceholder="Buscar campo..."
                 />
             </div>
         </div>
@@ -387,19 +407,15 @@ export function ImportServicesPage({ partnerId }: ImportServicesPageProps) {
             <div className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
                 <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
                     <div className="flex-1 flex flex-col items-center justify-center text-center px-4">
-                        <CheckCircleIcon className="w-16 h-16 text-green-500 mb-4" />
-                        <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading mb-2">Importação concluída!</h2>
-                        <p className="text-brand-inactive-text dark:text-dark-body mb-6">
-                            {importCount} de {totalRows} serviço(s) importados com sucesso.
-                        </p>
-                        <div className="flex gap-3">
-                            <Button variant="outline" onClick={() => router.push("/erp/servicos")}>
-                                Ver Serviços
-                            </Button>
-                            <Button onClick={() => { setStep("upload"); setImportDone(false); setParsedServices([]); setMapping([]) }}>
-                                Nova Importação
-                            </Button>
-                        </div>
+                        <IconPlaceholder
+                            icon={CheckCircleIcon}
+                            title="Importação concluída!"
+                            subtitle={`${importCount} de ${totalRows} serviços importados com sucesso.`}
+                            buttons={[
+                                { text: "Ver Serviços", action: () => router.push("/erp/services"), variant: "outline" },
+                                { text: "Nova Importação", action: () => { setStep("upload"); setImportDone(false); setParsedServices([]); setMapping([]) } }
+                            ]}
+                        />
                     </div>
                 </div>
             </div>

@@ -356,12 +356,13 @@ export default function CustomersPage({
             module: "customers",
             format: "xlsx",
             filters: {
+                storeId: selectedStore?.id || null,
                 search: debouncedSearch,
                 activeTab,
                 status: filters.status,
             },
         }, { selectedIds: selection.ids, totalCount: filteredCustomers.length })
-    }, [exportData, partnerId, debouncedSearch, activeTab, filters.status, selection.ids, filteredCustomers.length])
+    }, [exportData, partnerId, selectedStore?.id, debouncedSearch, activeTab, filters.status, selection.ids, filteredCustomers.length])
 
     // Handlers (URL-driven)
     const handleAddCustomer = () => openEntity('create')

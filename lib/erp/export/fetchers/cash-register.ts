@@ -25,6 +25,14 @@ export async function fetchCashRegisterExport(
         .select(CASH_REGISTER_SELECT)
         .eq("partner_id", partnerId)
 
+      if (filters.storeId) {
+        query = query.eq("store_id", filters.storeId)
+      }
+
+      if (filters.selectedIds?.length) {
+        query = query.in("id", filters.selectedIds)
+      }
+
       const statuses = (filters.status || []).filter(Boolean)
       if (statuses.length > 0) query = query.in("status", statuses)
 

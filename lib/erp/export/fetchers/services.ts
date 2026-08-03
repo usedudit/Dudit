@@ -36,6 +36,9 @@ export async function fetchServicesExport(
     fetchPage: async (cursor) => {
       let query = supabase.from("services").select(SERVICE_SELECT).eq("partner_id", partnerId)
 
+      if (filters.storeId) query = query.eq("store_id", filters.storeId)
+      if (filters.selectedIds?.length) query = query.in("id", filters.selectedIds)
+
       if (filters.activeTab === "active") query = query.eq("status", "ativo")
       else if (filters.activeTab === "inactive") query = query.eq("status", "inativo")
       else if (statusLabels.length === 1) {

@@ -336,6 +336,7 @@ export default function ServicesPage({
             module: "services",
             format: "xlsx",
             filters: {
+                storeId: selectedStore?.id || null,
                 search: debouncedSearch,
                 activeTab,
                 status: filters.status,
@@ -345,7 +346,7 @@ export default function ServicesPage({
                 maxDuration: filters.durationRange.max,
             },
         }, { selectedIds: selection.ids, totalCount: services.length })
-    }, [exportData, partnerId, debouncedSearch, activeTab, filters, selection.ids, services.length])
+    }, [exportData, partnerId, selectedStore?.id, debouncedSearch, activeTab, filters, selection.ids, services.length])
 
     const checkScroll = useCallback(() => {
         if (!tableContainerRef.current) return

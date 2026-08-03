@@ -61,7 +61,7 @@ export async function uploadPlanilhaAction(
     const readResult = await readSpreadsheet(buffer, file.name)
 
     const detectedEntity = entityType || detectEntity(readResult.headers)
-    const mapping = suggestMapping(readResult.headers, detectedEntity)
+    const mapping = suggestMapping(readResult.headers, detectedEntity, readResult.rows)
     const fields = getFieldsForEntity(detectedEntity)
     const availableFields = fields
       .filter((f) => f.name !== "technical_specs")
@@ -280,8 +280,16 @@ function rowToPreviewEntity(
     return row[col.headerIndex]?.trim() || null
   }
 
+  const rawName = get("name")
+  let name = rawName || (entityType === "customers" ? `Cliente ${index + 1}` : entityType === "services" ? `Serviço ${index + 1}` : `Item ${index + 1}`)
+  if (name.length > 255) {
+    name = name.substring(0, 252) + "..."
+  }
+
+  const rawStatus = get("status")?.toLowerCase()
+  const status = rawStatus && ["inativo", "inactive", "0", "false", "desativado"].includes(rawStatus) ? "inativo" : "ativo"
+
   if (entityType === "customers") {
-    const name = get("name") || `Cliente ${index + 1}`
     return {
       id: `import-${Date.now()}-${index}`,
       name,
@@ -299,14 +307,19 @@ function rowToPreviewEntity(
       city: get("city"),
       state: get("state"),
       zip_code: get("zip_code"),
-      is_active: true,
+      status,
+      is_active: status === "ativo",
       created_at: new Date().toISOString(),
     }
   }
 
   if (entityType === "services") {
-    const name = get("name") || `Serviço ${index + 1}`
     const price = get("price") ? parseFloat(get("price")!.replace(",", ".").replace(/[^0-9.\-]/g, "")) || 0 : 0
+    const rawVis = get("visibility_scope")?.toLowerCase()
+    let visibility_scope = "all"
+    if (rawVis && ["privado", "selecionado", "selected"].includes(rawVis)) visibility_scope = "selected"
+    else if (rawVis && ["exclusivo", "exclusive"].includes(rawVis)) visibility_scope = "exclusive"
+
     return {
       id: `import-${Date.now()}-${index}`,
       name,
@@ -317,16 +330,19 @@ function rowToPreviewEntity(
       category: get("category"),
       duration_minutes: get("duration_minutes") ? parseInt(get("duration_minutes")!.replace(/\D/g, "")) : 60,
       unit: get("unit") || "Serviço",
-      is_active: true,
+      status,
+      visibility_scope,
+      is_active: status === "ativo",
       created_at: new Date().toISOString(),
     }
   }
 
-  const name = get("name") || `Item ${index + 1}`
   const rawPrice = get("price")
   const price = rawPrice ? parseFloat(rawPrice.replace(",", ".").replace(/[^0-9.\-]/g, "")) || 0 : 0
   const rawStock = get("stock_quantity")
   const stock = rawStock ? parseInt(rawStock.replace(/\D/g, "")) || 0 : 0
+  const rawVis = get("visibility")?.toLowerCase()
+  const show_in_marketplace = !(rawVis && ["oculto", "privado", "unpublished", "inativo", "0", "false", "nao", "não"].includes(rawVis))
 
   return {
     id: `import-${Date.now()}-${index}`,
@@ -342,11 +358,13 @@ function rowToPreviewEntity(
     description: get("description"),
     ncm: get("ncm"),
     cest: get("cest"),
-    is_active: true,
+    status,
+    show_in_marketplace,
+    visibility: show_in_marketplace ? "Published" : "Unpublished",
+    is_active: status === "ativo",
     condition: get("condition") || "Novo",
     product_type: get("product_type") || "Físico",
     min_stock: get("min_stock") ? parseInt(get("min_stock")!.replace(/\D/g, "")) : null,
-    max_stock: get("max_stock") ? parseInt(get("max_stock")!.replace(/\D/g, "")) : null,
     show_price_in_store: true,
     images: [],
     created_at: new Date().toISOString(),

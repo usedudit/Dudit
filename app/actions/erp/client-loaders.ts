@@ -216,6 +216,7 @@ export type PartnerSupplierBucketItem = {
   email: string | null
   phone: string | null
   cnpj: string | null
+  avatar_url: string | null
 }
 
 export async function fetchPartnerSuppliersBucket(explicitPartnerId?: string): Promise<PartnerSupplierBucketItem[]> {
@@ -235,7 +236,7 @@ export async function fetchPartnerSuppliersBucket(explicitPartnerId?: string): P
   const supabase = await getSupabaseServerClient()
   const { data, error } = await supabase
     .from("suppliers")
-    .select("id, name, email, phone, cnpj")
+    .select("id, name, email, phone, cnpj, image_url")
     .eq("partner_id", partnerId)
     .eq("status", "ativo")
     .order("name", { ascending: true })
@@ -246,7 +247,14 @@ export async function fetchPartnerSuppliersBucket(explicitPartnerId?: string): P
     return []
   }
 
-  return (data || []) as PartnerSupplierBucketItem[]
+  return (data || []).map((c: any) => ({
+    id: String(c.id),
+    name: String(c.name || ""),
+    email: c.email ?? null,
+    phone: c.phone ?? null,
+    cnpj: c.cnpj ?? null,
+    avatar_url: c.image_url || null,
+  }))
 }
 
 export type PartnerTeamMemberBucketItem = {

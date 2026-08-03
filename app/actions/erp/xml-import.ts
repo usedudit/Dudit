@@ -134,6 +134,9 @@ async function matchProduct(
 
   const cleanGtin = product.gtin?.replace(/\D/g, "") || null
 
+  // Produtos arquivados/excluídos nunca são usados como match — sempre criar novo
+  const EXCLUDED_STATUSES = "(archived,arquivado,deleted,excluido)"
+
   for (const method of order) {
     if (method === "ean" && cleanGtin && cleanGtin.length >= 8) {
       const { data } = await supabase
@@ -141,6 +144,7 @@ async function matchProduct(
         .select("id, name, gtin, stock_quantity, cost_price, unit")
         .eq("partner_id", partnerId)
         .eq("gtin", cleanGtin)
+        .not("status", "in", EXCLUDED_STATUSES)
         .maybeSingle()
 
       if (data) {
@@ -163,6 +167,7 @@ async function matchProduct(
         .select("id, name, gtin, sku, stock_quantity, cost_price, unit")
         .eq("partner_id", partnerId)
         .eq("sku", product.codigo)
+        .not("status", "in", EXCLUDED_STATUSES)
         .maybeSingle()
 
       if (data) {
@@ -184,6 +189,7 @@ async function matchProduct(
         .from("product_suppliers")
         .select("product_id, products!inner(id, name, gtin, stock_quantity, cost_price, unit)")
         .eq("supplier_sku", product.codigo)
+        .not("products.status", "in", EXCLUDED_STATUSES)
         .maybeSingle()
 
       if (data) {
@@ -207,6 +213,7 @@ async function matchProduct(
         .select("id, name, gtin, stock_quantity, cost_price, unit")
         .eq("partner_id", partnerId)
         .eq("gtin", cleanGtin)
+        .not("status", "in", EXCLUDED_STATUSES)
         .maybeSingle()
 
       if (data) {
@@ -237,6 +244,7 @@ async function matchProduct(
         .from("products")
         .select("id, name, gtin, stock_quantity, cost_price, unit")
         .eq("partner_id", partnerId)
+        .not("status", "in", EXCLUDED_STATUSES)
         .limit(50)
 
       if (products && products.length > 0) {
@@ -274,6 +282,7 @@ async function matchProduct(
       .from("products")
       .select("id, name, gtin, stock_quantity, cost_price, unit")
       .eq("partner_id", partnerId)
+      .not("status", "in", EXCLUDED_STATUSES)
       .limit(100)
 
     if (allProducts && allProducts.length > 0) {

@@ -1380,7 +1380,7 @@ export async function getProductSuppliersAction(productId: string) {
             .select(`
                 id, product_id, supplier_id, cost_price, supplier_sku, lead_time_days,
                 last_purchase_price, last_purchase_date, last_invoice_key,
-                supplier:suppliers!inner(id, name, email, phone, cnpj, cpf)
+                supplier:suppliers!inner(id, name, email, phone, cnpj, cpf, image_url)
             `)
             .eq("product_id", productId)
         if (error) return { error: error.message }
@@ -1398,6 +1398,7 @@ export async function getProductSuppliersAction(productId: string) {
             supplier_email: ps.supplier?.email || null,
             supplier_phone: ps.supplier?.phone || null,
             supplier_document: ps.supplier?.cnpj || ps.supplier?.cpf || null,
+            supplier_image_url: ps.supplier?.image_url || null,
         }))
         return { suppliers, partnerId: product.partner_id }
     } catch (error: any) {
@@ -1410,13 +1411,13 @@ export async function searchSuppliersAction(partnerId: string, search: string) {
         const supabase = await getSupabaseServerClient()
         const sanitized = search.replace(/[%_]/g, "")
         if (!sanitized.trim()) {
-            const { data } = await supabase.from("suppliers").select("id, name, email, phone, cnpj, cpf").eq("partner_id", partnerId).order("name").limit(20)
+            const { data } = await supabase.from("suppliers").select("id, name, email, phone, cnpj, cpf, image_url").eq("partner_id", partnerId).order("name").limit(20)
             return { suppliers: data || [] }
         }
         const term = `%${sanitized}%`
         const { data, error } = await supabase
             .from("suppliers")
-            .select("id, name, email, phone, cnpj, cpf")
+            .select("id, name, email, phone, cnpj, cpf, image_url")
             .eq("partner_id", partnerId)
             .or(`name.ilike.${term},email.ilike.${term},cnpj.ilike.${term},cpf.ilike.${term},phone.ilike.${term}`)
             .order("name")

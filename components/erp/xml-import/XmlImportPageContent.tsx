@@ -68,6 +68,206 @@ const COLUMNS = [
     { id: "actions" as const, label: "Ações", align: "center" as const, width: "80px" },
 ]
 
+const ITEM_STOCK_OPTIONS = [
+    { value: "add", label: "Somar" },
+    { value: "weighted_average", label: "Média ponderada" },
+    { value: "ignore", label: "Não alterar" },
+]
+
+const ITEM_COST_OPTIONS = [
+    { value: "update", label: "Atualizar" },
+    { value: "weighted_average", label: "Média ponderada" },
+    { value: "ignore", label: "Não alterar" },
+]
+
+function getItemStockLabel(v: string) {
+    return ITEM_STOCK_OPTIONS.find((o) => o.value === v)?.label || v
+}
+
+function getItemCostLabel(v: string) {
+    return ITEM_COST_OPTIONS.find((o) => o.value === v)?.label || v
+}
+
+function getItemDecisionOptions(item: any) {
+    const opts: { value: string; label: string }[] = []
+    if (item.match_status === "new") {
+        opts.push({ value: "create_product", label: "Criar novo" })
+    } else {
+        opts.push({ value: "keep_product", label: item.match_status === "similar" ? "Manter cadastro" : "Manter" })
+        if (item.match_status === "similar") opts.push({ value: "update_fields", label: "Atualizar campos" })
+        opts.push({ value: "create_product", label: "Criar novo" })
+    }
+    opts.push({ value: "ignore", label: "Ignorar" })
+    return opts
+}
+
+function getItemDecisionLabel(v: string, item: any) {
+    return getItemDecisionOptions(item).find((o) => o.value === v)?.label || v
+}
+
+function getDecisionToneClass(v: string) {
+    switch (v) {
+        case "create_product": return "text-blue-600 dark:text-blue-400"
+        case "update_fields": return "text-orange-600 dark:text-orange-400"
+        case "ignore": return "text-gray-400 dark:text-dark-body"
+        default: return "text-brand-green dark:text-emerald-400"
+    }
+}
+
+function getItemMatchBadge(item: any) {
+    switch (item.match_status) {
+        case "new": return { label: "Novo", variant: "blue" as const }
+        case "similar": return { label: "Conflito", variant: "orange" as const }
+        case "skipped": return { label: "Ignorado", variant: "gray" as const }
+        default: return { label: "Match", variant: "green" as const }
+    }
+}
+
+function getSupplierConflict(item: any) {
+    return (item.conflicts || []).find((c: any) => c.campo === "fornecedor_diferente")
+}
+
+interface ImportItemRowProps {
+    item: any
+    d: any
+    isPreview: boolean
+    onOpenAction: (kind: "stock" | "cost" | "decision") => void
+    supplierName?: string
+    supplierAction?: string
+    onSupplierAction?: (value: "add" | "keep") => void
+}
+
+function ImportItemListRow({ item, d, isPreview, onOpenAction, supplierName, supplierAction, onSupplierAction }: ImportItemRowProps) {
+    const badge = getItemMatchBadge(item)
+    const supplierConflictInfo = getSupplierConflict(item)
+    return (
+        <tr className="group bg-white dark:bg-dark-background hover:bg-brand-gray dark:hover:bg-dark-border/20 transition-colors">
+            <td className="py-3 px-4 border-b border-brand-border dark:border-dark-border align-top">
+                <div className="flex flex-col gap-0.5 min-w-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate">{item.raw_name}</span>
+                        <Badge variant={badge.variant} className="whitespace-nowrap shrink-0">{badge.label}</Badge>
+                    </div>
+                    {item.raw_sku && (
+                        <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">SKU: {item.raw_sku}</span>
+                    )}
+                    {isPreview && (
+                        <span className={`text-[11px] font-semibold ${getDecisionToneClass(d.decision)}`}>
+                            {getItemDecisionLabel(d.decision, item)}
+                        </span>
+                    )}
+                    {isPreview && supplierConflictInfo && (
+                        <div className="flex flex-col gap-1 w-full mt-1.5">
+                            <span className="text-orange-600 dark:text-orange-400 font-semibold text-[11px]">
+                                Já vinculado a outro fornecedor ({supplierConflictInfo.valor_atual_name || "desconhecido"})
+                            </span>
+                            <div className="flex flex-wrap gap-3">
+                                <label className="flex items-center gap-1 cursor-pointer">
+                                    <input type="radio" name={`supplier_${item.id}`} value="add"
+                                        checked={supplierAction === "add"}
+                                        onChange={() => onSupplierAction?.("add")}
+                                        className="accent-brand-orange" />
+                                    <span className="text-xs text-brand-dark dark:text-dark-heading">Adicionar {supplierName || "novo"} como fornecedor</span>
+                                </label>
+                                <label className="flex items-center gap-1 cursor-pointer">
+                                    <input type="radio" name={`supplier_${item.id}`} value="keep"
+                                        checked={supplierAction !== "add"}
+                                        onChange={() => onSupplierAction?.("keep")}
+                                        className="accent-brand-orange" />
+                                    <span className="text-xs text-brand-dark dark:text-dark-heading">Não alterar fornecedores</span>
+                                </label>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </td>
+            <td className="py-3 px-4 border-b border-brand-border dark:border-dark-border align-top">
+                <span className="text-[13px] font-semibold text-brand-dark dark:text-dark-heading whitespace-nowrap">
+                    {formatQuantityWithUnit(item.raw_quantity, item.raw_unit)}
+                </span>
+            </td>
+            <td className="py-3 px-4 border-b border-brand-border dark:border-dark-border align-top">
+                <span className="text-[13px] font-semibold text-brand-dark dark:text-dark-heading whitespace-nowrap">
+                    R$ {Number(item.raw_unit_cost || 0).toFixed(2)}
+                </span>
+            </td>
+            <td className="py-3 px-4 border-b border-brand-border dark:border-dark-border align-top text-right">
+                {isPreview ? (
+                    <div className="flex items-center justify-end gap-1.5 action-btn">
+                        <Button variant="outline" size="sm" onClick={() => onOpenAction("stock")}>Estoque</Button>
+                        <Button variant="outline" size="sm" onClick={() => onOpenAction("cost")}>Custo</Button>
+                        <Button variant="outline" size="sm" onClick={() => onOpenAction("decision")}>Decisão</Button>
+                    </div>
+                ) : (
+                    <span className="text-xs text-brand-inactive-text dark:text-dark-body">-</span>
+                )}
+            </td>
+        </tr>
+    )
+}
+
+function ImportItemGridCard({ item, d, isPreview, onOpenAction, supplierName, supplierAction, onSupplierAction }: ImportItemRowProps) {
+    const badge = getItemMatchBadge(item)
+    const supplierConflictInfo = getSupplierConflict(item)
+    return (
+        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 flex flex-col gap-3">
+            <div className="flex items-start gap-2 min-w-0">
+                <h4 className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate" title={item.raw_name}>{item.raw_name}</h4>
+                <Badge variant={badge.variant} className="whitespace-nowrap shrink-0">{badge.label}</Badge>
+            </div>
+            <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate">
+                {item.raw_sku ? <span>SKU: {item.raw_sku}</span> : <span>Sem SKU</span>}
+                {item.raw_ean && <><span className="mx-1.5">•</span><span>EAN: {item.raw_ean}</span></>}
+            </div>
+            {isPreview && (
+                <span className={`text-[11px] font-semibold ${getDecisionToneClass(d.decision)}`}>
+                    {getItemDecisionLabel(d.decision, item)}
+                </span>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+                <div>
+                    <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body block">Quantidade</span>
+                    <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{formatQuantityWithUnit(item.raw_quantity, item.raw_unit)}</span>
+                </div>
+                <div className="text-right">
+                    <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body block">Custo unit.</span>
+                    <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">R$ {Number(item.raw_unit_cost || 0).toFixed(2)}</span>
+                </div>
+            </div>
+            {isPreview && (
+                <div className="flex gap-2 mt-1">
+                    <Button variant="outline" size="sm" className="flex-1" onClick={() => onOpenAction("stock")}>Estoque</Button>
+                    <Button variant="outline" size="sm" className="flex-1" onClick={() => onOpenAction("cost")}>Custo</Button>
+                    <Button variant="outline" size="sm" className="flex-1" onClick={() => onOpenAction("decision")}>Decisão</Button>
+                </div>
+            )}
+            {isPreview && supplierConflictInfo && (
+                <div className="flex flex-col gap-1 w-full border-t border-brand-border dark:border-dark-border pt-2">
+                    <span className="text-orange-600 dark:text-orange-400 font-semibold text-[11px]">
+                        Já vinculado a outro fornecedor ({supplierConflictInfo.valor_atual_name || "desconhecido"})
+                    </span>
+                    <div className="flex flex-col gap-1.5">
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                            <input type="radio" name={`supplier_${item.id}`} value="add"
+                                checked={supplierAction === "add"}
+                                onChange={() => onSupplierAction?.("add")}
+                                className="accent-brand-orange" />
+                            <span className="text-xs text-brand-dark dark:text-dark-heading">Adicionar {supplierName || "novo"} como fornecedor</span>
+                        </label>
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                            <input type="radio" name={`supplier_${item.id}`} value="keep"
+                                checked={supplierAction !== "add"}
+                                onChange={() => onSupplierAction?.("keep")}
+                                className="accent-brand-orange" />
+                            <span className="text-xs text-brand-dark dark:text-dark-heading">Não alterar fornecedores</span>
+                        </label>
+                    </div>
+                </div>
+            )}
+        </div>
+    )
+}
+
 export function XmlImportPageContent({ partnerId, initialImports, planGate }: XmlImportPageContentProps) {
     const { selectedStore } = useStore()
     const storeId = selectedStore?.id || ""
@@ -206,9 +406,9 @@ export function XmlImportPageContent({ partnerId, initialImports, planGate }: Xm
             partnerId,
             module: "xml-import",
             format: "xlsx",
-            filters: { search, activeTab, status: [] },
+            filters: { storeId: selectedStore?.id || null, search, activeTab, status: [] },
         }, { selectedIds: selection, totalCount: filtered.length })
-    }, [exportData, partnerId, search, activeTab, selection, filtered.length])
+    }, [exportData, partnerId, selectedStore?.id, search, activeTab, selection, filtered.length])
 
     const handleClearFilters = useCallback(() => { setSearch(""); setActiveTab("all") }, [])
     const handleOpenDetail = useCallback((imp: ImportItem) => setViewingImportId(imp.id), [])
@@ -721,7 +921,11 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
     const [historyEntries, setHistoryEntries] = useState<any[]>([])
     const [historyLoading, setHistoryLoading] = useState(false)
     const [historyLoaded, setHistoryLoaded] = useState(false)
+    const [itemsPage, setItemsPage] = useState(1)
+    const [actionModal, setActionModal] = useState<{ itemId: string; kind: "stock" | "cost" | "decision" } | null>(null)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
+    const isTabletOrMobile = useMediaQuery("(max-width: 1023px)")
+    const ITEMS_PER_PAGE = 10
     const { success: notifySuccess, error: notifyError } = useNotification()
     const { setHeaderOverride } = useSidebar()
 
@@ -882,6 +1086,12 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
 
     const safeConflicts = (c: any) => Array.isArray(c) ? c : []
 
+    const itemsTotalPages = Math.max(1, Math.ceil((preview.items?.length || 0) / ITEMS_PER_PAGE))
+    const paginatedItems = (preview.items || []).slice((itemsPage - 1) * ITEMS_PER_PAGE, itemsPage * ITEMS_PER_PAGE)
+
+    const actionItem = actionModal ? preview.items.find((i: any) => i.id === actionModal.itemId) : null
+    const actionDecision = actionItem ? getDecision(actionItem.id) : null
+
     return (
         <FadeIn>
             <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
@@ -950,17 +1160,57 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                                 <FadeIn key="details">
                                     <div className="grid grid-cols-12 gap-y-8 xl:gap-y-0">
                                         <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
+                                            {/* Mobile/Tablet: Summary + InfoCards acima do card da NF-e */}
+                                            <div className="xl:hidden mb-6">
+                                                <h3 className="font-bold text-brand-dark dark:text-dark-heading mb-3 text-base">Resumo</h3>
+                                                <ListItem
+                                                    icon={FileTextIcon}
+                                                    title={`${summaryCounts.total} ${summaryCounts.total === 1 ? "item" : "itens"}`}
+                                                    description={preview.invoice.valor_total > 0 ? `R$ ${preview.invoice.valor_total.toFixed(2)}` : "Sem valor total"}
+                                                    showChevron={true}
+                                                    onClick={() => setShowSummaryModal(true)}
+                                                    className="border-0 bg-transparent px-0 hover:bg-transparent"
+                                                />
+                                            </div>
+
+                                            {(isFailed && preview.errors?.length > 0) || (isReversed && preview.reversed_at) || reimported ? (
+                                                <div className="mb-6 space-y-3">
+                                                    {isFailed && preview.errors?.length > 0 && (
+                                                        <InfoCard color="red" title="Erro na importação" message={
+                                                            <ul className="list-disc pl-4 text-sm space-y-1">
+                                                                {preview.errors.map((e: any, i: number) => (
+                                                                    <li key={i}>{typeof e === "string" ? e : e.error || ""}</li>
+                                                                ))}
+                                                            </ul>
+                                                        } />
+                                                    )}
+                                                    {isReversed && preview.reversed_at && (
+                                                        <InfoCard color="red" title={`Importação Revertida em ${safeDateTime(preview.reversed_at)}`} message={
+                                                            <p>{preview.reversal_reason}</p>
+                                                        } />
+                                                    )}
+                                                    {reimported && (
+                                                        <InfoCard
+                                                            color="orange"
+                                                            message="Este XML já foi importado anteriormente e teve sua importação revertida. Revise os dados e confirme para importar novamente."
+                                                        />
+                                                    )}
+                                                </div>
+                                            ) : null}
+
                                             <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden mb-8">
                                                 <div className="bg-brand-gray dark:bg-dark-border/30 p-6 border-b border-brand-border dark:border-dark-border">
                                                     <div className="flex items-start justify-between">
                                                         <div className="flex flex-col gap-1.5">
                                                             <div className="flex items-center gap-1.5 font-bold text-brand-dark dark:text-dark-heading text-[16px]">
                                                                 <span>Série {preview.invoice.serie || "-"} | N° {preview.invoice.numero || "-"}</span>
-                                                                {preview.invoice.ambiente === "1" && <Badge variant="green" icon={null}>Produção</Badge>}
-                                                                {preview.invoice.ambiente === "2" && <Badge variant="orange" icon={null}>Homologação</Badge>}
+                                                                <span className="hidden md:inline-flex items-center gap-1.5">
+                                                                    {preview.invoice.ambiente === "1" && <Badge variant="green" icon={null}>Produção</Badge>}
+                                                                    {preview.invoice.ambiente === "2" && <Badge variant="orange" icon={null}>Homologação</Badge>}
+                                                                </span>
                                                             </div>
                                                             {(preview.invoice.modelo || preview.invoice.protocolo || preview.invoice.data_saida) && (
-                                                                <div className="flex items-center gap-1.5 text-xs text-brand-inactive-text dark:text-dark-body">
+                                                                <div className="hidden md:flex items-center gap-1.5 text-xs text-brand-inactive-text dark:text-dark-body">
                                                                     {preview.invoice.modelo && <span>Mod {preview.invoice.modelo}</span>}
                                                                     {(preview.invoice.modelo && (preview.invoice.protocolo || preview.invoice.data_saida)) && <span>•</span>}
                                                                     {preview.invoice.protocolo && <span>Prot {preview.invoice.protocolo}</span>}
@@ -968,9 +1218,15 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                                                                     {preview.invoice.data_saida && <span>Saída: {safeDate(preview.invoice.data_saida)}</span>}
                                                                 </div>
                                                             )}
+                                                            {preview.invoice.valor_total > 0 && (
+                                                                <div className="md:hidden mt-1.5">
+                                                                    <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Valor Total</span>
+                                                                    <p className="font-bold text-brand-dark dark:text-dark-heading text-[16px]">R$ {preview.invoice.valor_total.toFixed(2)}</p>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                         {preview.invoice.valor_total > 0 && (
-                                                            <div className="text-right">
+                                                            <div className="hidden md:block text-right">
                                                                 <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Valor Total</span>
                                                                 <p className="font-bold text-brand-dark dark:text-dark-heading text-[16px]">R$ {preview.invoice.valor_total.toFixed(2)}</p>
                                                             </div>
@@ -1002,211 +1258,65 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                                                 </div>
                                             </div>
 
-                                            {isFailed && preview.errors?.length > 0 && (
-                                                <div className="mb-8 space-y-2">
-                                                    {preview.errors.map((e: any, i: number) => (
-                                                        <InfoCard key={i} color="red" title={`Erro no item ${i + 1}`} message={typeof e === "string" ? e : e.error || ""} />
-                                                    ))}
-                                                </div>
-                                            )}
-
                                             <FormSection title="Produtos">
                                                 <div>
-                                                    {preview.items.map((item: any, itemIdx: number) => {
-                                                        const d = getDecision(item.id)
-                                                        const isNew = item.match_status === "new"
-                                                        const isSimilar = item.match_status === "similar"
-                                                        const isMatched = item.match_status === "matched"
-                                                        const isSkipped = item.match_status === "skipped"
-                                                        const conflicts = safeConflicts(item.conflicts)
-
-                                                        return (
-                                                            <Fragment key={item.id}>
-                                                                {itemIdx > 0 && <Separator className="my-4" />}
-                                                                <div>
-                                                                    <div className="p-0 flex items-start justify-between gap-4">
-                                                                        <div className="flex items-start gap-3 min-w-0 flex-1">
-                                                                            <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border">
-                                                                                <PackageIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                                                            </div>
-                                                                            <div className="min-w-0">
-                                                                                <div className="flex items-center gap-2">
-                                                                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{item.raw_name}</p>
-                                                                                    <Badge variant={isNew ? "blue" : isSimilar ? "orange" : isSkipped ? "gray" : "green"}>
-                                                                                        {isSkipped ? "Ignorado" : isNew ? "Novo" : isSimilar ? "Conflito" : "Match"}
-                                                                                    </Badge>
-                                                                                </div>
-                                                                                <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
-                                                                                    {item.raw_sku && <span className="text-xs text-brand-inactive-text">SKU: {item.raw_sku}</span>}
-                                                                                    {item.raw_ean && <span className="text-xs text-brand-inactive-text">EAN: {item.raw_ean}</span>}
-                                                                                    {item.raw_ncm && <span className="text-xs text-brand-inactive-text">NCM: {item.raw_ncm}</span>}
-                                                                                    <span className="text-xs text-brand-inactive-text">Qtd: {item.raw_quantity}</span>
-                                                                                    <span className="text-xs text-brand-inactive-text">Custo: R$ {Number(item.raw_unit_cost).toFixed(4)}</span>
-                                                                                    <span className="text-xs text-brand-inactive-text">Un: {item.raw_unit}</span>
-                                                                                </div>
-                                                                                <div className="flex items-center gap-2 mt-1">
-                                                                                    {item.match_method && <p className="text-xs text-brand-green">Match por {item.match_method}</p>}
-                                                                                    {item.match_confidence != null && (
-                                                                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${item.match_confidence >= 0.9
-                                                                                            ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                                                                                            : item.match_confidence >= 0.7
-                                                                                                ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
-                                                                                                : "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
-                                                                                            }`}>
-                                                                                            {Math.round(item.match_confidence * 100)}%
-                                                                                        </span>
-                                                                                    )}
-                                                                                </div>
-                                                                                {conflicts.map((c: any, ci: number) => (
-                                                                                    <div key={ci} className="flex items-center gap-1.5 mt-1 text-xs">
-                                                                                        {c.campo === "fornecedor_diferente" ? (
-                                                                                            <div className="flex flex-col gap-1 w-full">
-                                                                                                <span className="text-orange-600 font-semibold">
-                                                                                                    Produto já vinculado a outro fornecedor ({c.valor_atual_name || "desconhecido"})
-                                                                                                </span>
-                                                                                                <div className="flex gap-3 mt-1">
-                                                                                                    <label className="flex items-center gap-1 cursor-pointer">
-                                                                                                        <input
-                                                                                                            type="radio"
-                                                                                                            name={`supplier_${item.id}`}
-                                                                                                            value="add"
-                                                                                                            checked={supplierActions[item.id] === "add"}
-                                                                                                            onChange={() => setSupplierActions(prev => ({ ...prev, [item.id]: "add" }))}
-                                                                                                            className="accent-brand-orange"
-                                                                                                        />
-                                                                                                        <span className="text-brand-dark text-xs">
-                                                                                                            Adicionar {preview?.supplier.name || "novo"} como fornecedor
-                                                                                                        </span>
-                                                                                                    </label>
-                                                                                                    <label className="flex items-center gap-1 cursor-pointer">
-                                                                                                        <input
-                                                                                                            type="radio"
-                                                                                                            name={`supplier_${item.id}`}
-                                                                                                            value="keep"
-                                                                                                            checked={supplierActions[item.id] === "keep"}
-                                                                                                            onChange={() => setSupplierActions(prev => ({ ...prev, [item.id]: "keep" }))}
-                                                                                                            className="accent-brand-orange"
-                                                                                                        />
-                                                                                                        <span className="text-brand-dark text-xs">Manter vínculo atual</span>
-                                                                                                    </label>
-                                                                                                </div>
-                                                                                            </div>
-                                                                                        ) : (
-                                                                                            <>
-                                                                                                <span className="font-bold text-brand-dark">{c.campo}:</span>
-                                                                                                <span className="text-yellow-600 line-through">{String(c.valor_atual ?? "")}</span>
-                                                                                                <ArrowRightIcon className="w-3 h-3 text-brand-inactive-text" />
-                                                                                                <span className="text-brand-green">{String(c.valor_xml ?? "")}</span>
-                                                                                            </>
-                                                                                        )}
-                                                                                    </div>
-                                                                                ))}
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-
-                                                                    {isPreview && !isSkipped && (
-                                                                        <div className="mt-3 space-y-3">
-                                                                            <div className="flex flex-wrap gap-2">
-                                                                                {isMatched && (
-                                                                                    <Button variant={d.decision === "keep_product" ? "default" : "outline"} size="sm"
-                                                                                        onClick={() => setDecisions((prev: any) => ({ ...prev, [item.id]: { ...prev[item.id], decision: "keep_product" } }))}>
-                                                                                        Manter
-                                                                                    </Button>
-                                                                                )}
-                                                                                {isSimilar && (
-                                                                                    <>
-                                                                                        <Button variant={d.decision === "keep_product" ? "default" : "outline"} size="sm"
-                                                                                            onClick={() => setDecisions((prev: any) => ({ ...prev, [item.id]: { ...prev[item.id], decision: "keep_product" } }))}>
-                                                                                            Manter cadastro
-                                                                                        </Button>
-                                                                                        <Button variant={d.decision === "update_fields" ? "default" : "outline"} size="sm"
-                                                                                            onClick={() => setDecisions((prev: any) => ({ ...prev, [item.id]: { ...prev[item.id], decision: "update_fields" } }))}>
-                                                                                            Atualizar campos
-                                                                                        </Button>
-                                                                                    </>
-                                                                                )}
-                                                                                <Button variant={d.decision === "create_product" ? "default" : "outline"} size="sm"
-                                                                                    onClick={() => setDecisions((prev: any) => ({ ...prev, [item.id]: { ...prev[item.id], decision: "create_product" } }))}>
-                                                                                    Criar novo
-                                                                                </Button>
-                                                                                <Button variant={d.decision === "ignore" ? "default" : "outline"} size="sm"
-                                                                                    onClick={() => setDecisions((prev: any) => ({ ...prev, [item.id]: { ...prev[item.id], decision: "ignore" } }))}>
-                                                                                    Ignorar
-                                                                                </Button>
-                                                                            </div>
-
-                                                                            {d.decision !== "ignore" && (
-                                                                                <div className="flex items-center gap-4">
-                                                                                    <FormDropdown
-                                                                                        label="Estoque"
-                                                                                        value={d.stock_action}
-                                                                                        setValue={(val) => setDecisions((prev: any) => ({ ...prev, [item.id]: { ...prev[item.id], stock_action: val } }))}
-                                                                                        options={[
-                                                                                            { value: "add", label: "Somar" },
-                                                                                            { value: "weighted_average", label: "Média ponderada" },
-                                                                                            { value: "ignore", label: "Não alterar" },
-                                                                                        ]}
-                                                                                    />
-                                                                                    <FormDropdown
-                                                                                        label="Custo"
-                                                                                        value={d.cost_action}
-                                                                                        setValue={(val) => setDecisions((prev: any) => ({ ...prev, [item.id]: { ...prev[item.id], cost_action: val } }))}
-                                                                                        options={[
-                                                                                            { value: "update", label: "Atualizar" },
-                                                                                            { value: "weighted_average", label: "Média ponderada" },
-                                                                                            { value: "ignore", label: "Não alterar" },
-                                                                                        ]}
-                                                                                    />
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            </Fragment>
-                                                        )
-                                                    })}
+                                                    {isTabletOrMobile ? (
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                            {paginatedItems.map((item: any) => {
+                                                                const d = getDecision(item.id)
+                                                                return (
+                                                                    <ImportItemGridCard
+                                                                        key={item.id}
+                                                                        item={item}
+                                                                        d={d}
+                                                                        isPreview={isPreview}
+                                                                        onOpenAction={(kind) => setActionModal({ itemId: item.id, kind })}
+                                                                        supplierName={preview.supplier?.name}
+                                                                        supplierAction={supplierActions[item.id]}
+                                                                        onSupplierAction={(v) => setSupplierActions((prev: any) => ({ ...prev, [item.id]: v }))}
+                                                                    />
+                                                                )
+                                                            })}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="w-full overflow-hidden rounded-xl border border-brand-border dark:border-dark-border">
+                                                            <table className="w-full text-left border-separate border-spacing-0">
+                                                                <thead>
+                                                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                                        <th className="py-3 px-4 rounded-l-lg bg-brand-gray dark:bg-dark-border/50 text-[13px] font-medium text-gray-500 dark:text-dark-body">Produto</th>
+                                                                        <th className="py-3 px-4 bg-brand-gray dark:bg-dark-border/50 text-[13px] font-medium text-gray-500 dark:text-dark-body">Qtd</th>
+                                                                        <th className="py-3 px-4 bg-brand-gray dark:bg-dark-border/50 text-[13px] font-medium text-gray-500 dark:text-dark-body">Custo</th>
+                                                                        <th className="py-3 px-4 rounded-r-lg bg-brand-gray dark:bg-dark-border/50 text-[13px] font-medium text-gray-500 dark:text-dark-body text-right">Ações</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody>
+                                                                    {paginatedItems.map((item: any) => {
+                                                                        const d = getDecision(item.id)
+                                                                        return (
+                                                                            <ImportItemListRow
+                                                                                key={item.id}
+                                                                                item={item}
+                                                                                d={d}
+                                                                                isPreview={isPreview}
+                                                                                onOpenAction={(kind) => setActionModal({ itemId: item.id, kind })}
+                                                                                supplierName={preview.supplier?.name}
+                                                                                supplierAction={supplierActions[item.id]}
+                                                                                onSupplierAction={(v) => setSupplierActions((prev: any) => ({ ...prev, [item.id]: v }))}
+                                                                            />
+                                                                        )
+                                                                    })}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    )}
+                                                    {paginatedItems.length > 0 && itemsTotalPages > 1 && (
+                                                        <Pagination currentPage={itemsPage} totalPages={itemsTotalPages} onPageChange={setItemsPage} inline />
+                                                    )}
                                                 </div>
                                             </FormSection>
                                         </div>
 
                                         <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-l-0 xl:border-l border-brand-border dark:border-dark-border space-y-6">
-                                            {/* Mobile/Tablet: Summary ListItem */}
-                                            <div className="xl:hidden">
-                                                <h3 className="font-bold text-brand-dark dark:text-dark-heading mb-4 text-base">Resumo</h3>
-                                                <ListItem
-                                                    icon={FileTextIcon}
-                                                    title={`${summaryCounts.total} ${summaryCounts.total === 1 ? "item" : "itens"}`}
-                                                    description={preview.invoice.valor_total > 0 ? `R$ ${preview.invoice.valor_total.toFixed(2)}` : "Sem valor total"}
-                                                    showChevron={true}
-                                                    onClick={() => setShowSummaryModal(true)}
-                                                    className="border-0 bg-transparent px-0 hover:bg-transparent"
-                                                />
-                                            </div>
-
-                                            {isFailed && preview.errors?.length > 0 && (
-                                                <InfoCard color="red" title="Erro na importação" message={
-                                                    <ul className="list-disc pl-4 text-sm space-y-1">
-                                                        {preview.errors.map((e: any, i: number) => (
-                                                            <li key={i}>{typeof e === "string" ? e : e.error || ""}</li>
-                                                        ))}
-                                                    </ul>
-                                                } />
-                                            )}
-
-                                            {isReversed && preview.reversed_at && (
-                                                <InfoCard color="red" title={`Importação Revertida em ${safeDateTime(preview.reversed_at)}`} message={
-                                                    <p>{preview.reversal_reason}</p>
-                                                } />
-                                            )}
-
-                                            {reimported && (
-                                                <InfoCard
-                                                    color="orange"
-                                                    message="Este XML já foi importado anteriormente e teve sua importação revertida. Revise os dados e confirme para importar novamente."
-                                                />
-                                            )}
-
                                             {/* Desktop: SidebarCard with summary */}
                                             <div className="hidden xl:block">
                                                 <SidebarCard>
@@ -1476,6 +1586,55 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                     )}
                 </div>
             </DefaultModal>
+
+            {/* Item action modal (estoque / custo / decisão) */}
+            {actionModal && actionItem && (
+                <DefaultModal
+                    isOpen
+                    onClose={() => setActionModal(null)}
+                    title={actionModal.kind === "stock" ? "Ajuste de estoque" : actionModal.kind === "cost" ? "Atualização de custo" : "Decisão do produto"}
+                    maxWidth="lg"
+                >
+                    <div className="space-y-4">
+                        <div className="flex flex-col gap-0.5">
+                            <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading">{actionItem.raw_name}</span>
+                            {actionItem.raw_sku && (
+                                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">SKU: {actionItem.raw_sku}</span>
+                            )}
+                        </div>
+                        <div className="border-t border-brand-border dark:border-dark-border pt-4">
+                            {actionModal.kind === "stock" && (
+                                <FormDropdown
+                                    label="Estoque"
+                                    options={ITEM_STOCK_OPTIONS}
+                                    value={actionDecision?.stock_action || "add"}
+                                    setValue={(v) => setDecisions((prev: any) => ({ ...prev, [actionItem.id]: { ...prev[actionItem.id], stock_action: v } }))}
+                                />
+                            )}
+                            {actionModal.kind === "cost" && (
+                                <FormDropdown
+                                    label="Custo"
+                                    options={ITEM_COST_OPTIONS}
+                                    value={actionDecision?.cost_action || "update"}
+                                    setValue={(v) => setDecisions((prev: any) => ({ ...prev, [actionItem.id]: { ...prev[actionItem.id], cost_action: v } }))}
+                                />
+                            )}
+                            {actionModal.kind === "decision" && (
+                                <FormDropdown
+                                    label="Decisão"
+                                    options={getItemDecisionOptions(actionItem)}
+                                    value={actionDecision?.decision || "keep_product"}
+                                    setValue={(v) => setDecisions((prev: any) => ({ ...prev, [actionItem.id]: { ...prev[actionItem.id], decision: v } }))}
+                                />
+                            )}
+                        </div>
+                        <div className="flex items-center justify-end gap-3 pt-2">
+                            <Button variant="outline" onClick={() => setActionModal(null)}>Cancelar</Button>
+                            <Button onClick={() => setActionModal(null)}>Concluir</Button>
+                        </div>
+                    </div>
+                </DefaultModal>
+            )}
 
             {/* Reversal confirmation modal */}
             {showRevertModal && (

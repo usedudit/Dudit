@@ -154,7 +154,8 @@ import {
     ClockArrowUpIcon as ClockArrowUpIcon01,
     Video01Icon,
     EnergyIcon as EnergyIcon01,
-    CollectionsBookmarkIcon
+    CollectionsBookmarkIcon,
+    PinIcon as PinIcon01,
 } from "@hugeicons/core-free-icons"
 
 
@@ -208,6 +209,7 @@ export const AdjustIcon = CreateIcon(PlusMinus01Icon)
 export const ReturnIcon = CreateIcon(ArrowTurnBackwardIcon01)
 export const AnalyticsIcon = CreateIcon(AnalyticsUpIcon)
 export const CollectionsIcon = CreateIcon(CollectionsBookmarkIcon)
+export const PinIcon = CreateIcon(PinIcon01)
 
 // ============================
 // ACTIONS

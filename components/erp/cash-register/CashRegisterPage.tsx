@@ -360,9 +360,9 @@ export default function CashRegisterPage({
             partnerId,
             module: "cash-register",
             format: "xlsx",
-            filters: { search: debouncedSearch, status: filters.status, datePeriod: filters.dateOpenedPeriod },
+            filters: { storeId: storeId || null, search: debouncedSearch, status: filters.status, datePeriod: filters.dateOpenedPeriod },
         })
-    }, [exportData, partnerId, debouncedSearch, filters.status, filters.dateOpenedPeriod])
+    }, [exportData, partnerId, storeId, debouncedSearch, filters.status, filters.dateOpenedPeriod])
 
     const handleClearFilters = useCallback(() => {
         setSearch("")

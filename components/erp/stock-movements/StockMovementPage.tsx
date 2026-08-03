@@ -26,6 +26,7 @@ import { useInfiniteScrollObserver } from '@/hooks/use-infinite-scroll-observer'
 import { useEntityPage } from '@/hooks/use-entity-page';
 import { useErpExport } from '@/hooks/use-erp-export';
 import ExportSelectionModal from '@/components/erp/export/ExportSelectionModal';
+import { useStore } from "@/lib/store-context"
 import {
     EMPTY_DATE_PERIOD,
     resolveDatePeriodBounds,
@@ -396,18 +397,21 @@ const StockMovementPageContent = ({ partnerId, storeId, movements: initialMoveme
     });
 
 
+    const { selectedStore } = useStore()
+
     const handleExport = useCallback(() => {
         void exportData({
             partnerId,
             module: "stock-movements",
             format: "xlsx",
             filters: {
+                storeId: selectedStore?.id || null,
                 search: debouncedSearch,
                 activeTab,
                 movementType: filters.movement_type,
             },
         }, { selectedIds: selection.ids, totalCount: filteredMovements.length })
-    }, [exportData, partnerId, debouncedSearch, activeTab, filters.movement_type, selection.ids, filteredMovements.length])
+    }, [exportData, partnerId, selectedStore?.id, debouncedSearch, activeTab, filters.movement_type, selection.ids, filteredMovements.length])
 
     const handleClearFilters = () => {
         setSearchTerm("");

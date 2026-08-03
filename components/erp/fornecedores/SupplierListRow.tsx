@@ -164,6 +164,7 @@ const SupplierListRow = React.memo(
     prev.supplier.status === next.supplier.status &&
     prev.supplier.xml_count === next.supplier.xml_count &&
     prev.supplier.total_imported_value === next.supplier.total_imported_value &&
+    (prev.supplier.image_url || null) === (next.supplier.image_url || null) &&
     prev.selected === next.selected &&
     prev.columns === next.columns
 )

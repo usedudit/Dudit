@@ -499,7 +499,6 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                 </div>
                             )}
                             <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
-
                                 {/* Form Column */}
                                 <div className={`col-span-12 ${activeTab !== 'notes' ? 'lg:col-span-8 lg:pr-12' : ''}`}>
                                     <AnimatePresence mode="wait">

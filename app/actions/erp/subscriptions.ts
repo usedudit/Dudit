@@ -15,6 +15,7 @@ import {
   createMpSubscription,
   cancelMpSubscription,
   updateMpSubscription,
+  getMpSubscriptionStatus,
 } from "@/lib/services/mercadopago/subscriptions"
 import { SUBSCRIPTION_MESSAGES } from "@/lib/constants/messages"
 
@@ -48,6 +49,38 @@ export async function getSubscriptionStatusAction(): Promise<ActionResponse<any>
       getUsageCounters(partner.id),
     ])
 
+    let subscriptionPayload: any = subscription
+      ? {
+          id: subscription.id,
+          status: subscription.status,
+          billing_email: subscription.billing_email,
+          current_period_start: subscription.current_period_start,
+          current_period_end: subscription.current_period_end,
+          cancel_at_period_end: subscription.cancel_at_period_end,
+          pending_plan_id: subscription.pending_plan_id,
+          trial_end: subscription.trial_end,
+          payment_provider: subscription.payment_provider,
+        }
+      : null
+
+    // Enrich with the next payment date from Mercado Pago when available.
+    // This is more reliable than current_period_end for subscriptions that
+    // were created before period dates were tracked.
+    if (
+      subscriptionPayload &&
+      subscription?.mercado_pago_subscription_id &&
+      ["active", "trialing", "past_due"].includes(subscription.status)
+    ) {
+      try {
+        const mpStatus = await getMpSubscriptionStatus(subscription.mercado_pago_subscription_id)
+        if (mpStatus?.next_payment_date) {
+          subscriptionPayload.next_payment_date = mpStatus.next_payment_date
+        }
+      } catch {
+        // Non-critical: fall back to current_period_end on the client.
+      }
+    }
+
     return successResponse({
       plan: {
         id: plan.id,
@@ -57,19 +90,7 @@ export async function getSubscriptionStatusAction(): Promise<ActionResponse<any>
         limits: plan.limits_json,
         features: plan.features_json,
       },
-      subscription: subscription
-        ? {
-            id: subscription.id,
-            status: subscription.status,
-            billing_email: subscription.billing_email,
-            current_period_start: subscription.current_period_start,
-            current_period_end: subscription.current_period_end,
-            cancel_at_period_end: subscription.cancel_at_period_end,
-            pending_plan_id: subscription.pending_plan_id,
-            trial_end: subscription.trial_end,
-            payment_provider: subscription.payment_provider,
-          }
-        : null,
+      subscription: subscriptionPayload,
       usage: counters || {
         products_count: 0,
         users_count: 0,

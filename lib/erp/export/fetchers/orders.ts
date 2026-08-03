@@ -44,6 +44,9 @@ async function resolveSellerNames(supabase: SupabaseClient, partnerId: string, u
 function applyOrderFilters(query: any, filters: OrdersExportFilters, partnerId: string) {
   query = query.eq("partner_id", partnerId)
 
+  if (filters.storeId) query = query.eq("store_id", filters.storeId)
+  if (filters.selectedIds?.length) query = query.in("id", filters.selectedIds)
+
   const situations = resolveOrderSituations(filters)
   if (situations?.length) query = query.in("situation", situations)
 
@@ -73,6 +76,9 @@ function applyOrderFilters(query: any, filters: OrdersExportFilters, partnerId: 
 
 function applySaleFilters(query: any, filters: OrdersExportFilters, partnerId: string) {
   query = query.eq("partner_id", partnerId)
+
+  if (filters.storeId) query = query.eq("store_id", filters.storeId)
+  if (filters.selectedIds?.length) query = query.in("id", filters.selectedIds)
 
   const situations = resolveOrderSituations(filters)
   if (situations?.length) {

@@ -11,6 +11,7 @@ import { useMediaQuery } from "@/components/erp/hooks"
 import { formatCurrency, formatUnit } from "@/lib/utils"
 import Pagination from "@/components/reusable/Pagination"
 import type { ProductSupplierWithDetails } from "@/lib/types/product"
+import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 
 interface ProductSuppliersTabProps {
     productData: any
@@ -99,9 +100,11 @@ const SupplierRow = React.memo(({ supplier, columns, isSelected, isEditingThis, 
             case "supplier":
                 return (
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border flex items-center justify-center text-sm font-bold text-brand-dark dark:text-dark-heading shrink-0">
-                            {supplier.supplier_name?.charAt(0)?.toUpperCase() || "?"}
-                        </div>
+                        <UserProfileImage
+                            fullName={supplier.supplier_name || "Fornecedor"}
+                            imageUrl={supplier.supplier_image_url}
+                            className="w-10 h-10 text-[14px] shrink-0"
+                        />
                         <div className="flex flex-col">
                             <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate max-w-[200px]">{supplier.supplier_name || "-"}</span>
                             {supplier.supplier_document && <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">{supplier.supplier_document}</span>}

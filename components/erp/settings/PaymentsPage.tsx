@@ -298,11 +298,11 @@ export function PaymentsPage({
                                             )}
 
                                             {/* Entrada (sinal) */}
-                                            <FormSection title="Entrada (down payment)" hasSeparator>
+                                            <FormSection title="Sinal (pagamento antecipado)" hasSeparator>
                                                 <div className="space-y-6">
                                                     <div className="flex items-center justify-between py-3">
                                                         <div>
-                                                            <p className="font-medium text-brand-dark dark:text-dark-heading">Permitir entrada</p>
+                                                            <p className="font-medium text-brand-dark dark:text-dark-heading">Cobrar sinal</p>
                                                             <p className="text-xs text-brand-inactive-text">Cliente pode pagar apenas o sinal no checkout</p>
                                                         </div>
                                                         <Switch

@@ -11,6 +11,7 @@ import { useMediaQuery } from "@/components/erp/hooks"
 import { useEntityState } from "@/hooks/use-entity-state"
 import { useToast } from "@/hooks/use-toast"
 import { useErpExport } from "@/hooks/use-erp-export"
+import { useStore } from "@/lib/store-context"
 import ExportSelectionModal from "@/components/erp/export/ExportSelectionModal"
 import ReturnListRow, { getReturnStatusMeta } from "./ReturnListRow"
 import ReturnGridCard from "./ReturnGridCard"
@@ -416,12 +417,15 @@ export default function ReturnsPage({ partnerId, roleId, storeId, planGate }: Re
         setFilters(INITIAL_FILTERS)
     }, [setSearch])
 
+    const { selectedStore } = useStore()
+
     const handleExport = useCallback(() => {
         void exportData({
             partnerId,
             module: "returns",
             format: "xlsx",
             filters: { 
+                storeId: selectedStore?.id || null,
                 search: debouncedSearch, 
                 activeTab,
                 status: filters.status,
@@ -435,7 +439,7 @@ export default function ReturnsPage({ partnerId, roleId, storeId, planGate }: Re
                 hasEvidence: filters.hasEvidence,
             },
         })
-    }, [exportData, partnerId, debouncedSearch, activeTab, filters])
+    }, [exportData, partnerId, selectedStore?.id, debouncedSearch, activeTab, filters])
 
     if (planGate) {
         return (

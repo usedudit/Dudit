@@ -235,3 +235,102 @@ export async function createTransactionFromOrder(
         console.error("[TRANSACTION] Erro inesperado ao criar transaction:", err.message)
     }
 }
+
+export async function syncReceivableForOrder(
+    supabase: SupabaseClient,
+    orderData: {
+        order_number: string
+        partner_id: string
+        total_amount: number
+        paid_amount: number
+        situation: string
+        payment_method?: string | null
+        customer_id?: string | null
+        customer_name?: string | null
+        finance_account_id?: string | null
+        order_source?: string | null
+        due_date?: string | null
+    }
+): Promise<void> {
+    try {
+        const total = Math.max(0, Number(orderData.total_amount || 0))
+        const paid = Math.max(0, Number(orderData.paid_amount || 0))
+        const unpaidBalance = Math.max(0, Math.round((total - paid) * 100) / 100)
+        const refNote = `sale-receivable:${orderData.order_number}`
+
+        const { data: existingTx } = await supabase
+            .from("transactions")
+            .select("id, status, amount")
+            .eq("partner_id", orderData.partner_id)
+            .eq("reference_note", refNote)
+            .maybeSingle()
+
+        if (unpaidBalance <= 0.009 || orderData.situation === "paid" || orderData.situation === "cancelled") {
+            if (existingTx && existingTx.status === "pending") {
+                await supabase
+                    .from("transactions")
+                    .delete()
+                    .eq("id", existingTx.id)
+            }
+            return
+        }
+
+        const explicitAccountId = orderData.finance_account_id || null
+        const defaultSalesAccountId = explicitAccountId
+            ? null
+            : await resolveDefaultSalesAccountId(supabase, orderData.partner_id)
+        const accountId = explicitAccountId || defaultSalesAccountId
+
+        const dueDate = orderData.due_date ? new Date(orderData.due_date).toISOString() : new Date().toISOString()
+        const paymentType = normalizePaymentLabel(orderData.payment_method)
+
+        if (existingTx) {
+            if (existingTx.status === "pending") {
+                await supabase
+                    .from("transactions")
+                    .update({
+                        amount: unpaidBalance,
+                        original_amount: unpaidBalance,
+                        due_date: dueDate,
+                        customer_id: orderData.customer_id || null,
+                        account_id: accountId,
+                        payment_type: paymentType,
+                    })
+                    .eq("id", existingTx.id)
+            }
+        } else {
+            const transactionData = {
+                partner_id: orderData.partner_id,
+                description: orderData.order_number,
+                category: "Vendas",
+                contact_id: null,
+                contact_type: "customer",
+                customer_id: orderData.customer_id || null,
+                amount: unpaidBalance,
+                original_amount: unpaidBalance,
+                due_date: dueDate,
+                payment_date: null,
+                status: "pending",
+                notes: null,
+                installment_number: null,
+                total_installments: null,
+                interest_amount: 0,
+                fee_amount: 0,
+                discount_amount: 0,
+                payment_type: paymentType,
+                payment_method_id: null,
+                transaction_type: "income" as const,
+                origin: normalizeOrigin(orderData.order_source),
+                account_id: accountId,
+                reference_note: refNote,
+            }
+
+            const { error } = await supabase.from("transactions").insert(transactionData)
+            if (error) {
+                console.error(`[TRANSACTION] Erro ao criar conta a receber do pedido ${orderData.order_number}:`, error.message)
+            }
+        }
+    } catch (err: any) {
+        console.error("[TRANSACTION] Erro ao sincronizar conta a receber do pedido:", err.message)
+    }
+}

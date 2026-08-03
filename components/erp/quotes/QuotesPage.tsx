@@ -424,6 +424,7 @@ export default function QuotesPage({
                 module: "quotes",
                 format: "xlsx",
                 filters: {
+                    storeId: selectedStore?.id || storeId || null,
                     search: debouncedSearch,
                     activeTab,
                     status: filters.status,
@@ -435,7 +436,7 @@ export default function QuotesPage({
                 totalCount: filteredQuotes.length,
             }
         )
-    }, [exportData, partnerId, debouncedSearch, activeTab, filters.status, filters.issuePeriod, selection.ids, filteredQuotes.length])
+    }, [exportData, partnerId, selectedStore?.id, storeId, debouncedSearch, activeTab, filters.status, filters.issuePeriod, selection.ids, filteredQuotes.length])
 
     // Handlers
     const handleAddQuote = useCallback(() => {

@@ -18,17 +18,21 @@ export type ErpExportModule =
   | "xml-import"
   | "quotes"
 
-export type QuotesExportFilters = {
+export type BaseExportFilters = {
+  storeId?: string | null
+  selectedIds?: string[]
+}
+
+export type QuotesExportFilters = BaseExportFilters & {
   search?: string
   activeTab?: string
   status?: string[]
   datePeriod?: DatePeriodFilterValue
-  selectedIds?: string[]
 }
 
 export type ErpExportFormat = "xlsx" | "csv"
 
-export type OrdersExportFilters = {
+export type OrdersExportFilters = BaseExportFilters & {
   search?: string
   activeTab?: "Todos" | "Pendente" | "Pago" | "Enviado" | "Cancelado"
   status?: string[]
@@ -39,29 +43,36 @@ export type OrdersExportFilters = {
   datePeriod?: DatePeriodFilterValue
 }
 
-export type ProductsExportFilters = {
+export type ProductsExportFilters = BaseExportFilters & {
   search?: string
   activeTab?: "all" | "normal" | "low" | "out_of_stock"
   status?: string[]
   categories?: string[]
   stockStatus?: string[]
+  brands?: string[]
+  productTypes?: string[]
+  hasCostPrice?: boolean
+  isOnPromotion?: boolean
 }
 
-export type CustomersExportFilters = {
+export type CustomersExportFilters = BaseExportFilters & {
   search?: string
   activeTab?: "Todos" | "Ativo" | "Inativo" | "Bloqueado"
   status?: string[]
   datePeriod?: DatePeriodFilterValue
 }
 
-export type ServicesExportFilters = {
+export type ServicesExportFilters = BaseExportFilters & {
   search?: string
   activeTab?: "all" | "active" | "inactive"
   status?: string[]
   categories?: string[]
+  hasCostPrice?: boolean
+  minDuration?: string
+  maxDuration?: string
 }
 
-export type AppointmentsExportFilters = {
+export type AppointmentsExportFilters = BaseExportFilters & {
   startDate: string
   endDate: string
   staffIds?: string[]
@@ -69,64 +80,58 @@ export type AppointmentsExportFilters = {
   serviceName?: string
   customerId?: string | null
   search?: string
-  storeId?: string | null
 }
 
-export type SubscriptionsExportFilters = {
+export type SubscriptionsExportFilters = BaseExportFilters & {
   status?: RecurringSubscriptionStatus | "all"
   search?: string
 }
 
-export type ReturnsExportFilters = {
+export type ReturnsExportFilters = BaseExportFilters & {
   search?: string
   activeTab?: string
   status?: string[]
   source?: string[]
 }
 
-export type StockMovementsExportFilters = {
+export type StockMovementsExportFilters = BaseExportFilters & {
   search?: string
   activeTab?: string
   movementType?: string[]
   datePeriod?: DatePeriodFilterValue
-  selectedIds?: string[]
 }
 
-export type TransactionsExportFilters = {
+export type TransactionsExportFilters = BaseExportFilters & {
   search?: string
   activeTab?: string
   status?: string[]
   category?: string[]
   paymentType?: string[]
   datePeriod?: DatePeriodFilterValue
-  selectedIds?: string[]
 }
 
-export type SuppliersExportFilters = {
+export type SuppliersExportFilters = BaseExportFilters & {
   search?: string
   activeTab?: string
   status?: string[]
-  selectedIds?: string[]
 }
 
-export type ServiceOrdersExportFilters = {
+export type ServiceOrdersExportFilters = BaseExportFilters & {
   search?: string
   activeTab?: string
   status?: string[]
-  selectedIds?: string[]
 }
 
-export type CashRegisterExportFilters = {
+export type CashRegisterExportFilters = BaseExportFilters & {
   search?: string
   status?: string[]
   datePeriod?: DatePeriodFilterValue
 }
 
-export type XmlImportExportFilters = {
+export type XmlImportExportFilters = BaseExportFilters & {
   search?: string
   activeTab?: string
   status?: string[]
-  selectedIds?: string[]
 }
 
 export type ErpExportFilters =

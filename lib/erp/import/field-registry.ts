@@ -8,7 +8,8 @@ const productFields: FieldDef[] = [
   { name: "cost_price", label: "Preço Custo", type: "number", synonyms: ["custo", "preço custo", "preco custo", "custo unitario", "preço de custo", "preco de custo", "cost", "cost price", "valor custo", "preço de compra"] },
   { name: "stock_quantity", label: "Estoque", type: "number", synonyms: ["qtd", "quantidade", "estoque", "saldo", "quantidade estoque", "stock", "quantity", "qtde", "qty", "estoque atual", "saldo estoque", "quant"] },
   { name: "min_stock", label: "Estoque Mínimo", type: "number", synonyms: ["estoque mínimo", "estoque minimo", "min stock", "est min", "qtd min", "quantidade mínima", "quantidade minima", "min estoque"] },
-  { name: "max_stock", label: "Estoque Máximo", type: "number", synonyms: ["estoque máximo", "estoque maximo", "max stock", "est max", "qtd max", "quantidade máxima", "quantidade maxima", "max estoque"] },
+  { name: "status", label: "Status", type: "string", synonyms: ["status", "situação", "situacao", "estado", "ativo/inativo", "ativo", "inativo"] },
+  { name: "visibility", label: "Visibilidade", type: "string", synonyms: ["visibilidade", "visibility", "exibir", "publicado", "exibir na loja", "mostrar", "marketplace", "loja"] },
   { name: "description", label: "Descrição", type: "string", synonyms: ["descrição", "descricao", "description", "detalhes", "desc completa", "desc detalhada", "descricao completa"] },
   { name: "unit", label: "Unidade", type: "string", synonyms: ["unidade", "un", "unit", "und", "medida", "unid"] },
   { name: "category", label: "Categoria", type: "string", synonyms: ["categoria", "cat", "category", "categoria produto", "categoria do produto", "departamento", "depto"] },
@@ -41,6 +42,7 @@ const customerFields: FieldDef[] = [
   { name: "cpf", label: "CPF", type: "string", synonyms: ["cpf", "documento", "doc", "documento pf", "cpf/cnpj", "cpfcnpj", "documento principal"] },
   { name: "cnpj", label: "CNPJ", type: "string", synonyms: ["cnpj", "documento pj", "documento jurídico"] },
   { name: "birth_date", label: "Nascimento", type: "string", synonyms: ["nascimento", "birth", "birth date", "data nascimento", "data de nascimento", "dt nascimento", "aniversário", "aniversario"] },
+  { name: "status", label: "Status", type: "string", synonyms: ["status", "situação", "situacao", "estado", "ativo/inativo"] },
   { name: "notes", label: "Observações", type: "string", synonyms: ["observações", "observacoes", "notes", "obs", "anotações", "anotacoes", "informações adicionais"] },
   { name: "street", label: "Logradouro", type: "string", synonyms: ["endereço", "endereco", "rua", "street", "logradouro", "av", "avenida", "travessa"] },
   { name: "number", label: "Número", type: "string", synonyms: ["número", "numero", "n°", "nº", "number", "nr", "num"] },
@@ -59,6 +61,8 @@ const serviceFields: FieldDef[] = [
   { name: "category", label: "Categoria", type: "string", synonyms: ["categoria", "category", "cat", "categoria serviço", "categoria servico", "tipo serviço", "tipo servico"] },
   { name: "duration_minutes", label: "Duração (min)", type: "number", synonyms: ["duração", "duracao", "duration", "tempo", "minutes", "minutos", "duração minutos", "tempo serviço", "tempo servico"] },
   { name: "sku", label: "SKU", type: "string", synonyms: ["sku", "código", "codigo", "ref", "referencia", "código serviço", "codigo servico"] },
+  { name: "status", label: "Status", type: "string", synonyms: ["status", "situação", "situacao", "estado", "ativo/inativo"] },
+  { name: "visibility_scope", label: "Visibilidade", type: "string", synonyms: ["visibilidade", "visibility", "alcance", "público/privado", "visibilidade serviço"] },
   { name: "unit", label: "Unidade", type: "string", synonyms: ["unidade", "un", "unit", "medida"] },
 ]
 

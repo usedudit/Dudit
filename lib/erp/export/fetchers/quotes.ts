@@ -56,6 +56,14 @@ export async function fetchQuotesExport(
         .select(QUOTE_SELECT)
         .eq("partner_id", partnerId)
 
+      if (filters.storeId) {
+        query = query.eq("store_id", filters.storeId)
+      }
+
+      if (filters.selectedIds?.length) {
+        query = query.in("id", filters.selectedIds)
+      }
+
       if (dbStatuses.length > 0) {
         query = query.in("status", dbStatuses)
       }

@@ -378,6 +378,7 @@ export default function ProductsPage({
             module: "products",
             format: "xlsx",
             filters: {
+                storeId: selectedStore?.id || null,
                 search: debouncedSearch,
                 activeTab,
                 status: filters.status,
@@ -389,7 +390,7 @@ export default function ProductsPage({
                 isOnPromotion: filters.isOnPromotion,
             },
         }, { selectedIds: selection.ids, totalCount: products.length })
-    }, [exportData, partnerId, debouncedSearch, activeTab, filters, selection.ids, products.length])
+    }, [exportData, partnerId, selectedStore?.id, debouncedSearch, activeTab, filters, selection.ids, products.length])
 
     const checkScroll = useCallback(() => {
         if (!tableContainerRef.current) return

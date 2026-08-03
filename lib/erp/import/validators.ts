@@ -83,6 +83,25 @@ function validateRow(
     }
   }
 
+  // Length & Truncation warnings
+  const nameVal = rowData["name"]?.trim()
+  if (nameVal && nameVal.length > 255) {
+    warnings.push({
+      row: rowIndex + 1,
+      field: "Nome",
+      message: `Nome muito longo (${nameVal.length} caracteres). Será truncado para 255 caracteres.`,
+    })
+  }
+
+  const skuVal = rowData["sku"]?.trim()
+  if (skuVal && skuVal.length > 100) {
+    warnings.push({
+      row: rowIndex + 1,
+      field: "SKU",
+      message: `SKU muito longo. Será truncado para 100 caracteres.`,
+    })
+  }
+
   if (entityType === "customers") {
     const email = rowData["email"]
     if (email && !validateEmail(email)) {

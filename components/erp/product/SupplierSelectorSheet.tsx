@@ -7,6 +7,7 @@ import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { searchSuppliersAction } from "@/app/actions/erp/products"
+import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 
 interface SupplierResult {
   id: string
@@ -15,6 +16,7 @@ interface SupplierResult {
   phone: string | null
   cnpj: string | null
   cpf: string | null
+  image_url: string | null
 }
 
 interface SupplierSelectorSheetProps {
@@ -118,13 +120,11 @@ export function SupplierSelectorSheet({
                     isSelected ? "bg-brand-green/5 dark:bg-brand-green/10" : ""
                   }`}
                 >
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
-                    isSelected
-                      ? "bg-brand-green text-white"
-                      : "bg-brand-gray dark:bg-dark-border text-brand-dark dark:text-dark-heading"
-                  }`}>
-                    {supplier.name.charAt(0).toUpperCase()}
-                  </div>
+                  <UserProfileImage
+                    fullName={supplier.name || "Fornecedor"}
+                    imageUrl={supplier.image_url || (supplier as any).imageUrl || (supplier as any).avatar_url}
+                    className="w-10 h-10 shrink-0 text-sm"
+                  />
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{supplier.name}</p>
                     <p className="text-xs text-brand-inactive-text truncate">

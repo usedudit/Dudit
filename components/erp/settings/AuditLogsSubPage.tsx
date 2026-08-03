@@ -95,17 +95,17 @@ export function AuditLogsSubPage({ onBack }: { onBack: () => void }) {
 
   useEffect(() => {
     let cancelled = false
-    ;(async () => {
-      setLoading(true)
-      const res = await getAuditLogsAction()
-      if (cancelled) return
-      if (res.success) {
-        setEntries(res.data)
-      } else {
-        setError(res.error || "Erro ao carregar logs")
-      }
-      setLoading(false)
-    })()
+      ; (async () => {
+        setLoading(true)
+        const res = await getAuditLogsAction()
+        if (cancelled) return
+        if (res.success) {
+          setEntries(res.data)
+        } else {
+          setError(res.error || "Erro ao carregar logs")
+        }
+        setLoading(false)
+      })()
     return () => { cancelled = true }
   }, [])
 
@@ -152,7 +152,7 @@ export function AuditLogsSubPage({ onBack }: { onBack: () => void }) {
         </div>
 
         {/* Content */}
-        <div className="max-w-[1300px] mx-auto p-4 md:p-8 pt-6">
+        <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
           {error ? (
             <div className="text-center py-12 text-red-500">{error}</div>
           ) : entries.length === 0 ? (

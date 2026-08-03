@@ -121,7 +121,8 @@ const SupplierGridCard = React.memo(
     prev.supplier.name === next.supplier.name &&
     prev.supplier.status === next.supplier.status &&
     prev.supplier.xml_count === next.supplier.xml_count &&
-    prev.supplier.total_imported_value === next.supplier.total_imported_value
+    prev.supplier.total_imported_value === next.supplier.total_imported_value &&
+    (prev.supplier.image_url || null) === (next.supplier.image_url || null)
 )
 
 SupplierGridCard.displayName = "SupplierGridCard"

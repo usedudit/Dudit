@@ -42,6 +42,7 @@ function similarity(a: string, b: string): number {
 export function suggestMapping(
   headers: string[],
   entityType: EntityType,
+  rows?: string[][],
 ): ColumnMapping[] {
   const fields = getFieldsForEntity(entityType)
   const normalizedHeaders = headers.map(normalize)
@@ -51,6 +52,20 @@ export function suggestMapping(
     let bestLabel = ""
     let bestConfidence = 0
     let isCustom = false
+
+    // Extract up to 3 non-empty sample values from the rows for this column
+    const sampleValues: string[] = []
+    if (rows && rows.length > 0) {
+      for (const row of rows) {
+        if (index < row.length) {
+          const val = row[index]?.trim()
+          if (val && !sampleValues.includes(val)) {
+            sampleValues.push(val)
+            if (sampleValues.length >= 3) break
+          }
+        }
+      }
+    }
 
     for (const field of fields) {
       if (field.name === "technical_specs") continue
@@ -83,6 +98,36 @@ export function suggestMapping(
       }
     }
 
+    // Heuristics based on sample content if header match was weak or ambiguous
+    if (bestConfidence < 0.7 && sampleValues.length > 0) {
+      const sampleText = sampleValues.join(" ")
+
+      // Check email
+      if (entityType === "customers" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sampleValues[0])) {
+        bestField = "email"
+        bestLabel = fields.find((f) => f.name === "email")?.label || "E-mail"
+        bestConfidence = 0.9
+      }
+      // Check GTIN / Barcode (numeric 8, 12, 13, 14 digits)
+      else if (entityType === "products" && /^\d{8,14}$/.test(sampleValues[0].replace(/\D/g, "")) && sampleValues[0].length >= 8) {
+        bestField = "gtin"
+        bestLabel = fields.find((f) => f.name === "gtin")?.label || "Código Barras"
+        bestConfidence = 0.85
+      }
+      // Check CPF
+      else if (entityType === "customers" && sampleValues[0].replace(/\D/g, "").length === 11) {
+        bestField = "cpf"
+        bestLabel = fields.find((f) => f.name === "cpf")?.label || "CPF"
+        bestConfidence = 0.85
+      }
+      // Check CNPJ
+      else if (entityType === "customers" && sampleValues[0].replace(/\D/g, "").length === 14) {
+        bestField = "cnpj"
+        bestLabel = fields.find((f) => f.name === "cnpj")?.label || "CNPJ"
+        bestConfidence = 0.85
+      }
+    }
+
     if (bestConfidence < 0.5) {
       isCustom = true
       bestField = null
@@ -96,6 +141,7 @@ export function suggestMapping(
       fieldLabel: bestLabel,
       confidence: bestConfidence,
       isCustom,
+      sampleValues: sampleValues.length > 0 ? sampleValues : undefined,
     }
   })
 }

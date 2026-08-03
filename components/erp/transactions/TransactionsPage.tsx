@@ -817,6 +817,7 @@ export default function TransactionsPage({
             module: "transactions",
             format: "xlsx",
             filters: {
+                storeId: storeId || null,
                 search: debouncedSearch,
                 activeTab,
                 status: filters.status,
@@ -825,7 +826,7 @@ export default function TransactionsPage({
                 datePeriod: filters.datePeriod,
             },
         }, { selectedIds: selection.ids, totalCount: filteredTransactions.length })
-    }, [exportData, partnerId, debouncedSearch, activeTab, filters, selection.ids, filteredTransactions.length])
+    }, [exportData, partnerId, storeId, debouncedSearch, activeTab, filters, selection.ids, filteredTransactions.length])
 
     const handleClearFilters = () => {
         setSearch("")

@@ -15,6 +15,7 @@ export interface ColumnMapping {
   fieldLabel?: string
   confidence: number
   isCustom: boolean
+  sampleValues?: string[]
 }
 
 export interface ReadResult {

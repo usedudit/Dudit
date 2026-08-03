@@ -345,7 +345,10 @@ async function syncPosSaleToOrders(params: {
     let paymentMethodFixedFeeAmount = 0
     if (params.paymentBreakdown && params.paymentBreakdown.length > 0) {
         for (const entry of params.paymentBreakdown) {
-            paymentMethodDiscountAmount = safeMoney(paymentMethodDiscountAmount + Number(entry.paymentMethodDiscountAmount ?? entry.adjustmentAmount ?? 0))
+            const pmDiscount = entry.paymentMethodDiscountAmount !== undefined
+                ? Math.max(0, Number(entry.paymentMethodDiscountAmount || 0))
+                : (entry.adjustmentType === 'discount' ? Math.max(0, Number(entry.adjustmentAmount || 0)) : 0)
+            paymentMethodDiscountAmount = safeMoney(paymentMethodDiscountAmount + pmDiscount)
             paymentMethodInterestAmount = safeMoney(paymentMethodInterestAmount + Number(entry.interestAmount || 0))
             paymentMethodFeeAmount = safeMoney(paymentMethodFeeAmount + Number(entry.feeAmount || 0))
             paymentMethodFixedFeeAmount = safeMoney(paymentMethodFixedFeeAmount + Number(entry.fixedFeeAmount || 0))
@@ -433,25 +436,29 @@ const productIds = Array.from(
         }
     }
 
-    // Fetch cost prices for unit_cost snapshot - reuse productIds
+    // Fetch product/variant/service names and cost prices for order_items snapshot
     const variantIds = (saleItems || []).filter((i: any) => i.variant_id).map((i: any) => i.variant_id)
     const serviceIds = (saleItems || []).filter((i: any) => i.service_id).map((i: any) => i.service_id)
 
     const [{ data: products }, { data: variants }, { data: services }] = await Promise.all([
         productIds.length > 0
-            ? admin.from("products").select("id, cost_price").eq("partner_id", params.partnerId).in("id", productIds)
+            ? admin.from("products").select("id, name, cost_price").eq("partner_id", params.partnerId).in("id", productIds)
             : Promise.resolve({ data: [] as any[] }),
         variantIds.length > 0
-            ? admin.from("product_variants").select("id, cost_price").in("id", variantIds)
+            ? admin.from("product_variants").select("id, variant_name, cost_price").in("id", variantIds)
             : Promise.resolve({ data: [] as any[] }),
         serviceIds.length > 0
-            ? admin.from("services").select("id, cost_price").eq("partner_id", params.partnerId).in("id", serviceIds)
+            ? admin.from("services").select("id, name, service_name, cost_price").eq("partner_id", params.partnerId).in("id", serviceIds)
             : Promise.resolve({ data: [] as any[] }),
     ])
 
     const productCostMap = new Map<string, number>((products || []).map((p: { id: string; cost_price: number | null }) => [p.id, Number(p.cost_price || 0)]))
     const variantCostMap = new Map<string, number>((variants || []).map((v: { id: string; cost_price: number | null }) => [v.id, Number(v.cost_price || 0)]))
     const serviceCostMap = new Map<string, number>((services || []).map((s: { id: string; cost_price: number | null }) => [s.id, Number(s.cost_price || 0)]))
+
+    const productNameMap = new Map<string, string>((products || []).map((p: any) => [p.id, String(p.name || "").trim()]))
+    const variantNameMap = new Map<string, string>((variants || []).map((v: any) => [v.id, String(v.variant_name || "").trim()]))
+    const serviceNameMap = new Map<string, string>((services || []).map((s: any) => [s.id, String(s.service_name || s.name || "").trim()]))
 
     const orderPayload: Record<string, unknown> = {
         partner_id: params.partnerId,
@@ -545,6 +552,8 @@ const productIds = Array.from(
 
     if (!createdOrderId) return null
 
+    const draftItemsList: any[] = Array.isArray((draft as any)?.items) ? (draft as any).items : []
+
     const orderItems = (saleItems || []).map((item: any, index: number) => {
         let unitCost = 0
         if (item.service_id) {
@@ -554,11 +563,27 @@ const productIds = Array.from(
         } else if (item.product_id) {
             unitCost = productCostMap.get(item.product_id) || 0
         }
+
+        const draftMatch = draftItemsList.find((d: any) =>
+            (d.productId === item.product_id || d.product_id === item.product_id) &&
+            (!item.variant_id || d.variantId === item.variant_id || d.variant_id === item.variant_id)
+        )
+
+        const nameFromItem = item.product_name && item.product_name !== "Item" ? item.product_name : null
+        const nameFromDraft = draftMatch?.name || draftMatch?.customName || draftMatch?.custom_name || draftMatch?.product_name || draftMatch?.title || null
+        const nameFromProduct = item.product_id ? productNameMap.get(item.product_id) : (item.service_id ? serviceNameMap.get(item.service_id) : null)
+        const nameFromVariant = item.variant_id ? variantNameMap.get(item.variant_id) : null
+
+        let resolvedProductName = nameFromItem || nameFromDraft || nameFromProduct || "Produto"
+        if (nameFromVariant && !resolvedProductName.toLowerCase().includes(nameFromVariant.toLowerCase())) {
+            resolvedProductName = `${resolvedProductName} (${nameFromVariant})`
+        }
+
         return {
             order_id: createdOrderId,
             product_id: item.product_id || null,
             variant_id: item.variant_id || null,
-            product_name: item.product_name || "Item",
+            product_name: resolvedProductName,
             product_price: safeMoney(Number(item.unit_price || 0)),
             quantity: Number(item.quantity || 0),
             subtotal: safeMoney(Number(item.subtotal || 0)),
@@ -579,6 +604,28 @@ const productIds = Array.from(
             return null
         }
     }
+
+    if (params.preSaleId) {
+        await admin
+            .from("pre_sales")
+            .update({
+                order_id: createdOrderId,
+                status: "completed",
+            })
+            .eq("id", params.preSaleId)
+            .eq("partner_id", params.partnerId)
+    }
+
+    await logAuditEvent({
+        partnerId: params.partnerId,
+        actorUserId: params.actorUserId,
+        entityType: "order",
+        entityId: createdOrderId,
+        actionType: "created",
+        changeLines: [`Criou a venda no PDV (${finalOrderNumber}) no valor de R$ ${safeMoney(Number(sale.final_amount || 0)).toFixed(2)}.`],
+        source: "erp",
+        storeId: params.storeId || null,
+    })
 
     return createdOrderId
 }
@@ -1148,7 +1195,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
 
     const saleNumber = saleRecord?.sale_number || null
 
-    return { success: true as const, data: { saleId, saleNumber } }
+    return { success: true as const, data: { saleId, saleNumber, orderId: syncedOrderId || saleId } }
 }
 
 export async function createPOSQuickProductAction(input: {

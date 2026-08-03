@@ -6,6 +6,7 @@ import {
     Settings2Icon,
 } from '@/lib/icons';
 import { useErpExport } from '@/hooks/use-erp-export';
+import { useStore } from "@/lib/store-context";
 import { Button, Checkbox, IconPlaceholder, Pagination, Dropdown, DropdownItem } from '@/components/reusable';
 import { Settings, CalendarOff, RefreshCw, ArrowUpDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -610,6 +611,8 @@ const AppointmentsPage = ({
 
     const hasActiveFilters = appointmentFilters.teamIds.length > 0;
 
+    const { selectedStore } = useStore();
+
     const handleExport = useCallback(() => {
         const { startDate, endDate } = computeVisibleDateRange(currentDate, calendarView);
         void exportData({
@@ -617,12 +620,13 @@ const AppointmentsPage = ({
             module: "appointments",
             format: "xlsx",
             filters: {
+                storeId: selectedStore?.id || null,
                 startDate,
                 endDate,
                 staffIds: appointmentFilters.teamIds,
             },
         });
-    }, [exportData, partnerId, currentDate, calendarView, appointmentFilters.teamIds]);
+    }, [exportData, partnerId, selectedStore?.id, currentDate, calendarView, appointmentFilters.teamIds]);
 
     const visibleStaffMembers = useMemo(() => {
         if (appointmentFilters.teamIds.length === 0) return realStaffMembers;

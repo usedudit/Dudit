@@ -37,6 +37,7 @@ import type { RecurringSubscription } from "@/lib/types/recurring"
 import { getRecurringStatusLabel, getRecurringFrequencyLabel } from "@/lib/types/recurring"
 import { formatFullDate, formatCurrency } from "@/lib/utils"
 import { useErpExport } from "@/hooks/use-erp-export"
+import { useStore } from "@/lib/store-context"
 import { ExportFileIcon, CalendarIcon, MoneyIcon, Users, ListIcon } from "@/lib/icons"
 import { Button, Badge } from "@/components/reusable"
 
@@ -278,17 +279,20 @@ export default function RecurringSubscriptionsPage({
     }
   }, [page, totalPages, hasMore, loadingMore, loadMore])
 
+  const { selectedStore } = useStore()
+
   const handleExport = useCallback(() => {
     void exportData({
       partnerId,
       module: "subscriptions",
       format: "xlsx",
       filters: {
+        storeId: selectedStore?.id || null,
         status: statusFilter,
         search: debouncedSearch,
       },
     })
-  }, [exportData, partnerId, statusFilter, debouncedSearch])
+  }, [exportData, partnerId, selectedStore?.id, statusFilter, debouncedSearch])
 
   return (
     <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">

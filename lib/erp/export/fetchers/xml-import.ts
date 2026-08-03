@@ -26,6 +26,10 @@ export async function fetchXmlImportExport(
         .select(XML_IMPORT_SELECT)
         .eq("partner_id", partnerId)
 
+      if (filters.storeId) {
+        query = query.eq("store_id", filters.storeId)
+      }
+
       if (selectedIds.length > 0) {
         query = query.in("id", selectedIds)
       }

@@ -224,9 +224,9 @@ export default function ServiceOrdersPage({
       partnerId,
       module: "service-orders",
       format: "xlsx",
-      filters: { search: debouncedSearch, activeTab, status: filters.status },
+      filters: { storeId: storeId || null, search: debouncedSearch, activeTab, status: filters.status },
     }, { selectedIds: selection, totalCount: sortedOrders.length })
-  }, [exportData, partnerId, debouncedSearch, activeTab, filters.status, selection, sortedOrders.length])
+  }, [exportData, partnerId, storeId, debouncedSearch, activeTab, filters.status, selection, sortedOrders.length])
 
   const handleStatusChange = async (id: string, newStatus: string) => {
     setIsUpdatingStatus(true)

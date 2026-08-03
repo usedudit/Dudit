@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useCallback, useMemo } from "react"
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { listStoresAction, deleteStoreAction } from "@/app/actions/erp/stores"
 import { useStore } from "@/lib/store-context"
 import { usePermissions } from "@/lib/permission-context"
@@ -32,6 +32,7 @@ import {
   GridIcon,
   StarIcon,
   TrashIcon,
+  ArrowUpDownIcon,
 } from "@/lib/icons"
 
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -43,6 +44,25 @@ interface StoresPageContentProps {
     message: string
   }
 }
+
+type SortKey = "name" | "address" | "contact" | "status"
+type SortDirection = "asc" | "desc"
+
+interface ColumnDef {
+  id: string
+  label: string
+  align: "left" | "center" | "right"
+  width: string
+}
+
+// --- CONFIGURAÇÃO DE COLUNAS (Exact ERP List Pattern) ---
+const COLUMNS: ColumnDef[] = [
+  { id: "name", label: "Loja", align: "left", width: "280px" },
+  { id: "address", label: "Endereço", align: "left", width: "280px" },
+  { id: "contact", label: "Contato", align: "left", width: "160px" },
+  { id: "status", label: "Status", align: "center", width: "110px" },
+  { id: "actions", label: "Ações", align: "center", width: "150px" },
+]
 
 export function StoresPageContent({ partnerId, planGate }: StoresPageContentProps) {
   const isMobileOrTablet = useMediaQuery("(max-width: 1023px)")
@@ -59,6 +79,34 @@ export function StoresPageContent({ partnerId, planGate }: StoresPageContentProp
   const [viewMode, setViewMode] = useState<"grid" | "list">(isMobileOrTablet ? "grid" : "list")
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null)
+
+  // Scroll shadow state (Exact ERP List Pattern)
+  const tableContainerRef = useRef<HTMLDivElement>(null)
+  const [scrollState, setScrollState] = useState({ left: false, right: false })
+
+  const checkScroll = useCallback(() => {
+    if (!tableContainerRef.current) return
+    const { scrollLeft, scrollWidth, clientWidth } = tableContainerRef.current
+    setScrollState((prev) => {
+      const nextLeft = scrollLeft > 0
+      const nextRight = scrollLeft < scrollWidth - clientWidth - 2
+      if (prev.left === nextLeft && prev.right === nextRight) return prev
+      return { left: nextLeft, right: nextRight }
+    })
+  }, [])
+
+  const handleScroll = useCallback(() => {
+    checkScroll()
+  }, [checkScroll])
+
+  useEffect(() => {
+    checkScroll()
+    window.addEventListener("resize", checkScroll)
+    return () => {
+      window.removeEventListener("resize", checkScroll)
+    }
+  }, [checkScroll, viewMode])
 
   // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -147,7 +195,9 @@ export function StoresPageContent({ partnerId, planGate }: StoresPageContentProp
         !term ||
         s.name.toLowerCase().includes(term) ||
         (s.city && s.city.toLowerCase().includes(term)) ||
-        (s.state && s.state.toLowerCase().includes(term))
+        (s.state && s.state.toLowerCase().includes(term)) ||
+        (s.street && s.street.toLowerCase().includes(term)) ||
+        (s.phone && s.phone.includes(term))
 
       const matchesStatus =
         activeTab === "all" ||
@@ -158,11 +208,45 @@ export function StoresPageContent({ partnerId, planGate }: StoresPageContentProp
     })
   }, [stores, search, activeTab])
 
-  const totalPages = Math.ceil(filteredStores.length / itemsPerPage)
+  const sortedStores = useMemo(() => {
+    if (!sortConfig) return filteredStores
+
+    const { key, direction } = sortConfig
+
+    return [...filteredStores].sort((a, b) => {
+      let aVal: any
+      let bVal: any
+
+      switch (key) {
+        case "name":
+          aVal = a.name.toLowerCase()
+          bVal = b.name.toLowerCase()
+          break
+        case "address":
+          aVal = `${a.street || ""} ${a.city || ""} ${a.state || ""}`.toLowerCase()
+          bVal = `${b.street || ""} ${b.city || ""} ${b.state || ""}`.toLowerCase()
+          break
+        case "contact":
+          aVal = (a.phone || a.whatsapp_phone || "").toLowerCase()
+          bVal = (b.phone || b.whatsapp_phone || "").toLowerCase()
+          break
+        case "status":
+          aVal = a.is_active ? 1 : 0
+          bVal = b.is_active ? 1 : 0
+          break
+      }
+
+      if (aVal === bVal) return 0
+      const comparison = aVal < bVal ? -1 : 1
+      return direction === "asc" ? comparison : -comparison
+    })
+  }, [filteredStores, sortConfig])
+
+  const totalPages = Math.ceil(sortedStores.length / itemsPerPage)
   const paginatedStores = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage
-    return filteredStores.slice(start, start + itemsPerPage)
-  }, [filteredStores, currentPage, itemsPerPage])
+    return sortedStores.slice(start, start + itemsPerPage)
+  }, [sortedStores, currentPage, itemsPerPage])
 
   useEffect(() => {
     setCurrentPage(1)
@@ -186,7 +270,7 @@ export function StoresPageContent({ partnerId, planGate }: StoresPageContentProp
   }
 
   const handleSelectAll = () => {
-    setSelectedIds(new Set(filteredStores.map((s) => s.id)))
+    setSelectedIds(new Set(sortedStores.map((s) => s.id)))
   }
 
   const handleClearSelection = () => {
@@ -218,7 +302,6 @@ export function StoresPageContent({ partnerId, planGate }: StoresPageContentProp
 
   // Source Store reference for inheritance
   const sourceStore = stores.find((s) => s.is_headquarters) || stores[0] || null
-  const isAllSelected = filteredStores.length > 0 && selectedIds.size === filteredStores.length
 
   return (
     <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
@@ -330,7 +413,7 @@ export function StoresPageContent({ partnerId, planGate }: StoresPageContentProp
           <div className="px-4 md:px-8 mb-4">
             <SelectionBanner
               selectedCount={selectedIds.size}
-              totalCount={filteredStores.length}
+              totalCount={sortedStores.length}
               onSelectAll={handleSelectAll}
               onClearSelection={handleClearSelection}
             />
@@ -383,43 +466,88 @@ export function StoresPageContent({ partnerId, planGate }: StoresPageContentProp
             </div>
           ) : (
             /* LIST VIEW TABLE (Exact Product/Customer List Row Pattern) */
-            <div className="overflow-x-auto rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface shadow-xs">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-brand-border dark:border-dark-border bg-brand-gray/20 dark:bg-dark-surface text-xs font-bold text-brand-inactive-text uppercase">
-                    <th className="py-3.5 pl-6 pr-0 w-14">
-                      <Checkbox
-                        checked={isAllSelected}
-                        onChange={isAllSelected ? handleClearSelection : handleSelectAll}
+            <div className="w-full overflow-hidden rounded-xl relative">
+              <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
+              <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
+
+              <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={handleScroll}>
+                <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
+                  <thead>
+                    <tr className="bg-brand-gray dark:bg-dark-border/50">
+                      <th className="py-3 px-2 w-12 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50">
+                        <div className="flex items-center">
+                          <Checkbox
+                            checked={selectedIds.size === paginatedStores.length && paginatedStores.length > 0}
+                            onChange={(checked) => {
+                              if (checked) {
+                                setSelectedIds(new Set([...selectedIds, ...paginatedStores.map((x) => x.id)]))
+                              } else {
+                                setSelectedIds((prev) => {
+                                  const next = new Set(prev)
+                                  paginatedStores.forEach((x) => next.delete(x.id))
+                                  return next
+                                })
+                              }
+                            }}
+                            className="bg-white dark:bg-dark-background"
+                          />
+                        </div>
+                      </th>
+                      {COLUMNS.map((col, idx) => {
+                        const isSortable = col.id !== "actions"
+                        const isSorted = sortConfig?.key === col.id
+                        const isLast = idx === COLUMNS.length - 1
+                        return (
+                          <th
+                            key={col.id}
+                            className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} ${isSortable ? "cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors" : ""} ${isLast ? "rounded-r-lg" : ""}`}
+                            style={{ width: col.width }}
+                            onClick={() => {
+                              if (!isSortable) return
+                              setSortConfig((prev) => ({
+                                key: col.id as SortKey,
+                                direction: prev?.key === col.id && prev.direction === "asc" ? "desc" : "asc",
+                              }))
+                            }}
+                          >
+                            <div className={`relative flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
+                              <span>{col.label}</span>
+                              {isSortable && (
+                                <div className={`flex items-center ${col.align === "center" ? "absolute -right-5" : "ml-1.5"}`}>
+                                  <ArrowUpDownIcon
+                                    size={14}
+                                    className={`transition-all duration-200 ${isSorted ? "text-brand-dark dark:text-dark-heading opacity-100 block" : "text-brand-inactive-text hidden group-hover:block opacity-40"} ${isSorted && sortConfig.direction === "desc" ? "rotate-180" : ""}`}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </th>
+                        )
+                      })}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedStores.map((store) => (
+                      <StoreListRow
+                        key={store.id}
+                        store={store}
+                        columns={COLUMNS}
+                        selected={selectedIds.has(store.id)}
+                        isCurrentStore={selectedStore?.id === store.id}
+                        onSelect={handleToggleSelect}
+                        onSwitchStore={() => selectStore(store.id)}
+                        onEdit={() => handleOpenEdit(store)}
+                        onDelete={() => handleOpenDelete(store)}
                       />
-                    </th>
-                    <th className="py-3.5 px-2">Loja</th>
-                    <th className="py-3.5 px-2">Endereço</th>
-                    <th className="py-3.5 px-2">Contato</th>
-                    <th className="py-3.5 px-2 text-center">Status</th>
-                    <th className="py-3.5 px-2 text-right pr-6">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-brand-border dark:divide-dark-border text-sm">
-                  {paginatedStores.map((store) => (
-                    <StoreListRow
-                      key={store.id}
-                      store={store}
-                      selected={selectedIds.has(store.id)}
-                      isCurrentStore={selectedStore?.id === store.id}
-                      onSelect={() => handleToggleSelect(store.id)}
-                      onSwitchStore={() => selectStore(store.id)}
-                      onEdit={() => handleOpenEdit(store)}
-                      onDelete={() => handleOpenDelete(store)}
-                    />
-                  ))}
-                </tbody>
-              </table>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 
-          {/* PAGINATION */}
-          {totalPages > 1 && (
+          {/* PAGINATION (Exact ERP List Pattern) */}
+          {sortedStores.length > 0 && (
             <div className="mt-6 flex justify-center">
               <Pagination
                 currentPage={currentPage}

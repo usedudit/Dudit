@@ -1,7 +1,7 @@
 import "server-only"
 
 import { getAdminClient } from "@/lib/supabase/admin"
-import { queueWhatsappMessage, processWhatsappMessageById, logWhatsappAutomation } from "./whatsapp-dispatch.service"
+import { queueWhatsappMessage, processWhatsappMessageById } from "./whatsapp-dispatch.service"
 import { normalizePhoneToE164 } from "@/lib/whatsapp/phone"
 import { buildWhatsappMessage } from "@/lib/notifications/templates"
 import { resolveCustomerUserId } from "./notification.service"
@@ -151,15 +151,6 @@ export async function dispatchWhatsappAutomation(params: {
     const isEnabled = await shouldDeliverWhatsapp(userId, params.trigger)
     SecureLogger.info("[whatsapp] dispatch: should_deliver", { userId, trigger: params.trigger, isEnabled })
     if (!isEnabled) {
-      await logWhatsappAutomation({
-        partnerId: params.partnerId,
-        triggerType: params.trigger,
-        entityType: params.entityType,
-        entityId: params.entityId,
-        executionStatus: "skipped",
-        payload: { reason: "disabled_by_user" },
-        response: { reason: "whatsapp_disabled_by_user" },
-      })
       return { success: false, resultStatus: "skipped_disabled", reason: "whatsapp_disabled_by_user", messageId: null, providerMessageId: null }
     }
   }

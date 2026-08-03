@@ -19,22 +19,46 @@ export async function listStoresAction(partnerId: string) {
     const supabase = await getSupabaseServerClient()
     const { data, error } = await supabase
         .from("stores")
-        .select("*")
+        .select("*, addresses!store_id(id, zip_code, street, number, complement, neighborhood, city, state, is_default)")
         .eq("partner_id", partnerId)
         .order("created_at", { ascending: true })
 
     if (error) throw new Error(error.message)
 
+    // Merge the store's address (addresses table) onto the store row so the UI
+    // can render street/city/state/etc. directly (moved out of stores table).
+    const stores: any[] = []
     for (const store of data || []) {
-        if (store.cpf) {
+        const { addresses, ...rest } = store
+        const addrList = Array.isArray(addresses) ? addresses : []
+        const address = addrList.find((a: any) => a.is_default) || addrList[0] || null
+
+        const merged: any = {
+            ...rest,
+            addresses: addrList,
+        }
+
+        if (address) {
+            merged.zip_code = address.zip_code ?? null
+            merged.street = address.street ?? null
+            merged.number = address.number ?? null
+            merged.complement = address.complement ?? null
+            merged.neighborhood = address.neighborhood ?? null
+            merged.city = address.city ?? null
+            merged.state = address.state ?? null
+        }
+
+        if (merged.cpf) {
             try {
                 const { decryptCPF } = await import("@/lib/crypto")
-                store.cpf = await decryptCPF(store.cpf)
+                merged.cpf = await decryptCPF(merged.cpf as string)
             } catch { /* keep encrypted */ }
         }
+
+        stores.push(merged)
     }
 
-    return data || []
+    return stores
 }
 
 export async function getStoreAction(storeId: string) {

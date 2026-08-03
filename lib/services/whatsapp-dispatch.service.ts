@@ -7,7 +7,7 @@ import { getActiveWhatsappConnection } from "./whatsapp-connection.service"
 import { normalizePhoneToE164 } from "@/lib/whatsapp/phone"
 import { isRetryableWhatsappError } from "@/lib/whatsapp/errors"
 import { SecureLogger } from "@/lib/secure-logger"
-import type { QueueMessageInput, WhatsappAutomationTrigger, WhatsappTemplateComponent, WhatsappExecutionResult } from "@/lib/whatsapp/types"
+import type { QueueMessageInput, WhatsappTemplateComponent, WhatsappExecutionResult } from "@/lib/whatsapp/types"
 
 function calculateNextRetryAt(retryCount: number): string {
   const delayMinutes = Math.pow(2, Math.min(retryCount, 5))
@@ -33,27 +33,6 @@ export function buildTemplateComponentsFromPayload(payload: Record<string, unkno
   return [{ type: "body", parameters }]
 }
 
-export async function logWhatsappAutomation(params: {
-  partnerId: string
-  triggerType: WhatsappAutomationTrigger
-  entityType: string
-  entityId?: string | null
-  executionStatus: "success" | "skipped" | "failed"
-  payload?: Record<string, unknown>
-  response?: Record<string, unknown>
-}) {
-  const admin = getAdminClient()
-  await admin.from("whatsapp_automation_logs").insert({
-    partner_id: params.partnerId,
-    trigger_type: params.triggerType,
-    entity_type: params.entityType,
-    entity_id: params.entityId || null,
-    execution_status: params.executionStatus,
-    payload: params.payload || {},
-    response: params.response || {},
-  })
-}
-
 export async function queueWhatsappMessage(input: QueueMessageInput): Promise<WhatsappExecutionResult> {
   const admin = getAdminClient()
 
@@ -64,15 +43,6 @@ export async function queueWhatsappMessage(input: QueueMessageInput): Promise<Wh
       triggerType: input.triggerType,
       rawPhone: input.phoneNumber,
     })
-    await logWhatsappAutomation({
-      partnerId: input.partnerId,
-      triggerType: input.triggerType,
-      entityType: input.appointmentId ? "appointment" : input.orderId ? "order" : "customer",
-      entityId: input.appointmentId || input.orderId || input.customerId,
-      executionStatus: "skipped",
-      payload: input.payload,
-      response: { reason: "invalid_phone" },
-    })
     return { success: false, resultStatus: "skipped_invalid_phone", reason: "invalid_phone_number", messageId: null, providerMessageId: null }
   }
 
@@ -81,14 +51,6 @@ export async function queueWhatsappMessage(input: QueueMessageInput): Promise<Wh
   const connection = await getActiveWhatsappConnection(input.partnerId, input.storeId)
   if (!connection?.is_active) {
     SecureLogger.warn("[whatsapp] queue: no active connection", { partnerId: input.partnerId, storeId: input.storeId })
-    await logWhatsappAutomation({
-      partnerId: input.partnerId,
-      triggerType: input.triggerType,
-      entityType: input.appointmentId ? "appointment" : "general",
-      entityId: input.appointmentId || input.orderId,
-      executionStatus: "skipped",
-      response: { reason: "integration_inactive" },
-    })
     return { success: false, resultStatus: "skipped_no_connection", reason: "integration_inactive", messageId: null, providerMessageId: null }
   }
 
@@ -233,7 +195,6 @@ export async function sendQueuedMessage(message: Record<string, unknown>): Promi
       })
       .eq("id", messageId)
 
-    const triggerType = String(payload.triggerType || "manual_resend")
     const entityType = message.appointment_id
       ? "appointment"
       : message.order_id
@@ -241,15 +202,6 @@ export async function sendQueuedMessage(message: Record<string, unknown>): Promi
         : message.quote_id
           ? "quote"
           : "customer"
-
-    await logWhatsappAutomation({
-      partnerId,
-      triggerType: triggerType as never,
-      entityType,
-      entityId: String(message.appointment_id || message.order_id || message.quote_id || message.customer_id || ""),
-      executionStatus: "success",
-      response: { providerMessageId: result.providerMessageId },
-    })
 
     await logAuditEvent({
       partnerId,
@@ -302,15 +254,6 @@ export async function sendQueuedMessage(message: Record<string, unknown>): Promi
           failed_at: new Date().toISOString(),
         })
         .eq("id", messageId)
-
-      await logWhatsappAutomation({
-        partnerId,
-        triggerType: String((message.payload as Record<string, unknown>)?.triggerType || "manual_resend") as never,
-        entityType: "message",
-        entityId: messageId,
-        executionStatus: "failed",
-        response: { error: errorMessage, retryable },
-      })
 
       SecureLogger.error("[whatsapp] send: failed permanently", { messageId, error: errorMessage })
       return { success: false, resultStatus: "failed_send", reason: errorMessage, messageId, providerMessageId: null }

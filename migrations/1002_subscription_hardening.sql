@@ -59,14 +59,9 @@ ALTER TABLE public.processed_webhook_events ENABLE ROW LEVEL SECURITY;
 CREATE INDEX IF NOT EXISTS idx_processed_webhook_resource
   ON public.processed_webhook_events (resource_id, webhook_type);
 
--- TTL cleanup: events older than 90 days can be safely purged
--- Run periodically via pg_cron if table grows large:
---
---   SELECT cron.schedule(
---     'cleanup-old-webhook-events',
---     '0 3 * * 0',  -- Weekly at 3am Sunday
---     $$DELETE FROM public.processed_webhook_events WHERE processed_at < now() - interval '90 days'$$
---   );
+-- TTL cleanup: events older than 90 days are purged by a weekly pg_cron job.
+-- See migrations/20260802_webhook_events_ttl_cleanup.sql (creates
+-- purge_processed_webhook_events() and schedules 'cleanup-old-webhook-events').
 
 COMMENT ON TABLE public.processed_webhook_events IS 
   'Database-level idempotency for webhook processing. UNIQUE constraint on idempotency_key prevents duplicate event processing.';

@@ -140,6 +140,7 @@ const SelectSupplierSheet = ({
                     email: pinnedSupplier.email ?? null,
                     phone: null,
                     cnpj: null,
+                    avatar_url: pinnedSupplier.avatar_url ?? null,
                 }
             return [head, ...rest]
         },

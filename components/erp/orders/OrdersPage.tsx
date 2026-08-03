@@ -478,6 +478,7 @@ export default function OrdersPage({
             module: "orders",
             format: "xlsx",
             filters: {
+                storeId: selectedStore?.id || null,
                 search: debouncedSearch,
                 activeTab,
                 status: filters.status,
@@ -485,7 +486,7 @@ export default function OrdersPage({
                 datePeriod: filters.datePeriod,
             },
         })
-    }, [exportData, partnerId, debouncedSearch, activeTab, filters])
+    }, [exportData, partnerId, selectedStore?.id, debouncedSearch, activeTab, filters])
 
     // Handlers
     const handleAddOrder = useCallback(() => {

@@ -100,8 +100,11 @@ export const getPartnerPaymentMethodsCached = cache(async (partnerId: string) =>
     const supabase = await getSupabaseServerClient()
     const { data } = await supabase
         .from("payment_methods")
-        .select("*")
+        .select("*, finance_accounts!default_finance_account_id(name)")
         .eq("partner_id", partnerId)
 
-    return data
+    return (data || []).map((method: any) => ({
+        ...method,
+        finance_account_name: method.finance_accounts?.name || null,
+    }))
 })

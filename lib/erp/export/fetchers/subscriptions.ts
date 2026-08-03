@@ -27,6 +27,14 @@ export async function fetchSubscriptionsExport(
         .select(SUBSCRIPTION_SELECT)
         .eq("partner_id", partnerId)
 
+      if (filters.storeId) {
+        query = query.eq("store_id", filters.storeId)
+      }
+
+      if (filters.selectedIds?.length) {
+        query = query.in("id", filters.selectedIds)
+      }
+
       if (filters.status && filters.status !== "all") {
         query = query.eq("status", filters.status)
       }

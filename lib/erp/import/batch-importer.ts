@@ -229,19 +229,45 @@ async function importProductBatch(
       continue
     }
 
-    const name = row["name"]?.trim()
+    let name = row["name"]?.trim() || ""
     if (!name) {
       errors++
       continue
     }
 
-    const sku = row["sku"]?.trim() || generateSKUBase(name)
-    let finalSku = sku
+    if (name.length > 255) {
+      name = name.substring(0, 252) + "..."
+    }
+
+    let rawSku = row["sku"]?.trim() || generateSKUBase(name)
+    if (rawSku.length > 100) {
+      rawSku = rawSku.substring(0, 100)
+    }
+
+    let finalSku = rawSku
     if (existingSkus.has(finalSku)) {
-      finalSku = generateSKUWithSuffix(sku, 1)
+      finalSku = generateSKUWithSuffix(rawSku, 1)
     }
 
     const price = cleanNumber(row["price"] ?? "0") ?? 0
+
+    let status = "ativo"
+    const rawStatus = row["status"]?.trim().toLowerCase()
+    if (rawStatus) {
+      if (["inativo", "inactive", "0", "false", "desativado"].includes(rawStatus)) {
+        status = "inativo"
+      } else if (["rascunho", "draft"].includes(rawStatus)) {
+        status = "rascunho"
+      }
+    }
+
+    let showInMarketplace = true
+    const rawVis = row["visibility"]?.trim().toLowerCase()
+    if (rawVis) {
+      if (["oculto", "privado", "unpublished", "inativo", "0", "false", "nao", "não"].includes(rawVis)) {
+        showInMarketplace = false
+      }
+    }
 
     const specs: Record<string, string> = {}
     const productData: any = {
@@ -254,14 +280,14 @@ async function importProductBatch(
       stock_quantity: cleanNumber(row["stock_quantity"] ?? "0") ?? 0,
       cost_price: cleanNumber(row["cost_price"] ?? ""),
       min_stock: cleanNumber(row["min_stock"] ?? ""),
-      max_stock: cleanNumber(row["max_stock"] ?? ""),
       unit: row["unit"] || "UN",
       gtin: row["gtin"] || null,
       product_type: row["product_type"] || null,
       condition: row["condition"] || null,
       promotional_price: cleanNumber(row["promotional_price"] ?? ""),
-      status: "ativo",
-      show_in_marketplace: true,
+      status,
+      show_in_marketplace: showInMarketplace,
+      visibility: showInMarketplace ? "Published" : "Unpublished",
     }
 
     if (row["category"]) {
@@ -451,10 +477,14 @@ async function importCustomerBatch(
   const addressBatch: { customer_name: string; street: string; number: string; complement: string; neighborhood: string; city: string; state: string; zip_code: string }[] = []
 
   for (const row of batch) {
-    const name = row["name"]?.trim()
+    let name = row["name"]?.trim() || ""
     if (!name) {
       errors++
       continue
+    }
+
+    if (name.length > 255) {
+      name = name.substring(0, 252) + "..."
     }
 
     let email = row["email"]?.trim() || null
@@ -491,6 +521,12 @@ async function importCustomerBatch(
     }
     const personType = rawCpf && rawCpf.length === 11 ? "pf" : cnpj ? "pj" : "pf"
 
+    let status = "ativo"
+    const rawStatus = row["status"]?.trim().toLowerCase()
+    if (rawStatus && ["inativo", "inactive", "0", "false", "desativado"].includes(rawStatus)) {
+      status = "inativo"
+    }
+
     const customerData: any = {
       partner_id: partnerId,
       name,
@@ -502,7 +538,7 @@ async function importCustomerBatch(
       cnpj,
       birth_date: row["birth_date"] || null,
       notes: row["notes"] || null,
-      status: "ativo",
+      status,
     }
 
     toInsert.push(customerData)
@@ -588,16 +624,40 @@ async function importServiceBatch(
   const toInsert: any[] = []
 
   for (const row of batch) {
-    const name = row["name"]?.trim()
+    let name = row["name"]?.trim() || ""
     if (!name) {
       errors++
       continue
     }
 
-    const sku = row["sku"]?.trim()
+    if (name.length > 255) {
+      name = name.substring(0, 252) + "..."
+    }
+
+    let sku = row["sku"]?.trim() || null
+    if (sku && sku.length > 100) {
+      sku = sku.substring(0, 100)
+    }
+
     if (sku && existingSkus.has(sku)) {
       duplicates++
       continue
+    }
+
+    let status = "ativo"
+    const rawStatus = row["status"]?.trim().toLowerCase()
+    if (rawStatus && ["inativo", "inactive", "0", "false", "desativado"].includes(rawStatus)) {
+      status = "inativo"
+    }
+
+    let visibilityScope: 'all' | 'selected' | 'exclusive' = "all"
+    const rawVis = row["visibility_scope"]?.trim().toLowerCase()
+    if (rawVis) {
+      if (["privado", "selecionado", "selected"].includes(rawVis)) {
+        visibilityScope = "selected"
+      } else if (["exclusivo", "exclusive"].includes(rawVis)) {
+        visibilityScope = "exclusive"
+      }
     }
 
     const serviceData: any = {
@@ -610,7 +670,8 @@ async function importServiceBatch(
       duration_minutes: cleanNumber(row["duration_minutes"] ?? "60") ?? 60,
       sku: sku || null,
       unit: row["unit"] || "Serviço",
-      status: "ativo",
+      status,
+      visibility_scope: visibilityScope,
     }
 
     if (row["category"]) {
