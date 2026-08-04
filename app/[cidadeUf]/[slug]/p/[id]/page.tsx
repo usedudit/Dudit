@@ -2,6 +2,7 @@ import { cache } from "react"
 import { redirect } from "next/navigation"
 import type { Metadata } from 'next'
 import { ProductDetailsPageClient } from "@/components/marketplace/ProductDetailsPage"
+import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld"
 import {
   getMarketplaceProduct,
   getProductVariants,
@@ -182,7 +183,7 @@ export default async function ProductDetailsPage({
     <div className="bg-white min-h-screen font-sans text-brand-dark flex flex-col pt-[60px]">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(schemaJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(schemaJsonLd) }}
       />
 
       <ProductDetailsPageClient

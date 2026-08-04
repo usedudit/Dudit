@@ -1,9 +1,53 @@
 import "server-only"
 import { cache } from "react"
+import { createHmac, timingSafeEqual as cryptoTimingSafeEqual } from "crypto"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import type { User } from "@supabase/supabase-js"
 
 import { headers, cookies } from "next/headers"
+
+// ─── JWT Signature Verification ─────────────────────────────────────────────
+
+/**
+ * SECURITY: Verify a Supabase HS256 JWT's HMAC-SHA256 signature before trusting
+ * the payload. Returns the decoded payload if valid, null if verification fails.
+ *
+ * This prevents forged JWT cookies from being trusted when the middleware
+ * auth check is not executed (e.g., server actions, certain API routes).
+ */
+function verifyJwtSignature(token: string): any | null {
+    const secret = process.env.SUPABASE_JWT_SECRET
+    if (!secret) return null // No secret configured — cannot verify, fall through
+
+    const parts = token.split(".")
+    if (parts.length !== 3) return null
+
+    try {
+        // 1. Compute expected HMAC-SHA256 signature over "header.payload"
+        const signatureInput = `${parts[0]}.${parts[1]}`
+        const expectedSig = createHmac("sha256", secret)
+            .update(signatureInput)
+            .digest()
+
+        // 2. Decode the provided signature (base64url → Buffer)
+        const providedSig = Buffer.from(
+            parts[2].replace(/-/g, "+").replace(/_/g, "/"),
+            "base64"
+        )
+
+        // 3. Constant-time comparison to prevent timing attacks
+        if (expectedSig.length !== providedSig.length) return null
+        if (!cryptoTimingSafeEqual(expectedSig, providedSig)) return null
+
+        // 4. Signature verified — decode and return payload
+        const base64Payload = parts[1].replace(/-/g, "+").replace(/_/g, "/")
+        return JSON.parse(Buffer.from(base64Payload, "base64").toString("utf-8"))
+    } catch {
+        return null
+    }
+}
+
+// ─── Request Cache ──────────────────────────────────────────────────────────
 
 /**
  * Single request-scoped auth resolver.
@@ -19,7 +63,7 @@ const requestCache = new WeakMap<any, User | null>()
  * Ensures `auth.getUser()` is called AT MOST ONCE per server request.
  * 1. Checks internal module-level request cache (deduplication across util functions in Route Handlers).
  * 2. Checks middleware headers (Fast path - no DB call).
- * 3. Decodes Supabase session cookie locally (Fast path 2 - no DB call).
+ * 3. Verifies and decodes Supabase JWT from cookies locally (Fast path 2 - HMAC verified, no DB call).
  * 4. Fallback to Supabase verification (Slow path - cached for current request).
  */
 export const getCurrentUser = cache(async (): Promise<User | null> => {
@@ -60,8 +104,10 @@ export const getCurrentUser = cache(async (): Promise<User | null> => {
         return user
     }
 
-    // 3. Fast-path: Decode the Supabase JWT token from cookies locally.
-    // Safe because the cookie has already passed through the Next.js Middleware.
+    // 3. Fast-path: Verify and decode the Supabase JWT token from cookies locally.
+    // SECURITY: The JWT signature is verified using HMAC-SHA256 against SUPABASE_JWT_SECRET
+    // before trusting the payload. This prevents forged cookies from impersonating users
+    // even if the middleware auth check was not executed for this request.
     try {
         const cookieStore = await cookies()
         const authCookies = cookieStore.getAll()
@@ -79,22 +125,21 @@ export const getCurrentUser = cache(async (): Promise<User | null> => {
             }
 
             if (accessToken) {
-                const parts = accessToken.split(".")
-                if (parts.length === 3) {
-                    const base64Payload = parts[1].replace(/-/g, "+").replace(/_/g, "/")
-                    const payload = JSON.parse(Buffer.from(base64Payload, "base64").toString("utf-8"))
-                    if (payload && payload.sub && payload.exp && payload.exp > Date.now() / 1000) {
-                        const user = {
-                            id: payload.sub,
-                            email: payload.email || undefined,
-                            app_metadata: {},
-                            user_metadata: {},
-                            aud: "authenticated",
-                            created_at: "",
-                        } as User
-                        requestCache.set(headerList, user)
-                        return user
-                    }
+                // SECURITY FIX (HIGH-01): Verify JWT signature BEFORE trusting payload.
+                // Previously, the payload was decoded and trusted without checking
+                // the HMAC signature, allowing forged JWTs to impersonate any user.
+                const payload = verifyJwtSignature(accessToken)
+                if (payload && payload.sub && payload.exp && payload.exp > Date.now() / 1000) {
+                    const user = {
+                        id: payload.sub,
+                        email: payload.email || undefined,
+                        app_metadata: {},
+                        user_metadata: {},
+                        aud: "authenticated",
+                        created_at: "",
+                    } as User
+                    requestCache.set(headerList, user)
+                    return user
                 }
             }
         }

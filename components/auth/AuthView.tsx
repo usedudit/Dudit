@@ -11,6 +11,7 @@ import { generateNameFromEmail } from "@/lib/utils"
 import { Button, EmailInput, Input, PasswordInput, PasswordStrengthMeter, Checkbox, InfoCard, Spinner } from "@/components/reusable"
 import { calculatePasswordScore } from "@/lib/utils"
 import { getErrorMessage } from "@/lib/utils/error-handlers"
+import { preCheckLogin, handleLoginResult } from "@/app/actions/auth/lockout"
 
 // Types
 type AuthMode = "login" | "signup" | "verify-email" | "forgot-password"
@@ -163,15 +164,25 @@ export default function AuthView({
                 setMode("verify-email")
 
             } else {
+                const preCheck = await preCheckLogin(email)
+                if (!preCheck.allowed) {
+                    throw new Error(preCheck.error || "Acesso temporariamente bloqueado.")
+                }
+
                 const { error } = await supabase.auth.signInWithPassword({ email, password })
                 if (error) {
+                    const lockoutRes = await handleLoginResult(email, false)
                     if (error.message.includes("Email not confirmed")) {
                         setVerifyContext("signup")
                         setMode("verify-email")
                         return
                     }
+                    if (lockoutRes.error) {
+                        throw new Error(lockoutRes.error)
+                    }
                     throw error
                 }
+                await handleLoginResult(email, true)
                 router.push(nextParam)
                 router.refresh()
             }

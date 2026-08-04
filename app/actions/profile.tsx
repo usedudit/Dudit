@@ -134,35 +134,67 @@ export async function updateProfileAction(data: {
       const cleanCpf = sanitizedData.cpf.replace(/\D/g, "")
 
       // Encrypt CPF for storage
-      const { encryptCPF, decryptCPF } = await import("@/lib/crypto")
+      const { encryptCPF } = await import("@/lib/crypto")
+      const { createHash } = await import("crypto")
 
-      // Check uniqueness: fetch all non-null CPFs and decrypt to compare
-      // Nota de performance: Isso funciona bem para um MVP, mas se a base crescer muito,
-      // o ideal é voltar a ter uma coluna cpf_hash com UNIQUE INDEX.
-      const { data: existingCpfs, error: fetchError } = await supabaseAdmin
-        .from("user_profiles")
-        .select("user_id, cpf")
-        .not("cpf", "is", null)
-        .neq("user_id", userId)
+      // SECURITY FIX (MED-02): Compute deterministic SHA-256 hash for O(1) uniqueness check.
+      // This eliminates the timing oracle from the old approach (decrypting ALL CPFs in memory)
+      // which leaked database size information via response time.
+      const cpfHash = createHash("sha256").update(cleanCpf).digest("hex")
 
-      if (fetchError) {
-        console.error("Erro ao buscar CPFs para verificar unicidade:", fetchError)
-      } else if (existingCpfs && existingCpfs.length > 0) {
-        for (const row of existingCpfs) {
-          try {
-            const decrypted = await decryptCPF(row.cpf)
-            if (decrypted === cleanCpf) {
-              return { error: "Esse CPF não pôde ser usado. Verifique se está correto ou tente outro." }
+      // Try hash-based uniqueness check first (requires cpf_hash column in DB)
+      let uniquenessVerified = false
+      try {
+        const { data: existingHash, error: hashError } = await supabaseAdmin
+          .from("user_profiles")
+          .select("user_id")
+          .eq("cpf_hash", cpfHash)
+          .neq("user_id", userId)
+          .maybeSingle()
+
+        if (!hashError) {
+          uniquenessVerified = true
+          if (existingHash) {
+            return { error: "Esse CPF não pôde ser usado. Verifique se está correto ou tente outro." }
+          }
+        } else {
+          // Column doesn't exist yet — fall back to old method
+          console.warn("[SECURITY] cpf_hash column not found. Run DB migration to add it. Falling back to decrypt-all method.")
+        }
+      } catch {
+        // Column doesn't exist — fall back
+      }
+
+      // Fallback: decrypt-all method (only if hash check wasn't possible)
+      if (!uniquenessVerified) {
+        const { decryptCPF } = await import("@/lib/crypto")
+        const { data: existingCpfs, error: fetchError } = await supabaseAdmin
+          .from("user_profiles")
+          .select("user_id, cpf")
+          .not("cpf", "is", null)
+          .neq("user_id", userId)
+
+        if (fetchError) {
+          console.error("Erro ao buscar CPFs para verificar unicidade:", fetchError)
+        } else if (existingCpfs && existingCpfs.length > 0) {
+          for (const row of existingCpfs) {
+            try {
+              const decrypted = await decryptCPF(row.cpf)
+              if (decrypted === cleanCpf) {
+                return { error: "Esse CPF não pôde ser usado. Verifique se está correto ou tente outro." }
+              }
+            } catch (err) {
+              // Ignora se não conseguir descriptografar (ex: lixo no banco)
+              continue
             }
-          } catch (err) {
-            // Ignora se não conseguir descriptografar (ex: lixo no banco)
-            continue
           }
         }
       }
 
       try {
         updateData.cpf = await encryptCPF(cleanCpf)
+        // Always store the hash for future O(1) lookups (safe even if column doesn't exist yet — Supabase ignores unknown fields)
+        updateData.cpf_hash = cpfHash
       } catch (err) {
         console.error("Error encrypting CPF:", err)
         return { error: "Erro ao criptografar o CPF" }
@@ -170,6 +202,7 @@ export async function updateProfileAction(data: {
     } else {
       // Allow clearing CPF
       updateData.cpf = null
+      updateData.cpf_hash = null
     }
   }
 

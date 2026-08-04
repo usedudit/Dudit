@@ -1,5 +1,6 @@
 import type React from "react"
 import type { Metadata, Viewport } from "next"
+import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld"
 import "./globals.css"
 import { SupabaseProvider } from "@/providers/supabase-provider"
 import { QueryProvider } from "@/providers/query-provider"
@@ -209,7 +210,7 @@ export default async function RootLayout({
                 <script
                     type="application/ld+json"
                     dangerouslySetInnerHTML={{
-                        __html: JSON.stringify(jsonLd),
+                        __html: safeJsonLdStringify(jsonLd),
                     }}
                 />
             </head>

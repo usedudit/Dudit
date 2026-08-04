@@ -4,6 +4,7 @@ import { PlanDetailsPageClient } from "@/components/marketplace/PlanDetailsPage"
 import { getMarketplaceRecurringPlanAction } from "@/app/actions/marketplace/recurring-subscriptions"
 import { getPlanUrl } from "@/lib/utils/url-generator"
 import { getCurrentUser } from "@/lib/auth/authorization"
+import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld"
 import { getUserSessionData } from "@/lib/data/user"
 import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
 
@@ -115,7 +116,7 @@ export default async function PlanDetailsPage({
         <div className="bg-white min-h-screen font-sans text-brand-dark flex flex-col pt-[60px]">
             <script
                 type="application/ld+json"
-                dangerouslySetInnerHTML={{ __html: JSON.stringify(schemaJsonLd) }}
+                dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(schemaJsonLd) }}
             />
 
             <PlanDetailsPageClient

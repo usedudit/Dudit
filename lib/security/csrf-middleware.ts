@@ -24,9 +24,16 @@ export async function validateCSRFForAPI(request: NextRequest): Promise<CSRFVali
     return { valid: true }
   }
 
-  // Skip CSRF validation for webhooks (they use signature validation instead)
+  // Skip CSRF validation for webhooks (they use their own signature validation)
+  // SECURITY FIX (LOW-05): Use strict path prefix matching instead of substring .includes()
+  // to prevent bypass via crafted URLs like "/api/webhook-abuse"
+  const WEBHOOK_PATH_PREFIXES = [
+    "/api/webhooks/",           // Supabase webhooks
+    "/api/whatsapp/webhook/",   // WhatsApp (Meta + Evolution)
+    "/api/mercadopago/webhook/", // MercadoPago payment webhooks
+  ]
   const pathname = request.nextUrl.pathname
-  if (pathname.includes("/webhook")) {
+  if (WEBHOOK_PATH_PREFIXES.some(prefix => pathname.startsWith(prefix))) {
     return { valid: true }
   }
 

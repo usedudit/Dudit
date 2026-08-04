@@ -11,6 +11,8 @@ import {
    ArrowRightIcon
 } from '@/lib/icons';
 import { GridLines, Navbar, Footer, CTA } from '../../../components/InstitucionalShared';
+import { Metadata } from "next"
+import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld";
 import { useRouter } from 'next/navigation';
 import { Badge } from '@/components/reusable/Badge';
 
@@ -496,7 +498,7 @@ export default function PricingPage() {
       <div className="min-h-screen bg-white">
          <script
             type="application/ld+json"
-            dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd) }}
+            dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(faqLd) }}
          />
          <Navbar onNavigate={onNavigate} />
          <main>

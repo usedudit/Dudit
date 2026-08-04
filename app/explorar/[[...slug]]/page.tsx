@@ -1,4 +1,5 @@
 import { Suspense } from "react"
+import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld"
 import { ExplorarPageClient } from "@/components/marketplace/ExplorarPageClient"
 import { getCachedExploreProducts, resolveCityAndStateFromSlug } from "@/app/actions/marketplace/products"
 import { resolveCityCoordsFromSlug } from "@/app/actions/marketplace/search"
@@ -457,7 +458,7 @@ export default async function ExplorarPage({
         <div className="min-h-screen bg-white pt-[40px] lg:pt-[110px] font-sans flex flex-col">
             <script
                 type="application/ld+json"
-                dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
+                dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(breadcrumbLd) }}
             />
             <MarketplaceHeader userProfile={userProfile} cartCount={cartCount} />
 

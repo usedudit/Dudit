@@ -4,6 +4,7 @@ import { VendorPageClient } from "@/components/marketplace/VendorPage"
 import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
 import { getStoreUrl } from "@/lib/utils/url-generator"
 import { getCurrentUser } from "@/lib/auth/authorization"
+import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld"
 import { getUserSessionData } from "@/lib/data/user"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import {
@@ -243,7 +244,7 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
   return (
     <div className="min-h-screen bg-white w-full max-w-[100vw] overflow-x-hidden flex flex-col">
       <script type="application/ld+json" dangerouslySetInnerHTML={{
-        __html: JSON.stringify({
+        __html: safeJsonLdStringify({
           '@context': 'https://schema.org', '@type': 'BreadcrumbList',
           itemListElement: [
             { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://dudit.com.br' },
@@ -252,7 +253,7 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
           ],
         })
       }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schemaJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(schemaJsonLd) }} />
       <main className="lg:pt-[120px] flex-grow">
         <VendorPageClient
           partner={partnerData}

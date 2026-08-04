@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import type { Metadata } from 'next'
 import { ServiceDetailsPageClient } from "@/components/marketplace/ServiceDetailsPage"
+import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld"
 import {
     getMarketplaceService,
     getServiceStaffMembers,
@@ -162,7 +163,7 @@ export default async function ServiceDetailsPage({
         <div className="bg-white min-h-screen font-sans text-brand-dark flex flex-col pt-[60px]">
             <script
                 type="application/ld+json"
-                dangerouslySetInnerHTML={{ __html: JSON.stringify(schemaJsonLd) }}
+                dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(schemaJsonLd) }}
             />
 
             <ServiceDetailsPageClient

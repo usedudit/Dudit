@@ -3,8 +3,7 @@
  * Fase 2: Abstrações e Padrões
  */
 
-import { getCurrentUser } from "@/lib/auth/authorization"
-import { verifyPartnerOwnership } from "@/lib/auth/authorization"
+import { getCurrentUser, requirePartnerOwnership } from "@/lib/auth/authorization"
 import type { ActionResponse } from "@/lib/types/action-response"
 import { AUTH_MESSAGES, GENERIC_MESSAGES } from "@/lib/constants/messages"
 import { z } from "zod"
@@ -106,14 +105,9 @@ export function withPartnerAuth<TArgs extends unknown[], TReturn>(
         return { success: false, error: AUTH_MESSAGES.NOT_AUTHENTICATED }
       }
 
-      const isOwner = await verifyPartnerOwnership(partnerId)
-
-      if (!isOwner) {
-        return {
-          success: false,
-          error: options?.errorMessage || AUTH_MESSAGES.NO_PERMISSION,
-        }
-      }
+      // SECURITY FIX (LOW-01): Use requirePartnerOwnership which checks partner_users table
+      // (supports team members), not just partners.user_id (owner-only).
+      await requirePartnerOwnership(partnerId)
 
       const result = await action(user.id, partnerId, ...args)
       return { success: true, data: result }

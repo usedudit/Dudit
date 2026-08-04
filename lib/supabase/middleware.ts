@@ -125,6 +125,58 @@ export async function middleware(request: NextRequest) {
   if (!isServerAction) {
     console.log(`[MIDDLEWARE] ${request.method} ${pathname}`)
   }
+
+  // ============================================================================
+  // SECURITY FIX (HIGH-03): Origin-based CSRF protection for ALL Server Actions.
+  //
+  // Server actions are POST requests with the Next-Action header. We validate
+  // the Origin header against the expected app domain to prevent cross-site
+  // request forgery. This protects ALL ~50 server action files automatically
+  // without requiring each to implement its own CSRF check.
+  //
+  // Modern browsers ALWAYS send the Origin header on POST requests, so a missing
+  // Origin from a browser context is suspicious and blocked (fail-closed).
+  // ============================================================================
+  if (isServerAction && request.method === "POST") {
+    const origin = request.headers.get("origin")
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br"
+
+    // In development, allow localhost origins
+    const isDev = process.env.NODE_ENV === "development"
+
+    if (!origin) {
+      // Missing Origin on a POST = suspicious (browsers always send it).
+      // Block unless it's a same-origin non-browser call (e.g., test runners in dev).
+      if (!isDev) {
+        console.warn(`[MIDDLEWARE] CSRF: Blocked server action without Origin header on ${pathname}`)
+        return new NextResponse(
+          JSON.stringify({ error: "Requisição bloqueada: cabeçalho Origin ausente." }),
+          { status: 403, headers: { "Content-Type": "application/json" } }
+        )
+      }
+    } else {
+      try {
+        const originHost = new URL(origin).host
+        const expectedHost = new URL(appUrl).host
+        const isAllowedOrigin = originHost === expectedHost || (isDev && (originHost.startsWith("localhost") || originHost.startsWith("127.0.0.1")))
+
+        if (!isAllowedOrigin) {
+          console.warn(`[MIDDLEWARE] CSRF: Blocked cross-origin server action. Origin: ${origin}, Expected: ${expectedHost}`)
+          return new NextResponse(
+            JSON.stringify({ error: "Requisição bloqueada: origem não autorizada." }),
+            { status: 403, headers: { "Content-Type": "application/json" } }
+          )
+        }
+      } catch {
+        console.warn(`[MIDDLEWARE] CSRF: Blocked server action with malformed Origin: ${origin?.substring(0, 100)}`)
+        return new NextResponse(
+          JSON.stringify({ error: "Requisição bloqueada: origem inválida." }),
+          { status: 403, headers: { "Content-Type": "application/json" } }
+        )
+      }
+    }
+  }
+
   const forwarded = request.headers.get("x-forwarded-for")
   const ip = forwarded ? forwarded.split(",")[0].trim() : request.headers.get("x-real-ip") || "unknown"
 
@@ -191,7 +243,7 @@ export async function middleware(request: NextRequest) {
     worker-src 'self' blob:;
     child-src 'self' blob:;
     media-src 'self' blob: ${r2MediaOrigins};
-    script-src 'self' 'unsafe-inline' 'unsafe-eval'
+    script-src 'self' 'unsafe-inline' ${process.env.NODE_ENV === 'development' ? "'unsafe-eval'" : ''}
         https://sdk.mercadopago.com 
         https://www.mercadopago.com 
         https://*.mercadopago.com 
@@ -416,11 +468,15 @@ export async function middleware(request: NextRequest) {
                 .eq("user_id", user.id)
                 .maybeSingle()
               : Promise.resolve({ data: null }),
+            // SECURITY FIX (MED-04): Query through partner_users to verify user ownership.
+            // Previously queried partners directly, which leaked partner status to any user
+            // who manipulated the active_partner_id cookie.
             needsPartnerCheck
               ? supabase
-                .from("partners")
-                .select("is_active, erp_disabled")
-                .eq("id", activePartnerId!)
+                .from("partner_users")
+                .select("id, partners!inner(is_active, erp_disabled)")
+                .eq("partner_id", activePartnerId!)
+                .eq("user_id", user.id)
                 .maybeSingle()
               : Promise.resolve({ data: null }),
             needsUserDeletionCheck
@@ -496,9 +552,21 @@ export async function middleware(request: NextRequest) {
           }
 
           // Process partner status check result
-          const partner = partnerResult.data
-          if (partner && (partner.is_active === false || partner.erp_disabled === true)) {
-            console.log(`[MIDDLEWARE] Partner ${activePartnerId} is inactive/disabled - redirecting to /select-erp`)
+          // MED-04: partnerResult now comes from partner_users join, so
+          // .data is null if user doesn't belong to this partner (cookie tampered).
+          const partnerRow = partnerResult.data
+          if (partnerRow) {
+            const partnerInfo = (partnerRow as any).partners
+            if (partnerInfo && (partnerInfo.is_active === false || partnerInfo.erp_disabled === true)) {
+              console.log(`[MIDDLEWARE] Partner ${activePartnerId} is inactive/disabled - redirecting to /select-erp`)
+              const selectErpUrl = new URL("/select-erp", request.url)
+              const responseRedirect = NextResponse.redirect(selectErpUrl)
+              responseRedirect.cookies.delete("active_partner_id")
+              return responseRedirect
+            }
+          } else if (needsPartnerCheck) {
+            // User has no membership for this partner_id → cookie is invalid/tampered
+            console.warn(`[MIDDLEWARE] User ${user.id} has no access to partner ${activePartnerId} - clearing cookie`)
             const selectErpUrl = new URL("/select-erp", request.url)
             const responseRedirect = NextResponse.redirect(selectErpUrl)
             responseRedirect.cookies.delete("active_partner_id")
