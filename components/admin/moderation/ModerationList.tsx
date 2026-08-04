@@ -481,19 +481,18 @@ function ProductModerationSheet({
                         required
                     />
                 </div>
-            </DefaultModal>
-        </div>
+</DefaultModal>
 
-            {/* Image Lightbox */}
-            <ImageLightbox
-                isOpen={showLightbox}
-                onClose={() => setShowLightbox(false)}
-                images={allImages}
-                currentIndex={lightboxIndex}
-                onNavigate={(dir) => setLightboxIndex(prev => (prev + dir + allImages.length) % allImages.length)}
-            />
+        {/* Image Lightbox */}
+        <ImageLightbox
+            isOpen={showLightbox}
+            onClose={() => setShowLightbox(false)}
+            images={allImages}
+            currentIndex={lightboxIndex}
+            onNavigate={(dir) => setLightboxIndex(prev => (prev + dir + allImages.length) % allImages.length)}
+        />
         </div>
-    ) : null
+) : null
 
     if (isMobile) {
         return (
