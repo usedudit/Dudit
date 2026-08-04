@@ -117,7 +117,6 @@ export function StoreSwitcher() {
                     isOpen={isModalOpen}
                     onClose={() => setIsModalOpen(false)}
                     partnerId={partnerId}
-                    sourceStore={selectedStore}
                     onSaved={() => {
                         refreshStores()
                     }}

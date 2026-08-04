@@ -238,7 +238,7 @@ export function ERPSidebar() {
     if (pathname === "/erp/pdv") {
         return null
     }
-    const { isExpanded, toggleSidebar, isMobileOpen, setIsMobileOpen } = useSidebar()
+    const { isExpanded, toggleSidebar, isMobileOpen, setIsMobileOpen, sidebarCard } = useSidebar()
     const isCollapsed = !isExpanded
     const { canAccessPath: canAccess, businessInfo: contextBusinessInfo, planSlug } = usePermissions()
 
@@ -793,6 +793,11 @@ export function ERPSidebar() {
                         })}
                     </ul>
                 </nav>
+            </div>
+
+            {/* Sidebar Card - Desktop Only */}
+            <div className="hidden lg:block p-3">
+                {sidebarCard}
             </div>
 
             {/* MOBILE BOTTOM SHEET (VAUL) */}

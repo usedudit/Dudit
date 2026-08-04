@@ -11,8 +11,10 @@ import { useMediaQuery } from "@/components/erp/hooks"
 import { useEntityState } from "@/hooks/use-entity-state"
 import { useToast } from "@/hooks/use-toast"
 import { useErpExport } from "@/hooks/use-erp-export"
+import { usePermissions } from "@/lib/permission-context"
 import { useStore } from "@/lib/store-context"
 import ExportSelectionModal from "@/components/erp/export/ExportSelectionModal"
+import ExportColumnSelectionModal from "@/components/erp/export/ExportColumnSelectionModal"
 import ReturnListRow, { getReturnStatusMeta } from "./ReturnListRow"
 import ReturnGridCard from "./ReturnGridCard"
 import CreateReturnPage from "./CreateReturnPage"
@@ -90,7 +92,8 @@ function mapLegacyReason(reason: unknown) {
 export default function ReturnsPage({ partnerId, roleId, storeId, planGate }: ReturnsPageProps) {
     const { toast } = useToast()
     const { openPlanUpgrade } = usePlanUpgrade()
-    const { exportData, isExporting, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport()
+    const { planSlug } = usePermissions()
+    const { exportData, isExporting, columnSelectionModal, closeColumnSelectionModal, handleColumnConfirm, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport(planSlug)
     const isMobile = useMediaQuery("(max-width: 767px)")
     const isTablet = useMediaQuery("(max-width: 1024px)")
     const { state: entityState, open: openEntity, close: closeEntity } = useEntityState()
@@ -709,6 +712,13 @@ export default function ReturnsPage({ partnerId, roleId, storeId, planGate }: Re
                     </div>
                 </div>
             </DefaultModal>
+
+            <ExportColumnSelectionModal
+                isOpen={columnSelectionModal.isOpen}
+                canExportAllColumns={columnSelectionModal.canExportAllColumns}
+                onConfirm={handleColumnConfirm}
+                onClose={closeColumnSelectionModal}
+            />
 
             <ExportSelectionModal
                 isOpen={selectionModal.isOpen}

@@ -340,5 +340,6 @@ export function useEntityCache<TListItem extends { id: string }, TDetail extends
         invalidateAll,
         optimisticUpdate,
         setEntity,
+        removeItemFromListCache,
     }
 }

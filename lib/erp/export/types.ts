@@ -21,6 +21,7 @@ export type ErpExportModule =
 export type BaseExportFilters = {
   storeId?: string | null
   selectedIds?: string[]
+  includeAllColumns?: boolean
 }
 
 export type QuotesExportFilters = BaseExportFilters & {

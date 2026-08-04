@@ -66,12 +66,15 @@ function ProductModerationSheet({
     const [showFullRejectModal, setShowFullRejectModal] = useState(false)
     const [showApproveModal, setShowApproveModal] = useState(false)
     const [rejectReason, setRejectReason] = useState("")
+    const [showLightbox, setShowLightbox] = useState(false)
+    const [lightboxIndex, setLightboxIndex] = useState(0)
     const isMobile = useMediaQuery("(max-width: 768px)")
 
     // Reset local state when item changes
     useEffect(() => {
         setSelectedImages(new Set())
         setRejectReason("")
+        setShowLightbox(false)
     }, [item])
 
     const toggleImage = (url: string) => {
@@ -81,6 +84,13 @@ function ProductModerationSheet({
             else next.add(url)
             return next
         })
+    }
+
+    const allImages = (item?.images || []).map(url => url.startsWith("http") ? url : `${process.env.NEXT_PUBLIC_R2_PUBLIC_URL || ""}/${url}`)
+
+    const openLightbox = (index: number = 0) => {
+        setLightboxIndex(index)
+        setShowLightbox(true)
     }
 
     const content = item ? (
@@ -98,7 +108,7 @@ function ProductModerationSheet({
                 {/* Product/Partner Info */}
                 <div>
                     <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading leading-tight truncate">{item.title}</h3>
-                    <div className="flex items-center gap-3 mt-2">
+                    <div className="flex items-center gap-3 mt-2 flex-wrap">
                         <Badge variant={
                             item.moderation_status === "pending_moderation" ? "orange" :
                                 item.moderation_status === "flagged" ? "red" :
@@ -117,8 +127,67 @@ function ProductModerationSheet({
                                 {formatCurrency(item.price)}
                             </span>
                         )}
+                        {/* Category */}
+                        {item.category_name && (
+                            <span className="px-3 py-1 bg-brand-gray dark:bg-dark-border rounded-lg text-sm font-medium text-brand-dark dark:text-dark-heading">
+                                {item.category_name}
+                            </span>
+                        )}
+                        {/* Brand */}
+                        {item.brand_name && (
+                            <span className="px-3 py-1 bg-brand-green/10 dark:bg-brand-green/20 text-brand-green dark:text-brand-green/80 rounded-lg text-sm font-medium">
+                                {item.brand_name}
+                            </span>
+                        )}
+                        {/* Video indicator */}
+                        {item.video_url && (
+                            <span className="px-3 py-1 bg-brand-blue/10 dark:bg-brand-blue/20 text-brand-blue dark:text-brand-blue/80 rounded-lg text-sm font-medium flex items-center gap-1">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <polygon points="23 7 16 12 23 17 23 7" />
+                                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+                                </svg>
+                                Vídeo
+                            </span>
+                        )}
                     </div>
                 </div>
+
+                {/* Video Player */}
+                {item.video_url && item.video_type && (
+                    <div className="space-y-2">
+                        <h4 className="text-[13px] font-bold text-brand-inactive-text dark:text-dark-body">Vídeo</h4>
+                        <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-black/10 dark:bg-black/30 border border-brand-border dark:border-dark-border">
+                            {item.video_type === "youtube" && (
+                                <iframe
+                                    src={`https://www.youtube.com/embed/${item.video_url.split("v=")[1]?.split("&")[0]}`}
+                                    title="Vídeo do produto"
+                                    className="w-full h-full"
+                                    frameBorder="0"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                    allowFullScreen
+                                />
+                            )}
+                            {item.video_type === "vimeo" && (
+                                <iframe
+                                    src={`https://player.vimeo.com/video/${item.video_url.split("/").pop()}`}
+                                    title="Vídeo do produto"
+                                    className="w-full h-full"
+                                    frameBorder="0"
+                                    allow="autoplay; fullscreen; picture-in-picture"
+                                    allowFullScreen
+                                />
+                            )}
+                            {item.video_type === "upload" && item.video_url && (
+                                <video
+                                    src={item.video_url.startsWith("http") ? item.video_url : `https://img.dudit.com.br/${item.video_url}`}
+                                    controls
+                                    className="w-full h-full"
+                                    poster={item.video_thumbnail ? (item.video_thumbnail.startsWith("http") ? item.video_thumbnail : `https://img.dudit.com.br/${item.video_thumbnail}`) : undefined}
+                                />
+                            )}
+                        </div>
+                    </div>
+                )}
 
                 {/* description */}
                 <div>
@@ -217,14 +286,57 @@ function ProductModerationSheet({
                         )}
                     </div>
                     {item.images && item.images.length > 0 ? (
-                        <div className="grid grid-cols-3 gap-3">
-                            {item.images.map((url: string, idx: number) => (
-                                <ImageThumbnail key={idx} url={url} selected={selectedImages.has(url)} onToggle={() => toggleImage(url)} />
-                            ))}
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                            {item.images.map((url: string, idx: number) => {
+                                const fullUrl = url.startsWith("http") ? url : `${process.env.NEXT_PUBLIC_R2_PUBLIC_URL || ""}/${url}`
+                                const isSelected = selectedImages.has(url)
+                                return (
+                                    <div
+                                        key={idx}
+                                        className={`relative group aspect-square rounded-xl overflow-hidden border-2 cursor-pointer transition-all ${
+                                            isSelected ? "border-red-500 ring-2 ring-red-300" : "border-brand-border dark:border-dark-border hover:border-brand-green/50"
+                                        }`}
+                                        onClick={() => {
+                                            if (isSelected) {
+                                                toggleImage(url)
+                                            } else {
+                                                openLightbox(idx)
+                                            }
+                                        }}
+                                    >
+                                        <img src={fullUrl} alt={`Imagem ${idx + 1}`} className="w-full h-full object-cover" loading="lazy" />
+                                        {isSelected && (
+                                            <div className="absolute inset-0 bg-red-500/30 flex items-center justify-center">
+                                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                    <line x1="18" y1="6" x2="6" y2="18" />
+                                                    <line x1="6" y1="6" x2="18" y2="18" />
+                                                </svg>
+                                            </div>
+                                        )}
+                                        {!isSelected && (
+                                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <circle cx="12" cy="12" r="10" />
+                                                    <path d="M12 8v4M12 16h.01" />
+                                                </svg>
+                                            </div>
+                                        )}
+                                        <div className="absolute bottom-2 right-2">
+                                            <span className="text-xs bg-black/70 text-white px-2 py-1 rounded">
+                                                {idx + 1} / {item.images.length}
+                                            </span>
+                                        </div>
+                                    </div>
+                                )
+                            })}
                         </div>
                     ) : (
                         <div className="flex flex-col items-center justify-center p-8 bg-brand-gray dark:bg-dark-border/30 rounded-2xl border border-dashed border-brand-border dark:border-dark-border text-brand-inactive-text">
-                            <RemoveImageIcon size={32} className="mb-2 opacity-30" />
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mb-2 opacity-30">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                <circle cx="8.5" cy="8.5" r="1.5" />
+                                <polyline points="21 15 16 10 5 21" />
+                            </svg>
                             <span className="text-sm font-medium">Nenhuma imagem enviada</span>
                         </div>
                     )}
@@ -371,6 +483,16 @@ function ProductModerationSheet({
                 </div>
             </DefaultModal>
         </div>
+
+            {/* Image Lightbox */}
+            <ImageLightbox
+                isOpen={showLightbox}
+                onClose={() => setShowLightbox(false)}
+                images={allImages}
+                currentIndex={lightboxIndex}
+                onNavigate={(dir) => setLightboxIndex(prev => (prev + dir + allImages.length) % allImages.length)}
+            />
+        </div>
     ) : null
 
     if (isMobile) {
@@ -395,6 +517,66 @@ function ProductModerationSheet({
                 </div>
             </div>
         </Portal>
+    )
+}
+
+// Lightbox component for ProductModerationSheet
+function ImageLightbox({ isOpen, onClose, images, currentIndex, onNavigate }: {
+    isOpen: boolean
+    onClose: () => void
+    images: string[]
+    currentIndex: number
+    onNavigate: (dir: 1 | -1) => void
+}) {
+    if (!isOpen || images.length === 0) return null
+
+    const currentImage = images[currentIndex]
+
+    return (
+        <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center" onClick={onClose}>
+            <div className="relative w-full h-full max-w-[90vw] max-h-[90vh] flex items-center justify-center">
+                <img
+                    src={currentImage}
+                    alt={`Imagem ${currentIndex + 1} de ${images.length}`}
+                    className="max-w-full max-h-full object-contain"
+                />
+                {images.length > 1 && (
+                    <>
+                        <button
+                            onClick={(e) => { e.stopPropagation(); onNavigate(-1) }}
+                            className="absolute left-4 text-white/80 hover:text-white transition-colors p-2 rounded-full bg-black/50"
+                            aria-label="Anterior"
+                        >
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <polyline points="15 18 9 12 15 6" />
+                            </svg>
+                        </button>
+                        <button
+                            onClick={(e) => { e.stopPropagation(); onNavigate(1) }}
+                            className="absolute right-4 text-white/80 hover:text-white transition-colors p-2 rounded-full bg-black/50"
+                            aria-label="Próxima"
+                        >
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <polyline points="9 18 15 12 9 6" />
+                            </svg>
+                        </button>
+                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/70 text-sm">
+                            {currentIndex + 1} / {images.length}
+                        </div>
+                    </>
+                )}
+                <button
+                    onClick={(e) => { e.stopPropagation(); onClose() }}
+                    className="absolute top-4 right-4 text-white/80 hover:text-white transition-colors p-2 rounded-full bg-black/50"
+                    aria-label="Fechar"
+                >
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+        </div>
     )
 }
 

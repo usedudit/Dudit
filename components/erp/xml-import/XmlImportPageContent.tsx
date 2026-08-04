@@ -23,7 +23,9 @@ import {
     FileIcon
 } from "@/lib/icons"
 import { useErpExport } from "@/hooks/use-erp-export"
+import { usePermissions } from "@/lib/permission-context"
 import ExportSelectionModal from "@/components/erp/export/ExportSelectionModal"
+import ExportColumnSelectionModal from "@/components/erp/export/ExportColumnSelectionModal"
 import { formatQuantityWithUnit } from "@/lib/utils/formatters"
 
 type TabType = "all" | "pending" | "completed" | "failed"
@@ -273,7 +275,8 @@ export function XmlImportPageContent({ partnerId, initialImports, planGate }: Xm
     const storeId = selectedStore?.id || ""
     const { success: notifySuccess, error: notifyError } = useNotification()
     const { openPlanUpgrade } = usePlanUpgrade()
-    const { exportData, isExporting, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport()
+    const { planSlug } = usePermissions()
+    const { exportData, isExporting, columnSelectionModal, closeColumnSelectionModal, handleColumnConfirm, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport(planSlug)
     const isTabletOrMobile = useMediaQuery("(max-width: 1023px)")
     const router = useRouter()
 
@@ -323,11 +326,11 @@ export function XmlImportPageContent({ partnerId, initialImports, planGate }: Xm
         setPendingUploadId(null)
         setViewingImportId(null)
         setReimportedFlag(false)
-        listImportsAction(partnerId, { limit: 50 }).then((res) => {
+        listImportsAction(partnerId, { limit: 50, storeId }).then((res) => {
             if (res.success && res.imports) setImports(res.imports as ImportItem[])
         })
         router.refresh()
-    }, [partnerId, router])
+    }, [partnerId, router, storeId])
 
     const isPreviewView = !!previewImportId
     const listViewKey = "list-view"
@@ -486,6 +489,13 @@ export function XmlImportPageContent({ partnerId, initialImports, planGate }: Xm
                     reimported={reimportedFlag}
                 />
             )}
+
+            <ExportColumnSelectionModal
+                isOpen={columnSelectionModal.isOpen}
+                canExportAllColumns={columnSelectionModal.canExportAllColumns}
+                onConfirm={handleColumnConfirm}
+                onClose={closeColumnSelectionModal}
+            />
 
             <ExportSelectionModal
                 isOpen={selectionModal.isOpen}
@@ -945,7 +955,7 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
 
     useEffect(() => {
         let cancelled = false
-        getImportPreviewAction(importId, partnerId).then((res) => {
+        getImportPreviewAction(importId, partnerId, storeId).then((res) => {
             if (cancelled) return
             if (res.success && res.preview) {
                 setPreview(res.preview)
@@ -1027,7 +1037,7 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
 
     const handleRevert = async () => {
         setIsReverting(true)
-        const result = await revertImportAction(importId, partnerId, revertReason)
+        const result = await revertImportAction(importId, partnerId, revertReason, storeId)
         if (result.success) {
             notifySuccess("Importação revertida!", result.message)
             setShowRevertModal(false)

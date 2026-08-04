@@ -6,7 +6,9 @@ import {
     Settings2Icon,
 } from '@/lib/icons';
 import { useErpExport } from '@/hooks/use-erp-export';
+import { usePermissions } from '@/lib/permission-context';
 import { useStore } from "@/lib/store-context";
+import ExportColumnSelectionModal from '@/components/erp/export/ExportColumnSelectionModal';
 import { Button, Checkbox, IconPlaceholder, Pagination, Dropdown, DropdownItem } from '@/components/reusable';
 import { Settings, CalendarOff, RefreshCw, ArrowUpDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -147,6 +149,7 @@ const AppointmentsPage = ({
     const [moreSheetDate, setMoreSheetDate] = useState<string>('');
     const [moreSheetAppointments, setMoreSheetAppointments] = useState<Appointment[]>([]);
     const [isSaving, setIsSaving] = useState(false);
+    const { planSlug } = usePermissions();
 
     // Selection Mode
     const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -154,7 +157,7 @@ const AppointmentsPage = ({
     const [draftData, setDraftData] = useState<{ services: any[], client: any, staffId?: number } | null>(null);
     const [preSelectedStaffId, setPreSelectedStaffId] = useState<string | undefined>(undefined);
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
-    const { exportData, isExporting, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport();
+    const { exportData, isExporting, columnSelectionModal, closeColumnSelectionModal, handleColumnConfirm, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport(planSlug);
 
     const mapDbAppointment = useCallback((row: any): Appointment => ({
         id: String(row.id),
@@ -1146,6 +1149,13 @@ const AppointmentsPage = ({
             </AnimatePresence >
         </>
     );
+
+    <ExportColumnSelectionModal
+        isOpen={columnSelectionModal.isOpen}
+        canExportAllColumns={columnSelectionModal.canExportAllColumns}
+        onConfirm={handleColumnConfirm}
+        onClose={closeColumnSelectionModal}
+    />
 };
 
 export default AppointmentsPage;

@@ -12,11 +12,12 @@ interface ServiceOrderGridCardProps {
   onSelect: () => void
   onDetails: () => void
   onEdit?: () => void
+  onStatus?: () => void
+  onShare?: () => void
   onDelete?: () => void
   statusColor: string
   statusLabel: string
   teamMembers?: any[]
-  children?: React.ReactNode
 }
 
 const ServiceOrderGridCard = React.memo(
@@ -26,11 +27,12 @@ const ServiceOrderGridCard = React.memo(
     onSelect,
     onDetails,
     onEdit,
+    onStatus,
+    onShare,
     onDelete,
     statusColor,
     statusLabel,
     teamMembers = [],
-    children,
   }: ServiceOrderGridCardProps) => {
     const formatDate = (d: string) => {
       if (!d) return "-"
@@ -135,11 +137,10 @@ const ServiceOrderGridCard = React.memo(
               </span>
               <ActionsDropdown
                 onEdit={onEdit}
+                onStatus={onStatus}
+                onShare={onShare}
                 onDelete={onDelete}
-                onView={onDetails}
-              >
-                {children}
-              </ActionsDropdown>
+              />
             </div>
           </div>
         </div>

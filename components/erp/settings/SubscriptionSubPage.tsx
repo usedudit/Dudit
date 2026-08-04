@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { Button, DefaultModal, AlertModal } from "@/components/reusable"
+import { Button, DefaultModal, AlertModal, InfoCard } from "@/components/reusable"
 import { Input as FormInput } from "@/components/reusable/Input"
 import Portal from "@/components/Portal"
 import {
@@ -808,29 +808,20 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
                     title="Cancelar assinatura"
                 >
                     <div className="space-y-5 py-2">
-                        <div className="flex items-start gap-3 p-4 rounded-2xl bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30">
-                            <AlertTriangleIcon size={20} className="text-red-500 shrink-0 mt-0.5" />
-                            <div className="space-y-1">
-                                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                    Poxa, que pena!
-                                </p>
-                                <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                                    Você vai perder os recursos do plano <strong>{subData?.plan.name}</strong> e voltar para o plano Grátis. Se mudar de ideia depois, é só assinar novamente.
-                                </p>
-                            </div>
-                        </div>
+                        <InfoCard title="Poxa, que pena!" message={`Você vai perder os recursos do plano ${subData?.plan?.name || "atual"} e voltar para o plano Grátis. Se mudar de ideia depois, é só assinar novamente`} />
 
                         <div className="flex flex-col sm:flex-row gap-3 pt-2">
                             <Button
                                 variant="outline"
-                                className="flex-1 h-12 font-bold"
+                                className="flex-1 h-12"
                                 onClick={() => setCancelModal(false)}
                                 disabled={!!actionLoading}
                             >
                                 Manter meu plano
                             </Button>
                             <Button
-                                className="flex-1 h-12 bg-red-600 hover:bg-red-700 text-white font-bold"
+                                variant="destructive"
+                                className="flex-1 h-12"
                                 onClick={() => {
                                     setCancelModal(false)
                                     setCancelConfirmOpen(true)

@@ -907,26 +907,41 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
 
     const supabase = createAdminClient()
 
-    // Pre-validate inputs before calling RPC
     if (!input.preSaleId) return { success: false as const, error: "ID da pré-venda é obrigatório." }
     const paidAmount = safeMoney(Number(input.paidAmount || 0))
 
-    // Validate discount permission if the pre-sale has a discount applied
-    const { data: draftCheck } = await supabase
+    // Fetch pre_sale draft
+    const { data: preSaleDraft } = await supabase
         .from("pre_sales")
-        .select("discount_amount, coupon_id")
+        .select("*")
         .eq("id", input.preSaleId)
         .eq("partner_id", input.partnerId)
-        .single()
-    if (draftCheck) {
-        const hasDiscount = Number(draftCheck.discount_amount || 0) > 0
-        const hasCoupon = !!draftCheck.coupon_id
-        if (hasDiscount || hasCoupon) {
-            await requirePermission(input.partnerId, "pdv", "can_apply_discount")
+        .maybeSingle()
+
+    if (!preSaleDraft) {
+        return { success: false as const, error: "Pré-venda não encontrada." }
+    }
+
+    if (preSaleDraft.status === "completed" && preSaleDraft.order_id) {
+        // Idempotent: return existing order if already completed
+        const { data: existingOrder } = await supabase
+            .from("orders")
+            .select("id, order_number")
+            .eq("id", preSaleDraft.order_id)
+            .maybeSingle()
+        if (existingOrder) {
+            return { success: true as const, data: { saleId: existingOrder.id, saleNumber: existingOrder.order_number, orderId: existingOrder.id } }
         }
     }
 
-    // Validate finance account belongs to partner
+    // Validate discount permission if pre-sale has a discount or coupon applied
+    const hasDiscount = Number(preSaleDraft.discount_amount || 0) > 0
+    const hasCoupon = !!preSaleDraft.coupon_id || !!preSaleDraft.coupon_code
+    if (hasDiscount || hasCoupon) {
+        await requirePermission(input.partnerId, "pdv", "can_apply_discount")
+    }
+
+    // Validate finance account
     if (input.financeAccountId) {
         const { data: acc } = await supabase
             .from("finance_accounts")
@@ -938,7 +953,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
         if (!acc?.id) return { success: false as const, error: "Conta financeira inválida ou inativa." }
     }
 
-    // Require open cash session — store-aware when storeId is provided
+    // Require open cash session
     const activeSessionResult = await getActiveCashSessionAction(input.partnerId, input.storeId)
     if (!activeSessionResult.success) {
         return { success: false as const, error: "Não foi possível validar o caixa aberto." }
@@ -947,7 +962,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
         return { success: false as const, error: "Abra um caixa para finalizar vendas no PDV." }
     }
 
-    // Build payment breakdown for RPC
+    // Build payment breakdown
     const resolvedBreakdown: Array<{
         method: string
         amount: number
@@ -975,8 +990,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
         })
     }
 
-    let breakdownForRpc = resolvedBreakdown
-
+    let breakdownForOrder = resolvedBreakdown
     const paymentAware = await resolvePosFinalTotalWithPaymentMethod({
         supabase,
         partnerId: input.partnerId,
@@ -984,14 +998,8 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
         preSaleId: input.preSaleId,
         paymentBreakdown: resolvedBreakdown,
     })
-    if (paymentAware === null) {
-        return { success: false as const, error: "Pré-venda não encontrada ou indisponível para finalizar." }
-    }
-    if (!paymentAware.ok) {
-        return { success: false as const, error: paymentAware.error }
-    }
-    if ((paymentAware.adjustedBreakdown || []).length > 0) {
-        breakdownForRpc = paymentAware.adjustedBreakdown.map((row: any) => ({
+    if (paymentAware && paymentAware.ok && (paymentAware.adjustedBreakdown || []).length > 0) {
+        breakdownForOrder = paymentAware.adjustedBreakdown.map((row: any) => ({
             method: row.method,
             amount: safeMoney(Number(row.amount || 0)),
             amountReceived: safeMoney(Number(row.amountReceived ?? row.amount ?? 0)),
@@ -1010,149 +1018,152 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
             installmentNumber: Math.max(1, Math.floor(Number(row.installmentNumber || 1))),
         }))
     }
-    // `pre_sales.total_amount` stays the line-item / merch base total so `finalize_pos_sale` RPC
-    // consistency checks (draft vs recalculated subtotal) keep passing. Final charged amounts
-    // per method are only in `p_payment_breakdown` (post discount/interest/fee per leg).
-    const paidAmountForRpc =
-        breakdownForRpc.length > 0
-            ? safeMoney(breakdownForRpc.reduce((acc, row) => acc + Number(row.amount || 0), 0))
-            : paidAmount
 
-    // Call atomic RPC — now store-aware via p_store_id
-    const { data: rpcResult, error: rpcError } = await supabase.rpc("finalize_pos_sale", {
-        p_partner_id: input.partnerId,
-        p_pre_sale_id: input.preSaleId,
-        p_finance_account_id: input.financeAccountId || null,
-        p_cash_session_id: activeSessionResult.data.id,
-        p_paid_amount: paidAmountForRpc,
-        p_payment_method: input.paymentMethod || "PDV",
-        p_payment_breakdown: breakdownForRpc.length > 0 ? breakdownForRpc : null,
-        p_user_id: user.id,
-        p_store_id: input.storeId || null,
-    })
+    const totalPaidAmount = breakdownForOrder.length > 0
+        ? safeMoney(breakdownForOrder.reduce((acc, row) => acc + Number(row.amount || 0), 0))
+        : paidAmount
 
-    if (rpcError) {
-        const msg = rpcError.message || "Falha ao finalizar venda."
-        return { success: false as const, error: msg }
-    }
-
-    const saleId = rpcResult?.[0]?.sale_id
-    if (!saleId) {
-        return { success: false as const, error: "Falha ao finalizar venda - nenhum ID retornado." }
-    }
-
-    const { data: finalizedPreSale } = await supabase
-        .from("pre_sales")
-        .select("shipping_fee, distance_km, delivery_breakdown, coupon_id, coupon_code, coupon_discount_amount, customer_id")
-        .eq("id", input.preSaleId)
-        .eq("partner_id", input.partnerId)
-        .limit(1)
-        .maybeSingle()
-
-    const hasShipping = Number(finalizedPreSale?.shipping_fee || 0) > 0
-    let finalDeliveryStatus = hasShipping ? "preparing" : "delivered"
-    if (input.isPendingDelivery) {
-        finalDeliveryStatus = hasShipping ? "preparing" : "pickup_available"
-    }
-
-    await supabase
-        .from("sales")
-        .update({ delivery_status: finalDeliveryStatus })
-        .eq("id", saleId)
-        .eq("partner_id", input.partnerId)
-
-    if (finalizedPreSale) {
-        await supabase
-            .from("sales")
-            .update({
-                delivery_fee: Number(finalizedPreSale.shipping_fee || 0),
-                distance_km: Number((finalizedPreSale as any).distance_km || 0),
-                delivery_breakdown: (finalizedPreSale as any).delivery_breakdown || null,
-            })
-            .eq("id", saleId)
-            .eq("partner_id", input.partnerId)
-    }
-
-    // Read back the RPC-saved values (source of truth - RPC has atomic locking)
-    const { data: savedSale } = await supabase
-        .from("sales")
-        .select("final_amount, paid_amount, payment_status")
-        .eq("id", saleId)
-        .eq("partner_id", input.partnerId)
-        .single()
-
-    const rpcFinalAmount = savedSale ? Number(savedSale.final_amount || 0) : paymentAware.totalAmount
-    const rpcPaidAmount = savedSale ? Number(savedSale.paid_amount || 0) : paidAmountForRpc
-    const rpcPaymentStatus = savedSale?.payment_status || "paid"
-
-    const sellerPartnerUserId = input.sellerId || null
-    const { data: sellerPartnerUser } = sellerPartnerUserId
-        ? await supabase
-            .from("partner_users")
-            .select("user_id")
-            .eq("id", sellerPartnerUserId)
+    // Customer name lookup if customer_id is provided
+    let customerName: string | undefined = undefined
+    if (preSaleDraft.customer_id) {
+        const { data: cust } = await supabase
+            .from("customers")
+            .select("name")
+            .eq("id", preSaleDraft.customer_id)
             .eq("partner_id", input.partnerId)
             .maybeSingle()
-        : { data: null as { user_id?: string | null } | null }
+        customerName = cust?.name?.trim() || undefined
+    }
+
+    const hasShipping = Number(preSaleDraft.shipping_fee || 0) > 0
+    let finalDeliveryStatus: 'delivered' | 'preparing' | 'pickup_available' = hasShipping ? 'preparing' : 'delivered'
+    if (input.isPendingDelivery) {
+        finalDeliveryStatus = hasShipping ? 'preparing' : 'pickup_available'
+    }
+
+    // Map draft items to ERPItemPayload
+    const draftItemsList = Array.isArray(preSaleDraft.items) ? preSaleDraft.items : []
+    const erpItems: import("./orders").ERPItemPayload[] = draftItemsList.map((item: any, index: number) => ({
+        productId: item.product_id || item.productId || undefined,
+        variantId: item.variant_id || item.variantId || undefined,
+        unitPrice: safeMoney(Number(item.unit_price ?? item.price ?? 0)),
+        quantity: Math.max(1, Math.floor(Number(item.quantity ?? item.qty ?? 1))),
+        sortOrder: index,
+    }))
+
+    const { createERPOrderAction } = await import("./orders")
+    const orderResult = await createERPOrderAction({
+        partnerId: input.partnerId,
+        storeId: input.storeId || undefined,
+        customerId: preSaleDraft.customer_id || undefined,
+        customerName: customerName || "Consumidor final",
+        salesChannel: "Presencial",
+        deliveryMethod: hasShipping ? "delivery" : "pickup",
+        deliveryStatus: finalDeliveryStatus,
+        paymentStatus: "paid",
+        paymentMethod: input.paymentMethod || "PDV",
+        paymentBreakdown: breakdownForOrder as any,
+        financeAccountId: input.financeAccountId || "",
+        items: erpItems,
+        subtotal: safeMoney(Number(preSaleDraft.subtotal || 0)),
+        discountValue: safeMoney(Number(preSaleDraft.discount_amount || 0)),
+        discountType: "fixed",
+        couponCode: preSaleDraft.coupon_code || undefined,
+        couponId: preSaleDraft.coupon_id || undefined,
+        couponDiscountAmount: safeMoney(Number(preSaleDraft.coupon_discount_amount || 0)),
+        shippingCost: safeMoney(Number(preSaleDraft.shipping_fee || 0)),
+        additionalCosts: safeMoney(Number(preSaleDraft.other_costs || 0)),
+        deliveryBreakdown: preSaleDraft.delivery_breakdown || null,
+        totalAmount: totalPaidAmount,
+        paidAmount: totalPaidAmount,
+        notes: preSaleDraft.notes || undefined,
+        skipCSRF: true,
+        sellerPartnerUserId: input.sellerId || null,
+    })
+
+    if (orderResult.error || !orderResult.orderId) {
+        return { success: false as const, error: orderResult.error || "Falha ao criar pedido no PDV." }
+    }
+
+    const orderId = orderResult.orderId
+    const orderNumber = orderResult.orderNumber || orderId
+
+    // Mark pre_sale as completed
+    await supabase
+        .from("pre_sales")
+        .update({
+            status: "completed",
+            order_id: orderId,
+            updated_at: new Date().toISOString(),
+        })
+        .eq("id", input.preSaleId)
+        .eq("partner_id", input.partnerId)
+
+    // Record cash register movement for cash payment entries
+    if (activeSessionResult.data?.id) {
+        for (const entry of breakdownForOrder) {
+            const m = String(entry.method || "").toLowerCase().trim()
+            if (m.includes("dinheiro") || m.includes("cash")) {
+                await supabase.from("cash_movements").insert({
+                    partner_id: input.partnerId,
+                    store_id: input.storeId || null,
+                    cash_session_id: activeSessionResult.data.id,
+                    type: "sale",
+                    description: `Venda PDV ${orderNumber}`,
+                    amount: entry.amount,
+                    user_id: user.id,
+                    order_id: orderId,
+                })
+            }
+        }
+    }
+
+    // Seller commission
+    const sellerPartnerUserId = input.sellerId || null
     if (sellerPartnerUserId) {
         await createCommissionExpenseForEntity({
             supabase,
             partnerId: input.partnerId,
             partnerUserId: sellerPartnerUserId,
             role: "seller",
-            saleAmount: rpcFinalAmount,
+            saleAmount: totalPaidAmount,
             entityType: "sale",
-            entityId: saleId,
+            entityId: orderId,
             accountId: input.financeAccountId || null,
             createdByUserId: user.id,
         })
     }
 
+    // Goals tracking
     {
-        const goalSellerUserId = (() => {
-            if (!sellerPartnerUserId) return user.id
-            const match = sellerPartnerUser?.user_id
-            return match ? String(match) : user.id
-        })()
-
+        const goalSellerUserId = user.id
         if (goalSellerUserId) {
             await applySaleToGoals({
                 supabase,
                 partnerId: input.partnerId,
                 sellerUserId: goalSellerUserId,
-                saleAmount: rpcFinalAmount,
+                saleAmount: totalPaidAmount,
                 createdByUserId: user.id,
                 accountId: input.financeAccountId || null,
             })
         }
     }
 
-    const syncedOrderId = await syncPosSaleToOrders({
-        partnerId: input.partnerId,
-        storeId: input.storeId || null,
-        saleId,
-        preSaleId: input.preSaleId,
-        financeAccountId: input.financeAccountId || null,
-        defaultPaymentMethod: input.paymentMethod || "PDV",
-        actorUserId: user.id,
-        sellerPartnerUserId: sellerPartnerUserId || null,
-        isPendingDelivery: input.isPendingDelivery,
-        paymentProvider: input.paymentProvider,
-        mpPaymentId: input.mpPaymentId,
-        paymentBreakdown: breakdownForRpc.length > 0 ? breakdownForRpc : null,
-    })
+    // Record coupon usage if coupon was applied
+    if (preSaleDraft.coupon_id && orderId) {
+        await supabase.from("coupon_usages").upsert(
+            {
+                coupon_id: preSaleDraft.coupon_id,
+                customer_id: preSaleDraft.customer_id || null,
+                order_id: orderId,
+            },
+            { onConflict: "coupon_id,order_id", ignoreDuplicates: true }
+        )
+    }
 
-    // Invalidate caches (non-blocking - sale is already safely committed)
-    const draftItems = await supabase
-        .from("sale_items")
-        .select("product_id")
-        .eq("sale_id", saleId)
-        .eq("partner_id", input.partnerId)
-
+    // Invalidate product & order caches
     const productIds = new Set<string>(
-        ((draftItems.data || []) as Array<{ product_id: string | null }>)
-            .map((item) => item.product_id)
-            .filter(Boolean) as string[]
+        erpItems.map((item) => item.productId).filter(Boolean) as string[]
     )
     for (const productId of productIds) {
         await invalidateProductCache(productId, input.partnerId, "update", { silent: true })
@@ -1162,40 +1173,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
     await revalidateTransactions(input.partnerId)
     await revalidateStockMovements(input.partnerId)
 
-    await logAuditEvent({
-        partnerId: input.partnerId,
-        actorUserId: user.id,
-        entityType: "sale",
-        entityId: saleId,
-        actionType: "created",
-        changeLines: [`finalizou venda PDV no valor de R$ ${paidAmount.toFixed(2)}.`],
-        source: "manual",
-    })
-
-    // ── Record coupon usage if coupon was applied ─────────────────────────
-    if (finalizedPreSale?.coupon_id && syncedOrderId) {
-        const adminForCoupon = createAdminClient()
-        await adminForCoupon.from("coupon_usages").upsert(
-            {
-                coupon_id: finalizedPreSale.coupon_id,
-                customer_id: finalizedPreSale.customer_id || null,
-                order_id: syncedOrderId,
-            },
-            { onConflict: "coupon_id,order_id", ignoreDuplicates: true }
-        )
-    }
-
-    // Fetch the human-readable sale_number (DDT-XXXXXX) to display on the frontend
-    const { data: saleRecord } = await supabase
-        .from("sales")
-        .select("sale_number")
-        .eq("id", saleId)
-        .eq("partner_id", input.partnerId)
-        .maybeSingle()
-
-    const saleNumber = saleRecord?.sale_number || null
-
-    return { success: true as const, data: { saleId, saleNumber, orderId: syncedOrderId || saleId } }
+    return { success: true as const, data: { saleId: orderId, saleNumber: orderNumber, orderId } }
 }
 
 export async function createPOSQuickProductAction(input: {
@@ -1389,7 +1367,7 @@ export async function getPOSCustomerDetailsAction(input: {
     const [{ data: customer, error: customerError }, { data: address }] = await Promise.all([
         supabase
             .from("customers")
-            .select("id, name, email, phone, cpf, image_url")
+            .select("id, name, email, phone, cpf, image_url, store_credit")
             .eq("partner_id", input.partnerId)
             .eq("id", input.customerId)
             .single(),
@@ -1425,6 +1403,7 @@ export async function getPOSCustomerDetailsAction(input: {
             phone: customer.phone || null,
             cpf: plainCpf,
             image_url: customer.image_url || null,
+            store_credit: Math.max(0, Number((customer as any).store_credit || 0)),
             address: address ? {
                 zipCode: address.zip_code || "",
                 street: address.street || "",

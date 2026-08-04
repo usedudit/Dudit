@@ -7,6 +7,8 @@ import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import type { PartnerRole } from "@/lib/permissions/types"
 import { can } from "@/lib/permissions/can"
 import type { RoleId } from "@/lib/permissions/rbac-types"
+import { unstable_cache } from "next/cache"
+import { TAGS } from "@/lib/utils/revalidation-tags"
 
 // ─── Stats Types ────────────────────────────────────────────────────────────
 
@@ -36,68 +38,80 @@ export interface TeamMember {
 
 const ROLE_ORDER: Record<string, number> = { OWNER: 0, ADMIN: 1, MANAGER: 2, OPERATOR: 3, DELIVERY: 4 }
 
-async function fetchPartnerTeamMembers(partnerId: string): Promise<{ members: TeamMember[]; error?: string }> {
-    const admin = getAdminClient()
+// Cached version of fetchPartnerTeamMembers - revalidates on team changes
+const fetchPartnerTeamMembersCached = unstable_cache(
+    async (partnerId: string): Promise<{ members: TeamMember[]; error?: string }> => {
+        const admin = getAdminClient()
 
-    const { data: partner } = await admin
-        .from("partners")
-        .select("user_id")
-        .eq("id", partnerId)
-        .single()
-    const ownerUserId = partner?.user_id
-
-    let { data: partnerUsers, error } = await admin
-        .from("partner_users")
-        .select("id, user_id, role_id, created_at")
-        .eq("partner_id", partnerId)
-        .order("created_at", { ascending: true })
-    if (error) return { members: [], error: error.message }
-
-    if (ownerUserId && !partnerUsers?.some((pu: any) => pu.user_id === ownerUserId)) {
-        const { data: newPu } = await admin
-            .from("partner_users")
-            .insert({ partner_id: partnerId, user_id: ownerUserId, role_id: "owner" })
-            .select("id, user_id, role_id, created_at")
+        const { data: partner } = await admin
+            .from("partners")
+            .select("user_id")
+            .eq("id", partnerId)
             .single()
-        if (newPu) partnerUsers = partnerUsers ? [newPu, ...partnerUsers] : [newPu]
+        const ownerUserId = partner?.user_id
+
+        let { data: partnerUsers, error } = await admin
+            .from("partner_users")
+            .select("id, user_id, role_id, created_at")
+            .eq("partner_id", partnerId)
+            .order("created_at", { ascending: true })
+        if (error) return { members: [], error: error.message }
+
+        if (ownerUserId && !partnerUsers?.some((pu: any) => pu.user_id === ownerUserId)) {
+            const { data: newPu } = await admin
+                .from("partner_users")
+                .insert({ partner_id: partnerId, user_id: ownerUserId, role_id: "owner" })
+                .select("id, user_id, role_id, created_at")
+                .single()
+            if (newPu) partnerUsers = partnerUsers ? [newPu, ...partnerUsers] : [newPu]
+        }
+
+        if (!partnerUsers || partnerUsers.length === 0) return { members: [] }
+
+        const userIds = partnerUsers.map((pu: any) => pu.user_id)
+        const [profilesRes, authUsers] = await Promise.all([
+            admin.from("user_profiles").select("user_id, full_name").in("user_id", userIds),
+            Promise.all(userIds.map(async (uid: string) => {
+                const { data } = await admin.auth.admin.getUserById(uid)
+                return data?.user ? { id: data.user.id, email: data.user.email } : null
+            })),
+        ])
+
+        let emailMap: Record<string, string> = {}
+        for (const u of authUsers) if (u) emailMap[u.id] = u.email || ""
+
+        const profileMap: Record<string, { full_name: string | null }> = {}
+        if (profilesRes.data) for (const p of profilesRes.data) profileMap[p.user_id] = { full_name: p.full_name }
+
+        const members: TeamMember[] = partnerUsers
+            .map((pu: any) => ({
+                id: pu.id,
+                userId: pu.user_id,
+                email: emailMap[pu.user_id] || "",
+                fullName: profileMap[pu.user_id]?.full_name || null,
+                avatarUrl: null,
+                role: String(pu.role_id || "delivery").toUpperCase() as PartnerRole,
+                permissions: null,
+                createdAt: pu.created_at,
+                isOwner: pu.user_id === ownerUserId,
+            }) as TeamMember)
+            .sort((a: TeamMember, b: TeamMember) => {
+                if (a.isOwner && !b.isOwner) return -1
+                if (!a.isOwner && b.isOwner) return 1
+                return (ROLE_ORDER[a.role] ?? 4) - (ROLE_ORDER[b.role] ?? 4)
+            })
+
+        return { members }
+    },
+    ["team-members"],
+    {
+        tags: ["team-members"],
+        revalidate: 300, // 5 minutes
     }
+)
 
-    if (!partnerUsers || partnerUsers.length === 0) return { members: [] }
-
-    const userIds = partnerUsers.map((pu: any) => pu.user_id)
-    const [profilesRes, authUsers] = await Promise.all([
-        admin.from("user_profiles").select("user_id, full_name").in("user_id", userIds),
-        Promise.all(userIds.map(async (uid: string) => {
-            const { data } = await admin.auth.admin.getUserById(uid)
-            return data?.user ? { id: data.user.id, email: data.user.email } : null
-        })),
-    ])
-
-    let emailMap: Record<string, string> = {}
-    for (const u of authUsers) if (u) emailMap[u.id] = u.email || ""
-
-    const profileMap: Record<string, { full_name: string | null }> = {}
-    if (profilesRes.data) for (const p of profilesRes.data) profileMap[p.user_id] = { full_name: p.full_name }
-
-    const members: TeamMember[] = partnerUsers
-        .map((pu: any) => ({
-            id: pu.id,
-            userId: pu.user_id,
-            email: emailMap[pu.user_id] || "",
-            fullName: profileMap[pu.user_id]?.full_name || null,
-            avatarUrl: null,
-            role: String(pu.role_id || "delivery").toUpperCase() as PartnerRole,
-            permissions: null,
-            createdAt: pu.created_at,
-            isOwner: pu.user_id === ownerUserId,
-        }) as TeamMember)
-        .sort((a: TeamMember, b: TeamMember) => {
-            if (a.isOwner && !b.isOwner) return -1
-            if (!a.isOwner && b.isOwner) return 1
-            return (ROLE_ORDER[a.role] ?? 4) - (ROLE_ORDER[b.role] ?? 4)
-        })
-
-    return { members }
+async function fetchPartnerTeamMembers(partnerId: string): Promise<{ members: TeamMember[]; error?: string }> {
+    return fetchPartnerTeamMembersCached(partnerId)
 }
 
 // ─── Server Actions ─────────────────────────────────────────────────────────
@@ -323,8 +337,9 @@ export async function updateTeamMemberRole(
         revalidatePath("/erp", "layout")
 
         // Invalidate the affected user's access cache so role change reflects immediately
-        const { revalidateUserAccess } = await import("@/lib/utils/revalidation")
+        const { revalidateUserAccess, revalidateTeamMembers } = await import("@/lib/utils/revalidation")
         revalidateUserAccess(memberUserId)
+        revalidateTeamMembers(partnerId)
 
         return { success: true }
     } catch (error: any) {
@@ -396,8 +411,9 @@ export async function removeTeamMember(memberUserId: string): Promise<{ success:
 
         // Invalidate the removed user's access cache so the ERP disappears from their selector
         // and they can no longer access this ERP
-        const { revalidateUserAccess } = await import("@/lib/utils/revalidation")
+        const { revalidateUserAccess, revalidateTeamMembers } = await import("@/lib/utils/revalidation")
         revalidateUserAccess(memberUserId)
+        revalidateTeamMembers(partnerId)
 
         return { success: true }
     } catch (error: any) {

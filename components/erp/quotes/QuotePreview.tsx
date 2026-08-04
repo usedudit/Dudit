@@ -104,11 +104,11 @@ const QuotePreview = ({
         const TOTALS_SECTION_HEIGHT = 150;
         const NOTE_HEIGHT = note ? 80 : 0;
 
-        const P1_FIXED_CONTENT_HEIGHT = 420;
-        const P1_TOTAL_AVAILABLE_HEIGHT = 1050;
+        const P1_FIXED_CONTENT_HEIGHT = 449;
+        const P1_TOTAL_AVAILABLE_HEIGHT = 1123;
         const P1_AVAILABLE_FOR_ROWS_AND_TOTALS = P1_TOTAL_AVAILABLE_HEIGHT - P1_FIXED_CONTENT_HEIGHT;
 
-        const PN_FIXED_CONTENT_HEIGHT = 230;
+        const PN_FIXED_CONTENT_HEIGHT = 246;
         const PN_AVAILABLE_FOR_ROWS_AND_TOTALS = P1_TOTAL_AVAILABLE_HEIGHT - PN_FIXED_CONTENT_HEIGHT;
 
         const chunks: { items: any[]; hasTotals: boolean; type: string }[] = [];
@@ -158,7 +158,7 @@ const QuotePreview = ({
                     {pages.map((page, pageIndex) => (
                         <div
                             key={pageIndex}
-                            className={`w-[650px] min-w-[650px] shrink-0 bg-white text-[#113833] overflow-hidden relative font-sans min-h-[1050px] flex flex-col ${printMode ? "pdf-print-page" : "shadow-md rounded-sm"}`}
+                            className={`w-[210mm] min-w-[210mm] shrink-0 bg-white text-[#113833] overflow-hidden relative font-sans min-h-[297mm] flex flex-col ${printMode ? "pdf-print-page" : "shadow-md rounded-sm"}`}
                         >
                             {/* ✅ HEADER - relative z-10 agora está DENTRO desta div */}
                             <div

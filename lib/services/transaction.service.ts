@@ -241,6 +241,7 @@ export async function syncReceivableForOrder(
     orderData: {
         order_number: string
         partner_id: string
+        store_id?: string | null
         total_amount: number
         paid_amount: number
         situation: string
@@ -294,6 +295,7 @@ export async function syncReceivableForOrder(
                         due_date: dueDate,
                         customer_id: orderData.customer_id || null,
                         account_id: accountId,
+                        store_id: orderData.store_id || null,
                         payment_type: paymentType,
                     })
                     .eq("id", existingTx.id)
@@ -301,6 +303,7 @@ export async function syncReceivableForOrder(
         } else {
             const transactionData = {
                 partner_id: orderData.partner_id,
+                store_id: orderData.store_id || null,
                 description: orderData.order_number,
                 category: "Vendas",
                 contact_id: null,

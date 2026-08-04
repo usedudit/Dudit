@@ -61,6 +61,8 @@ import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 import { FadeIn } from "@/components/animations/FadeIn"
 
 import { useErpExport } from "@/hooks/use-erp-export"
+import { usePermissions } from "@/lib/permission-context"
+import ExportColumnSelectionModal from "@/components/erp/export/ExportColumnSelectionModal"
 
 // --- TYPES & INTERFACES ---
 
@@ -165,7 +167,8 @@ export default function OrdersPage({
 }) {
     const { toast } = useToast()
     const router = useRouter()
-    const { exportData, isExporting } = useErpExport()
+    const { planSlug } = usePermissions()
+    const { exportData, isExporting, columnSelectionModal, closeColumnSelectionModal, handleColumnConfirm } = useErpExport(planSlug)
     const { selectedStore, isLoading: storeLoading } = useStore()
     const isTabletOrMobile = useMediaQuery("(max-width: 1023px)")
     const { profile: userProfile } = useUserProfile()
@@ -1324,6 +1327,13 @@ export default function OrdersPage({
                     orderId={printOrderId}
                 />
             )}
+
+            <ExportColumnSelectionModal
+                isOpen={columnSelectionModal.isOpen}
+                canExportAllColumns={columnSelectionModal.canExportAllColumns}
+                onConfirm={handleColumnConfirm}
+                onClose={closeColumnSelectionModal}
+            />
         </>
     )
 }

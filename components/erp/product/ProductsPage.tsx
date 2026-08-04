@@ -19,6 +19,7 @@ import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { getNextPlanTarget, isPlanLimitReachedError } from "@/lib/subscription/limit-upgrade"
 import { useErpExport } from "@/hooks/use-erp-export"
 import ExportSelectionModal from "@/components/erp/export/ExportSelectionModal"
+import ExportColumnSelectionModal from "@/components/erp/export/ExportColumnSelectionModal"
 
 // Actions
 import {
@@ -34,6 +35,7 @@ import {
     batchUpdateProductsAction,
     searchProductByBarcodeAction,
 } from "@/app/actions/erp/products"
+import { createBatchStockMovementAction } from "@/app/actions/erp/stock-movements"
 
 // Components
 import { Button, Checkbox, IconPlaceholder, SelectionBanner, ThreeDotsLoader } from "@/components/reusable"
@@ -305,7 +307,7 @@ export default function ProductsPage({
     })
     const [modals, setModals] = useState({ filter: false, import: false })
     const [showReplenishment, setShowReplenishment] = useState(false)
-    const { exportData, isExporting, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport()
+    const { exportData, isExporting, columnSelectionModal, closeColumnSelectionModal, handleColumnConfirm, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport(planSlug)
     const [bulkEditModal, setBulkEditModal] = useState({ isOpen: false })
     const [isCameraOpen, setIsCameraOpen] = useState(false)
 
@@ -611,6 +613,7 @@ export default function ProductsPage({
             setActionModal({ open: false, text: "" })
             if (result.success) {
                 afterMutation(deleteId, true)
+                cache.removeItemFromListCache(deleteId)
                 setProducts((p) => p.filter((prod) => prod.id !== deleteId))
                 notifySuccess("Excluído")
             } else {
@@ -671,6 +674,7 @@ export default function ProductsPage({
                 notifyError(isPermission ? "Sem permissão" : "Erro", result.error)
             } else {
                 afterMutation()
+                ids.forEach(id => cache.removeItemFromListCache(id))
                 const idSet = new Set(ids)
                 setProducts((p) => p.filter((prod) => !idSet.has(prod.id)))
                 notifySuccess("Excluído")
@@ -765,6 +769,51 @@ export default function ProductsPage({
             if (updates.length > 0) {
                 const result = await batchUpdateProductsAction(updates)
                 if (result.success) {
+                    // Create stock movements for stock adjustments
+                    if (payload.type === 'stock' && payload.stockReason) {
+                        const stockMovementItems = updates.map(u => {
+                            const product = productsMap.get(u.id)
+                            if (!product) return null
+                            const currentStock = product.stock_quantity || (product as any).stock || 0
+                            const newStock = u.stock_quantity
+                            const diff = newStock - currentStock
+                            if (diff === 0) return null
+
+                            return {
+                                productId: product.id,
+                                variantId: null,
+                                quantity: Math.abs(diff),
+                            }
+                        }).filter(Boolean) as { productId: string; variantId: string | null; quantity: number }[]
+
+                        if (stockMovementItems.length > 0) {
+                            // Determine movement type based on stock mode
+                            let movementType: 'in' | 'out' = 'in'
+                            if (payload.stockMode === 'add') {
+                                movementType = 'in'
+                            } else if (payload.stockMode === 'sub' || payload.stockMode === 'zero') {
+                                movementType = 'out'
+                            } else if (payload.stockMode === 'fixed') {
+                                // For fixed mode, check if we're mostly increasing or decreasing
+                                const totalDiff = updates.reduce((sum, u) => {
+                                    const p = productsMap.get(u.id)
+                                    return sum + (u.stock_quantity - (p?.stock_quantity || (p as any)?.stock || 0))
+                                }, 0)
+                                movementType = totalDiff >= 0 ? 'in' : 'out'
+                            }
+
+                            const movementResult = await createBatchStockMovementAction({
+                                type: movementType,
+                                reason: payload.stockReason,
+                                notes: `Ajuste em massa: ${payload.stockMode === 'add' ? 'Adição' : payload.stockMode === 'sub' ? 'Redução' : payload.stockMode === 'fixed' ? 'Definição' : 'Zeramento'} de ${payload.stockValue || 0}`,
+                                items: stockMovementItems,
+                            })
+                            if (!movementResult?.success) {
+                                console.warn("Stock movement creation failed:", movementResult?.error)
+                            }
+                        }
+                    }
+
                     afterMutation()
                     const updatesMap = new Map(updates.map(u => [u.id, u]))
                     setProducts(p => p.map(prod => updatesMap.has(prod.id) ? { ...prod, ...updatesMap.get(prod.id) } : prod))
@@ -1256,6 +1305,13 @@ export default function ProductsPage({
                     allProducts={products}
                 />
             )}
+
+            <ExportColumnSelectionModal
+                isOpen={columnSelectionModal.isOpen}
+                canExportAllColumns={columnSelectionModal.canExportAllColumns}
+                onConfirm={handleColumnConfirm}
+                onClose={closeColumnSelectionModal}
+            />
 
             <ExportSelectionModal
                 isOpen={selectionModal.isOpen}

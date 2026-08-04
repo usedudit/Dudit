@@ -3,21 +3,18 @@
 import { useMemo, useState, useRef, useEffect, useCallback } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { motion, AnimatePresence } from "framer-motion"
+import { AnimatePresence } from "framer-motion"
 import {
-    Badge,
     Button,
     DefaultModal,
     Input,
     MoneyInput,
     IconPlaceholder,
-    SkeletonLoader,
     FormSection,
     ThreeDotsLoader,
 } from "@/components/reusable"
 import FilterSheet, { type FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
-import { Separator } from "@/components/reusable/Separator"
 import { ArrowUpDownIcon, CreditCardIcon, MoneyIcon, QRCodeIcon, ExportFileIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import {
@@ -42,8 +39,9 @@ import { useNotification } from "@/hooks/use-notification"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useInfiniteList } from "@/hooks/use-infinite-list"
 import { useErpExport } from "@/hooks/use-erp-export"
+import { usePermissions } from "@/lib/permission-context"
+import ExportColumnSelectionModal from "@/components/erp/export/ExportColumnSelectionModal"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
-
 import CashRegisterPageControls from "./CashRegisterPageControls"
 import CashSessionGridCard from "./CashSessionGridCard"
 import CashSessionListItem from "./CashSessionListRow"
@@ -126,7 +124,8 @@ export default function CashRegisterPage({
     initialViewId?: string | null
 }) {
     const { success: notifySuccess, error: notifyError } = useNotification()
-    const { exportData, isExporting } = useErpExport()
+    const { planSlug } = usePermissions()
+    const { exportData, isExporting, columnSelectionModal, closeColumnSelectionModal, handleColumnConfirm } = useErpExport(planSlug)
     const isMobile = useMediaQuery("(max-width: 768px)")
     const isTablet = useMediaQuery("(max-width: 1024px)")
     const router = useRouter()
@@ -514,25 +513,26 @@ export default function CashRegisterPage({
     }, [closeSummary, groupedRows, countedByPm])
 
     return (
-        <AnimatePresence mode="wait">
-            {selectedSessionId ? (
-                <CashSessionDetailPage
-                    key="detail"
-                    partnerId={partnerId}
-                    details={detailedSession}
-                    isLoading={isDetailLoading}
-                    onBack={() => {
-                        setSelectedSessionId(null)
-                        setDetailedSession(null)
-                        router.replace(pathname, { scroll: false })
-                    }}
-                />
-            ) : (
-                <FadeIn
-                    key="list"
-                    className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
-                >
-                    <style>{`
+        <>
+            <AnimatePresence mode="wait">
+                {selectedSessionId ? (
+                    <CashSessionDetailPage
+                        key="detail"
+                        partnerId={partnerId}
+                        details={detailedSession}
+                        isLoading={isDetailLoading}
+                        onBack={() => {
+                            setSelectedSessionId(null)
+                            setDetailedSession(null)
+                            router.replace(pathname, { scroll: false })
+                        }}
+                    />
+                ) : (
+                    <FadeIn
+                        key="list"
+                        className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
+                    >
+                        <style>{`
                         .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; }
                         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
                         .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; border: 2px solid #fff; }
@@ -541,310 +541,317 @@ export default function CashRegisterPage({
                         .hide-scrollbar::-webkit-scrollbar { display: none; }
                         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
                     `}</style>
-                    <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
-                        <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
-                            <div className="flex flex-col gap-2 pt-1">
-                                <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
-                                    Controle de Caixa
-                                </h1>
-                                <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
-                                    Abertura, fechamento e auditoria de sessões do PDV.
-                                </p>
+                        <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
+                            <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
+                                <div className="flex flex-col gap-2 pt-1">
+                                    <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
+                                        Controle de Caixa
+                                    </h1>
+                                    <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
+                                        Abertura, fechamento e auditoria de sessões do PDV.
+                                    </p>
+                                </div>
+
+                                <div className="flex items-center gap-3">
+                                    <Button variant="outline" onClick={handleExport} disabled={isExporting} leftIcon={<ExportFileIcon size={18} />}>
+                                        {isExporting ? "Exportando..." : "Exportar"}
+                                    </Button>
+                                    {!activeSession?.id ? (
+                                        <Button onClick={() => setOpenModal(true)}>Abrir Caixa</Button>
+                                    ) : (
+                                        <Button onClick={openCloseModal} isLoading={isPreparingClose}>
+                                            Fechar Caixa Atual
+                                        </Button>
+                                    )}
+                                </div>
                             </div>
 
-                            <div className="flex items-center gap-3">
-                                <Button variant="outline" onClick={handleExport} disabled={isExporting} leftIcon={<ExportFileIcon size={18} />}>
-                                    {isExporting ? "Exportando..." : "Exportar"}
-                                </Button>
+                            <div className="md:hidden px-4 mb-4">
                                 {!activeSession?.id ? (
-                                    <Button onClick={() => setOpenModal(true)}>Abrir Caixa</Button>
+                                    <Button onClick={() => setOpenModal(true)} className="w-full">
+                                        Abrir Caixa
+                                    </Button>
                                 ) : (
-                                    <Button onClick={openCloseModal} isLoading={isPreparingClose}>
+                                    <Button onClick={openCloseModal} isLoading={isPreparingClose} className="w-full">
                                         Fechar Caixa Atual
                                     </Button>
                                 )}
                             </div>
-                        </div>
 
-                        <div className="md:hidden px-4 mb-4">
-                            {!activeSession?.id ? (
-                                <Button onClick={() => setOpenModal(true)} className="w-full">
-                                    Abrir Caixa
-                                </Button>
-                            ) : (
-                                <Button onClick={openCloseModal} isLoading={isPreparingClose} className="w-full">
-                                    Fechar Caixa Atual
-                                </Button>
+                            <CashRegisterPageControls
+                                search={search}
+                                onSearchChange={setSearch}
+                                onOpenFilter={() => setModals((prev) => ({ ...prev, filter: true }))}
+                                onOpenSession={() => setOpenModal(true)}
+                                filters={filters}
+                                setFilters={setFilters}
+                                viewMode={effectiveViewMode}
+                                onViewModeChange={setViewModeState}
+                                hasActiveFilters={hasActiveFilters}
+                            />
+
+                            <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
+                                <AnimatePresence mode="wait">
+                                    {paginated.length === 0 ? (
+                                        <FadeIn
+                                            key="empty"
+                                            className="flex flex-col items-center justify-center h-[600px] text-center p-8 w-full"
+                                        >
+                                            <IconPlaceholder
+                                                placeholderType="image"
+                                                imageSrc={isFiltered ? "https://img.dudit.com.br/static/mascots/NaoEncontrado.png" : "https://img.dudit.com.br/static/mascots/PDV.png"}
+                                                imageAlt="Sem sessões"
+                                                title={isFiltered ? "Nenhuma sessão encontrada" : "Caixa nunca utilizado"}
+                                                subtitle={isFiltered ? "Tente ajustar seus filtros ou termos de busca." : "Abra seu primeiro caixa para começar a vender no PDV."}
+                                                itemButton={!isFiltered ? {
+                                                    text: "Abrir Caixa",
+                                                    action: () => setOpenModal(true),
+                                                } : {
+                                                    text: "Limpar filtros",
+                                                    action: handleClearFilters,
+                                                    variant: "outline",
+                                                }}
+                                            />
+                                        </FadeIn>
+                                    ) : (
+                                        <FadeIn
+                                            key={effectiveViewMode}
+                                            className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
+                                        >
+                                            {effectiveViewMode === "grid" ? (
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                                                    {paginated.map((session) => (
+                                                        <CashSessionGridCard
+                                                            key={session.id}
+                                                            session={session}
+                                                            onDetails={handleViewDetails}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <div className="w-full overflow-hidden rounded-xl relative">
+                                                    <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
+                                                    <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
+
+                                                    <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
+                                                        <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
+                                                            <thead>
+                                                                <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                                    {columns.map((col, idx) => {
+                                                                        const isSorted = sortConfig?.key === col.id
+                                                                        const isLast = idx === columns.length - 1
+                                                                        const isFirst = idx === 0
+
+                                                                        return (
+                                                                            <th
+                                                                                key={col.id}
+                                                                                className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors ${isFirst ? "rounded-l-lg pl-6" : ""} ${isLast ? "rounded-r-lg" : ""}`}
+                                                                                style={{ width: col.width }}
+                                                                                onClick={() => {
+                                                                                    setSortConfig((prev) => ({
+                                                                                        key: col.id,
+                                                                                        direction: prev?.key === col.id && prev.direction === "asc" ? "desc" : "asc",
+                                                                                    }))
+                                                                                }}
+                                                                            >
+                                                                                <div className={`relative flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
+                                                                                    <span>{col.label}</span>
+                                                                                    <div className="ml-1.5 w-4 shrink-0 flex items-center justify-center">
+                                                                                        <ArrowUpDownIcon
+                                                                                            size={14}
+                                                                                            className={`transition-all duration-200 ${isSorted ? "text-brand-dark dark:text-dark-heading opacity-100" : "text-brand-inactive-text opacity-0 group-hover:opacity-40"} ${isSorted && sortConfig?.direction === "desc" ? "rotate-180" : ""}`}
+                                                                                        />
+                                                                                    </div>
+                                                                                </div>
+                                                                            </th>
+                                                                        )
+                                                                    })}
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {paginated.map((session) => (
+                                                                    <CashSessionListItem
+                                                                        key={session.id}
+                                                                        session={session}
+                                                                        columns={columns}
+                                                                        selected={false}
+                                                                        onSelect={() => { }}
+                                                                        onDetails={handleViewDetails}
+                                                                        showCheckbox={false}
+                                                                    />
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </FadeIn>
+                                    )}
+                                </AnimatePresence>
+                                {hasNextPage ? <div ref={observerTarget} className="h-12 w-full shrink-0" aria-hidden /> : null}
+                            </div>
+
+                            {filtered.length > 0 && (
+                                <Pagination
+                                    currentPage={page}
+                                    totalPages={totalPages}
+                                    onPageChange={(p) => {
+                                        setPage(p)
+                                        if (p === totalPages && hasNextPage && !isFetchingNextPage) {
+                                            void fetchNextPage()
+                                        }
+                                    }}
+                                />
                             )}
+                            {hasNextPage && page === totalPages && isFetchingNextPage ? (
+                                <div className="flex flex-col gap-2 py-2 px-4">
+                                    <div className="h-10 w-full max-w-lg mx-auto rounded-lg bg-gray-100 dark:bg-dark-border/30 animate-pulse" />
+                                    <div className="h-10 w-full max-w-lg mx-auto rounded-lg bg-gray-100 dark:bg-dark-border/30 animate-pulse opacity-70" />
+                                </div>
+                            ) : null}
                         </div>
 
-                        <CashRegisterPageControls
-                            search={search}
-                            onSearchChange={setSearch}
-                            onOpenFilter={() => setModals((prev) => ({ ...prev, filter: true }))}
-                            onOpenSession={() => setOpenModal(true)}
+                        <FilterSheet
+                            isOpen={modals.filter}
+                            onClose={() => setModals((prev) => ({ ...prev, filter: false }))}
+                            sections={filterSections}
                             filters={filters}
                             setFilters={setFilters}
-                            viewMode={effectiveViewMode}
-                            onViewModeChange={setViewModeState}
-                            hasActiveFilters={hasActiveFilters}
+                            onClear={handleClearFilters}
                         />
 
-                        <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
-                            <AnimatePresence mode="wait">
-                                {paginated.length === 0 ? (
-                                    <FadeIn
-                                        key="empty"
-                                        className="flex flex-col items-center justify-center h-[600px] text-center p-8 w-full"
-                                    >
-                                        <IconPlaceholder
-                                            placeholderType="image"
-                                            imageSrc={isFiltered ? "https://img.dudit.com.br/static/mascots/NaoEncontrado.png" : "https://img.dudit.com.br/static/mascots/PDV.png"}
-                                            imageAlt="Sem sessões"
-                                            title={isFiltered ? "Nenhuma sessão encontrada" : "Caixa nunca utilizado"}
-                                            subtitle={isFiltered ? "Tente ajustar seus filtros ou termos de busca." : "Abra seu primeiro caixa para começar a vender no PDV."}
-                                            itemButton={!isFiltered ? {
-                                                text: "Abrir Caixa",
-                                                action: () => setOpenModal(true),
-                                            } : {
-                                                text: "Limpar filtros",
-                                                action: handleClearFilters,
-                                                variant: "outline",
-                                            }}
-                                        />
-                                    </FadeIn>
-                                ) : (
-                                    <FadeIn
-                                        key={effectiveViewMode}
-                                        className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
-                                    >
-                                        {effectiveViewMode === "grid" ? (
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
-                                                {paginated.map((session) => (
-                                                    <CashSessionGridCard
-                                                        key={session.id}
-                                                        session={session}
-                                                        onDetails={handleViewDetails}
-                                                    />
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <div className="w-full overflow-hidden rounded-xl relative">
-                                                <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
-                                                <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
-
-                                                <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
-                                                    <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
-                                                        <thead>
-                                                            <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                                {columns.map((col, idx) => {
-                                                                    const isSorted = sortConfig?.key === col.id
-                                                                    const isLast = idx === columns.length - 1
-                                                                    const isFirst = idx === 0
-
-                                                                    return (
-                                                                        <th
-                                                                            key={col.id}
-                                                                            className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors ${isFirst ? "rounded-l-lg pl-6" : ""} ${isLast ? "rounded-r-lg" : ""}`}
-                                                                            style={{ width: col.width }}
-                                                                            onClick={() => {
-                                                                                setSortConfig((prev) => ({
-                                                                                    key: col.id,
-                                                                                    direction: prev?.key === col.id && prev.direction === "asc" ? "desc" : "asc",
-                                                                                }))
-                                                                            }}
-                                                                        >
-                                                                            <div className={`relative flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
-                                                                                <span>{col.label}</span>
-                                                                                <div className="ml-1.5 w-4 shrink-0 flex items-center justify-center">
-                                                                                    <ArrowUpDownIcon
-                                                                                        size={14}
-                                                                                        className={`transition-all duration-200 ${isSorted ? "text-brand-dark dark:text-dark-heading opacity-100" : "text-brand-inactive-text opacity-0 group-hover:opacity-40"} ${isSorted && sortConfig?.direction === "desc" ? "rotate-180" : ""}`}
-                                                                                    />
-                                                                                </div>
-                                                                            </div>
-                                                                        </th>
-                                                                    )
-                                                                })}
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            {paginated.map((session) => (
-                                                                <CashSessionListItem
-                                                                    key={session.id}
-                                                                    session={session}
-                                                                    columns={columns}
-                                                                    selected={false}
-                                                                    onSelect={() => { }}
-                                                                    onDetails={handleViewDetails}
-                                                                    showCheckbox={false}
-                                                                />
-                                                            ))}
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </FadeIn>
-                                )}
-                            </AnimatePresence>
-                            {hasNextPage ? <div ref={observerTarget} className="h-12 w-full shrink-0" aria-hidden /> : null}
-                        </div>
-
-                        {filtered.length > 0 && (
-                            <Pagination
-                                currentPage={page}
-                                totalPages={totalPages}
-                                onPageChange={(p) => {
-                                    setPage(p)
-                                    if (p === totalPages && hasNextPage && !isFetchingNextPage) {
-                                        void fetchNextPage()
-                                    }
-                                }}
-                            />
-                        )}
-                        {hasNextPage && page === totalPages && isFetchingNextPage ? (
-                            <div className="flex flex-col gap-2 py-2 px-4">
-                                <div className="h-10 w-full max-w-lg mx-auto rounded-lg bg-gray-100 dark:bg-dark-border/30 animate-pulse" />
-                                <div className="h-10 w-full max-w-lg mx-auto rounded-lg bg-gray-100 dark:bg-dark-border/30 animate-pulse opacity-70" />
+                        <DefaultModal isOpen={openModal} onClose={closeOpenModal} title="Abrir caixa">
+                            <div className="space-y-3">
+                                <MoneyInput label="Troco inicial" value={openingBalance} onChange={setOpeningBalance} />
+                                <Input label="Observações" value={openingNotes} onChange={(e: any) => setOpeningNotes(e.target.value)} />
+                                <div className="flex justify-end gap-2">
+                                    <Button variant="outline" onClick={closeOpenModal}>Cancelar</Button>
+                                    <Button onClick={handleOpenSession} isLoading={isOpeningSession}>Confirmar abertura</Button>
+                                </div>
                             </div>
-                        ) : null}
-                    </div>
+                        </DefaultModal>
 
-                    <FilterSheet
-                        isOpen={modals.filter}
-                        onClose={() => setModals((prev) => ({ ...prev, filter: false }))}
-                        sections={filterSections}
-                        filters={filters}
-                        setFilters={setFilters}
-                        onClear={handleClearFilters}
-                    />
-
-                    <DefaultModal isOpen={openModal} onClose={closeOpenModal} title="Abrir caixa">
-                        <div className="space-y-3">
-                            <MoneyInput label="Troco inicial" value={openingBalance} onChange={setOpeningBalance} />
-                            <Input label="Observações" value={openingNotes} onChange={(e: any) => setOpeningNotes(e.target.value)} />
-                            <div className="flex justify-end gap-2">
-                                <Button variant="outline" onClick={closeOpenModal}>Cancelar</Button>
-                                <Button onClick={handleOpenSession} isLoading={isOpeningSession}>Confirmar abertura</Button>
-                            </div>
-                        </div>
-                    </DefaultModal>
-
-                    <DefaultModal isOpen={closeModal} onClose={closeCloseModal} title="Fechar caixa">
-                        <div className="space-y-4">
-                            {isPreparingClose && !closeSummary ? (
-                                <ThreeDotsLoader />
-                            ) : closeSummary ? (
-                                <>
-                                    {closePreview ? (
-                                        <FormSection title="Saldo na gaveta">
-                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                                <div className="rounded-xl bg-brand-gray dark:bg-dark-border/30 px-3 py-2">
-                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">Saldo de abertura</p>
-                                                    <p className="mt-1 text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                                        {formatCurrency(closePreview.opening)}
-                                                    </p>
-                                                </div>
-                                                <div className="rounded-xl bg-brand-gray dark:bg-dark-border/30 px-3 py-2">
-                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">Vendas em dinheiro</p>
-                                                    <p className="mt-1 text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                                        {formatCurrency(closePreview.expectedCashSales)}
-                                                    </p>
-                                                </div>
-                                                <div className="rounded-xl bg-brand-gray dark:bg-dark-border/30 px-3 py-2">
-                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">Saldo esperado na gaveta</p>
-                                                    <p className="mt-1 text-sm font-semibold text-brand-primary">
-                                                        {formatCurrency(closePreview.expectedDrawerTotal)}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <div className="rounded-xl bg-brand-gray dark:bg-dark-border/30 px-3 py-2">
-                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">Saldo informado com a contagem</p>
-                                                <div className="mt-1 flex items-center justify-between gap-3">
-                                                    <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                                        {formatCurrency(closePreview.informedDrawerTotal)}
-                                                    </p>
-                                                    <p className={`text-sm font-bold ${closePreview.difference === 0 ? "text-brand-green" : "text-brand-orange"}`}>
-                                                        Diferença: {formatCurrency(closePreview.difference)}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </FormSection>
-                                    ) : null}
-
-                                    <FormSection title="Resumo calculado" hasSeparator className="mb-8">
-                                        {groupedRows.length > 0 ? (
-                                            groupedRows.map((row: any) => {
-                                                const visual = resolvePaymentMethodVisual(row)
-                                                return (
-                                                    <div key={row.paymentMethodId || row.label} className="w-full rounded-2xl bg-brand-gray/80 dark:bg-dark-border/20 p-3 flex items-center justify-between gap-3">
-                                                        <div className="flex items-center gap-3 min-w-0">
-                                                            <div className="w-9 h-9 rounded-full bg-brand-slate dark:bg-dark-border/50 border border-brand-border dark:border-dark-border flex items-center justify-center">
-                                                                <visual.Icon className="w-5 h-5" />
-                                                            </div>
-                                                            <div className="min-w-0">
-                                                                <p className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate">{row.label}</p>
-                                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">Calculado no período</p>
-                                                            </div>
-                                                        </div>
-                                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading shrink-0">
-                                                            {formatCurrency(Number(row.calculated ?? row.total ?? 0))}
-                                                        </span>
+                        <DefaultModal isOpen={closeModal} onClose={closeCloseModal} title="Fechar caixa">
+                            <div className="space-y-4">
+                                {isPreparingClose && !closeSummary ? (
+                                    <ThreeDotsLoader />
+                                ) : closeSummary ? (
+                                    <>
+                                        {closePreview ? (
+                                            <FormSection title="Saldo na gaveta">
+                                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                                    <div className="rounded-xl bg-brand-gray dark:bg-dark-border/30 px-3 py-2">
+                                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body">Saldo de abertura</p>
+                                                        <p className="mt-1 text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                            {formatCurrency(closePreview.opening)}
+                                                        </p>
                                                     </div>
-                                                )
-                                            })
-                                        ) : (
-                                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                                                Nenhuma venda no período desta sessão.
-                                            </p>
-                                        )}
-                                    </FormSection>
+                                                    <div className="rounded-xl bg-brand-gray dark:bg-dark-border/30 px-3 py-2">
+                                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body">Vendas em dinheiro</p>
+                                                        <p className="mt-1 text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                            {formatCurrency(closePreview.expectedCashSales)}
+                                                        </p>
+                                                    </div>
+                                                    <div className="rounded-xl bg-brand-gray dark:bg-dark-border/30 px-3 py-2">
+                                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body">Saldo esperado na gaveta</p>
+                                                        <p className="mt-1 text-sm font-semibold text-brand-primary">
+                                                            {formatCurrency(closePreview.expectedDrawerTotal)}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div className="rounded-xl bg-brand-gray dark:bg-dark-border/30 px-3 py-2">
+                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">Saldo informado com a contagem</p>
+                                                    <div className="mt-1 flex items-center justify-between gap-3">
+                                                        <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                            {formatCurrency(closePreview.informedDrawerTotal)}
+                                                        </p>
+                                                        <p className={`text-sm font-bold ${closePreview.difference === 0 ? "text-brand-green" : "text-brand-orange"}`}>
+                                                            Diferença: {formatCurrency(closePreview.difference)}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </FormSection>
+                                        ) : null}
 
-                                    {groupedRows.length === 0 ? (
-                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                                            Sem formas de pagamento para conferência nesta sessão.
-                                        </p>
-                                    ) : (
-                                        <FormSection title="Contagem de dinheiro no caixa" hasSeparator>
-                                            {groupedRows.filter((row: any) => {
-                                                const type = String(row.paymentMethodType || "").toLowerCase()
-                                                const label = String(row.label || "").toLowerCase()
-                                                return type === "cash" || label.includes("dinheiro")
-                                            }).map((row: any) => {
-                                                const key = row.paymentMethodId || "__none__"
-                                                return (
-                                                    <MoneyInput
-                                                        key={key}
-                                                        label={`Contado - ${row.label}`}
-                                                        value={Number(countedByPm[key] ?? row.calculated ?? 0)}
-                                                        onChange={(v) => setCountedByPm((prev) => ({ ...prev, [key]: String(v) }))}
-                                                    />
-                                                )
-                                            })}
+                                        <FormSection title="Resumo calculado" hasSeparator className="mb-8">
+                                            {groupedRows.length > 0 ? (
+                                                groupedRows.map((row: any) => {
+                                                    const visual = resolvePaymentMethodVisual(row)
+                                                    return (
+                                                        <div key={row.paymentMethodId || row.label} className="w-full rounded-2xl bg-brand-gray/80 dark:bg-dark-border/20 p-3 flex items-center justify-between gap-3">
+                                                            <div className="flex items-center gap-3 min-w-0">
+                                                                <div className="w-9 h-9 rounded-full bg-brand-slate dark:bg-dark-border/50 border border-brand-border dark:border-dark-border flex items-center justify-center">
+                                                                    <visual.Icon className="w-5 h-5" />
+                                                                </div>
+                                                                <div className="min-w-0">
+                                                                    <p className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate">{row.label}</p>
+                                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">Calculado no período</p>
+                                                                </div>
+                                                            </div>
+                                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading shrink-0">
+                                                                {formatCurrency(Number(row.calculated ?? row.total ?? 0))}
+                                                            </span>
+                                                        </div>
+                                                    )
+                                                })
+                                            ) : (
+                                                <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                                    Nenhuma venda no período desta sessão.
+                                                </p>
+                                            )}
                                         </FormSection>
-                                    )}
-                                </>
-                            ) : null}
 
-                            <Input
-                                label="Observações de fechamento"
-                                value={closingNotes}
-                                onChange={(e: any) => setClosingNotes(e.target.value)}
-                                maxLength={500}
-                                showCharacterCount
-                            />
-                            <div className="flex justify-end gap-2">
-                                <Button variant="outline" onClick={closeCloseModal}>Cancelar</Button>
-                                <Button id="cash-close-submit" onClick={handleCloseSession} isLoading={isClosingSession}>
-                                    Confirmar fechamento
-                                </Button>
+                                        {groupedRows.length === 0 ? (
+                                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                                Sem formas de pagamento para conferência nesta sessão.
+                                            </p>
+                                        ) : (
+                                            <FormSection title="Contagem de dinheiro no caixa" hasSeparator>
+                                                {groupedRows.filter((row: any) => {
+                                                    const type = String(row.paymentMethodType || "").toLowerCase()
+                                                    const label = String(row.label || "").toLowerCase()
+                                                    return type === "cash" || label.includes("dinheiro")
+                                                }).map((row: any) => {
+                                                    const key = row.paymentMethodId || "__none__"
+                                                    return (
+                                                        <MoneyInput
+                                                            key={key}
+                                                            label={`Contado - ${row.label}`}
+                                                            value={Number(countedByPm[key] ?? row.calculated ?? 0)}
+                                                            onChange={(v) => setCountedByPm((prev) => ({ ...prev, [key]: String(v) }))}
+                                                        />
+                                                    )
+                                                })}
+                                            </FormSection>
+                                        )}
+                                    </>
+                                ) : null}
+
+                                <Input
+                                    label="Observações de fechamento"
+                                    value={closingNotes}
+                                    onChange={(e: any) => setClosingNotes(e.target.value)}
+                                    maxLength={500}
+                                    showCharacterCount
+                                />
+                                <div className="flex justify-end gap-2">
+                                    <Button variant="outline" onClick={closeCloseModal}>Cancelar</Button>
+                                    <Button id="cash-close-submit" onClick={handleCloseSession} isLoading={isClosingSession}>
+                                        Confirmar fechamento
+                                    </Button>
+                                </div>
                             </div>
-                        </div>
-                    </DefaultModal>
-                </FadeIn>
-            )
-            }
-        </AnimatePresence >
+                        </DefaultModal>
+                    </FadeIn>
+                )}
+            </AnimatePresence>
+
+            <ExportColumnSelectionModal
+                isOpen={columnSelectionModal.isOpen}
+                canExportAllColumns={columnSelectionModal.canExportAllColumns}
+                onConfirm={handleColumnConfirm}
+                onClose={closeColumnSelectionModal}
+            />
+        </>
     )
 }

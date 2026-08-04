@@ -262,6 +262,14 @@ export async function revalidatePartnerInvitations(partnerId: string) {
 }
 
 /**
+ * Revalida a lista de membros da equipe de um parceiro.
+ * Deve ser chamada quando membros são adicionados, removidos ou têm roles alterados.
+ */
+export async function revalidateTeamMembers(partnerId: string) {
+    await safeRevalidateTag(TAGS.teamMembers(partnerId))
+}
+
+/**
  * Revalida o Cache O(1) do Redis/Explore/Home no Next.js App Router
  */
 export async function revalidateExploreSearch(options?: { silent?: boolean }) {

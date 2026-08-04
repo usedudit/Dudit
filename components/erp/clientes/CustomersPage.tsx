@@ -40,6 +40,7 @@ import {
 import { FadeIn } from "@/components/animations/FadeIn"
 import { useErpExport } from "@/hooks/use-erp-export"
 import ExportSelectionModal from "@/components/erp/export/ExportSelectionModal"
+import ExportColumnSelectionModal from "@/components/erp/export/ExportColumnSelectionModal"
 
 // --- TYPES & INTERFACES ---
 
@@ -95,11 +96,11 @@ export default function CustomersPage({
 }) {
     const router = useRouter()
     const { toast } = useToast()
-    const { exportData, isExporting, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport()
+    const { planSlug } = usePermissions()
+    const { exportData, isExporting, columnSelectionModal, closeColumnSelectionModal, handleColumnConfirm, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport(planSlug)
     const { selectedStore, isLoading: storeLoading } = useStore()
     const isMobile = useMediaQuery("(max-width: 767px)")
     const isTablet = useMediaQuery("(max-width: 1024px)")
-    const { planSlug } = usePermissions()
     const showBirthdayBadge = hasMinimumPlan(planSlug, "crescer")
 
     const queryKey = useMemo(() => ["erp", "customers", partnerId] as const, [partnerId])
@@ -426,6 +427,7 @@ export default function CustomersPage({
         const result = await deleteCustomersInBatchAction([idToDelete])
         if (result.success) {
             afterMutation()
+            cache.removeItemFromListCache(idToDelete)
             toast({ title: "Excluído com sucesso" })
             setSelection((p) => {
                 const nextIds = new Set(p.ids)
@@ -451,6 +453,7 @@ export default function CustomersPage({
             const result = await deleteCustomersInBatchAction(ids)
             if (result.success) {
                 afterMutation()
+                ids.forEach(id => cache.removeItemFromListCache(id))
                 toast({ title: "Excluído com sucesso" })
             } else {
                 toast({ title: "Erro", description: result.error, variant: "destructive" })
@@ -783,6 +786,13 @@ export default function CustomersPage({
             />
 
             <SavingStatusModal isOpen={isDeletingCustomer || isProcessingBulk} text={isDeletingCustomer ? "Excluindo cliente..." : "Processando..."} />
+
+            <ExportColumnSelectionModal
+                isOpen={columnSelectionModal.isOpen}
+                canExportAllColumns={columnSelectionModal.canExportAllColumns}
+                onConfirm={handleColumnConfirm}
+                onClose={closeColumnSelectionModal}
+            />
 
             <ExportSelectionModal
                 isOpen={selectionModal.isOpen}

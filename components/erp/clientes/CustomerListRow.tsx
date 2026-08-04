@@ -65,7 +65,7 @@ const CustomerListItem = React.memo(
             <div className="flex items-center gap-3 text-left">
               <UserProfileImage
                 fullName={customer.name || "Cliente"}
-                imageUrl={customer.image_url || customer.imageUrl || customer.avatar_url}
+                imageUrl={customer.image_url || customer.imageUrl || customer.avatar_url || customer.avatar}
                 className="w-10 h-10 text-[14px]"
               />
               <div className="flex flex-col min-w-0">

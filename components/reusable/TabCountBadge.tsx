@@ -3,7 +3,8 @@ import { cn } from "@/lib/utils"
 type TabCountBadgeVariant = "gray" | "green" | "yellow" | "red" | "blue" | "orange"
 
 interface TabCountBadgeProps {
-  count: number
+  count?: number
+  value?: string
   variant?: TabCountBadgeVariant
 }
 
@@ -16,7 +17,7 @@ const variantStyles: Record<TabCountBadgeVariant, string> = {
   orange: "bg-orange-50 text-orange-500 dark:bg-orange-900/30 dark:text-orange-400",
 }
 
-export function TabCountBadge({ count, variant = "gray" }: TabCountBadgeProps) {
+export function TabCountBadge({ count, value, variant = "gray" }: TabCountBadgeProps) {
   return (
     <span
       className={cn(
@@ -24,7 +25,7 @@ export function TabCountBadge({ count, variant = "gray" }: TabCountBadgeProps) {
         variantStyles[variant]
       )}
     >
-      {count}
+      {value ?? count}
     </span>
   )
 }

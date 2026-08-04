@@ -16,6 +16,7 @@ import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { getNextPlanTarget, isPlanLimitReachedError } from "@/lib/subscription/limit-upgrade"
 import { useErpExport } from "@/hooks/use-erp-export"
 import ExportSelectionModal from "@/components/erp/export/ExportSelectionModal"
+import ExportColumnSelectionModal from "@/components/erp/export/ExportColumnSelectionModal"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 
@@ -164,11 +165,11 @@ export default function ServicesPage({
 }: { services: any[]; initialNextCursor: ERPServiceListCursor | null; initialHasMore: boolean; partnerId: string; partner?: any; }) {
     const router = useRouter()
     const { toast } = useToast()
-    const { exportData, isExporting, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport()
+    const { planSlug } = usePermissions()
+    const { exportData, isExporting, columnSelectionModal, closeColumnSelectionModal, handleColumnConfirm, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport(planSlug)
     const { selectedStore } = useStore()
     const isMobile = useMediaQuery("(max-width: 767px)")
     const isTabletOrMobile = useMediaQuery("(max-width: 1023px)")
-    const { planSlug } = usePermissions()
     const { openPlanUpgrade } = usePlanUpgrade()
 
     const storeId = selectedStore?.id || null
@@ -484,6 +485,7 @@ export default function ServicesPage({
             setActionModal({ open: false, text: "" })
             if (result.success) {
                 afterMutation(deleteId, true)
+                cache.removeItemFromListCache(deleteId)
                 setServices((p) => p.filter((prod) => prod.id !== deleteId))
                 toast({ title: "Excluído" })
             } else {
@@ -551,6 +553,7 @@ export default function ServicesPage({
                 })
             } else {
                 afterMutation()
+                ids.forEach(id => cache.removeItemFromListCache(id))
                 const idSet = new Set(ids)
                 setServices((p) => p.filter((prod) => !idSet.has(prod.id)))
                 toast({ title: "Excluídos" })
@@ -840,6 +843,7 @@ export default function ServicesPage({
                                                                                         return { ...p, ids: s }
                                                                                     })
                                                                                 }}
+                                                                                className="bg-white dark:bg-dark-background"
                                                                             />
                                                                         </th>
                                                                         {FIXED_COLUMNS.map((col) => {
@@ -1007,6 +1011,13 @@ export default function ServicesPage({
                 filters={filters}
                 setFilters={setFilters}
                 onClear={() => setFilters(INITIAL_FILTERS)}
+            />
+
+            <ExportColumnSelectionModal
+                isOpen={columnSelectionModal.isOpen}
+                canExportAllColumns={columnSelectionModal.canExportAllColumns}
+                onConfirm={handleColumnConfirm}
+                onClose={closeColumnSelectionModal}
             />
 
             <ExportSelectionModal

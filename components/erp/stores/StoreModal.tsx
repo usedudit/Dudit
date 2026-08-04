@@ -21,7 +21,7 @@ import {
 import { BusinessHoursSelector } from "@/components/BusinessHoursSelector"
 import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
-import { createStoreAction, createStoreWithInheritanceAction, updateStoreAction } from "@/app/actions/erp/stores"
+import { createStoreAction, updateStoreAction } from "@/app/actions/erp/stores"
 import ImageCropperModal from "@/components/ImageCropperModal"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 
@@ -30,11 +30,10 @@ interface StoreModalProps {
   onClose: () => void
   partnerId: string
   store?: any | null
-  sourceStore?: any | null
   onSaved: () => void
 }
 
-export function StoreModal({ isOpen, onClose, partnerId, store, sourceStore, onSaved }: StoreModalProps) {
+export function StoreModal({ isOpen, onClose, partnerId, store, onSaved }: StoreModalProps) {
   const isEdit = !!store
   const [activeTab, setActiveTab] = useState<string>("gerais")
 
@@ -65,19 +64,6 @@ export function StoreModal({ isOpen, onClose, partnerId, store, sourceStore, onS
 
   // --- Opening Hours State (Exact BusinessHoursSelector pattern) ---
   const [hours, setHours] = useState(() => normalizeOpeningHours({}))
-
-  // --- Inheritance Options (Create Mode) ---
-  const [showInheritance, setShowInheritance] = useState(false)
-  const [inheritOptions, setInheritOptions] = useState({
-    inheritProducts: true,
-    inheritServices: true,
-    inheritCategories: true,
-    inheritPaymentMethods: true,
-    inheritFinancialSettings: true,
-    inheritLogistics: true,
-    inheritOpeningHours: true,
-    inheritShowcase: true,
-  })
 
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
@@ -130,7 +116,6 @@ export function StoreModal({ isOpen, onClose, partnerId, store, sourceStore, onS
           noNumber: false,
         })
         setHours(normalizeOpeningHours({}))
-        setShowInheritance(false)
       }
     }
   }, [isOpen, store])
@@ -217,21 +202,11 @@ export function StoreModal({ isOpen, onClose, partnerId, store, sourceStore, onS
         })
         if (!res.success) throw new Error(res.error || "Erro ao atualizar loja")
       } else {
-        if (showInheritance && sourceStore) {
-          const res = await createStoreWithInheritanceAction({
-            partnerId,
-            sourceStoreId: sourceStore.id,
-            ...storePayload,
-            ...inheritOptions,
-          })
-          if (!res.success) throw new Error(res.error || "Erro ao criar loja")
-        } else {
-          const res = await createStoreAction({
-            partnerId,
-            ...storePayload,
-          })
-          if (!res.success) throw new Error(res.error || "Erro ao criar loja")
-        }
+        const res = await createStoreAction({
+          partnerId,
+          ...storePayload,
+        })
+        if (!res.success) throw new Error(res.error || "Erro ao criar loja")
       }
 
       onSaved()
@@ -334,46 +309,6 @@ export function StoreModal({ isOpen, onClose, partnerId, store, sourceStore, onS
                 rows={2}
                 disabled={isLoading}
               />
-
-              {/* Copy options if creating and sourceStore exists */}
-              {!isEdit && sourceStore && (
-                <div className="p-4 rounded-xl bg-brand-primary/5 border border-brand-primary/20 space-y-3">
-                  <label className="flex items-center gap-2 text-sm font-semibold text-brand-dark cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={showInheritance}
-                      onChange={(e) => setShowInheritance(e.target.checked)}
-                      className="rounded border-brand-border text-brand-primary focus:ring-brand-primary"
-                    />
-                    Copiar produtos e configurações da loja principal ({sourceStore.name})
-                  </label>
-
-                  {showInheritance && (
-                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-brand-primary/10 text-xs">
-                      {[
-                        { key: "inheritProducts", label: "Produtos" },
-                        { key: "inheritServices", label: "Serviços" },
-                        { key: "inheritCategories", label: "Categorias" },
-                        { key: "inheritPaymentMethods", label: "Formas de pagamento" },
-                        { key: "inheritFinancialSettings", label: "Configurações financeiras" },
-                        { key: "inheritLogistics", label: "Logística" },
-                        { key: "inheritOpeningHours", label: "Horários" },
-                        { key: "inheritShowcase", label: "Vitrine" },
-                      ].map(({ key, label }) => (
-                        <label key={key} className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={(inheritOptions as any)[key]}
-                            onChange={() => setInheritOptions((prev) => ({ ...prev, [key]: !(prev as any)[key] }))}
-                            className="rounded border-brand-border text-brand-primary focus:ring-brand-primary"
-                          />
-                          <span>{label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
             </TabsContent>
 
             {/* ABA 2: ENDEREÇO (Exact BusinessDataSubPage pattern) */}

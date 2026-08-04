@@ -334,9 +334,10 @@ export async function acceptInvitation(
         })
 
         // 10. Invalidate caches so the new ERP appears immediately in the user's selector
-        const { revalidateUserAccess, revalidatePartnerInvitations } = await import("@/lib/utils/revalidation")
+        const { revalidateUserAccess, revalidatePartnerInvitations, revalidateTeamMembers } = await import("@/lib/utils/revalidation")
         revalidateUserAccess(user.id)
         revalidatePartnerInvitations(invitation.partner_id)
+        revalidateTeamMembers(invitation.partner_id)
 
         return { success: true, partnerId: invitation.partner_id }
     } catch (error) {

@@ -6,8 +6,8 @@ import { createContext, useContext, useState, useCallback, useEffect, useMemo } 
 const SIDEBAR_STATE_KEY = "dudit_sidebar_state"
 
 interface SidebarContextType {
-  isExpanded: boolean // Desktop expansion state
-  isMobileOpen: boolean // Mobile sheet open state
+  isExpanded: boolean
+  isMobileOpen: boolean
   toggleSidebar: () => void
   setIsMobileOpen: (open: boolean) => void
   headerOverride: {
@@ -17,6 +17,8 @@ interface SidebarContextType {
     isSubPage?: boolean
   } | null
   setHeaderOverride: (override: SidebarContextType["headerOverride"]) => void
+  sidebarCard: React.ReactNode | null
+  setSidebarCard: (card: React.ReactNode | null) => void
 }
 
 const SidebarContext = createContext<SidebarContextType | undefined>(undefined)
@@ -31,12 +33,11 @@ export function SidebarProvider({
   const [isExpanded, setIsExpanded] = useState(initialExpanded)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [headerOverride, setHeaderOverride] = useState<SidebarContextType["headerOverride"]>(null)
+  const [sidebarCard, setSidebarCard] = useState<React.ReactNode | null>(null)
 
   const toggleSidebar = useCallback(() => {
     setIsExpanded((prev) => {
       const newState = !prev
-      // Set cookie path=/ to be available across all routes
-      // Max-Age 1 year
       document.cookie = `${SIDEBAR_STATE_KEY}=${newState ? "expanded" : "collapsed"}; path=/; max-age=31536000; SameSite=Lax`
       return newState
     })
@@ -49,7 +50,9 @@ export function SidebarProvider({
     setIsMobileOpen,
     headerOverride,
     setHeaderOverride,
-  }), [isExpanded, isMobileOpen, toggleSidebar, headerOverride])
+    sidebarCard,
+    setSidebarCard,
+  }), [isExpanded, isMobileOpen, toggleSidebar, headerOverride, sidebarCard, setSidebarCard])
 
   return (
     <SidebarContext.Provider value={contextValue}>

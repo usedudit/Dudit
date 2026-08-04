@@ -13,7 +13,7 @@ const ORDER_SELECT = `
   id, order_number, customer_name, buyer_id, created_by, created_at,
   situation, payment_method, payment_breakdown, delivery_status, order_source,
   discount_value, discount_amount, payment_method_discount_amount,
-  delivery_fee, shipping_cost, additional_costs, total_amount,
+  delivery_fee, additional_costs, total_amount,
   order_items(product_name, quantity, product_price, subtotal)
 `
 

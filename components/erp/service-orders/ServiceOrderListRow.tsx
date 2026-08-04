@@ -22,11 +22,12 @@ interface ServiceOrderListRowProps {
   onSelect: (id: string) => void
   onDetails: () => void
   onEdit?: () => void
+  onStatus?: () => void
+  onShare?: () => void
   onDelete?: () => void
   statusColor: string
   statusLabel: string
   teamMembers?: any[]
-  children?: React.ReactNode
 }
 
 const ServiceOrderListRow = React.memo(
@@ -37,11 +38,12 @@ const ServiceOrderListRow = React.memo(
     onSelect,
     onDetails,
     onEdit,
+    onStatus,
+    onShare,
     onDelete,
     statusColor,
     statusLabel,
     teamMembers = [],
-    children,
   }: ServiceOrderListRowProps) => {
     const formatDate = (d: string) => {
       if (!d) return "-"
@@ -118,12 +120,11 @@ const ServiceOrderListRow = React.memo(
           return (
             <div className="flex justify-center" onClick={(e) => e.stopPropagation()}>
               <ActionsDropdown
-                onView={onDetails}
                 onEdit={onEdit}
+                onStatus={onStatus}
+                onShare={onShare}
                 onDelete={onDelete}
-              >
-                {children}
-              </ActionsDropdown>
+              />
             </div>
           )
 

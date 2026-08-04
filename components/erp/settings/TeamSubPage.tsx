@@ -1,8 +1,8 @@
 "use client"
 
 import React, { useState, useEffect, useTransition, useRef, useCallback } from "react"
-import { Button, IconPlaceholder, InfoCard, Input, ThreeDotsLoader, Tabs, TabsList, TabsTrigger, TabsContent, Separator, ActionsDropdown, Badge, AlertModal, DropdownItem, ListItem, RadioButton } from "@/components/reusable"
-import { MailIcon, CheckCircleIcon, ChevronLeftIcon, PlusIcon, CalendarIcon, UserIcon, MotorbikeIcon, ShieldIcon, CrownIcon, ManagerIcon } from "@/lib/icons"
+import { Button, IconPlaceholder, InfoCard, Input, ThreeDotsLoader, Tabs, TabsList, TabsTrigger, TabsContent, Separator, ActionsDropdown, Badge, AlertModal, DropdownItem, ListItem, RadioButton, Checkbox, Dropdown } from "@/components/reusable"
+import { MailIcon, CheckCircleIcon, ChevronLeftIcon, PlusIcon, CalendarIcon, UserIcon, MotorbikeIcon, ShieldIcon, CrownIcon, ManagerIcon, CopyIcon, ThreeDotsIcon, TrashIcon } from "@/lib/icons"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { getTeamMembers, getTeamMemberStatsAction, removeTeamMember, updateTeamMemberRole } from "@/app/actions/erp/team"
 import { listStoreMembersAction, addStoreMemberAction, removeStoreMemberAction } from "@/app/actions/erp/store-members"
@@ -96,6 +96,10 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
     const [memberToDelete, setMemberToDelete] = useState<string | null>(null)
     const [memberStoreMap, setMemberStoreMap] = useState<Record<string, string[]>>({})
     const [inviteToDelete, setInviteToDelete] = useState<string | null>(null)
+    const [inviteToRegenerate, setInviteToRegenerate] = useState<any | null>(null)
+    const [showRegenerateLinkModal, setShowRegenerateLinkModal] = useState(false)
+    const [regenerateUrl, setRegenerateUrl] = useState<string | null>(null)
+    const [regenerateCopied, setRegenerateCopied] = useState(false)
     const { toast } = useToast()
     const [selectedMemberStats, setSelectedMemberStats] = useState<TeamMemberStats | null>(null)
     const [isLoadingStats, setIsLoadingStats] = useState(false)
@@ -276,6 +280,47 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
         })
     }
 
+    const handleRegenerateInviteLink = async () => {
+        if (!inviteToRegenerate) return
+        startTransition(async () => {
+            try {
+                const { revokeInvitation, createInvitation } = await import("@/app/actions/invitations")
+
+                // First revoke the old invitation
+                await revokeInvitation({ invitationId: inviteToRegenerate.id, partnerId })
+
+                // Create a new invitation with the same details
+                const targetStores = (inviteToRegenerate.permissions as any)?._store_ids_ as string[] | null
+                const result = await createInvitation({
+                    partnerId,
+                    email: inviteToRegenerate.email,
+                    role: inviteToRegenerate.role as PartnerRole,
+                    storeIds: targetStores || [],
+                })
+
+                if (result.success && result.inviteUrl) {
+                    setRegenerateUrl(result.inviteUrl)
+                    setShowRegenerateLinkModal(true)
+                    fetchMembers()
+                } else {
+                    toast({ title: "Erro", description: result.error || "Erro ao gerar novo link.", variant: "destructive" })
+                }
+            } catch (e) {
+                toast({ title: "Erro", description: "Erro ao gerar novo link.", variant: "destructive" })
+            } finally {
+                setInviteToRegenerate(null)
+            }
+        })
+    }
+
+    const copyRegenerateToClipboard = () => {
+        if (regenerateUrl) {
+            navigator.clipboard.writeText(regenerateUrl)
+            setRegenerateCopied(true)
+            setTimeout(() => setRegenerateCopied(false), 2000)
+        }
+    }
+
     const handleShowMemberStats = useCallback(async (member: TeamMember) => {
         setIsLoadingStats(true)
         setSelectedMemberStats(null)
@@ -449,34 +494,49 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
                                                                                 )}
                                                                             </div>
                                                                         </td>
-                                                                        <td className="py-4 px-6 text-right">
-                                                                            <ActionsDropdown
-                                                                                onDelete={member.userId !== currentUserId ? () => setMemberToDelete(member.userId) : undefined}
-                                                                            >
-                                                                                {currentUserRole && member.userId !== currentUserId && (
-                                                                                    getAllowedInviteRoles(currentUserRole)
-                                                                                        .filter((role) => canModifyUser(currentUserRole, member.role as PartnerRole) && role !== member.role)
-                                                                                        .map((role) => (
-                                                                                            <DropdownItem
-                                                                                                key={role}
-                                                                                                onClick={() => handleUpdateRole(member.userId, role)}
-                                                                                            >
-                                                                                                <UserIcon size={16} /> Alterar para {ROLE_LABELS[role]}
-                                                                                            </DropdownItem>
-                                                                                        ))
-                                                                                )}
-                                                                                {currentUserRole && member.userId !== currentUserId && (member.role === "MANAGER" || member.role === "OPERATOR" || member.role === "DELIVERY") && canModifyUser(currentUserRole, member.role as PartnerRole) && (
-                                                                                    <DropdownItem
-                                                                                        onClick={() => {
-                                                                                            setShowAddStoreMemberModal(true)
-                                                                                            setSelectedStoreMemberUserId(member.userId)
-                                                                                        }}
-                                                                                    >
-                                                                                        Gerenciar lojas
-                                                                                    </DropdownItem>
-                                                                                )}
-                                                                            </ActionsDropdown>
-                                                                        </td>
+<td className="py-4 px-6 text-right">
+                                                                         <Dropdown
+                                                                             trigger={
+                                                                                 <Button variant="outline" className="w-[40px] h-[40px] p-0 flex items-center justify-center">
+                                                                                     <ThreeDotsIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-heading" />
+                                                                                 </Button>
+                                                                             }
+                                                                             align="right"
+                                                                             showChevron={false}
+                                                                             fullWidth={false}
+                                                                         >
+                                                                             {currentUserRole && member.userId !== currentUserId && (
+                                                                                 getAllowedInviteRoles(currentUserRole)
+                                                                                     .filter((role) => canModifyUser(currentUserRole, member.role as PartnerRole) && role !== member.role)
+                                                                                     .map((role) => (
+                                                                                         <DropdownItem
+                                                                                             key={role}
+                                                                                             onClick={() => handleUpdateRole(member.userId, role)}
+                                                                                         >
+                                                                                             <UserIcon size={16} /> Alterar para {ROLE_LABELS[role]}
+                                                                                         </DropdownItem>
+                                                                                     ))
+                                                                             )}
+                                                                             {currentUserRole && member.userId !== currentUserId && (member.role === "MANAGER" || member.role === "OPERATOR" || member.role === "DELIVERY") && canModifyUser(currentUserRole, member.role as PartnerRole) && (
+                                                                                 <DropdownItem
+                                                                                     onClick={() => {
+                                                                                         setShowAddStoreMemberModal(true)
+                                                                                         setSelectedStoreMemberUserId(member.userId)
+                                                                                     }}
+                                                                                 >
+                                                                                     Gerenciar lojas
+                                                                                 </DropdownItem>
+                                                                             )}
+                                                                             {member.userId !== currentUserId && (
+                                                                                 <DropdownItem
+                                                                                     onClick={() => setMemberToDelete(member.userId)}
+                                                                                     className="text-brand-red dark:text-brand-red"
+                                                                                 >
+                                                                                     <TrashIcon size={16} /> Remover
+                                                                                 </DropdownItem>
+                                                                             )}
+                                                                         </Dropdown>
+                                                                     </td>
                                                                     </tr>
                                                                 ))}
                                                             </tbody>
@@ -514,8 +574,15 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
                                                                             {ROLE_LABELS[member.role as PartnerRole] || member.role}
                                                                         </Badge>
 
-                                                                        <ActionsDropdown
-                                                                            onDelete={member.userId !== currentUserId ? () => setMemberToDelete(member.userId) : undefined}
+                                                                        <Dropdown
+                                                                            trigger={
+                                                                                <Button variant="outline" className="w-[40px] h-[40px] p-0 flex items-center justify-center">
+                                                                                    <ThreeDotsIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-heading" />
+                                                                                </Button>
+                                                                            }
+                                                                            align="right"
+                                                                            showChevron={false}
+                                                                            fullWidth={false}
                                                                         >
                                                                             {currentUserRole && member.userId !== currentUserId && (
                                                                                 getAllowedInviteRoles(currentUserRole)
@@ -529,7 +596,15 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
                                                                                         </DropdownItem>
                                                                                     ))
                                                                             )}
-                                                                        </ActionsDropdown>
+                                                                            {member.userId !== currentUserId && (
+                                                                                <DropdownItem
+                                                                                    onClick={() => setMemberToDelete(member.userId)}
+                                                                                    className="text-brand-red dark:text-brand-red"
+                                                                                >
+                                                                                    <TrashIcon size={16} /> Remover
+                                                                                </DropdownItem>
+                                                                            )}
+                                                                        </Dropdown>
                                                                     </div>
                                                                 </div>
                                                                 {idx < teamMembers.length - 1 && <Separator className="opacity-50" />}
@@ -575,15 +650,12 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
                                                                     <tr key={inv.id} className="group hover:bg-brand-gray/50 dark:hover:bg-dark-border/20 transition-colors">
                                                                         <td className="py-4 px-6">
                                                                             <div className="flex items-center gap-4">
-                                                                                <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border/30 flex items-center justify-center text-brand-inactive-text">
+                                                                                <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
                                                                                     <MailIcon size={20} />
                                                                                 </div>
                                                                                 <div className="flex flex-col min-w-0">
                                                                                     <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading leading-tight truncate">
                                                                                         {inv.email}
-                                                                                    </span>
-                                                                                    <span className="text-[10px] font-bold text-brand-primary uppercase tracking-tighter">
-                                                                                        Aguardando aceitação
                                                                                     </span>
                                                                                 </div>
                                                                             </div>
@@ -594,13 +666,22 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
                                                                             </span>
                                                                         </td>
                                                                         <td className="py-4 px-4 text-center">
-                                                                            <Badge variant="gray">
+                                                                            <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">
+                                                                                {inv.createdAt ? formatDate(inv.createdAt) : "-"}
+                                                                            </span>
+                                                                        </td>
+                                                                        <td className="py-4 px-4 text-center">
+                                                                            <Badge variant="gray" icon={null}>
                                                                                 {ROLE_LABELS[inv.role as PartnerRole] || inv.role}
                                                                             </Badge>
                                                                         </td>
                                                                         <td className="py-4 px-6 text-right">
                                                                             <ActionsDropdown
                                                                                 onDelete={() => setInviteToDelete(inv.id)}
+                                                                                onCopy={() => {
+                                                                                    setInviteToRegenerate(inv)
+                                                                                    setShowRegenerateLinkModal(true)
+                                                                                }}
                                                                             />
                                                                         </td>
                                                                     </tr>
@@ -610,39 +691,43 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
                                                     </div>
 
                                                     {/* Mobile List */}
-                                                    <div className="md:hidden flex flex-col">
-                                                        {invitations.filter(i => !i.used_at && !i.revoked_at).map((inv, idx, arr) => (
-                                                            <React.Fragment key={inv.id}>
-                                                                <div className="py-5 flex items-center justify-between gap-4">
-                                                                    <div className="flex items-center gap-4 min-w-0">
-                                                                        <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/30 flex items-center justify-center text-brand-inactive-text shrink-0">
-                                                                            <MailIcon size={24} />
-                                                                        </div>
-                                                                        <div className="flex flex-col min-w-0">
-                                                                            <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
-                                                                                {inv.email}
-                                                                            </h3>
-                                                                            <span className="text-[10px] font-bold text-brand-primary uppercase tracking-tighter mb-1">
-                                                                                Aguardando aceitação
-                                                                            </span>
-                                                                            <div className="flex items-center gap-2">
-                                                                                <Badge variant="gray">
-                                                                                    {ROLE_LABELS[inv.role as PartnerRole] || inv.role}
-                                                                                </Badge>
-                                                                                <span className="text-[11px] text-brand-inactive-text dark:text-dark-body flex items-center gap-1 font-medium">
-                                                                                    <CalendarIcon size={12} /> {inv.createdAt ? formatDate(inv.createdAt) : "-"}
-                                                                                </span>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                    <ActionsDropdown
-                                                                        onDelete={() => setInviteToDelete(inv.id)}
-                                                                    />
-                                                                </div>
-                                                                {idx < arr.length - 1 && <Separator className="opacity-50" />}
-                                                            </React.Fragment>
-                                                        ))}
-                                                    </div>
+<div className="md:hidden flex flex-col">
+                {invitations.filter(i => !i.used_at && !i.revoked_at).map((inv, idx, arr) => (
+                    <React.Fragment key={inv.id}>
+                        <div className="py-5 flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-4 min-w-0">
+                                <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/30 flex items-center justify-center text-brand-inactive-text shrink-0">
+                                    <MailIcon size={24} />
+                                </div>
+                                <div className="flex flex-col min-w-0">
+                                    <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
+                                        {inv.email}
+                                    </h3>
+                                    <span className="text-[10px] font-bold text-brand-primary uppercase tracking-tighter mb-1">
+                                        {inv.createdAt ? formatDate(inv.createdAt) : "-"}
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        <Badge variant="gray">
+                                            {ROLE_LABELS[inv.role as PartnerRole] || inv.role}
+                                        </Badge>
+                                        <span className="text-[11px] text-brand-inactive-text dark:text-dark-body flex items-center gap-1 font-medium">
+                                            <CalendarIcon size={12} /> {inv.createdAt ? formatDate(inv.createdAt) : "-"}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            <ActionsDropdown
+                                onDelete={() => setInviteToDelete(inv.id)}
+                                onCopy={() => {
+                                    setInviteToRegenerate(inv)
+                                    setShowRegenerateLinkModal(true)
+                                }}
+                            />
+                        </div>
+                        {idx < arr.length - 1 && <Separator className="opacity-50" />}
+                    </React.Fragment>
+                ))}
+            </div>
                                                 </>
                                             )}
                                         </FadeIn>
@@ -715,19 +800,17 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
                                     <div className="space-y-2 max-h-48 overflow-y-auto border border-brand-border dark:border-dark-border rounded-xl p-3">
                                         {allStores.map((store) => (
                                             <label key={store.id} className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-brand-gray dark:hover:bg-dark-border/30 cursor-pointer">
-                                                <input
-                                                    type="checkbox"
+                                                <Checkbox
+                                                    label={store.name}
                                                     checked={inviteSelectedStores.includes(store.id)}
-                                                    onChange={(e) => {
-                                                        if (e.target.checked) {
-                                                            setInviteSelectedStores(prev => [...prev, store.id])
-                                                        } else {
+                                                    onChange={() => {
+                                                        if (inviteSelectedStores.includes(store.id)) {
                                                             setInviteSelectedStores(prev => prev.filter(id => id !== store.id))
+                                                        } else {
+                                                            setInviteSelectedStores(prev => [...prev, store.id])
                                                         }
                                                     }}
-                                                    className="w-4 h-4 rounded border-brand-border text-brand-accent focus:ring-brand-accent"
                                                 />
-                                                <span className="text-sm text-brand-dark dark:text-dark-heading">{store.name}</span>
                                             </label>
                                         ))}
                                     </div>
@@ -742,29 +825,28 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
                             </form>
                         ) : (
                             <div className="space-y-6 text-center py-4">
-                                <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                                    <CheckCircleIcon size={40} className="text-green-500" />
-                                </div>
-                                <div>
-                                    <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading mb-2">Convite Gerado!</h3>
-                                    <p className="text-brand-inactive-text text-sm">
-                                        Envie o link abaixo para o membro que deseja convidar.
-                                    </p>
-                                </div>
+                                <IconPlaceholder
+                                    icon={CheckCircleIcon}
+                                    title="Convite Gerado!"
+                                    subtitle="Envie o link abaixo para o membro que deseja convidar."
+                                />
 
-                                <div className="p-4 bg-brand-gray dark:bg-gray-800 rounded-xl border border-brand-border dark:border-dark-border flex items-center justify-between gap-4">
-                                    <p className="text-xs font-mono text-brand-dark dark:text-dark-heading truncate flex-1 text-left">
-                                        {inviteUrl}
-                                    </p>
-                                    <button
+                                {/* Copy Field */}
+                                <div className="flex gap-2 w-full mb-6">
+                                    <Input
+                                        readOnly
+                                        value={inviteUrl}
+                                    />
+                                    <Button
+                                        variant="outline"
                                         onClick={copyToClipboard}
-                                        className="px-4 py-2 bg-brand-dark text-white rounded-lg text-sm font-bold shrink-0 hover:bg-brand-dark/90 transition-all"
+                                        className="gap-2 shrink-0 h-[42px] w-[42px]"
                                     >
-                                        {copied ? "Copiado!" : "Copiar"}
-                                    </button>
+                                        {copied ? <CheckCircleIcon size={16} className="text-brand-green" /> : <CopyIcon size={16} />}
+                                    </Button>
                                 </div>
 
-                                <p className="text-[10px] text-brand-inactive-text">
+                                <p className="text-sm text-brand-inactive-text">
                                     Este link expira em 7 dias ou após o primeiro uso.
                                 </p>
                             </div>
@@ -871,6 +953,44 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
                                 )}
                             </div>
                         )}
+                    </DefaultModal>
+
+                    {/* Regenerate Invite Link Modal */}
+                    <DefaultModal
+                        isOpen={showRegenerateLinkModal}
+                        onClose={() => {
+                            setShowRegenerateLinkModal(false)
+                            setRegenerateUrl(null)
+                            setRegenerateCopied(false)
+                        }}
+                        title="Link do Convite Regenerado"
+                    >
+                        <div className="space-y-6 text-center py-4">
+                            <IconPlaceholder
+                                icon={CheckCircleIcon}
+                                title="Novo Link Gerado!"
+                                subtitle="O link anterior foi invalidado. Envie o novo link abaixo."
+                            />
+
+                            {/* Copy Field */}
+                            <div className="flex gap-2 w-full mb-6">
+                                <Input
+                                    readOnly
+                                    value={regenerateUrl || ""}
+                                />
+                                <Button
+                                    variant="outline"
+                                    onClick={copyRegenerateToClipboard}
+                                    className="gap-2 shrink-0 h-[42px] w-[42px]"
+                                >
+                                    {regenerateCopied ? <CheckCircleIcon size={16} className="text-brand-green" /> : <CopyIcon size={16} />}
+                                </Button>
+                            </div>
+
+                            <p className="text-sm text-brand-inactive-text">
+                                Este link expira em 7 dias ou após o primeiro uso.
+                            </p>
+                        </div>
                     </DefaultModal>
 
                     {/* Member Stats Modal */}

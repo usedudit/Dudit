@@ -7,20 +7,14 @@ import ImageCropperModal from "@/components/ImageCropperModal"
 import {
     MoneyIcon, Package, EyeIcon, TrashIcon, RemoveImageIcon, AlertTriangleIcon,
     UploadIcon, CheckIcon, EditIcon, ChevronLeftIcon,
-    ClockIcon,
-    PartiallyPaidIcon,
-    CheckCircleIcon,
-    DeliverySentIcon,
-    DeliveryPickupIcon,
-    BlockedIcon,
-    DeliveryFailedIcon
+    WrenchIcon
 } from "@/lib/icons"
 
 import { DELIVERY_STATUS_OPTIONS, PICKUP_STATUS_OPTIONS, MIXED_STATUS_OPTIONS } from "@/lib/orders/status"
 import DefaultModal from "./DefaultModal"
 
 // --- Tipagens ---
-export type BulkActionType = 'price' | 'stock' | 'visibility' | 'image' | 'remove_image' | 'delete' | 'status' | 'order_payment' | 'order_delivery'
+export type BulkActionType = 'price' | 'stock' | 'visibility' | 'image' | 'remove_image' | 'delete' | 'status' | 'order_payment' | 'order_delivery' | 'service_order_status'
 
 export interface BulkActionPayload {
     type: BulkActionType
@@ -30,23 +24,30 @@ export interface BulkActionPayload {
     stockMode?: 'add' | 'sub' | 'fixed' | 'zero'
     stockValue?: number
     stockIgnoreNegative?: boolean
+    stockReason?: string
     visibilityMode?: 'publish' | 'hide'
     imageFile?: File | null
     status?: 'draft' | 'sent' | 'approved' | 'rejected' | 'expired' | 'cancelled'
     orderStatus?: string
+    serviceOrderStatus?: string
 }
 
 interface BulkEditActionsModalProps {
     isOpen: boolean
     onClose: () => void
     selectedCount: number
-    targetType: 'product' | 'variation' | 'service' | 'quote' | 'order'
+    targetType: 'product' | 'variation' | 'service' | 'quote' | 'order' | 'service_order'
     orderSelectionGuards?: {
         paidCount: number
         deliveredCount: number
         cancelledCount: number
         totalCount: number
         deliveryTypes?: string[]
+    }
+    serviceOrderSelectionGuards?: {
+        deliveredCount: number
+        cancelledCount: number
+        totalCount: number
     }
     onApply: (payload: BulkActionPayload) => Promise<void>
 }
@@ -106,6 +107,7 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
     selectedCount,
     targetType,
     orderSelectionGuards,
+    serviceOrderSelectionGuards,
     onApply
 }) => {
     const [view, setView] = useState<BulkActionType | 'menu'>('menu')
@@ -113,10 +115,11 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
 
     // Estados de Configuração
     const [priceConfig, setPriceConfig] = useState({ mode: 'percent_inc', value: 0, onlyPublished: false })
-    const [stockConfig, setStockConfig] = useState({ mode: 'add', value: 0, ignoreNegative: false })
+    const [stockConfig, setStockConfig] = useState({ mode: 'add', value: 0, ignoreNegative: false, reason: '' })
     const [visConfig, setVisConfig] = useState<'publish' | 'hide'>('publish')
     const [statusConfig, setStatusConfig] = useState<'draft' | 'sent' | 'approved' | 'rejected' | 'expired' | 'cancelled'>('sent')
     const [orderStatusConfig, setOrderStatusConfig] = useState<string>('')
+    const [serviceOrderStatusConfig, setServiceOrderStatusConfig] = useState<string>('')
     const [imageState, setImageState] = useState<{ file: File | null, preview: string | null }>({ file: null, preview: null })
 
     // UI Helpers
@@ -137,17 +140,24 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
         ? (orderSelectionGuards?.paidCount || 0) + cancelledCount
         : view === "order_delivery"
             ? (orderSelectionGuards?.deliveredCount || 0) + cancelledCount
-            : 0
+            : view === "service_order_status"
+                ? (serviceOrderSelectionGuards?.deliveredCount || 0) + (serviceOrderSelectionGuards?.cancelledCount || 0)
+                : 0
     const selectableCount = Math.max(0, (orderSelectionGuards?.totalCount || 0) - ignoredByRuleCount)
+    const serviceOrderSelectableCount = Math.max(0, (serviceOrderSelectionGuards?.totalCount || 0) - ignoredByRuleCount)
     const isOrderPaymentFullyBlocked = targetType === "order"
         && (orderSelectionGuards?.totalCount || 0) > 0
         && selectableCount === 0
     const isOrderDeliveryFullyBlocked = targetType === "order"
         && (orderSelectionGuards?.totalCount || 0) > 0
         && selectableCount === 0
+    const isServiceOrderStatusFullyBlocked = targetType === "service_order"
+        && (serviceOrderSelectionGuards?.totalCount || 0) > 0
+        && serviceOrderSelectableCount === 0
     const isCurrentViewBlocked =
         (view === "order_payment" && isOrderPaymentFullyBlocked)
         || (view === "order_delivery" && isOrderDeliveryFullyBlocked)
+        || (view === "service_order_status" && isServiceOrderStatusFullyBlocked)
 
     const handleApply = async () => {
         if (isCurrentViewBlocked) return
@@ -162,12 +172,15 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
                 payload.stockMode = stockConfig.mode as any
                 payload.stockValue = stockConfig.value || 0
                 payload.stockIgnoreNegative = stockConfig.ignoreNegative
+                payload.stockReason = stockConfig.reason
             } else if (view === 'visibility') {
                 payload.visibilityMode = visConfig
             } else if (view === 'status') {
                 payload.status = statusConfig
             } else if (view === 'order_payment' || view === 'order_delivery') {
                 payload.orderStatus = orderStatusConfig
+            } else if (view === 'service_order_status') {
+                payload.serviceOrderStatus = serviceOrderStatusConfig
             } else if (view === 'image') {
                 payload.imageFile = imageState.file
             }
@@ -203,13 +216,14 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
         } catch (error) { console.error("Erro ao processar imagem", error) }
     }
 
-    const targetLabel = targetType === 'product' ? 'produtos' : targetType === 'variation' ? 'variantes' : targetType === 'service' ? 'serviços' : targetType === 'order' ? 'pedidos' : 'orçamentos'
-    const singularTargetLabel = targetType === 'product' ? 'produto' : targetType === 'variation' ? 'variante' : targetType === 'service' ? 'serviço' : targetType === 'order' ? 'pedido' : 'orçamento'
+    const targetLabel = targetType === 'product' ? 'produtos' : targetType === 'variation' ? 'variantes' : targetType === 'service' ? 'serviços' : targetType === 'order' ? 'pedidos' : targetType === 'service_order' ? 'ordens de serviço' : 'orçamentos'
+    const singularTargetLabel = targetType === 'product' ? 'produto' : targetType === 'variation' ? 'variante' : targetType === 'service' ? 'serviço' : targetType === 'order' ? 'pedido' : targetType === 'service_order' ? 'ordem de serviço' : 'orçamento'
 
     const viewTitles: Record<string, string> = {
         menu: '', price: 'Alterar Preço', stock: 'Ajustar Estoque',
         visibility: 'Visibilidade', image: 'Aplicar Imagem', remove_image: 'Remover Imagem',
         status: 'Alterar Status', order_payment: 'Status de Pagamento', order_delivery: 'Status de Envio',
+        service_order_status: 'Alterar Status',
         delete: `Excluir ${targetLabel.charAt(0).toUpperCase() + targetLabel.slice(1)}`
     }
 
@@ -242,7 +256,12 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
                                 </div>
                             </>
                         )}
-                        {targetType !== 'order' && (
+                        {targetType === 'service_order' && (
+                            <div className={isServiceOrderStatusFullyBlocked ? "opacity-50 pointer-events-none" : ""}>
+                                <BulkActionCard icon={WrenchIcon} label="Alterar Status" onClick={() => { setView('service_order_status'); setServiceOrderStatusConfig('aprovada') }} />
+                            </div>
+                        )}
+                        {targetType !== 'order' && targetType !== 'service_order' && (
                             <BulkActionCard icon={TrashIcon} label="Excluir" onClick={() => setView('delete')} danger />
                         )}
                     </div>
@@ -342,6 +361,32 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
                             />
                         )}
 
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-brand-dark dark:text-dark-heading">Motivo da movimentação</label>
+                            <select
+                                value={stockConfig.reason}
+                                onChange={e => setStockConfig(p => ({ ...p, reason: e.target.value }))}
+                                className="w-full px-3 py-2 rounded-lg border border-brand-border bg-white dark:bg-dark-surface dark:border-dark-border text-brand-dark dark:text-dark-heading focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                            >
+                                <option value="">Selecione um motivo</option>
+                                {stockConfig.mode === 'add' || stockConfig.mode === 'fixed' ? (
+                                    <>
+                                        <option value="Compra de Fornecedor">Compra de Fornecedor</option>
+                                        <option value="Devolução de Cliente">Devolução de Cliente</option>
+                                        <option value="Ajuste de Estoque">Ajuste de Estoque</option>
+                                        <option value="Outro">Outro</option>
+                                    </>
+                                ) : (
+                                    <>
+                                        <option value="Avaria / Perda">Avaria / Perda</option>
+                                        <option value="Ajuste de Estoque">Ajuste de Estoque</option>
+                                        <option value="Uso Interno">Uso Interno</option>
+                                        <option value="Outro">Outro</option>
+                                    </>
+                                )}
+                            </select>
+                        </div>
+
                         <label className="flex items-center gap-3 p-2 cursor-pointer">
                             <Checkbox checked={stockConfig.ignoreNegative} onChange={c => setStockConfig(p => ({ ...p, ignoreNegative: c }))} />
                             <span className="text-sm text-brand-dark dark:text-dark-heading font-medium">
@@ -358,7 +403,7 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
                             description={`Os ${targetLabel} ficarão visíveis na vitrine`}
                             icon={EyeIcon}
                             onClick={() => setVisConfig('publish')}
-                            className="px-4 py-1 gap-4"
+                            className="px-4 py-3 gap-4"
                             right={
                                 <RadioButton
                                     checked={visConfig === 'publish'}
@@ -373,7 +418,7 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
                             description={`Os ${targetLabel} ficarão ocultos na vitrine`}
                             icon={EyeIcon}
                             onClick={() => setVisConfig('hide')}
-                            className="px-4 py-1 gap-4"
+                            className="px-4 py-3 gap-4"
                             right={
                                 <RadioButton
                                     checked={visConfig === 'hide'}
@@ -401,7 +446,7 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
                                 key={s.value}
                                 title={s.label}
                                 onClick={() => setStatusConfig(s.value!)}
-                                className="px-4 py-1 gap-4"
+                                className="px-4 py-3 gap-4"
                                 right={
                                     <RadioButton
                                         checked={statusConfig === s.value}
@@ -455,12 +500,62 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
                                     title={s.label}
                                     titleClassName="font-medium"
                                     onClick={() => !isCurrentViewBlocked && setOrderStatusConfig(s.value)}
-                                    className={`px-4 py-1 gap-4 ${isCurrentViewBlocked ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
+                                    className={`px-4 py-3 gap-4 ${isCurrentViewBlocked ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
                                     right={
                                         <RadioButton
                                             checked={orderStatusConfig === s.value}
                                             onChange={() => !isCurrentViewBlocked && setOrderStatusConfig(s.value)}
                                             name="orderStatusM"
+                                            value={s.value}
+                                        />
+                                    }
+                                />
+                            ))}
+                        </div>
+                    </div>
+                )
+            case 'service_order_status':
+                const serviceOrderStatuses = [
+                    { value: 'aberta', label: 'Aberta' },
+                    { value: 'aguardando_aprovacao', label: 'Aguardando Aprovação' },
+                    { value: 'aprovada', label: 'Aprovada' },
+                    { value: 'em_andamento', label: 'Em Andamento' },
+                    { value: 'aguardando_peca', label: 'Aguardando Peça' },
+                    { value: 'concluida', label: 'Concluída' },
+                    { value: 'entregue', label: 'Entregue' },
+                    { value: 'cancelada', label: 'Cancelada' },
+                ]
+                return (
+                    <div className="space-y-3 pt-2">
+                        {ignoredByRuleCount > 0 && (
+                            <InfoCard
+                                title="Atenção"
+                                message={`${ignoredByRuleCount} de ${(serviceOrderSelectionGuards?.totalCount || 0)} ordem(ns) de serviço serão ignoradas por regra.`}
+                                color="orange"
+                                className="px-4"
+                            />
+                        )}
+                        {isCurrentViewBlocked && (
+                            <InfoCard
+                                title="Atenção"
+                                message="Todas as ordens de serviço selecionadas já estão em status final (entregue/cancelada). Não é possível alterar o status."
+                                color="orange"
+                                className="px-4"
+                            />
+                        )}
+                        <div className="space-y-1 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
+                            {serviceOrderStatuses.map((s) => (
+                                <ListItem
+                                    key={s.value}
+                                    title={s.label}
+                                    titleClassName="font-medium"
+                                    onClick={() => !isCurrentViewBlocked && setServiceOrderStatusConfig(s.value)}
+                                    className={`px-4 py-3 gap-4 ${isCurrentViewBlocked ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
+                                    right={
+                                        <RadioButton
+                                            checked={serviceOrderStatusConfig === s.value}
+                                            onChange={() => !isCurrentViewBlocked && setServiceOrderStatusConfig(s.value)}
+                                            name="serviceOrderStatusM"
                                             value={s.value}
                                         />
                                     }

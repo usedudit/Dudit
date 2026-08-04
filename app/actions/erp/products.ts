@@ -1760,7 +1760,19 @@ export async function batchUpdateProductsAction(updates: Array<{ id: string;[key
         const results = await Promise.all(updates.map(update => {
             const { id, ...data } = update
             if (!sanitized.includes(id)) return Promise.resolve({ error: "Unauthorized ID" })
-            return admin.from("products").update(data).eq("id", id)
+
+            // Convert is_active/isActive to status since is_active is a generated column
+            const updateData = { ...data }
+            if (updateData.is_active !== undefined) {
+                updateData.status = updateData.is_active ? "ativo" : "inativo"
+                delete updateData.is_active
+            }
+            if (updateData.isActive !== undefined) {
+                updateData.status = updateData.isActive ? "ativo" : "inativo"
+                delete updateData.isActive
+            }
+
+            return admin.from("products").update(updateData).eq("id", id)
         }))
 
         const firstError = results.find(r => r.error)

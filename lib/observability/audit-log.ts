@@ -23,7 +23,6 @@ type AuditEvent =
   | "coupon.updated"
   | "coupon.deleted"
   | "coupon.stores_updated"
-  | "store.created_with_inheritance"
 
 export function logAudit(event: AuditEvent, data: Record<string, unknown>): void {
   const payload = {

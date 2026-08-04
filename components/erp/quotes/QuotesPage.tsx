@@ -24,7 +24,9 @@ import QuotePrintModal from "./QuotePrintModal"
 import { useNotification } from "@/hooks/use-notification"
 import { ShareModal } from "@/components/marketplace/ShareModal"
 import { useErpExport } from "@/hooks/use-erp-export"
+import { usePermissions } from "@/lib/permission-context"
 import ExportSelectionModal from "@/components/erp/export/ExportSelectionModal"
+import ExportColumnSelectionModal from "@/components/erp/export/ExportColumnSelectionModal"
 import {
     EMPTY_DATE_PERIOD,
     resolveDatePeriodBounds,
@@ -113,6 +115,7 @@ export default function QuotesPage({
     const { success, error } = useNotification()
     const debouncedRefresh = useDebouncedRefresh()
     const { isLoading: storeLoading, selectedStore } = useStore()
+    const { planSlug } = usePermissions()
     const partnerName = selectedStore?.name || "Sua Loja"
     const isMobile = useMediaQuery("(max-width: 767px)")
     const isTablet = useMediaQuery("(max-width: 1024px)")
@@ -163,7 +166,7 @@ export default function QuotesPage({
     }, [loadedQuotes])
 
     // Export state & handlers
-    const { exportData, isExporting, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport()
+    const { exportData, isExporting, columnSelectionModal, closeColumnSelectionModal, handleColumnConfirm, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport(planSlug)
 
     // Status alteration state
     const [quoteToUpdateStatus, setQuoteToUpdateStatus] = useState<any | null>(null)
@@ -954,6 +957,13 @@ export default function QuotesPage({
                     </div>
                 </DefaultModal>
             )}
+
+            <ExportColumnSelectionModal
+                isOpen={columnSelectionModal.isOpen}
+                canExportAllColumns={columnSelectionModal.canExportAllColumns}
+                onConfirm={handleColumnConfirm}
+                onClose={closeColumnSelectionModal}
+            />
 
             <ExportSelectionModal
                 isOpen={selectionModal.isOpen}

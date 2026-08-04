@@ -300,9 +300,6 @@ export function StoresPageContent({ partnerId, planGate }: StoresPageContentProp
     )
   }
 
-  // Source Store reference for inheritance
-  const sourceStore = stores.find((s) => s.is_headquarters) || stores[0] || null
-
   return (
     <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
       <style>{`
@@ -564,7 +561,6 @@ export function StoresPageContent({ partnerId, planGate }: StoresPageContentProp
           onClose={() => setIsModalOpen(false)}
           partnerId={partnerId}
           store={editingStore}
-          sourceStore={sourceStore}
           onSaved={async () => {
             await loadStores()
             await refreshStores()

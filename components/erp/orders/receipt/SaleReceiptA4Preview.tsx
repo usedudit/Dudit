@@ -48,7 +48,7 @@ const SaleReceiptA4Preview = ({
         const ROW_HEIGHT = 85
         const TOTALS_SECTION_HEIGHT = 320
         const P1_FIXED_CONTENT_HEIGHT = 570
-        const P1_TOTAL_AVAILABLE_HEIGHT = 1050
+        const P1_TOTAL_AVAILABLE_HEIGHT = 1123
         const P1_AVAILABLE_FOR_ROWS_AND_TOTALS = P1_TOTAL_AVAILABLE_HEIGHT - P1_FIXED_CONTENT_HEIGHT
         const PN_FIXED_CONTENT_HEIGHT = 300
         const PN_AVAILABLE_FOR_ROWS_AND_TOTALS = P1_TOTAL_AVAILABLE_HEIGHT - PN_FIXED_CONTENT_HEIGHT
@@ -101,7 +101,7 @@ const SaleReceiptA4Preview = ({
                 {pages.map((page, pageIndex) => (
                     <div
                         key={pageIndex}
-                        className="w-[650px] min-w-[650px] shrink-0 bg-white text-[#113833] shadow-md overflow-hidden relative font-sans rounded-sm min-h-[1050px] flex flex-col"
+                        className="w-[210mm] min-w-[210mm] shrink-0 bg-white text-[#113833] shadow-md overflow-hidden relative font-sans rounded-sm min-h-[297mm] flex flex-col"
                     >
                         <div
                             className="px-8 py-8 relative overflow-hidden flex flex-col justify-between h-[160px] shrink-0"

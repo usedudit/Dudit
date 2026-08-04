@@ -33,6 +33,7 @@ import { fetchJSONWithCSRF } from '@/lib/utils/fetch-with-csrf';
 import { formatPaymentMethodLabel } from '@/lib/utils/payment-method-label';
 import { usePaymentMethods } from '@/hooks/use-payment-methods';
 import { useStore } from '@/lib/store-context';
+import { getPOSCustomerDetailsAction } from '@/app/actions/erp/pdv';
 
 
 const PAYMENT_METHODS_UPDATED_EVENT = "payment-methods-updated";
@@ -59,7 +60,10 @@ const getFormattedMethodLabel = (name: string, type?: string | null) => {
     return formatPaymentMethodLabel(name, type);
 };
 
-const getCustomerCredit = (cust: any) => {
+const getCustomerCredit = (cust: any, fetchedCredit?: number | null) => {
+    if (typeof fetchedCredit === "number" && !isNaN(fetchedCredit)) {
+        return Math.max(0, fetchedCredit);
+    }
     if (!cust) return 0;
     return Math.max(0, Number(cust.store_credit ?? cust.storeCredit ?? cust.credit ?? cust.customer_credit ?? cust.store_credit_amount ?? cust.balance ?? 0));
 };
@@ -287,6 +291,21 @@ const PaymentModal = ({
     const { selectedStore } = useStore();
 
     const [effectiveDepositPercent, setEffectiveDepositPercent] = useState<number | undefined>(propsDepositPercentage)
+    const [fetchedCustomerCredit, setFetchedCustomerCredit] = useState<number | null>(null);
+
+    useEffect(() => {
+        if (!isOpen || !customer?.id || !partnerId) {
+            setFetchedCustomerCredit(null);
+            return;
+        }
+        let active = true;
+        getPOSCustomerDetailsAction({ partnerId, customerId: customer.id }).then((res) => {
+            if (active && res?.success && res?.data) {
+                setFetchedCustomerCredit(Number(res.data.store_credit || 0));
+            }
+        }).catch(() => {});
+        return () => { active = false; };
+    }, [isOpen, customer?.id, partnerId]);
 
     useEffect(() => {
         if (propsDepositPercentage != null) {
@@ -2262,7 +2281,7 @@ const PaymentModal = ({
                                                 <CompactPaymentStatusAlert totalPaid={compactAlertPaid} totalNeed={compactAlertNeed} />
                                                 <div className="bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-900/30 rounded-xl p-4 text-sm mb-2 text-center w-full">
                                                     <span className="font-semibold text-brand-dark dark:text-dark-heading">Saldo de Crédito disponível: </span>
-                                                    <span className="font-bold text-brand-green">{formatCurrency(getCustomerCredit(customer))}</span>
+                                                    <span className="font-bold text-brand-green">{formatCurrency(getCustomerCredit(customer, fetchedCustomerCredit))}</span>
                                                 </div>
                                                 <div className="min-w-0 flex-1">
                                                     <PaymentAmountLabel
@@ -2273,7 +2292,7 @@ const PaymentModal = ({
                                                     <MoneyInput
                                                         value={paymentBaseAmount}
                                                         onChange={(val: any) => {
-                                                            const maxCredit = getCustomerCredit(customer);
+                                                            const maxCredit = getCustomerCredit(customer, fetchedCustomerCredit);
                                                             const num = maxCredit > 0 ? Math.min(maxCredit, Number(val || 0)) : Number(val || 0);
                                                             handlePaymentBaseAmountChange(num);
                                                         }}
@@ -2644,7 +2663,7 @@ const PaymentModal = ({
                                                                 label="Crédito do cliente"
                                                                 disabled={isMarketplaceOrder}
                                                                 onClick={() => {
-                                                                    const customerCredit = getCustomerCredit(customer);
+                                                                    const customerCredit = getCustomerCredit(customer, fetchedCustomerCredit);
                                                                     const remainingToPay = Math.max(0, chargeTarget - splitBaseSum);
                                                                     const defaultAmt = customerCredit > 0 ? Math.min(customerCredit, remainingToPay) : remainingToPay;
                                                                     const newLeg = {

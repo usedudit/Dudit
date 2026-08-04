@@ -326,7 +326,7 @@ export async function createServiceOrderAction(
         delivery_status: "not_sent",
         delivery_type: "pickup",
         order_source: "admin_service_order",
-        payment_method: null,
+        payment_method: "Método não definido",
         notes: orderRefNote,
         created_at: new Date().toISOString(),
         created_by: user.id,

@@ -10,11 +10,11 @@ interface InvoicePreviewProps {
     printMode?: boolean
 }
 
-const A4_HEIGHT = 1050
+const A4_HEIGHT = 1123
 const ROW_HEIGHT = 40
 const TOTALS_SECTION_HEIGHT = 150
-const PAGE_1_FIXED = 420
-const PAGE_N_FIXED = 230
+const PAGE_1_FIXED = 449
+const PAGE_N_FIXED = 246
 
 function formatCurrency(value: number): string {
     return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value)
@@ -102,7 +102,7 @@ export function InvoicePreview({ data, printMode }: InvoicePreviewProps) {
                 @media print {
                     .invoice-page { page-break-after: always; box-shadow: none !important; margin: 0 !important; }
                 }
-                .invoice-page { width: 650px; min-height: ${A4_HEIGHT}px; background: white; overflow: hidden; position: relative; }
+                .invoice-page { width: 210mm; min-height: ${A4_HEIGHT}px; background: white; overflow: hidden; position: relative; }
                 ${!printMode ? `.invoice-page { box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 16px; border-radius: 8px; }` : ""}
             `}</style>
 

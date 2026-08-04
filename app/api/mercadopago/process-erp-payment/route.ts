@@ -143,14 +143,17 @@ async function handler(request: NextRequest) {
       lastName = parts.slice(1).join(" ");
     }
 
-    const payerEmail = (paymentFormData.payer?.email || "").trim() || user.email;
     const identificationNumber = paymentFormData.payer?.identification?.number ? String(paymentFormData.payer.identification.number).replace(/\D/g, "") : "";
+
+    const isPix = paymentFormData.payment_method_id === "pix";
+    const customerEmail = (paymentFormData.payer?.email || "").trim();
+    const hasCustomerEmail = customerEmail.length > 0;
 
     const mpPaymentRequest: Record<string, any> = {
       transaction_amount: amount,
       payment_method_id: paymentFormData.payment_method_id,
       payer: {
-        email: payerEmail,
+        ...(!isPix && { email: hasCustomerEmail ? customerEmail : user.email }),
         first_name: firstName,
         ...(lastName ? { last_name: lastName } : {}),
         ...(identificationNumber ? {

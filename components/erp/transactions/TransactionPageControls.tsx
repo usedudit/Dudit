@@ -53,6 +53,8 @@ interface TransactionPageControlsProps {
     /** When true, hides the tab selector (used when the tab is forced by the route) */
     hideTabs?: boolean
     tabCounts?: { "Transações": number; "A pagar": number; "A receber": number }
+    /** Monetary values for each tab (used when forcedTab is set for Receber/Pagar pages) */
+    tabValues?: { "A pagar"?: { pending: number; overdue: number; completed: number }; "A receber"?: { pending: number; overdue: number; completed: number } }
 }
 
 const TransactionPageControls: React.FC<TransactionPageControlsProps> = ({
@@ -70,6 +72,7 @@ const TransactionPageControls: React.FC<TransactionPageControlsProps> = ({
     addDisabled = false,
     hideTabs = false,
     tabCounts,
+    tabValues,
 }) => {
     const filtersContainerRef = useRef<HTMLDivElement>(null)
     const [filterScrollState, setFilterScrollState] = useState({ left: false, right: false })
@@ -88,6 +91,26 @@ const TransactionPageControls: React.FC<TransactionPageControlsProps> = ({
         window.addEventListener("resize", checkFilterScroll)
         return () => window.removeEventListener("resize", checkFilterScroll)
     }, [checkFilterScroll, filters])
+
+    const formatCurrency = (value: number) => {
+        return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value)
+    }
+
+    const getTabBadge = (tab: TransactionTab) => {
+        if (!tabValues) return null
+        // tabValues only has "A pagar" and "A receber"
+        if (tab !== "A pagar" && tab !== "A receber") return null
+        const values = tabValues[tab]
+        if (!values) return null
+        
+        // Show "Pendente" value as the main badge
+        return (
+            <TabCountBadge 
+                value={formatCurrency(values.pending)} 
+                variant={tab === "A receber" ? "green" : "red"} 
+            />
+        )
+    }
 
     const BadgeList = () => (
         <AnimatePresence>
@@ -153,10 +176,10 @@ const TransactionPageControls: React.FC<TransactionPageControlsProps> = ({
                             <TabsTrigger value="Transações" icon={ListIcon} badge={tabCounts && <TabCountBadge count={tabCounts["Transações"]} variant="gray" />}>
                                 Transações
                             </TabsTrigger>
-                            <TabsTrigger value="A pagar" icon={ArrowDownIcon} badge={tabCounts && <TabCountBadge count={tabCounts["A pagar"]} variant="red" />}>
+                            <TabsTrigger value="A pagar" icon={ArrowDownIcon} badge={getTabBadge("A pagar") || (tabCounts && <TabCountBadge count={tabCounts["A pagar"]} variant="red" />)}>
                                 A pagar
                             </TabsTrigger>
-                            <TabsTrigger value="A receber" icon={ArrowUpIcon} badge={tabCounts && <TabCountBadge count={tabCounts["A receber"]} variant="green" />}>
+                            <TabsTrigger value="A receber" icon={ArrowUpIcon} badge={getTabBadge("A receber") || (tabCounts && <TabCountBadge count={tabCounts["A receber"]} variant="green" />)}>
                                 A receber
                             </TabsTrigger>
                         </TabsList>

@@ -38,6 +38,7 @@ import { getRecurringStatusLabel, getRecurringFrequencyLabel } from "@/lib/types
 import { formatFullDate, formatCurrency } from "@/lib/utils"
 import { useErpExport } from "@/hooks/use-erp-export"
 import { useStore } from "@/lib/store-context"
+import ExportColumnSelectionModal from "@/components/erp/export/ExportColumnSelectionModal"
 import { ExportFileIcon, CalendarIcon, MoneyIcon, Users, ListIcon } from "@/lib/icons"
 import { Button, Badge } from "@/components/reusable"
 
@@ -61,7 +62,8 @@ export default function RecurringSubscriptionsPage({
   initialNextCursor: string | null
 }) {
   const { toast } = useToast()
-  const { exportData, isExporting } = useErpExport()
+  const { planSlug } = usePermissions()
+  const { exportData, isExporting, columnSelectionModal, closeColumnSelectionModal, handleColumnConfirm } = useErpExport(planSlug)
   const isMobile = useMediaQuery("(max-width: 767px)")
   const isTablet = useMediaQuery("(max-width: 1024px)")
   const { canEdit } = usePermissions()
@@ -623,6 +625,13 @@ export default function RecurringSubscriptionsPage({
           </div>
         )}
       </div>
+
+      <ExportColumnSelectionModal
+          isOpen={columnSelectionModal.isOpen}
+          canExportAllColumns={columnSelectionModal.canExportAllColumns}
+          onConfirm={handleColumnConfirm}
+          onClose={closeColumnSelectionModal}
+      />
     </FadeIn>
   )
 }

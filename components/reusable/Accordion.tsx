@@ -7,18 +7,17 @@ import {
   ChevronDownIcon,
   ThreeDotsIcon,
   EditIcon,
-  DuplicateIcon,
   TrashIcon,
-  EyeIcon,
-  ReloadIcon,
   ShareIcon,
-  PrinterIcon,
-  MailIcon,
-  ArchiveIcon,
-  BlockedIcon,
-  MoneyIcon,
-  MotorbikeIcon,
   StatusIcon,
+  CopyIcon,
+  EyeIcon,
+  DuplicateIcon,
+  PrinterIcon,
+  ArchiveIcon,
+  ReturnIcon,
+  CancelIcon,
+  TruckIcon,
 } from "@/lib/icons"
 
 interface AccordionProps {
@@ -82,49 +81,46 @@ export const Accordion: React.FC<AccordionProps> = ({
   )
 }
 
-// ... ActionsDropdown permanece igual ...
-interface ActionsDropdownProps {
-  onEdit?: () => void
-  onDuplicate?: () => void
-  onDelete?: () => void
+export interface ActionsDropdownProps {
   onView?: () => void
-  onUndo?: () => void
-  onShare?: () => void
-  onPrint?: () => void
-  onEmail?: () => void
-  onArchive?: () => void
-  onUnarchive?: () => void
-  onCancel?: () => void
-  onPaymentStatus?: () => void
-  onDeliveryStatus?: () => void
-  onStatus?: () => void
+  onEdit?: (() => void) | undefined
+  onStatus?: (() => void) | undefined
+  onPaymentStatus?: (() => void) | undefined
+  onDeliveryStatus?: (() => void) | undefined
+  onShare?: (() => void) | undefined
+  onCopy?: (() => void) | undefined
+  onDuplicate?: (() => void) | undefined
+  onArchive?: (() => void | Promise<void>) | undefined
+  onUnarchive?: (() => void | Promise<void>) | undefined
+  onCancel?: (() => void) | undefined
   cancelLabel?: string
-  cancelIcon?: React.ReactNode
+  onPrint?: (() => void) | undefined
+  onUndo?: (() => void) | undefined
+  onDelete?: (() => void) | undefined
   trigger?: React.ReactElement
   className?: string
   children?: React.ReactNode
 }
 
 export const ActionsDropdown: React.FC<ActionsDropdownProps> = ({
+  onView,
   onEdit,
   onDuplicate,
-  onDelete,
-  onView,
-  onUndo,
-  onShare,
-  onPrint,
-  onEmail,
-  onArchive,
-  onUnarchive,
-  onCancel,
+  onStatus,
   onPaymentStatus,
   onDeliveryStatus,
-  onStatus,
-  cancelLabel = "Cancelar",
-  cancelIcon,
+  onShare,
+  onCopy,
+  onPrint,
+  onArchive,
+  onUnarchive,
+  onUndo,
+  onCancel,
+  cancelLabel,
+  onDelete,
   trigger,
   className,
-  children
+  children,
 }) => (
   <Dropdown
     trigger={
@@ -138,9 +134,10 @@ export const ActionsDropdown: React.FC<ActionsDropdownProps> = ({
     showChevron={false}
     fullWidth={false}
   >
+    {children}
     {onView && (
       <DropdownItem onClick={onView}>
-        <EyeIcon size={18} /> Ver Detalhes
+        <EyeIcon size={18} /> Visualizar
       </DropdownItem>
     )}
     {onEdit && (
@@ -153,9 +150,19 @@ export const ActionsDropdown: React.FC<ActionsDropdownProps> = ({
         <DuplicateIcon size={18} /> Duplicar
       </DropdownItem>
     )}
-    {onUndo && (
-      <DropdownItem onClick={onUndo}>
-        <ReloadIcon size={18} /> Desfazer
+    {onStatus && (
+      <DropdownItem onClick={onStatus}>
+        <StatusIcon size={18} /> Alterar Status
+      </DropdownItem>
+    )}
+    {onPaymentStatus && (
+      <DropdownItem onClick={onPaymentStatus}>
+        <StatusIcon size={18} /> Status do Pagamento
+      </DropdownItem>
+    )}
+    {onDeliveryStatus && (
+      <DropdownItem onClick={onDeliveryStatus}>
+        <TruckIcon size={18} /> Status da Entrega
       </DropdownItem>
     )}
     {onShare && (
@@ -163,24 +170,34 @@ export const ActionsDropdown: React.FC<ActionsDropdownProps> = ({
         <ShareIcon size={18} /> Compartilhar
       </DropdownItem>
     )}
+    {onCopy && (
+      <DropdownItem onClick={onCopy}>
+        <CopyIcon size={18} /> Copiar link
+      </DropdownItem>
+    )}
     {onPrint && (
       <DropdownItem onClick={onPrint}>
         <PrinterIcon size={18} /> Imprimir
       </DropdownItem>
     )}
-    {onEmail && (
-      <DropdownItem onClick={onEmail}>
-        <MailIcon size={18} /> Enviar por E-mail
-      </DropdownItem>
-    )}
     {onArchive && (
-      <DropdownItem onClick={onArchive} className="text-brand-orange dark:text-brand-orange">
+      <DropdownItem onClick={onArchive}>
         <ArchiveIcon size={18} /> Arquivar
       </DropdownItem>
     )}
     {onUnarchive && (
-      <DropdownItem onClick={onUnarchive} className="text-brand-green dark:text-brand-green">
+      <DropdownItem onClick={onUnarchive}>
         <ArchiveIcon size={18} /> Desarquivar
+      </DropdownItem>
+    )}
+    {onUndo && (
+      <DropdownItem onClick={onUndo}>
+        <ReturnIcon size={18} /> Desfazer
+      </DropdownItem>
+    )}
+    {onCancel && (
+      <DropdownItem onClick={onCancel}>
+        <CancelIcon size={18} /> {cancelLabel || "Cancelar"}
       </DropdownItem>
     )}
     {onDelete && (
@@ -188,33 +205,5 @@ export const ActionsDropdown: React.FC<ActionsDropdownProps> = ({
         <TrashIcon size={18} /> Excluir
       </DropdownItem>
     )}
-    {onCancel && (
-      <DropdownItem onClick={onCancel} className={cancelLabel === "Cancelar" ? "text-brand-red" : ""}>
-        {cancelIcon ? cancelIcon : (
-          (cancelLabel.toLowerCase().includes("pago") ||
-            cancelLabel.toLowerCase().includes("recebido") ||
-            cancelLabel.toLowerCase().includes("quitar") ||
-            cancelLabel.toLowerCase().includes("estornar"))
-            ? <MoneyIcon size={18} />
-            : <BlockedIcon size={18} />
-        )} {cancelLabel}
-      </DropdownItem>
-    )}
-    {onPaymentStatus && (
-      <DropdownItem onClick={onPaymentStatus}>
-        <MoneyIcon size={18} /> Alterar status de pagamento
-      </DropdownItem>
-    )}
-    {onDeliveryStatus && (
-      <DropdownItem onClick={onDeliveryStatus}>
-        <MotorbikeIcon size={18} /> Alterar status de entrega
-      </DropdownItem>
-    )}
-    {onStatus && (
-      <DropdownItem onClick={onStatus}>
-        <StatusIcon size={18} /> Alterar status
-      </DropdownItem>
-    )}
-    {children}
   </Dropdown>
 )

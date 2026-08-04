@@ -704,6 +704,7 @@ export async function uploadXMLAction(
         .from("xml_imports")
         .update({
           supplier_id: supplierId,
+          store_id: storeId,
           invoice_number: metadata.invoice.numero,
           invoice_series: metadata.invoice.serie,
           invoice_date: metadata.invoice.data_emissao || null,
@@ -751,6 +752,7 @@ export async function uploadXMLAction(
         .insert({
           partner_id: partnerId,
           supplier_id: supplierId,
+          store_id: storeId,
           access_key: metadata.invoice.chave,
           invoice_number: metadata.invoice.numero,
           invoice_series: metadata.invoice.serie,
@@ -799,6 +801,7 @@ export async function uploadXMLAction(
         .from("xml_import_items")
         .insert({
           xml_import_id: xmlImport.id,
+          store_id: storeId,
           raw_sku: prod.codigo || null,
           raw_name: prod.nome,
           raw_ean: prod.gtin || null,
@@ -1094,7 +1097,11 @@ export async function confirmImportAction(
   }
 }
 
-export async function getImportPreviewAction(xmlImportId: string, partnerId: string): Promise<{
+export async function getImportPreviewAction(
+  xmlImportId: string,
+  partnerId: string,
+  storeId?: string
+): Promise<{
   success: boolean
   preview?: ImportPreview
   error?: string
@@ -1103,12 +1110,17 @@ export async function getImportPreviewAction(xmlImportId: string, partnerId: str
     await requireUser()
     const supabase = await getSupabaseServerClient()
 
-    const { data: xmlImport, error: impErr } = await supabase
+    let query = supabase
       .from("xml_imports")
       .select("*")
       .eq("id", xmlImportId)
       .eq("partner_id", partnerId)
-      .single()
+
+    if (storeId) {
+      query = query.eq("store_id", storeId)
+    }
+
+    const { data: xmlImport, error: impErr } = await query.single()
 
     if (impErr || !xmlImport) {
       return { success: false, error: "Importação não encontrada" }
@@ -1231,6 +1243,7 @@ export async function listImportsAction(
     status?: string
     invoiceNumber?: string
     accessKey?: string
+    storeId?: string
   },
 ): Promise<{ success: boolean; imports?: any[]; total?: number; error?: string }> {
   try {
@@ -1247,6 +1260,10 @@ export async function listImportsAction(
         created_at, updated_at, reversed_at, reversal_reason
       `, { count: "exact" })
       .eq("partner_id", partnerId)
+
+    if (options?.storeId) {
+      query = query.eq("store_id", options.storeId)
+    }
 
     if (options?.startDate) {
       query = query.gte("created_at", options.startDate)
@@ -1286,6 +1303,7 @@ export async function revertImportAction(
   xmlImportId: string,
   partnerId: string,
   reason?: string,
+  storeId?: string
 ): Promise<{ success: boolean; error?: string; message?: string }> {
   try {
     await requirePermission(partnerId, "products", "create")
@@ -1297,6 +1315,7 @@ export async function revertImportAction(
       p_xml_import_id: xmlImportId,
       p_reason: reason || null,
       p_created_by: user.id,
+      p_store_id: storeId || null,
     })
 
     if (rpcErr) {

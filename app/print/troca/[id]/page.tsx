@@ -126,7 +126,7 @@ export default async function PrintTrocaPage({ params }: PageProps) {
         <PrintLayout>
             <div className="flex flex-col w-full h-full bg-white dark:bg-dark-surface relative overflow-hidden quote-a4-print">
                 <div className="w-full flex flex-col items-center p-0">
-                    <div className="w-[650px] min-w-[650px] shrink-0 bg-white text-[#113833] shadow-md overflow-hidden relative font-sans rounded-sm min-h-[1050px] flex flex-col pdf-print-page">
+                    <div className="w-[210mm] min-w-[210mm] shrink-0 bg-white text-[#113833] shadow-md overflow-hidden relative font-sans rounded-sm min-h-[297mm] flex flex-col pdf-print-page">
 
                         {/* ✅ HEADER - relative z-10 agora está DENTRO desta div */}
                         <div

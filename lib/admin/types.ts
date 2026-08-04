@@ -165,6 +165,12 @@ export interface ModerationItem {
     moderation_status: string
     risk_score: number
     created_at: string
+    // Product-specific fields
+    category_name?: string | null
+    brand_name?: string | null
+    video_url?: string | null
+    video_type?: string | null
+    video_thumbnail?: string | null
 }
 
 export interface FetchedProduct {

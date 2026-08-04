@@ -32,7 +32,7 @@ import type { PaymentBreakdownEntry } from "@/lib/payments/financial-engine"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 import { resolveDeliverySettingsRow } from "@/app/actions/shared/delivery"
 
-type ERPItemPayload = {
+export type ERPItemPayload = {
     productId: string | null
     variantId?: string | null
     customName?: string
@@ -41,7 +41,7 @@ type ERPItemPayload = {
     sortOrder: number
 }
 
-type ERPOrderPayload = {
+export type ERPOrderPayload = {
     partnerId: string
     customerId?: string
     customerName?: string
@@ -78,6 +78,8 @@ type ERPOrderPayload = {
         state: string
     }
     csrf_token?: string
+    skipCSRF?: boolean
+    sellerPartnerUserId?: string | null
     paymentProvider?: string | null
     mpPaymentId?: string | null
 }
@@ -1462,9 +1464,11 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         await requirePermission(partnerId, "orders", "can_apply_discount")
     }
 
-    const { requireCSRF } = await import("@/lib/security/csrf-action-wrapper")
-    const csrfValidation = await requireCSRF(data.csrf_token)
-    if (!csrfValidation.valid) return { error: csrfValidation.error || "Token CSRF inválido" }
+    if (!data.skipCSRF) {
+        const { requireCSRF } = await import("@/lib/security/csrf-action-wrapper")
+        const csrfValidation = await requireCSRF(data.csrf_token)
+        if (!csrfValidation.valid) return { error: csrfValidation.error || "Token CSRF inválido" }
+    }
 
     const limitCheck = await checkLimit(partnerId, "monthly_orders")
     if (!limitCheck.allowed) return { error: limitCheck.message || "Limite mensal atingido." }
@@ -1682,6 +1686,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         delivery_address: deliveryAddressStr || null,
         finance_account_id: data.financeAccountId,
         created_by: user.id,
+        seller_partner_user_id: data.sellerPartnerUserId || null,
         pricing_version: pricingResult.pricingVersion,
         delivery_payer: effectiveDeliveryPayer,
         seller_commission_amount: sellerCommissionAmount,
@@ -1925,6 +1930,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     await syncReceivableForOrder(supabase, {
         order_number: order.order_number,
         partner_id: partnerId,
+        store_id: order.store_id || data.storeId || null,
         total_amount: Number(order.total_amount || 0),
         paid_amount: Number(paymentState.paidAmount || 0),
         situation: paymentState.situation,
@@ -2647,6 +2653,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     await syncReceivableForOrder(supabase, {
         order_number: currentOrder.order_number || orderId,
         partner_id: data.partnerId,
+        store_id: (currentOrder as any).store_id || data.storeId || null,
         total_amount: Number(updateServerTotal || 0),
         paid_amount: Number(paymentState.paidAmount || 0),
         situation: paymentState.situation,
@@ -3333,15 +3340,12 @@ export async function updateOrdersStatusInBatchAction(payload: {
             return { error: "Status de pagamento invalido para atualizacao em massa." }
         }
 
-        const paymentWarnings: string[] = []
         let paymentProcessedCount = 0
         for (const order of currentOrders || []) {
             if (order.situation === "cancelled") {
-                paymentWarnings.push(`Pedido ${order.order_number || order.id}: está cancelado e não pode ter o pagamento alterado.`)
                 continue
             }
             if (order.situation === "paid") {
-                paymentWarnings.push(`Pedido ${order.order_number || order.id}: já está pago e não pode ter o pagamento alterado.`)
                 continue
             }
             const paymentState = resolvePaymentState({
@@ -3414,6 +3418,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
             await syncReceivableForOrder(supabase, {
                 order_number: order.order_number || order.id,
                 partner_id: payload.partnerId,
+                store_id: order.store_id || null,
                 total_amount: Number(order.total_amount || 0),
                 paid_amount: Number(paymentState.paidAmount || 0),
                 situation: paymentState.situation,
@@ -3427,7 +3432,6 @@ export async function updateOrdersStatusInBatchAction(payload: {
         if (paymentProcessedCount === 0) {
             return { error: "Nenhum pedido elegível para alteração de pagamento." }
         }
-        overallWarnings.push(...paymentWarnings)
     }
 
     if (payload.actionType === "delivery_status") {
@@ -3444,7 +3448,6 @@ export async function updateOrdersStatusInBatchAction(payload: {
             return { error: "Status de envio invalido para atualizacao em massa." }
         }
 
-        const deliveryWarnings: string[] = []
         let deliveryProcessedCount = 0
 
         // P4: separa os pedidos elegíveis em dois grupos para evitar N UPDATEs sequenciais:
@@ -3453,11 +3456,9 @@ export async function updateOrdersStatusInBatchAction(payload: {
         const eligibleDeliveryOrders: any[] = []
         for (const order of currentOrders || []) {
             if (order.situation === "cancelled") {
-                deliveryWarnings.push(`Pedido ${order.order_number || order.id}: está cancelado e não pode ter o status de entrega alterado.`)
                 continue
             }
             if (order.delivery_status === "delivered") {
-                deliveryWarnings.push(`Pedido ${order.order_number || order.id}: já está entregue e não pode ter o status de entrega alterado.`)
                 continue
             }
             eligibleDeliveryOrders.push(order)
@@ -3513,7 +3514,6 @@ export async function updateOrdersStatusInBatchAction(payload: {
         if (deliveryProcessedCount === 0) {
             return { error: "Nenhum pedido elegível para alteração de entrega." }
         }
-        overallWarnings.push(...deliveryWarnings)
     }
 
     try {

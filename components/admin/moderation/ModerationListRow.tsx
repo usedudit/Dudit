@@ -1,6 +1,6 @@
 "use client"
 
-import React from "react"
+import React, { useState } from "react"
 import { motion } from "framer-motion"
 import { Badge, ActionsDropdown, DropdownItem } from "@/components/reusable"
 import {
@@ -8,8 +8,11 @@ import {
     RemoveImageIcon,
     StoreIcon,
     CancelCircleIcon,
+    ExpandIcon,
 } from "@/lib/icons"
 import type { ModerationItem } from "@/lib/admin/types"
+import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { FadeIn } from "@/components/animations/FadeIn"
 
 interface ModerationListRowProps {
     item: ModerationItem
@@ -24,6 +27,8 @@ const ModerationListRow = React.memo(({
     onDetail,
     onApprove
 }: ModerationListRowProps) => {
+    const [showLightbox, setShowLightbox] = useState(false)
+    const [lightboxIndex, setLightboxIndex] = useState(0)
 
     const statusMap: Record<string, { variant: "orange" | "red" | "green" | "gray" | "blue"; label: string }> = {
         pending_moderation: { variant: "orange", label: "Pendente" },
@@ -37,104 +42,161 @@ const ModerationListRow = React.memo(({
 
     const firstImage = item.images?.[0]
     const imageUrl = firstImage
-        ? (firstImage.startsWith("http") ? firstImage : `${process.env.NEXT_PUBLIC_R2_PUBLIC_URL || ""}/${firstImage}`)
+        ? getR2ImageUrl(firstImage)
         : null
 
+    const allImages = (item.images || []).map(url => getR2ImageUrl(url))
+
+    const openLightbox = (index: number = 0) => {
+        setLightboxIndex(index)
+        setShowLightbox(true)
+    }
+
     return (
-        <motion.tr
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="group hover:[&:not(:has(.action-btn:hover))]:bg-brand-gray dark:hover:[&:not(:has(.action-btn:hover))]:bg-dark-border/10 transition-colors cursor-pointer bg-white dark:bg-dark-background"
-            onClick={() => onDetail(item)}
-        >
-            {/* Produto */}
-            <td className="p-2 pl-6 border-b border-brand-border dark:border-dark-border">
-                <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-lg bg-gray-100 dark:bg-dark-border overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
-                        {imageUrl ? (
-                            <img src={imageUrl} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                                {item.type === "partner" ? (
-                                    <StoreIcon className="w-4 h-4 text-brand-inactive-text" />
-                                ) : (
-                                    <RemoveImageIcon className="w-4 h-4 text-brand-inactive-text" />
-                                )}
-                            </div>
-                        )}
+        <>
+            <motion.tr
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="group hover:[&:not(:has(.action-btn:hover))]:bg-brand-gray dark:hover:[&:not(:has(.action-btn:hover))]:bg-dark-border/10 transition-colors cursor-pointer bg-white dark:bg-dark-background"
+                onClick={() => onDetail(item)}
+            >
+                {/* Produto */}
+                <td className="p-2 pl-6 border-b border-brand-border dark:border-dark-border">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-16 h-16 rounded-lg bg-gray-100 dark:bg-dark-border overflow-hidden shrink-0 border border-brand-border dark:border-dark-border cursor-pointer relative" onClick={(e) => { e.stopPropagation(); openLightbox(0) }}>
+                            {imageUrl ? (
+                                <img src={imageUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                    {item.type === "partner" ? (
+                                        <StoreIcon className="w-5 h-5 text-brand-inactive-text" />
+                                    ) : (
+                                        <RemoveImageIcon className="w-5 h-5 text-brand-inactive-text" />
+                                    )}
+                                </div>
+                            )}
+                            {item.images && item.images.length > 1 && (
+                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                                    <ExpandIcon className="w-5 h-5 text-white" />
+                                    <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs bg-black/80 text-white px-1.5 py-0.5 rounded whitespace-nowrap">
+                                        {item.images.length} imagens - clique para ver
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                            <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                {item.title}
+                            </span>
+                            <span className="text-[11px] font-medium text-brand-inactive-text opacity-70">
+                                {item.id}
+                            </span>
+                            {/* Category and Brand */}
+                            {(item.category_name || item.brand_name) && (
+                                <div className="flex items-center gap-2 mt-1 text-[10px] text-brand-inactive-text flex-wrap">
+                                    {item.category_name && (
+                                        <span className="px-1.5 py-0.5 bg-brand-gray dark:bg-dark-border rounded text-[9px]">
+                                            {item.category_name}
+                                        </span>
+                                    )}
+                                    {item.brand_name && (
+                                        <span className="px-1.5 py-0.5 bg-brand-green/10 dark:bg-brand-green/20 text-brand-green dark:text-brand-green/80 rounded text-[9px]">
+                                            {item.brand_name}
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+                            {/* Video indicator */}
+                            {item.video_url && (
+                                <div className="flex items-center gap-1 mt-1 text-[10px] text-brand-blue">
+                                    <span className="px-1.5 py-0.5 bg-brand-blue/10 dark:bg-brand-blue/20 rounded text-[9px]">
+                                        Vídeo
+                                    </span>
+                                </div>
+                            )}
+                        </div>
                     </div>
+                </td>
+
+                {/* Loja */}
+                <td className="p-2 border-b border-brand-border dark:border-dark-border text-left">
                     <div className="flex flex-col min-w-0">
-                        <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading leading-tight truncate">
-                            {item.title}
-                        </span>
-                        <span className="text-[11px] font-medium text-brand-inactive-text opacity-70">
-                            {item.id}
-                        </span>
-                    </div>
-                </div>
-            </td>
-
-            {/* Loja */}
-            <td className="p-2 border-b border-brand-border dark:border-dark-border text-left">
-                <div className="flex flex-col min-w-0">
-                    <div className="flex items-center gap-1">
-                        <StoreIcon size={12} className="text-brand-inactive-text shrink-0" />
-                        <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate">
-                            {item.store_name || item.owner_store_name}
+                        <div className="flex items-center gap-1">
+                            <StoreIcon size={12} className="text-brand-inactive-text shrink-0" />
+                            <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate">
+                                {item.store_name || item.owner_store_name}
+                            </span>
+                        </div>
+                        <span className="text-[11px] font-medium text-brand-inactive-text opacity-70 ml-4">
+                            {item.store_id || item.partner_id}
                         </span>
                     </div>
-                    <span className="text-[11px] font-medium text-brand-inactive-text opacity-70 ml-4">
-                        {item.store_id || item.partner_id}
+                </td>
+
+                {/* Imagens */}
+                <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
+                    <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
+                        {item.images?.length || 0}
                     </span>
-                </div>
-            </td>
+                    {item.images && item.images.length > 0 && (
+                        <button
+                            onClick={(e) => { e.stopPropagation(); openLightbox(0) }}
+                            className="text-[10px] text-brand-green hover:underline mt-0.5 block cursor-pointer"
+                        >
+                            Ver
+                        </button>
+                    )}
+                </td>
 
-            {/* Imagens */}
-            <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
-                <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
-                    {item.images?.length || 0}
-                </span>
-            </td>
+                {/* Data */}
+                <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
+                    <div className="flex flex-col items-center">
+                        <span className="font-medium text-[13px] text-brand-dark dark:text-dark-heading">
+                            {new Date(item.created_at).toLocaleDateString("pt-BR")}
+                        </span>
+                        <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body opacity-70">
+                            {new Date(item.created_at).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                    </div>
+                </td>
 
-            {/* Data */}
-            <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
-                <div className="flex flex-col items-center">
-                    <span className="font-medium text-[13px] text-brand-dark dark:text-dark-heading">
-                        {new Date(item.created_at).toLocaleDateString("pt-BR")}
-                    </span>
-                    <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body opacity-70">
-                        {new Date(item.created_at).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                </div>
-            </td>
+                {/* Status */}
+                <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
+                    <div className="flex justify-center">
+                        <Badge variant={statusInfo.variant}>
+                            {statusInfo.label}
+                        </Badge>
+                    </div>
+                </td>
 
-            {/* Status */}
-            <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
-                <div className="flex justify-center">
-                    <Badge variant={statusInfo.variant}>
-                        {statusInfo.label}
-                    </Badge>
-                </div>
-            </td>
-
-            {/* Ações */}
-            <td className="p-2 pr-6 border-b border-brand-border dark:border-dark-border text-center">
-                <div className="flex justify-center action-btn" onClick={(e) => e.stopPropagation()}>
-                    <ActionsDropdown
-                        onView={() => onDetail(item)}
-                    >
-                        {item.moderation_status === "pending_moderation" && (
-                            <DropdownItem onClick={() => onApprove(item.id, item.type)} className="text-brand-green">
-                                <CheckCircleIcon size={16} /> Aprovar {item.type === "product" ? "Produto" : item.type === "partner" ? "Perfil" : item.type === "community_video" ? "Vídeo" : "Serviço"}
+                {/* Ações */}
+                <td className="p-2 pr-6 border-b border-brand-border dark:border-dark-border text-center">
+                    <div className="flex justify-center action-btn" onClick={(e) => e.stopPropagation()}>
+                        <ActionsDropdown
+                            onView={() => onDetail(item)}
+                        >
+                            {item.moderation_status === "pending_moderation" && (
+                                <DropdownItem onClick={() => onApprove(item.id, item.type)} className="text-brand-green">
+                                    <CheckCircleIcon size={16} /> Aprovar {item.type === "product" ? "Produto" : item.type === "partner" ? "Perfil" : item.type === "community_video" ? "Vídeo" : "Serviço"}
+                                </DropdownItem>
+                            )}
+                            <DropdownItem onClick={() => onDetail(item)} className="text-brand-red">
+                                <CancelCircleIcon size={16} /> Rejeitar {item.type === "product" ? "Produto" : item.type === "partner" ? "Perfil" : item.type === "community_video" ? "Vídeo" : "Serviço"}
                             </DropdownItem>
-                        )}
-                        <DropdownItem onClick={() => onDetail(item)} className="text-brand-red">
-                            <CancelCircleIcon size={16} /> Rejeitar {item.type === "product" ? "Produto" : item.type === "partner" ? "Perfil" : item.type === "community_video" ? "Vídeo" : "Serviço"}
-                        </DropdownItem>
-                    </ActionsDropdown>
-                </div>
-            </td>
-        </motion.tr>
+                        </ActionsDropdown>
+                    </div>
+                </td>
+            </motion.tr>
+
+            {/* Lightbox */}
+            <ImageLightbox
+                isOpen={showLightbox}
+                onClose={() => setShowLightbox(false)}
+                images={allImages}
+                currentIndex={lightboxIndex}
+                onNavigate={(dir) => setLightboxIndex(prev => (prev + dir + allImages.length) % allImages.length)}
+            />
+        </>
     )
 }, (prev, next) =>
     prev.item.id === next.item.id &&
@@ -145,3 +207,63 @@ const ModerationListRow = React.memo(({
 ModerationListRow.displayName = "ModerationListRow"
 
 export default ModerationListRow
+
+// Lightbox component
+function ImageLightbox({ isOpen, onClose, images, currentIndex, onNavigate }: {
+    isOpen: boolean
+    onClose: () => void
+    images: string[]
+    currentIndex: number
+    onNavigate: (dir: 1 | -1) => void
+}) {
+    if (!isOpen || images.length === 0) return null
+
+    const currentImage = images[currentIndex]
+
+    return (
+        <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center" onClick={onClose}>
+            <div className="relative w-full h-full max-w-[90vw] max-h-[90vh] flex items-center justify-center">
+                <img
+                    src={currentImage}
+                    alt={`Imagem ${currentIndex + 1} de ${images.length}`}
+                    className="max-w-full max-h-full object-contain"
+                />
+                {images.length > 1 && (
+                    <>
+                        <button
+                            onClick={(e) => { e.stopPropagation(); onNavigate(-1) }}
+                            className="absolute left-4 text-white/80 hover:text-white transition-colors p-2 rounded-full bg-black/50"
+                            aria-label="Anterior"
+                        >
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <polyline points="15 18 9 12 15 6" />
+                            </svg>
+                        </button>
+                        <button
+                            onClick={(e) => { e.stopPropagation(); onNavigate(1) }}
+                            className="absolute right-4 text-white/80 hover:text-white transition-colors p-2 rounded-full bg-black/50"
+                            aria-label="Próxima"
+                        >
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <polyline points="9 18 15 12 9 6" />
+                            </svg>
+                        </button>
+                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/70 text-sm">
+                            {currentIndex + 1} / {images.length}
+                        </div>
+                    </>
+                )}
+                <button
+                    onClick={(e) => { e.stopPropagation(); onClose() }}
+                    className="absolute top-4 right-4 text-white/80 hover:text-white transition-colors p-2 rounded-full bg-black/50"
+                    aria-label="Fechar"
+                >
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+    )
+}

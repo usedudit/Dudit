@@ -25,7 +25,9 @@ import { useMediaQuery } from '@/components/erp/hooks';
 import { useInfiniteScrollObserver } from '@/hooks/use-infinite-scroll-observer';
 import { useEntityPage } from '@/hooks/use-entity-page';
 import { useErpExport } from '@/hooks/use-erp-export';
+import { usePermissions } from '@/lib/permission-context';
 import ExportSelectionModal from '@/components/erp/export/ExportSelectionModal';
+import ExportColumnSelectionModal from '@/components/erp/export/ExportColumnSelectionModal';
 import { useStore } from "@/lib/store-context"
 import {
     EMPTY_DATE_PERIOD,
@@ -62,6 +64,7 @@ const MOVEMENT_TYPE_LABELS: Record<string, string> = {
 const StockMovementPageContent = ({ partnerId, storeId, movements: initialMovements, initialNextCursor, initialHasMore }: StockMovementPageProps) => {
     const { error: notifyError, success: notifySuccess } = useNotification();
     const isTabletOrMobile = useMediaQuery("(max-width: 1023px)");
+    const { planSlug } = usePermissions();
 
     const queryKey = useMemo(() => ['erp', 'stock-movements', partnerId, storeId] as const, [partnerId, storeId]);
 
@@ -125,7 +128,7 @@ const StockMovementPageContent = ({ partnerId, storeId, movements: initialMoveme
     const [isUndoing, setIsUndoing] = useState(false);
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null);
     const [selection, setSelection] = useState({ ids: new Set<string>() });
-    const { exportData, isExporting, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport();
+    const { exportData, isExporting, columnSelectionModal, closeColumnSelectionModal, handleColumnConfirm, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport(planSlug)
 
     const tableContainerRef = useRef<HTMLDivElement>(null);
     const [scrollState, setScrollState] = useState({ left: false, right: false });
@@ -716,6 +719,13 @@ const StockMovementPageContent = ({ partnerId, storeId, movements: initialMoveme
                         confirmText={isUndoing ? "Desfazendo..." : "Desfazer Todos"}
                         variant="warning"
                         isLoading={isUndoing}
+                    />
+
+                    <ExportColumnSelectionModal
+                        isOpen={columnSelectionModal.isOpen}
+                        canExportAllColumns={columnSelectionModal.canExportAllColumns}
+                        onConfirm={handleColumnConfirm}
+                        onClose={closeColumnSelectionModal}
                     />
 
                     <ExportSelectionModal

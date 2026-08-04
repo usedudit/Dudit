@@ -429,7 +429,7 @@ export function LabelPrintModal({ isOpen, onClose, allProducts }: LabelPrintModa
                                         </div>
                                     ) : (
                                         <div className="flex justify-center">
-                                            <div className="bg-white shadow-md rounded-sm overflow-hidden" style={{ transform: "scale(0.6)", transformOrigin: "top center" }}>
+                                            <div className="bg-white shadow-md rounded-sm overflow-hidden">
                                                 <LabelSheet
                                                     key={activeTab}
                                                     products={labelProducts}

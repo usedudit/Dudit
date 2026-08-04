@@ -41,7 +41,7 @@ export const SupplierDetailPage = ({ supplier, onBack, onEdit }: Props) => {
 
     const handleBack = useCallback(() => onBack(), [onBack]);
 
-    const { setHeaderOverride } = useSidebar();
+    const { setHeaderOverride, setSidebarCard } = useSidebar();
 
     useEffect(() => {
         setHeaderOverride({
@@ -51,6 +51,23 @@ export const SupplierDetailPage = ({ supplier, onBack, onEdit }: Props) => {
         })
         return () => setHeaderOverride(null)
     }, [supplier?.name, handleBack, setHeaderOverride])
+
+    useEffect(() => {
+        setSidebarCard(
+            <div className="flex items-center gap-3 p-2 rounded-lg bg-brand-dark/30 border border-dark-border">
+                <UserProfileImage
+                    fullName={supplier?.name || "Fornecedor"}
+                    imageUrl={supplier?.image_url || supplier?.imageUrl || supplier?.avatar_url}
+                    className="w-10 h-10 text-sm shrink-0"
+                />
+                <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-white truncate">{supplier?.name || "Fornecedor"}</p>
+                    <p className="text-[11px] text-brand-inactive-text truncate">{supplier?.supplier_code || supplier?.email || "Fornecedor"}</p>
+                </div>
+            </div>
+        )
+        return () => setSidebarCard(null)
+    }, [supplier?.name, supplier?.image_url, supplier?.imageUrl, supplier?.avatar_url, supplier?.supplier_code, supplier?.email, setSidebarCard])
 
     const handleScroll = useCallback(() => {
         if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5);

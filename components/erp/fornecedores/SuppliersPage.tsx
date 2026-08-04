@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast"
 import { getERPSuppliersPageAction, getSupplierByIdAction, type ERPSupplierListCursor } from "@/app/actions/erp/suppliers"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { useEntityPage } from "@/hooks/use-entity-page"
+import { usePermissions } from "@/lib/permission-context"
 
 import { Button, IconPlaceholder, ThreeDotsLoader, Checkbox, Badge, AlertModal, SavingStatusModal, SelectionBanner } from "@/components/reusable"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
@@ -36,6 +37,7 @@ import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { useErpExport } from "@/hooks/use-erp-export"
 import { useStore } from "@/lib/store-context"
 import ExportSelectionModal from "@/components/erp/export/ExportSelectionModal"
+import ExportColumnSelectionModal from "@/components/erp/export/ExportColumnSelectionModal"
 
 interface Supplier {
     id: string
@@ -86,6 +88,7 @@ export default function SuppliersPage({
 }) {
     const { toast } = useToast()
     const { openPlanUpgrade } = usePlanUpgrade()
+    const { planSlug } = usePermissions()
     const isMobile = useMediaQuery("(max-width: 767px)")
     const isTablet = useMediaQuery("(max-width: 1024px)")
 
@@ -141,7 +144,7 @@ export default function SuppliersPage({
 
     const observerTarget = useRef<HTMLDivElement>(null)
 
-    const { exportData, isExporting, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport()
+    const { exportData, isExporting, columnSelectionModal, closeColumnSelectionModal, handleColumnConfirm, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport(planSlug)
     const isLoading = isQueryLoading
     const itemsPerPage = 8
 
@@ -186,13 +189,13 @@ export default function SuppliersPage({
     const filterSections = useMemo<FilterSectionConfig[]>(() => {
         // Only show status filter if there are suppliers with different statuses
         const statusLabels = [...new Set((rawSuppliers || []).map((s: any) => s.status === "ativo" ? "Ativo" : "Inativo"))]
-        
+
         const sections: FilterSectionConfig[] = []
-        
+
         if (statusLabels.length > 1) {
             sections.push({ id: "status", title: "Status", type: "checkbox-list", options: statusLabels })
         }
-        
+
         return sections
     }, [rawSuppliers])
 
@@ -327,6 +330,7 @@ export default function SuppliersPage({
         const result = await deleteSuppliersInBatchAction([idToDelete])
         if (result.success) {
             afterMutation()
+            cache.removeItemFromListCache(idToDelete)
             toast({ title: "Excluído com sucesso" })
             setSelection((p) => {
                 const nextIds = new Set(p.ids)
@@ -350,6 +354,7 @@ export default function SuppliersPage({
             const result = await deleteSuppliersInBatchAction(ids)
             if (result.success) {
                 afterMutation()
+                ids.forEach(id => cache.removeItemFromListCache(id))
                 toast({ title: "Excluído com sucesso" })
             } else {
                 toast({ title: "Erro", description: result.error, variant: "destructive" })
@@ -685,6 +690,13 @@ export default function SuppliersPage({
             />
 
             <SavingStatusModal isOpen={isDeletingSupplier || isProcessingBulk} text={isDeletingSupplier ? "Excluindo fornecedor..." : "Processando..."} />
+
+            <ExportColumnSelectionModal
+                isOpen={columnSelectionModal.isOpen}
+                canExportAllColumns={columnSelectionModal.canExportAllColumns}
+                onConfirm={handleColumnConfirm}
+                onClose={closeColumnSelectionModal}
+            />
 
             <ExportSelectionModal
                 isOpen={selectionModal.isOpen}

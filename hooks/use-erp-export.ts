@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from "react"
 import { exportERPAction, type ExportERPInput } from "@/app/actions/erp/export"
 import { useToast } from "@/hooks/use-toast"
+import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 
 function downloadBase64File(base64: string, filename: string, mimeType: string) {
   const binary = atob(base64)
@@ -22,16 +23,30 @@ export interface UseErpExportOptions {
   totalCount?: number
 }
 
-export function useErpExport() {
+interface ColumnSelectionModalState {
+  isOpen: boolean
+  baseInput: ExportERPInput
+  selectedCount: number
+  totalCount: number
+  selectedIds: string[]
+  onConfirm: (includeAllColumns: boolean) => void
+}
+
+interface SelectionModalState {
+  isOpen: boolean
+  selectedCount: number
+  totalCount: number
+  selectedIds: string[]
+  baseInput: ExportERPInput
+}
+
+export function useErpExport(planSlug: string = "free") {
   const { toast } = useToast()
   const [isExporting, setIsExporting] = useState(false)
-  const [modalState, setModalState] = useState<{
-    isOpen: boolean
-    selectedCount: number
-    totalCount: number
-    selectedIds: string[]
-    baseInput: ExportERPInput
-  } | null>(null)
+  const [selectionModalState, setSelectionModalState] = useState<SelectionModalState | null>(null)
+  const [columnSelectionModalState, setColumnSelectionModalState] = useState<ColumnSelectionModalState | null>(null)
+
+  const canExportAllColumns = hasMinimumPlan(planSlug, "crescer")
 
   const doExport = useCallback(
     async (input: ExportERPInput) => {
@@ -73,52 +88,103 @@ export function useErpExport() {
       const selectedCount = selectedIds?.size ?? 0
 
       if (selectedCount > 0 && selectedCount < totalCount) {
-        setModalState({
+        setColumnSelectionModalState({
           isOpen: true,
+          baseInput: input,
           selectedCount,
           totalCount,
           selectedIds: Array.from(selectedIds!),
-          baseInput: input,
+          onConfirm: (includeAllColumns: boolean) => {
+            setColumnSelectionModalState(null)
+            const inputWithColumns = {
+              ...input,
+              filters: { ...input.filters, includeAllColumns },
+            }
+            setSelectionModalState({
+              isOpen: true,
+              selectedCount,
+              totalCount,
+              selectedIds: Array.from(selectedIds!),
+              baseInput: inputWithColumns,
+            })
+          },
         })
       } else {
-        void doExport(input)
+        setColumnSelectionModalState({
+          isOpen: true,
+          baseInput: input,
+          selectedCount,
+          totalCount,
+          selectedIds: Array.from(selectedIds || []),
+          onConfirm: (includeAllColumns: boolean) => {
+            setColumnSelectionModalState(null)
+            void doExport({
+              ...input,
+              filters: { ...input.filters, includeAllColumns },
+            })
+          },
+        })
       }
     },
     [doExport],
   )
 
-  const closeModal = useCallback(() => {
-    setModalState(null)
+  const closeColumnSelectionModal = useCallback(() => {
+    setColumnSelectionModalState(null)
+  }, [])
+
+  const handleColumnConfirm = useCallback(
+    (includeAllColumns: boolean) => {
+      if (!columnSelectionModalState) return
+      const { onConfirm } = columnSelectionModalState
+      onConfirm(includeAllColumns)
+    },
+    [columnSelectionModalState],
+  )
+
+  const closeSelectionModal = useCallback(() => {
+    setSelectionModalState(null)
   }, [])
 
   const handleExportSelected = useCallback(() => {
-    if (!modalState) return
-    const { baseInput, selectedIds } = modalState
+    if (!selectionModalState) return
+    const { baseInput, selectedIds } = selectionModalState
     void doExport({
       ...baseInput,
       filters: { ...baseInput.filters, selectedIds },
     })
-  }, [modalState, doExport])
+  }, [selectionModalState, doExport])
 
   const handleExportAll = useCallback(() => {
-    if (!modalState) return
-    void doExport(modalState.baseInput)
-  }, [modalState, doExport])
+    if (!selectionModalState) return
+    void doExport(selectionModalState.baseInput)
+  }, [selectionModalState, doExport])
+
+  const columnSelectionModal = useMemo(
+    () => ({
+      isOpen: columnSelectionModalState?.isOpen ?? false,
+      canExportAllColumns,
+    }),
+    [columnSelectionModalState, canExportAllColumns],
+  )
 
   const selectionModal = useMemo(
     () => ({
-      isOpen: modalState?.isOpen ?? false,
-      selectedCount: modalState?.selectedCount ?? 0,
-      totalCount: modalState?.totalCount ?? 0,
+      isOpen: selectionModalState?.isOpen ?? false,
+      selectedCount: selectionModalState?.selectedCount ?? 0,
+      totalCount: selectionModalState?.totalCount ?? 0,
     }),
-    [modalState],
+    [selectionModalState],
   )
 
   return {
     exportData,
     isExporting,
+    columnSelectionModal,
+    closeColumnSelectionModal,
+    handleColumnConfirm,
     selectionModal,
-    closeSelectionModal: closeModal,
+    closeSelectionModal,
     handleExportSelected,
     handleExportAll,
   }

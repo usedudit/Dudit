@@ -89,6 +89,9 @@ export async function getModerationQueue(
         .from("products")
         .select(`
       id, name, description, price, images, moderation_status, created_at, store_id,
+      category_id, category:product_categories!category_id(name),
+      brand_id, brand:brands!brand_id(name),
+      video_url, video_type, video_thumbnail,
       partner:partners!inner(id, user_id),
       store:stores!store_id!left(id, name, phone, description, banner_url, gallery, logo_url, risk_score)
     `)
@@ -162,6 +165,11 @@ export async function getModerationQueue(
             moderation_status: p.moderation_status,
             risk_score: st?.risk_score ?? 0,
             created_at: p.created_at,
+            category_name: p.category?.name || null,
+            brand_name: p.brand?.name || null,
+            video_url: p.video_url || null,
+            video_type: p.video_type || null,
+            video_thumbnail: p.video_thumbnail || null,
         }
     })
 

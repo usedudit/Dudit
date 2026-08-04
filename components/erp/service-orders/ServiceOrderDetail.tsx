@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { ShareModal } from "@/components/marketplace/ShareModal"
-import { Button, Badge, Tabs, TabsList, TabsTrigger, TabsContent, ThreeDotsLoader, ActionsDropdown, DropdownItem, FormSection, ListItem, IconPlaceholder, AlertModal } from "@/components/reusable"
+import { Button, Badge, Tabs, TabsList, TabsTrigger, TabsContent, ThreeDotsLoader, ActionsDropdown, DropdownItem, FormSection, ListItem, IconPlaceholder, AlertModal, FormDropdown } from "@/components/reusable"
 import CustomerCard from "@/components/reusable/CustomerCard"
 import { ChevronLeftIcon, WrenchIcon, UserIcon, CalendarIcon, FileIcon, CheckCircleIcon, ClockIcon, EditIcon, PackageIcon } from "@/lib/icons"
 import { formatCurrency, formatDate } from "@/lib/utils"
@@ -77,6 +77,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
     const [confirmDelete, setConfirmDelete] = useState(false)
     const [isRegeneratingCode, setIsRegeneratingCode] = useState(false)
     const [showStatusModal, setShowStatusModal] = useState(false)
+    const [selectedStatus, setSelectedStatus] = useState("")
 
     useEffect(() => { setOrder(data) }, [data])
 
@@ -330,31 +331,23 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
 
                                     {/* Desktop action buttons */}
                                     <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                        <ActionsDropdown>
-                                            <DropdownItem onClick={handleEditClick}>
-                                                Editar
-                                            </DropdownItem>
-                                            <DropdownItem onClick={() => setShowStatusModal(true)}>
-                                                Alterar Status
-                                            </DropdownItem>
-                                            <DropdownItem onClick={async () => {
-                                                if (!hasMinimumPlan(planSlug, "crescer")) {
-                                                    openPlanUpgrade("crescer");
-                                                    return
-                                                }
-                                                const { ensurePublicTokenAction } = await import("@/app/actions/erp/service-orders")
-                                                const token = await ensurePublicTokenAction(partnerId, order.id)
-                                                if (token) {
-                                                    setOrder((prev: any) => ({ ...prev, public_token: token }))
-                                                }
-                                                setShowShareModal(true);
-                                            }}>
-                                                Compartilhar
-                                            </DropdownItem>
-                                            <DropdownItem onClick={() => setConfirmDelete(true)} className="text-brand-red">
-                                                Excluir
-                                            </DropdownItem>
-                                        </ActionsDropdown>
+                                        <ActionsDropdown
+                                          onEdit={handleEditClick}
+                                          onStatus={() => setShowStatusModal(true)}
+                                          onShare={async () => {
+                                            if (!hasMinimumPlan(planSlug, "crescer")) {
+                                              openPlanUpgrade("crescer");
+                                              return
+                                            }
+                                            const { ensurePublicTokenAction } = await import("@/app/actions/erp/service-orders")
+                                            const token = await ensurePublicTokenAction(partnerId, order.id)
+                                            if (token) {
+                                              setOrder((prev: any) => ({ ...prev, public_token: token }))
+                                            }
+                                            setShowShareModal(true);
+                                          }}
+                                          onDelete={() => setConfirmDelete(true)}
+                                        />
                                     </div>
                                 </div>
 
@@ -478,15 +471,6 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                             title="Prioridade"
                                                             description={order.priority ? (PRIORITY_META[order.priority]?.label || order.priority) : "-"}
                                                             className="border border-brand-border dark:border-dark-border rounded-xl px-4 py-3 bg-brand-gray/5"
-                                                            right={
-                                                                order.priority ? (
-                                                                    <div className="flex items-center h-full">
-                                                                        <Badge variant={PRIORITY_META[order.priority]?.variant || "gray"}>
-                                                                            {PRIORITY_META[order.priority]?.label || order.priority}
-                                                                        </Badge>
-                                                                    </div>
-                                                                ) : null
-                                                            }
                                                         />
                                                         <ListItem
                                                             icon={ClockIcon}
@@ -1003,35 +987,38 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
 
             {/* Status Change Modal */}
             {showStatusModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowStatusModal(false)}>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => { setShowStatusModal(false); setSelectedStatus("") }}>
                     <div className="bg-white dark:bg-dark-surface rounded-2xl p-6 w-full max-w-sm mx-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
                         <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">Alterar Status</h3>
                         <p className="text-sm text-brand-inactive-text mb-4">Status atual: <strong className="text-brand-dark dark:text-dark-heading">{SERVICE_ORDER_STATUS_META[order.status as ServiceOrderStatus]?.label || order.status}</strong></p>
-                        <div className="space-y-2">
-                            {availableTransitions.length === 0 ? (
-                                <p className="text-sm text-brand-inactive-text text-center py-4">Não há alterações de status disponíveis.</p>
-                            ) : (
-                                availableTransitions.map((status) => {
-                                    const meta = SERVICE_ORDER_STATUS_META[status as ServiceOrderStatus]
-                                    return (
-                                        <button
-                                            key={status}
-                                            onClick={async () => {
-                                                await handleStatusChange(status)
-                                                setShowStatusModal(false)
-                                            }}
-                                            disabled={loading}
-                                            className="w-full text-left px-4 py-3 rounded-xl border border-brand-border dark:border-dark-border hover:bg-brand-gray dark:hover:bg-dark-border/30 transition-colors disabled:opacity-50"
-                                        >
-                                            <span className="font-medium text-sm text-brand-dark dark:text-dark-heading">{meta?.label || status}</span>
-                                        </button>
-                                    )
-                                })
-                            )}
-                        </div>
+                        {availableTransitions.length === 0 ? (
+                            <p className="text-sm text-brand-inactive-text text-center py-4">Não há alterações de status disponíveis.</p>
+                        ) : (
+                            <FormDropdown
+                              label="Novo status"
+                              options={availableTransitions.map((status) => ({
+                                value: status,
+                                label: SERVICE_ORDER_STATUS_META[status as ServiceOrderStatus]?.label || status
+                              }))}
+                              value={selectedStatus}
+                              setValue={setSelectedStatus}
+                              placeholder="Selecione o novo status"
+                              actionItem={{
+                                label: "Confirmar",
+                                icon: <CheckCircleIcon size={18} />,
+                                onClick: async () => {
+                                  if (selectedStatus) {
+                                    await handleStatusChange(selectedStatus)
+                                    setShowStatusModal(false)
+                                    setSelectedStatus("")
+                                  }
+                                }
+                              }}
+                            />
+                        )}
                         <div className="flex justify-end mt-4">
                             <button
-                                onClick={() => setShowStatusModal(false)}
+                                onClick={() => { setShowStatusModal(false); setSelectedStatus("") }}
                                 className="text-sm font-medium text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors px-4 py-2"
                             >
                                 Cancelar

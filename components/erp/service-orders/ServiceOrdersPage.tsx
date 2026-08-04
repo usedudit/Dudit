@@ -16,6 +16,7 @@ import AlertModal from "@/components/reusable/AlertModal"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 import { ShareModal } from "@/components/marketplace/ShareModal"
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
+import { BulkEditActionsModal, BulkActionPayload } from "@/components/reusable/BulkEditActionsModal"
 import ServiceOrderListRow from "./ServiceOrderListRow"
 import ServiceOrderGridCard from "./ServiceOrderGridCard"
 import ServiceOrderForm from "./ServiceOrderForm"
@@ -25,7 +26,9 @@ import {
   ListIcon, GridIcon, ArrowUpDownIcon, ClockIcon, CheckCircleIcon, BlockedIcon, ExportFileIcon,
 } from "@/lib/icons"
 import { useErpExport } from "@/hooks/use-erp-export"
+import { usePermissions } from "@/lib/permission-context"
 import ExportSelectionModal from "@/components/erp/export/ExportSelectionModal"
+import ExportColumnSelectionModal from "@/components/erp/export/ExportColumnSelectionModal"
 import {
   isDatePeriodFilterActive,
   resolveDatePeriodBounds,
@@ -35,6 +38,7 @@ import {
 import {
   getERPServiceOrdersPageAction,
   getServiceOrderDetailsAction,
+  updateServiceOrderStatusAction,
 } from "@/app/actions/erp/service-orders"
 import { SERVICE_ORDER_STATUS_META, type ServiceOrderStatus } from "@/lib/types/service-order"
 
@@ -81,6 +85,7 @@ export default function ServiceOrdersPage({
   const [isDeleting, setIsDeleting] = useState(false)
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
   const isTabletOrMobile = useMediaQuery("(max-width: 1024px)")
+  const { planSlug } = usePermissions()
   const [filters, setFilters] = useState<any>({
     status: [],
     total: { min: "", max: "" },
@@ -97,7 +102,9 @@ export default function ServiceOrdersPage({
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [showShareModal, setShowShareModal] = useState<{ id: string; token: string } | null>(null)
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null)
-  const { exportData, isExporting, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport()
+  const [bulkEditModal, setBulkEditModal] = useState({ isOpen: false })
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
+  const { exportData, isExporting, columnSelectionModal, closeColumnSelectionModal, handleColumnConfirm, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport(planSlug)
   const itemsPerPage = 50
 
   const { data: teamMembers = [] } = useQuery({
@@ -151,6 +158,70 @@ export default function ServiceOrdersPage({
     afterMutation()
     queryClient.invalidateQueries({ queryKey: ["service-orders", partnerId, storeId] })
   }, [afterMutation, queryClient, partnerId, storeId])
+
+  const handleBulkEditApply = async (payload: BulkActionPayload) => {
+    const ids = Array.from(selection)
+    if (ids.length === 0) return
+
+    if (payload.type === 'service_order_status' && payload.serviceOrderStatus) {
+      const status = payload.serviceOrderStatus
+      let successCount = 0
+      let failCount = 0
+      let skippedCount = 0
+      const errors: string[] = []
+
+      for (const id of ids) {
+        const order = effectiveOrders?.find(o => o.id === id)
+        if (!order) {
+          failCount++
+          continue
+        }
+        // Skip orders that are already in final status (entregue, cancelada)
+        if (order.status === 'entregue' || order.status === 'cancelada') {
+          skippedCount++
+          continue
+        }
+        // Skip if already has the target status
+        if (order.status === status) {
+          skippedCount++
+          continue
+        }
+
+        const result = await updateServiceOrderStatusAction(partnerId, id, status)
+        if (result.success) {
+          successCount++
+        } else {
+          failCount++
+          errors.push(`${order.order_number}: ${result.error}`)
+        }
+      }
+
+      let message = ""
+      if (successCount > 0) message += `${successCount} ordem(ns) atualizada(s). `
+      if (skippedCount > 0) message += `${skippedCount} ignorada(s) (já no status final ou mesmo status). `
+      if (failCount > 0) message += `${failCount} falharam.`
+
+      if (successCount > 0) {
+        handleMutation()
+        toast({ title: "Sucesso", description: message.trim() })
+      } else {
+        toast({ title: "Erro", description: message.trim() || "Nenhuma ordem foi atualizada", variant: "destructive" })
+      }
+
+      if (errors.length > 0) {
+        console.warn("Bulk status update errors:", errors)
+      }
+
+      setBulkEditModal({ isOpen: false })
+      setSelection(new Set())
+      return
+    }
+
+    if (payload.type === 'delete') {
+      setConfirmBulkDelete(true)
+      return
+    }
+  }
 
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setSearch(e.target.value)
@@ -258,6 +329,27 @@ export default function ServiceOrdersPage({
     } finally {
       setIsDeleting(false)
       setConfirmDelete(null)
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    setIsDeleting(true)
+    try {
+      const { deleteServiceOrderAction } = await import("@/app/actions/erp/service-orders")
+      const ids = Array.from(selection)
+      let successCount = 0
+      for (const id of ids) {
+        const res = await deleteServiceOrderAction(partnerId, id)
+        if (res.success) successCount++
+      }
+      if (successCount > 0) {
+        toast({ description: `${successCount} ordem(ns) de serviço deletada(s)` })
+        handleMutation()
+      }
+      setSelection(new Set())
+      setConfirmBulkDelete(false)
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -375,6 +467,13 @@ export default function ServiceOrdersPage({
       {renderDatePeriodBadge("Data Prevista", filters.expected_completion_date, "expected_completion_date")}
     </>
   )
+
+  const serviceOrderSelectionGuards = useMemo(() => {
+    const selectedOrders = sortedOrders.filter((o: any) => selection.has(o.id))
+    const deliveredCount = selectedOrders.filter((o: any) => o.status === 'entregue').length
+    const cancelledCount = selectedOrders.filter((o: any) => o.status === 'cancelada').length
+    return { deliveredCount, cancelledCount, totalCount: selection.size }
+  }, [sortedOrders, selection])
 
   return (
     <>
@@ -583,6 +682,30 @@ export default function ServiceOrdersPage({
               </div>
             )}
 
+            {selection.size > 0 && !entityState.isOpen && (
+              <FloatingActionBar
+                selectedCount={selection.size}
+                onClearSelection={() => setSelection(new Set())}
+              >
+                <Button
+                  variant="ghost"
+                  onClick={() => setBulkEditModal({ isOpen: true })}
+                  leftIcon={<WrenchIcon size={18} />}
+                  className="h-10 px-3"
+                >
+                  Ações em massa
+                </Button>
+                <Button
+                  variant="ghostred"
+                  className="h-10 px-3"
+                  onClick={() => setConfirmBulkDelete(true)}
+                  leftIcon={<TrashIcon size={18} />}
+                >
+                  Excluir
+                </Button>
+              </FloatingActionBar>
+            )}
+
             <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-4">
               <AnimatePresence mode="wait">
                 {paginated.length === 0 ? (
@@ -614,27 +737,17 @@ export default function ServiceOrdersPage({
                                 }}
                                 onDetails={() => openEntity("view", o.id)}
                                 onEdit={() => openEntity("edit", o.id)}
+                                onStatus={() => handleStatusChange(o.id, "aguardando_aprovacao")}
+                                onShare={async () => {
+                                  const { ensurePublicTokenAction } = await import("@/app/actions/erp/service-orders")
+                                  const token = await ensurePublicTokenAction(partnerId, o.id)
+                                  if (token) setShowShareModal({ id: o.id, token })
+                                }}
                                 onDelete={() => setConfirmDelete(o.id)}
                                 statusColor={statusColor(o.status)}
                                 statusLabel={statusLabel(o.status)}
                                 teamMembers={teamMembers}
-                              >
-                                {(STATUS_TRANSITIONS[o.status] || []).map((st) => {
-                                  const meta = SERVICE_ORDER_STATUS_META[st as ServiceOrderStatus]
-                                  return (
-                                    <DropdownItem key={st} onClick={() => handleStatusChange(o.id, st)}>
-                                      Marcar como: {meta?.label}
-                                    </DropdownItem>
-                                  )
-                                })}
-                                <DropdownItem onClick={async () => {
-                                  const { ensurePublicTokenAction } = await import("@/app/actions/erp/service-orders")
-                                  const token = await ensurePublicTokenAction(partnerId, o.id)
-                                  if (token) setShowShareModal({ id: o.id, token })
-                                }}>
-                                  Compartilhar
-                                </DropdownItem>
-                              </ServiceOrderGridCard>
+                              />
                             ))}
                           </div>
                         ) : (
@@ -703,27 +816,17 @@ export default function ServiceOrdersPage({
                                       }}
                                       onDetails={() => openEntity("view", o.id)}
                                       onEdit={() => openEntity("edit", o.id)}
+                                      onStatus={() => handleStatusChange(o.id, "aguardando_aprovacao")}
+                                      onShare={async () => {
+                                        const { ensurePublicTokenAction } = await import("@/app/actions/erp/service-orders")
+                                        const token = await ensurePublicTokenAction(partnerId, o.id)
+                                        if (token) setShowShareModal({ id: o.id, token })
+                                      }}
                                       onDelete={() => setConfirmDelete(o.id)}
                                       statusColor={statusColor(o.status)}
                                       statusLabel={statusLabel(o.status)}
                                       teamMembers={teamMembers}
-                                    >
-                                      {(STATUS_TRANSITIONS[o.status] || []).map((st) => {
-                                        const meta = SERVICE_ORDER_STATUS_META[st as ServiceOrderStatus]
-                                        return (
-                                          <DropdownItem key={st} onClick={() => handleStatusChange(o.id, st)}>
-                                            Marcar como: {meta?.label}
-                                          </DropdownItem>
-                                        )
-                                      })}
-                                      <DropdownItem onClick={async () => {
-                                        const { ensurePublicTokenAction } = await import("@/app/actions/erp/service-orders")
-                                        const token = await ensurePublicTokenAction(partnerId, o.id)
-                                        if (token) setShowShareModal({ id: o.id, token })
-                                      }}>
-                                        Compartilhar
-                                      </DropdownItem>
-                                    </ServiceOrderListRow>
+                                    />
                                   ))}
                                 </tbody>
                               </table>
@@ -786,6 +889,13 @@ export default function ServiceOrdersPage({
         })}
       />
 
+      <ExportColumnSelectionModal
+        isOpen={columnSelectionModal.isOpen}
+        canExportAllColumns={columnSelectionModal.canExportAllColumns}
+        onConfirm={handleColumnConfirm}
+        onClose={closeColumnSelectionModal}
+      />
+
       <ExportSelectionModal
         isOpen={selectionModal.isOpen}
         selectedCount={selectionModal.selectedCount}
@@ -808,6 +918,26 @@ export default function ServiceOrdersPage({
 
       <SavingStatusModal isOpen={isDeleting} text="Excluindo ordem de serviço..." />
       <SavingStatusModal isOpen={isUpdatingStatus} text="Atualizando status..." />
+
+      <BulkEditActionsModal
+        isOpen={bulkEditModal.isOpen}
+        onClose={() => setBulkEditModal({ isOpen: false })}
+        selectedCount={selection.size}
+        targetType="service_order"
+        serviceOrderSelectionGuards={serviceOrderSelectionGuards}
+        onApply={handleBulkEditApply}
+      />
+
+      <AlertModal
+        isOpen={confirmBulkDelete}
+        onClose={() => setConfirmBulkDelete(false)}
+        onConfirm={handleBulkDelete}
+        title="Excluir Ordens de Serviço"
+        description={`Tem certeza que deseja excluir ${selection.size} ordem(ns) de serviço?`}
+        confirmText="Excluir"
+        cancelText="Cancelar"
+        variant="danger"
+      />
     </>
   )
 }

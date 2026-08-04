@@ -29,25 +29,25 @@ export interface ArchivePayload {
 
 /**
  * Scopes a query to only return active (non-deleted) records.
- * Equivalent to appending: WHERE deleted_at IS NULL
+ * Equivalent to appending: WHERE deleted_at IS NULL AND status != 'deleted'
  */
-export function scopeActiveOnly<T extends { is: (col: string, val: null) => any }>(query: T): T {
-  return query.is("deleted_at", null)
+export function scopeActiveOnly<T extends { is: (col: string, val: null) => any; not: (col: string, op: string, val: any) => any }>(query: T): T {
+  return query.is("deleted_at", null).not("status", "neq", "deleted")
 }
 
 /**
  * Scopes a query to only return archived (plan-archived or manually archived) records.
- * Equivalent to appending: WHERE deleted_at IS NULL AND status IN ('archived', 'arquivado')
+ * Equivalent to appending: WHERE deleted_at IS NULL AND status IN ('archived', 'arquivado') AND status != 'deleted'
  */
-export function scopeArchivedOnly<T extends { is: (col: string, val: null) => any; in: (col: string, vals: string[]) => any }>(query: T): T {
-  return query.is("deleted_at", null).in("status", ["archived", "arquivado"])
+export function scopeArchivedOnly<T extends { is: (col: string, val: null) => any; in: (col: string, vals: string[]) => any; not: (col: string, op: string, val: any) => any }>(query: T): T {
+  return query.is("deleted_at", null).in("status", ["archived", "arquivado"]).not("status", "neq", "deleted")
 }
 
 /**
  * Scopes a query to include all non-deleted records, including archived ones.
  */
-export function scopeWithArchived<T extends { is: (col: string, val: null) => any }>(query: T): T {
-  return query.is("deleted_at", null)
+export function scopeWithArchived<T extends { is: (col: string, val: null) => any; not: (col: string, op: string, val: any) => any }>(query: T): T {
+  return query.is("deleted_at", null).not("status", "neq", "deleted")
 }
 
 /**

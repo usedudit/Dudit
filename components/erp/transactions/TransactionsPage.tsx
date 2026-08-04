@@ -32,6 +32,7 @@ import { useSidebar } from "@/lib/sidebar-context"
 import { useNotification } from "@/hooks/use-notification"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { useEntityPage } from "@/hooks/use-entity-page"
+import { usePermissions } from "@/lib/permission-context"
 import {
     EMPTY_DATE_PERIOD,
     resolveDatePeriodBounds,
@@ -44,6 +45,7 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { ChevronLeftIcon } from "@/lib/icons"
 import { useErpExport } from "@/hooks/use-erp-export"
 import ExportSelectionModal from "@/components/erp/export/ExportSelectionModal"
+import ExportColumnSelectionModal from "@/components/erp/export/ExportColumnSelectionModal"
 
 function ymdFromRaw(raw: string | null | undefined): string | null {
     if (!raw) return null
@@ -157,6 +159,7 @@ export default function TransactionsPage({
 }) {
     const { openPlanUpgrade } = usePlanUpgrade()
     const { success: notifySuccess, error: notifyError } = useNotification()
+    const { planSlug } = usePermissions()
     const isMobile = useMediaQuery("(max-width: 767px)")
     const isTablet = useMediaQuery("(max-width: 1024px)")
 
@@ -189,7 +192,7 @@ export default function TransactionsPage({
     const [cancelReason, setCancelReason] = useState("")
     const [cancellingTransaction, setCancellingTransaction] = useState(false)
     const [settlingGroup, setSettlingGroup] = useState(false)
-    const { exportData, isExporting, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport()
+    const { exportData, isExporting, columnSelectionModal, closeColumnSelectionModal, handleColumnConfirm, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport(planSlug)
     const observerTarget = useRef<HTMLDivElement>(null)
 
     const [storeId] = useState<string | null>(storeIdProp || null)
@@ -746,45 +749,88 @@ export default function TransactionsPage({
         return { "Transações": Transacoes, "A pagar": pagar, "A receber": receber }
     }, [loadedTransactions])
 
-    // ── Summary cards for Recebimentos / Pagamentos pages ──────────────
-    const summaryCards = useMemo(() => {
-        if (!forcedTab || forcedTab === "Transações") return null
+    // ── All transactions (including virtual recurring) for tab values calculation ──────────────
+    const allTransactionsForTabValues = useMemo(() => {
+        const virtualItems: ERPTransaction[] = recurringOccurrences.map((occ) => {
+            const dateObj = new Date(`${occ.occurrenceDate}T12:00:00`)
+            const daysUntilDue = diffCalendarDaysInSaoPaulo(occ.occurrenceDate)
+            const dateLabel = dateObj.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric", timeZone: "America/Sao_Paulo" })
+            const dateShort = dateObj.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", timeZone: "America/Sao_Paulo" })
+            return {
+                id: `virt-${occ.recurringId}-${occ.occurrenceDate}`,
+                displayId: "",
+                description: occ.description,
+                category: String(occ.categoryName || "").trim() || "-",
+                contactName: occ.contactName || "-",
+                contactType: (occ.contactType || "other") as ERPTransaction["contactType"],
+                dueDate: dateLabel,
+                dueDateShort: dateShort,
+                dueDateTime: "",
+                dateNote: "-",
+                createdAtDate: "",
+                createdAtTime: "",
+                daysUntilDue,
+                isOverdue: daysUntilDue < 0,
+                paymentType: occ.paymentDisplay || "Não informado",
+                status: "Pendente",
+                statusVariant: daysUntilDue < 0 ? "red" : "orange",
+                amount: occ.amount,
+                transactionType: occ.type as ERPTransaction["transactionType"],
+                ledgerDirection: occ.type === "income" ? "in" : "out",
+                rawStatus: "pending",
+                origin: "system",
+                accountId: occ.accountId,
+                categoryId: occ.categoryId,
+                subcategoryId: occ.subcategoryId,
+                contactId: occ.contactId,
+                customerId: occ.customerId,
+                recurringId: occ.recurringId,
+                paymentMethodId: occ.paymentMethodId ?? null,
+                isRecurringOccurrence: true,
+                recurringTemplateId: occ.recurringTemplateId,
+                occurrenceDate: occ.occurrenceDate,
+                dueDateRaw: occ.dueDate,
+            }
+        })
+        return [...loadedTransactions, ...virtualItems]
+    }, [loadedTransactions, recurringOccurrences])
 
+    // ── Tab monetary values for Recebimentos / Pagamentos pages ──────────────
+    const tabValues = useMemo(() => {
         const nowMs = Date.now()
         const nowYmd = msToBrazilYmd(nowMs)
         const currentMonth = nowYmd.slice(0, 7) // "YYYY-MM"
 
-        let totalPending = 0
-        let totalOverdue = 0
-        let totalCompletedThisMonth = 0
+        let pagarPending = 0, pagarOverdue = 0, pagarCompleted = 0
+        let receberPending = 0, receberOverdue = 0, receberCompleted = 0
 
-        for (const item of filteredTransactions) {
+        for (const item of allTransactionsForTabValues) {
             const status = String(item.rawStatus || "").toLowerCase()
             const isPaid = status === "paid" || item.status.toLowerCase() === "recebido" || item.status.toLowerCase() === "pago"
+            const isReceivables = item.ledgerDirection === "in"
+            const isPayables = item.ledgerDirection === "out"
 
             if (isPaid) {
                 // Check if paid this month
                 const payYmd = ymdFromRaw(item.paymentDateRaw) || ymdFromRaw(item.createdAtRaw)
                 if (payYmd && payYmd.startsWith(currentMonth)) {
-                    totalCompletedThisMonth += item.amount
+                    if (isReceivables) receberCompleted += item.amount
+                    else if (isPayables) pagarCompleted += item.amount
                 }
             } else if (item.isOverdue || item.status.toLowerCase() === "atrasado" || (item.daysUntilDue !== undefined && item.daysUntilDue < 0)) {
-                totalOverdue += item.amount
+                if (isReceivables) receberOverdue += item.amount
+                else if (isPayables) pagarOverdue += item.amount
             } else {
-                totalPending += item.amount
+                if (isReceivables) receberPending += item.amount
+                else if (isPayables) pagarPending += item.amount
             }
         }
 
-        const isReceivables = forcedTab === "A receber"
         return {
-            pending: { label: "Pendente", value: totalPending },
-            overdue: { label: "Vencido", value: totalOverdue },
-            completed: {
-                label: isReceivables ? "Recebido no mês" : "Pago no mês",
-                value: totalCompletedThisMonth,
-            },
+            "A pagar": { pending: pagarPending, overdue: pagarOverdue, completed: pagarCompleted },
+            "A receber": { pending: receberPending, overdue: receberOverdue, completed: receberCompleted },
         }
-    }, [forcedTab, filteredTransactions])
+    }, [allTransactionsForTabValues])
 
     const refreshTransactionsNow = useCallback(async () => {
         // Invalidate cache + list via the entity page pattern (same as Products)
@@ -2072,37 +2118,8 @@ export default function TransactionsPage({
                     addDisabled={false}
                     hideTabs={!!forcedTab}
                     tabCounts={tabCounts}
+                    tabValues={tabValues}
                 />
-
-                {/* ── Summary cards (Recebimentos / Pagamentos only) ── */}
-                {summaryCards && hasTransactions && (
-                    <div className="grid grid-cols-3 gap-3 md:gap-4 mb-5 px-4 md:px-8">
-                        <div className="rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface p-3 md:p-4 transition-colors">
-                            <p className="text-[11px] md:text-xs font-bold text-brand-inactive-text uppercase tracking-wider mb-1">
-                                {summaryCards.pending.label}
-                            </p>
-                            <p className="text-lg md:text-xl font-bold text-orange-500">
-                                {formatCurrency(summaryCards.pending.value)}
-                            </p>
-                        </div>
-                        <div className="rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface p-3 md:p-4 transition-colors">
-                            <p className="text-[11px] md:text-xs font-bold text-brand-inactive-text uppercase tracking-wider mb-1">
-                                {summaryCards.overdue.label}
-                            </p>
-                            <p className="text-lg md:text-xl font-bold text-brand-red">
-                                {formatCurrency(summaryCards.overdue.value)}
-                            </p>
-                        </div>
-                        <div className="rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface p-3 md:p-4 transition-colors">
-                            <p className="text-[11px] md:text-xs font-bold text-brand-inactive-text uppercase tracking-wider mb-1">
-                                {summaryCards.completed.label}
-                            </p>
-                            <p className="text-lg md:text-xl font-bold text-brand-green">
-                                {formatCurrency(summaryCards.completed.value)}
-                            </p>
-                        </div>
-                    </div>
-                )}
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
                     <AnimatePresence mode="wait">
@@ -2275,6 +2292,13 @@ export default function TransactionsPage({
                 filters={filters}
                 setFilters={setFilters as any}
                 onClear={() => setFilters(INITIAL_FILTERS)}
+            />
+
+            <ExportColumnSelectionModal
+                isOpen={columnSelectionModal.isOpen}
+                canExportAllColumns={columnSelectionModal.canExportAllColumns}
+                onConfirm={handleColumnConfirm}
+                onClose={closeColumnSelectionModal}
             />
 
             <ExportSelectionModal

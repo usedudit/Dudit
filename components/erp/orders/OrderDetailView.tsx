@@ -692,8 +692,8 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                     <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
                                         <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                                             <TabsTrigger value="summary">Dados gerais</TabsTrigger>
-                                            <TabsTrigger value="history">Histórico</TabsTrigger>
                                             <TabsTrigger value="attachments">Anexos</TabsTrigger>
+                                            <TabsTrigger value="history">Histórico</TabsTrigger>
                                         </TabsList>
                                     </div>
                                 </div>
