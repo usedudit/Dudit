@@ -829,12 +829,14 @@ async function createFinancialTransactionsForPaidOrder(supabase: Awaited<ReturnT
     orderSource?: string | null
     orderId?: string | null
     mpPaymentId?: string | null
+    storeId?: string | null
 }) {
     try {
         const { createTransactionFromOrder } = await import("@/lib/services/transaction.service")
         await createTransactionFromOrder(supabase, {
             order_number: params.orderNumber,
             partner_id: params.partnerId,
+            store_id: params.storeId || null,
             total_amount: params.totalAmount,
             payment_method: params.paymentMethod || null,
             payment_provider: params.paymentProvider || null,
@@ -866,6 +868,7 @@ export async function createFinancialTransactionsForReceivedAmount(
         customerName?: string | null
         financeAccountId?: string | null
         orderSource?: string | null
+        storeId?: string | null
     }
 ) {
     try {
@@ -878,6 +881,7 @@ export async function createFinancialTransactionsForReceivedAmount(
             await createTransactionFromOrder(supabase, {
                 order_number: params.orderNumber,
                 partner_id: params.partnerId,
+                store_id: params.storeId || null,
                 total_amount: params.totalAmount,
                 payment_method: params.paymentMethod,
                 payment_breakdown: null,
@@ -913,6 +917,7 @@ export async function createFinancialTransactionsForReceivedAmount(
                 await createTransactionFromOrder(supabase, {
                     order_number: params.orderNumber,
                     partner_id: params.partnerId,
+                    store_id: params.storeId || null,
                     total_amount: delta,
                     payment_method: newEntry.method,
                     payment_provider: params.orderSource === "Marketplace" || String(newEntry.method).toLowerCase().includes("mercado pago") ? "Mercado Pago" : null,
@@ -960,6 +965,7 @@ async function createSellerCommissionForPaidOrder(params: {
     saleAmount: number
     accountId?: string | null
     createdByUserId?: string | null
+    storeId?: string | null
 }) {
     const partnerUserId = await resolvePartnerUserIdFromUserId(
         params.supabase,
@@ -971,6 +977,7 @@ async function createSellerCommissionForPaidOrder(params: {
     await createCommissionExpenseForEntity({
         supabase: params.supabase,
         partnerId: params.partnerId,
+        storeId: params.storeId || null,
         partnerUserId,
         role: "seller",
         saleAmount: params.saleAmount,
@@ -1002,6 +1009,7 @@ async function createRefundTransactionForCancelledOrder(params: {
     paidAmount: number
     financeAccountId?: string | null
     createdByUserId?: string | null
+    storeId?: string | null
 }) {
     const paidAmount = Math.max(0, Number(params.paidAmount || 0))
     if (paidAmount <= 0.009) return { success: true as const }
@@ -1039,6 +1047,7 @@ async function createRefundTransactionForCancelledOrder(params: {
         .from("transactions")
         .insert({
             partner_id: params.partnerId,
+            store_id: params.storeId || null,
             description: `Reembolso automático da venda ${params.orderNumber}`,
             category: "Reembolso",
             customer_id: params.customerId || null,
@@ -1154,6 +1163,7 @@ async function createRefundTransactionForCancelledOrderSafe(params: {
     paidAmount: number
     financeAccountId?: string | null
     createdByUserId?: string | null
+    storeId?: string | null
 }) {
     const paidAmount = Math.max(0, Number(params.paidAmount || 0))
     if (paidAmount <= 0.009) return { success: true as const }
@@ -1233,6 +1243,7 @@ async function createRefundTransactionForCancelledOrderSafe(params: {
     const paymentDate = new Date().toISOString()
     const refundPayload = {
         partner_id: params.partnerId,
+        store_id: params.storeId || null,
         description: `Reembolso automático da venda ${params.orderNumber}`,
         category: "Reembolso",
         customer_id: params.customerId || null,
@@ -1921,6 +1932,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
             orderId: order.id,
             orderNumber: order.order_number,
             partnerId,
+            storeId: order.store_id || data.storeId || null,
             totalAmount: Number(order.total_amount || 0),
             newBreakdown: finalBreakdown,
             oldBreakdown: [],
@@ -1957,6 +1969,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
             saleAmount: Number(order.total_amount || 0),
             accountId: order.finance_account_id || data.financeAccountId,
             createdByUserId: user.id,
+            storeId: order.store_id || data.storeId || null,
         })
     }
 
@@ -2320,6 +2333,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             payment_provider,
             mp_payment_id,
             finance_account_id,
+            store_id,
             delivery_address,
             inventory_deducted,
             created_by,
@@ -2644,6 +2658,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             orderId: orderId,
             orderNumber: currentOrder.order_number || orderId,
             partnerId: data.partnerId,
+            storeId: (currentOrder as any).store_id || data.storeId || null,
             totalAmount: Number(updateServerTotal || 0),
             newBreakdown: finalBreakdown,
             oldBreakdown: currentOrder.payment_breakdown || [],
@@ -2680,6 +2695,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             saleAmount: Number(updateServerTotal || 0),
             accountId: data.financeAccountId,
             createdByUserId: user.id,
+            storeId: (currentOrder as any).store_id || data.storeId || null,
         })
     }
 
@@ -3162,6 +3178,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                             paidAmount: refundAmount,
                             financeAccountId: order.finance_account_id || null,
                             createdByUserId: user.id,
+                            storeId: order.store_id || null,
                         })
 
                         if ("error" in refundResult) {
@@ -3178,6 +3195,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                     await reverseCommissionForEntity({
                         supabase,
                         partnerId: payload.partnerId,
+                        storeId: order.store_id || null,
                         entityType: "sale",
                         entityId: order.id,
                         partnerUserId: sellerPartnerUserId,
@@ -3396,6 +3414,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                     orderId: order.id,
                     orderNumber: order.order_number || order.id,
                     partnerId: payload.partnerId,
+                    storeId: order.store_id || null,
                     totalAmount: Number(order.total_amount || 0),
                     newBreakdown,
                     oldBreakdown,
@@ -3417,6 +3436,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                     saleAmount: Number(order.total_amount || 0),
                     accountId: order.finance_account_id || null,
                     createdByUserId: user.id,
+                    storeId: order.store_id || null,
                 })
             }
 
@@ -4078,6 +4098,7 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
                 orderId: payload.orderId,
                 orderNumber: order.order_number,
                 partnerId: payload.partnerId,
+                storeId: order.store_id || null,
                 totalAmount: totalAmountToSave,
                 paymentMethod: payload.paymentMethod,
                 paymentProvider: payload.paymentProvider,
@@ -4100,6 +4121,7 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
                 saleAmount: totalAmountToSave,
                 accountId: payload.financeAccountId,
                 createdByUserId: user.id,
+                storeId: order.store_id || null,
             })
         }
 

@@ -295,7 +295,7 @@ async function applyFinanceAccountBalanceDelta(
 }
 
 const FINANCIAL_TX_LIST_SELECT = `
-        id, description, category, amount, original_amount, interest_amount, discount_amount, paid_amount, due_date, payment_date, created_at, status, notes, payment_type, transaction_type, contact_id, customer_id, contact_type,
+        id, description, category, amount, original_amount, interest_amount, discount_amount, paid_amount, due_date, payment_date, created_at, status, notes, payment_type, transaction_type, contact_id, customer_id, contact_type, store_id,
         transfer_group_id, refund_kind, reference_note, origin, account_id, category_id, subcategory_id, recurring_id, payment_method_id, installment_group_id, installment_number,
         transaction_contacts(name, type)
       `
@@ -1338,6 +1338,7 @@ export async function createInstallmentGroupAction(input: {
             .from("installment_groups")
             .insert({
                 partner_id: input.partnerId,
+                store_id: input.storeId || null,
                 description: input.description.trim(),
                 total_amount: totalAmount,
                 installments_count: count,
@@ -1580,7 +1581,7 @@ export async function recordInstallmentPaymentAction(input: {
 
         const { data: tx, error: txErr } = await supabase
             .from("transactions")
-            .select("id, status, partner_id, installment_group_id, installment_number, description, category, category_id, subcategory_id, account_id, contact_id, customer_id, contact_type, payment_type, notes, due_date, original_amount, amount, transaction_type, refund_kind")
+            .select("id, status, partner_id, store_id, installment_group_id, installment_number, description, category, category_id, subcategory_id, account_id, contact_id, customer_id, contact_type, payment_type, notes, due_date, original_amount, amount, transaction_type, refund_kind")
             .eq("id", input.transactionId)
             .eq("partner_id", input.partnerId)
             .single()
@@ -1633,6 +1634,7 @@ export async function recordInstallmentPaymentAction(input: {
             .insert({
                 partner_id: input.partnerId,
                 transaction_id: input.transactionId,
+                store_id: tx.store_id || null,
                 amount: finalPaid,
                 base_amount: baseApplied,
                 interest_amount: interestAmount,
@@ -1780,7 +1782,7 @@ export async function recordRegularTransactionPaymentAction(input: {
 
         const { data: tx, error: txErr } = await supabase
             .from("transactions")
-            .select("id, status, partner_id, description, category, category_id, subcategory_id, account_id, contact_id, customer_id, contact_type, payment_type, notes, due_date, original_amount, amount, transaction_type, refund_kind")
+            .select("id, status, partner_id, store_id, description, category, category_id, subcategory_id, account_id, contact_id, customer_id, contact_type, payment_type, notes, due_date, original_amount, amount, transaction_type, refund_kind")
             .eq("id", input.transactionId)
             .eq("partner_id", input.partnerId)
             .single()
@@ -1826,6 +1828,7 @@ export async function recordRegularTransactionPaymentAction(input: {
             .insert({
                 partner_id: input.partnerId,
                 transaction_id: input.transactionId,
+                store_id: tx.store_id || null,
                 amount: finalPaid,
                 base_amount: baseApplied,
                 interest_amount: interestAmount,
@@ -2134,6 +2137,7 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
                 .insert({
                     partner_id: input.partnerId,
                     transaction_id: pendingTx.id,
+                    store_id: rec.store_id || null,
                     amount: finalPaid,
                     base_amount: paymentAmount,
                     interest_amount: interestAmount,
@@ -2222,6 +2226,7 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
                 .insert({
                     partner_id: input.partnerId,
                     transaction_id: newTx.id,
+                    store_id: rec.store_id || null,
                     amount: finalPaid,
                     base_amount: paymentAmount,
                     interest_amount: interestAmount,

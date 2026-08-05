@@ -58,6 +58,8 @@ export interface StoreAccessRecord {
     isOwn: boolean
     ownerName: string | null
     businessInfo: any
+    /** True quando o storeId é a matriz (is_headquarters) do parceiro. */
+    isHeadquarters: boolean
 }
 
 // ─── Active Partner Cookie Management ───────────────────────────────────────
@@ -322,108 +324,172 @@ const getCachedUserStoreAccess = (userId: string) => unstable_cache(
         const template = await getPermissionTemplate()
 
         // Get all partner_ids the user has access to (owned + invited)
-        const [ownedPartnersRes, invitedPartnersRes] = await Promise.all([
-            admin.from("partners").select("id, business_info").eq("user_id", userId).eq("is_active", true).neq("erp_disabled", true),
-            admin.from("partner_users").select("partner_id").eq("user_id", userId)
+        const [ownedPartnersRes, invitedRes] = await Promise.all([
+            admin.from("partners").select("id, user_id, business_info").eq("user_id", userId).eq("is_active", true).neq("erp_disabled", true),
+            admin.from("partner_users").select("id, partner_id, role_id").eq("user_id", userId)
         ])
 
-        const ownedPartnerIds = (ownedPartnersRes.data || []).map((p: any) => p.id)
-        const invitedPartnerIds = (invitedPartnersRes.data || []).map((p: any) => p.partner_id)
+        const ownedPartners = (ownedPartnersRes.data || []) as any[]
+        const invitedRows = (invitedRes.data || []) as any[]
+        const ownedPartnerIds = ownedPartners.map((p: any) => p.id)
+        const invitedPartnerIds = [...new Set(invitedRows.map((pu: any) => pu.partner_id))]
         const allPartnerIds = [...new Set([...ownedPartnerIds, ...invitedPartnerIds])]
 
         if (allPartnerIds.length === 0) return []
 
         // Get all stores for these partners
         const { data: stores } = await admin.from("stores")
-            .select("id, name, partner_id")
+            .select("id, name, partner_id, is_headquarters")
             .in("partner_id", allPartnerIds)
 
         if (!stores || stores.length === 0) return []
 
-        // For invited users, get store_members to know which stores they have access to
-        const invitedStoreIds = new Set<string>()
-        if (invitedPartnerIds.length > 0) {
+        // store_members do usuário: define a quais lojas ele tem acesso nos
+        // parceiros onde foi convidado (dono tem bypass via partners.user_id)
+        const invitedPartnerUserIds = invitedRows.map((pu: any) => pu.id)
+        const memberStores = new Map<string, Set<string>>() // partnerUserId -> storeIds
+        const memberRoleByStore = new Map<string, Map<string, string | null>>() // partnerUserId -> storeId -> role
+        if (invitedPartnerUserIds.length > 0) {
             const { data: storeMembers } = await admin.from("store_members")
-                .select("store_id, partner_user_id, role, permissions")
-                .in("store_id", stores.map((s: any) => s.id))
-            if (storeMembers) {
-                // Get partner_user_ids for this user in these partners
-                const { data: partnerUsers } = await admin.from("partner_users")
-                    .select("id, partner_id")
-                    .eq("user_id", userId)
-                    .in("partner_id", invitedPartnerIds)
-                const partnerUserIds = new Set((partnerUsers || []).map((pu: any) => pu.id))
-                for (const sm of storeMembers) {
-                    if (partnerUserIds.has(sm.partner_user_id)) {
-                        invitedStoreIds.add(sm.store_id)
-                    }
-                }
+                .select("store_id, partner_user_id, role")
+                .in("partner_user_id", invitedPartnerUserIds)
+            for (const sm of storeMembers || []) {
+                if (!memberStores.has(sm.partner_user_id)) memberStores.set(sm.partner_user_id, new Set())
+                memberStores.get(sm.partner_user_id)!.add(sm.store_id)
+                if (!memberRoleByStore.has(sm.partner_user_id)) memberRoleByStore.set(sm.partner_user_id, new Map())
+                memberRoleByStore.get(sm.partner_user_id)!.set(sm.store_id, sm.role)
             }
         }
 
-        // Get partner names for display
+        // Partner names + owner resolution in batch (no N+1)
         const { data: partners } = await admin.from("partners")
-            .select("id, business_info")
+            .select("id, user_id, business_info")
             .in("id", allPartnerIds)
-        const partnerNames = new Map<string, string>()
-        if (partners) {
-            for (const p of partners) {
-                const biz = p.business_info as any
-                partnerNames.set(p.id, biz?.nome_fantasia || biz?.razao_social || "Parceiro")
-            }
-        }
+        const partnerById = new Map<string, any>()
+        for (const p of partners || []) partnerById.set(p.id, p)
 
-        // Get owner names for invited partners
         const ownerUserIds = new Set<string>()
-        if (invitedPartnerIds.length > 0) {
-            const { data: invitedPartners } = await admin.from("partners")
-                .select("id, user_id")
-                .in("id", invitedPartnerIds)
-            if (invitedPartners) {
-                for (const p of invitedPartners) {
-                    if (p.user_id) ownerUserIds.add(p.user_id)
-                }
-            }
-        }
+        for (const p of partners || []) if (p.user_id) ownerUserIds.add(p.user_id)
         const ownerNames = new Map<string, string>()
         if (ownerUserIds.size > 0) {
             const { data: profiles } = await admin.from("user_profiles")
                 .select("user_id, full_name")
                 .in("user_id", Array.from(ownerUserIds))
-            if (profiles) {
-                for (const p of profiles) {
-                    ownerNames.set(p.user_id, p.full_name)
-                }
+            for (const prof of profiles || []) ownerNames.set(prof.user_id, prof.full_name)
+        }
+
+        const storeById = new Map<string, any>()
+        for (const s of stores) storeById.set(s.id, s)
+
+        const partnerNameOf = (partnerId: string): string => {
+            const p = partnerById.get(partnerId)
+            const biz = p?.business_info as any
+            return biz?.nome_fantasia || biz?.razao_social || "Parceiro"
+        }
+
+        const partnerOwnerNameOf = (partnerId: string): string => {
+            const ownerId = partnerById.get(partnerId)?.user_id
+            return ownerId ? ownerNames.get(ownerId) || "Desconhecido" : "Desconhecido"
+        }
+
+        // Normaliza role para o id canônico (lowercase). store_members.role é a
+        // coluna legacy uppercase (ex.: "MANAGER"); partner_users.role_id é canônica.
+        const normalizeRoleId = (raw: string | null | undefined, fallback: RoleId = "delivery"): RoleId => {
+            switch (String(raw || "").trim().toLowerCase()) {
+                case "owner": return "owner"
+                case "admin": return "admin"
+                case "manager": return "manager"
+                case "operator": return "operator"
+                case "delivery": return "delivery"
+                case "editor": return "operator"
+                case "viewer": return "delivery"
+                default: return fallback
             }
         }
 
-        // Build store access records
-        const storeRecords: StoreAccessRecord[] = []
-        for (const store of stores) {
-            const isOwned = ownedPartnerIds.includes(store.partner_id)
-            const hasAccess = isOwned || invitedStoreIds.has(store.id)
-            if (!hasAccess) continue
+        const pickHeadquarters = (partnerStores: any[]) =>
+            partnerStores.find((s: any) => s.is_headquarters === true) || partnerStores[0]
 
-            const partnerName = partnerNames.get(store.partner_id) || "Parceiro"
-            const roleId = isOwned ? "owner" : "operator" // invited users get operator as base
-            const dbPerms = isOwned ? {} : undefined
-            const ownerName = isOwned ? "Você" : (ownerNames.get(
-                (await admin.from("partners").select("user_id").eq("id", store.partner_id).single()).data?.user_id || ""
-            ) || "Desconhecido")
+        const storeRecords: StoreAccessRecord[] = []
+
+        // ── ERPs próprios: 1 card por parceiro (matriz). O usuário troca de
+        //    filial depois de entrar (StoreSwitcher) ──
+        for (const partner of ownedPartners) {
+            const partnerStores = stores.filter((s: any) => s.partner_id === partner.id)
+            if (partnerStores.length === 0) continue
+            const hq = pickHeadquarters(partnerStores)
 
             storeRecords.push({
-                storeId: store.id,
-                storeName: store.name,
-                partnerId: store.partner_id,
-                partnerName,
+                storeId: hq.id,
+                storeName: hq.name,
+                partnerId: partner.id,
+                partnerName: partnerNameOf(partner.id),
                 userId,
-                roleId,
-                role: roleId.toUpperCase() as PartnerRole,
-                permissions: normalizePermissions(template, dbPerms),
-                isOwn: isOwned,
-                ownerName: isOwned ? "Você" : ownerName,
-                businessInfo: null
+                roleId: "owner",
+                role: "OWNER" as PartnerRole,
+                permissions: normalizePermissions(template, {}),
+                isOwn: true,
+                ownerName: "Você",
+                businessInfo: null,
+                isHeadquarters: true,
             })
+        }
+
+        // ── Lojas convidadas (outros parceiros): 1 card por loja com o cargo
+        //    real. Convites legados aceitos sem store_members caem na matriz ──
+        for (const pu of invitedRows) {
+            if (ownedPartnerIds.includes(pu.partner_id)) continue // dono já coberto acima
+            const partner = partnerById.get(pu.partner_id)
+            if (!partner) continue
+            if (partner.is_active === false || partner.erp_disabled === true) continue
+
+            const partnerStores = stores.filter((s: any) => s.partner_id === pu.partner_id)
+            if (partnerStores.length === 0) continue
+
+            const baseRoleId = normalizeRoleId(pu.role_id, "delivery")
+            const storeIds = memberStores.get(pu.id) || new Set<string>()
+            const roleByStore = memberRoleByStore.get(pu.id) || new Map<string, string | null>()
+
+            if (storeIds.size === 0) {
+                // Fallback defensivo: convite legado sem store_members → matriz
+                const hq = pickHeadquarters(partnerStores)
+                storeRecords.push({
+                    storeId: hq.id,
+                    storeName: hq.name,
+                    partnerId: pu.partner_id,
+                    partnerName: partnerNameOf(pu.partner_id),
+                    userId,
+                    roleId: baseRoleId,
+                    role: baseRoleId.toUpperCase() as PartnerRole,
+                    permissions: normalizePermissions(template, undefined),
+                    isOwn: false,
+                    ownerName: partnerOwnerNameOf(pu.partner_id),
+                    businessInfo: null,
+                    isHeadquarters: true,
+                })
+                continue
+            }
+
+            for (const sid of storeIds) {
+                const store = storeById.get(sid)
+                if (!store) continue
+                const roleId = normalizeRoleId(roleByStore.get(sid) ?? null, baseRoleId)
+
+                storeRecords.push({
+                    storeId: store.id,
+                    storeName: store.name,
+                    partnerId: pu.partner_id,
+                    partnerName: partnerNameOf(pu.partner_id),
+                    userId,
+                    roleId,
+                    role: roleId.toUpperCase() as PartnerRole,
+                    permissions: normalizePermissions(template, undefined),
+                    isOwn: false,
+                    ownerName: partnerOwnerNameOf(pu.partner_id),
+                    businessInfo: null,
+                    isHeadquarters: store.is_headquarters === true,
+                })
+            }
         }
 
         return storeRecords

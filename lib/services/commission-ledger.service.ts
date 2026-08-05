@@ -28,6 +28,7 @@ async function getCommissionConfig(params: {
 export async function createCommissionExpenseForEntity(params: {
   supabase: SupabaseClient
   partnerId: string
+  storeId?: string | null
   partnerUserId: string
   role: CommissionRole
   saleAmount?: number
@@ -73,6 +74,7 @@ export async function createCommissionExpenseForEntity(params: {
 
   const payload: Record<string, unknown> = {
     partner_id: params.partnerId,
+    store_id: params.storeId || null,
     description,
     category: "Comissões",
     amount,
@@ -114,6 +116,7 @@ export async function createCommissionExpenseForEntity(params: {
 export async function reverseCommissionForEntity(params: {
   supabase: SupabaseClient
   partnerId: string
+  storeId?: string | null
   entityType: "sale" | "delivery"
   entityId: string
   partnerUserId: string
@@ -150,6 +153,7 @@ export async function reverseCommissionForEntity(params: {
 
   const payload: Record<string, unknown> = {
     partner_id: params.partnerId,
+    store_id: params.storeId || null,
     description: params.entityType === "sale" ? "Estorno comissão venda" : "Estorno comissão entrega",
     category: "Comissões",
     amount: reversalAmount,

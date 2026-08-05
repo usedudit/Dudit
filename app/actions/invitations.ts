@@ -82,6 +82,11 @@ export async function createInvitation(input: {
             return { success: false, error: "Você não pode convidar a si mesmo." }
         }
 
+        // OWNER is a single-user role tied to the partner creator - never assignable via invite
+        if (String(input.role || "").toUpperCase() === "OWNER") {
+            return { success: false, error: "Não é possível convidar como proprietário. O proprietário é o criador da conta." }
+        }
+
         // SECURITY FIX (LOW-04): Targeted email lookup instead of listing all users
         // admin.auth.admin.listUsers() loads ALL users - use direct profile query instead
         const { data: matchingProfile } = await admin
@@ -253,9 +258,12 @@ export async function acceptInvitation(
 
         if (inviteEmail !== userEmail) {
             // Increment failed attempts counter (brute-force tracking)
-            await admin.rpc("increment_invite_failed_attempts", {
-                p_invitation_id: invitation.id,
-            }).catch(() => { })
+            // NOTE: supabase builders are thenables (no .catch) - use try/catch instead
+            try {
+                await admin.rpc("increment_invite_failed_attempts", {
+                    p_invitation_id: invitation.id,
+                })
+            } catch { /* non-blocking */ }
 
             // Log security mismatch
             await auditLog({
@@ -299,6 +307,9 @@ export async function acceptInvitation(
         }
 
         // 8. Create store_members for invited stores (if specified)
+        // NOTE: The RPC accept_partner_invitation now handles store_members atomically.
+        // This app-side upsert is only a defensive fallback for legacy invites accepted
+        // before the RPC upgrade. supabase builders are thenables (no .catch) - use try/catch.
         const storeIds = (invitation.permissions as any)?._store_ids_ as string[] | null
         if (storeIds && storeIds.length > 0) {
             const { data: partnerUser } = await admin
@@ -312,12 +323,16 @@ export async function acceptInvitation(
                 const memberships = storeIds.map((sid: string) => ({
                     partner_user_id: partnerUser.id,
                     store_id: sid,
+                    role: invitation.role,
+                    permissions: invitation.permissions,
                 }))
-                await admin.from("store_members").upsert(memberships, {
-                    onConflict: "partner_user_id, store_id",
-                }).catch((e: any) => {
+                try {
+                    await admin.from("store_members").upsert(memberships, {
+                        onConflict: "partner_user_id, store_id",
+                    })
+                } catch (e: any) {
                     console.warn("[Invitations] Failed to create some store_members:", e)
-                })
+                }
             }
         }
 

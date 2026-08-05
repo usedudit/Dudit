@@ -1124,6 +1124,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
         await createCommissionExpenseForEntity({
             supabase,
             partnerId: input.partnerId,
+            storeId: input.storeId || null,
             partnerUserId: sellerPartnerUserId,
             role: "seller",
             saleAmount: totalPaidAmount,

@@ -1363,16 +1363,18 @@ export async function updateERPDeliveryStatusAction(params: {
   if (params.status === "delivered" && currentDelivery.delivery_person_id) {
     const { data: deliveryOrders } = await supabase
       .from("delivery_orders")
-      .select("orders(delivery_fee)")
+      .select("orders(delivery_fee, store_id)")
       .eq("delivery_id", params.deliveryId)
 
     const deliveryFeeTotal = (deliveryOrders || []).reduce((sum: number, row: any) => {
       return sum + Number(row?.orders?.delivery_fee || 0)
     }, 0)
+    const deliveryStoreId = (deliveryOrders?.[0] as any)?.orders?.store_id ?? null
 
     await createCommissionExpenseForEntity({
       supabase,
       partnerId: params.partnerId,
+      storeId: deliveryStoreId,
       partnerUserId: String(currentDelivery.delivery_person_id),
       role: "delivery",
       deliveryFee: deliveryFeeTotal,
@@ -1383,9 +1385,17 @@ export async function updateERPDeliveryStatusAction(params: {
   }
 
   if (params.status === "cancelled" && currentDelivery.delivery_person_id) {
+    const { data: cancelledOrderRows } = await supabase
+      .from("delivery_orders")
+      .select("orders(store_id)")
+      .eq("delivery_id", params.deliveryId)
+      .limit(1)
+    const cancelledStoreId = (cancelledOrderRows?.[0] as any)?.orders?.store_id ?? null
+
     await reverseCommissionForEntity({
       supabase,
       partnerId: params.partnerId,
+      storeId: cancelledStoreId,
       entityType: "delivery",
       entityId: params.deliveryId,
       partnerUserId: String(currentDelivery.delivery_person_id),
@@ -1653,16 +1663,18 @@ export async function updateERPSingleOrderDeliveryStatusAction(params: {
     if (finalDeliveryStatus === "delivered" && currentDelivery.delivery_person_id) {
       const { data: deliveryOrders } = await supabase
         .from("delivery_orders")
-        .select("orders(delivery_fee)")
+        .select("orders(delivery_fee, store_id)")
         .eq("delivery_id", params.deliveryId)
 
       const deliveryFeeTotal = (deliveryOrders || []).reduce((sum: number, row: any) => {
         return sum + Number(row?.orders?.delivery_fee || 0)
       }, 0)
+      const deliveryStoreId = (deliveryOrders?.[0] as any)?.orders?.store_id ?? null
 
       await createCommissionExpenseForEntity({
         supabase,
         partnerId: params.partnerId,
+        storeId: deliveryStoreId,
         partnerUserId: String(currentDelivery.delivery_person_id),
         role: "delivery",
         deliveryFee: deliveryFeeTotal,

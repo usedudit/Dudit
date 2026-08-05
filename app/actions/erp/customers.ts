@@ -543,7 +543,7 @@ export async function updateComprehensiveCustomerAction(data: {
 
 export async function getCustomerByIdAction(customerId: string) {
   const user = await requireUser()
-  if (!user) return { error: "NÃ£o autenticado" }
+  if (!user) return { error: "Não autenticado" }
 
   const supabase = await getSupabaseServerClient()
 
@@ -553,8 +553,8 @@ export async function getCustomerByIdAction(customerId: string) {
       id, partner_id, name, email, phone, phone_fixed, status, person_type,
       cpf, cnpj, nome_fantasia, inscricao_estadual, contribuinte,
       store_credit, notes, birth_date, mother_name, father_name, website,
-      created_at, zip_code, street, number, complement, neighborhood,
-      city, state, country, user_id, marketplace_user_id, image_url
+      created_at, user_id, marketplace_user_id, image_url,
+      addresses!customer_id(address_type, zip_code, street, number, complement, neighborhood, city, state, country, is_default)
     `)
     .eq("id", customerId)
     .maybeSingle()
@@ -570,6 +570,19 @@ export async function getCustomerByIdAction(customerId: string) {
     } catch (e) {
       // keep encrypted
     }
+  }
+
+  // Extract primary address from joined addresses for backwards compatibility
+  const primaryAddress = customer.addresses?.find((a: any) => a.address_type === "primary" || a.is_default)
+  if (primaryAddress) {
+    ;(customer as any).zip_code = primaryAddress.zip_code
+    ;(customer as any).street = primaryAddress.street
+    ;(customer as any).number = primaryAddress.number
+    ;(customer as any).complement = primaryAddress.complement
+    ;(customer as any).neighborhood = primaryAddress.neighborhood
+    ;(customer as any).city = primaryAddress.city
+    ;(customer as any).state = primaryAddress.state
+    ;(customer as any).country = primaryAddress.country
   }
 
   const { getPartnerPlan } = await import("@/lib/services/subscription.service")

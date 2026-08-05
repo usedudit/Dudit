@@ -157,7 +157,7 @@ async function processWebhookWithRetry(
     // ── Idempotency check: has this payment already been processed? ──
     const { data: existingOrderData, error: checkError } = await supabase
       .from("orders")
-      .select("id, situation, total_amount, paid_amount, partner_id, payment_expires_at, cancelled_at, payment_breakdown, finance_account_id, checkout_fulfillment")
+      .select("id, situation, total_amount, paid_amount, partner_id, store_id, payment_expires_at, cancelled_at, payment_breakdown, finance_account_id, checkout_fulfillment")
       .eq("mp_payment_id", paymentId.toString())
       .limit(1)
       .single()
@@ -307,7 +307,7 @@ async function processWebhookWithRetry(
     if (!orderData) {
       const { data: order, error: orderError } = await supabase
         .from("orders")
-        .select("id, situation, total_amount, paid_amount, partner_id, payment_breakdown, finance_account_id, checkout_fulfillment")
+        .select("id, situation, total_amount, paid_amount, partner_id, store_id, payment_breakdown, finance_account_id, checkout_fulfillment")
         .eq("mp_payment_id", paymentId.toString())
         .limit(1)
         .single()
@@ -557,7 +557,7 @@ async function processWebhookWithRetry(
         const { createTransactionFromOrder } = await import("@/lib/services/transaction.service")
         const { data: fullOrder } = await supabase
           .from("orders")
-          .select("order_number, partner_id, total_amount, paid_amount, payment_method, payment_provider, payment_breakdown, buyer_id, customer_name, customer_id, finance_account_id, order_source")
+          .select("order_number, partner_id, store_id, total_amount, paid_amount, payment_method, payment_provider, payment_breakdown, buyer_id, customer_name, customer_id, finance_account_id, order_source")
           .eq("id", orderId)
           .single()
 
@@ -566,6 +566,7 @@ async function processWebhookWithRetry(
             order_id: orderId,
             order_number: fullOrder.order_number,
             partner_id: fullOrder.partner_id,
+            store_id: fullOrder.store_id || null,
             total_amount: fullOrder.total_amount,
             payment_method: fullOrder.payment_method || null,
             payment_provider: fullOrder.payment_provider || null,

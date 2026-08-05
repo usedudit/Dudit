@@ -119,6 +119,7 @@ export async function createRecurringTransactionAction(input: {
   customerId?: string | null
   contactType?: RecurringContactType | null
   paymentMethodId?: string | null
+  storeId?: string | null
 }) {
   try {
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -152,6 +153,7 @@ export async function createRecurringTransactionAction(input: {
       .from("recurring_transactions")
       .insert({
         partner_id: input.partnerId,
+        store_id: input.storeId || null,
         type: input.type,
         amount: amount,
         description: description,
@@ -470,6 +472,7 @@ export type RecurringOccurrence = {
   contactType: RecurringContactType | null
   contactName: string
   paymentMethodId: string | null
+  storeId: string | null
   paymentDisplay: string
 }
 
@@ -577,6 +580,7 @@ export async function generateRecurringOccurrencesAction(partnerId: string) {
         contactType: (row.contact_type as RecurringContactType | null) || null,
         contactName,
         paymentMethodId: row.payment_method_id || null,
+        storeId: row.store_id || null,
         paymentDisplay,
       }
     })

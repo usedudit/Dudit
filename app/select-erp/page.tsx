@@ -82,6 +82,7 @@ export default async function SelectErpPage() {
                     <div className="flex flex-col gap-3">
                         {sortedAccess.map((access, index) => {
                             const isOwn = access.isOwn
+                            const roleLabel = ROLE_LABELS[roleIdToPartnerRole(access.roleId)] || access.roleId
 
                             return (
                                 <form key={access.storeId} action={selectErpAction}>
@@ -95,20 +96,21 @@ export default async function SelectErpPage() {
                                             className={`px-6 py-5 gap-4 ${isOwn ? "ring-2 ring-brand-primary/20 bg-brand-primary/5" : ""}`}
                                             icon={StoreIcon}
                                             title={
-                                                <div className="flex items-center gap-2">
-                                                    <span className="truncate">{access.storeName} |</span>
-                                                    <p className="text-xs font-bold text-brand-inactive-text">{access.partnerName}</p>
-                                                    <p className="text-xs font-bold text-brand-inactive-text">{ROLE_LABELS[roleIdToPartnerRole(access.roleId)] || access.roleId}</p>
-
-                                                    {isOwn && (
-                                                        <p className="text-xs font-bold text-brand-green">Sua loja</p>
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className="truncate">{access.storeName}</span>
+                                                    {isOwn ? (
+                                                        <p className="text-xs font-bold text-brand-green">Sua loja · Matriz</p>
+                                                    ) : (
+                                                        <p className="text-xs font-bold text-brand-inactive-text">{roleLabel}</p>
                                                     )}
                                                 </div>
                                             }
                                             description={
-                                                !isOwn && access.ownerName
-                                                    ? `Proprietário: ${access.ownerName}`
-                                                    : undefined
+                                                isOwn
+                                                    ? `${access.partnerName} — você pode alternar entre matriz e filiais depois de entrar`
+                                                    : access.ownerName
+                                                        ? `${access.partnerName} · Proprietário: ${access.ownerName}`
+                                                        : access.partnerName
                                             }
                                             showChevron={true}
                                         />

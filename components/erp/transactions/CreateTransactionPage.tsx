@@ -911,6 +911,7 @@ export default function CreateTransactionPage({
             try {
                 const res = await createTransferPairAction({
                     partnerId,
+                    storeId,
                     fromAccountId: fromAccountId!,
                     toAccountId: toAccountId!,
                     amount,
@@ -1020,6 +1021,7 @@ export default function CreateTransactionPage({
 
                 const recRes = await createRecurringTransactionAction({
                     partnerId,
+                    storeId,
                     type: txKind,
                     amount,
                     description: description.trim(),
@@ -1074,6 +1076,7 @@ export default function CreateTransactionPage({
 
                 const installmentRes = await createInstallmentGroupAction({
                     partnerId,
+                    storeId,
                     transactionType: txKind,
                     description: description.trim(),
                     categoryLabel: selectedCategoryName,
