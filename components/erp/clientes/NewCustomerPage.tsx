@@ -36,7 +36,7 @@ import { createComprehensiveCustomerAction, updateComprehensiveCustomerAction, g
 import { useR2Upload } from "@/hooks/use-r2-upload"
 import ImageCropperModal from "@/components/ImageCropperModal"
 import { getAddressesAction } from "@/app/actions/shared/addresses"
-import { consultarCNPJ } from "@/lib/nuvem-fiscal"
+import { consultarCNPJ } from "@/lib/fiscal"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 import { validateEmail, validateCPF, validateCNPJ, validatePhoneBR, validateURL, validateCEP } from "@/lib/input-validator"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"

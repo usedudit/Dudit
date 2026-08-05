@@ -1102,7 +1102,7 @@ export default function TransactionsPage({
         setPaymentAmount(String(Number(row.remainingAmount || 0).toFixed(2)))
         setInterestAmount("0")
         setDiscountAmount("0")
-        setPaymentMethodId(resolvedPaymentMethods?.[0]?.id || "")
+        setPaymentMethodId(row.paymentMethodId || resolvedPaymentMethods?.[0]?.id || "")
         setPaymentModalOpen(true)
     }, [installmentDetail, notifyError, resolvedPaymentMethods])
 
@@ -1257,6 +1257,8 @@ export default function TransactionsPage({
                         const isInstallment = !!selectedInstallmentForPayment.installmentGroupId
                         const isRecurring = !!selectedInstallmentForPayment.isRecurringOccurrence
                         const isRegular = !isInstallment && !isRecurring
+                        // Parcelas de venda nascem com o método fixado pela venda (ex: cartão de crédito)
+                        const lockedPaymentMethod = isInstallment && !!selectedInstallmentForPayment.paymentMethodId
                         const currentRemaining = Number(selectedInstallmentForPayment.remainingAmount ?? selectedInstallmentForPayment.amount ?? 0)
                         const nextRemaining = Math.max(0, currentRemaining - Number(paymentAmount || 0))
 
@@ -1387,6 +1389,7 @@ export default function TransactionsPage({
                                                 label: pm.name,
                                             }))}
                                             placeholder="Selecione"
+                                            disabled={lockedPaymentMethod}
                                         />
                                         <div>
                                             <MoneyInput
@@ -1644,7 +1647,7 @@ export default function TransactionsPage({
                                                                     paymentAmount: String(Number(row.remainingAmount || 0).toFixed(2)),
                                                                     interestAmount: "0",
                                                                     discountAmount: "0",
-                                                                    paymentMethodId: paymentMethods?.[0]?.id || "",
+                                                                    paymentMethodId: row.paymentMethodId || paymentMethods?.[0]?.id || "",
                                                                 }
                                                                 const finalPaid = Math.max(0, Number(values.paymentAmount || 0) + Number(values.interestAmount || 0) - Number(values.discountAmount || 0))
                                                                 return (
@@ -1695,6 +1698,7 @@ export default function TransactionsPage({
                                                                                     label: pm.name,
                                                                                 }))}
                                                                                 placeholder="Selecione"
+                                                                                disabled={!!row.paymentMethodId}
                                                                             />
                                                                         </td>
                                                                         <td className="p-2 border-b border-brand-border dark:border-dark-border" style={{ width: "112px" }}>
@@ -1739,7 +1743,7 @@ export default function TransactionsPage({
                                                         paymentAmount: String(Number(row.remainingAmount || 0).toFixed(2)),
                                                         interestAmount: "0",
                                                         discountAmount: "0",
-                                                        paymentMethodId: paymentMethods?.[0]?.id || "",
+                                                        paymentMethodId: row.paymentMethodId || paymentMethods?.[0]?.id || "",
                                                     }
                                                     const finalPaid = Math.max(0, Number(values.paymentAmount || 0) + Number(values.interestAmount || 0) - Number(values.discountAmount || 0))
                                                     return (
@@ -1804,6 +1808,7 @@ export default function TransactionsPage({
                                                                             label: pm.name,
                                                                         }))}
                                                                         placeholder="Selecione"
+                                                                        disabled={!!row.paymentMethodId}
                                                                     />
                                                                     <MoneyInput
                                                                         label="Juros"

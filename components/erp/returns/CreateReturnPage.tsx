@@ -48,9 +48,12 @@ import SelectCustomerSheet from "@/components/erp/clientes/SelectCustomerSheet"
 
 const mapPaymentMethodToPt = (method: string): string => {
     const m = String(method || "").toLowerCase().trim();
+    if (m === "dinheiro" || m === "cash") return "Dinheiro";
     if (m === "pix") return "Pix";
-    if (m === "credit_card") return "Cartão de Crédito";
-    if (m === "other") return "Outro";
+    if (m === "credit_card" || m === "cartão de crédito") return "Cartão de Crédito";
+    if (m === "debit_card" || m === "cartão de débito") return "Cartão de Débito";
+    if (m === "tef") return "TEF";
+    if (m === "other" || m === "outro") return "Outro";
     if (m === "mercado pago" || m === "mercado_pago") return "Mercado Pago";
     return method;
 }
@@ -372,8 +375,8 @@ export default function CreateReturnPage({
                 const snapItems: ReplacementItemState[] = returnRequest.exchangeItemsSnapshot.map((ei: any) => ({
                     product: {
                         id: ei.product_id,
-                        name: "",
-                        sku: "",
+                        name: ei.product_name || "",
+                        sku: ei.sku || "",
                         gtin: null,
                         price: ei.unit_price || 0,
                         stock: 0,
@@ -708,7 +711,7 @@ export default function CreateReturnPage({
             const payload = {
                 orderId: selectedOrder.id,
                 orderNumber: selectedOrder.order_number,
-                customerId: selectedOrder.buyer_id || "",
+                customerId: selectedOrder.buyer_id || selectedOrder.customer?.id || "",
                 customerName: selectedOrder.customer_name || selectedOrder.customer?.name || "Cliente",
                 customerEmail: selectedOrder.customer?.email || "",
                 customerPhone: selectedOrder.customer?.phone || "",
@@ -728,6 +731,8 @@ export default function CreateReturnPage({
                     variant_id: null,
                     quantity: item.quantity,
                     unit_price: Number(item.product.price || 0),
+                    product_name: item.product.name || "",
+                    sku: item.product.sku || "",
                 })),
                 exchangeBalanceResolution: exchangeSurplus > 0 ? exchangeBalanceResolution : null,
                 returnDate: returnDate.toISOString(),
@@ -1048,7 +1053,9 @@ export default function CreateReturnPage({
                                                     {isViewOnly ? (
                                                         <div className="flex flex-col gap-6">
                                                             {returnItems.filter(item => item.checked).map((item) => {
-                                                                const lineTotal = item.netItemValue ? item.netItemValue * item.quantity : item.price * item.quantity;
+                                                                const netVal = Number(item.netItemValue || 0);
+                                                                const unitPrice = item.price > 0 ? item.price : (netVal > 0 && item.quantity > 0 ? netVal / item.quantity : 0);
+                                                                const lineTotal = netVal > 0 ? netVal : (unitPrice * item.quantity);
                                                                 return (
                                                                     <div key={item.id} className="flex items-start gap-4">
                                                                         <div className="w-16 h-16 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
@@ -1075,7 +1082,7 @@ export default function CreateReturnPage({
                                                                                 </span>
                                                                                 <span>•</span>
                                                                                 <span>
-                                                                                    Preço unitário: <strong className="text-brand-dark dark:text-dark-heading">{formatCurrency(item.price)}</strong>
+                                                                                    Preço unitário: <strong className="text-brand-dark dark:text-dark-heading">{formatCurrency(unitPrice)}</strong>
                                                                                 </span>
                                                                                 <span>•</span>
                                                                                 <span>
@@ -1599,6 +1606,19 @@ export default function CreateReturnPage({
 
                                                             {resolutionType === "exchange" && (
                                                                 <>
+                                                                    <FormDropdown
+                                                                        label="Status da troca"
+                                                                        disabled={isViewOnly}
+                                                                        value={exchangeStatus}
+                                                                        setValue={setExchangeStatus}
+                                                                        options={[
+                                                                            { value: "pending", label: "Pendente" },
+                                                                            { value: "reserved", label: "Reservado" },
+                                                                            { value: "sent", label: "Enviado" },
+                                                                            { value: "completed", label: "Concluído" }
+                                                                        ]}
+                                                                    />
+
                                                                     <div ref={replacementSearchRef} className="relative md:col-span-2">
                                                                         <Input
                                                                             label="Produtos de reposição"
@@ -1737,18 +1757,6 @@ export default function CreateReturnPage({
                                                                         </div>
                                                                     )}
 
-                                                                    <FormDropdown
-                                                                        label="Status da troca"
-                                                                        disabled={isViewOnly}
-                                                                        value={exchangeStatus}
-                                                                        setValue={setExchangeStatus}
-                                                                        options={[
-                                                                            { value: "pending", label: "Pendente" },
-                                                                            { value: "reserved", label: "Reservado" },
-                                                                            { value: "sent", label: "Enviado" },
-                                                                            { value: "completed", label: "Concluído" }
-                                                                        ]}
-                                                                    />
                                                                     <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
                                                                         <div className="rounded-xl border border-brand-border dark:border-dark-border p-4">
                                                                             <p className="text-brand-inactive-text dark:text-dark-body">Total dos substitutos</p>
@@ -1802,13 +1810,19 @@ export default function CreateReturnPage({
                                                                                             isMercadoPagoOrder
                                                                                                 ? [
                                                                                                     { value: "Mercado Pago", label: "Mercado Pago (Automático)" },
+                                                                                                    { value: "dinheiro", label: "Dinheiro (Manual)" },
                                                                                                     { value: "pix", label: "Pix (Manual)" },
                                                                                                     { value: "credit_card", label: "Cartão de Crédito (Manual)" },
+                                                                                                    { value: "debit_card", label: "Cartão de Débito (Manual)" },
+                                                                                                    { value: "tef", label: "TEF (Manual)" },
                                                                                                     { value: "other", label: "Outro (Manual)" }
                                                                                                 ]
                                                                                                 : [
+                                                                                                    { value: "dinheiro", label: "Dinheiro" },
                                                                                                     { value: "pix", label: "Pix" },
                                                                                                     { value: "credit_card", label: "Cartão de Crédito" },
+                                                                                                    { value: "debit_card", label: "Cartão de Débito" },
+                                                                                                    { value: "tef", label: "TEF" },
                                                                                                     { value: "other", label: "Outro" }
                                                                                                 ]
                                                                                         }

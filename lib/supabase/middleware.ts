@@ -257,7 +257,6 @@ export async function middleware(request: NextRequest) {
         https://http2.mlstatic.com 
         https://*.mlstatic.com 
         https://secure.mlstatic.com
-        https://auth.nuvemfiscal.com.br
         https://static.cloudflareinsights.com 
         https://*.cloudflare.com 
         https://accounts.google.com 
@@ -281,8 +280,6 @@ export async function middleware(request: NextRequest) {
         https://api.mapbox.com 
         https://events.mapbox.com 
         https://*.tiles.mapbox.com 
-        https://api.nuvemfiscal.com.br 
-        https://auth.nuvemfiscal.com.br 
         https://http2.mlstatic.com 
         https://*.mlstatic.com 
         https://www.mercadolibre.com 
@@ -305,7 +302,6 @@ export async function middleware(request: NextRequest) {
         https://*.mercadopago.com 
         https://checkout.mercadopago.com
         https://accounts.google.com
-        https://auth.nuvemfiscal.com.br 
         https://www.mercadolibre.com
         https://www.youtube.com
         https://www.youtube-nocookie.com

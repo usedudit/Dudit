@@ -99,9 +99,12 @@ const createReturnSchema = z.object({
         variant_id: z.string().uuid().nullable().optional(),
         quantity: z.number().int().positive().max(999),
         unit_price: z.number().nonnegative().max(99999999),
+        product_name: z.string().optional().nullable(),
+        sku: z.string().optional().nullable(),
     })).max(100).optional().nullable(),
     exchangeBalanceResolution: z.enum(["refund", "store_credit"]).nullable().optional(),
     returnToInventory: z.boolean().optional().nullable(),
+    customerId: z.string().uuid().optional().nullable(),
 })
 
 const createCancellationSchema = z.object({
@@ -253,15 +256,15 @@ function normalizeReturnRow(row: any): ReturnRequestListItem & { returnEvents?: 
         mpPaymentId: row.orders?.mp_payment_id || undefined,
         orderTotal: toNumber(row.orders?.total_amount),
         orderPaidAmount: toNumber(row.orders?.amount_paid || row.orders?.paid_amount || row.orders?.total_amount),
-        refundPaymentMethod: (row.return_refunds && row.return_refunds[0]) ? row.return_refunds[0].payment_method : undefined,
+        refundPaymentMethod: row.refund_payment_method || ((row.return_refunds && row.return_refunds[0]) ? row.return_refunds[0].payment_method : undefined),
         exchangeOrderId: row.exchange_order_id || undefined,
         exchangeSubstatus: row.exchange_substatus || undefined,
         exchangeShortfallAmount: toNumber(row.exchange_shortfall_amount),
         exchangeSurplusAmount: toNumber(row.exchange_surplus_amount),
         exchangeItemsSnapshot: exchangeItems,
-        exchangeBalanceResolution: ((row.approved_resolution === "exchange" || row.desired_resolution === "exchange") && toNumber(row.exchange_surplus_amount) > 0
+        exchangeBalanceResolution: (row.exchange_balance_resolution || ((row.approved_resolution === "exchange" || row.desired_resolution === "exchange") && toNumber(row.exchange_surplus_amount) > 0
             ? (toNumber(row.store_credit_amount) > 0 ? "store_credit" : toNumber(row.refund_amount) > 0 ? "refund" : undefined)
-            : undefined) as any,
+            : undefined)) as any,
         items,
         returnEvents: (row.return_events || []).map((e: any) => ({
             id: e.id,
@@ -501,6 +504,7 @@ export async function createReturnRequestAction(input: unknown) {
             p_expires_at: data.expiresAt || null,
             p_request_type: data.resolution === "none" ? "return" : null,
             p_store_id: ctx?.activeStoreId || null,
+            p_customer_id: data.customerId || null,
         })
 
         if (error) throw error

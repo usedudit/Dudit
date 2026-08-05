@@ -38,11 +38,10 @@ const ALLOWED_HOSTNAMES: ReadonlySet<string> = new Set([
   // ── Email (Unosend) ──
   "api.unosend.co",
 
-  // ── Fiscal (Nuvem Fiscal, ViaCEP, CNPJA) ──
-  "auth.nuvemfiscal.com.br",
-  "api.nuvemfiscal.com.br",
+  // ── Fiscal (ViaCEP, CNPJA, BrasilAPI) ──
   "viacep.com.br",
   "open.cnpja.com",
+  "brasilapi.com.br",
 
   // ── AI / Moderation ──
   "api.cloudflare.com",

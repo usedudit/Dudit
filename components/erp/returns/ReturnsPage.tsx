@@ -174,6 +174,7 @@ export default function ReturnsPage({ partnerId, roleId, storeId, planGate }: Re
                 const response = await createReturnRequestAction({
                     partnerId,
                     orderId: data.orderId,
+                    customerId: data.customerId || null,
                     resolution: mapLegacyResolution(data.resolutionType || data.desiredResolution || data.refundType),
                     reason: mapLegacyReason(selectedItems[0]?.reason || data.reason),
                     message: data.observations || "",

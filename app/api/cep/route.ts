@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { consultarCEP } from "@/lib/nuvem-fiscal"
 import { safeFetch } from "@/lib/security/ssrf-guard"
+import { geocodeAddress } from "@/lib/services/location.service"
 
 export const runtime = "edge"
 
@@ -13,16 +13,22 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // 1. Tentar Nuvem Fiscal primeiro
-    const data = await consultarCEP(cep)
+    // Consulta direta ao ViaCEP via safeFetch
+    const response = await safeFetch(`https://viacep.com.br/ws/${cep}/json/`, {
+      timeoutMs: 8_000,
+      maxResponseBytes: 256 * 1024,
+      maxRedirects: 2,
+      skipDnsCheck: true,
+    })
 
-    // Se retornou erro de não encontrado, vamos para o fallback
-    if (data && (data as any).error === "CEP não encontrado") {
-      throw new Error("CEP não encontrado na Nuvem Fiscal")
+    const viaCepData = await response.json()
+
+    if (viaCepData.erro) {
+      return NextResponse.json({ error: "CEP não encontrado" }, { status: 404 })
     }
 
-    // Parse logradouro to extract number
-    let cleanLogradouro = data.logradouro || ""
+    // Extrai e sanitiza logradouro e número se presentes
+    let cleanLogradouro = viaCepData.logradouro || ""
     let parsedNumber = ""
     const commaIndex = cleanLogradouro.lastIndexOf(",")
     if (commaIndex !== -1) {
@@ -33,67 +39,51 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const responseData = {
-      ...data,
-      logradouro: cleanLogradouro,
-      numero: parsedNumber,
+    // Obter latitude e longitude via geocodificação
+    let latitude: number | null = null
+    let longitude: number | null = null
+
+    const addressParts = [
+      cleanLogradouro,
+      viaCepData.bairro,
+      viaCepData.localidade,
+      viaCepData.uf,
+      "Brasil",
+    ].filter(Boolean)
+
+    if (addressParts.length > 0) {
+      try {
+        const fullAddress = addressParts.join(", ")
+        const coords = await geocodeAddress(fullAddress)
+        if (coords) {
+          latitude = coords.lat
+          longitude = coords.lng
+        }
+      } catch (geocodeErr) {
+        console.warn(`[API CEP] Falha na geocodificação do CEP ${cep}:`, geocodeErr)
+      }
     }
 
-    return NextResponse.json(responseData, {
+    const mappedData = {
+      cep: viaCepData.cep,
+      logradouro: cleanLogradouro,
+      numero: parsedNumber,
+      complemento: viaCepData.complemento || "",
+      bairro: viaCepData.bairro || "",
+      localidade: viaCepData.localidade || "",
+      uf: viaCepData.uf || "",
+      ibge: viaCepData.ibge || "",
+      latitude,
+      longitude,
+    }
+
+    return NextResponse.json(mappedData, {
       headers: {
         "Cache-Control": "public, s-maxage=86400, stale-while-revalidate=43200",
       },
     })
   } catch (error) {
-    console.warn(`[API CEP] Falha na Nuvem Fiscal para o CEP ${cep}, tentando ViaCEP...`)
-
-    try {
-      // 2. Fallback para ViaCEP
-      // 2. Fallback para ViaCEP - safeFetch enforces hostname allowlist + timeout
-      // CEP is already digits-only (line 8), safe from path injection
-      const response = await safeFetch(`https://viacep.com.br/ws/${cep}/json/`, {
-        timeoutMs: 8_000,
-        maxResponseBytes: 256 * 1024, // 256 KB - CEP responses are tiny JSON
-        maxRedirects: 2,
-        skipDnsCheck: true, // Edge runtime - dns module unavailable
-      })
-      const viaCepData = await response.json()
-
-      if (viaCepData.erro) {
-        return NextResponse.json({ error: "CEP não encontrado" }, { status: 404 })
-      }
-
-      // Mapear dados do ViaCEP para o formato esperado pela aplicação
-      let cleanLogradouro = viaCepData.logradouro || ""
-      let parsedNumber = ""
-      const commaIndex = cleanLogradouro.lastIndexOf(",")
-      if (commaIndex !== -1) {
-        const afterComma = cleanLogradouro.substring(commaIndex + 1).trim()
-        if (/^(\d+|s\/n)/i.test(afterComma)) {
-          cleanLogradouro = cleanLogradouro.substring(0, commaIndex).trim()
-          parsedNumber = afterComma.split(" - ")[0].trim()
-        }
-      }
-
-      const mappedData = {
-        cep: viaCepData.cep,
-        logradouro: cleanLogradouro,
-        numero: parsedNumber,
-        complemento: viaCepData.complemento || "",
-        bairro: viaCepData.bairro,
-        localidade: viaCepData.localidade,
-        uf: viaCepData.uf,
-        ibge: viaCepData.ibge,
-      }
-
-      return NextResponse.json(mappedData, {
-        headers: {
-          "Cache-Control": "public, s-maxage=86400, stale-while-revalidate=43200",
-        },
-      })
-    } catch (fallbackError) {
-      console.error("[API CEP] Erro no fallback ViaCEP:", fallbackError)
-      return NextResponse.json({ error: "Erro ao buscar CEP em ambos os provedores" }, { status: 500 })
-    }
+    console.error(`[API CEP] Erro ao buscar CEP ${cep}:`, error)
+    return NextResponse.json({ error: "Erro interno ao buscar CEP" }, { status: 500 })
   }
 }

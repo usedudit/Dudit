@@ -1437,7 +1437,7 @@ export default function CreateTransactionPage({
                                         message={isRecurringTemplateEdit
                                             ? "Alterações passam a valer para ocorrências futuras. Pagamentos já confirmados não são alterados."
                                             : "A data de vencimento acima é a primeira ocorrência. As próximas datas aparecem em A pagar/A receber e seguem a frequência abaixo."}
-                                        className="mb-6"
+                                        className="my-6"
                                     />
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <FormDropdown
@@ -1497,9 +1497,8 @@ export default function CreateTransactionPage({
                                     )}
                                     {isRecurringTemplateEdit && (
                                         <Button
-                                            type="button"
-                                            variant="outline"
-                                            className="w-full border-brand-red/40 text-brand-red hover:bg-brand-red/5"
+                                            variant="outlinered"
+                                            className="w-full mt-6"
                                             onClick={() => setCancelRecurringOpen(true)}
                                             disabled={isSaving}
                                         >

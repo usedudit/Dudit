@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useRef } from "react"
 import { Input } from "@/components/reusable"
-import { consultarCEP } from "@/lib/nuvem-fiscal"
 import { Spinner } from "@/components/reusable/Spinner"
 import { Button } from "@/components/reusable/Button"
 
@@ -14,6 +13,8 @@ interface CepResponse {
     uf?: string
     numero?: string
     ibge?: string
+    latitude?: number | null
+    longitude?: number | null
     erro?: boolean
     error?: string
 }
@@ -21,7 +22,16 @@ interface CepResponse {
 interface CepInputProps extends Omit<React.ComponentProps<typeof Input>, "onChange" | "onBlur"> {
     value: string
     onChange: (value: string) => void
-    onAddressFetched?: (addressData: { street: string; neighborhood: string; city: string; state: string; number: string; ibge?: string }) => void
+    onAddressFetched?: (addressData: {
+        street: string
+        neighborhood: string
+        city: string
+        state: string
+        number: string
+        ibge?: string
+        latitude?: number | null
+        longitude?: number | null
+    }) => void
 }
 
 export const CepInput: React.FC<CepInputProps> = ({
@@ -36,7 +46,7 @@ export const CepInput: React.FC<CepInputProps> = ({
     const [lastFetchedCep, setLastFetchedCep] = useState(value?.replace(/\D/g, "") || "")
     const fetchingCepRef = useRef("")
 
-    // Formata o CEP enquando o usuário digita
+    // Formata o CEP enquanto o usuário digita
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         let text = e.target.value.replace(/\D/g, "")
         if (text.length > 8) text = text.substring(0, 8)
@@ -46,7 +56,7 @@ export const CepInput: React.FC<CepInputProps> = ({
         onChange(text)
     }
 
-    // Busca o endereço pelo CEP
+    // Busca o endereço pelo CEP via /api/cep
     const fetchAddressByCep = async (cepToFetch: string) => {
         const cleanCep = cepToFetch.replace(/\D/g, "")
         if (cleanCep.length !== 8 || cleanCep === lastFetchedCep || cleanCep === fetchingCepRef.current) return
@@ -54,7 +64,6 @@ export const CepInput: React.FC<CepInputProps> = ({
         fetchingCepRef.current = cleanCep
         setLoading(true)
         try {
-            // Usando a API consolidada que já tem fallback automático
             const response = await fetch(`/api/cep?cep=${cleanCep}`)
             const data: CepResponse = await response.json()
 
@@ -67,6 +76,8 @@ export const CepInput: React.FC<CepInputProps> = ({
                     state: data.uf || "",
                     number: data.numero || "",
                     ibge: data.ibge || "",
+                    latitude: data.latitude ?? null,
+                    longitude: data.longitude ?? null,
                 })
             } else {
                 fetchingCepRef.current = ""
@@ -86,7 +97,7 @@ export const CepInput: React.FC<CepInputProps> = ({
         }
     }
 
-    // Option: Fetch auto if we have complete CEP without waiting for blur
+    // Busca automática se tiver 8 dígitos
     useEffect(() => {
         const cleanCep = value.replace(/\D/g, "")
         if (cleanCep.length === 8 && onAddressFetched && cleanCep !== lastFetchedCep) {

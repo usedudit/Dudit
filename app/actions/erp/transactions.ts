@@ -1581,13 +1581,18 @@ export async function recordInstallmentPaymentAction(input: {
 
         const { data: tx, error: txErr } = await supabase
             .from("transactions")
-            .select("id, status, partner_id, store_id, installment_group_id, installment_number, description, category, category_id, subcategory_id, account_id, contact_id, customer_id, contact_type, payment_type, notes, due_date, original_amount, amount, transaction_type, refund_kind")
+            .select("id, status, partner_id, store_id, payment_method_id, installment_group_id, installment_number, description, category, category_id, subcategory_id, account_id, contact_id, customer_id, contact_type, payment_type, notes, due_date, original_amount, amount, transaction_type, refund_kind")
             .eq("id", input.transactionId)
             .eq("partner_id", input.partnerId)
             .single()
         if (txErr || !tx) throw new Error(txErr?.message || "Parcela não encontrada.")
         if (!tx.installment_group_id) throw new Error("Pagamento parcial é permitido apenas para parcelas.")
         if (!isStatusPending(tx.status)) throw new Error("A parcela já está quitada.")
+
+        // Parcelas de venda (ledger de vendas) já nascem com o método de pagamento
+        // fixado pelo gateway (ex: cartão de crédito) — não pode ser alterado.
+        const lockedPaymentMethodId = tx.payment_method_id || null
+        const effectivePaymentMethodId = lockedPaymentMethodId || input.paymentMethodId || null
 
         const paymentAmount = Number(input.paymentAmount || 0)
         const interestAmount = Number(input.interestAmount || 0)
@@ -1639,7 +1644,7 @@ export async function recordInstallmentPaymentAction(input: {
                 base_amount: baseApplied,
                 interest_amount: interestAmount,
                 discount_amount: discountAmount,
-                payment_method_id: input.paymentMethodId || null,
+                payment_method_id: effectivePaymentMethodId,
                 created_by_user_id: userId,
                 created_at: nowIso,
                 idempotency_key: idempotencyKey,
@@ -1653,11 +1658,11 @@ export async function recordInstallmentPaymentAction(input: {
         }
 
         let resolvedAccountId = tx.account_id
-        if (input.paymentMethodId) {
+        if (effectivePaymentMethodId) {
             const { data: pm } = await supabase
                 .from("payment_methods")
                 .select("default_finance_account_id")
-                .eq("id", input.paymentMethodId)
+                .eq("id", effectivePaymentMethodId)
                 .eq("partner_id", input.partnerId)
                 .maybeSingle()
             if (pm?.default_finance_account_id) {
@@ -1965,19 +1970,30 @@ export async function settleInstallmentGroupAction(input: {
         // Pre-fetch pending transactions to log audit events after successful settlement
         const { data: pendingTxs } = await supabase
             .from("transactions")
-            .select("id")
+            .select("id, payment_method_id")
             .eq("partner_id", input.partnerId)
             .eq("installment_group_id", input.installmentGroupId)
             .neq("status", "paid")
 
         const txIdsToLog = pendingTxs?.map((t: any) => t.id) || []
 
+        // Parcelas de venda mantêm o método fixado pela venda (ex: cartão de crédito)
+        const lockedPmByTx = new Map<string, string>(
+            (pendingTxs || [])
+                .map((t: any) => [t.id, t.payment_method_id])
+                .filter(([, pm]: any[]) => !!pm),
+        )
+        const sanitizedPayments = (input.installmentPayments || []).map((p) => ({
+            ...p,
+            paymentMethodId: lockedPmByTx.get(p.transactionId) || p.paymentMethodId || null,
+        }))
+
         // Execute the atomic settlement RPC
         const { data, error } = await supabase.rpc("settle_installment_group", {
             p_partner_id: input.partnerId,
             p_installment_group_id: input.installmentGroupId,
             p_user_id: userId,
-            p_custom_payments: input.installmentPayments || null
+            p_custom_payments: sanitizedPayments.length > 0 ? sanitizedPayments : null
         })
 
         if (error) {
@@ -1986,7 +2002,7 @@ export async function settleInstallmentGroupAction(input: {
         }
 
         // Log audit events for the transactions that were just settled
-        const settleCustomPayments = input.installmentPayments || []
+        const settleCustomPayments = sanitizedPayments
         if (txIdsToLog.length > 0) {
             await Promise.allSettled(
                 txIdsToLog.map((transactionId: string) => {

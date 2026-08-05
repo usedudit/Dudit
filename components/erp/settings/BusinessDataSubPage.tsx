@@ -38,7 +38,7 @@ import { useStore } from "@/lib/store-context"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
 import type { BusinessMode } from "@/lib/business-info"
 import { normalizeBusinessInfo } from "@/lib/business-info"
-import { consultarCNPJ } from "@/lib/nuvem-fiscal"
+import { consultarCNPJ } from "@/lib/fiscal"
 
 const SELLS_OPTIONS = [
     {
