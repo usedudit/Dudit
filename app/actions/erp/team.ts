@@ -69,16 +69,24 @@ const fetchPartnerTeamMembersCached = unstable_cache(
         if (!partnerUsers || partnerUsers.length === 0) return { members: [] }
 
         const userIds = partnerUsers.map((pu: any) => pu.user_id)
-        const [profilesRes, authUsers] = await Promise.all([
-            admin.from("user_profiles").select("user_id, full_name").in("user_id", userIds),
-            Promise.all(userIds.map(async (uid: string) => {
-                const { data } = await admin.auth.admin.getUserById(uid)
-                return data?.user ? { id: data.user.id, email: data.user.email } : null
-            })),
-        ])
 
-        let emailMap: Record<string, string> = {}
-        for (const u of authUsers) if (u) emailMap[u.id] = u.email || ""
+        // Emails via a single listUsers batch (1-2 HTTP calls) instead of N sequential
+        // auth.admin.getUserById calls, which were the main latency source of this fetch.
+        const emailMap: Record<string, string> = {}
+        const PAGE_SIZE = 200
+        for (let page = 1; ; page++) {
+            const { data: pageData, error } = await admin.auth.admin.listUsers({ page, perPage: PAGE_SIZE })
+            if (error || !pageData?.users || pageData.users.length === 0) break
+            for (const u of pageData.users) {
+                if (u.email && userIds.includes(u.id)) emailMap[u.id] = u.email
+            }
+            if (pageData.users.length < PAGE_SIZE) break
+        }
+
+        const { data: profilesRes } = await admin
+            .from("user_profiles")
+            .select("user_id, full_name")
+            .in("user_id", userIds)
 
         const profileMap: Record<string, { full_name: string | null }> = {}
         if (profilesRes.data) for (const p of profilesRes.data) profileMap[p.user_id] = { full_name: p.full_name }
@@ -172,104 +180,91 @@ export async function getTeamMemberStatsAction(): Promise<{ stats: TeamMemberSta
             return { stats: [], error: "Sem permissão para visualizar estatísticas." }
         }
 
-        const admin = getAdminClient()
-        const partnerId = context.partnerId
-
-        // Get commission transactions from last 90 days for performance
-        const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
-        const { data: commissionData } = await admin
-            .from("transactions")
-            .select("seller_partner_user_id, amount, created_at, reference_note")
-            .eq("partner_id", partnerId)
-            .eq("category", "Comissões")
-            .eq("transaction_type", "expense")
-            .not("seller_partner_user_id", "is", null)
-            .gte("created_at", ninetyDaysAgo)
-            .order("created_at", { ascending: false })
-
-        // Aggregate per seller
-        const statsMap = new Map<string, { saleCount: number; totalCommissionValue: number; lastSaleDate: string | null }>()
-
-        if (commissionData) {
-            for (const row of commissionData) {
-                const sid = row.seller_partner_user_id as string
-                if (!sid) continue
-                const existing = statsMap.get(sid) || { saleCount: 0, totalCommissionValue: 0, lastSaleDate: null as string | null }
-                existing.saleCount += 1
-                existing.totalCommissionValue += Number(row.amount || 0)
-                if (!existing.lastSaleDate || (row.created_at && row.created_at > existing.lastSaleDate)) {
-                    existing.lastSaleDate = row.created_at as string
-                }
-                statsMap.set(sid, existing)
-            }
-        }
-
-        // Get total sales amount per commission owner by parsing reference_note
-        // reference_note format: "commission:sale:<entityId>:<partnerUserId>"
-        const referenceNotes = (commissionData || [])
-            .filter((r: any) => r.seller_partner_user_id)
-            .map((r: any) => r.reference_note as string)
-            .filter(Boolean)
-
-        // Extract unique entity IDs from reference notes for PDV sales and ERP orders
-        const saleIds: string[] = []
-        const orderIds: string[] = []
-        const entityToSellerMap = new Map<string, string>() // entityId -> sellerPartnerUserId
-
-        for (const ref of referenceNotes) {
-            const parts = ref.split(":")
-            if (parts.length >= 4 && parts[0] === "commission" && parts[1] === "sale") {
-                const entityId = parts[2]
-                const sellerId = parts[3]
-                saleIds.push(entityId)
-                entityToSellerMap.set(entityId, sellerId)
-            }
-        }
-
-        // Query sales (PDV) amounts
-        let saleAmountMap = new Map<string, number>()
-        if (saleIds.length > 0) {
-            const { data: salesData } = await admin
-                .from("sales")
-                .select("id, total_amount")
-                .in("id", saleIds)
-            if (salesData) {
-                for (const s of salesData) {
-                    saleAmountMap.set(s.id, Number(s.total_amount || 0))
-                }
-            }
-        }
-
-        // Build per-seller total sales value
-        const salesValuePerSeller = new Map<string, number>()
-        for (const [entityId, sellerId] of entityToSellerMap) {
-            const amount = saleAmountMap.get(entityId) || 0
-            salesValuePerSeller.set(sellerId, (salesValuePerSeller.get(sellerId) || 0) + amount)
-        }
-
-        // Get all partner users to build full stats list
-        const { members, error: membersErr } = await fetchPartnerTeamMembers(partnerId)
-        if (membersErr) return { stats: [], error: membersErr }
-
-        const stats: TeamMemberStats[] = members.map((m) => {
-            const s = statsMap.get(m.id)
-            const totalSalesValue = salesValuePerSeller.get(m.id) || 0
-            return {
-                partnerUserId: m.id,
-                fullName: m.fullName,
-                avatarUrl: m.avatarUrl,
-                saleCount: s?.saleCount || 0,
-                totalSalesValue,
-                totalCommissionValue: s?.totalCommissionValue || 0,
-                lastSaleDate: s?.lastSaleDate || null,
-            }
-        })
-
+        const stats = await fetchTeamStatsCached(context.partnerId)
         return { stats }
     } catch (error: any) {
         return { stats: [], error: error.message }
     }
 }
+
+// Aggregated per-member stats, cached per partner.
+// Sales come from orders (covers both ERP pedidos and PDV sales synced with is_pos_sale),
+// commissions from the Comissões expense transactions. No arbitrary time window.
+const fetchTeamStatsCached = unstable_cache(
+    async (partnerId: string): Promise<TeamMemberStats[]> => {
+        const admin = getAdminClient()
+
+        const [usersRes, ordersRes, commissionsRes] = await Promise.all([
+            admin
+                .from("partner_users")
+                .select("id, user_id")
+                .eq("partner_id", partnerId),
+            admin
+                .from("orders")
+                .select("id, total_amount, created_at, seller_partner_user_id")
+                .eq("partner_id", partnerId)
+                .neq("situation", "cancelled"),
+            admin
+                .from("transactions")
+                .select("amount, seller_partner_user_id")
+                .eq("partner_id", partnerId)
+                .eq("category", "Comissões")
+                .eq("transaction_type", "expense")
+                .not("seller_partner_user_id", "is", null),
+        ])
+
+        const partnerUsers = usersRes.data || []
+        const userIds = partnerUsers.map((pu: any) => pu.user_id)
+
+        const { data: profilesRes } = await admin
+            .from("user_profiles")
+            .select("user_id, full_name")
+            .in("user_id", userIds)
+        const profileMap = new Map<string, string | null>(
+            (profilesRes || []).map((p: any) => [p.user_id, p.full_name])
+        )
+
+        // Sales per seller (keyed by partner_users.id)
+        const salesMap = new Map<string, { saleCount: number; totalSalesValue: number; lastSaleDate: string | null }>()
+        for (const order of ordersRes.data || []) {
+            const sid = order.seller_partner_user_id as string | null
+            if (!sid) continue
+            const existing = salesMap.get(sid) || { saleCount: 0, totalSalesValue: 0, lastSaleDate: null as string | null }
+            existing.saleCount += 1
+            existing.totalSalesValue += Number(order.total_amount || 0)
+            if (!existing.lastSaleDate || (order.created_at && order.created_at > existing.lastSaleDate)) {
+                existing.lastSaleDate = order.created_at as string
+            }
+            salesMap.set(sid, existing)
+        }
+
+        // Commissions per seller
+        const commissionMap = new Map<string, number>()
+        for (const tx of commissionsRes.data || []) {
+            const sid = tx.seller_partner_user_id as string
+            if (!sid) continue
+            commissionMap.set(sid, (commissionMap.get(sid) || 0) + Number(tx.amount || 0))
+        }
+
+        return partnerUsers.map((pu: any) => {
+            const sales = salesMap.get(pu.id) || { saleCount: 0, totalSalesValue: 0, lastSaleDate: null }
+            return {
+                partnerUserId: pu.id,
+                fullName: profileMap.get(pu.user_id) || null,
+                avatarUrl: null,
+                saleCount: sales.saleCount,
+                totalSalesValue: sales.totalSalesValue,
+                totalCommissionValue: commissionMap.get(pu.id) || 0,
+                lastSaleDate: sales.lastSaleDate,
+            }
+        })
+    },
+    ["team-stats"],
+    {
+        revalidate: 60,
+        tags: ["team-stats"],
+    }
+)
 
 /**
  * Update a team member's role.

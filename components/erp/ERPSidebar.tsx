@@ -109,17 +109,17 @@ const navItems: NavItem[] = [
         label: "Relatórios",
         href: "/erp/reports",
     },
-{
-            icon: MegaphoneIcon,
-            label: "Marketing",
-            submenu: [
-                { label: "Cupons de Desconto", href: "/erp/coupons" },
-                { label: "Campanhas e Promoções", href: "/erp/promotions" },
-                { label: "Planos Recorrentes", href: "/erp/recurring/plans" },
-                { label: "Assinaturas", href: "/erp/recurring/subscriptions" },
-                { label: "Vídeos da Comunidade", href: "/erp/marketing/videos" },
-            ],
-        },
+    {
+        icon: MegaphoneIcon,
+        label: "Marketing",
+        submenu: [
+            { label: "Cupons de Desconto", href: "/erp/coupons" },
+            { label: "Campanhas e Promoções", href: "/erp/promotions" },
+            { label: "Planos Recorrentes", href: "/erp/recurring/plans" },
+            { label: "Assinaturas", href: "/erp/recurring/subscriptions" },
+            { label: "Vídeos da Comunidade", href: "/erp/marketing/videos" },
+        ],
+    },
     {
         icon: StoreIcon,
         label: "Minha Vitrine",
@@ -793,11 +793,6 @@ export function ERPSidebar() {
                         })}
                     </ul>
                 </nav>
-            </div>
-
-            {/* Sidebar Card - Desktop Only */}
-            <div className="hidden lg:block p-3">
-                {sidebarCard}
             </div>
 
             {/* MOBILE BOTTOM SHEET (VAUL) */}

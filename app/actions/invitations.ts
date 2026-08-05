@@ -139,6 +139,11 @@ export async function createInvitation(input: {
         const expiresAt = new Date()
         expiresAt.setDate(expiresAt.getDate() + 7)
 
+        // Build invite URL (also persisted as share_url so the team admin can
+        // copy the link again later without regenerating/invalidating the invite)
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || ""
+        const inviteUrl = `${appUrl}/invite/${rawToken}`
+
         // 6. Insert invitation
         const { error: insertError } = await admin.from("partner_invitations").insert({
             partner_id: input.partnerId,
@@ -150,6 +155,7 @@ export async function createInvitation(input: {
             created_by_user_id: user.id,
             created_by_role: String(access.roleId || "").toUpperCase(),
             expires_at: expiresAt.toISOString(),
+            share_url: inviteUrl,
         })
 
         if (insertError) {
@@ -169,11 +175,7 @@ export async function createInvitation(input: {
             },
         })
 
-        // 8. Build invite URL
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || ""
-        const inviteUrl = `${appUrl}/invite/${rawToken}`
-
-        // 9. Invalidate invitation list cache so the new invite appears immediately
+        // 8. Invalidate invitation list cache so the new invite appears immediately
         const { revalidatePartnerInvitations } = await import("@/lib/utils/revalidation")
         revalidatePartnerInvitations(input.partnerId)
 
@@ -451,7 +453,7 @@ export async function listPartnerInvitations(partnerId: string): Promise<{
 
         const { data, error } = await admin
             .from("partner_invitations")
-            .select("id, email, role, created_at, expires_at, used_at, used_by, revoked_at, revoked_by, created_by_user_id, created_by_role")
+            .select("id, email, role, created_at, expires_at, used_at, used_by, revoked_at, revoked_by, created_by_user_id, created_by_role, share_url")
             .eq("partner_id", partnerId)
             .order("created_at", { ascending: false })
             .limit(50)

@@ -13,15 +13,41 @@ import { DASHBOARD_TAGS } from "@/lib/data/dashboard"
 import { getRandomDefaultBanner } from "@/lib/utils/banner"
 
 export async function listStoresAction(partnerId: string) {
-    await requireUser()
+    const user = await requireUser()
     await requirePartnerAccess(partnerId)
 
+    // Escopo por store_members: dono (partners.user_id) ou role owner veem todas
+    // as lojas; membros convidados veem APENAS as lojas em que têm store_member.
+    const admin = createAdminClient()
+    const [partnerRes, puRes] = await Promise.all([
+        admin.from("partners").select("user_id").eq("id", partnerId).maybeSingle(),
+        admin.from("partner_users").select("id, role_id").eq("partner_id", partnerId).eq("user_id", user.id).maybeSingle(),
+    ])
+
+    const isPartnerOwner = partnerRes.data?.user_id === user.id
+    const roleId = String(puRes.data?.role_id || "").toLowerCase()
+    let allowedStoreIds: string[] | null = null
+
+    if (!isPartnerOwner && roleId !== "owner") {
+        if (!puRes.data) return [] // membro sem partner_users -> sem acesso a lojas
+        const { data: members } = await admin
+            .from("store_members")
+            .select("store_id")
+            .eq("partner_user_id", puRes.data.id)
+        const memberStoreIds = (members || []).map((m: any) => m.store_id)
+        if (memberStoreIds.length === 0) return []
+        allowedStoreIds = memberStoreIds
+    }
+
     const supabase = await getSupabaseServerClient()
-    const { data, error } = await supabase
+    let query = supabase
         .from("stores")
         .select("*, addresses!store_id(id, zip_code, street, number, complement, neighborhood, city, state, is_default)")
         .eq("partner_id", partnerId)
-        .order("created_at", { ascending: true })
+    if (allowedStoreIds !== null) {
+        query = query.in("id", allowedStoreIds)
+    }
+    const { data, error } = await query.order("created_at", { ascending: true })
 
     if (error) throw new Error(error.message)
 

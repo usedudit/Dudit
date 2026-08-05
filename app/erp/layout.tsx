@@ -35,6 +35,8 @@ import { LimitStatusWidget } from "@/components/erp/LimitStatusWidget"
 import type { PartnerRole, PartnerRoutePermissions } from "@/lib/permissions/types"
 import type { RoleId } from "@/lib/permissions/rbac-types"
 
+import { listStoresAction } from "@/app/actions/erp/stores"
+
 export default async function ERPLayout({
   children,
 }: {
@@ -106,6 +108,15 @@ export default async function ERPLayout({
   const partnerPlan = await getPartnerPlan(context.partnerId)
   const activeStoreId = await getActiveStoreId()
 
+  let initialStores: any[] = []
+  try {
+    initialStores = await listStoresAction(context.partnerId)
+  } catch (e) {
+    console.error("Error pre-fetching stores in layout:", e)
+  }
+
+  const effectiveActiveStoreId = activeStoreId || (initialStores.length > 0 ? (initialStores.find(s => s.is_headquarters)?.id || initialStores[0].id) : null)
+
   return (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
       <ProductMetadataProvider>
@@ -118,7 +129,7 @@ export default async function ERPLayout({
             planSlug={partnerPlan.slug}
           >
             <PlanUpgradeProvider>
-              <StoreProvider partnerId={context.partnerId} activeStoreId={activeStoreId}>
+              <StoreProvider partnerId={context.partnerId} activeStoreId={effectiveActiveStoreId} initialStores={initialStores}>
                 <SidebarProvider initialExpanded={initialExpanded}>
                   <div className="flex h-screen bg-brand-page-bg dark:bg-brand-page-bg text-brand-dark dark:text-white transition-colors duration-200">
                     <ERPSidebar />

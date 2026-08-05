@@ -468,16 +468,16 @@ export async function middleware(request: NextRequest) {
                 .eq("user_id", user.id)
                 .maybeSingle()
               : Promise.resolve({ data: null }),
-            // SECURITY FIX (MED-04): Query through partner_users to verify user ownership.
-            // Previously queried partners directly, which leaked partner status to any user
-            // who manipulated the active_partner_id cookie.
+            // SECURITY FIX (MED-04): get_partner_runtime_status (SECURITY DEFINER) returns
+            // ONLY {is_active, erp_disabled} and only for owner/members of the partner.
+            // Previously we joined partner_users -> partners!inner(...), but partners RLS
+            // only exposes the row to the OWNER, so the inner join returned null for
+            // invited members and the middleware cleared their cookie. The RPC avoids
+            // the RLS join while still returning null for cookie tamperers (non-members).
             needsPartnerCheck
-              ? supabase
-                .from("partner_users")
-                .select("id, partners!inner(is_active, erp_disabled)")
-                .eq("partner_id", activePartnerId!)
-                .eq("user_id", user.id)
-                .maybeSingle()
+              ? Promise.resolve(
+                  supabase.rpc("get_partner_runtime_status", { p_partner_id: activePartnerId! })
+                ).then((rpcResult) => ({ data: rpcResult.error ? null : rpcResult.data }))
               : Promise.resolve({ data: null }),
             needsUserDeletionCheck
               ? supabase
@@ -552,12 +552,11 @@ export async function middleware(request: NextRequest) {
           }
 
           // Process partner status check result
-          // MED-04: partnerResult now comes from partner_users join, so
+          // MED-04: partnerResult comes from get_partner_runtime_status, so
           // .data is null if user doesn't belong to this partner (cookie tampered).
-          const partnerRow = partnerResult.data
-          if (partnerRow) {
-            const partnerInfo = (partnerRow as any).partners
-            if (partnerInfo && (partnerInfo.is_active === false || partnerInfo.erp_disabled === true)) {
+          const partnerStatus = partnerResult.data
+          if (partnerStatus) {
+            if (partnerStatus.is_active === false || partnerStatus.erp_disabled === true) {
               console.log(`[MIDDLEWARE] Partner ${activePartnerId} is inactive/disabled - redirecting to /select-erp`)
               const selectErpUrl = new URL("/select-erp", request.url)
               const responseRedirect = NextResponse.redirect(selectErpUrl)

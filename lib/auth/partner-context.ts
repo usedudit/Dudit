@@ -538,6 +538,20 @@ const checkRealTimePartnerAccess = (partnerId: string, userId: string) => unstab
     }
 )
 
+async function resolveDefaultStoreId(partnerId: string): Promise<string | null> {
+    try {
+        const admin = createAdminClient()
+        const { data: stores } = await admin.from("stores").select("id, is_headquarters").eq("partner_id", partnerId).order("created_at", { ascending: true })
+        if (stores && stores.length > 0) {
+            const hq = stores.find((s: any) => s.is_headquarters) || stores[0]
+            return hq.id
+        }
+    } catch (e) {
+        console.error("Error resolving default store id:", e)
+    }
+    return null
+}
+
 /**
  * Gets the current authenticated user's partner context.
  * 
@@ -572,10 +586,15 @@ export const getCurrentPartnerContext = cache(async (resolvedUser?: any): Promis
                 return null
             }
 
+            let activeStoreId = await getActiveStoreId()
+            if (!activeStoreId) {
+                activeStoreId = await resolveDefaultStoreId(match.partnerId)
+            }
+
             return {
                 userId: match.userId,
                 partnerId: match.partnerId,
-                activeStoreId: await getActiveStoreId(),
+                activeStoreId,
                 role: match.role,
                 roleId: match.roleId,
                 permissions: match.permissions,
@@ -587,10 +606,14 @@ export const getCurrentPartnerContext = cache(async (resolvedUser?: any): Promis
     // If no valid cookie, and they only have 1 ERP that belongs to them, auto-resolve
     if (allAccess.length === 1 && allAccess[0].roleId === "owner") {
         const match = allAccess[0]
+        let activeStoreId = await getActiveStoreId()
+        if (!activeStoreId) {
+            activeStoreId = await resolveDefaultStoreId(match.partnerId)
+        }
         return {
             userId: match.userId,
             partnerId: match.partnerId,
-            activeStoreId: await getActiveStoreId(),
+            activeStoreId,
             role: match.role,
             roleId: match.roleId,
             permissions: match.permissions,

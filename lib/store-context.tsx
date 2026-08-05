@@ -51,20 +51,34 @@ export function StoreProvider({
   children,
   partnerId: propPartnerId,
   activeStoreId: propActiveStoreId,
+  initialStores = [],
 }: {
   children: React.ReactNode
   partnerId?: string
   activeStoreId?: string | null
+  initialStores?: Store[]
 }) {
-  const [selectedStore, setSelectedStore] = useState<Store | null>(null)
-  const [stores, setStores] = useState<Store[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const initialSelected = useMemo(() => {
+    if (initialStores && initialStores.length > 0) {
+      if (propActiveStoreId) {
+        const found = initialStores.find((s) => s.id === propActiveStoreId)
+        if (found) return found
+      }
+      return initialStores[0]
+    }
+    return null
+  }, [initialStores, propActiveStoreId])
+
+  const [selectedStore, setSelectedStore] = useState<Store | null>(initialSelected)
+  const [stores, setStores] = useState<Store[]>(initialStores || [])
+  const [isLoading, setIsLoading] = useState(!initialStores || initialStores.length === 0)
   const [hasError, setHasError] = useState(false)
   const router = useRouter()
   const [partnerId, setPartnerId] = useState<string | null>(propPartnerId || null)
-  const hasSyncedCookie = useRef(false)
 
   useEffect(() => {
+    if (initialStores && initialStores.length > 0) return
+
     const cached = localStorage.getItem("cachedStores")
     const cachedTime = localStorage.getItem("cachedStoresTimestamp")
     const cachedSelected = localStorage.getItem("selectedStoreId")
@@ -79,18 +93,33 @@ export function StoreProvider({
         if (selected) {
           setStores(parsedStores)
           setSelectedStore(selected)
+          setIsLoading(false)
         }
       } catch (e) {
         console.error("Error loading cached stores:", e)
       }
     }
-  }, [])
+  }, [initialStores])
 
   useEffect(() => {
     if (propPartnerId && propPartnerId !== partnerId) {
       setPartnerId(propPartnerId)
     }
   }, [propPartnerId, partnerId])
+
+  // Sync propActiveStoreId or initialStores when props change from SSR
+  useEffect(() => {
+    if (initialStores && initialStores.length > 0) {
+      setStores(initialStores)
+      const found = propActiveStoreId ? initialStores.find((s) => s.id === propActiveStoreId) : null
+      if (found) {
+        setSelectedStore(found)
+      } else if (!selectedStore || !initialStores.some(s => s.id === selectedStore.id)) {
+        setSelectedStore(initialStores[0])
+      }
+      setIsLoading(false)
+    }
+  }, [initialStores, propActiveStoreId])
 
   const fetchStores = useCallback(async () => {
     if (!partnerId) {
@@ -128,8 +157,8 @@ export function StoreProvider({
       } else if (savedStoreId && data?.find((s: any) => s.id === savedStoreId)) {
         setSelectedStore(data.find((s: any) => s.id === savedStoreId) || null)
       } else if (data && data.length > 0) {
-        setSelectedStore(data[0])
-        localStorage.setItem("selectedStoreId", data[0].id)
+        setSelectedStore((prev) => prev || data[0])
+        if (!savedStoreId) localStorage.setItem("selectedStoreId", data[0].id)
       } else {
         setSelectedStore(null)
       }
