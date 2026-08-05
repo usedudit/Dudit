@@ -263,14 +263,20 @@ export default function DeliveriesPage({
     } | null>(null)
     const [simpleConfirmModal, setSimpleConfirmModal] = useState<{ isOpen: boolean; deliveryId: string; nextStatus: string } | null>(null)
 
-    const handleStatusChangeClick = useCallback((deliveryId: string, currentStatus: string) => {
+    const handleQuickStatusChange = useCallback((deliveryId: string, targetOrCurrentStatus?: string) => {
+        const item = mapped.find((d: any) => d.id === deliveryId)
+        const currentStatus = item ? item.status : "pending"
+        const nextStatus = targetOrCurrentStatus && targetOrCurrentStatus !== currentStatus
+            ? targetOrCurrentStatus
+            : currentStatus
+
         setStatusModal({
             isOpen: true,
             deliveryId,
             currentStatus,
-            nextStatus: currentStatus
+            nextStatus
         })
-    }, [])
+    }, [mapped])
 
     const handleStatusTransition = useCallback((deliveryId: string, currentStatus: string, nextStatus: string) => {
         setStatusModal(null)
@@ -327,12 +333,10 @@ export default function DeliveriesPage({
         }
     }, [partnerId, statusOverrides])
 
-    const handleQuickStatusChange = handleStatusChangeClick
-
     const totalPages = Math.max(1, Math.ceil(mapped.length / ITEMS_PER_PAGE))
     const paginated = mapped.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
 
-    const filterSections: FilterSectionConfig[] = [{ id: "status", title: "Status", type: "checkbox-list", options: ["Pendente", "Em preparação", "Saiu para entrega", "Concluída", "Cancelada"] }]
+    const filterSections: FilterSectionConfig[] = [{ id: "status", title: "Status", type: "checkbox-list", options: ["Não enviado", "Em preparação", "Enviado", "Entregue", "Falha na entrega", "Cancelada"] }]
 
     return (
         <AnimatePresence mode="wait">
@@ -585,10 +589,10 @@ export default function DeliveriesPage({
                         value={statusModal?.nextStatus || ""}
                         setValue={(val) => setStatusModal(prev => prev ? { ...prev, nextStatus: val } : null)}
                         options={[
-                            { value: "pending", label: "Pendente" },
+                            { value: "pending", label: "Não enviado" },
                             { value: "preparing", label: "Em preparação" },
-                            { value: "sent", label: "Saiu para entrega" },
-                            { value: "delivered", label: "Concluída" },
+                            { value: "sent", label: "Enviado" },
+                            { value: "delivered", label: "Entregue" },
                             { value: "cancelled", label: "Cancelada" },
                             { value: "delivery_failed", label: "Falha na entrega" },
                         ]}

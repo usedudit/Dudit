@@ -35,15 +35,15 @@ const PAYMENT_STATUS_META: Record<string, { label: string; variant: BadgeVariant
 
 const DELIVERY_STATUS_META: Record<string, { label: string; variant: BadgeVariant }> = {
   // Basic delivery (new canonical set)
-  pending: { label: "Pendente", variant: "gray" },
+  pending: { label: "Não enviado", variant: "gray" },
   preparing: { label: "Em preparação", variant: "orange" },
-  sent: { label: "Saiu para entrega", variant: "blue" },
-  delivered: { label: "Concluída", variant: "green" },
+  sent: { label: "Enviado", variant: "blue" },
+  delivered: { label: "Entregue", variant: "green" },
   cancelled: { label: "Cancelada", variant: "red" },
 
   // Backward compatibility (older status values still exist in DB/UI)
-  not_sent: { label: "Pendente", variant: "gray" },
-  pickup_available: { label: "Pronto retirada", variant: "cyan" },
+  not_sent: { label: "Não enviado", variant: "gray" },
+  pickup_available: { label: "Pronto para retirada", variant: "cyan" },
   delivery_failed: { label: "Falha na entrega", variant: "red" },
 }
 
@@ -99,7 +99,7 @@ export function getFulfillmentModeLabel(mode?: string | null) {
 
 const DELIVERY_LABELS: Record<string, string> = {
   not_sent: "Não enviado",
-  pending: "Pendente",
+  pending: "Não enviado",
   preparing: "Em preparação",
   sent: "Enviado",
   delivered: "Entregue",

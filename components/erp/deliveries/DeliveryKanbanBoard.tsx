@@ -37,7 +37,7 @@ export default function DeliveryKanbanBoard({
     const columns = [
         {
             id: "pending",
-            title: "Pendente",
+            title: "Não enviado",
             subtitle: "Novos pedidos",
             themeClass: "bg-blue-50/70 border-blue-100/50 text-blue-600 dark:bg-blue-950/20 dark:border-blue-900/30 dark:text-blue-400",
             dotBgClass: "bg-blue-100 dark:bg-blue-900/40",
@@ -57,7 +57,7 @@ export default function DeliveryKanbanBoard({
         },
         {
             id: "sent",
-            title: "Saiu para entrega",
+            title: "Enviado",
             subtitle: "A caminho",
             themeClass: "bg-rose-50/70 border-rose-100/50 text-rose-600 dark:bg-rose-950/20 dark:border-rose-900/30 dark:text-rose-400",
             dotBgClass: "bg-rose-100 dark:bg-rose-900/40",

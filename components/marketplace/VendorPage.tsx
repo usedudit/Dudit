@@ -254,6 +254,7 @@ const MapboxMap = ({ lat, lng, name, address, isActive }: { lat?: number; lng?: 
     const mapContainerRef = useRef<HTMLDivElement>(null)
     const mapRef = useRef<any>(null)
     const [isMapping, setIsMapping] = useState(true)
+    const [mapError, setMapError] = useState<string | null>(null)
 
     useEffect(() => {
         let cancelled = false
@@ -285,13 +286,18 @@ const MapboxMap = ({ lat, lng, name, address, isActive }: { lat?: number; lng?: 
                 if (cancelled || !mapContainerRef.current) return
                 const mapboxgl = (window as any).mapboxgl
                 mapboxgl.accessToken = token
-                mapRef.current = new mapboxgl.Map({
+                const map = new mapboxgl.Map({
                     container: mapContainerRef.current,
                     style: "mapbox://styles/mapbox/light-v11",
                     center: [lng, lat],
                     zoom: 15,
                     attributionControl: false,
                 })
+                map.on("error", (e: any) => {
+                    if (cancelled) return
+                    setMapError(e?.error?.message || e?.message || "Falha ao carregar o mapa.")
+                })
+                mapRef.current = map
                 const marker = new mapboxgl.Marker({ color: "#059669" }).setLngLat([lng, lat]).addTo(mapRef.current)
                 if (name || address) {
                     marker.setPopup(new mapboxgl.Popup({ offset: 35, closeButton: false }).setHTML(`<div style="padding:4px;font-family:system-ui,sans-serif"><strong>${name}</strong><p style="margin:2px 0 0;font-size:12px;color:#4B5563">${address || ""}</p></div>`))
@@ -303,6 +309,7 @@ const MapboxMap = ({ lat, lng, name, address, isActive }: { lat?: number; lng?: 
         initMap()
         return () => {
             cancelled = true
+            setMapError(null)
             mapRef.current?.remove()
         }
     }, [lat, lng, name, address])
@@ -317,6 +324,9 @@ const MapboxMap = ({ lat, lng, name, address, isActive }: { lat?: number; lng?: 
 
     if (!process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || !isMapping) {
         return <div className="w-full h-full bg-gray-100 flex items-center justify-center p-4 text-center text-[12px] text-brand-inactive-text">Localização indisponível no mapa.</div>
+    }
+    if (mapError) {
+        return <div className="w-full h-full bg-gray-100 flex items-center justify-center p-4 text-center text-[12px] text-brand-inactive-text">Não foi possível carregar o mapa.</div>
     }
     return <div ref={mapContainerRef} className="w-full h-full bg-gray-100" />
 }

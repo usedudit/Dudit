@@ -576,10 +576,10 @@ export default function CreateDeliveryPage({
                                                                     value={status}
                                                                     setValue={setStatus}
                                                                     options={[
-                                                                        { value: "pending", label: "Pendente" },
+                                                                        { value: "pending", label: "Não enviado" },
                                                                         { value: "preparing", label: "Em preparação" },
-                                                                        { value: "sent", label: "Saiu para entrega" },
-                                                                        { value: "delivered", label: "Concluída" },
+                                                                        { value: "sent", label: "Enviado" },
+                                                                        { value: "delivered", label: "Entregue" },
                                                                         { value: "cancelled", label: "Cancelada" },
                                                                     ]}
                                                                 />
@@ -797,12 +797,6 @@ export default function CreateDeliveryPage({
                                             <span className="text-brand-inactive-text dark:text-dark-body font-medium">Data e Hora</span>
                                             <span className="font-bold text-brand-dark dark:text-dark-heading">
                                                 {activeOrder.orderDate ? formatDateTime(activeOrder.orderDate) : "-"}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between items-center text-sm">
-                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Canal de Venda</span>
-                                            <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                {activeOrder.orderSource || "Manual"}
                                             </span>
                                         </div>
                                     </div>

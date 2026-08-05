@@ -105,6 +105,11 @@ export function OptimizedMapbox({
         map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right")
         mapRef.current = map
 
+        map.on("error", () => {
+          if (cancelled) return
+          setIsMapping(false)
+        })
+
         map.on("load", () => {
           if (cancelled) return
           fireBoundsChange(true) // Fetch inicial automático

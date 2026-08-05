@@ -37,7 +37,7 @@ type CreateDeliveryPayload = {
 }
 
 const DEFAULT_PAGE_SIZE = 100
-const ACTIVE_DELIVERY_STATUSES = ["pending", "not_sent", "preparing", "sent", "pickup_available"] as const
+const ACTIVE_DELIVERY_STATUSES = ["preparing", "sent", "pickup_available"] as const
 
 function revalidateDeliveryDashboard(partnerId: string) {
   // @ts-ignore - Next 15 accepts profile as the second argument.
@@ -457,19 +457,32 @@ function formatAddress(orderLike: any) {
     .trim()
 }
 
-function extractZipPrefix(address: string): string | null {
+function extractZipInfo(address: string): { fullZip: string | null; prefixZip: string | null } {
   const raw = String(address || "")
-  const m = raw.match(/\b(\d{5})-?\d{3}\b/)
-  if (!m?.[1]) return null
-  return m[1]
+  const m = raw.match(/\b(\d{5})-?(\d{3})\b/)
+  if (m?.[1] && m?.[2]) {
+    const full = `${m[1]}-${m[2]}`
+    return { fullZip: full, prefixZip: m[1] }
+  }
+  const mPrefix = raw.match(/\b(\d{5})\b/)
+  if (mPrefix?.[1]) {
+    return { fullZip: null, prefixZip: mPrefix[1] }
+  }
+  return { fullZip: null, prefixZip: null }
 }
 
 function normalizeAddressGroupKey(address: string): { key: string; label: string } {
   const cleaned = String(address || "").trim()
-  const zipPrefix = extractZipPrefix(cleaned)
-  if (zipPrefix) return { key: `zip:${zipPrefix}`, label: `CEP ${zipPrefix}` }
+  const { fullZip, prefixZip } = extractZipInfo(cleaned)
+  if (fullZip) return { key: `cep:${fullZip}`, label: `CEP ${fullZip}` }
+  if (prefixZip) return { key: `zip:${prefixZip}`, label: `Região CEP ${prefixZip}` }
 
-  // Very lightweight fallback: last "City - ST" pattern
+  // Fallback: bairro / cidade
+  const neighborhoodMatch = cleaned.match(/,\s*([^,]+),\s*([^,]+)\s*-\s*([A-Z]{2})/i)
+  if (neighborhoodMatch?.[1]) {
+    return { key: `bairro:${neighborhoodMatch[1].trim().toLowerCase()}`, label: `Bairro ${neighborhoodMatch[1].trim()}` }
+  }
+
   const cityState = cleaned.match(/,\s*([^,]+)\s*-\s*([A-Z]{2})\s*$/i)
   if (cityState?.[1] && cityState?.[2]) {
     const city = String(cityState[1]).trim().toLowerCase()
@@ -716,12 +729,26 @@ export async function fetchDeliveryOrderBucketAction(partnerId: string) {
 
   let customerMap = new Map<string, any>()
   if (buyerIds.length > 0) {
-    const { data: customerRows } = await supabase
-      .from("customers")
-      .select("id, name, email, phone, image_url, street, number, complement, neighborhood, city, state, zip_code")
-      .in("id", buyerIds)
+    const [{ data: customerRows }, { data: addressRows }] = await Promise.all([
+      supabase
+        .from("customers")
+        .select("id, name, email, phone, image_url")
+        .in("id", buyerIds),
+      supabase
+        .from("addresses")
+        .select("customer_id, street, number, complement, neighborhood, city, state, zip_code")
+        .in("customer_id", buyerIds)
+        .eq("address_type", "primary"),
+    ])
+
+    const addressMap = new Map<string, any>()
+    for (const addr of addressRows || []) {
+      addressMap.set(String(addr.customer_id), addr)
+    }
+
     for (const row of customerRows || []) {
-      customerMap.set(String(row.id), row)
+      const addr = addressMap.get(String(row.id))
+      customerMap.set(String(row.id), { ...row, ...addr })
     }
   }
 
@@ -982,6 +1009,22 @@ export async function createERPDeliveryAction(payload: CreateDeliveryPayload) {
     return { success: false as const, error: createError.message }
   }
 
+  // Disassociate orderIds from previous pending/not_sent deliveries if any
+  try {
+    const { data: previousPendingLinks } = await supabase
+      .from("delivery_orders")
+      .select("id, delivery_id, deliveries!inner(id, status)")
+      .in("order_id", orderIds)
+      .in("deliveries.status", ["pending", "not_sent"])
+
+    if (previousPendingLinks && previousPendingLinks.length > 0) {
+      const linkIdsToDelete = previousPendingLinks.map((l: any) => l.id)
+      await supabase.from("delivery_orders").delete().in("id", linkIdsToDelete)
+    }
+  } catch (err) {
+    console.warn("[createERPDeliveryAction] Failed to clean up previous pending links:", err)
+  }
+
   const linkRows = orderIds.map((orderId, idx) => ({
     delivery_id: created.id,
     order_id: orderId,
@@ -1192,12 +1235,26 @@ export async function getERPDeliveryDetailsAction(deliveryId: string, partnerId:
 
   let customerMap = new Map<string, any>()
   if (buyerIds.length > 0) {
-    const { data: customerRows } = await supabase
-      .from("customers")
-      .select("id, name, email, phone, image_url, street, number, complement, neighborhood, city, state, zip_code")
-      .in("id", buyerIds)
+    const [{ data: customerRows }, { data: addressRows }] = await Promise.all([
+      supabase
+        .from("customers")
+        .select("id, name, email, phone, image_url")
+        .in("id", buyerIds),
+      supabase
+        .from("addresses")
+        .select("customer_id, street, number, complement, neighborhood, city, state, zip_code")
+        .in("customer_id", buyerIds)
+        .eq("address_type", "primary"),
+    ])
+
+    const addressMap = new Map<string, any>()
+    for (const addr of addressRows || []) {
+      addressMap.set(String(addr.customer_id), addr)
+    }
+
     for (const row of customerRows || []) {
-      customerMap.set(String(row.id), row)
+      const addr = addressMap.get(String(row.id))
+      customerMap.set(String(row.id), { ...row, ...addr })
     }
   }
 

@@ -111,10 +111,15 @@ export function StoreProvider({
   useEffect(() => {
     if (initialStores && initialStores.length > 0) {
       setStores(initialStores)
-      const found = propActiveStoreId ? initialStores.find((s) => s.id === propActiveStoreId) : null
-      if (found) {
-        setSelectedStore(found)
-      } else if (!selectedStore || !initialStores.some(s => s.id === selectedStore.id)) {
+      const savedStoreId = typeof window !== "undefined" ? localStorage.getItem("selectedStoreId") : null
+      const targetId = savedStoreId || propActiveStoreId
+
+      if (targetId && initialStores.some((s) => s.id === targetId)) {
+        const found = initialStores.find((s) => s.id === targetId)
+        if (found) {
+          setSelectedStore(found)
+        }
+      } else if (!selectedStore || !initialStores.some((s) => s.id === selectedStore.id)) {
         setSelectedStore(initialStores[0])
       }
       setIsLoading(false)
@@ -151,11 +156,11 @@ export function StoreProvider({
 
       const savedStoreId = localStorage.getItem("selectedStoreId")
 
-      if (propActiveStoreId && data?.find((s: any) => s.id === propActiveStoreId)) {
+      if (savedStoreId && data?.find((s: any) => s.id === savedStoreId)) {
+        setSelectedStore(data.find((s: any) => s.id === savedStoreId) || null)
+      } else if (propActiveStoreId && data?.find((s: any) => s.id === propActiveStoreId)) {
         setSelectedStore(data.find((s: any) => s.id === propActiveStoreId) || null)
         localStorage.setItem("selectedStoreId", propActiveStoreId)
-      } else if (savedStoreId && data?.find((s: any) => s.id === savedStoreId)) {
-        setSelectedStore(data.find((s: any) => s.id === savedStoreId) || null)
       } else if (data && data.length > 0) {
         setSelectedStore((prev) => prev || data[0])
         if (!savedStoreId) localStorage.setItem("selectedStoreId", data[0].id)

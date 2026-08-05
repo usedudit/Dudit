@@ -81,26 +81,6 @@ export default function DeliveryKanbanCard({
       onQuickStatusChange?.(delivery.id, status)
     }
 
-    if (delivery.status === "pending" || delivery.status === "not_sent") {
-      return (
-        <div className="flex gap-2 w-full mt-4 pt-3 border-t border-brand-border dark:border-dark-border">
-          <button
-            onClick={(e) => handleActionClick(e, "preparing")}
-            className="flex-1 py-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full text-xs font-bold transition-all duration-200 flex items-center justify-center gap-1 cursor-pointer"
-          >
-            Preparar
-          </button>
-          <button
-            onClick={(e) => handleActionClick(e, "cancelled")}
-            className="py-1.5 px-3 bg-gray-100 hover:bg-red-50 hover:text-red-600 dark:bg-dark-border dark:hover:bg-red-950/20 text-gray-500 dark:text-dark-body rounded-full text-xs font-bold transition-all duration-200 flex items-center justify-center cursor-pointer"
-            title="Cancelar entrega"
-          >
-            Recusar
-          </button>
-        </div>
-      )
-    }
-
     if (delivery.status === "preparing") {
       return (
         <div className="flex gap-2 w-full mt-4 pt-3 border-t border-brand-border dark:border-dark-border">
@@ -173,7 +153,7 @@ export default function DeliveryKanbanCard({
           </div>
         </div>
 
-        {/* Title Row: ID, Channel & Order Count */}
+        {/* Title Row: ID & Order Count */}
         <div className="flex items-center gap-2 mb-2 flex-wrap">
           <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">
             {delivery.orderDisplayId}
@@ -183,9 +163,6 @@ export default function DeliveryKanbanCard({
               +{delivery.orderCount - 1} ped.
             </span>
           )}
-          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${getChannelStyle(delivery.orderSource)} shrink-0`}>
-            {formatChannelName(delivery.orderSource || "Manual")}
-          </span>
         </div>
 
         {/* Description / Customer info */}

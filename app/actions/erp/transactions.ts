@@ -2995,26 +2995,34 @@ export async function getTransactionDetailsAction(
         if (row.category === "Vendas" && row.description && salesOrder) {
             const ord = salesOrder
             if (ord?.buyer_id) {
-                const { data: cust } = await supabase
+                const [{ data: cust }, { data: addr }] = await Promise.all([
+                  supabase
                     .from("customers")
-                    .select("name, email, phone, image_url, street, number, complement, neighborhood, city, state, zip_code")
+                    .select("name, email, phone, image_url")
                     .eq("id", ord.buyer_id)
                     .eq("partner_id", partnerId)
-                    .maybeSingle()
+                    .maybeSingle(),
+                  supabase
+                    .from("addresses")
+                    .select("street, number, complement, neighborhood, city, state, zip_code")
+                    .eq("customer_id", ord.buyer_id)
+                    .eq("address_type", "primary")
+                    .maybeSingle(),
+                ])
                 contactCard = {
                     title: "Cliente",
                     name: cust?.name || ord.customer_name || "Cliente",
                     email: cust?.email ?? null,
                     phone: cust?.phone ?? null,
                     image_url: cust?.image_url ?? null,
-                    address: cust?.street || cust?.city ? {
-                        street: cust?.street,
-                        number: cust?.number,
-                        complement: cust?.complement,
-                        neighborhood: cust?.neighborhood,
-                        city: cust?.city,
-                        state: cust?.state,
-                        zipCode: cust?.zip_code,
+                    address: addr?.street || addr?.city ? {
+                        street: addr?.street,
+                        number: addr?.number,
+                        complement: addr?.complement,
+                        neighborhood: addr?.neighborhood,
+                        city: addr?.city,
+                        state: addr?.state,
+                        zipCode: addr?.zip_code,
                     } : null,
                     isCustomer: true,
                 }
@@ -3031,26 +3039,34 @@ export async function getTransactionDetailsAction(
             }
         } else if (row.category === "Vendas" && posSaleCustomerId !== undefined) {
             if (posSaleCustomerId) {
-                const { data: cust } = await supabase
+                const [{ data: cust }, { data: addr }] = await Promise.all([
+                  supabase
                     .from("customers")
-                    .select("name, email, phone, image_url, street, number, complement, neighborhood, city, state, zip_code")
+                    .select("name, email, phone, image_url")
                     .eq("id", posSaleCustomerId)
                     .eq("partner_id", partnerId)
-                    .maybeSingle()
+                    .maybeSingle(),
+                  supabase
+                    .from("addresses")
+                    .select("street, number, complement, neighborhood, city, state, zip_code")
+                    .eq("customer_id", posSaleCustomerId)
+                    .eq("address_type", "primary")
+                    .maybeSingle(),
+                ])
                 contactCard = {
                     title: "Cliente",
                     name: cust?.name || "Cliente",
                     email: cust?.email ?? null,
                     phone: cust?.phone ?? null,
                     image_url: cust?.image_url ?? null,
-                    address: cust?.street || cust?.city ? {
-                        street: cust?.street,
-                        number: cust?.number,
-                        complement: cust?.complement,
-                        neighborhood: cust?.neighborhood,
-                        city: cust?.city,
-                        state: cust?.state,
-                        zipCode: cust?.zip_code,
+                    address: addr?.street || addr?.city ? {
+                        street: addr?.street,
+                        number: addr?.number,
+                        complement: addr?.complement,
+                        neighborhood: addr?.neighborhood,
+                        city: addr?.city,
+                        state: addr?.state,
+                        zipCode: addr?.zip_code,
                     } : null,
                     isCustomer: true,
                 }
@@ -3065,26 +3081,34 @@ export async function getTransactionDetailsAction(
             }
         } else if (row.customer_id || ((row.contact_type === "customer" || row.contact_type === "cliente") && row.contact_id)) {
             const effectiveCustomerId = row.customer_id || row.contact_id
-            const { data: cust } = await supabase
+            const [{ data: cust }, { data: addr }] = await Promise.all([
+              supabase
                 .from("customers")
-                .select("name, email, phone, image_url, street, number, complement, neighborhood, city, state, zip_code")
+                .select("name, email, phone, image_url")
                 .eq("id", effectiveCustomerId)
                 .eq("partner_id", partnerId)
-                .maybeSingle()
+                .maybeSingle(),
+              supabase
+                .from("addresses")
+                .select("street, number, complement, neighborhood, city, state, zip_code")
+                .eq("customer_id", effectiveCustomerId)
+                .eq("address_type", "primary")
+                .maybeSingle(),
+            ])
             contactCard = {
                 title: "Cliente",
                 name: cust?.name || "Cliente",
                 email: cust?.email ?? null,
                 phone: cust?.phone ?? null,
                 image_url: cust?.image_url ?? null,
-                address: cust?.street || cust?.city ? {
-                    street: cust?.street,
-                    number: cust?.number,
-                    complement: cust?.complement,
-                    neighborhood: cust?.neighborhood,
-                    city: cust?.city,
-                    state: cust?.state,
-                    zipCode: cust?.zip_code,
+                address: addr?.street || addr?.city ? {
+                    street: addr?.street,
+                    number: addr?.number,
+                    complement: addr?.complement,
+                    neighborhood: addr?.neighborhood,
+                    city: addr?.city,
+                    state: addr?.state,
+                    zipCode: addr?.zip_code,
                 } : null,
                 isCustomer: true,
             }

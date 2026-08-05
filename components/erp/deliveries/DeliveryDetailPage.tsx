@@ -93,6 +93,7 @@ export default function DeliveryDetailPage({
     const [delivery, setDelivery] = useState<any>(null)
     const [loading, setLoading] = useState(true)
     const [route, setRoute] = useState<any | null>(null)
+    const [routeError, setRouteError] = useState<string | null>(null)
     const [routeLoading, setRouteLoading] = useState(false)
     const [isMapModalOpen, setIsMapModalOpen] = useState(false)
     const [isScrolled, setIsScrolled] = useState(false)
@@ -167,7 +168,13 @@ export default function DeliveryDetailPage({
             setRouteLoading(true)
             const res = await getDeliveryRoutePointsAction({ partnerId, deliveryId })
             if (!alive) return
-            setRoute(res.success ? res.data : null)
+            if (res.success) {
+                setRoute(res.data)
+                setRouteError(null)
+            } else {
+                setRoute(null)
+                setRouteError(res.error || "Não foi possível carregar a rota.")
+            }
             setRouteLoading(false)
         }
         run()
@@ -441,12 +448,13 @@ export default function DeliveryDetailPage({
                                 ) : route?.points?.length ? (
                                     <DeliveryRouteMap
                                         points={route.points}
+                                        origin={route.origin}
                                         initialLat={route.origin?.lat ?? null}
                                         initialLng={route.origin?.lng ?? null}
                                     />
                                 ) : (
-                                    <div className="h-full flex items-center justify-center rounded-2xl border border-brand-border dark:border-dark-border bg-brand-gray/50 dark:bg-dark-surface/50">
-                                        <span className="text-sm text-brand-inactive-text">Sem dados de rota para exibir.</span>
+                                    <div className="h-full flex items-center justify-center rounded-2xl border border-brand-border dark:border-dark-border bg-brand-gray/50 dark:bg-dark-surface/50 px-4">
+                                        <span className="text-sm text-brand-inactive-text text-center">{routeError || "Sem dados de rota para exibir."}</span>
                                     </div>
                                 )}
                             </div>
@@ -473,6 +481,7 @@ export default function DeliveryDetailPage({
                     {route?.points?.length && (
                         <DeliveryRouteMap
                             points={route.points}
+                            origin={route.origin}
                             initialLat={route.origin?.lat ?? null}
                             initialLng={route.origin?.lng ?? null}
                         />
@@ -959,9 +968,9 @@ export default function DeliveryDetailPage({
                         options={[
                             { value: "delivered", label: "Entregue" },
                             { value: "delivery_failed", label: "Falha na entrega" },
-                            { value: "pending", label: "Pendente" },
+                            { value: "pending", label: "Não enviado" },
                             { value: "preparing", label: "Em preparação" },
-                            { value: "sent", label: "Saiu para entrega" },
+                            { value: "sent", label: "Enviado" },
                             { value: "cancelled", label: "Cancelada" },
                         ]}
                         placeholder="Selecione o status"
