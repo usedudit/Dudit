@@ -244,12 +244,13 @@ export async function POST(request: NextRequest) {
                 const { createTransactionFromOrder } = await import("@/lib/services/transaction.service")
                 const { data: fullOrder } = await supabaseAdmin
                   .from("orders")
-                  .select("order_number, partner_id, total_amount, payment_method, payment_provider, payment_breakdown, buyer_id, customer_name, customer_id")
+                  .select("order_number, partner_id, total_amount, payment_method, payment_provider, payment_breakdown, buyer_id, customer_name, customer_id, mp_payment_id")
                   .eq("id", order.id)
                   .single()
 
                 if (fullOrder) {
                   await createTransactionFromOrder(supabaseAdmin, {
+                    order_id: order.id,
                     order_number: fullOrder.order_number,
                     partner_id: fullOrder.partner_id,
                     total_amount: fullOrder.total_amount,
@@ -259,6 +260,7 @@ export async function POST(request: NextRequest) {
                     payment_date: paymentData.date_approved || new Date().toISOString(),
                     customer_id: fullOrder.customer_id,
                     customer_name: fullOrder.customer_name,
+                    mp_payment_id: fullOrder.mp_payment_id || null,
                   })
 
                   const { fulfillMarketplaceOrder } = await import("@/lib/services/marketplace-checkout-fulfillment")

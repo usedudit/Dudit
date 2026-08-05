@@ -554,28 +554,32 @@ async function processWebhookWithRetry(
     // ── Create revenue transaction when payment approved ──
     if (paymentInfo.status === "approved") {
       try {
-        const { createFinancialTransactionsForReceivedAmount } = await import("@/app/actions/erp/orders")
+        const { createTransactionFromOrder } = await import("@/lib/services/transaction.service")
         const { data: fullOrder } = await supabase
           .from("orders")
           .select("order_number, partner_id, total_amount, paid_amount, payment_method, payment_provider, payment_breakdown, buyer_id, customer_name, customer_id, finance_account_id, order_source")
           .eq("id", orderId)
           .single()
 
-        if (fullOrder && Number(fullOrder.paid_amount || 0) > previousPaidAmount + 0.009) {
-          await createFinancialTransactionsForReceivedAmount(supabase, {
-            orderId: orderId,
-            orderNumber: fullOrder.order_number,
-            partnerId: fullOrder.partner_id,
-            totalAmount: fullOrder.total_amount,
-            newBreakdown: fullOrder.payment_breakdown || [],
-            oldBreakdown: orderData.payment_breakdown || [],
-            customerId: fullOrder.customer_id || fullOrder.buyer_id || null,
-            customerName: fullOrder.customer_name || null,
-            financeAccountId: fullOrder.finance_account_id || null,
-            orderSource: fullOrder.order_source || "manual",
-            paymentMethod: fullOrder.payment_method || "Método não definido",
+        if (fullOrder) {
+          await createTransactionFromOrder(supabase, {
+            order_id: orderId,
+            order_number: fullOrder.order_number,
+            partner_id: fullOrder.partner_id,
+            total_amount: fullOrder.total_amount,
+            payment_method: fullOrder.payment_method || null,
+            payment_provider: fullOrder.payment_provider || null,
+            payment_breakdown: fullOrder.payment_breakdown || null,
+            payment_date: paymentInfo.date_approved || new Date().toISOString(),
+            customer_id: fullOrder.customer_id || fullOrder.buyer_id || null,
+            customer_name: fullOrder.customer_name || null,
+            finance_account_id: fullOrder.finance_account_id || null,
+            order_source: fullOrder.order_source || "manual",
+            mp_payment_id: paymentId.toString(),
           })
+        }
 
+        if (fullOrder && Number(fullOrder.paid_amount || 0) > previousPaidAmount + 0.009) {
           const { fulfillMarketplaceOrder } = await import("@/lib/services/marketplace-checkout-fulfillment")
           await fulfillMarketplaceOrder(supabase, orderId)
         }

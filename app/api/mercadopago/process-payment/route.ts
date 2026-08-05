@@ -924,6 +924,8 @@ async function handler(request: NextRequest) {
       try {
         const { createTransactionFromOrder } = await import("@/lib/services/transaction.service")
         await createTransactionFromOrder(adminClient, {
+          order_id: newOrder.id,
+          store_id: storeId || null,
           order_number: newOrder.order_number || newOrder.id,
           partner_id: partnerId,
           total_amount: chargeAmount,
@@ -933,6 +935,7 @@ async function handler(request: NextRequest) {
           payment_breakdown: [{ method: paymentMethodDisplayName, amount: chargeAmount }],
           customer_id: resolvedCustomerId,
           customer_name: customerName,
+          mp_payment_id: String(mpPaymentId),
         })
 
         const { fulfillMarketplaceOrder } = await import("@/lib/services/marketplace-checkout-fulfillment")

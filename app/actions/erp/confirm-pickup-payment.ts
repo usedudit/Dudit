@@ -85,6 +85,7 @@ export async function confirmPickupPaymentAction(params: {
   try {
     const { createTransactionFromOrder } = await import("@/lib/services/transaction.service")
     await createTransactionFromOrder(adminClient, {
+      order_id: params.orderId,
       order_number: order.order_number || order.id,
       partner_id: ctx.partnerId,
       total_amount: order.total_amount,

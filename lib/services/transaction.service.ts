@@ -14,6 +14,42 @@ interface OrderDataForTransaction {
     finance_account_id?: string | null
     order_source?: string | null
     reference_note?: string
+    order_id?: string | null
+    store_id?: string | null
+    mp_payment_id?: string | null
+}
+
+type LedgerEntry = {
+    method: string
+    gross: number
+    net: number
+    cost: number
+    isMercadoPago: boolean
+    paymentMethodId: string | null
+    installmentNumber: number
+    interestAmount: number
+    feeAmount: number
+    fixedFeeAmount: number
+    discountAmount: number
+    provider: string | null
+    paymentStatus: string | null
+    paymentTypeId: string | null
+    feeDetails: Array<{ type: string; amount: number; feePayer: string }> | null
+}
+
+const round2 = (value: number) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100
+
+function addMonthsIso(isoDate: string, months: number): string {
+    const date = new Date(isoDate)
+    date.setMonth(date.getMonth() + months)
+    return date.toISOString()
+}
+
+function splitNetAmount(total: number, parts: number): number[] {
+    if (parts <= 1) return [round2(total)]
+    const base = round2(total / parts)
+    const last = round2(total - base * (parts - 1))
+    return Array.from({ length: parts }, (_, i) => (i === parts - 1 ? last : base))
 }
 
 function normalizeOrigin(raw?: string | null): string {
@@ -91,7 +127,7 @@ async function applyAccountBalanceDelta(
     accountId: string | null,
     amount: number,
 ) {
-    if (!accountId || !(amount > 0)) return
+    if (!accountId || !(Math.abs(amount) > 0.0001)) return
     const { error } = await supabase.rpc("apply_account_balance_delta", {
         p_account_id: accountId,
         p_partner_id: partnerId,
@@ -102,52 +138,335 @@ async function applyAccountBalanceDelta(
     }
 }
 
-function buildEntries(orderData: OrderDataForTransaction): Array<{
-    method: string;
-    amount: number;
-    paymentMethodId: string | null;
-    installmentNumber: number;
-    amountReceived?: number;
-    adjustmentType?: string;
-    adjustmentAmount?: number;
-    feeBearer?: string | null;
-    interestAmount?: number;
-    feeAmount?: number;
-    fixedFeeAmount?: number;
-}> {
+function buildEntries(orderData: OrderDataForTransaction): LedgerEntry[] {
     const fromBreakdown = (orderData.payment_breakdown || [])
-        .map((entry) => ({
-            method: normalizePaymentLabel(entry.method),
-            amount: Number(entry.amount ?? entry.effectiveAmount ?? 0),
-            paymentMethodId: entry.paymentMethodId || null,
-            installmentNumber: Math.max(1, Math.floor(Number(entry.installmentNumber || 1))),
-            amountReceived: Number(entry.amountReceived ?? entry.amount ?? entry.effectiveAmount ?? 0),
-            adjustmentType: entry.adjustmentType || 'none',
-            adjustmentAmount: Number(entry.adjustmentAmount || 0),
-            feeBearer: entry.feeBearer || null,
-            interestAmount: Number(entry.interestAmount || 0),
-            feeAmount: Number(entry.feeAmount || 0),
-            fixedFeeAmount: Number(entry.fixedFeeAmount || 0),
-        }))
-        .filter((entry) => entry.amount > 0.009)
+        .map((entry) => {
+            const gross = round2(Number(entry.amount ?? entry.effectiveAmount ?? 0))
+            const isMercadoPago = String(entry.provider || orderData.payment_provider || "")
+                .toLowerCase()
+                .includes("mercado pago")
+            // MP: amountReceived = líquido recebido (net_received_amount).
+            // Manual: netAmount = líquido do financial engine; amountReceived = base.
+            const netRaw = isMercadoPago
+                ? Number(entry.amountReceived ?? 0)
+                : Number(entry.netAmount ?? entry.amountReceived ?? 0)
+            const net = netRaw > 0.009 ? round2(netRaw) : gross
+
+            return {
+                method: normalizePaymentLabel(entry.method),
+                gross,
+                net,
+                cost: round2(gross - net),
+                isMercadoPago,
+                paymentMethodId: entry.paymentMethodId || null,
+                installmentNumber: Math.min(48, Math.max(1, Math.floor(Number(entry.installmentNumber || 1)))),
+                interestAmount: round2(Number(entry.interestAmount || 0)),
+                feeAmount: round2(Number(entry.feeAmount || 0)),
+                fixedFeeAmount: round2(Number(entry.fixedFeeAmount || 0)),
+                discountAmount: entry.adjustmentType === "discount"
+                    ? round2(Number(entry.adjustmentAmount || 0))
+                    : 0,
+                provider: entry.provider || null,
+                paymentStatus: entry.paymentStatus || null,
+                paymentTypeId: entry.paymentTypeId || null,
+                feeDetails: Array.isArray(entry.feeDetails) && entry.feeDetails.length > 0
+                    ? entry.feeDetails
+                    : null,
+            }
+        })
+        .filter((entry) => entry.gross > 0.009)
 
     if (fromBreakdown.length > 0) return fromBreakdown
 
+    const gross = round2(Number(orderData.total_amount || 0))
     return [{
         method: normalizePaymentLabel(orderData.payment_method),
-        amount: Number(orderData.total_amount || 0),
+        gross,
+        net: gross,
+        cost: 0,
+        isMercadoPago: false,
         paymentMethodId: null,
         installmentNumber: 1,
-        amountReceived: Number(orderData.total_amount || 0),
-        adjustmentType: 'none',
-        adjustmentAmount: 0,
-        feeBearer: null,
         interestAmount: 0,
         feeAmount: 0,
         fixedFeeAmount: 0,
+        discountAmount: 0,
+        provider: null,
+        paymentStatus: null,
+        paymentTypeId: null,
+        feeDetails: null,
     }]
 }
 
+function mapMpPaymentStatus(status: string | null | undefined): string {
+    const s = String(status || "").toLowerCase()
+    if (["approved", "rejected", "refunded", "charged_back", "cancelled", "expired"].includes(s)) return s
+    return "pending"
+}
+
+/**
+ * Camada de gateway (payments): 1 registro por pagamento MP, idempotente por
+ * `mp:{partner}:{mp_payment_id}`. Criado no checkout (bruto) e refinado quando
+ * o webhook chega com taxas/líquido. Fluxos manuais não geram payments.
+ */
+async function resolveOrCreatePaymentRow(
+    supabase: SupabaseClient,
+    orderData: OrderDataForTransaction,
+    entries: LedgerEntry[],
+): Promise<string | null> {
+    const isMercadoPago = String(orderData.payment_provider || "").toLowerCase().includes("mercado pago")
+        || entries.some((entry) => entry.isMercadoPago)
+    if (!isMercadoPago || !orderData.mp_payment_id) return null
+
+    const idempotencyKey = `mp:${orderData.partner_id}:${orderData.mp_payment_id}`
+
+    const { data: existing } = await supabase
+        .from("payments")
+        .select("id, provider_status, provider_payment_type")
+        .eq("idempotency_key", idempotencyKey)
+        .maybeSingle()
+
+    const totalGross = round2(entries.reduce((sum, entry) => sum + entry.gross, 0))
+    const totalNet = round2(entries.reduce((sum, entry) => sum + entry.net, 0))
+    const totalCost = round2(totalGross - totalNet)
+    const maxInstallments = Math.min(48, Math.max(1, ...entries.map((entry) => entry.installmentNumber)))
+    const firstWithDetails = entries.find((entry) => entry.feeDetails)?.feeDetails || null
+    const firstStatus = entries.find((entry) => entry.paymentStatus)?.paymentStatus || null
+    const firstPaymentType = entries.find((entry) => entry.paymentTypeId)?.paymentTypeId || null
+    const firstPaymentMethodId = entries.find((entry) => entry.paymentMethodId)?.paymentMethodId || null
+
+    if (existing?.id) {
+        if (totalCost > 0.009) {
+            const refinedStatus = mapMpPaymentStatus(firstStatus || existing.provider_status)
+            const { error } = await supabase
+                .from("payments")
+                .update({
+                    amount: totalGross,
+                    base_amount: totalGross,
+                    interest_amount: round2(entries.reduce((sum, entry) => sum + entry.interestAmount, 0)),
+                    discount_amount: round2(entries.reduce((sum, entry) => sum + entry.discountAmount, 0)),
+                    fee_amount: round2(entries.reduce((sum, entry) => sum + entry.feeAmount, 0)),
+                    fixed_fee_amount: round2(entries.reduce((sum, entry) => sum + entry.fixedFeeAmount, 0)),
+                    net_amount: totalNet,
+                    fee_details: firstWithDetails || {},
+                    installment_count: maxInstallments,
+                    installments_selected: maxInstallments,
+                    status: refinedStatus,
+                    approved_at: refinedStatus === "approved"
+                        ? (orderData.payment_date || new Date().toISOString())
+                        : null,
+                    provider_status: firstStatus || existing.provider_status,
+                    provider_payment_type: firstPaymentType || existing.provider_payment_type,
+                })
+                .eq("id", existing.id)
+            if (error) {
+                console.error("[TRANSACTION] Erro ao refinar pagamento gateway:", error.message)
+            }
+        }
+        return existing.id
+    }
+
+    const paymentStatus = mapMpPaymentStatus(firstStatus)
+    const { data: inserted, error } = await supabase
+        .from("payments")
+        .insert({
+            partner_id: orderData.partner_id,
+            store_id: orderData.store_id || null,
+            order_id: orderData.order_id || null,
+            customer_id: orderData.customer_id || null,
+            payment_method_id: firstPaymentMethodId,
+            provider: "mercado_pago",
+            provider_payment_id: orderData.mp_payment_id,
+            provider_status: firstStatus,
+            provider_payment_type: firstPaymentType,
+            amount: totalGross,
+            base_amount: totalGross,
+            interest_amount: round2(entries.reduce((sum, entry) => sum + entry.interestAmount, 0)),
+            discount_amount: round2(entries.reduce((sum, entry) => sum + entry.discountAmount, 0)),
+            fee_amount: round2(entries.reduce((sum, entry) => sum + entry.feeAmount, 0)),
+            fixed_fee_amount: round2(entries.reduce((sum, entry) => sum + entry.fixedFeeAmount, 0)),
+            net_amount: totalNet,
+            fee_details: firstWithDetails || {},
+            installment_count: maxInstallments,
+            installments_selected: maxInstallments,
+            status: paymentStatus,
+            amount_refunded: 0,
+            approved_at: paymentStatus === "approved"
+                ? (orderData.payment_date || new Date().toISOString())
+                : null,
+            idempotency_key: idempotencyKey,
+        })
+        .select("id")
+        .single()
+
+    if (error) {
+        console.error("[TRANSACTION] Erro ao registrar pagamento gateway:", error.message)
+        return null
+    }
+    return inserted?.id || null
+}
+
+async function createInstallmentGroupForSale(
+    supabase: SupabaseClient,
+    orderData: OrderDataForTransaction,
+    entry: LedgerEntry,
+    accountId: string | null,
+    paymentRowId: string | null,
+    startDate: string,
+): Promise<string | null> {
+    try {
+        let query = supabase
+            .from("installment_groups")
+            .select("id")
+            .eq("partner_id", orderData.partner_id)
+        query = orderData.order_id
+            ? query.eq("order_id", orderData.order_id)
+            : query.eq("description", orderData.order_number)
+        const { data: existingGroup } = await query
+            .order("created_at", { ascending: true })
+            .limit(1)
+            .maybeSingle()
+        if (existingGroup?.id) return existingGroup.id
+
+        const { data: insertedGroup, error } = await supabase
+            .from("installment_groups")
+            .insert({
+                partner_id: orderData.partner_id,
+                store_id: orderData.store_id || null,
+                description: orderData.order_number,
+                total_amount: entry.net,
+                installments_count: entry.installmentNumber,
+                frequency: "monthly",
+                interval: 1,
+                interval_value: 1,
+                start_date: startDate,
+                account_id: accountId,
+                payment_method_id: entry.paymentMethodId,
+                order_id: orderData.order_id || null,
+                payment_id: paymentRowId,
+                customer_id: orderData.customer_id || null,
+            })
+            .select("id")
+            .single()
+
+        if (error) {
+            console.error(`[TRANSACTION] Erro ao criar grupo de parcelas do pedido ${orderData.order_number}:`, error.message)
+            return null
+        }
+        return insertedGroup?.id || null
+    } catch (err: any) {
+        console.error("[TRANSACTION] Erro inesperado ao criar grupo de parcelas:", err.message)
+        return null
+    }
+}
+
+/**
+ * Upgrade do ledger quando o webhook chega DEPOIS do checkout com dados de
+ * taxa/líquido (aprovação instantânea: pix/crédito aprova no checkout com
+ * bruto; o webhook refina para líquido). Idempotente: só ajusta quando o
+ * settlement ainda está com o valor bruto.
+ */
+async function refineLedgerEntry(
+    supabase: SupabaseClient,
+    orderData: OrderDataForTransaction,
+    saleEntry: LedgerEntry,
+    ctx: {
+        recognitionRef: string
+        feeRef: string
+        settlementRef: string
+        installments: number
+        existingByNote: Map<string, any>
+        accountId: string | null
+        paymentRowId: string | null
+        recognitionTx: any
+    },
+): Promise<void> {
+    if (!(saleEntry.cost > 0.009)) return
+
+    if (ctx.recognitionTx) {
+        const recognitionUpdate: Record<string, unknown> = {
+            fee_amount: round2(saleEntry.feeAmount + saleEntry.fixedFeeAmount),
+            interest_amount: saleEntry.interestAmount,
+        }
+        if (ctx.paymentRowId && !ctx.recognitionTx.payment_id) {
+            recognitionUpdate.payment_id = ctx.paymentRowId
+        }
+        await supabase.from("transactions").update(recognitionUpdate).eq("id", ctx.recognitionTx.id)
+    }
+
+    if (!ctx.existingByNote.has(ctx.feeRef)) {
+        await supabase.from("transactions").insert({
+            partner_id: orderData.partner_id,
+            store_id: orderData.store_id || null,
+            description: orderData.order_number,
+            category: "Taxas de Pagamento",
+            contact_id: null,
+            contact_type: "customer",
+            customer_id: orderData.customer_id || null,
+            amount: saleEntry.cost,
+            original_amount: saleEntry.cost,
+            due_date: null,
+            payment_date: orderData.payment_date || new Date().toISOString(),
+            status: "paid",
+            notes: null,
+            installment_number: null,
+            total_installments: null,
+            interest_amount: saleEntry.interestAmount,
+            fee_amount: round2(saleEntry.feeAmount + saleEntry.fixedFeeAmount),
+            discount_amount: saleEntry.discountAmount,
+            payment_type: saleEntry.method,
+            payment_method_id: saleEntry.paymentMethodId,
+            transaction_type: "expense" as const,
+            origin: normalizeOrigin(orderData.order_source),
+            account_id: null,
+            kind: "fee" as const,
+            payment_id: ctx.paymentRowId,
+            reference_note: ctx.feeRef,
+        })
+    }
+
+    if (ctx.installments > 1) {
+        const parts = splitNetAmount(saleEntry.net, ctx.installments)
+        for (let n = 1; n <= ctx.installments; n++) {
+            const settlementTx = ctx.existingByNote.get(`${ctx.settlementRef}:${n}`)
+            if (!settlementTx) continue
+            const target = parts[n - 1]
+            const current = round2(Number(settlementTx.amount || 0))
+            if (Math.abs(current - target) > 0.005) {
+                await supabase
+                    .from("transactions")
+                    .update({ amount: target, original_amount: target })
+                    .eq("id", settlementTx.id)
+            }
+        }
+    } else {
+        const settlementTx = ctx.existingByNote.get(ctx.settlementRef)
+        if (settlementTx) {
+            const current = round2(Number(settlementTx.amount || 0))
+            const stillGross = Math.abs(current - saleEntry.gross) <= 0.005
+            if (Math.abs(current - saleEntry.net) > 0.005 && stillGross) {
+                await supabase
+                    .from("transactions")
+                    .update({ amount: saleEntry.net, original_amount: saleEntry.net })
+                    .eq("id", settlementTx.id)
+                await applyAccountBalanceDelta(supabase, orderData.partner_id, ctx.accountId, -saleEntry.cost)
+            }
+        }
+    }
+}
+
+/**
+ * Ledger único de venda (Fase 2). Para cada entrada do payment_breakdown:
+ *   recognition = DRE bruto (income paid, NÃO move saldo)
+ *   fee         = despesa DRE do gateway (expense paid, NÃO move saldo)
+ *   settlement  = ÚNICO evento de caixa (valor líquido)
+ *                - à vista: 1 settlement paid D+0 (move saldo +net)
+ *                - parcelado: installment_groups + N settlements pending
+ *                             (contas a receber; liquidadas via settle RPC)
+ * Registros legados (reference_note sem sufixo de ledger) nunca são misturados:
+ * se o fluxo antigo já processou a entrada, ela é ignorada (zero duplicação).
+ * Idempotente por reference_note (retries de webhook/checkout são seguros).
+ */
 export async function createTransactionFromOrder(
     supabase: SupabaseClient,
     orderData: OrderDataForTransaction,
@@ -163,73 +482,204 @@ export async function createTransactionFromOrder(
             : await resolveDefaultSalesAccountId(supabase, orderData.partner_id)
         const accountId = explicitAccountId || mercadoPagoAccountId || defaultSalesAccountId
 
-        // Build deterministic reference_note keys for each entry.
-        // Format: "sale-tx:{order_number}:{index}" - unique per entry, stable across retries.
-        const entriesWithRef = entries.map((entry, index) => ({
-            ...entry,
-            referenceNote: orderData.reference_note || `sale-tx:${orderData.order_number}:${index}`,
-        }))
+        const paymentRowId = await resolveOrCreatePaymentRow(supabase, orderData, entries)
 
-        // Batch dedup: single query to find all already-created transactions for this order
-        const refNotes = entriesWithRef.map(e => e.referenceNote)
-        const { data: existingTxs } = await supabase
-            .from("transactions")
-            .select("reference_note")
-            .eq("partner_id", orderData.partner_id)
-            .in("reference_note", refNotes)
+        for (const [index, entry] of entries.entries()) {
+            if (!(entry.gross > 0.009)) continue
 
-        const existingRefs = new Set(
-            (existingTxs || []).map((t: any) => String(t.reference_note))
-        )
+            const baseRef = orderData.reference_note || `sale-tx:${orderData.order_number}:${index}`
+            const recognitionRef = `${baseRef}:recognition`
+            const feeRef = `${baseRef}:fee`
+            const settlementRef = `${baseRef}:settlement`
+            const installments = entry.installmentNumber
 
-        for (const [index, entry] of entriesWithRef.entries()) {
-            const amount = Number(entry.amount || 0)
-            if (!(amount > 0.009)) continue
+            const refNotes = [
+                baseRef,
+                recognitionRef,
+                feeRef,
+                settlementRef,
+                ...Array.from({ length: installments }, (_, i) => `${settlementRef}:${i + 1}`),
+            ]
 
-            // Skip if this exact entry was already created (retry/webhook dedup)
-            if (existingRefs.has(entry.referenceNote)) continue
+            const { data: existingTxs } = await supabase
+                .from("transactions")
+                .select("id, kind, status, amount, original_amount, reference_note, payment_id")
+                .eq("partner_id", orderData.partner_id)
+                .in("reference_note", refNotes)
 
-            // Use individual amounts from breakdown directly (never derive from adjustmentType)
-            const interestAmount = Number(entry.interestAmount || 0)
-            const feeAmount = Number(entry.feeAmount || 0) + Number(entry.fixedFeeAmount || 0)
-            const discountAmount = entry.adjustmentType === 'discount'
-                ? Number(entry.adjustmentAmount || 0)
-                : 0
+            const existingByNote = new Map<string, any>(
+                (existingTxs || []).map((tx: any) => [String(tx.reference_note), tx]),
+            )
 
-            const originalAmount = entry.amountReceived ?? amount
+            // Fluxo antigo (legado) já processou esta entrada → não misturar modelos
+            if (existingByNote.has(baseRef)) continue
 
-            const transactionData = {
+            const recognitionTx = existingByNote.get(recognitionRef)
+
+            if (recognitionTx) {
+                // Ledger já criado (ex: aprovação no checkout) → refinar com fees/líquido
+                await refineLedgerEntry(supabase, orderData, entry, {
+                    recognitionRef,
+                    feeRef,
+                    settlementRef,
+                    installments,
+                    existingByNote,
+                    accountId,
+                    paymentRowId,
+                    recognitionTx,
+                })
+                continue
+            }
+
+            // 1) Reconhecimento — DRE bruto, não move saldo
+            const { error: recError } = await supabase.from("transactions").insert({
                 partner_id: orderData.partner_id,
+                store_id: orderData.store_id || null,
                 description: orderData.order_number,
                 category: "Vendas",
                 contact_id: null,
                 contact_type: "customer",
                 customer_id: orderData.customer_id || null,
-                amount: amount,
+                amount: entry.gross,
+                original_amount: entry.gross,
                 due_date: null,
                 payment_date: paymentDate,
                 status: "paid",
                 notes: null,
-                installment_number: entries.length > 1 ? (index + 1) : null,
-                total_installments: entries.length > 1 ? entries.length : null,
-                original_amount: originalAmount,
-                interest_amount: interestAmount,
-                fee_amount: feeAmount,
-                discount_amount: discountAmount,
+                installment_number: null,
+                total_installments: null,
+                interest_amount: entry.interestAmount,
+                fee_amount: round2(entry.feeAmount + entry.fixedFeeAmount),
+                discount_amount: entry.discountAmount,
                 payment_type: entry.method,
-                payment_method_id: entry.paymentMethodId || null,
+                payment_method_id: entry.paymentMethodId,
                 transaction_type: "income" as const,
                 origin: normalizeOrigin(orderData.order_source),
-                account_id: accountId,
-                reference_note: entry.referenceNote,
-            }
-
-            const { error } = await supabase.from("transactions").insert(transactionData)
-            if (error) {
-                console.error(`[TRANSACTION] Erro ao criar transaction do pedido ${orderData.order_number}:`, error.message)
+                account_id: null,
+                kind: "recognition" as const,
+                payment_id: paymentRowId,
+                reference_note: recognitionRef,
+            })
+            if (recError) {
+                console.error(`[TRANSACTION] Erro ao criar reconhecimento do pedido ${orderData.order_number}:`, recError.message)
                 continue
             }
-            await applyAccountBalanceDelta(supabase, orderData.partner_id, accountId, amount)
+
+            // 2) Taxa do gateway — despesa DRE, não move saldo
+            if (entry.cost > 0.009) {
+                const { error: feeError } = await supabase.from("transactions").insert({
+                    partner_id: orderData.partner_id,
+                    store_id: orderData.store_id || null,
+                    description: orderData.order_number,
+                    category: "Taxas de Pagamento",
+                    contact_id: null,
+                    contact_type: "customer",
+                    customer_id: orderData.customer_id || null,
+                    amount: entry.cost,
+                    original_amount: entry.cost,
+                    due_date: null,
+                    payment_date: paymentDate,
+                    status: "paid",
+                    notes: null,
+                    installment_number: null,
+                    total_installments: null,
+                    interest_amount: entry.interestAmount,
+                    fee_amount: round2(entry.feeAmount + entry.fixedFeeAmount),
+                    discount_amount: entry.discountAmount,
+                    payment_type: entry.method,
+                    payment_method_id: entry.paymentMethodId,
+                    transaction_type: "expense" as const,
+                    origin: normalizeOrigin(orderData.order_source),
+                    account_id: null,
+                    kind: "fee" as const,
+                    payment_id: paymentRowId,
+                    reference_note: feeRef,
+                })
+                if (feeError) {
+                    console.error(`[TRANSACTION] Erro ao criar taxa do pedido ${orderData.order_number}:`, feeError.message)
+                }
+            }
+
+            // 3) Liquidação — único evento que move caixa (valor líquido)
+            if (installments > 1) {
+                const groupId = await createInstallmentGroupForSale(
+                    supabase,
+                    orderData,
+                    entry,
+                    accountId,
+                    paymentRowId,
+                    paymentDate,
+                )
+                const parts = splitNetAmount(entry.net, installments)
+                for (let n = 1; n <= installments; n++) {
+                    const { error: settleError } = await supabase.from("transactions").insert({
+                        partner_id: orderData.partner_id,
+                        store_id: orderData.store_id || null,
+                        description: orderData.order_number,
+                        category: "Vendas",
+                        contact_id: null,
+                        contact_type: "customer",
+                        customer_id: orderData.customer_id || null,
+                        amount: parts[n - 1],
+                        original_amount: parts[n - 1],
+                        due_date: addMonthsIso(paymentDate, n - 1),
+                        payment_date: null,
+                        status: "pending",
+                        notes: null,
+                        installment_number: n,
+                        total_installments: installments,
+                        interest_amount: 0,
+                        fee_amount: 0,
+                        discount_amount: 0,
+                        payment_type: entry.method,
+                        payment_method_id: entry.paymentMethodId,
+                        transaction_type: "income" as const,
+                        origin: normalizeOrigin(orderData.order_source),
+                        account_id: accountId,
+                        kind: "settlement" as const,
+                        payment_id: paymentRowId,
+                        installment_group_id: groupId,
+                        reference_note: `${settlementRef}:${n}`,
+                    })
+                    if (settleError) {
+                        console.error(`[TRANSACTION] Erro ao criar parcela ${n} do pedido ${orderData.order_number}:`, settleError.message)
+                    }
+                }
+            } else {
+                const { error: settleError } = await supabase.from("transactions").insert({
+                    partner_id: orderData.partner_id,
+                    store_id: orderData.store_id || null,
+                    description: orderData.order_number,
+                    category: "Vendas",
+                    contact_id: null,
+                    contact_type: "customer",
+                    customer_id: orderData.customer_id || null,
+                    amount: entry.net,
+                    original_amount: entry.net,
+                    due_date: paymentDate,
+                    payment_date: paymentDate,
+                    status: "paid",
+                    notes: null,
+                    installment_number: null,
+                    total_installments: null,
+                    interest_amount: 0,
+                    fee_amount: 0,
+                    discount_amount: 0,
+                    payment_type: entry.method,
+                    payment_method_id: entry.paymentMethodId,
+                    transaction_type: "income" as const,
+                    origin: normalizeOrigin(orderData.order_source),
+                    account_id: accountId,
+                    kind: "settlement" as const,
+                    payment_id: paymentRowId,
+                    reference_note: settlementRef,
+                })
+                if (settleError) {
+                    console.error(`[TRANSACTION] Erro ao criar liquidação do pedido ${orderData.order_number}:`, settleError.message)
+                } else {
+                    await applyAccountBalanceDelta(supabase, orderData.partner_id, accountId, entry.net)
+                }
+            }
         }
     } catch (err: any) {
         console.error("[TRANSACTION] Erro inesperado ao criar transaction:", err.message)
@@ -297,6 +747,7 @@ export async function syncReceivableForOrder(
                         account_id: accountId,
                         store_id: orderData.store_id || null,
                         payment_type: paymentType,
+                        kind: "settlement",
                     })
                     .eq("id", existingTx.id)
             }
@@ -326,6 +777,7 @@ export async function syncReceivableForOrder(
                 origin: normalizeOrigin(orderData.order_source),
                 account_id: accountId,
                 reference_note: refNote,
+                kind: "settlement" as const,
             }
 
             const { error } = await supabase.from("transactions").insert(transactionData)

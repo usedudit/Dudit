@@ -827,6 +827,8 @@ async function createFinancialTransactionsForPaidOrder(supabase: Awaited<ReturnT
     paymentDate?: string | null
     financeAccountId?: string | null
     orderSource?: string | null
+    orderId?: string | null
+    mpPaymentId?: string | null
 }) {
     try {
         const { createTransactionFromOrder } = await import("@/lib/services/transaction.service")
@@ -842,6 +844,8 @@ async function createFinancialTransactionsForPaidOrder(supabase: Awaited<ReturnT
             customer_name: params.customerName || null,
             finance_account_id: params.financeAccountId || null,
             order_source: params.orderSource || "manual",
+            order_id: params.orderId || null,
+            mp_payment_id: params.mpPaymentId || null,
         })
     } catch (error) {
         console.error("[orders_financial] createFinancialTransactionsForPaidOrder:", error)
@@ -1056,6 +1060,7 @@ async function createRefundTransactionForCancelledOrder(params: {
             reference_note: params.orderId,
             account_id: financeAccountId,
             created_by_user_id: params.createdByUserId || null,
+            kind: "refund",
         })
 
     if (error) return { error: error.message }
@@ -1249,6 +1254,7 @@ async function createRefundTransactionForCancelledOrderSafe(params: {
         reference_note: params.orderId,
         account_id: financeAccountId,
         created_by_user_id: params.createdByUserId || null,
+        kind: "refund",
     }
 
     let insertResult = await params.supabase
@@ -4069,6 +4075,7 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
 
         if (nextSituation === "paid") {
             await createFinancialTransactionsForPaidOrder(supabase, {
+                orderId: payload.orderId,
                 orderNumber: order.order_number,
                 partnerId: payload.partnerId,
                 totalAmount: totalAmountToSave,
@@ -4080,6 +4087,7 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
                 paymentDate: new Date().toISOString(),
                 financeAccountId: payload.financeAccountId,
                 orderSource: order.order_source || "manual",
+                mpPaymentId: payload.mpPaymentId || null,
             })
 
             await fulfillMarketplaceOrderIfNeeded(supabase, payload.orderId)
