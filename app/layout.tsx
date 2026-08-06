@@ -207,6 +207,11 @@ export default async function RootLayout({
                     href="https://fonts.gstatic.com"
                     crossOrigin="anonymous"
                 />
+                <link
+                    id="mapbox-gl-css"
+                    rel="stylesheet"
+                    href="https://api.mapbox.com/mapbox-gl-js/v3.28.0/mapbox-gl.css"
+                />
                 <script
                     type="application/ld+json"
                     dangerouslySetInnerHTML={{

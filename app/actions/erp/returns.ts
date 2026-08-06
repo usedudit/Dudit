@@ -1060,6 +1060,61 @@ export async function processReturnRequestAction(input: unknown) {
             : data.exchangeBalanceResolution === "refund"
                 ? toNumber(result?.exchange_surplus_amount)
                 : 0
+
+        // Ledger Fase 2: reconcilia settlements da venda original quando a
+        // solicitação é aprovada/resolvida. Não cria transações novas — só
+        // cancela/reduz settlements pending (parcelas já quitadas são cobertas
+        // pelo refund existente). Idempotente por reconcileKey.
+        if (data.nextStatus === "APPROVED" || data.nextStatus === "RESOLVED") {
+            const { cancelPendingSettlementsForOrder, reduceFutureSettlementsForRefund } =
+                await import("@/lib/services/transaction.service")
+            const orderId = request.order_id
+            const orderNumber = (request as any).orders?.order_number || null
+            const reconcileKey = `return:${request.id}`
+            const shortId = request.id.slice(0, 8).toUpperCase()
+            const reason = isExchange
+                ? `Troca DVL-${shortId}`
+                : request.request_type === "cancellation"
+                    ? `Cancelamento DVL-${shortId}`
+                    : `Devolução DVL-${shortId}`
+
+            if (request.request_type === "cancellation" || isExchange) {
+                await cancelPendingSettlementsForOrder({
+                    supabase,
+                    partnerId: request.partner_id,
+                    orderId,
+                    orderNumber,
+                    reason,
+                    reconcileKey,
+                    actorUserId: user.id,
+                })
+            } else if (requestedRefundAmount > 0.009) {
+                const totalPaid = getOrderAmountPaid((request as any).orders || {})
+                const isFullRefund = maxActionAmount + 0.009 >= totalPaid
+                if (isFullRefund) {
+                    await cancelPendingSettlementsForOrder({
+                        supabase,
+                        partnerId: request.partner_id,
+                        orderId,
+                        orderNumber,
+                        reason,
+                        reconcileKey,
+                        actorUserId: user.id,
+                    })
+                } else {
+                    await reduceFutureSettlementsForRefund({
+                        supabase,
+                        partnerId: request.partner_id,
+                        orderId,
+                        orderNumber,
+                        refundAmount: requestedRefundAmount,
+                        reason,
+                        reconcileKey,
+                        actorUserId: user.id,
+                    })
+                }
+            }
+        }
         // Refund MP não é mais executado aqui.
         // A aprovação da devolução cria o registro return_refund com status PENDING.
         // A execução real do reembolso MP ocorre em executeMercadoPagoRefundAction,

@@ -789,3 +789,243 @@ export async function syncReceivableForOrder(
         console.error("[TRANSACTION] Erro ao sincronizar conta a receber do pedido:", err.message)
     }
 }
+
+// ─── Reconciliação do ledger Fase 2 em refunds/devoluções ───────────────────
+// NÃO cria novas transações e NÃO altera recognition/fee/refund existentes:
+// apenas cancela ou reduz settlements (kind='settlement') PENDENTES da venda,
+// que nunca moveram saldo — por isso não há ajuste de caixa aqui.
+// Idempotente por reconcileKey: linhas já reconciliadas (marcadas nas notes)
+// são puladas em execuções repetidas.
+
+function isLedgerPendingStatus(status: string | null | undefined): boolean {
+    const s = String(status || "").trim().toLowerCase()
+    return s === "pending" || s === "pendente"
+}
+
+export async function findOrderSettlements(params: {
+    supabase: SupabaseClient
+    partnerId: string
+    orderId?: string | null
+    orderNumber?: string | null
+}): Promise<any[]> {
+    const { supabase } = params
+    const paymentIds: string[] = []
+    if (params.orderId) {
+        const { data: payRows } = await supabase
+            .from("payments")
+            .select("id")
+            .eq("partner_id", params.partnerId)
+            .eq("order_id", params.orderId)
+        if (payRows?.length) paymentIds.push(...payRows.map((p: any) => p.id))
+    }
+
+    let query = supabase
+        .from("transactions")
+        .select("id, status, amount, original_amount, due_date, installment_group_id, installment_number, reference_note, notes, payment_id")
+        .eq("partner_id", params.partnerId)
+        .eq("kind", "settlement")
+
+    if (paymentIds.length > 0) query = query.in("payment_id", paymentIds)
+    else if (params.orderNumber) query = query.eq("description", params.orderNumber)
+    else return []
+
+    const { data } = await query
+    return data || []
+}
+
+async function auditLedgerReconciliation(params: {
+    partnerId: string
+    actorUserId?: string | null
+    entityId: string
+    actionType: string
+    changeLines: string[]
+    storeId?: string | null
+}) {
+    try {
+        const { logAuditEvent } = await import("./timeline.service")
+        await logAuditEvent({
+            partnerId: params.partnerId,
+            actorUserId: params.actorUserId || null,
+            entityType: "transaction",
+            entityId: params.entityId,
+            actionType: params.actionType,
+            changeLines: params.changeLines,
+            metadata: { source: "ledger_reconciliation" },
+            source: "manual",
+            storeId: params.storeId || null,
+        } as any)
+    } catch (err) {
+        console.error("[TRANSACTION] Erro ao registrar audit de reconciliação:", err)
+    }
+}
+
+/**
+ * Cancela todos os settlements PENDENTES da venda (refund integral, troca ou
+ * cancelamento de pedido). Parcelas já quitadas NÃO são tocadas — o valor já
+ * recebido é coberto pelo evento de refund gerado pelo fluxo existente.
+ */
+export async function cancelPendingSettlementsForOrder(params: {
+    supabase: SupabaseClient
+    partnerId: string
+    orderId?: string | null
+    orderNumber?: string | null
+    reason?: string | null
+    reconcileKey: string
+    actorUserId?: string | null
+}): Promise<{ cancelled: number }> {
+    try {
+        const { supabase } = params
+        const settlements = await findOrderSettlements(params)
+        const pending = settlements.filter(
+            (s: any) => isLedgerPendingStatus(s.status) && !String(s.notes || "").includes(params.reconcileKey),
+        )
+        if (pending.length === 0) return { cancelled: 0 }
+
+        const now = new Date().toISOString()
+        const reason = params.reason ? ` - ${params.reason}` : ""
+        let cancelled = 0
+
+        for (const s of pending) {
+            const existingNote = String(s.notes || "").trim()
+            const { error } = await supabase
+                .from("transactions")
+                .update({
+                    status: "cancelled",
+                    notes: existingNote
+                        ? `${existingNote} | Cancelado após refund/devolução (${params.reconcileKey})${reason}`
+                        : `Cancelado após refund/devolução (${params.reconcileKey}) em ${now}${reason}`,
+                })
+                .eq("id", s.id)
+                .eq("partner_id", params.partnerId)
+            if (!error) {
+                cancelled += 1
+                await auditLedgerReconciliation({
+                    partnerId: params.partnerId,
+                    actorUserId: params.actorUserId,
+                    entityId: s.id,
+                    actionType: "cancelled",
+                    changeLines: ["Settlement de venda cancelado após refund/devolução."],
+                })
+            }
+        }
+        return { cancelled }
+    } catch (err: any) {
+        console.error("[TRANSACTION] Erro ao cancelar settlements do pedido:", err.message)
+        return { cancelled: 0 }
+    }
+}
+
+/**
+ * Refund parcial: reduz o saldo futuro a receber pelas parcelas PENDENTES,
+ * começando da parcela mais distante (maior vencimento) para a mais próxima.
+ * Parcela que zera é cancelada. Atualiza amount E original_amount para manter
+ * a matemática de quitação (recordInstallmentPaymentAction usa original_amount).
+ */
+export async function reduceFutureSettlementsForRefund(params: {
+    supabase: SupabaseClient
+    partnerId: string
+    orderId?: string | null
+    orderNumber?: string | null
+    refundAmount: number
+    reason?: string | null
+    reconcileKey: string
+    actorUserId?: string | null
+}): Promise<{ reduced: number; cancelled: number }> {
+    try {
+        const { supabase } = params
+        let remaining = round2(Math.max(0, Number(params.refundAmount || 0)))
+        if (remaining < 0.009) return { reduced: 0, cancelled: 0 }
+
+        const settlements = await findOrderSettlements(params)
+        const pendingAll = settlements.filter((s: any) => isLedgerPendingStatus(s.status))
+        const pending = pendingAll
+            .filter((s: any) => !String(s.notes || "").includes(params.reconcileKey))
+            .sort((a: any, b: any) => {
+                const da = a.due_date ? new Date(a.due_date).getTime() : 0
+                const db = b.due_date ? new Date(b.due_date).getTime() : 0
+                if (db !== da) return db - da
+                return Number(b.installment_number || 0) - Number(a.installment_number || 0)
+            })
+        if (pending.length === 0) return { reduced: 0, cancelled: 0 }
+
+        // Reivindica TODAS as pendentes com a chave ANTES de reduzir: re-execução
+        // da mesma chave vira no-op total, mesmo que a primeira execução não tenha
+        // tocado em todas as parcelas (evita aplicar o MESMO refund duas vezes em
+        // parcelas ainda não marcadas). Chaves diferentes (novos refunds) seguem
+        // processando normalmente.
+        const now = new Date().toISOString()
+        const claimNote = `Reconciliação de refund registrada (${params.reconcileKey})`
+        for (const s of pendingAll) {
+            const existingNote = String(s.notes || "").trim()
+            await supabase
+                .from("transactions")
+                .update({ notes: existingNote ? `${existingNote} | ${claimNote}` : `${claimNote} em ${now}` })
+                .eq("id", s.id)
+                .eq("partner_id", params.partnerId)
+        }
+
+        const reason = params.reason ? ` - ${params.reason}` : ""
+        let reduced = 0
+        let cancelled = 0
+
+        for (const s of pending) {
+            if (remaining < 0.009) break
+            const current = round2(Number(s.amount || 0))
+            if (current <= 0.009) continue
+
+            const existingNote = String(s.notes || "").trim()
+
+            if (current <= remaining) {
+                remaining = round2(remaining - current)
+                const { error } = await supabase
+                    .from("transactions")
+                    .update({
+                        status: "cancelled",
+                        notes: existingNote
+                            ? `${existingNote} | Parcela cancelada por refund parcial (${params.reconcileKey})${reason}`
+                            : `Parcela cancelada por refund parcial (${params.reconcileKey}) em ${now}${reason}`,
+                    })
+                    .eq("id", s.id)
+                    .eq("partner_id", params.partnerId)
+                if (!error) {
+                    cancelled += 1
+                    await auditLedgerReconciliation({
+                        partnerId: params.partnerId,
+                        actorUserId: params.actorUserId,
+                        entityId: s.id,
+                        actionType: "cancelled",
+                        changeLines: ["Parcela cancelada por refund parcial."],
+                    })
+                }
+            } else {
+                const newAmount = round2(current - remaining)
+                remaining = 0
+                const { error } = await supabase
+                    .from("transactions")
+                    .update({
+                        amount: newAmount,
+                        original_amount: newAmount,
+                        notes: existingNote
+                            ? `${existingNote} | Valor reduzido por refund parcial (${params.reconcileKey})${reason}`
+                            : `Valor reduzido por refund parcial (${params.reconcileKey}) em ${now}${reason}`,
+                    })
+                    .eq("id", s.id)
+                    .eq("partner_id", params.partnerId)
+                if (!error) {
+                    reduced += 1
+                    await auditLedgerReconciliation({
+                        partnerId: params.partnerId,
+                        actorUserId: params.actorUserId,
+                        entityId: s.id,
+                        actionType: "updated",
+                        changeLines: [`Valor da parcela reduzido: R$ ${current.toFixed(2)} → R$ ${newAmount.toFixed(2)}.`],
+                    })
+                }
+            }
+        }
+        return { reduced, cancelled }
+    } catch (err: any) {
+        console.error("[TRANSACTION] Erro ao reduzir settlements por refund parcial:", err.message)
+        return { reduced: 0, cancelled: 0 }
+    }
+}

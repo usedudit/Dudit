@@ -3193,13 +3193,25 @@ export async function updateOrdersStatusInBatchAction(payload: {
                 })
 
                 await syncCancelledOrderAppointmentsAndTransactions(supabase, order.id)
-                const { syncReceivableForOrder } = await import("@/lib/services/transaction.service")
+                const { syncReceivableForOrder, cancelPendingSettlementsForOrder } = await import("@/lib/services/transaction.service")
                 await syncReceivableForOrder(supabase, {
                     order_number: order.order_number || order.id,
                     partner_id: payload.partnerId,
                     total_amount: 0,
                     paid_amount: 0,
                     situation: "cancelled",
+                })
+                // Ledger Fase 2: venda cancelada não tem mais obrigação de
+                // recebimento futuro — cancela settlements pendentes (sempre,
+                // independente do refund automático). Idempotente.
+                await cancelPendingSettlementsForOrder({
+                    supabase,
+                    partnerId: payload.partnerId,
+                    orderId: order.id,
+                    orderNumber: order.order_number || order.id,
+                    reason: payload.cancelReason?.trim() || "Cancelamento de pedido",
+                    reconcileKey: `order-cancel:${order.id}`,
+                    actorUserId: user.id,
                 })
 
                 if (stockWasRestoredOnCancel) {

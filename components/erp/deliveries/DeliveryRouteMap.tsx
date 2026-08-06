@@ -231,6 +231,9 @@ export function DeliveryRouteMap({
     })
 
     if (!bounds.isEmpty()) {
+      try {
+        mapRef.current?.resize()
+      } catch {}
       mapRef.current.fitBounds(bounds, { padding: 48, maxZoom: 14, duration: 500 })
     }
   }, [points, origin, ready])
@@ -244,8 +247,8 @@ export function DeliveryRouteMap({
   }
 
   return (
-    <div className="w-full h-full rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden relative">
-      <div ref={mapContainerRef} className="absolute inset-0" />
+    <div className="w-full h-full rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden relative min-h-[250px]">
+      <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />
 
       {mapError && (!ready || mapError.status === 401 || mapError.status === 403) && (
         <div className="absolute inset-0 z-10 bg-white/95 dark:bg-dark-surface/95 flex flex-col items-center justify-center gap-2 p-6 text-center">
