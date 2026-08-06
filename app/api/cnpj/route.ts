@@ -3,16 +3,50 @@ import { safeFetch } from "@/lib/security/ssrf-guard"
 
 export const runtime = "edge"
 
-function mapCnpjaData(data: any, cnpj: string) {
-  let phone = ""
-  if (Array.isArray(data.phones) && data.phones.length > 0) {
-    const p = data.phones[0]
-    if (p.area && p.number) {
-      phone = `(${p.area}) ${p.number}`
-    } else if (p.number) {
-      phone = String(p.number)
+function categorizePhones(rawPhones: string[]) {
+  let telefone_fixo = ""
+  let celular = ""
+
+  for (const raw of rawPhones) {
+    if (!raw) continue
+    const digits = raw.replace(/\D/g, "")
+    if (!digits) continue
+
+    const isMobile = digits.length === 11 || (digits.length === 9 && digits.startsWith("9"))
+
+    if (isMobile && !celular) {
+      celular = digits.length === 11
+        ? `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`
+        : digits
+    } else if (!isMobile && !telefone_fixo) {
+      telefone_fixo = digits.length === 10
+        ? `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`
+        : digits
     }
   }
+
+  const primaryPhone = telefone_fixo || celular || ""
+
+  return {
+    telefone: primaryPhone,
+    telefone_fixo: telefone_fixo || undefined,
+    celular: celular || undefined,
+  }
+}
+
+function mapCnpjaData(data: any, cnpj: string) {
+  const rawPhones: string[] = []
+  if (Array.isArray(data.phones)) {
+    for (const p of data.phones) {
+      if (p.area && p.number) {
+        rawPhones.push(`${p.area}${p.number}`)
+      } else if (p.number) {
+        rawPhones.push(String(p.number))
+      }
+    }
+  }
+
+  const phoneObj = categorizePhones(rawPhones)
 
   let email = ""
   if (Array.isArray(data.emails) && data.emails.length > 0) {
@@ -32,7 +66,9 @@ function mapCnpjaData(data: any, cnpj: string) {
     uf: data.address?.state || "",
     municipio: data.address?.city || "",
     municipio_codigo_ibge: data.address?.ibgeId ? String(data.address.ibgeId) : undefined,
-    telefone: phone,
+    telefone: phoneObj.telefone,
+    telefone_fixo: phoneObj.telefone_fixo,
+    celular: phoneObj.celular,
     email: email,
     cnae_fiscal: data.mainActivity?.id ? String(data.mainActivity.id) : undefined,
     simples_optante: data.simples?.optant ?? false,
@@ -41,10 +77,11 @@ function mapCnpjaData(data: any, cnpj: string) {
 }
 
 function mapBrasilApiData(bData: any, cnpj: string) {
-  let phone = ""
-  if (bData.ddd_telefone_1) {
-    phone = bData.ddd_telefone_1
-  }
+  const rawPhones: string[] = []
+  if (bData.ddd_telefone_1) rawPhones.push(String(bData.ddd_telefone_1))
+  if (bData.ddd_telefone_2) rawPhones.push(String(bData.ddd_telefone_2))
+
+  const phoneObj = categorizePhones(rawPhones)
 
   return {
     cnpj: bData.cnpj || cnpj,
@@ -59,7 +96,9 @@ function mapBrasilApiData(bData: any, cnpj: string) {
     uf: bData.uf || "",
     municipio: bData.municipio || "",
     municipio_codigo_ibge: bData.codigo_municipio ? String(bData.codigo_municipio) : undefined,
-    telefone: phone,
+    telefone: phoneObj.telefone,
+    telefone_fixo: phoneObj.telefone_fixo,
+    celular: phoneObj.celular,
     email: bData.email || "",
     cnae_fiscal: bData.cnae_fiscal ? String(bData.cnae_fiscal) : undefined,
     simples_optante: bData.opcao_pelo_simples ?? false,

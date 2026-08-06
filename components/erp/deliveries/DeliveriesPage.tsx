@@ -8,7 +8,8 @@ import { Button, IconPlaceholder, AlertModal, FormDropdown, Input } from "@/comp
 import { FadeIn } from "@/components/animations/FadeIn"
 import Pagination from "@/components/reusable/Pagination"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
-import { ExportFileIcon, PlusIcon, ArrowUpDownIcon, SparklesIcon } from "@/lib/icons"
+import { ExportFileIcon, PlusIcon, ArrowUpDownIcon, SparklesIcon, MapPinIcon } from "@/lib/icons"
+
 import { useInfiniteList } from "@/hooks/use-infinite-list"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { getERPDeliveriesPageAction, type ERPDeliveryListCursor, updateERPDeliveryStatusAction, getERPDeliveryPlanAccessAction, getSmartDeliverySuggestionsAction } from "@/app/actions/erp/deliveries"
@@ -52,64 +53,102 @@ function doesTransitionRequireReason(currentStatus: string, nextStatus: string):
 }
 
 type SortKey = "order_id" | "delivery_fee" | "status" | "delivery_person" | "estimated_time" | "dates" | "delivered_at"
-type SortDirection = "asc" | "desc"
-
-const ITEMS_PER_PAGE = 8
-
-const COLUMNS: Array<{ id: SortKey | "actions"; label: string; align: "left" | "center" | "right"; width: string }> = [
-    { id: "order_id", label: "Pedido", align: "left", width: "240px" },
-    { id: "delivery_fee", label: "Valor Envio", align: "left", width: "140px" },
-    { id: "status", label: "Status", align: "left", width: "130px" },
-    { id: "delivery_person", label: "Entregador", align: "left", width: "220px" },
-    { id: "estimated_time", label: "Tempo Estimado", align: "left", width: "140px" },
-    { id: "dates", label: "Data saída / Prevista", align: "left", width: "220px" },
-    { id: "delivered_at", label: "Data Entrega", align: "left", width: "170px" },
-    { id: "actions", label: "Ações", align: "center", width: "70px" },
-]
 
 export default function DeliveriesPage({
     partnerId,
-    deliveries: initialDeliveries,
-    initialNextCursor,
-    initialHasMore,
-    planGate,
+    deliveries: initialDeliveries = [],
+    initialNextCursor = null,
+    initialHasMore = false,
+    planGate: propPlanGate,
 }: {
     partnerId: string
-    deliveries: any[]
-    initialNextCursor: ERPDeliveryListCursor | null
-    initialHasMore: boolean
+    deliveries?: any[]
+    initialNextCursor?: ERPDeliveryListCursor | null
+    initialHasMore?: boolean
     planGate?: { requiredPlanSlug: "crescer" | "escalar"; message: string }
 }) {
     const router = useRouter()
     const searchParams = useSearchParams()
     const pathname = usePathname()
     const { openPlanUpgrade } = usePlanUpgrade()
-    const [search, setSearch] = useState("")
-    const [page, setPage] = useState(1)
-    const [viewMode, setViewMode] = useState<"list" | "grid" | "kanban">("kanban")
-    const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null)
+
+    const { state: entityState, open: openEntity, close: closeEntity } = useEntityState()
+    const isCreatingEntity = entityState.isOpen && entityState.action === "create"
+    const selectedDeliveryId = entityState.isOpen && (entityState.action === "view" || entityState.action === "edit") ? entityState.entityId : null
+    const wrapper = isCreatingEntity ? "create" : selectedDeliveryId ? "detail" : "list"
+
+    const [createPrefillOrderIds, setCreatePrefillOrderIds] = useState<string[] | null>(null)
+
+    const initialSearch = searchParams?.get("search") || ""
+    const [search, setSearchState] = useState(initialSearch)
+
+    const setSearch = useCallback((val: string) => {
+        setSearchState(val)
+        if (typeof window !== "undefined") {
+            const url = new URL(window.location.href)
+            if (val.trim()) {
+                url.searchParams.set("search", val.trim())
+            } else {
+                url.searchParams.delete("search")
+            }
+            window.history.replaceState(window.history.state, "", url.toString())
+        }
+    }, [])
+
+    const [debouncedSearch, setDebouncedSearch] = useState(initialSearch)
     const [filters, setFilters] = useState<{ status: string[] }>({ status: [] })
     const [isFilterOpen, setIsFilterOpen] = useState(false)
+    const [viewMode, setViewMode] = useState<"kanban">("kanban")
 
-    // Use standard ERP page URL handling pattern
-    const { state: entityState, open: openEntity, close: closeEntity } = useEntityState()
+    const initialTab = searchParams?.get("tab") === "closed" || searchParams?.get("tab") === "cancelled" ? "closed" : "active"
+    const [activeTab, setActiveTabState] = useState<"active" | "closed">(initialTab)
 
-    const wrapper = entityState.action === "create" ? "create" : entityState.action === "view" ? "detail" : "list"
-    const selectedDeliveryId = entityState.entityId
-
-    const [statusOverrides, setStatusOverrides] = useState<Record<string, string>>({})
-    const [debouncedSearch, setDebouncedSearch] = useState("")
-    const observerTarget = useRef<HTMLDivElement>(null)
-    const tableContainerRef = useRef<HTMLDivElement>(null)
+    const setActiveTab = useCallback((tab: "active" | "closed") => {
+        setActiveTabState(tab)
+        if (typeof window !== "undefined") {
+            const url = new URL(window.location.href)
+            if (tab === "closed") {
+                url.searchParams.set("tab", "closed")
+            } else {
+                url.searchParams.delete("tab")
+            }
+            window.history.replaceState(window.history.state, "", url.toString())
+        }
+    }, [])
+    const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: "asc" | "desc" } | null>(null)
     const [scrollState, setScrollState] = useState({ left: false, right: false })
     const [planSlug, setPlanSlug] = useState<string>("free")
     const [suggestionsOpen, setSuggestionsOpen] = useState(false)
     const [suggestionsLoading, setSuggestionsLoading] = useState(false)
     const [suggestions, setSuggestions] = useState<any[]>([])
-    const [createPrefillOrderIds, setCreatePrefillOrderIds] = useState<string[] | null>(null)
+
+    const [statusModal, setStatusModal] = useState<{ deliveryId: string; currentStatus: string; nextStatus: string } | null>(null)
+    const [statusOverrides, setStatusOverrides] = useState<Record<string, string>>({})
+    const [deliveryWarningModal, setDeliveryWarningModal] = useState<{
+        isOpen: boolean;
+        deliveryId: string;
+        currentStatus: string;
+        nextStatus: string;
+        reasonDropdownValue: string;
+        customReasonText: string;
+    } | null>(null)
+    const [simpleConfirmModal, setSimpleConfirmModal] = useState<{
+        isOpen: boolean;
+        deliveryId: string;
+        nextStatus: string;
+    } | null>(null)
+
+    const tableContainerRef = useRef<HTMLDivElement>(null)
+    const observerTarget = useRef<HTMLDivElement>(null)
 
     const queryKey = useMemo(() => ["erp", "deliveries", partnerId] as const, [partnerId])
-    const { items, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteList<any, ERPDeliveryListCursor>({
+    const {
+        items,
+        isLoading,
+        isFetchingNextPage,
+        hasNextPage,
+        fetchNextPage,
+    } = useInfiniteList<any, ERPDeliveryListCursor>({
         queryKey,
         initialPage: { items: initialDeliveries, nextCursor: initialNextCursor, hasMore: initialHasMore },
         fetchFn: async ({ cursor }) => {
@@ -119,6 +158,8 @@ export default function DeliveriesPage({
         },
         dedupeKey: useCallback((d: any) => String(d?.id || ""), []),
     })
+
+    const planGate = propPlanGate
 
     useInfiniteScrollObserver(observerTarget, {
         enabled: true,
@@ -180,6 +221,18 @@ export default function DeliveriesPage({
         return () => window.removeEventListener("resize", checkScroll)
     }, [viewMode, items])
 
+    const tabCounts = useMemo(() => {
+        let active = 0
+        let closed = 0
+        for (const raw of items || []) {
+            const effectiveStatus = statusOverrides[raw.id] || raw.status || "not_sent"
+            const isClosed = ["delivered", "cancelled", "delivery_failed"].includes(effectiveStatus)
+            if (isClosed) closed++
+            else active++
+        }
+        return { active, closed }
+    }, [items, statusOverrides])
+
     const mapped = useMemo(() => {
         const term = debouncedSearch.toLowerCase().trim()
         const nowMs = Date.now()
@@ -221,7 +274,7 @@ export default function DeliveriesPage({
                 startedAt: raw.started_at,
                 deliveredAt: raw.delivered_at,
                 estimatedArrivalAt,
-                deliveryFee: Number(order.delivery_fee || 0),
+                deliveryFee: links.reduce((sum: number, l: any) => sum + Number(l.orders?.delivery_fee || 0), 0),
                 createdAtMs: new Date(raw.created_at).getTime(),
                 deliveryTimingState: isLate ? "late" : "on_time",
                 deliveryTimingLabel: estimatedArrivalAt ? (isLate ? "Atrasada" : "No prazo") : "",
@@ -233,52 +286,73 @@ export default function DeliveriesPage({
             const matchSearch = !term || d.orderDisplayId.toLowerCase().includes(term) || d.customerName.toLowerCase().includes(term)
             const statusLabel = getDeliveryStatusMeta(d.status).label
             const matchStatus = filters.status.length === 0 || filters.status.includes(statusLabel)
-            return matchSearch && matchStatus
+
+            const isClosed = ["delivered", "cancelled", "delivery_failed"].includes(d.status)
+            const matchTab = activeTab === "closed" ? isClosed : !isClosed
+
+            return matchSearch && matchStatus && matchTab
         })
 
         if (sortConfig) {
             list = [...list].sort((a: any, b: any) => {
-                let aVal: any = a[sortConfig.key]
-                let bVal: any = b[sortConfig.key]
-                if (sortConfig.key === "dates") {
-                    aVal = new Date(a.startedAt || 0).getTime()
-                    bVal = new Date(b.startedAt || 0).getTime()
-                }
-                if (aVal === bVal) return 0
-                const cmp = aVal < bVal ? -1 : 1
-                return sortConfig.direction === "asc" ? cmp : -cmp
+                let aVal = a[sortConfig.key]
+                let bVal = b[sortConfig.key]
+                if (typeof aVal === "string") aVal = aVal.toLowerCase()
+                if (typeof bVal === "string") bVal = bVal.toLowerCase()
+                if (aVal < bVal) return sortConfig.direction === "asc" ? -1 : 1
+                if (aVal > bVal) return sortConfig.direction === "asc" ? 1 : -1
+                return 0
             })
         }
+
         return list
-    }, [items, search, filters, sortConfig, statusOverrides])
+    }, [items, debouncedSearch, filters, sortConfig, statusOverrides, activeTab])
 
-    const [statusModal, setStatusModal] = useState<{ isOpen: boolean; deliveryId: string; currentStatus: string; nextStatus: string } | null>(null)
-    const [deliveryWarningModal, setDeliveryWarningModal] = useState<{
-        isOpen: boolean
-        deliveryId: string
-        nextStatus: string
-        currentStatus: string
-        reasonDropdownValue: string
-        customReasonText: string
-    } | null>(null)
-    const [simpleConfirmModal, setSimpleConfirmModal] = useState<{ isOpen: boolean; deliveryId: string; nextStatus: string } | null>(null)
+    const totalPages = Math.ceil(mapped.length / 100) || 1
+    const [page, setPage] = useState(1)
 
-    const handleQuickStatusChange = useCallback((deliveryId: string, targetOrCurrentStatus?: string) => {
-        const item = mapped.find((d: any) => d.id === deliveryId)
-        const currentStatus = item ? item.status : "pending"
-        const nextStatus = targetOrCurrentStatus && targetOrCurrentStatus !== currentStatus
-            ? targetOrCurrentStatus
-            : currentStatus
+    useEffect(() => {
+        setPage(1)
+    }, [debouncedSearch, filters, sortConfig, activeTab])
 
-        setStatusModal({
-            isOpen: true,
+    const paginated = useMemo(() => {
+        const start = (page - 1) * 100
+        return mapped.slice(start, start + 100)
+    }, [mapped, page])
+
+    const executeStatusChange = async (deliveryId: string, nextStatus: string, reason?: string) => {
+        setStatusOverrides(prev => ({ ...prev, [deliveryId]: nextStatus }))
+        const res = await updateERPDeliveryStatusAction({
             deliveryId,
-            currentStatus,
-            nextStatus
+            partnerId,
+            status: nextStatus as any,
+            changeReason: reason || undefined
         })
-    }, [mapped])
 
-    const handleStatusTransition = useCallback((deliveryId: string, currentStatus: string, nextStatus: string) => {
+        if (!res.success) {
+            setStatusOverrides(prev => {
+                const next = { ...prev }
+                delete next[deliveryId]
+                return next
+            })
+            toast({
+                title: "Erro ao atualizar status",
+                description: res.error || "Não foi possível atualizar o status da entrega.",
+                variant: "destructive"
+            })
+        } else {
+            toast({
+                title: "Status atualizado",
+                description: `A entrega foi atualizada para "${getDeliveryStatusMeta(nextStatus).label}".`,
+            })
+        }
+    }
+
+    const handleQuickStatusChange = (deliveryId: string, currentStatus: string) => {
+        setStatusModal({ deliveryId, currentStatus, nextStatus: currentStatus })
+    }
+
+    const handleStatusTransition = (deliveryId: string, currentStatus: string, nextStatus: string) => {
         setStatusModal(null)
         if (currentStatus === nextStatus) return
 
@@ -286,57 +360,34 @@ export default function DeliveriesPage({
             setDeliveryWarningModal({
                 isOpen: true,
                 deliveryId,
-                nextStatus,
                 currentStatus,
+                nextStatus,
                 reasonDropdownValue: "",
-                customReasonText: ""
+                customReasonText: "",
             })
         } else {
             setSimpleConfirmModal({
                 isOpen: true,
                 deliveryId,
-                nextStatus
+                nextStatus,
             })
         }
-    }, [])
+    }
 
-    const confirmDeliveryWarningStatusChange = useCallback(async () => {
+    const confirmDeliveryWarningStatusChange = async () => {
         if (!deliveryWarningModal) return
         const { deliveryId, nextStatus, reasonDropdownValue, customReasonText } = deliveryWarningModal
-        const reason = reasonDropdownValue === "other"
-            ? customReasonText.trim()
-            : CHANGE_STATUS_REASONS.find(r => r.value === reasonDropdownValue)?.label || ""
+        let finalReason = reasonDropdownValue
+        if (reasonDropdownValue === "other" && customReasonText.trim()) {
+            finalReason = `Outro: ${customReasonText.trim()}`
+        } else {
+            const foundLabel = CHANGE_STATUS_REASONS.find(r => r.value === reasonDropdownValue)?.label
+            if (foundLabel) finalReason = foundLabel
+        }
 
         setDeliveryWarningModal(null)
-        await executeStatusChange(deliveryId, nextStatus, reason)
-    }, [deliveryWarningModal])
-
-    const executeStatusChange = useCallback(async (deliveryId: string, nextStatus: string, reason?: string) => {
-        const previous = statusOverrides[deliveryId]
-        setStatusOverrides((prev) => ({ ...prev, [deliveryId]: nextStatus }))
-        const res = await updateERPDeliveryStatusAction({
-            partnerId,
-            deliveryId,
-            status: nextStatus as any,
-            changeReason: reason
-        })
-        if (!res.success) {
-            toast.error(res.error || "Erro ao atualizar status da entrega.")
-            setStatusOverrides((prev) => {
-                const next = { ...prev }
-                if (previous) next[deliveryId] = previous
-                else delete next[deliveryId]
-                return next
-            })
-        } else {
-            toast.success("Status da entrega atualizado com sucesso!")
-        }
-    }, [partnerId, statusOverrides])
-
-    const totalPages = Math.max(1, Math.ceil(mapped.length / ITEMS_PER_PAGE))
-    const paginated = mapped.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
-
-    const filterSections: FilterSectionConfig[] = [{ id: "status", title: "Status", type: "checkbox-list", options: ["Não enviado", "Em preparação", "Enviado", "Entregue", "Falha na entrega", "Cancelada"] }]
+        await executeStatusChange(deliveryId, nextStatus, finalReason)
+    }
 
     return (
         <AnimatePresence mode="wait">
@@ -380,19 +431,22 @@ export default function DeliveriesPage({
                         </div>
 
                         <DeliveryPageControls
+                            activeTab={activeTab}
+                            onActiveTabChange={setActiveTab}
                             search={search}
                             onSearchChange={setSearch}
                             onOpenFilter={() => setIsFilterOpen(true)}
                             onAdd={() => openEntity("create")}
-                            viewMode={viewMode}
-                            onViewModeChange={setViewMode}
+                            onOpenSuggestions={loadSuggestions}
+                            canSmartSuggest={canSmartSuggest}
                             addDisabled={!!planGate}
+                            tabCounts={tabCounts}
                         />
 
                         <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
                             <AnimatePresence mode="wait">
                                 {paginated.length === 0 ? (
-                                    <FadeIn key="empty" className="flex flex-col items-center justify-center h-[600px] text-center p-8 w-full">
+                                    <FadeIn key="empty" className="flex flex-col items-center justify-center h-[500px] text-center p-8 w-full">
                                         <IconPlaceholder
                                             placeholderType="image"
                                             imageSrc={
@@ -418,80 +472,19 @@ export default function DeliveriesPage({
                                             }
                                         />
                                     </FadeIn>
-                                ) : viewMode === "kanban" ? (
+                                ) : (
                                     <FadeIn key="kanban" className="w-full">
                                         <DeliveryKanbanBoard
                                             deliveries={mapped}
+                                            activeTab={activeTab}
                                             onDetails={(id) => openEntity("view", id)}
                                             onQuickStatusChange={handleQuickStatusChange}
                                         />
-                                    </FadeIn>
-                                ) : viewMode === "grid" ? (
-                                    <FadeIn key="grid" className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
-                                        {paginated.map((delivery) => <DeliveryGridCard key={delivery.id} delivery={delivery} onQuickStatusChange={handleQuickStatusChange} onDetails={() => openEntity("view", delivery.id)} />)}
-                                    </FadeIn>
-                                ) : (
-                                    <FadeIn key="list-table" className="w-full overflow-hidden rounded-xl relative">
-                                        <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
-                                        <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
-                                        <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
-                                            <table className="w-full text-left border-separate border-spacing-0 min-w-[1400px]">
-                                                <thead>
-                                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                        {COLUMNS.map((col, idx) => {
-                                                            const sortable = col.id !== "actions"
-                                                            const sorted = sortConfig?.key === col.id
-                                                            return (
-                                                                <th
-                                                                    key={col.id}
-                                                                    style={{ width: col.width }}
-                                                                    className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${idx === 0 ? "rounded-l-lg" : ""} ${idx === COLUMNS.length - 1 ? "rounded-r-lg" : ""} ${sortable ? "cursor-pointer group" : ""}`}
-                                                                    onClick={() => {
-                                                                        if (!sortable) return
-                                                                        setSortConfig((prev) => ({ key: col.id as SortKey, direction: prev?.key === col.id && prev.direction === "asc" ? "desc" : "asc" }))
-                                                                    }}
-                                                                >
-                                                                    <div className="flex items-center gap-1.5">
-                                                                        <span>{col.label}</span>
-                                                                        {sortable ? <ArrowUpDownIcon size={14} className={`transition-all duration-200 ${sorted ? "text-brand-dark dark:text-dark-heading opacity-100" : "text-brand-inactive-text opacity-40 group-hover:opacity-100"}`} /> : null}
-                                                                    </div>
-                                                                </th>
-                                                            )
-                                                        })}
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {paginated.map((delivery) => (
-                                                        <DeliveryListItem key={delivery.id} delivery={delivery} columns={COLUMNS as any} onQuickStatusChange={handleQuickStatusChange} onDetails={() => openEntity("view", delivery.id)} />
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
                                     </FadeIn>
                                 )}
                             </AnimatePresence>
                             {hasNextPage ? <div ref={observerTarget} className="h-12 w-full shrink-0" aria-hidden /> : null}
                         </div>
-
-                        {mapped.length > 0 && viewMode !== "kanban" ? (
-                            <Pagination
-                                currentPage={page}
-                                totalPages={totalPages}
-                                onPageChange={(p) => {
-                                    setPage(p)
-                                    if (p === totalPages && hasNextPage && !isFetchingNextPage) void fetchNextPage()
-                                }}
-                            />
-                        ) : null}
-
-                        <FilterSheet
-                            isOpen={isFilterOpen}
-                            onClose={() => setIsFilterOpen(false)}
-                            sections={filterSections}
-                            filters={filters}
-                            setFilters={setFilters as any}
-                            onClear={() => setFilters({ status: [] })}
-                        />
                     </div>
                 </FadeIn>
             )}
@@ -500,7 +493,7 @@ export default function DeliveriesPage({
                 isOpen={suggestionsOpen}
                 onClose={() => setSuggestionsOpen(false)}
                 title="Sugestões de entregas"
-                maxWidth="3xl"
+                maxWidth="4xl"
                 footer={
                     <Button variant="outline" onClick={() => setSuggestionsOpen(false)}>
                         Fechar
@@ -509,53 +502,100 @@ export default function DeliveriesPage({
             >
                 <div className="space-y-4">
                     {suggestionsLoading ? (
-                        <div className="text-sm text-brand-inactive-text">Gerando sugestões...</div>
+                        <div className="flex flex-col items-center justify-center py-16 text-center">
+                            <div className="w-8 h-8 border-2 border-brand-primary border-t-transparent rounded-full animate-spin mb-3" />
+                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Calculando rotas e agrupamentos...</p>
+                            <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1">Analisando CEPs e distâncias dos pedidos pendentes.</p>
+                        </div>
                     ) : suggestions.length === 0 ? (
-                        <div className="text-sm text-brand-inactive-text">Nenhuma sugestão encontrada para os pedidos atuais.</div>
+                        <div className="flex flex-col items-center justify-center py-16 text-center">
+                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Nenhuma sugestão encontrada</p>
+                            <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1">Não há pedidos pendentes suficientes com CEPs agrupáveis no momento.</p>
+                        </div>
                     ) : (
-                        suggestions.map((sug, idx) => (
-                            <div key={`${sug.groupKey}-${idx}`} className="rounded-2xl border border-brand-border dark:border-dark-border p-4 bg-white dark:bg-dark-surface">
-                                <div className="flex items-start justify-between gap-3">
-                                    <div className="min-w-0">
-                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
-                                            {sug.groupLabel}
-                                        </div>
-                                        <div className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                            {sug.orders?.length || 0} pedido(s)
-                                            {sug.totalDistanceKm != null ? ` • ${formatDistance(Number(sug.totalDistanceKm))}` : ""}
-                                            {sug.estimatedDurationMinutes != null ? ` • ${sug.estimatedDurationMinutes} min` : ""}
-                                        </div>
-                                    </div>
-                                    <Button
-                                        size="sm"
-                                        onClick={() => {
-                                            const ids = (sug.orders || []).map((o: any) => o.id).filter(Boolean)
-                                            setSuggestionsOpen(false)
-                                            setCreatePrefillOrderIds(ids)
-                                            openEntity("create")
-                                        }}
-                                    >
-                                        Criar entrega
-                                    </Button>
-                                </div>
-
-                                <div className="mt-3 space-y-2">
-                                    {(sug.orders || []).map((o: any) => (
-                                        <div key={o.id} className="flex items-start justify-between gap-3 text-sm">
-                                            <div className="min-w-0">
-                                                <div className="font-bold text-brand-dark dark:text-dark-heading truncate">{o.displayId}</div>
-                                                <div className="text-xs text-brand-inactive-text dark:text-dark-body truncate">
-                                                    {o.customerName}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {suggestions.map((sug, idx) => (
+                                <motion.div
+                                    key={`${sug.groupKey}-${idx}`}
+                                    initial={{ opacity: 0, y: 12 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.25, delay: idx * 0.05 }}
+                                    className="rounded-2xl border border-brand-border dark:border-dark-border p-4 bg-white dark:bg-dark-surface shadow-xs flex flex-col justify-between hover:border-brand-primary/40 transition-all duration-200"
+                                >
+                                    <div>
+                                        {/* Map Thumbnail Decorator */}
+                                        <div className="w-full h-[84px] bg-brand-gray dark:bg-dark-border/40 rounded-xl relative overflow-hidden mb-3.5 flex items-center justify-center group">
+                                            <img
+                                                src="https://img.dudit.com.br/static/MapLarge.png"
+                                                className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300"
+                                                alt="Mapa"
+                                            />
+                                            <div className="absolute inset-0 flex items-center justify-center bg-black/5">
+                                                <div className="w-7 h-7 bg-brand-primary rounded-full border-2 border-white flex items-center justify-center text-white z-10 shadow-md group-hover:scale-110 transition-transform">
+                                                    <div className="w-2.5 h-2.5 bg-white rounded-full"></div>
                                                 </div>
                                             </div>
-                                            <div className="text-xs text-brand-inactive-text dark:text-dark-body shrink-0">
-                                                {o.distanceKm == null ? "-" : `${Number(o.distanceKm).toFixed(1)} km`}
+                                            <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                                                <MapPinIcon size={10} />
+                                                <span>{sug.groupLabel}</span>
                                             </div>
                                         </div>
-                                    ))}
-                                </div>
-                            </div>
-                        ))
+
+                                        {/* Header Info */}
+                                        <div className="flex items-start justify-between gap-2 mb-3">
+                                            <div className="min-w-0">
+                                                <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">
+                                                    {sug.groupLabel}
+                                                </h4>
+                                                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                                    <span className="bg-brand-primary/10 text-brand-primary text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                                        {sug.orders?.length || 0} pedido(s)
+                                                    </span>
+                                                    {sug.totalDistanceKm != null ? (
+                                                        <span className="bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                                            {formatDistance(Number(sug.totalDistanceKm))}
+                                                        </span>
+                                                    ) : null}
+                                                    {sug.estimatedDurationMinutes != null ? (
+                                                        <span className="bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                                            ~{sug.estimatedDurationMinutes} min
+                                                        </span>
+                                                    ) : null}
+                                                </div>
+                                            </div>
+
+                                            <Button
+                                                size="sm"
+                                                onClick={() => {
+                                                    const ids = (sug.orders || []).map((o: any) => o.id).filter(Boolean)
+                                                    setSuggestionsOpen(false)
+                                                    setCreatePrefillOrderIds(ids)
+                                                    openEntity("create")
+                                                }}
+                                                className="shrink-0 font-bold"
+                                            >
+                                                Criar entrega
+                                            </Button>
+                                        </div>
+
+                                        {/* Order Items List */}
+                                        <div className="space-y-2 border-t border-brand-border/40 dark:border-dark-border/40 pt-2.5">
+                                            {(sug.orders || []).map((o: any) => (
+                                                <div key={o.id} className="flex items-center justify-between gap-2 text-xs">
+                                                    <div className="min-w-0 flex items-center gap-1.5">
+                                                        <span className="font-bold text-brand-dark dark:text-dark-heading shrink-0">{o.displayId}</span>
+                                                        <span className="text-brand-inactive-text dark:text-dark-body truncate">• {o.customerName}</span>
+                                                    </div>
+                                                    <div className="text-[11px] font-bold text-brand-primary shrink-0 bg-brand-primary/5 px-2 py-0.5 rounded">
+                                                        {o.distanceKm == null ? "-" : `${Number(o.distanceKm).toFixed(1)} km`}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            ))}
+                        </div>
                     )}
                 </div>
             </DefaultModal>
@@ -583,9 +623,12 @@ export default function DeliveriesPage({
                     </div>
                 }
             >
-                <div className="p-4 space-y-4">
+                <div className="space-y-4 py-2">
+                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                        Selecione o novo status para esta entrega:
+                    </p>
                     <FormDropdown
-                        label="Status da entrega"
+                        label="Status de Entrega"
                         value={statusModal?.nextStatus || ""}
                         setValue={(val) => setStatusModal(prev => prev ? { ...prev, nextStatus: val } : null)}
                         options={[

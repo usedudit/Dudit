@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useMemo, useEffect } from "react"
 import { AnimatePresence } from "framer-motion"
-import { Tabs, TabsList, TabsTrigger, TabsContent, Button, AlertModal, ThreeDotsLoader } from "@/components/reusable"
+import { Tabs, TabsList, TabsTrigger, TabsContent, Button, AlertModal, ThreeDotsLoader, Input, MoneyInput, Combobox, Checkbox, ListItem, RadioButton, InfoCard, PercentageInput } from "@/components/reusable"
 import { ChevronLeftIcon, SaveIcon } from "@/lib/icons"
 import { useToast } from "@/components/ui/use-toast"
 import { useNotification } from "@/hooks/use-notification"
@@ -32,17 +32,14 @@ import { pickBankThenCashDefaultFinanceAccountId, type FinanceAccountType } from
 import DefaultModal from "@/components/reusable/DefaultModal"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
-import { Input, MoneyInput, Combobox, Checkbox, ListItem, RadioButton, InfoCard, PercentageInput, Button as ReusableButton, FormSection, FormDropdown, DatePicker } from "@/components/reusable"
-import { TagIcon, MoneyIcon, FileIcon, UserIcon, TruckIcon } from "@/lib/icons"
+import { TagIcon, MoneyIcon, FileIcon, TruckIcon } from "@/lib/icons"
 import SelectCouponSheet from "@/components/erp/pdv/SelectCouponSheet"
 import POSShippingSheet from "@/components/erp/pdv/POSShippingSheet"
 import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import type { PaymentBreakdownEntry } from "@/lib/payments/financial-engine"
-
 import { getServiceCheckoutSettingsAction } from "@/app/actions/marketplace/service-checkout-settings"
-import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 
 // Tabs
 import { OrderGeneralTab } from "./OrderGeneralTab"
@@ -154,7 +151,14 @@ export function parseAddressString(addressStr: string) {
             number = dashParts[0];
             neighborhood = dashParts.slice(1).join("-").trim();
         } else {
-            number = part;
+            // Check if part looks like house number (digits, S/N, km, etc.)
+            const isNumberLike = /^\d+|^s\/n|^sn/i.test(part);
+            if (isNumberLike) {
+                number = part;
+            } else {
+                neighborhood = part;
+                number = "S/N";
+            }
         }
     } else if (middleParts.length >= 2) {
         const numPart = middleParts[0];
@@ -178,6 +182,10 @@ export function parseAddressString(addressStr: string) {
         } else {
             neighborhood = neighborhoodPart;
         }
+    }
+
+    if (!number || number.trim() === "" || number.toLowerCase() === neighborhood.toLowerCase()) {
+        number = "S/N";
     }
 
     return {

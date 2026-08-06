@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useRef } from "react"
+import React, { useState, useRef, useEffect } from "react"
 import { Input } from "@/components/reusable"
 import { Spinner } from "@/components/reusable/Spinner"
 import { Button } from "@/components/reusable/Button"
@@ -43,23 +43,33 @@ export const CepInput: React.FC<CepInputProps> = ({
     ...props
 }) => {
     const [loading, setLoading] = useState(false)
-    const [lastFetchedCep, setLastFetchedCep] = useState(value?.replace(/\D/g, "") || "")
-    const fetchingCepRef = useRef("")
+    const lastFetchedCepRef = useRef<string>(value?.replace(/\D/g, "") || "")
+    const fetchingCepRef = useRef<string>("")
+    const onAddressFetchedRef = useRef(onAddressFetched)
 
-    // Formata o CEP enquanto o usuário digita
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        let text = e.target.value.replace(/\D/g, "")
-        if (text.length > 8) text = text.substring(0, 8)
-        if (text.length > 5) {
-            text = `${text.substring(0, 5)}-${text.substring(5, 8)}`
+    // Manter callback sempre atualizado via ref sem disparar re-renders ou efeitos colaterais
+    useEffect(() => {
+        onAddressFetchedRef.current = onAddressFetched
+    }, [onAddressFetched])
+
+    // Sincronizar o último CEP buscado caso o valor inicial já venha preenchido da base
+    useEffect(() => {
+        const clean = value?.replace(/\D/g, "") || ""
+        if (clean.length === 8 && !lastFetchedCepRef.current) {
+            lastFetchedCepRef.current = clean
         }
-        onChange(text)
-    }
+    }, [value])
 
     // Busca o endereço pelo CEP via /api/cep
     const fetchAddressByCep = async (cepToFetch: string) => {
         const cleanCep = cepToFetch.replace(/\D/g, "")
-        if (cleanCep.length !== 8 || cleanCep === lastFetchedCep || cleanCep === fetchingCepRef.current) return
+        if (
+            cleanCep.length !== 8 ||
+            cleanCep === lastFetchedCepRef.current ||
+            cleanCep === fetchingCepRef.current
+        ) {
+            return
+        }
 
         fetchingCepRef.current = cleanCep
         setLoading(true)
@@ -68,8 +78,8 @@ export const CepInput: React.FC<CepInputProps> = ({
             const data: CepResponse = await response.json()
 
             if (data && !data.error && !data.erro) {
-                setLastFetchedCep(cleanCep)
-                onAddressFetched?.({
+                lastFetchedCepRef.current = cleanCep
+                onAddressFetchedRef.current?.({
                     street: data.logradouro || "",
                     neighborhood: data.bairro || "",
                     city: data.localidade || data.municipio || "",
@@ -79,31 +89,37 @@ export const CepInput: React.FC<CepInputProps> = ({
                     latitude: data.latitude ?? null,
                     longitude: data.longitude ?? null,
                 })
-            } else {
-                fetchingCepRef.current = ""
             }
         } catch (e) {
             console.error("Erro ao buscar CEP:", e)
-            fetchingCepRef.current = ""
         } finally {
+            fetchingCepRef.current = ""
             setLoading(false)
         }
     }
 
-    // Dispara busca se o blur for focado com 8 dígitos e onAddressFetched passado
-    const handleBlur = () => {
-        if (onAddressFetched) {
-            fetchAddressByCep(value)
+    // Chamado EXCLUSIVAMENTE quando o usuário digita no input do CEP
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        let text = e.target.value.replace(/\D/g, "")
+        if (text.length > 8) text = text.substring(0, 8)
+        if (text.length > 5) {
+            text = `${text.substring(0, 5)}-${text.substring(5, 8)}`
+        }
+        onChange(text)
+
+        // Se o usuário digitou/colou exatamente 8 dígitos no campo CEP, busca o endereço
+        if (text.replace(/\D/g, "").length === 8) {
+            fetchAddressByCep(text)
         }
     }
 
-    // Busca automática se tiver 8 dígitos
-    useEffect(() => {
-        const cleanCep = value.replace(/\D/g, "")
-        if (cleanCep.length === 8 && onAddressFetched && cleanCep !== lastFetchedCep) {
-            fetchAddressByCep(value)
+    // Chamado EXCLUSIVAMENTE quando o foco sai do input de CEP
+    const handleBlur = () => {
+        const clean = value?.replace(/\D/g, "") || ""
+        if (clean.length === 8 && clean !== lastFetchedCepRef.current) {
+            fetchAddressByCep(clean)
         }
-    }, [value, onAddressFetched])
+    }
 
     return (
         <div className="relative">

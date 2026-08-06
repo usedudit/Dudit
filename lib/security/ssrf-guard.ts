@@ -35,9 +35,6 @@ const ALLOWED_HOSTNAMES: ReadonlySet<string> = new Set([
   // ── Payment (Mercado Pago) ──
   "api.mercadopago.com",
 
-  // ── Email (Unosend) ──
-  "api.unosend.co",
-
   // ── Fiscal (ViaCEP, CNPJA, BrasilAPI) ──
   "viacep.com.br",
   "open.cnpja.com",
@@ -381,12 +378,19 @@ async function readResponseWithSizeLimit(
     throw new SSRFError(`Error reading response body: ${(err as Error).message}`)
   }
 
-  // Reconstruct the response with the buffered body
+  // Reconstruct the response with the buffered body.
+  // We clean content-encoding, content-length, and transfer-encoding headers
+  // because the body array is now decompressed raw bytes.
+  const newHeaders = new Headers(response.headers)
+  newHeaders.delete("content-encoding")
+  newHeaders.delete("content-length")
+  newHeaders.delete("transfer-encoding")
+
   const blob = new Blob(chunks as BlobPart[])
   return new Response(blob, {
     status: response.status,
     statusText: response.statusText,
-    headers: response.headers,
+    headers: newHeaders,
   })
 }
 

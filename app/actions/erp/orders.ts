@@ -1627,8 +1627,8 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
 
     let deliveryAddressStr = ""
     if (data.deliveryMethod === "delivery" && data.address) {
-        const { street, number, neighborhood, city, state, zipCode, complement } = data.address
-        deliveryAddressStr = `${street}, ${number}${complement ? ` (${complement})` : ""}, ${neighborhood}, ${city} - ${state}, ${zipCode}`
+        const { buildFormattedAddress } = await import("@/lib/utils/format-address")
+        deliveryAddressStr = buildFormattedAddress(data.address)
     }
 
     const preparationEstimate = await resolveOrderPreparationEstimate({

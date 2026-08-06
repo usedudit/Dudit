@@ -267,7 +267,16 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                     if (data.razao_social) setCustomerName(data.razao_social)
                     if (data.nome_fantasia) setFantasia(data.nome_fantasia)
                     if (data.email) setEmail(data.email)
-                    if (data.telefone) setMobile(data.telefone)
+                    if (data.celular) setMobile(data.celular)
+                    if (data.telefone_fixo) setPhone(data.telefone_fixo)
+                    else if (data.telefone && !data.celular) {
+                        const digits = data.telefone.replace(/\D/g, "")
+                        if (digits.length === 11 || (digits.length === 9 && digits.startsWith("9"))) {
+                            setMobile(data.telefone)
+                        } else {
+                            setPhone(data.telefone)
+                        }
+                    }
                     if (data.cep) setCep(data.cep)
                     if (data.logradouro) setStreet(data.logradouro)
                     if (data.numero) setNumber(data.numero)

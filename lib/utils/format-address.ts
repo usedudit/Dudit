@@ -15,7 +15,7 @@ export function formatAddressParts(addr: AddressParts | null | undefined): strin
 
     const streetStr = addr.street || ""
     const num = addr.number
-    const numStr = num !== null && num !== undefined && String(num).trim() !== "" ? `, ${String(num).trim()}` : ""
+    const numStr = num !== null && num !== undefined && String(num).trim() !== "" ? `, ${String(num).trim()}` : ", S/N"
     const compStr = addr.complement ? ` - ${addr.complement}` : ""
     const line1 = `${streetStr}${numStr}${compStr}`.trim().replace(/^,/, "").trim()
 
@@ -26,6 +26,35 @@ export function formatAddressParts(addr: AddressParts | null | undefined): strin
 
     const lines = [line1, line2].filter(Boolean)
     return lines.length > 0 ? lines.join("\n") : null
+}
+
+export function buildFormattedAddress(addr: AddressParts | null | undefined): string {
+    if (!addr) return ""
+    const streetStr = (addr.street || "").trim()
+    if (!streetStr) return ""
+
+    let numStr = addr.number != null ? String(addr.number).trim() : ""
+    if (!numStr || numStr === "null" || numStr === "undefined" || numStr === "0") {
+        numStr = "S/N"
+    }
+
+    const neighStr = (addr.neighborhood || "").trim()
+    if (numStr.toLowerCase() === neighStr.toLowerCase() && neighStr !== "") {
+        numStr = "S/N"
+    }
+
+    const compStr = addr.complement && addr.complement.trim() ? ` (${addr.complement.trim()})` : ""
+    const zipStr = addr.zipCode || addr.zip_code || ""
+
+    const parts: string[] = []
+    parts.push(`${streetStr}, ${numStr}${compStr}`)
+    if (neighStr) parts.push(neighStr)
+
+    const cityStateStr = [addr.city?.trim(), (addr.state || addr.uf)?.trim()].filter(Boolean).join(" - ")
+    if (cityStateStr) parts.push(cityStateStr)
+    if (zipStr?.trim()) parts.push(zipStr.trim())
+
+    return parts.join(", ")
 }
 
 const CEP_LINE_REGEX = /^CEP\s*[:\-]?\s*\d{5}-?\d{3}$/i

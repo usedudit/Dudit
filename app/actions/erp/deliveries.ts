@@ -99,20 +99,28 @@ async function getPartnerUserNameByIdMap(
     .eq("partner_id", partnerId)
     .in("id", uniqueIds)
 
+  const { data: partnerUsersByUserId } = await supabase
+    .from("partner_users")
+    .select("id, user_id")
+    .eq("partner_id", partnerId)
+    .in("user_id", uniqueIds)
+
+  const allPartnerUsers = [...(partnerUsers || []), ...(partnerUsersByUserId || [])]
   const userIdByPartnerUserId = new Map<string, string>()
-  const userIds = new Set<string>()
-  for (const row of partnerUsers || []) {
+  const allUserIds = new Set<string>(uniqueIds)
+
+  for (const row of allPartnerUsers) {
     if (!row?.id || !row?.user_id) continue
     userIdByPartnerUserId.set(String(row.id), String(row.user_id))
-    userIds.add(String(row.user_id))
+    allUserIds.add(String(row.user_id))
   }
 
   const nameByUserId = new Map<string, string>()
-  if (userIds.size > 0) {
+  if (allUserIds.size > 0) {
     const { data: profiles } = await supabase
       .from("user_profiles")
       .select("user_id, full_name")
-      .in("user_id", Array.from(userIds))
+      .in("user_id", Array.from(allUserIds))
 
     for (const profile of profiles || []) {
       if (!profile?.user_id) continue
@@ -121,8 +129,9 @@ async function getPartnerUserNameByIdMap(
   }
 
   const nameByPartnerUserId = new Map<string, string>()
-  for (const [partnerUserId, userId] of userIdByPartnerUserId.entries()) {
-    nameByPartnerUserId.set(partnerUserId, nameByUserId.get(userId) || "Entregador")
+  for (const id of uniqueIds) {
+    const userId = userIdByPartnerUserId.get(id) || id
+    nameByPartnerUserId.set(id, nameByUserId.get(userId) || nameByUserId.get(id) || "Entregador")
   }
 
   return nameByPartnerUserId
@@ -500,13 +509,13 @@ async function estimateOrderDistanceKm(params: {
   originCoords: { lat: number; lng: number } | null
 }): Promise<number | null> {
   const preset = params.order?.distance_km
-  if (preset != null && !Number.isNaN(Number(preset))) {
+  if (preset != null && !Number.isNaN(Number(preset)) && Number(preset) > 0) {
     return Number(Number(preset).toFixed(2))
   }
 
   const address = formatAddress(params.order)
   if (!address || !params.originCoords) return null
-  const dest = await getOrCreateCachedCoords({ supabase: params.supabase, partnerId: params.partnerId, addressText: address })
+  const dest = await geocodeAddress(address)
   if (!dest) return null
   return Number(calculateDistance(params.originCoords, dest).toFixed(2))
 }
@@ -560,16 +569,48 @@ export async function getSmartDeliverySuggestionsAction(input: {
 
   if (error) return { success: false as const, error: error.message }
 
-  // origin coords from addresses (single source of truth)
-  const { data: store } = await supabase
+  // Resolve store origin coordinates
+  const { data: defaultStore } = await supabase
     .from("stores")
-    .select("id, addresses!store_id(latitude, longitude)")
+    .select("id")
     .eq("partner_id", input.partnerId)
+    .order("created_at", { ascending: true })
+    .limit(1)
     .maybeSingle()
-  const addr = Array.isArray(store?.addresses) ? store.addresses[0] : null
-  const originCoords = addr?.latitude && addr?.longitude
-    ? { lat: Number(addr.latitude), lng: Number(addr.longitude) }
-    : null
+
+  let storeAddress: any = null
+  if (defaultStore?.id) {
+    const { data } = await supabase
+      .from("addresses")
+      .select("city, state, zip_code, street, number, latitude, longitude")
+      .eq("store_id", defaultStore.id)
+      .maybeSingle()
+    storeAddress = data
+  }
+
+  if (!storeAddress) {
+    const { data } = await supabase
+      .from("addresses")
+      .select("city, state, zip_code, street, number, latitude, longitude")
+      .eq("partner_id", input.partnerId)
+      .eq("is_default", true)
+      .maybeSingle()
+    storeAddress = data
+  }
+
+  let originCoords: { lat: number; lng: number } | null = null
+  if (storeAddress?.latitude && storeAddress?.longitude) {
+    originCoords = { lat: Number(storeAddress.latitude), lng: Number(storeAddress.longitude) }
+  } else if (storeAddress) {
+    const originAddressStr = [
+      [storeAddress.street, storeAddress.number].filter(Boolean).join(", "),
+      [storeAddress.city, storeAddress.state].filter(Boolean).join(", "),
+      storeAddress.zip_code || "",
+    ].filter(Boolean).join(" ")
+    if (originAddressStr) {
+      originCoords = await geocodeAddress(originAddressStr)
+    }
+  }
 
   const eligible = (orders || [])
     .filter((o: any) => {

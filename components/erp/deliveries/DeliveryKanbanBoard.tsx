@@ -10,15 +10,15 @@ interface DeliveryKanbanBoardProps {
     deliveries: any[]
     onDetails: (deliveryId: string) => void
     onQuickStatusChange?: (deliveryId: string, status: string) => void
+    activeTab?: "active" | "closed"
 }
 
 export default function DeliveryKanbanBoard({
     deliveries,
     onDetails,
     onQuickStatusChange,
+    activeTab = "active",
 }: DeliveryKanbanBoardProps) {
-    // Tabs: "active" (Kanban with 4 columns) or "cancelled" (Grid of cancelled/failed deliveries)
-    const [activeTab, setActiveTab] = useState<"active" | "cancelled">("active")
     const [dragOverCol, setDragOverCol] = useState<string | null>(null)
 
     // Group deliveries by status
@@ -39,10 +39,10 @@ export default function DeliveryKanbanBoard({
             id: "pending",
             title: "Não enviado",
             subtitle: "Novos pedidos",
-            themeClass: "bg-blue-50/70 border-blue-100/50 text-blue-600 dark:bg-blue-950/20 dark:border-blue-900/30 dark:text-blue-400",
-            dotBgClass: "bg-blue-100 dark:bg-blue-900/40",
-            dotClass: "bg-blue-500",
-            badgeClass: "bg-blue-100/60 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300",
+            themeClass: "bg-gray-50/70 border-gray-200/60 text-gray-700 dark:bg-zinc-800/30 dark:border-zinc-700/50 dark:text-zinc-300",
+            dotBgClass: "bg-gray-200 dark:bg-zinc-700",
+            dotClass: "bg-gray-500",
+            badgeClass: "bg-gray-200/70 text-gray-700 dark:bg-zinc-700 dark:text-zinc-300",
             items: pendingDeliveries,
         },
         {
@@ -59,10 +59,10 @@ export default function DeliveryKanbanBoard({
             id: "sent",
             title: "Enviado",
             subtitle: "A caminho",
-            themeClass: "bg-rose-50/70 border-rose-100/50 text-rose-600 dark:bg-rose-950/20 dark:border-rose-900/30 dark:text-rose-400",
-            dotBgClass: "bg-rose-100 dark:bg-rose-900/40",
-            dotClass: "bg-rose-500",
-            badgeClass: "bg-rose-100/60 text-rose-700 dark:bg-rose-900/60 dark:text-rose-300",
+            themeClass: "bg-blue-50/70 border-blue-100/50 text-blue-600 dark:bg-blue-950/20 dark:border-blue-900/30 dark:text-blue-400",
+            dotBgClass: "bg-blue-100 dark:bg-blue-900/40",
+            dotClass: "bg-blue-500",
+            badgeClass: "bg-blue-100/60 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300",
             items: sentDeliveries,
         },
         {
@@ -96,21 +96,7 @@ export default function DeliveryKanbanBoard({
     }
 
     return (
-        <div className="flex flex-col h-full w-full px-4 md:px-8">
-            {/* Standard ERP Tab Switcher */}
-            <div className="mb-6 px-4 md:px-0">
-                <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as "active" | "cancelled")}>
-                    <TabsList className="px-0">
-                        <TabsTrigger value="active" icon={ColumnsIcon}>
-                            Entregas Ativas ({pendingDeliveries.length + preparingDeliveries.length + sentDeliveries.length + deliveredDeliveries.length})
-                        </TabsTrigger>
-                        <TabsTrigger value="cancelled" icon={BlockedIcon}>
-                            Canceladas / Falhas ({cancelledDeliveries.length})
-                        </TabsTrigger>
-                    </TabsList>
-                </Tabs>
-            </div>
-
+        <div className="flex flex-col h-full w-full">
             <AnimatePresence mode="wait">
                 {activeTab === "active" ? (
                     /* Kanban Board View */

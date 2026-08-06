@@ -6,12 +6,23 @@ import { ActionsDropdown, Badge } from "@/components/reusable"
 import { DropdownItem } from "@/components/reusable/Dropdown"
 import { formatCurrency } from "@/lib/utils"
 import { getDeliveryStatusMeta } from "@/lib/orders/status"
-import { ClockIcon, MapPinIcon, TruckIcon, UserIcon } from "@/lib/icons"
+import { ClockIcon, MapPinIcon, TruckIcon, UserIcon, BlockedIcon, DeliverySentIcon, CheckCircleIcon, DeliveryPickupIcon, DeliveryFailedIcon } from "@/lib/icons"
 
 interface DeliveryKanbanCardProps {
   delivery: any
   onDetails: () => void
   onQuickStatusChange?: (deliveryId: string, status: string) => void
+}
+
+const statusIconMap: Record<string, React.ReactNode> = {
+  pending: <BlockedIcon size={12} />,
+  not_sent: <BlockedIcon size={12} />,
+  preparing: <ClockIcon size={12} />,
+  sent: <DeliverySentIcon size={12} />,
+  delivered: <CheckCircleIcon size={12} />,
+  pickup_available: <DeliveryPickupIcon size={12} />,
+  delivery_failed: <DeliveryFailedIcon size={12} />,
+  cancelled: <BlockedIcon size={12} />,
 }
 
 // Function to calculate relative time elapsed
@@ -42,85 +53,11 @@ export default function DeliveryKanbanCard({
     return () => clearInterval(interval)
   }, [delivery.createdAtMs])
 
-  const isClosed = ["delivered", "cancelled", "delivery_failed"].includes(delivery.status)
-
-  // Style helper for channels (iFood, Site, PDV)
-  const getChannelStyle = (source: string) => {
-    const src = String(source || "").toLowerCase().trim()
-    if (src === "ifood") {
-      return "bg-red-50 text-red-600 border-red-200/50 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/40"
-    }
-    if (src === "site" || src === "store" || src === "website") {
-      return "bg-emerald-50 text-emerald-600 border-emerald-200/50 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/40"
-    }
-    if (src === "pdv" || src === "presencial" || src === "pos") {
-      return "bg-indigo-50 text-indigo-600 border-indigo-200/50 dark:bg-indigo-950/20 dark:text-indigo-400 dark:border-indigo-900/40"
-    }
-    return "bg-gray-50 text-gray-600 border-gray-200/50 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700/40"
-  };
+  const statusMeta = getDeliveryStatusMeta(delivery.status)
 
   const handleDragStart = (e: React.DragEvent) => {
     e.dataTransfer.setData("text/plain", delivery.id)
     e.dataTransfer.effectAllowed = "move"
-  }
-
-  const formatChannelName = (src: string) => {
-    const str = String(src || "").toLowerCase().trim()
-    if (str === "ifood") return "iFood"
-    if (str === "pdv" || str === "pos") return "PDV"
-    if (str === "site" || str === "store" || str === "website") return "Site"
-    return src.charAt(0).toUpperCase() + src.slice(1)
-  }
-
-  // Render dynamic action buttons on the footer
-  const renderActionButtons = () => {
-    if (isClosed) return null
-
-    const handleActionClick = (e: React.MouseEvent, status: string) => {
-      e.stopPropagation()
-      onQuickStatusChange?.(delivery.id, status)
-    }
-
-    if (delivery.status === "preparing") {
-      return (
-        <div className="flex gap-2 w-full mt-4 pt-3 border-t border-brand-border dark:border-dark-border">
-          <button
-            onClick={(e) => handleActionClick(e, "sent")}
-            className="flex-1 py-1.5 px-3 bg-brand-primary hover:bg-brand-dark text-white rounded-full text-xs font-bold transition-all duration-200 flex items-center justify-center gap-1 cursor-pointer"
-          >
-            Enviar p/ Rota
-          </button>
-          <button
-            onClick={(e) => handleActionClick(e, "cancelled")}
-            className="py-1.5 px-3 bg-gray-100 hover:bg-red-50 hover:text-red-600 dark:bg-dark-border dark:hover:bg-red-950/20 text-gray-500 dark:text-dark-body rounded-full text-xs font-bold transition-all duration-200 flex items-center justify-center cursor-pointer"
-          >
-            Cancelar
-          </button>
-        </div>
-      )
-    }
-
-    if (delivery.status === "sent" || delivery.status === "pickup_available") {
-      return (
-        <div className="flex gap-2 w-full mt-4 pt-3 border-t border-brand-border dark:border-dark-border">
-          <button
-            onClick={(e) => handleActionClick(e, "delivered")}
-            className="flex-1 py-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full text-xs font-bold transition-all duration-200 flex items-center justify-center gap-1 cursor-pointer"
-          >
-            Entregue
-          </button>
-          <button
-            onClick={(e) => handleActionClick(e, "delivery_failed")}
-            className="py-1.5 px-3 bg-gray-100 hover:bg-red-50 hover:text-red-600 dark:bg-dark-border dark:hover:bg-red-950/20 text-gray-500 dark:text-dark-body rounded-full text-xs font-bold transition-all duration-200 flex items-center justify-center cursor-pointer"
-            title="Falha na entrega"
-          >
-            Falhou
-          </button>
-        </div>
-      )
-    }
-
-    return null
   }
 
   return (
@@ -153,7 +90,7 @@ export default function DeliveryKanbanCard({
           </div>
         </div>
 
-        {/* Title Row: ID & Order Count */}
+        {/* Title Row: ID & Order Count & Status Badge */}
         <div className="flex items-center gap-2 mb-2 flex-wrap">
           <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">
             {delivery.orderDisplayId}
@@ -163,6 +100,10 @@ export default function DeliveryKanbanCard({
               +{delivery.orderCount - 1} ped.
             </span>
           )}
+          <Badge variant={statusMeta.variant} className="flex items-center gap-1 scale-90 origin-left">
+            {statusIconMap[delivery.status] || <BlockedIcon size={12} />}
+            <span>{statusMeta.label}</span>
+          </Badge>
         </div>
 
         {/* Description / Customer info */}
@@ -210,9 +151,6 @@ export default function DeliveryKanbanCard({
           </div>
         </div>
       </div>
-
-      {/* Card Footer: Quick Actions */}
-      {renderActionButtons()}
     </motion.div>
   )
 }
