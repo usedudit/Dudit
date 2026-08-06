@@ -40,8 +40,9 @@ export function DeliveryRouteMap({
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<any>(null)
   const markersRef = useRef<any[]>([])
+  const readyRef = useRef(false)
   const [ready, setReady] = useState(false)
-  const [mapError, setMapError] = useState<string | null>(null)
+  const [mapError, setMapError] = useState<{ message: string; status: number | null } | null>(null)
 
   const rawToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
   const token = rawToken ? rawToken.replace(/['"]/g, "").trim() : ""
@@ -93,17 +94,35 @@ export function DeliveryRouteMap({
 
         map.on("load", () => {
           if (cancelled) return
+          readyRef.current = true
           setReady(true)
+          console.log("[DeliveryRouteMap] mapa carregado (load) — token:", token.slice(0, 18) + "...")
         })
 
-        // Erro no carregamento do estilo/tiles (ex.: token sem permissão de tiles)
+        let idleLogged = false
+        map.on("idle", () => {
+          if (cancelled || idleLogged) return
+          idleLogged = true
+          console.log("[DeliveryRouteMap] mapa renderizado (primeiro idle) — tiles OK")
+        })
+
+        // Log de TODOS os erros do mapa (estilo/tiles/fontes) — essencial para diagnóstico
         map.on("error", (e: any) => {
-          if (cancelled || ready) return
-          setMapError((prev) => prev || e?.error?.message || e?.message || "Falha ao carregar o mapa.")
+          const err = e?.error || e
+          const status = Number(err?.status ?? err?.code)
+          console.error("[DeliveryRouteMap] erro do mapa:", {
+            status: status || "sem status",
+            url: err?.url ?? err?.message,
+            message: err?.message || "sem mensagem",
+          })
+          if (cancelled) return
+          // Só mostra overlay em falha crítica: antes do load (estilo/token) ou auth 401/403
+          if (readyRef.current && status !== 401 && status !== 403) return
+          setMapError((prev) => prev || { message: err?.message || "Falha ao carregar o mapa.", status: status || null })
         })
       } catch (err) {
         console.error("[DeliveryRouteMap] map init error:", err)
-        if (!cancelled) setMapError("Falha ao carregar o mapa.")
+        if (!cancelled) setMapError({ message: "Falha ao carregar o mapa.", status: null })
       }
     }
 
@@ -111,6 +130,7 @@ export function DeliveryRouteMap({
 
     return () => {
       cancelled = true
+      readyRef.current = false
       if (mapRef.current) {
         mapRef.current.remove()
         mapRef.current = null
@@ -193,17 +213,24 @@ export function DeliveryRouteMap({
     <div className="w-full h-full rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden relative">
       <div ref={mapContainerRef} className="absolute inset-0" />
 
-      {mapError && !ready && (
+      {mapError && (!ready || mapError.status === 401 || mapError.status === 403) && (
         <div className="absolute inset-0 z-10 bg-white/95 dark:bg-dark-surface/95 flex flex-col items-center justify-center gap-2 p-6 text-center">
           <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
             Não foi possível carregar o mapa.
           </p>
           <p className="text-xs text-brand-inactive-text dark:text-dark-body max-w-[320px] leading-relaxed">
-            {mapError}
+            {mapError.message}
           </p>
-          <p className="text-[11px] text-brand-inactive-text dark:text-dark-body">
-            Verifique se o token do Mapbox tem permissão de tiles (tilesets:read).
-          </p>
+          {mapError.status === 401 || mapError.status === 403 ? (
+            <p className="text-[11px] text-brand-inactive-text dark:text-dark-body">
+              Tiles retornando {mapError.status}: confira se o token tem permissão de tiles (tilesets:read) e se a URL
+              restriction (Allowed URLs) do token no console Mapbox não está bloqueando o domínio.
+            </p>
+          ) : (
+            <p className="text-[11px] text-brand-inactive-text dark:text-dark-body">
+              Verifique se o token do Mapbox tem permissão de tiles (tilesets:read).
+            </p>
+          )}
         </div>
       )}
 
