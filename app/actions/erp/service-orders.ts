@@ -349,7 +349,7 @@ export async function createServiceOrderAction(
 }
 
 async function getCustomerSnapshot(admin: any, customerId: string) {
-  const [{ data: customer }, { data: address }] = await Promise.all([
+  const [{ data: customer }, { data: addresses }] = await Promise.all([
     admin
       .from("customers")
       .select("id, name, email, phone, image_url")
@@ -357,14 +357,15 @@ async function getCustomerSnapshot(admin: any, customerId: string) {
       .single(),
     admin
       .from("addresses")
-      .select("zip_code, street, number, complement, neighborhood, city, state")
+      .select("zip_code, street, number, complement, neighborhood, city, state, address_type, is_default")
       .eq("customer_id", customerId)
-      .eq("address_type", "primary")
-      .limit(1)
-      .maybeSingle(),
+      .limit(10),
   ])
 
   if (!customer) return null
+
+  const primary = (addresses || []).find((a: any) => a.address_type === "primary" || a.is_default) || addresses?.[0] || null
+  const billing = (addresses || []).find((a: any) => a.address_type === "billing") || null
 
   return {
     id: customer.id,
@@ -372,13 +373,26 @@ async function getCustomerSnapshot(admin: any, customerId: string) {
     email: customer.email,
     phone: customer.phone,
     image_url: customer.image_url || null,
-    city: address?.city || null,
-    state: address?.state || null,
-    zip_code: address?.zip_code || null,
-    street: address?.street || null,
-    number: address?.number || null,
-    complement: address?.complement || null,
-    neighborhood: address?.neighborhood || null,
+    city: primary?.city || null,
+    state: primary?.state || null,
+    zip_code: primary?.zip_code || null,
+    street: primary?.street || null,
+    number: primary?.number || null,
+    complement: primary?.complement || null,
+    neighborhood: primary?.neighborhood || null,
+    addresses: [primary, billing]
+      .filter(Boolean)
+      .map((a: any) => ({
+        address_type: a.address_type || "primary",
+        is_default: !!a.is_default,
+        zip_code: a.zip_code || null,
+        street: a.street || null,
+        number: a.number || null,
+        complement: a.complement || null,
+        neighborhood: a.neighborhood || null,
+        city: a.city || null,
+        state: a.state || null,
+      })),
   }
 }
 

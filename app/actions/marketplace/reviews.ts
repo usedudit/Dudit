@@ -528,8 +528,8 @@ export async function getPartnerReviews(partnerId: string, storeId?: string | nu
     .from("reviews")
     .select(`
       *,
-      products(name, images, slug, unit),
-      services(name, images, slug, unit)
+      products(name, images, unit),
+      services(name, images, unit)
     `)
     .order("created_at", { ascending: false })
 

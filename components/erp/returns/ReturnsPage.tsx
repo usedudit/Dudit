@@ -1,9 +1,9 @@
 "use client"
 
-import React, { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { AnimatePresence } from "framer-motion"
-import { Badge, Button, IconPlaceholder, Pagination, Tabs, TabsList, TabsTrigger, ThreeDotsLoader, DefaultModal, Checkbox } from "@/components/reusable"
+import { Button, IconPlaceholder, Pagination, Tabs, TabsList, TabsTrigger, ThreeDotsLoader, DefaultModal, Checkbox } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { PlusIcon, ExportFileIcon, ReturnIcon, XIcon } from "@/lib/icons"
@@ -20,7 +20,6 @@ import ReturnGridCard from "./ReturnGridCard"
 import CreateReturnPage from "./CreateReturnPage"
 import ReturnPageControls from "./ReturnPageControls"
 import type { ReturnRequest } from "./types"
-import { formatDate } from "@/lib/utils"
 import { createReturnRequestAction, getReturnRequestsPageAction, processReturnRequestAction } from "@/app/actions/erp/returns"
 import { getReturnResolutionLabel } from "@/lib/returns/types"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
@@ -428,9 +427,9 @@ export default function ReturnsPage({ partnerId, roleId, storeId, planGate }: Re
             partnerId,
             module: "returns",
             format: "xlsx",
-            filters: { 
+            filters: {
                 storeId: selectedStore?.id || null,
-                search: debouncedSearch, 
+                search: debouncedSearch,
                 activeTab,
                 status: filters.status,
                 resolutionType: filters.resolutionType,

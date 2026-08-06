@@ -210,11 +210,29 @@ function normalizeReturnRow(row: any): ReturnRequestListItem & { returnEvents?: 
                 product_id: ei.product_id,
                 variant_id: ei.variant_id || null,
                 quantity: ei.quantity || 1,
-                unit_price: ei.unit_price || 0,
+                unit_price: Number(ei.unit_price || ei.price || 0),
+                product_name: ei.product_name || ei.name || "",
+                sku: ei.sku || "",
             }))
         }
         return undefined
     })()
+
+    const refundRecord = (row.return_refunds && Array.isArray(row.return_refunds) && row.return_refunds.length > 0) ? row.return_refunds[0] : null
+    const storeCreditRecord = (row.store_credits && Array.isArray(row.store_credits) && row.store_credits.length > 0) ? row.store_credits[0] : null
+
+    const resolvedRefundVal = toNumber(row.refund_amount) > 0
+        ? toNumber(row.refund_amount)
+        : (refundRecord && toNumber(refundRecord.amount) > 0 ? toNumber(refundRecord.amount) : 0)
+
+    const resolvedCreditVal = toNumber(row.store_credit_amount) > 0
+        ? toNumber(row.store_credit_amount)
+        : (storeCreditRecord && toNumber(storeCreditRecord.amount) > 0 ? toNumber(storeCreditRecord.amount) : 0)
+
+    const orderPaid = toNumber(row.orders?.amount_paid || row.orders?.paid_amount || row.orders?.total_amount)
+    const resolvedRefundType = refundRecord?.refund_type
+        ? refundRecord.refund_type
+        : (resolvedRefundVal > 0 && orderPaid > 0 && Math.abs(resolvedRefundVal - orderPaid) < 0.01 ? "full" : (resolvedRefundVal > 0 ? "partial" : undefined))
 
     return {
         id: row.id,
@@ -236,9 +254,9 @@ function normalizeReturnRow(row: any): ReturnRequestListItem & { returnEvents?: 
         approvedResolution: row.approved_resolution,
         reason: row.reason,
         status: row.status,
-        refundValue: toNumber(row.refund_amount),
-        refundType: (row.return_refunds && row.return_refunds[0]) ? row.return_refunds[0].refund_type : undefined,
-        storeCreditValue: toNumber(row.store_credit_amount),
+        refundValue: resolvedRefundVal,
+        refundType: resolvedRefundType,
+        storeCreditValue: resolvedCreditVal,
         evidenceImages: (row.return_evidence || []).map((e: any) => e.file_url).filter(Boolean),
         observations: row.customer_details || row.customer_message || row.seller_notes || row.internal_notes || "",
         customerMessage: row.customer_message || row.customer_details || "",
@@ -255,8 +273,8 @@ function normalizeReturnRow(row: any): ReturnRequestListItem & { returnEvents?: 
         paymentProvider: row.orders?.payment_provider || undefined,
         mpPaymentId: row.orders?.mp_payment_id || undefined,
         orderTotal: toNumber(row.orders?.total_amount),
-        orderPaidAmount: toNumber(row.orders?.amount_paid || row.orders?.paid_amount || row.orders?.total_amount),
-        refundPaymentMethod: row.refund_payment_method || ((row.return_refunds && row.return_refunds[0]) ? row.return_refunds[0].payment_method : undefined),
+        orderPaidAmount: orderPaid,
+        refundPaymentMethod: row.refund_payment_method || (refundRecord ? refundRecord.payment_method : undefined),
         exchangeOrderId: row.exchange_order_id || undefined,
         exchangeSubstatus: row.exchange_substatus || undefined,
         exchangeShortfallAmount: toNumber(row.exchange_shortfall_amount),
@@ -371,10 +389,9 @@ export async function getReturnRequestDetailsAction(partnerId: string, requestId
             .from("return_requests")
             .select(`
         *,
-        orders!order_id(order_number, customer_name, total_amount, payment_method, payment_provider, mp_payment_id, situation, delivery_status, delivery_address, buyer_id),
+        orders!order_id(order_number, customer_name, total_amount, amount_paid, paid_amount, payment_method, payment_provider, mp_payment_id, situation, delivery_status, delivery_address, buyer_id),
         return_items!return_items_return_request_id_fkey(*, products!product_id(images, video_thumbnail)),
         return_evidence(*),
-        return_events(*),
         return_refunds(*),
         store_credits(*)
       `)
@@ -408,25 +425,28 @@ export async function getReturnRequestDetailsAction(partnerId: string, requestId
             }
         }
 
-        // Resolve actor names for return_events
-        const events = (data as any)?.return_events || []
-        let eventsWithActorNames = events
-        if (events.length > 0) {
-            const actorIds = Array.from(new Set(events.map((e: any) => e.actor_user_id).filter(Boolean))) as string[]
-            if (actorIds.length > 0) {
-                const { data: profiles } = await supabase
-                    .from("user_profiles")
-                    .select("user_id, full_name")
-                    .in("user_id", actorIds)
-                const nameMap = new Map((profiles || []).map((p: any) => [p.user_id, p.full_name?.trim() || "Usuário"]))
-                eventsWithActorNames = events.map((e: any) => ({
-                    ...e,
-                    actor_name: e.actor_user_id ? nameMap.get(e.actor_user_id) || "Usuário" : "Sistema",
-                }))
-            }
-        }
+        // Fetch events from audit_logs
+        const { data: auditLogsData } = await supabase
+            .from("audit_logs")
+            .select("*")
+            .eq("entity_type", "return_request")
+            .eq("entity_id", requestId)
+            .order("created_at", { ascending: true })
 
-        const normalized = normalizeReturnRow({ ...data, return_events: eventsWithActorNames })
+        const returnEvents = (auditLogsData || []).map((e: any) => ({
+            id: e.id,
+            return_request_id: e.entity_id,
+            previous_status: e.metadata?.from_status || e.old_values?.status || null,
+            new_status: e.metadata?.to_status || e.new_values?.status || null,
+            changed_by: e.actor_user_id || e.user_id || null,
+            actor_name: e.actor_name || "Sistema",
+            notes: (Array.isArray(e.change_lines) && e.change_lines[0]) ? e.change_lines[0] : (e.metadata?.notes || e.metadata?.message || null),
+            metadata: e.metadata || e.new_values || {},
+            event_type: e.action_type || e.action || "updated",
+            created_at: e.created_at,
+        }))
+
+        const normalized = normalizeReturnRow({ ...data, return_events: returnEvents })
         if (buyerDetails) {
             normalized.customerEmail = normalized.customerEmail || buyerDetails.email || undefined
             normalized.customerPhone = normalized.customerPhone || buyerDetails.phone || undefined
@@ -1553,7 +1573,7 @@ export async function fetchReturnOrderBucketAction(partnerId: string) {
             try {
                 const { data: customersData } = await supabase
                     .from("customers")
-                    .select("id, name, email, phone")
+                    .select("id, name, email, phone, image_url, addresses(*)")
                     .in("id", buyerIds)
                     ; (customersData || []).forEach((c: any) => customersMap.set(c.id, c))
             } catch (_) {

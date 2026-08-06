@@ -685,15 +685,6 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                 {/* Customer Info Card */}
                                                 <CustomerCard
                                                     customer={order.customer_snapshot}
-                                                    address={order.customer_snapshot ? {
-                                                        street: order.customer_snapshot.street || order.customer_snapshot.address_street,
-                                                        number: order.customer_snapshot.number || order.customer_snapshot.address_number,
-                                                        complement: order.customer_snapshot.complement || order.customer_snapshot.address_complement,
-                                                        neighborhood: order.customer_snapshot.neighborhood || order.customer_snapshot.address_neighborhood,
-                                                        city: order.customer_snapshot.city || order.customer_snapshot.address_city,
-                                                        state: order.customer_snapshot.state || order.customer_snapshot.address_state || order.customer_snapshot.address_uf || order.customer_snapshot.uf,
-                                                        zipCode: order.customer_snapshot.zip_code || order.customer_snapshot.zipCode || order.customer_snapshot.address_zip_code,
-                                                    } : null}
                                                     showMap={false}
                                                 />
 

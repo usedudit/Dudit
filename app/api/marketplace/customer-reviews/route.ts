@@ -105,8 +105,8 @@ export async function GET(request: NextRequest) {
       service_id,
       partner_id,
       order_id,
-      products(name, images, slug, unit),
-      services(name, images, slug, unit)
+      products(name, images, unit),
+      services(name, images, unit)
     `)
     .eq("partner_id", customer.partner_id)
     .or(orConditions.join(","))

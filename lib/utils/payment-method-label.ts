@@ -38,11 +38,19 @@ export function formatPaymentMethodLabel(
     return typeOrName.charAt(0).toUpperCase() + typeOrName.slice(1)
   }
 
-  // Get the friendly type label
-  const typeLabel = getFriendlyTypeLabel(rawType || rawName)
-
   // Extract the real descriptive name, resolving any previous formatting/parentheses
   let displayName = rawName || rawType
+
+  // Separate a trailing installment suffix (" - 2x") so it doesn't break parenthesis parsing below
+  let installmentSuffix = ""
+  const suffixMatch = displayName.match(/(.*?)\s+-\s*(\d+)x\s*$/i)
+  if (suffixMatch) {
+    displayName = suffixMatch[1].trimEnd()
+    installmentSuffix = ` - ${suffixMatch[2]}x`
+  }
+
+  // Get the friendly type label
+  const typeLabel = getFriendlyTypeLabel(displayName)
 
   const match = displayName.match(/^([^(]+)\(([^)]+)\)$/)
   if (match) {
@@ -98,5 +106,6 @@ export function formatPaymentMethodLabel(
     (typeLower === "cartão de débito" && (nameLower === "debito" || nameLower === "débito" || nameLower === "debit" || nameLower === "debit_card" || nameLower === "debitcard")) ||
     (typeLower === "boleto" && (nameLower === "boleto" || nameLower === "boleto bancário" || nameLower === "boleto bancario"))
 
-  return isSameConcept ? finalType : `${finalType} (${finalName})`
+  const base = isSameConcept ? finalType : `${finalType} (${finalName})`
+  return installmentSuffix ? `${base}${installmentSuffix}` : base
 }

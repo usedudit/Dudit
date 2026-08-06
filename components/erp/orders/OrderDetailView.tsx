@@ -7,7 +7,8 @@ import {
     AlertCircleIcon,
     XIcon,
     ClockIcon,
-    MoneyIcon
+    MoneyIcon,
+    ReturnIcon
 } from "@/lib/icons"
 import {
     Button,
@@ -22,11 +23,11 @@ import {
     TabsTrigger,
     ListItem,
     FormSection,
-    Pagination
+    Pagination,
+    Tooltip
 } from "@/components/reusable"
 import { usePermissions } from "@/lib/permission-context"
 import { useSidebar } from "@/lib/sidebar-context"
-
 import { getOrderDetailsAction, getOrderHistoryAction } from "@/app/actions/erp/orders"
 import { getOrderDeliverySummaryAction } from "@/app/actions/erp/deliveries"
 import { OrderHistoryTab } from "./OrderHistoryTab"
@@ -95,6 +96,43 @@ const formatServiceSchedule = (dateStr: string, timeStr: string) => {
         }
     }
     return `${day}/${month}/${year}${timeFormatted}`;
+};
+
+const formatReturnReasonLabel = (rawReason?: string | null): string => {
+    if (!rawReason) return "Não informado";
+    const r = String(rawReason).trim().toLowerCase();
+
+    const labels: Record<string, string> = {
+        defective: "Defeituoso / Danificado",
+        wrong_item: "Item Errado",
+        wrong_size: "Tamanho Errado / Incompatível",
+        regret: "Desistência / Arrependimento",
+        not_as_described: "Diferente do Anúncio",
+        delayed: "Atraso na Entrega",
+        other: "Outro Motivo",
+        outro: "Outro Motivo",
+        defeito: "Defeituoso / Danificado",
+        item_errado: "Item Errado",
+        "item errado": "Item Errado",
+        "recebi item errado": "Item Errado",
+        arrependimento: "Desistência / Arrependimento",
+        tamanho: "Tamanho Errado / Incompatível",
+    };
+
+    if (labels[r]) return labels[r];
+
+    return r
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
+const formatReturnConditionLabel = (rawCondition?: string | null): string => {
+    if (!rawCondition) return "Não informado";
+    const c = String(rawCondition).trim().toLowerCase();
+    if (c === "sealed" || c === "lacrado") return "Lacrado";
+    if (c === "damaged" || c === "danificado") return "Danificado";
+    if (c === "opened" || c === "aberto") return "Aberto";
+    return c.charAt(0).toUpperCase() + c.slice(1);
 };
 
 const getReturnStatusMeta = (status: string) => {
@@ -868,35 +906,44 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
                                                                                 if (itemReturns.length === 0) return null;
 
-                                                                                return (
-                                                                                    <div className="mt-3 p-3 bg-brand-gray/40 dark:bg-dark-border/20 rounded-xl border border-brand-border/40 dark:border-dark-border/40 space-y-2">
-                                                                                        <h5 className="text-[11px] font-bold text-brand-dark dark:text-dark-heading flex items-center gap-1">
-                                                                                            <span>🔄 Histórico de Devolução / Troca</span>
-                                                                                        </h5>
-                                                                                        <div className="divide-y divide-brand-border/30 dark:divide-dark-border/10">
+                                                                                const tooltipContent = (
+                                                                                    <div className="space-y-2 text-left p-1 min-w-[220px]">
+                                                                                        <div className="flex items-center gap-1.5 font-bold border-b border-brand-border/30 dark:border-dark-border/30 pb-1.5 text-xs text-brand-dark dark:text-dark-heading">
+                                                                                            <ReturnIcon className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
+                                                                                            <span>Histórico de Devolução / Troca</span>
+                                                                                        </div>
+                                                                                        <div className="space-y-2 divide-y divide-brand-border/20 dark:divide-dark-border/20 text-xs">
                                                                                             {itemReturns.map((ret: any, idx: number) => {
                                                                                                 const statusMeta = getReturnStatusMeta(ret.requestStatus);
                                                                                                 return (
-                                                                                                    <div key={idx} className="py-1.5 first:pt-0 last:pb-0 flex flex-wrap items-center justify-between gap-2 text-xs">
-                                                                                                        <div className="flex items-center gap-2">
-                                                                                                            <span className="font-medium text-brand-inactive-text">
-                                                                                                                Qtd: <strong className="text-brand-dark dark:text-dark-heading">{formatQuantityWithUnit(ret.quantity, ret.unit)}</strong>
-                                                                                                            </span>
-                                                                                                            <span className="text-gray-300">&bull;</span>
-                                                                                                            <span className="text-brand-inactive-text">Condição: {ret.condition === "sealed" || ret.condition === "lacrado" ? "Lacrado" : ret.condition === "damaged" || ret.condition === "danificado" ? "Danificado" : "Aberto"}</span>
-                                                                                                            <span className="text-gray-300">&bull;</span>
-                                                                                                            <span className="text-brand-inactive-text">Motivo: {ret.reason || "Não informado"}</span>
-                                                                                                        </div>
-                                                                                                        <div className="flex items-center gap-2">
-                                                                                                            <span className="text-brand-inactive-text font-mono text-[10px] bg-white dark:bg-dark-surface px-1.5 py-0.5 rounded border border-brand-border/50">
+                                                                                                    <div key={idx} className="pt-1.5 first:pt-0 space-y-1">
+                                                                                                        <div className="flex items-center justify-between gap-2">
+                                                                                                            <span className="font-mono text-[10px] bg-white/70 dark:bg-black/30 px-1.5 py-0.5 rounded border border-brand-border/50 dark:border-dark-border">
                                                                                                                 DVL-{ret.requestId.slice(0, 6).toUpperCase()}
                                                                                                             </span>
-                                                                                                            <Badge variant={statusMeta.variant} className="scale-90 whitespace-nowrap">{statusMeta.label}</Badge>
+                                                                                                            <Badge variant={statusMeta.variant} className="scale-90 font-medium">
+                                                                                                                {statusMeta.label}
+                                                                                                            </Badge>
+                                                                                                        </div>
+                                                                                                        <div className="text-[11px] text-brand-inactive-text dark:text-dark-body space-y-0.5">
+                                                                                                            <p><strong>Quantidade:</strong> {formatQuantityWithUnit(ret.quantity, ret.unit || item.products?.unit)}</p>
+                                                                                                            <p><strong>Condição:</strong> {formatReturnConditionLabel(ret.condition)}</p>
+                                                                                                            <p><strong>Motivo:</strong> {formatReturnReasonLabel(ret.reason)}</p>
                                                                                                         </div>
                                                                                                     </div>
                                                                                                 );
                                                                                             })}
                                                                                         </div>
+                                                                                    </div>
+                                                                                );
+
+                                                                                return (
+                                                                                    <div className="mt-1.5">
+                                                                                        <Tooltip text={tooltipContent}>
+                                                                                            <Badge variant="purple" icon={<ReturnIcon className="w-3 h-3" />} className="scale-90 whitespace-nowrap cursor-pointer hover:opacity-90">
+                                                                                                {itemReturns.length > 1 ? `Devolução / Troca (${itemReturns.length})` : "Devolução / Troca"}
+                                                                                            </Badge>
+                                                                                        </Tooltip>
                                                                                     </div>
                                                                                 );
                                                                             })()}
@@ -1364,35 +1411,44 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
                                                                             if (itemReturns.length === 0) return null;
 
-                                                                            return (
-                                                                                <div className="mt-3 p-3 bg-brand-gray/40 dark:bg-dark-border/20 rounded-xl border border-brand-border/40 dark:border-dark-border/40 space-y-2">
-                                                                                    <h5 className="text-[11px] font-bold text-brand-dark dark:text-dark-heading flex items-center gap-1">
-                                                                                        <span>🔄 Histórico de Devolução / Troca</span>
-                                                                                    </h5>
-                                                                                    <div className="divide-y divide-brand-border/30 dark:divide-dark-border/10">
+                                                                            const tooltipContentMobile = (
+                                                                                <div className="space-y-2 text-left p-1 min-w-[220px]">
+                                                                                    <div className="flex items-center gap-1.5 font-bold border-b border-brand-border/30 dark:border-dark-border/30 pb-1.5 text-xs text-brand-dark dark:text-dark-heading">
+                                                                                        <ReturnIcon className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
+                                                                                        <span>Histórico de Devolução / Troca</span>
+                                                                                    </div>
+                                                                                    <div className="space-y-2 divide-y divide-brand-border/20 dark:divide-dark-border/20 text-xs">
                                                                                         {itemReturns.map((ret: any, idx: number) => {
                                                                                             const statusMeta = getReturnStatusMeta(ret.requestStatus);
                                                                                             return (
-                                                                                                <div key={idx} className="py-1.5 first:pt-0 last:pb-0 flex flex-wrap items-center justify-between gap-2 text-xs">
-                                                                                                    <div className="flex items-center gap-2">
-                                                                                                        <span className="font-medium text-brand-inactive-text">
-                                                                                                            Qtd: <strong className="text-brand-dark dark:text-dark-heading">{ret.quantity} un.</strong>
-                                                                                                        </span>
-                                                                                                        <span className="text-gray-300">&bull;</span>
-                                                                                                        <span className="text-brand-inactive-text">Condição: {ret.condition === "sealed" || ret.condition === "lacrado" ? "Lacrado" : ret.condition === "damaged" || ret.condition === "danificado" ? "Danificado" : "Aberto"}</span>
-                                                                                                        <span className="text-gray-300">&bull;</span>
-                                                                                                        <span className="text-brand-inactive-text">Motivo: {ret.reason || "Não informado"}</span>
-                                                                                                    </div>
-                                                                                                    <div className="flex items-center gap-2">
-                                                                                                        <span className="text-brand-inactive-text font-mono text-[10px] bg-white dark:bg-dark-surface px-1.5 py-0.5 rounded border border-brand-border/50">
+                                                                                                <div key={idx} className="pt-1.5 first:pt-0 space-y-1">
+                                                                                                    <div className="flex items-center justify-between gap-2">
+                                                                                                        <span className="font-mono text-[10px] bg-white/70 dark:bg-black/30 px-1.5 py-0.5 rounded border border-brand-border/50 dark:border-dark-border">
                                                                                                             DVL-{ret.requestId.slice(0, 6).toUpperCase()}
                                                                                                         </span>
-                                                                                                        <Badge variant={statusMeta.variant} className="scale-90 whitespace-nowrap">{statusMeta.label}</Badge>
+                                                                                                        <Badge variant={statusMeta.variant} className="scale-90 font-medium">
+                                                                                                            {statusMeta.label}
+                                                                                                        </Badge>
+                                                                                                    </div>
+                                                                                                    <div className="text-[11px] text-brand-inactive-text dark:text-dark-body space-y-0.5">
+                                                                                                        <p><strong>Quantidade:</strong> {formatQuantityWithUnit(ret.quantity, ret.unit || item.products?.unit)}</p>
+                                                                                                        <p><strong>Condição:</strong> {formatReturnConditionLabel(ret.condition)}</p>
+                                                                                                        <p><strong>Motivo:</strong> {formatReturnReasonLabel(ret.reason)}</p>
                                                                                                     </div>
                                                                                                 </div>
                                                                                             );
                                                                                         })}
                                                                                     </div>
+                                                                                </div>
+                                                                            );
+
+                                                                            return (
+                                                                                <div className="mt-1.5">
+                                                                                    <Tooltip text={tooltipContentMobile}>
+                                                                                        <Badge variant="purple" icon={<ReturnIcon className="w-3 h-3" />} className="scale-90 whitespace-nowrap cursor-pointer hover:opacity-90">
+                                                                                            {itemReturns.length > 1 ? `Devolução / Troca (${itemReturns.length})` : "Devolução / Troca"}
+                                                                                        </Badge>
+                                                                                    </Tooltip>
                                                                                 </div>
                                                                             );
                                                                         })()}

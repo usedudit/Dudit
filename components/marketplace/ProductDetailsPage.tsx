@@ -1410,7 +1410,7 @@ export function ProductDetailsPageClient({
                                     <div>
                                         <p className="text-sm text-brand-dark font-medium leading-snug">Retirar no local</p>
                                         {preparationEstimate && (Number(product.availability_value || 0) > 0 || preparationEstimate.readyAt.getTime() > preparationEstimate.now.getTime()) && (
-                                            <p className="text-xs text-orange-500">
+                                            <p className="text-xs text-brand-orange">
                                                 Pronto {getReadyDayLabel(preparationEstimate) === "hoje" ? "hoje" : getReadyDayLabel(preparationEstimate)} entre {preparationEstimate.readyAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} e {preparationEstimate.pickupWindowEnd.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
                                             </p>
                                         )}
@@ -1518,7 +1518,7 @@ export function ProductDetailsPageClient({
                                     <div className="mt-2 min-w-0">
                                         <div className="flex items-center gap-1.5 justify-between">
                                             <span className="font-bold text-brand-dark text-base truncate">
-{partner.store_name}
+                                                {partner.store_name}
                                             </span>
                                             <div className="flex items-center gap-1 shrink-0 px-1.5 py-0.5">
                                                 <StarIcon size={12} className="text-brand-green fill-brand-green" strokeWidth={0} />

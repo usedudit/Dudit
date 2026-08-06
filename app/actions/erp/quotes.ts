@@ -1479,7 +1479,7 @@ export async function convertQuoteToOrderAction(data: {
                     shipping_cost,
                     additional_costs,
                     total,
-                    customers ( id, name, addresses(*) )
+                    customers ( id, name, email, phone, image_url, addresses(*) )
                 `)
                 .eq("id", data.quoteId)
                 .eq("partner_id", data.partnerId)

@@ -8,6 +8,7 @@ import { useSidebar } from "@/lib/sidebar-context"
 import { UnsavedChangesDialog } from "@/components/reusable/UnsavedChangesDialog"
 
 import { FadeIn } from "@/components/animations/FadeIn"
+import { parseAddressString } from "../orders/CreateOrder"
 import { useMediaQuery, usePickerBucket } from "@/components/erp/hooks"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import {
@@ -101,9 +102,7 @@ function toLocalDateInput(value: Date | string | undefined) {
 
 function buildCustomerAddress(address?: string) {
     if (!address) return null
-    return {
-        street: address,
-    }
+    return parseAddressString(address)
 }
 
 function getOrderPreviewImage(order?: OrderPickerItem | null) {

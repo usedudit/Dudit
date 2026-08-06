@@ -1098,7 +1098,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                             {isSaving ? "Salvando..." : "Salvar"}
                         </Button>
                     </div>
-                </Tabs >
+                </Tabs>
 
                 {/* Modals */}
                 {showImageCropper && selectedImageForCrop && (

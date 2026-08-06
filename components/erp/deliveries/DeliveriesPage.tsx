@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
 import { useEntityState } from "@/hooks/use-entity-state"
 import { motion, AnimatePresence } from "framer-motion"
-import { Button, IconPlaceholder, AlertModal, FormDropdown, Input } from "@/components/reusable"
+import { Button, IconPlaceholder, AlertModal, FormDropdown, Input, SkeletonLoader } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import Pagination from "@/components/reusable/Pagination"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
@@ -509,10 +509,32 @@ export default function DeliveriesPage({
             >
                 <div className="space-y-4">
                     {suggestionsLoading ? (
-                        <div className="flex flex-col items-center justify-center py-16 text-center">
-                            <div className="w-8 h-8 border-2 border-brand-primary border-t-transparent rounded-full animate-spin mb-3" />
-                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Calculando rotas e agrupamentos...</p>
-                            <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1">Analisando CEPs e distâncias dos pedidos pendentes.</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {[1, 2, 3, 4].map((i) => (
+                                <div key={i} className="rounded-2xl border border-brand-border dark:border-dark-border p-4 bg-white dark:bg-dark-surface shadow-xs flex flex-col justify-between space-y-3">
+                                    <SkeletonLoader height={84} className="rounded-xl w-full" />
+                                    <div className="flex items-start justify-between gap-2">
+                                        <div className="space-y-2 flex-1 min-w-0">
+                                            <SkeletonLoader height={16} width="65%" className="rounded" />
+                                            <div className="flex gap-1.5 pt-1">
+                                                <SkeletonLoader height={20} width={70} className="rounded-full" />
+                                                <SkeletonLoader height={20} width={50} className="rounded-full" />
+                                            </div>
+                                        </div>
+                                        <SkeletonLoader height={32} width={90} className="rounded-lg shrink-0" />
+                                    </div>
+                                    <div className="space-y-2 border-t border-brand-border/40 dark:border-dark-border/40 pt-2.5">
+                                        <div className="flex justify-between items-center">
+                                            <SkeletonLoader height={14} width="55%" className="rounded" />
+                                            <SkeletonLoader height={14} width={40} className="rounded" />
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <SkeletonLoader height={14} width="65%" className="rounded" />
+                                            <SkeletonLoader height={14} width={40} className="rounded" />
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     ) : suggestions.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -524,9 +546,9 @@ export default function DeliveriesPage({
                             {suggestions.map((sug, idx) => (
                                 <motion.div
                                     key={`${sug.groupKey}-${idx}`}
-                                    initial={{ opacity: 0, y: 12 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ duration: 0.25, delay: idx * 0.05 }}
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    transition={{ duration: 0.2, delay: idx * 0.04 }}
                                     className="rounded-2xl border border-brand-border dark:border-dark-border p-4 bg-white dark:bg-dark-surface shadow-xs flex flex-col justify-between hover:border-brand-primary/40 transition-all duration-200"
                                 >
                                     <div>

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
     DownloadIcon,
     ArrowRightIcon,
@@ -10,7 +10,7 @@ import {
     PinIcon,
     LinkIcon
 } from '@/lib/icons';
-import { Button, ThreeDotsLoader, AlertModal, InfoCard, Badge } from '@/components/reusable';
+import { Button, ThreeDotsLoader, AlertModal, InfoCard, Badge, Input } from '@/components/reusable';
 import { FadeIn } from '@/components/animations/FadeIn';
 import { useNotification } from '@/hooks/use-notification';
 import { useSidebar } from "@/lib/sidebar-context"
@@ -189,7 +189,6 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
                                 <div className="hidden md:flex items-start justify-between">
                                     <div className="flex flex-col gap-1 overflow-hidden min-w-0">
                                         <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
-                                            <span className="truncate">{movementTitle}</span>
                                             <Badge
                                                 variant={isIn ? "green" : "red"}
                                                 className="whitespace-nowrap scale-90 shrink-0"
@@ -231,145 +230,24 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
                                         <TabsTrigger value="attachments">Anexos</TabsTrigger>
                                     </TabsList>
                                 </div>
+                            </div>
+                        </div>
 
-                                {/* Content Body */}
-                                <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
-                                    <AnimatePresence mode="wait">
-                                        <TabsContent value="details" className="mt-0">
-                                            <FadeIn key="details">
-                                                {/* Desktop View */}
-                                                <div className="hidden xl:block">
-                                                    <div className={hasNotes ? "grid grid-cols-12 gap-y-8 gap-x-8 relative" : "space-y-8"}>
-                                                        {/* MAIN COLUMN */}
-                                                        <div className={hasNotes ? "col-span-12 xl:col-span-8 pr-0 xl:pr-12" : ""}>
+                        {/* Content Body */}
+                        <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
+                            <AnimatePresence mode="wait">
+                                <TabsContent value="details" className="mt-0">
+                                    <FadeIn key="details">
+                                        {/* Desktop View */}
+                                        <div className="hidden xl:block">
+                                            <div className={hasNotes ? "grid grid-cols-12 gap-y-8 gap-x-8 relative" : "space-y-8"}>
+                                                {/* MAIN COLUMN */}
+                                                <div className={hasNotes ? "col-span-12 xl:col-span-8 pr-0 xl:pr-12" : ""}>
 
-                                                            {/* Movement Details Card */}
-                                                            <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden mb-8">
-                                                                {/* Top: Info (Gray) */}
-                                                                <div className="bg-brand-gray dark:bg-dark-border/30 p-6 border-b border-brand-border dark:border-dark-border">
-                                                                    <div className="flex justify-between items-center">
-                                                                        <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Resumo da Operação</span>
-                                                                        <div className="flex items-center gap-2">
-                                                                            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">Total de itens:</span>
-                                                                            <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
-                                                                                {displayItems.length} {displayItems.length === 1 ? 'item' : 'itens'}
-                                                                            </span>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-
-                                                                {/* Bottom: Product Items (White) */}
-                                                                <div className="bg-white dark:bg-dark-surface">
-                                                                    {displayItems.map((item, index) => {
-                                                                        const lineIn = item.type === 'in';
-                                                                        return (
-                                                                            <div key={item.id}>
-                                                                                {index > 0 && (
-                                                                                    <div className="h-px bg-brand-border dark:bg-dark-border mx-6" />
-                                                                                )}
-                                                                                <div className="p-6">
-                                                                                    <div className="flex flex-col md:flex-row md:items-center gap-6">
-                                                                                        <div className="flex items-start gap-5 flex-1">
-                                                                                            <div className="w-14 h-14 rounded-full border border-brand-border dark:border-dark-border overflow-hidden shrink-0 bg-brand-gray dark:bg-dark-border/20">
-                                                                                                <img
-                                                                                                    src={getR2ImageUrl(item.product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"}
-                                                                                                    className="w-full h-full object-cover rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border"
-                                                                                                    alt={item.product.name}
-                                                                                                />
-                                                                                            </div>
-
-                                                                                            <div className="flex-1 min-w-0">
-                                                                                                <h4 className="font-bold text-lg text-brand-dark dark:text-dark-heading truncate">{item.product.name}</h4>
-
-                                                                                                <div className="flex items-center gap-2">
-                                                                                                    <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">{item.product.sku}</span>
-                                                                                                    <span className="text-brand-inactive-text dark:text-dark-body">•</span>
-                                                                                                    <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">{item.product.category}</span>
-                                                                                                    <span className="text-brand-inactive-text dark:text-dark-body">•</span>
-                                                                                                    <span className={`text-sm font-bold ${lineIn ? 'text-brand-green' : 'text-brand-red'}`}>
-                                                                                                        {lineIn ? '+' : '-'}{item.quantity}
-                                                                                                    </span>
-                                                                                                </div>
-                                                                                            </div>
-                                                                                        </div>
-
-                                                                                        {/* Desktop Divider */}
-                                                                                        <div className="hidden md:block w-px h-12 bg-brand-border dark:bg-dark-border mx-2"></div>
-                                                                                        {/* Mobile Divider */}
-                                                                                        <div className="md:hidden w-full h-px bg-brand-border dark:bg-dark-border"></div>
-
-                                                                                        <div className="flex items-center justify-between md:justify-start gap-4 md:gap-8 min-w-fit px-2 md:px-0">
-                                                                                            <div className="text-center md:text-left">
-                                                                                                <div className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mb-0.5">Estoque Anterior</div>
-                                                                                                <div className="text-md font-bold text-brand-dark dark:text-dark-heading">{formatQuantityWithUnit(item.product.previousStock, item.product.unit)}</div>
-                                                                                            </div>
-
-                                                                                            <div className="flex items-center justify-center text-brand-inactive-text dark:text-dark-body">
-                                                                                                <ArrowRightIcon size={18} />
-                                                                                            </div>
-
-                                                                                            <div className="text-center md:text-left">
-                                                                                                <div className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mb-0.5">Estoque Pós-Mov.</div>
-                                                                                                <div className={`text-md font-bold ${lineIn ? 'text-brand-green' : 'text-brand-red'}`}>{formatQuantityWithUnit(item.product.currentStock, item.product.unit)}</div>
-                                                                                            </div>
-                                                                                        </div>
-                                                                                    </div>
-                                                                                </div>
-                                                                            </div>
-                                                                        );
-                                                                    })}
-                                                                </div>
-                                                            </div>
-
-                                                            {/* Detalhes da Movimentação - BELOW Resumo da Operação */}
-                                                            <FormSection title="Detalhes da Movimentação" hasSeparator>
-                                                                <div className="grid md:grid-cols-4 gap-4">
-                                                                    <ListItem
-                                                                        icon={PinIcon}
-                                                                        title="Motivo"
-                                                                        description={reason || "-"}
-                                                                        className="px-4 py-3 gap-4"
-                                                                    />
-                                                                    {data.referenceName && (
-                                                                        <ListItem
-                                                                            icon={LinkIcon}
-                                                                            title="Referência"
-                                                                            description={data.referenceName}
-                                                                            className="px-4 py-3 gap-4"
-                                                                        />
-                                                                    )}
-                                                                </div>
-                                                            </FormSection>
-
-                                                        </div >
-
-                                                        {/* RIGHT COLUMN - SIDEBAR (only when notes exist) */}
-                                                        {
-                                                            hasNotes && (
-                                                                <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-l border-brand-border dark:border-dark-border space-y-8">
-                                                                    <div>
-                                                                        <InfoCard
-                                                                            color="orange"
-                                                                            message={
-                                                                                <div className="flex flex-col">
-                                                                                    <span className="text-[12px] font-medium text-brand-inactive-text dark:text-dark-body">Observações</span>
-                                                                                    <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading truncate">{notes}</span>
-                                                                                </div>
-                                                                            }
-                                                                        />
-                                                                    </div>
-                                                                </div>
-                                                            )
-                                                        }
-                                                    </div >
-                                                </div >
-
-                                                {/* Mobile/Tablet View */}
-                                                < div className="xl:hidden space-y-6" >
-                                                    {/* Items Cards for Mobile */}
-                                                    < div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden" >
+                                                    {/* Movement Details Card */}
+                                                    <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden mb-8">
                                                         {/* Top: Info (Gray) */}
-                                                        < div className="bg-brand-gray dark:bg-dark-border/30 p-6 border-b border-brand-border dark:border-dark-border" >
+                                                        <div className="bg-brand-gray dark:bg-dark-border/30 p-6 border-b border-brand-border dark:border-dark-border">
                                                             <div className="flex justify-between items-center">
                                                                 <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Resumo da Operação</span>
                                                                 <div className="flex items-center gap-2">
@@ -379,20 +257,21 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
                                                                     </span>
                                                                 </div>
                                                             </div>
-                                                        </div >
+                                                        </div>
 
-                                                        {
-                                                            displayItems.map((item, index) => {
+                                                        {/* Bottom: Product Items (White) */}
+                                                        <div className="bg-white dark:bg-dark-surface">
+                                                            {displayItems.map((item, index) => {
                                                                 const lineIn = item.type === 'in';
                                                                 return (
                                                                     <div key={item.id}>
                                                                         {index > 0 && (
                                                                             <div className="h-px bg-brand-border dark:bg-dark-border mx-6" />
                                                                         )}
-                                                                        <div className="p-4 md:p-6">
-                                                                            <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
-                                                                                <div className="flex items-start gap-4 md:gap-5 flex-1">
-                                                                                    <div className="w-12 h-12 md:w-14 md:h-14 rounded-full border border-brand-border dark:border-dark-border overflow-hidden shrink-0 bg-brand-gray dark:bg-dark-border/20">
+                                                                        <div className="p-6">
+                                                                            <div className="flex flex-col md:flex-row md:items-center gap-6">
+                                                                                <div className="flex items-start gap-5 flex-1">
+                                                                                    <div className="w-14 h-14 rounded-full border border-brand-border dark:border-dark-border overflow-hidden shrink-0 bg-brand-gray dark:bg-dark-border/20">
                                                                                         <img
                                                                                             src={getR2ImageUrl(item.product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"}
                                                                                             className="w-full h-full object-cover rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border"
@@ -415,17 +294,22 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
                                                                                     </div>
                                                                                 </div>
 
-                                                                                <div className="flex flex-col md:flex-row items-center md:items-center justify-between md:justify-start gap-4 md:gap-8 min-w-fit px-2 md:px-0 w-full">
-                                                                                    <div className="text-center md:text-left flex-1">
+                                                                                {/* Desktop Divider */}
+                                                                                <div className="hidden md:block w-px h-12 bg-brand-border dark:bg-dark-border mx-2"></div>
+                                                                                {/* Mobile Divider */}
+                                                                                <div className="md:hidden w-full h-px bg-brand-border dark:bg-dark-border"></div>
+
+                                                                                <div className="flex items-center justify-between md:justify-start gap-4 md:gap-8 min-w-fit px-2 md:px-0">
+                                                                                    <div className="text-center md:text-left">
                                                                                         <div className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mb-0.5">Estoque Anterior</div>
                                                                                         <div className="text-md font-bold text-brand-dark dark:text-dark-heading">{formatQuantityWithUnit(item.product.previousStock, item.product.unit)}</div>
                                                                                     </div>
 
-                                                                                    <div className="flex items-center justify-center text-brand-inactive-text dark:text-dark-body w-full md:w-auto">
+                                                                                    <div className="flex items-center justify-center text-brand-inactive-text dark:text-dark-body">
                                                                                         <ArrowRightIcon size={18} />
                                                                                     </div>
 
-                                                                                    <div className="text-center md:text-left flex-1">
+                                                                                    <div className="text-center md:text-left">
                                                                                         <div className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mb-0.5">Estoque Pós-Mov.</div>
                                                                                         <div className={`text-md font-bold ${lineIn ? 'text-brand-green' : 'text-brand-red'}`}>{formatQuantityWithUnit(item.product.currentStock, item.product.unit)}</div>
                                                                                     </div>
@@ -434,105 +318,219 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
                                                                         </div>
                                                                     </div>
                                                                 );
-                                                            })
-                                                        }
-                                                    </div >
+                                                            })}
+                                                        </div>
+                                                    </div>
 
                                                     {/* Detalhes da Movimentação - BELOW Resumo da Operação */}
-                                                    < FormSection title="Detalhes da Movimentação" hasSeparator={false} className="mt-0" >
-                                                        <div className="space-y-4">
+                                                    <FormSection title="Detalhes da Movimentação" hasSeparator>
+                                                        <div className="grid md:grid-cols-4 gap-4">
                                                             <ListItem
+                                                                icon={PinIcon}
                                                                 title="Motivo"
-                                                                description={reason || "—"}
-                                                                className="border-0 bg-transparent px-0 hover:bg-transparent"
+                                                                description={reason || "-"}
+                                                                className="px-4 py-3 gap-4"
                                                             />
                                                             {data.referenceName && (
                                                                 <ListItem
+                                                                    icon={LinkIcon}
                                                                     title="Referência"
                                                                     description={data.referenceName}
-                                                                    left={<FileTextIcon size={18} className="text-brand-inactive-text dark:text-dark-body" />}
-                                                                    className="border-0 bg-transparent px-0 hover:bg-transparent"
+                                                                    className="px-4 py-3 gap-4"
                                                                 />
                                                             )}
                                                         </div>
-                                                    </FormSection >
+                                                    </FormSection>
 
-                                                    {/* Notes Mobile */}
-                                                    {
-                                                        notes && (
-                                                            <InfoCard
-                                                                color="orange"
-                                                                message={
-                                                                    <div className="flex flex-col">
-                                                                        <span className="text-[12px] font-medium text-brand-inactive-text dark:text-dark-body">Observações</span>
-                                                                        <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading truncate">{notes}</span>
-                                                                    </div>
-                                                                }
-                                                            />
-                                                        )
-                                                    }
                                                 </div >
-                                            </FadeIn >
-                                        </TabsContent >
 
-                                        {/* Anexos */}
-                                        <TabsContent value="attachments" className="mt-0" >
-                                            <FadeIn key="attachments">
-                                                <GenericAttachmentsTab
-                                                    entityId={movement.id}
-                                                    partnerId={partnerId}
-                                                    entityType="stock_movement"
-                                                    title="Anexos da Movimentação"
-                                                    subtitle="Gerencie comprovantes, fotos ou notas fiscais desta movimentação."
-                                                />
-                                            </FadeIn>
-                                        </TabsContent >
-                                    </AnimatePresence>
-                                </div>
+                                                {/* RIGHT COLUMN - SIDEBAR (only when notes exist) */}
+                                                {
+                                                    hasNotes && (
+                                                        <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-l border-brand-border dark:border-dark-border space-y-8">
+                                                            <div>
+                                                                <InfoCard
+                                                                    color="orange"
+                                                                    message={
+                                                                        <div className="flex flex-col">
+                                                                            <span className="text-[12px] font-medium text-brand-inactive-text dark:text-dark-body">Observações</span>
+                                                                            <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading truncate">{notes}</span>
+                                                                        </div>
+                                                                    }
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    )
+                                                }
+                                            </div >
+                                        </div >
 
-                                {/* Mobile Action Bar */}
-                                < div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3" >
-                                    <Button
-                                        variant="outline"
-                                        className="flex-1 h-12"
-                                        onClick={() => setIsUndoModalOpen(true)}
-                                        leftIcon={<ReloadIcon size={18} />}
-                                    >
-                                        Desfazer
-                                    </Button>
-                                    <Button
-                                        className="flex-1 h-12"
-                                        leftIcon={<DownloadIcon size={18} />}
-                                    >
-                                        PDF
-                                    </Button>
-                                </div >
+                                        {/* Mobile/Tablet View */}
+                                        < div className="xl:hidden space-y-6" >
+                                            {/* Items Cards for Mobile */}
+                                            < div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden" >
+                                                {/* Top: Info (Gray) */}
+                                                < div className="bg-brand-gray dark:bg-dark-border/30 p-6 border-b border-brand-border dark:border-dark-border" >
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Resumo da Operação</span>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">Total de itens:</span>
+                                                            <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
+                                                                {displayItems.length} {displayItems.length === 1 ? 'item' : 'itens'}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div >
 
-                                <AlertModal
-                                    isOpen={isUndoModalOpen}
-                                    onClose={() => setIsUndoModalOpen(false)}
-                                    onConfirm={handleUndo}
-                                    title="Desfazer movimentação?"
-                                    message={
-                                        <div className="flex flex-col gap-4 mt-2 text-left">
-                                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">Esta ação criará uma movimentação inversa para estornar o estoque. Deseja continuar?</p>
-                                            <input
-                                                type="text"
-                                                placeholder="Ex: Erro de preenchimento"
-                                                value={undoReason}
-                                                onChange={(e) => setUndoReason(e.target.value)}
-                                                className="w-full px-3 py-2 border border-brand-border dark:border-dark-border rounded-lg bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/20"
-                                            />
-                                        </div>
-                                    }
-                                    confirmText={isUndoing ? "Desfazendo..." : "Desfazer"}
-                                    variant="warning"
-                                    isLoading={isUndoing}
-                                />
-                            </div >
-                        </div >
-                    </div >
+                                                {
+                                                    displayItems.map((item, index) => {
+                                                        const lineIn = item.type === 'in';
+                                                        return (
+                                                            <div key={item.id}>
+                                                                {index > 0 && (
+                                                                    <div className="h-px bg-brand-border dark:bg-dark-border mx-6" />
+                                                                )}
+                                                                <div className="p-4 md:p-6">
+                                                                    <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
+                                                                        <div className="flex items-start gap-4 md:gap-5 flex-1">
+                                                                            <div className="w-12 h-12 md:w-14 md:h-14 rounded-full border border-brand-border dark:border-dark-border overflow-hidden shrink-0 bg-brand-gray dark:bg-dark-border/20">
+                                                                                <img
+                                                                                    src={getR2ImageUrl(item.product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"}
+                                                                                    className="w-full h-full object-cover rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border"
+                                                                                    alt={item.product.name}
+                                                                                />
+                                                                            </div>
+
+                                                                            <div className="flex-1 min-w-0">
+                                                                                <h4 className="font-bold text-lg text-brand-dark dark:text-dark-heading truncate">{item.product.name}</h4>
+
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">{item.product.sku}</span>
+                                                                                    <span className="text-brand-inactive-text dark:text-dark-body">•</span>
+                                                                                    <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">{item.product.category}</span>
+                                                                                    <span className="text-brand-inactive-text dark:text-dark-body">•</span>
+                                                                                    <span className={`text-sm font-bold ${lineIn ? 'text-brand-green' : 'text-brand-red'}`}>
+                                                                                        {lineIn ? '+' : '-'}{item.quantity}
+                                                                                    </span>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+
+                                                                        <div className="flex flex-col md:flex-row items-center md:items-center justify-between md:justify-start gap-4 md:gap-8 min-w-fit px-2 md:px-0 w-full">
+                                                                            <div className="text-center md:text-left flex-1">
+                                                                                <div className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mb-0.5">Estoque Anterior</div>
+                                                                                <div className="text-md font-bold text-brand-dark dark:text-dark-heading">{formatQuantityWithUnit(item.product.previousStock, item.product.unit)}</div>
+                                                                            </div>
+
+                                                                            <div className="flex items-center justify-center text-brand-inactive-text dark:text-dark-body w-full md:w-auto">
+                                                                                <ArrowRightIcon size={18} />
+                                                                            </div>
+
+                                                                            <div className="text-center md:text-left flex-1">
+                                                                                <div className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mb-0.5">Estoque Pós-Mov.</div>
+                                                                                <div className={`text-md font-bold ${lineIn ? 'text-brand-green' : 'text-brand-red'}`}>{formatQuantityWithUnit(item.product.currentStock, item.product.unit)}</div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })
+                                                }
+                                            </div >
+
+                                            {/* Detalhes da Movimentação - BELOW Resumo da Operação */}
+                                            < FormSection title="Detalhes da Movimentação" hasSeparator={false} className="mt-0" >
+                                                <div className="space-y-4">
+                                                    <ListItem
+                                                        title="Motivo"
+                                                        description={reason || "—"}
+                                                        className="border-0 bg-transparent px-0 hover:bg-transparent"
+                                                    />
+                                                    {data.referenceName && (
+                                                        <ListItem
+                                                            title="Referência"
+                                                            description={data.referenceName}
+                                                            left={<FileTextIcon size={18} className="text-brand-inactive-text dark:text-dark-body" />}
+                                                            className="border-0 bg-transparent px-0 hover:bg-transparent"
+                                                        />
+                                                    )}
+                                                </div>
+                                            </FormSection >
+
+                                            {/* Notes Mobile */}
+                                            {
+                                                notes && (
+                                                    <InfoCard
+                                                        color="orange"
+                                                        message={
+                                                            <div className="flex flex-col">
+                                                                <span className="text-[12px] font-medium text-brand-inactive-text dark:text-dark-body">Observações</span>
+                                                                <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading truncate">{notes}</span>
+                                                            </div>
+                                                        }
+                                                    />
+                                                )
+                                            }
+                                        </div >
+                                    </FadeIn >
+                                </TabsContent >
+
+                                {/* Anexos */}
+                                <TabsContent value="attachments" className="mt-0" >
+                                    <FadeIn key="attachments">
+                                        <GenericAttachmentsTab
+                                            entityId={movement.id}
+                                            partnerId={partnerId}
+                                            entityType="stock_movement"
+                                            title="Anexos da Movimentação"
+                                            subtitle="Gerencie comprovantes, fotos ou notas fiscais desta movimentação."
+                                        />
+                                    </FadeIn>
+                                </TabsContent >
+                            </AnimatePresence>
+                        </div>
+                    </div>
                 </Tabs>
+
+                {/* Mobile Action Bar */}
+                <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3" >
+                    <Button
+                        variant="outline"
+                        className="flex-1 h-12"
+                        onClick={() => setIsUndoModalOpen(true)}
+                        leftIcon={<ReloadIcon size={18} />}
+                    >
+                        Desfazer
+                    </Button>
+                    <Button
+                        className="flex-1 h-12"
+                        leftIcon={<DownloadIcon size={18} />}
+                    >
+                        PDF
+                    </Button>
+                </div >
+
+                <AlertModal
+                    isOpen={isUndoModalOpen}
+                    onClose={() => setIsUndoModalOpen(false)}
+                    onConfirm={handleUndo}
+                    title="Desfazer movimentação?"
+                    message={
+                        <div className="flex flex-col gap-4 mt-2 text-left">
+                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">Esta ação criará uma movimentação inversa para estornar o estoque. Deseja continuar?</p>
+                            <Input
+                                label="Motivo do estorno (opcional)"
+                                placeholder="Ex: Erro de preenchimento"
+                                value={undoReason}
+                                onChange={(e) => setUndoReason(e.target.value)}
+                            />
+                        </div>
+                    }
+                    confirmText={isUndoing ? "Desfazendo..." : "Desfazer"}
+                    variant="warning"
+                    isLoading={isUndoing}
+                />
             </div>
         </FadeIn >
     );

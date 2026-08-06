@@ -1164,6 +1164,8 @@ async function createRefundTransactionForCancelledOrderSafe(params: {
     financeAccountId?: string | null
     createdByUserId?: string | null
     storeId?: string | null
+    paymentBreakdown?: Array<{ method?: string | null; amount?: number; paymentMethodId?: string | null }> | null
+    paymentMethod?: string | null
 }) {
     const paidAmount = Math.max(0, Number(params.paidAmount || 0))
     if (paidAmount <= 0.009) return { success: true as const }
@@ -1234,6 +1236,45 @@ async function createRefundTransactionForCancelledOrderSafe(params: {
     const refundableAmount = Math.max(0, paidAmount - alreadyRefundedAmount)
     if (refundableAmount <= 0.009) return { success: true as const }
 
+    // O reembolso deve respeitar o(s) método(s) de pagamento da venda: uma mov
+    // financeira por método usado (payment_breakdown), cada uma com o método e o
+    // valor do respectivo método. Sem breakdown, usa o método da venda (ou Reembolso).
+    const round2 = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100
+    const breakdownEntries = (Array.isArray(params.paymentBreakdown) ? params.paymentBreakdown : []).filter(
+        (e: any) => Number(e?.amount || 0) > 0.009 && String(e?.method || "").trim(),
+    )
+
+    const refundLegs: Array<{ method: string; amount: number; paymentMethodId?: string | null }> = []
+    if (breakdownEntries.length > 0) {
+        const breakdownTotal = breakdownEntries.reduce((sum: number, e: any) => sum + Math.max(0, Number(e?.amount || 0)), 0)
+        let remaining = refundableAmount
+        for (let i = 0; i < breakdownEntries.length && remaining > 0.009; i += 1) {
+            const entry = breakdownEntries[i]
+            const isLast = i === breakdownEntries.length - 1
+            const share = isLast
+                ? remaining
+                : Math.min(
+                      round2((Math.max(0, Number(entry?.amount || 0)) / breakdownTotal) * refundableAmount),
+                      remaining,
+                  )
+            const legAmount = round2(share)
+            remaining = round2(remaining - legAmount)
+            if (legAmount <= 0.009) continue
+            refundLegs.push({
+                method: String(entry?.method || "").trim(),
+                amount: legAmount,
+                paymentMethodId: entry?.paymentMethodId || null,
+            })
+        }
+    }
+    if (refundLegs.length === 0) {
+        refundLegs.push({
+            method: String(params.paymentMethod || "").trim() || "Reembolso",
+            amount: refundableAmount,
+            paymentMethodId: null,
+        })
+    }
+
     const transactionContactId = await resolveOrCreateTransactionContactByName({
         supabase: params.supabase,
         partnerId: params.partnerId,
@@ -1241,85 +1282,101 @@ async function createRefundTransactionForCancelledOrderSafe(params: {
     })
 
     const paymentDate = new Date().toISOString()
-    const refundPayload = {
-        partner_id: params.partnerId,
-        store_id: params.storeId || null,
-        description: `Reembolso automático da venda ${params.orderNumber}`,
-        category: "Reembolso",
-        customer_id: params.customerId || null,
-        contact_id: transactionContactId,
-        contact_type: "customer",
-        amount: refundableAmount,
-        due_date: null,
-        payment_date: paymentDate,
-        transaction_date: paymentDate,
-        status: "paid",
-        notes: "Gerado automaticamente ao cancelar venda.",
-        payment_type: "Reembolso",
-        original_amount: refundableAmount,
-        interest_amount: null,
-        fee_amount: 0,
-        transaction_type: "refund",
-        origin: "system",
-        refund_kind: "revenue_refund",
-        reference_note: params.orderId,
-        account_id: financeAccountId,
-        created_by_user_id: params.createdByUserId || null,
-        kind: "refund",
-    }
+    let createdCount = 0
 
-    let insertResult = await params.supabase
-        .from("transactions")
-        .insert(refundPayload)
-        .select("id")
-        .maybeSingle()
-
-    if (insertResult.error) {
-        const message = String(insertResult.error.message || "").toLowerCase()
-        if (message.includes("created_by_user_id") && message.includes("transactions")) {
-            const fallbackPayload = { ...refundPayload }
-            delete (fallbackPayload as Record<string, unknown>).created_by_user_id
-            insertResult = await params.supabase
-                .from("transactions")
-                .insert(fallbackPayload)
-                .select("id")
-                .maybeSingle()
+    for (const leg of refundLegs) {
+        const refundPayload = {
+            partner_id: params.partnerId,
+            store_id: params.storeId || null,
+            description: `Reembolso automático da venda ${params.orderNumber}`,
+            category: "Reembolso",
+            customer_id: params.customerId || null,
+            contact_id: transactionContactId,
+            contact_type: "customer",
+            amount: leg.amount,
+            due_date: null,
+            payment_date: paymentDate,
+            transaction_date: paymentDate,
+            status: "paid",
+            notes: "Gerado automaticamente ao cancelar venda.",
+            payment_type: leg.method,
+            original_amount: leg.amount,
+            interest_amount: null,
+            fee_amount: 0,
+            transaction_type: "refund",
+            origin: "system",
+            refund_kind: "revenue_refund",
+            reference_note: params.orderId,
+            account_id: financeAccountId,
+            payment_method_id: leg.paymentMethodId || null,
+            created_by_user_id: params.createdByUserId || null,
+            kind: "refund",
         }
-    }
 
-    if (insertResult.error || !insertResult.data?.id) {
-        console.error("[orders_cancel_refund] failed_to_create_refund", {
-            orderId: params.orderId,
-            orderNumber: params.orderNumber,
-            partnerId: params.partnerId,
-            financeAccountId,
-            paidAmount,
-            alreadyRefundedAmount,
-            refundableAmount,
-            error: insertResult.error,
+        let insertResult = await params.supabase
+            .from("transactions")
+            .insert(refundPayload)
+            .select("id")
+            .maybeSingle()
+
+        if (insertResult.error) {
+            const message = String(insertResult.error.message || "").toLowerCase()
+            const fallbackPayload = { ...refundPayload }
+            let shouldRetry = false
+            if (message.includes("created_by_user_id") && message.includes("transactions")) {
+                delete (fallbackPayload as Record<string, unknown>).created_by_user_id
+                shouldRetry = true
+            }
+            if (message.includes("payment_method_id")) {
+                ;(fallbackPayload as Record<string, unknown>).payment_method_id = null
+                shouldRetry = true
+            }
+            if (shouldRetry) {
+                insertResult = await params.supabase
+                    .from("transactions")
+                    .insert(fallbackPayload)
+                    .select("id")
+                    .maybeSingle()
+            }
+        }
+
+        if (insertResult.error || !insertResult.data?.id) {
+            console.error("[orders_cancel_refund] failed_to_create_refund", {
+                orderId: params.orderId,
+                orderNumber: params.orderNumber,
+                partnerId: params.partnerId,
+                financeAccountId,
+                paidAmount,
+                alreadyRefundedAmount,
+                refundableAmount,
+                leg,
+                error: insertResult.error,
+            })
+            return { error: insertResult.error?.message || "Não foi possível gerar o reembolso automático." }
+        }
+
+        const { error: balanceError } = await params.supabase.rpc("apply_account_balance_delta", {
+            p_account_id: financeAccountId,
+            p_partner_id: params.partnerId,
+            p_delta: -Math.abs(leg.amount),
         })
-        return { error: insertResult.error?.message || "Não foi possível gerar o reembolso automático." }
+
+        if (balanceError) {
+            console.error("[orders_cancel_refund] failed_to_apply_account_balance_delta", {
+                orderId: params.orderId,
+                orderNumber: params.orderNumber,
+                transactionId: insertResult.data.id,
+                partnerId: params.partnerId,
+                financeAccountId,
+                leg,
+                error: balanceError,
+            })
+        }
+
+        createdCount += 1
     }
 
-    const { error: balanceError } = await params.supabase.rpc("apply_account_balance_delta", {
-        p_account_id: financeAccountId,
-        p_partner_id: params.partnerId,
-        p_delta: -Math.abs(refundableAmount),
-    })
-
-    if (balanceError) {
-        console.error("[orders_cancel_refund] failed_to_apply_account_balance_delta", {
-            orderId: params.orderId,
-            orderNumber: params.orderNumber,
-            transactionId: insertResult.data.id,
-            partnerId: params.partnerId,
-            financeAccountId,
-            refundableAmount,
-            error: balanceError,
-        })
-    }
-
-    return { success: true as const }
+    return { success: true as const, created: createdCount }
 }
 
 function buildReopenStockErrorMessage(items: OrderStockItem[]) {
@@ -1578,17 +1635,15 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     const serverShippingCost = pricingResult.shipping
     const breakdownTotal = sanitizedPaymentBreakdown.reduce((s, e) => s + e.amount, 0)
     const hasBreakdown = sanitizedPaymentBreakdown.length > 0
-    const finalTotal = hasBreakdown ? breakdownTotal : (Number(data.totalAmount) || serverComputedTotal)
-    // Usa o subtotal original do pedido como base do desconto do método,
-    // em vez do serverComputedTotal (que pode incluir brindes/promoções).
-    const discountBase = hasBreakdown ? Math.max(0, Number(data.subtotal || 0) || serverComputedTotal) : Math.max(serverComputedTotal, finalTotal)
-    const paymentMethodExtraAmount = Math.max(0, finalTotal - discountBase)
+
     // Extract individual adjustment totals from payment breakdown for separate columns
     let paymentMethodInterestAmount = 0
     let paymentMethodFeeAmount = 0
     let paymentMethodFixedFeeAmount = 0
     let breakdownPaymentMethodDiscountAmount = 0
     let paymentMethodStoreCreditAmount = 0
+    let customerExtraFees = 0
+
     for (const entry of sanitizedPaymentBreakdown) {
         const m = String(entry.method || "").toLowerCase().trim()
         const bearer = String(entry.feeBearer || "merchant").toLowerCase().trim()
@@ -1599,24 +1654,26 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
             paymentMethodInterestAmount = Math.max(0, paymentMethodInterestAmount + Number(entry.interestAmount || 0))
             paymentMethodFeeAmount = Math.max(0, paymentMethodFeeAmount + Number(entry.feeAmount || 0))
             paymentMethodFixedFeeAmount = Math.max(0, paymentMethodFixedFeeAmount + Number(entry.fixedFeeAmount || 0))
-            if (adjType === "discount" || adjType === "" || adjType === "none") {
+            if (adjType === "discount") {
                 breakdownPaymentMethodDiscountAmount = Math.max(0, breakdownPaymentMethodDiscountAmount + Number(entry.paymentMethodDiscountAmount || 0))
             }
+        } else {
+            customerExtraFees = Math.max(0, customerExtraFees + Number(entry.interestAmount || 0) + Number(entry.feeAmount || 0) + Number(entry.fixedFeeAmount || 0))
         }
         if (m === "store_credit" || m === "store-credit" || m.includes("vale-compra") || m.includes("vale_compra") || m.includes("crédito")) {
             paymentMethodStoreCreditAmount = Math.max(0, paymentMethodStoreCreditAmount + Number(entry.amount || entry.effectiveAmount || 0))
         }
     }
-    const paymentMethodDiscountAmount = breakdownPaymentMethodDiscountAmount > 0
-        ? breakdownPaymentMethodDiscountAmount
-        : Math.max(0, discountBase - finalTotal)
-    let serverTotalAmount = finalTotal
+
+    const paymentMethodDiscountAmount = breakdownPaymentMethodDiscountAmount
+    const paymentMethodExtraAmount = customerExtraFees
+    const serverTotalAmount = Math.max(0, serverComputedTotal - paymentMethodDiscountAmount + paymentMethodExtraAmount)
     const adjustedPaymentBreakdown = sanitizedPaymentBreakdown
     const paymentMethodSummary = buildPaymentMethodSummary(adjustedPaymentBreakdown, data.paymentMethod)
     const paymentState = resolvePaymentState({
         requestedStatus: data.paymentStatus,
         totalAmount: serverTotalAmount,
-        paidAmount: data.paidAmount,
+        paidAmount: hasBreakdown && breakdownTotal > 0 ? breakdownTotal : data.paidAmount,
         fallbackPaidAmount:
             data.paymentStatus === "paid"
                 ? serverTotalAmount
@@ -2336,7 +2393,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             store_id,
             delivery_address,
             inventory_deducted,
-            created_by,
+            exchange_return_request_id,
             order_items(product_id, variant_id, product_name, quantity, product_price)
         `)
         .eq("id", orderId)
@@ -2344,6 +2401,10 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         .single()
 
     if (currentOrderError || !currentOrder) return { error: currentOrderError?.message || "Pedido não encontrado" }
+
+    if (currentOrder.exchange_return_request_id && Number(data.totalAmount || 0) < (Number(currentOrder.paid_amount || 0) - 0.009)) {
+        return { error: `O total do pedido (R$ ${Number(data.totalAmount || 0).toFixed(2)}) não pode ser menor que o crédito de troca aplicado (R$ ${Number(currentOrder.paid_amount || 0).toFixed(2)}).` }
+    }
 
     // Enforce role-based and status-based editing locks
     const isPaidOrder = currentOrder.situation === 'paid' || currentOrder.situation === 'partially_paid'
@@ -3260,6 +3321,8 @@ export async function updateOrdersStatusInBatchAction(payload: {
                             financeAccountId: order.finance_account_id || null,
                             createdByUserId: user.id,
                             storeId: order.store_id || null,
+                            paymentBreakdown: Array.isArray(order.payment_breakdown) ? order.payment_breakdown : null,
+                            paymentMethod: order.payment_method || null,
                         })
 
                         if ("error" in refundResult) {
@@ -4125,15 +4188,20 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
 
         const breakdownTotal = (payload.paymentBreakdown || []).reduce((s, e) => s + Number(e.amount || 0), 0)
         const hasBreakdown = (payload.paymentBreakdown || []).length > 0
-        const finalTotal = hasBreakdown ? breakdownTotal : orderPrice
-        const paymentMethodDiscountAmount = Math.max(0, orderPrice - finalTotal)
-        const paymentMethodExtraAmount = Math.max(0, finalTotal - orderPrice)
-        const totalAmountToSave = finalTotal
+        let breakdownDiscount = 0
+        for (const entry of (payload.paymentBreakdown || [])) {
+            if ((entry as any).adjustmentType === "discount") {
+                breakdownDiscount += Number((entry as any).paymentMethodDiscountAmount || 0)
+            }
+        }
+        const paymentMethodDiscountAmount = breakdownDiscount
+        const paymentMethodExtraAmount = 0
+        const totalAmountToSave = Math.max(0, orderPrice - paymentMethodDiscountAmount)
 
         const paymentState = resolvePaymentState({
             requestedStatus: payload.paymentStatus,
             totalAmount: totalAmountToSave,
-            paidAmount: payload.paidAmount,
+            paidAmount: hasBreakdown && breakdownTotal > 0 ? breakdownTotal : payload.paidAmount,
             fallbackPaidAmount: Number(order.paid_amount || 0),
         })
 

@@ -10,6 +10,39 @@
 ALTER TABLE public.return_requests ADD COLUMN IF NOT EXISTS exchange_balance_resolution TEXT NULL;
 ALTER TABLE public.return_requests ADD COLUMN IF NOT EXISTS refund_payment_method TEXT NULL;
 
+ALTER TABLE public.return_requests DROP CONSTRAINT IF EXISTS return_requests_exchange_substatus_check;
+ALTER TABLE public.return_requests ADD CONSTRAINT return_requests_exchange_substatus_check CHECK (
+  exchange_substatus IS NULL OR exchange_substatus IN (
+    'aguardando_envio',
+    'enviado',
+    'entregue',
+    'pending',
+    'reserved',
+    'sent',
+    'completed',
+    'reservado',
+    'concluido'
+  )
+);
+
+ALTER TABLE public.return_events DROP CONSTRAINT IF EXISTS return_events_source_check;
+ALTER TABLE public.return_events ADD CONSTRAINT return_events_source_check CHECK (source IN ('user', 'system', 'gateway', 'moderation', 'erp', 'marketplace'));
+
+UPDATE public.stock_movements
+SET reference_name = 'Devolução DVL-' || UPPER(SUBSTRING(source_return_request_id::TEXT FROM 1 FOR 6))
+WHERE source_return_request_id IS NOT NULL
+  AND (reference_name IS NULL OR reference_name = '');
+
+UPDATE public.transactions
+SET category = 'Trocas e Devoluções'
+WHERE reference_note LIKE 'return:%'
+   OR category IN ('Reembolso', 'Crédito em Loja', 'Store Credit Liability', 'Crédito em loja');
+
+UPDATE public.transactions
+SET payment_type = 'store_credit'
+WHERE reference_note LIKE 'return:%:credit'
+  AND (payment_type IS NULL OR payment_type = '');
+
 DROP FUNCTION IF EXISTS public.create_return_request(UUID, UUID, UUID, TEXT, TEXT, TEXT, TEXT, JSONB, JSONB, TEXT, TIMESTAMPTZ, TEXT, UUID, TEXT, UUID, UUID);
 DROP FUNCTION IF EXISTS public.create_return_request(UUID, UUID, UUID, TEXT, TEXT, TEXT, TEXT, JSONB, JSONB, TEXT, TIMESTAMPTZ, TEXT, UUID, TEXT, UUID);
 
@@ -201,7 +234,13 @@ BEGIN
     END IF;
 
     v_return_net := ROUND(((v_line_net / GREATEST(1, v_order_item.quantity)) * v_qty)::NUMERIC, 2);
-    v_sku := NULLIF(TRIM(COALESCE(v_item->>'sku', v_order_item.sku, '')), '');
+
+    v_sku := NULLIF(TRIM(COALESCE(
+      v_item->>'sku',
+      (SELECT sku FROM public.product_variants WHERE id = v_order_item.variant_id),
+      (SELECT sku FROM public.products WHERE id = v_order_item.product_id),
+      ''
+    )), '');
 
     INSERT INTO public.return_items (
       return_request_id, order_item_id, product_id, variant_id,
@@ -246,7 +285,9 @@ BEGIN
     return_request_id, partner_id, store_id, actor_user_id, event_type, from_status, to_status, message, source, idempotency_key
   ) VALUES (
     v_request_id, p_partner_id, v_store_id, p_created_by, 'created', NULL, 'PENDING_REVIEW',
-    'Solicitação criada', COALESCE(NULLIF(p_source, ''), 'erp'), p_idempotency_key
+    'Solicitação criada',
+    CASE WHEN LOWER(COALESCE(p_source, '')) IN ('user', 'system', 'gateway', 'moderation', 'erp', 'marketplace') THEN LOWER(p_source) ELSE 'user' END,
+    p_idempotency_key
   );
 
   RETURN jsonb_build_object('id', v_request_id, 'idempotent', false);
@@ -417,6 +458,7 @@ BEGIN
         SET source_return_request_id = p_request_id,
             store_id = v_store_id,
             reason = 'RETURN_IN',
+            reference_name = 'Devolução DVL-' || UPPER(SUBSTRING(p_request_id::TEXT FROM 1 FOR 6)),
             notes = 'Devolução DVL-' || UPPER(SUBSTRING(p_request_id::TEXT FROM 1 FOR 6))
         WHERE id = v_stock_movement_id;
       END IF;
@@ -480,15 +522,20 @@ BEGIN
         0,
         delivery_type,
         delivery_address,
-        CASE WHEN v_exchange_difference > 0 THEN NULL ELSE 'exchange' END,
-        payment_provider,
-        CASE WHEN v_exchange_difference > 0 THEN 'partially_paid' ELSE 'paid' END,
+        'exchange',
+        NULL,
+        CASE WHEN v_exchange_difference > 0 THEN 'pending' ELSE 'paid' END,
         'not_sent',
         'Troca',
         'Pedido gerado pela troca DVL-' || UPPER(SUBSTRING(p_request_id::TEXT FROM 1 FOR 6)),
         id,
         p_request_id,
-        jsonb_build_array(jsonb_build_object('method', 'exchange', 'amount', v_exchange_total - v_exchange_difference)),
+        jsonb_build_array(jsonb_build_object(
+          'method', 'exchange',
+          'label', 'Crédito de Troca (DVL-' || UPPER(SUBSTRING(p_request_id::TEXT FROM 1 FOR 6)) || ')',
+          'amount', v_exchange_total - v_exchange_difference,
+          'return_request_id', p_request_id
+        )),
         TRUE,
         NOW(),
         NOW()
@@ -560,7 +607,7 @@ BEGIN
       ) VALUES (
         v_request.partner_id,
         'Reembolso ' || COALESCE(v_request.order_number_snapshot, v_request.order_id::TEXT),
-        'Reembolso',
+        'Trocas e Devoluções',
         ABS(v_effective_refund_amount),
         NULL,
         NOW(),
@@ -658,6 +705,7 @@ BEGIN
         payment_date,
         status,
         notes,
+        payment_type,
         transaction_type,
         customer_id,
         contact_type,
@@ -668,12 +716,13 @@ BEGIN
       ) VALUES (
         v_request.partner_id,
         'Crédito em Loja ' || COALESCE(v_request.order_number_snapshot, v_request.order_id::TEXT),
-        'Crédito em Loja',
+        'Trocas e Devoluções',
         ABS(v_effective_credit_amount),
         NULL,
         NOW(),
         'paid',
         'Crédito concedido na devolução',
+        'store_credit',
         'expense',
         v_request.customer_id,
         'customer',
@@ -705,7 +754,7 @@ BEGIN
       exchange_shortfall_amount = CASE WHEN v_exchange_difference > 0 THEN v_exchange_difference ELSE exchange_shortfall_amount END,
       exchange_surplus_amount = CASE WHEN v_exchange_surplus > 0 THEN v_exchange_surplus ELSE exchange_surplus_amount END,
       exchange_items_snapshot = CASE WHEN jsonb_array_length(v_exchange_items) > 0 THEN v_exchange_items ELSE exchange_items_snapshot END,
-      exchange_substatus = CASE WHEN jsonb_array_length(v_exchange_items) > 0 AND exchange_substatus IS NULL THEN 'pending' ELSE exchange_substatus END,
+      exchange_substatus = CASE WHEN jsonb_array_length(v_exchange_items) > 0 AND exchange_substatus IS NULL THEN 'aguardando_envio' ELSE exchange_substatus END,
       exchange_balance_resolution = COALESCE(NULLIF(p_exchange_balance_resolution, ''), exchange_balance_resolution),
       refund_payment_method = COALESCE(NULLIF(p_refund_payment_method, ''), refund_payment_method),
       seller_notes = COALESCE(NULLIF(LEFT(COALESCE(p_notes, ''), 2000), ''), seller_notes),

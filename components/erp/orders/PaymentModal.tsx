@@ -292,6 +292,8 @@ const PaymentModal = ({
 
     const [effectiveDepositPercent, setEffectiveDepositPercent] = useState<number | undefined>(propsDepositPercentage)
     const [fetchedCustomerCredit, setFetchedCustomerCredit] = useState<number | null>(null);
+    const [useStoreCredit, setUseStoreCredit] = useState(false);
+    const [storeCreditToUse, setStoreCreditToUse] = useState<number>(0);
 
     useEffect(() => {
         if (!isOpen || !customer?.id || !partnerId) {
@@ -545,6 +547,28 @@ const PaymentModal = ({
     const subTotal = cart.reduce((acc: number, item: any) => acc + (item.unitPrice * item.quantity), 0);
     const total = subTotal + shippingFee + otherCosts - discountAmount;
     const chargeTarget = Math.max(0, Number(amountDue ?? total));
+
+    const customerCredit = getCustomerCredit(customer, fetchedCustomerCredit);
+    const effectiveCreditApplied = useStoreCredit
+        ? Math.min(customerCredit, Math.min(chargeTarget, Math.max(0, Number(storeCreditToUse || 0))))
+        : 0;
+    const netChargeTarget = Math.max(0, chargeTarget - effectiveCreditApplied);
+
+    useEffect(() => {
+        if (isOpen && useStoreCredit && customerCredit > 0) {
+            const maxApplicable = Math.min(customerCredit, chargeTarget);
+            setStoreCreditToUse((prev) => (prev <= 0 || prev > maxApplicable ? maxApplicable : prev));
+        } else if (!isOpen || !useStoreCredit) {
+            setStoreCreditToUse(0);
+        }
+    }, [isOpen, useStoreCredit, customerCredit, chargeTarget]);
+
+    useEffect(() => {
+        if (!isOpen) {
+            setUseStoreCredit(false);
+            setStoreCreditToUse(0);
+        }
+    }, [isOpen]);
     const itemCount = cart.reduce((acc: number, item: any) => acc + item.quantity, 0);
     const resetSelectedMethodPricing = (options?: { clearType?: boolean; resetInstallments?: boolean }) => {
         setSelectedMethodId(null);
@@ -586,12 +610,8 @@ const PaymentModal = ({
     const availableMethodTypes = useMemo(() => {
         const types = new Set(activeMethods.map((m: PartnerPaymentMethod) => normalizeMethodType(m.type)));
         types.add("cash"); // Always allow cash
-        const hasCustomer = Boolean(customer && (customer.id || customer.name || customer.email || customer.cpf_cnpj));
-        if (hasCustomer) {
-            types.add("store_credit");
-        }
         return types;
-    }, [activeMethods, customer]);
+    }, [activeMethods]);
 
     // Listen for payment methods updates from settings page (create/update/delete)
     useEffect(() => {
@@ -1071,17 +1091,17 @@ const PaymentModal = ({
                     initialAmt = Number(currentSlot.amount);
                 } else {
                     const otherPaid = payments.reduce((acc, p, idx) => idx !== editingPaymentIndex ? acc + p.amount : acc, 0);
-                    const needed = Math.max(0, chargeTarget - otherPaid);
+                    const needed = Math.max(0, netChargeTarget - otherPaid);
                     initialAmt = needed > 0 ? needed : 0;
                 }
             } else {
-                initialAmt = Math.max(0, chargeTarget);
+                initialAmt = Math.max(0, netChargeTarget);
             }
             setPaymentBaseAmount(initialAmt);
             setCalcBaseAmount(initialAmt);
             userManuallyChangedRef.current = false;
         }
-    }, [view, editingPaymentIndex, chargeTarget, payments]);
+    }, [view, editingPaymentIndex, netChargeTarget, payments]);
 
     // Debounce base amount input typing to recalculate payment method details
     useEffect(() => {
@@ -1117,7 +1137,7 @@ const PaymentModal = ({
         // In split mode, calculate discount/fee based on the leg's amount (calcBaseAmount), not the full total
         const base = editingPaymentIndex !== null
             ? Math.max(0, Number(calcBaseAmount || 0))
-            : chargeTarget;
+            : netChargeTarget;
 
         const currentMethod = selectedMethodId ? activeMethods.find((m: any) => m.id === selectedMethodId) : null;
         const feeBearer = (currentMethod?.fee_bearer || "merchant") as "merchant" | "customer";
@@ -1611,24 +1631,49 @@ const PaymentModal = ({
     };
 
     const buildConfirmPayload = (isUnpaidRegister?: boolean) => {
-        const isUnpaid = isUnpaidRegister || (view !== 'split' && paymentBaseAmount === 0);
-        const splitFinalCharged =
-            view === 'split' && splitPreview && 'success' in splitPreview && splitPreview.success
-                ? splitPreview.finalTotal
-                : null;
+        const hasCreditLeg = useStoreCredit && effectiveCreditApplied > 0.009;
 
-        const rawPaymentBreakdown = view === 'split'
-            ? payments
+        const storeCreditLeg = hasCreditLeg ? [{
+            method: 'store_credit',
+            amount: effectiveCreditApplied,
+            amountReceived: effectiveCreditApplied,
+            adjustmentType: 'none',
+            adjustmentPercent: 0,
+            adjustmentAmount: 0,
+            effectiveAmount: effectiveCreditApplied,
+            netAmount: effectiveCreditApplied,
+            feeBearer: 'merchant',
+            paymentMethodDiscountAmount: 0,
+            interestAmount: 0,
+            feeAmount: 0,
+            fixedFeeAmount: 0,
+            paymentMethodId: null,
+            installmentNumber: 1,
+        }] : [];
+
+        const isCreditOnlyConfirm = view === 'methods' && hasCreditLeg;
+
+        let selectedLegs: any[] = [];
+
+        if (isCreditOnlyConfirm) {
+            selectedLegs = [];
+        } else if (view === 'split') {
+            const splitFinalCharged =
+                splitPreview && 'success' in splitPreview && splitPreview.success
+                    ? splitPreview.finalTotal
+                    : null;
+
+            selectedLegs = payments
                 .filter((payment) => payment.method && payment.amount > 0.009)
                 .map((payment, i) => {
                     const pr = splitPreview && 'success' in splitPreview && splitPreview.success
                         ? splitPreview.rows[i]
-                        : null
-                    const finalAmt = Number(pr?.finalAmount ?? payment.amount ?? 0)
+                        : null;
+                    const finalAmt = Number(pr?.finalAmount ?? payment.amount ?? 0);
                     return {
                         method: payment.method,
                         amount: finalAmt,
-                        amountReceived: isUnpaid ? 0 : Number(pr?.amountReceived ?? payment.amount ?? 0),
+                        amountReceived: isUnpaidRegister ? 0 : Number(pr?.amountReceived ?? payment.amount ?? 0),
                         adjustmentType: pr?.adjustmentType || 'none',
                         adjustmentPercent: Number(pr?.adjustmentPercent || 0),
                         adjustmentAmount: Number(pr?.adjustmentAmount || 0),
@@ -1641,13 +1686,12 @@ const PaymentModal = ({
                         fixedFeeAmount: Number(pr?.fixedFeeAmount || 0),
                         paymentMethodId: payment.paymentMethodId || null,
                         installmentNumber: Math.max(1, Number(payment.installmentNumber || 1)),
-                    }
-                })
-            : [{
+                    };
+                });
+        } else {
+            const isUnpaid = isUnpaidRegister || (netChargeTarget > 0 && paymentBaseAmount === 0);
+            const methodLeg = {
                 method: (() => {
-                    if (view === 'store_credit') {
-                        return 'store_credit';
-                    }
                     if (isMarketplaceOrder && originalPaymentMethod) {
                         return formatPaymentMethodToFullLabel(originalPaymentMethod);
                     }
@@ -1662,12 +1706,7 @@ const PaymentModal = ({
                     const fallbackType = view === 'money' ? 'cash' : (view === 'pix' ? 'pix' : 'card');
                     return getFormattedMethodLabel(fallbackName, fallbackType);
                 })(),
-                amount: (() => {
-                    if (isUnpaid) {
-                        return Number(paymentCalculation?.effectiveAmount ?? chargeTarget ?? 0);
-                    }
-                    return Number(totalPaidCalculated || 0);
-                })(),
+                amount: isUnpaid ? 0 : Number(totalPaidCalculated || 0),
                 amountReceived: isUnpaid ? 0 : (view === 'money'
                     ? (wantsChange ? Math.max(payWithAmount, totalPaidCalculated) : Math.max(paymentBaseAmount, totalPaidCalculated))
                     : Number(paymentCalculation?.amountReceived ?? totalPaidCalculated ?? 0)),
@@ -1683,18 +1722,8 @@ const PaymentModal = ({
                 adjustmentType: paymentCalculation?.adjustmentType || 'none',
                 adjustmentPercent: Number(paymentCalculation?.adjustmentPercent || 0),
                 adjustmentAmount: Number(paymentCalculation?.adjustmentAmount || 0),
-                effectiveAmount: (() => {
-                    if (isUnpaid) {
-                        return Number(paymentCalculation?.effectiveAmount ?? chargeTarget ?? 0);
-                    }
-                    return Number(paymentCalculation?.effectiveAmount ?? totalPaidCalculated ?? 0);
-                })(),
-                netAmount: (() => {
-                    if (isUnpaid) {
-                        return Number(paymentCalculation?.netAmount ?? chargeTarget ?? 0);
-                    }
-                    return Number(paymentCalculation?.netAmount ?? totalPaidCalculated ?? 0);
-                })(),
+                effectiveAmount: isUnpaid ? 0 : Number(paymentCalculation?.effectiveAmount ?? totalPaidCalculated ?? 0),
+                netAmount: isUnpaid ? 0 : Number(paymentCalculation?.netAmount ?? totalPaidCalculated ?? 0),
                 feeBearer: paymentCalculation?.feeBearer || null,
                 paymentMethodDiscountAmount: Number(paymentCalculation?.paymentMethodDiscountAmount || 0),
                 interestAmount: Number(paymentCalculation?.interestAmount || 0),
@@ -1702,28 +1731,39 @@ const PaymentModal = ({
                 fixedFeeAmount: Number(paymentCalculation?.fixedFeeAmount || 0),
                 paymentMethodId: selectedMethodId || null,
                 installmentNumber: Math.max(1, Number(installments || 1)),
-            }];
+            };
 
+            selectedLegs = [methodLeg].filter((l) => l.amount > 0.009 || isUnpaidRegister);
+        }
+
+        const rawPaymentBreakdown = [...storeCreditLeg, ...selectedLegs];
         const newPaymentBreakdown = rawPaymentBreakdown;
 
         const validExistingBreakdown = existingPaidAmount > 0.009 ? (existingPaymentBreakdown || []) : [];
 
         const mergedPaymentBreakdown = [...validExistingBreakdown, ...newPaymentBreakdown]
-            .filter((entry: any) => entry?.method && (Number(entry?.amount || 0) > 0.009 || isUnpaid));
+            .filter((entry: any) => entry?.method && (Number(entry?.amount || 0) > 0.009 || isUnpaidRegister));
 
         const paymentMethod = Array.from(new Set(mergedPaymentBreakdown.map((entry: any) => formatPaymentMethodToFullLabel(entry.method)))).join(', ') || 'Método não definido';
 
+        const splitFinalCharged =
+            view === 'split' && splitPreview && 'success' in splitPreview && splitPreview.success
+                ? splitPreview.finalTotal
+                : null;
+
         const singleRegisterAmount =
-            view !== 'split' ? (isUnpaid ? 0 : totalPaidCalculated) : 0;
+            view !== 'split' ? (isUnpaidRegister ? 0 : (effectiveCreditApplied + (isCreditOnlyConfirm ? 0 : totalPaidCalculated))) : (effectiveCreditApplied + (splitFinalCharged || 0));
 
         const paidToRegister =
-            existingPaidAmount + (splitFinalCharged != null ? splitFinalCharged : singleRegisterAmount);
+            existingPaidAmount + singleRegisterAmount;
+
+        const isUnderpaid = paidToRegister < chargeTarget - 0.005;
 
         return {
             paymentMethod: paymentMethod || 'Método não definido',
             paymentBreakdown: mergedPaymentBreakdown,
             splitPayments: view === 'split' ? payments : [],
-            paymentStatus: isUnpaid ? 'unpaid' : (isUnderpaid ? 'partially_paid' : 'paid'),
+            paymentStatus: isUnpaidRegister ? 'unpaid' : (isUnderpaid ? 'partially_paid' : 'paid'),
             isPendingDelivery,
             paidAmount: paidToRegister
         };
@@ -2104,6 +2144,58 @@ const PaymentModal = ({
                                                             </div>
                                                         </div>
                                                     )}
+                                                    {customerCredit > 0.009 && (
+                                                         <div className="p-4 rounded-2xl border border-green-300 dark:border-green-800/50 bg-green-50/80 dark:bg-green-950/20 shadow-sm transition-all">
+                                                             <div className="flex items-center justify-between gap-3">
+                                                                 <div className="flex items-center gap-3 min-w-0 flex-1">
+                                                                     <Checkbox
+                                                                         id="use-store-credit-checkbox"
+                                                                         checked={useStoreCredit}
+                                                                         onChange={(checked: any) => {
+                                                                             setUseStoreCredit(Boolean(checked));
+                                                                         }}
+                                                                     />
+                                                                     <div className="min-w-0 flex-1">
+                                                                         <span className="font-bold text-sm text-brand-dark dark:text-dark-heading block truncate">
+                                                                             Usar crédito do cliente
+                                                                         </span>
+                                                                         <span className="text-xs text-brand-green font-semibold block mt-0.5">
+                                                                             Saldo disponível: {formatCurrency(customerCredit)}
+                                                                         </span>
+                                                                     </div>
+                                                                 </div>
+                                                                 {useStoreCredit && (
+                                                                     <div className="w-32 shrink-0">
+                                                                         <MoneyInput
+                                                                             value={storeCreditToUse}
+                                                                             onChange={(val: any) => {
+                                                                                 const num = Math.min(customerCredit, Math.min(chargeTarget, Math.max(0, Number(val || 0))));
+                                                                                 setStoreCreditToUse(num);
+                                                                             }}
+                                                                             className="text-right font-bold text-sm h-9"
+                                                                         />
+                                                                     </div>
+                                                                 )}
+                                                             </div>
+                                                             {useStoreCredit && (
+                                                                 <div className="mt-3 pt-2.5 border-t border-green-200 dark:border-green-800/40 flex justify-between items-center text-xs font-semibold text-brand-dark dark:text-dark-heading">
+                                                                     <span>Abatido no crédito: <strong className="text-brand-green">{formatCurrency(effectiveCreditApplied)}</strong></span>
+                                                                     <span>Restante a pagar: <strong className="text-brand-primary">{formatCurrency(netChargeTarget)}</strong></span>
+                                                                 </div>
+                                                             )}
+                                                             {useStoreCredit && netChargeTarget <= 0.009 && (
+                                                                 <div className="mt-3">
+                                                                     <Button
+                                                                         variant="filled"
+                                                                         className="w-full h-11 text-sm font-bold bg-brand-green text-white hover:bg-brand-green/90"
+                                                                         onClick={() => handleStartProcessing()}
+                                                                     >
+                                                                         Confirmar Pagamento com Crédito ({formatCurrency(effectiveCreditApplied)})
+                                                                     </Button>
+                                                                 </div>
+                                                             )}
+                                                         </div>
+                                                     )}
                                                     <div className="grid grid-cols-2 gap-4">
                                                         {availableMethodTypes.has("cash") && (
                                                             <PaymentMethodCard
@@ -2151,14 +2243,6 @@ const PaymentModal = ({
                                                                 label="Outros"
                                                                 disabled={isMarketplaceOrder}
                                                                 onClick={() => openMethodTypeSelection("other")}
-                                                            />
-                                                        )}
-                                                        {availableMethodTypes.has("store_credit") && (
-                                                            <PaymentMethodCard
-                                                                icon={TagIcon}
-                                                                label="Crédito do cliente"
-                                                                disabled={isMarketplaceOrder}
-                                                                onClick={() => openMethodTypeSelection("store_credit")}
                                                             />
                                                         )}
                                                         <PaymentMethodCard

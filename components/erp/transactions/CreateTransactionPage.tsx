@@ -83,11 +83,14 @@ interface CreateTransactionPageProps {
     storeId?: string | null
     categories: CategoryItem[]
     accounts: AccountItem[]
+    paymentMethods?: any[]
     onBack: () => void
     onSuccess?: () => void
     /** When set, the page operates in edit mode with pre-filled data */
     editTransaction?: import("../../../lib/services/transactions.types").ERPTransaction
-    forcedTab?: "Transações" | "A pagar" | "A receber"
+    editRecurringTemplateId?: string
+    editRecurringTemplate?: any
+    forcedTab?: "Transações" | "A pagar" | "A receber" | "Vencidos" | "Cancelados"
 }
 
 type ContactType = "customer" | "supplier" | "service" | "employee" | "partner" | "other"
@@ -148,47 +151,38 @@ const FormCombobox = ({
     onChange,
     options,
     disabled,
-    actionItem,
     placeholder,
+    actionItem,
     error,
     errorMessage,
 }: {
-    label: string
-    value: string | undefined
-    onChange: (val: string) => void
-    options: { label: string; value: string }[]
+    label?: string
+    value?: string
+    onChange: (value?: string) => void
+    options: { value: string; label: string }[]
     disabled?: boolean
-    actionItem?: { label: string; icon?: React.ReactNode; onClick: () => void }
     placeholder?: string
+    actionItem?: { label: string; icon?: React.ReactNode; onClick: () => void }
     error?: boolean
     errorMessage?: string
-}) => (
-    <div className="flex flex-col gap-1.5 w-full">
-        <label className="text-sm font-medium text-brand-dark dark:text-dark-heading">{label}</label>
+}) => {
+    return (
         <Combobox
+            label={label}
             options={options}
             value={value}
             onChange={onChange}
             disabled={disabled}
-            width="w-full"
-            className="w-full"
-            actionItem={actionItem}
             placeholder={placeholder}
+            actionItem={actionItem}
             error={error}
+            errorMessage={errorMessage}
         />
-        {error && errorMessage ? <p className="text-xs text-brand-red">{errorMessage}</p> : null}
-    </div>
-)
+    )
+}
 
-const SidebarCard = ({
-    children,
-    hasTopStrip = true,
-}: {
-    children: React.ReactNode
-    hasTopStrip?: boolean
-}) => (
-    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden">
-        {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />}
+const SidebarCard = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => (
+    <div className={`p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface/50 ${className}`}>
         {children}
     </div>
 )
@@ -198,14 +192,14 @@ export default function CreateTransactionPage({
     storeId: storeIdProp,
     categories,
     accounts,
+    paymentMethods = [],
     onBack,
     onSuccess,
     editTransaction,
     editRecurringTemplateId,
     editRecurringTemplate,
-    paymentMethods = [],
     forcedTab,
-}: CreateTransactionPageProps & { editRecurringTemplateId?: string, editRecurringTemplate?: any, paymentMethods?: any[] }) {
+}: CreateTransactionPageProps) {
     const router = useRouter()
     const debouncedRefresh = useDebouncedRefresh()
     const { success, error } = useNotification()
@@ -221,10 +215,14 @@ export default function CreateTransactionPage({
     /* ── Edit mode computed flags ── */
     const isEditMode = !!editTransaction || !!editRecurringTemplate
     const isRecurringTemplateEdit = !!editRecurringTemplate
+    const isCancelledTx = !!editTransaction && (
+        String(editTransaction.rawStatus || "").toLowerCase().includes("cancel") ||
+        String(editTransaction.status || "").toLowerCase().includes("cancel")
+    )
     const isPaidTransaction = !!editTransaction && String(editTransaction.rawStatus || "").toLowerCase() === "paid"
     const isPendingTransaction = !!editTransaction && String(editTransaction.rawStatus || "").toLowerCase() === "pending"
     const isSystemGatewayOrigin = !!editTransaction && ["system", "gateway"].includes(String(editTransaction.origin || "").toLowerCase())
-    const lockFinancialFields = isPaidTransaction || isSystemGatewayOrigin
+    const lockFinancialFields = isPaidTransaction || isSystemGatewayOrigin || isCancelledTx
     const lockAmountField = lockFinancialFields || (isEditMode && !!editTransaction && isPendingTransaction)
     const isInstallmentTransaction = !!editTransaction?.installmentGroupId
     const isRecurringTransaction = !!editTransaction && !!editTransaction.recurringId
@@ -704,6 +702,7 @@ export default function CreateTransactionPage({
 
     const collectValidationErrors = useCallback((): Set<string> => {
         const e = new Set<string>()
+        if (isCancelledTx) return e
         if (txKind === "transfer") {
             if (!(amount > 0)) e.add("amount")
             if (!fromAccountId) e.add("fromAccountId")
@@ -738,6 +737,7 @@ export default function CreateTransactionPage({
         }
         return e
     }, [
+        isCancelledTx,
         txKind,
         amount,
         fromAccountId,
@@ -846,11 +846,14 @@ export default function CreateTransactionPage({
                 const cp = contactPayload()
                 const patch: Record<string, unknown> = {}
 
-                if (isInstallmentTransaction) {
+                if (isCancelledTx) {
+                    patch.notes = notes || null
+                } else if (isInstallmentTransaction) {
                     patch.notes = notes || null
                     patch.accountId = accountId || null
                     patch.paymentMethodId = paymentMethodId || null
                 } else {
+
                     // Always allow these
                     patch.description = description.trim()
                     patch.notes = notes || null

@@ -4,6 +4,7 @@ import React from "react";
 import { Button } from "./Button";
 import { TrashIcon } from "@/lib/icons";
 import { UserProfileImage } from "@/lib/utils/UserProfileImage";
+import { formatAddressParts } from "@/lib/utils/format-address";
 
 interface CustomerCardProps {
     customer?: {
@@ -44,21 +45,35 @@ interface CustomerCardProps {
 
 /** Normalize an address-like object so that both snake_case DB fields and
  *  camelCase props are accessible under a single canonical shape. */
-const normalizeAddress = (addr: any): { street?: string; number?: string; complement?: string; neighborhood?: string; city?: string; state?: string; country?: string; zipCode?: string } | null => {
+export const normalizeAddress = (addr: any): { street?: string; number?: string; complement?: string; neighborhood?: string; city?: string; state?: string; country?: string; zipCode?: string } | null => {
     if (!addr) return null;
     const normalized = {
-        street: addr.street || addr.address_street || undefined,
-        number: addr.number || addr.address_number || undefined,
-        complement: addr.complement || addr.address_complement || undefined,
+        street: addr.street || addr.address_street || addr.logradouro || undefined,
+        number: addr.number || addr.address_number || addr.numero || undefined,
+        complement: addr.complement || addr.address_complement || addr.complemento || undefined,
         neighborhood: addr.neighborhood || addr.address_neighborhood || addr.bairro || undefined,
-        city: addr.city || addr.address_city || addr.cidade || undefined,
+        city: addr.city || addr.address_city || addr.cidade || addr.localidade || undefined,
         state: addr.state || addr.uf || addr.address_state || addr.address_uf || undefined,
         country: addr.country || addr.address_country || undefined,
-        zipCode: addr.zipCode || addr.zip_code || addr.address_zip_code || addr.cep || undefined,
+        zipCode: addr.zipCode || addr.zip_code || addr.address_zip_code || addr.cep || addr.postal_code || undefined,
     };
     // Only return if there's at least one meaningful field
-    if (normalized.street || normalized.city || normalized.zipCode) return normalized;
+    if (normalized.street || normalized.city || normalized.zipCode || normalized.number || normalized.neighborhood || normalized.complement) return normalized;
     return null;
+};
+
+/** Format a normalized address using the canonical print format, with a trailing CEP line when available. */
+export const formatAddress = (addr: any): string | null => {
+    if (!addr) return null;
+
+    const base = formatAddressParts(addr);
+    const lines = base ? base.split("\n") : [];
+
+    if (addr.zipCode && addr.zipCode.trim()) {
+        lines.push(`CEP ${addr.zipCode.trim()}`);
+    }
+
+    return lines.length > 0 ? lines.join("\n") : null;
 };
 
 const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, billingAddress, showMap = true, className = "", onRemove, chrome = "default" }) => {
@@ -106,7 +121,7 @@ const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, billingA
 
     // 2. Resolve contact info: check multiple possible field names
     const resolvedEmail = customer?.email || (customer as any)?.contact_email || (customer as any)?.buyer_email || "";
-    const resolvedPhone = customer?.phone || (customer as any)?.contact_phone || (customer as any)?.phone_fixed || (customer as any)?.phoneFixed || "";
+    const resolvedPhone = customer?.phone || (customer as any)?.contact_phone || (customer as any)?.phone_fixed || (customer as any)?.phoneFixed || (customer as any)?.whatsapp || (customer as any)?.celular || (customer as any)?.cellphone || (customer as any)?.mobile || (customer as any)?.telefone || "";
 
     // 2b. Resolve customer avatar: check multiple possible field names
     const resolvedImageUrl = (customer as any)?.image_url || (customer as any)?.avatar_url || (customer as any)?.avatar || (customer as any)?.imageUrl || (customer as any)?.photo_url || (customer as any)?.profile_picture || null;
@@ -114,25 +129,9 @@ const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, billingA
     const addressToUse = resolveAddress();
     const resolvedBillingAddress = resolveBillingAddress();
 
-    const hasAddress = !!addressToUse?.street || !!addressToUse?.city || !!addressToUse?.zipCode;
-    const hasBillingAddress = !!resolvedBillingAddress?.street || !!resolvedBillingAddress?.city;
+    const hasAddress = !!addressToUse?.street || !!addressToUse?.number || !!addressToUse?.complement || !!addressToUse?.neighborhood || !!addressToUse?.city || !!addressToUse?.state || !!addressToUse?.zipCode;
+    const hasBillingAddress = !!resolvedBillingAddress?.street || !!resolvedBillingAddress?.number || !!resolvedBillingAddress?.neighborhood || !!resolvedBillingAddress?.city || !!resolvedBillingAddress?.state || !!resolvedBillingAddress?.zipCode;
     const hasContact = !!resolvedEmail || !!resolvedPhone;
-
-    const formatAddress = (addr: any) => {
-        if (!addr) return null;
-
-        const streetLine = addr.street
-            ? `${addr.street}${addr.number ? `, ${addr.number}` : ""} - ${addr.neighborhood || "Bairro não informado"}`
-            : null;
-
-        const cityLine = (addr.city || addr.state || addr.uf)
-            ? `${addr.city || ""}${(addr.state || addr.uf) ? ` - ${addr.state || addr.uf}` : ""}`
-            : null;
-
-        return [streetLine, cityLine]
-            .filter(Boolean)
-            .join("\n");
-    };
 
     const formattedAddress = formatAddress(addressToUse);
     const formattedBillingAddress = formatAddress(resolvedBillingAddress);
@@ -143,7 +142,9 @@ const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, billingA
             : "rounded-2xl border border-brand-border dark:border-dark-border"
 
     const fullAddress = addressToUse
-        ? `${addressToUse.street || ""}, ${addressToUse.number || ""}, ${addressToUse.neighborhood || ""}, ${addressToUse.city || ""} - ${addressToUse.state || ""}, ${addressToUse.zipCode || ""}`
+        ? [addressToUse.street, addressToUse.number, addressToUse.complement, addressToUse.neighborhood, addressToUse.city, addressToUse.state, addressToUse.zipCode]
+            .filter(Boolean)
+            .join(", ")
         : "";
 
     const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`;
@@ -170,7 +171,7 @@ const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, billingA
                             />
                         </div>
                         <div className="min-w-0 flex flex-col justify-center">
-                            <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">{customer?.name || "Consumidor Final"}</h4>
+                            <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">{customer?.name || "Consumidor final"}</h4>
                             {(customer as any)?.id && (
                                 <p className="text-[12px] font-medium text-brand-inactive-text dark:text-dark-body leading-none mt-0.5">
                                     ID #{(customer as any).id.substring(0, 5).toUpperCase()}

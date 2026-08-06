@@ -333,7 +333,7 @@ export default function CreateReturnPage({
                 orderDate: returnRequest.createdAt,
                 status: returnRequest.orderStatus || "paid",
                 deliveryStatus: returnRequest.deliveryStatus || "delivered",
-                totalAmount: returnRequest.refundValue || 0,
+                totalAmount: returnRequest.orderTotal || returnRequest.orderPaidAmount || returnRequest.refundValue || 0,
                 payment_provider: returnRequest.paymentProvider,
                 paymentProvider: returnRequest.paymentProvider,
                 mp_payment_id: returnRequest.mpPaymentId,
@@ -407,8 +407,8 @@ export default function CreateReturnPage({
             setResolutionType((returnRequest.approvedResolution || returnRequest.desiredResolution || "refund") as any)
 
             const isCancellation = returnRequest.requestType === "cancellation" || (returnRequest as any).request_type === "cancellation"
-            const loadedRefundValue = returnRequest.refundValue || (returnRequest.desiredResolution === "refund" ? itemsTotal : 0)
-            const isFullRefund = isCancellation || (loadedRefundValue > 0 && returnRequest.orderPaidAmount && Math.abs(loadedRefundValue - returnRequest.orderPaidAmount) < 0.01)
+            const loadedRefundValue = returnRequest.refundValue || (rawReturnRequestData?.return_refunds && rawReturnRequestData.return_refunds[0]?.amount ? Number(rawReturnRequestData.return_refunds[0].amount) : 0) || (returnRequest.desiredResolution === "refund" || returnRequest.approvedResolution === "refund" ? itemsTotal : 0)
+            const isFullRefund = isCancellation || returnRequest.refundType === "full" || (loadedRefundValue > 0 && returnRequest.orderPaidAmount && Math.abs(loadedRefundValue - returnRequest.orderPaidAmount) < 0.01)
 
             setRefundType(isCancellation ? "full" : (returnRequest.refundType || (isFullRefund ? "full" : (returnRequest.desiredResolution === "store_credit" ? "store_credit" : returnRequest.desiredResolution === "refund" ? "partial" : "none"))))
             setRefundValue(isCancellation ? (returnRequest.orderPaidAmount || loadedRefundValue) : loadedRefundValue)
@@ -504,7 +504,9 @@ export default function CreateReturnPage({
         if (!selectedOrder) return null
 
         // If order has buyer customer address
-        const customerAddr = selectedOrder.customer?.addresses?.[0]
+        const customerAddr =
+            selectedOrder.customer?.addresses?.find((a: any) => a.address_type === "primary" || a.is_default) ||
+            selectedOrder.customer?.addresses?.[0]
         if (customerAddr) {
             return {
                 street: customerAddr.street || "",
@@ -1361,7 +1363,6 @@ export default function CreateReturnPage({
                                                 <FormSection hasSeparator title="Resolução da devolução">
                                                     {isViewOnly ? (
                                                         <div className="space-y-1">
-                                                            <PaymentRow label="Data" value={formatDateTime(returnDate)} />
                                                             <PaymentRow
                                                                 label="Status da solicitação"
                                                                 value={
@@ -1370,6 +1371,7 @@ export default function CreateReturnPage({
                                                                     </Badge>
                                                                 }
                                                             />
+                                                            <PaymentRow label="Data" value={formatDateTime(returnDate)} />
                                                             <PaymentRow
                                                                 label="Tipo de resolução"
                                                                 value={
@@ -1460,18 +1462,19 @@ export default function CreateReturnPage({
                                                                     />
                                                                     <PaymentRow label="Total dos substitutos" value={formatCurrency(replacementTotal)} />
                                                                     <PaymentRow label="Crédito disponível" value={formatCurrency(calculatedRefundValue)} />
-                                                                    <PaymentRow
-                                                                        label={exchangeDifference > 0 ? "Diferença a cobrar" : "Saldo restante"}
-                                                                        value={formatCurrency(exchangeDifference > 0 ? exchangeDifference : exchangeSurplus)}
-                                                                    />
-                                                                    {exchangeSurplus > 0 && (
-                                                                        <PaymentRow
-                                                                            label="Destino do saldo"
-                                                                            value={
-                                                                                exchangeBalanceResolution === "store_credit" ? "Gerar vale-compra" : "Gerar reembolso"
-                                                                            }
-                                                                        />
-                                                                    )}
+                                                                    {exchangeDifference > 0.009 ? (
+                                                                        <PaymentRow label="Diferença a cobrar" value={formatCurrency(exchangeDifference)} />
+                                                                    ) : exchangeSurplus > 0.009 ? (
+                                                                        <>
+                                                                            <PaymentRow label="Saldo restante" value={formatCurrency(exchangeSurplus)} />
+                                                                            <PaymentRow
+                                                                                label="Destino do saldo"
+                                                                                value={
+                                                                                    exchangeBalanceResolution === "store_credit" ? "Gerar vale-compra" : "Gerar reembolso"
+                                                                                }
+                                                                            />
+                                                                        </>
+                                                                    ) : null}
                                                                 </>
                                                             )}
 
@@ -1503,7 +1506,7 @@ export default function CreateReturnPage({
                                                                 setValue={(val) => setReturnStatus(val as ReturnRequest["status"])}
                                                                 options={[
                                                                     { value: "PENDING_REVIEW", label: "Pendente" },
-                                                                    { value: "UNDER_ANALYSIS", label: "Em analise" },
+                                                                    { value: "UNDER_ANALYSIS", label: "Em análise" },
                                                                     { value: "WAITING_CUSTOMER", label: "Aguardando cliente" },
                                                                     { value: "APPROVED", label: "Aprovada" },
                                                                     { value: "REJECTED", label: "Recusada" },
@@ -2035,8 +2038,7 @@ export default function CreateReturnPage({
                         </Button>
                         <Button
                             onClick={() => completeSave([])}
-                            variant="outline"
-                            className="text-brand-red hover:bg-brand-red-light hover:border-brand-red"
+                            variant="outlinered"
                             disabled={isSaving}
                         >
                             Não retornar nenhum

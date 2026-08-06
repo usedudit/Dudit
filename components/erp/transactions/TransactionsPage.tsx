@@ -2,7 +2,8 @@
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Button, Checkbox, IconPlaceholder, Badge, FormDropdown, MoneyInput, ThreeDotsLoader, InfoCard, FormSection, ActionsDropdown, DropdownItem, SavingStatusModal } from "@/components/reusable"
+import { Button, Checkbox, IconPlaceholder, Badge, FormDropdown, MoneyInput, ThreeDotsLoader, InfoCard, FormSection, ActionsDropdown, DropdownItem, SavingStatusModal, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
+import { KPICard } from "@/components/erp/dashboard/cards/KPICard"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
@@ -21,12 +22,14 @@ import InstallmentParcelsTable, { type InstallmentParcelRow } from "./Installmen
 import type { ERPTransaction, FinancialTransactionCursor, TransactionTab } from "@/lib/services/transactions.types"
 import type { RecurringOccurrence } from "@/app/actions/erp/recurring-transactions"
 import { markRecurringOccurrenceAsPaidAction, recordRegularTransactionPaymentAction } from "@/app/actions/erp/transactions"
-import { getInstallmentGroupDetailsAction } from "@/app/actions/erp/transactions"
+import { getInstallmentGroupDetailsAction, updateInstallmentGroupNotesAction } from "@/app/actions/erp/transactions"
 import { recordInstallmentPaymentAction } from "@/app/actions/erp/transactions"
 import { settleInstallmentGroupAction } from "@/app/actions/erp/transactions"
 import { getFinancialTransactionsAction, getTransactionDetailsAction, type TransactionDetailPayload } from "@/app/actions/erp/transactions"
 import { cancelPendingTransactionAction } from "@/app/actions/erp/transactions"
 import { getPaymentMethodsAction } from "@/app/actions/erp/payment-methods"
+import { GenericAttachmentsTab } from "../shared/GenericAttachmentsTab"
+import { STANDARD_PAYMENT_METHODS } from "@/lib/finance-utils"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { useSidebar } from "@/lib/sidebar-context"
 import { useNotification } from "@/hooks/use-notification"
@@ -76,6 +79,13 @@ function transactionFilterYmd(item: ERPTransaction, tab: TransactionTab): string
     }
     if (item.paymentDateRaw) return ymdFromRaw(item.paymentDateRaw)
     return ymdFromRaw(item.dueDateRaw)
+}
+
+function isCancelledTransaction(item: ERPTransaction): boolean {
+    return (
+        String(item.rawStatus || "").toLowerCase().includes("cancel") ||
+        String(item.status || "").toLowerCase().includes("cancel")
+    )
 }
 
 interface FilterState {
@@ -168,7 +178,7 @@ export default function TransactionsPage({
     const [activeTab, setActiveTabState] = useState<TransactionTab>(forcedTab || "Transações")
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
-    const setActiveTab = forcedTab ? () => { } : setActiveTabState
+    const setActiveTab = setActiveTabState
     const [viewMode, setViewModeState] = useState<"list" | "grid">(isMobile ? "grid" : "list")
     const effectiveViewMode = isTablet ? "grid" : viewMode
     const [page, setPage] = useState(1)
@@ -184,7 +194,7 @@ export default function TransactionsPage({
     const [paymentAmount, setPaymentAmount] = useState("")
     const [interestAmount, setInterestAmount] = useState("0")
     const [discountAmount, setDiscountAmount] = useState("0")
-    const [paymentMethodId, setPaymentMethodId] = useState("")
+    const [paymentMethodId, setPaymentMethodId] = useState("Pix")
     const [fallbackPaymentMethods, setFallbackPaymentMethods] = useState<any[]>([])
     const [confirmRecurringPayment, setConfirmRecurringPayment] = useState<ERPTransaction | null>(null)
     const [confirmSettleGroup, setConfirmSettleGroup] = useState<ERPTransaction | null>(null)
@@ -192,6 +202,9 @@ export default function TransactionsPage({
     const [cancelReason, setCancelReason] = useState("")
     const [cancellingTransaction, setCancellingTransaction] = useState(false)
     const [settlingGroup, setSettlingGroup] = useState(false)
+    const [installmentDetailTab, setInstallmentDetailTab] = useState<"general" | "attachments" | "notes">("general")
+    const [installmentNotesText, setInstallmentNotesText] = useState("")
+    const [savingInstallmentNotes, setSavingInstallmentNotes] = useState(false)
     const { exportData, isExporting, columnSelectionModal, closeColumnSelectionModal, handleColumnConfirm, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport(planSlug)
     const observerTarget = useRef<HTMLDivElement>(null)
 
@@ -464,12 +477,20 @@ export default function TransactionsPage({
                 item.category.toLowerCase().includes(term)
 
             const isPrevisto = item.isRecurringOccurrence || item.status === "Pendente" || item.isOverdue || item.status === "Atrasado" || (item.transactionType !== 'adjustment' && item.transactionType !== 'transfer' && !['recebido', 'pago', 'paid'].includes(item.status.toLowerCase()))
+            const isCancelled = isCancelledTransaction(item)
+            const isOverdueItem = item.isOverdue || item.status.toLowerCase() === "atrasado" || (item.daysUntilDue !== undefined && item.daysUntilDue < 0)
 
             const matchesLedgerByTab =
-                activeTab === "A pagar" ? item.ledgerDirection === "out" :
-                    activeTab === "A receber" ? item.ledgerDirection === "in" :
+                (activeTab === "A pagar" || (activeTab === "Vencidos" && forcedTab === "A pagar")) ? item.ledgerDirection === "out" :
+                    (activeTab === "A receber" || (activeTab === "Vencidos" && forcedTab === "A receber")) ? item.ledgerDirection === "in" :
                         true
-            const matchesTab = activeTab === "Transações" ? (!isPrevisto && !item.isRecurringOccurrence) : isPrevisto
+            const matchesTab = activeTab === "Cancelados"
+                ? isCancelled
+                : activeTab === "Transações"
+                    ? (!isPrevisto && !item.isRecurringOccurrence && !isCancelled)
+                    : activeTab === "Vencidos"
+                        ? (isPrevisto && !isCancelled && isOverdueItem)
+                        : (isPrevisto && !isCancelled)
 
             const matchesStatus = filters.status.length === 0 || filters.status.includes(item.status)
             const matchesCategory = filters.category.length === 0 || filters.category.includes(item.category)
@@ -507,22 +528,13 @@ export default function TransactionsPage({
         }
         const passthrough: ERPTransaction[] = []
         for (const item of result) {
+            if (isCancelledTransaction(item)) {
+                passthrough.push(item)
+                continue
+            }
             if (!item.isRecurringOccurrence && item.installmentGroupId) {
-                const fullStats = fullGroupStats.get(item.installmentGroupId)
-                const totalCount = fullStats?.total || item.installmentTotalCount || 0
-                const paidCount = fullStats?.paid || 0
-                const hasGroupPending = totalCount > 0 && paidCount < totalCount
-                if (activeTab === "Transações" && hasGroupPending) {
-                    continue
-                }
-                if (activeTab === "Transações" && !hasGroupPending && totalCount > 0 && paidCount === totalCount) {
-                    const key = item.installmentGroupId
-                    const pl = paidInstallmentByGroup.get(key) || []
-                    pl.push(item)
-                    paidInstallmentByGroup.set(key, pl)
-                    continue
-                }
-                if (String(item.rawStatus || "").toLowerCase() === "paid") {
+                const isPaid = String(item.rawStatus || "").toLowerCase() === "paid" || item.status.toLowerCase() === "pago" || item.status.toLowerCase() === "recebido"
+                if (isPaid) {
                     passthrough.push(item)
                     continue
                 }
@@ -741,13 +753,29 @@ export default function TransactionsPage({
 
     const tabCounts = useMemo(() => {
         const Transacoes = loadedTransactions.length
-        let pagar = 0, receber = 0
+        let pagar = 0, receber = 0, cancelados = 0, vencidos = 0
         for (const t of loadedTransactions) {
-            if ((t as any).ledgerDirection === "out") pagar++
-            else if ((t as any).ledgerDirection === "in") receber++
+            const isCancelled = isCancelledTransaction(t)
+            if (isCancelled) {
+                cancelados++
+            } else {
+                if ((t as any).ledgerDirection === "out") pagar++
+                else if ((t as any).ledgerDirection === "in") receber++
+
+                const isPaid = String(t.rawStatus || "").toLowerCase() === "paid" || t.status.toLowerCase() === "recebido" || t.status.toLowerCase() === "pago"
+                if (!isPaid && (t.isOverdue || t.status.toLowerCase() === "atrasado" || (t.daysUntilDue !== undefined && t.daysUntilDue < 0))) {
+                    if (forcedTab === "A pagar" && (t as any).ledgerDirection !== "out") {
+                        // skip
+                    } else if (forcedTab === "A receber" && (t as any).ledgerDirection !== "in") {
+                        // skip
+                    } else {
+                        vencidos++
+                    }
+                }
+            }
         }
-        return { "Transações": Transacoes, "A pagar": pagar, "A receber": receber }
-    }, [loadedTransactions])
+        return { "Transações": Math.max(0, Transacoes - cancelados), "A pagar": pagar, "A receber": receber, "Vencidos": vencidos, "Cancelados": cancelados }
+    }, [loadedTransactions, forcedTab])
 
     // ── All transactions (including virtual recurring) for tab values calculation ──────────────
     const allTransactionsForTabValues = useMemo(() => {
@@ -803,8 +831,13 @@ export default function TransactionsPage({
 
         let pagarPending = 0, pagarOverdue = 0, pagarCompleted = 0
         let receberPending = 0, receberOverdue = 0, receberCompleted = 0
+        let canceladosTotal = 0
 
         for (const item of allTransactionsForTabValues) {
+            if (isCancelledTransaction(item)) {
+                canceladosTotal += item.amount
+                continue
+            }
             const status = String(item.rawStatus || "").toLowerCase()
             const isPaid = status === "paid" || item.status.toLowerCase() === "recebido" || item.status.toLowerCase() === "pago"
             const isReceivables = item.ledgerDirection === "in"
@@ -826,11 +859,19 @@ export default function TransactionsPage({
             }
         }
 
+        const vencidosTotal = forcedTab === "A pagar"
+            ? pagarOverdue
+            : forcedTab === "A receber"
+                ? receberOverdue
+                : (pagarOverdue + receberOverdue)
+
         return {
             "A pagar": { pending: pagarPending, overdue: pagarOverdue, completed: pagarCompleted },
             "A receber": { pending: receberPending, overdue: receberOverdue, completed: receberCompleted },
+            "Vencidos": { total: vencidosTotal },
+            "Cancelados": { total: canceladosTotal },
         }
-    }, [allTransactionsForTabValues])
+    }, [allTransactionsForTabValues, forcedTab])
 
     const refreshTransactionsNow = useCallback(async () => {
         // Invalidate cache + list via the entity page pattern (same as Products)
@@ -1382,12 +1423,9 @@ export default function TransactionsPage({
                                         </div>
                                         <FormDropdown
                                             label="Meio de pagamento"
-                                            value={paymentMethodId}
+                                            value={paymentMethodId || "Pix"}
                                             setValue={setPaymentMethodId}
-                                            options={(resolvedPaymentMethods || []).map((pm: any) => ({
-                                                value: pm.id,
-                                                label: pm.name,
-                                            }))}
+                                            options={STANDARD_PAYMENT_METHODS}
                                             placeholder="Selecione"
                                             disabled={lockedPaymentMethod}
                                         />
@@ -1688,17 +1726,14 @@ export default function TransactionsPage({
                                                                         </td>
                                                                         <td className="p-2 border-b border-brand-border dark:border-dark-border" style={{ width: "176px" }}>
                                                                             <FormDropdown
-                                                                                value={values.paymentMethodId}
+                                                                                value={values.paymentMethodId || "Pix"}
                                                                                 setValue={(val: string) => setSettlePaymentsByInstallment((prev) => ({
                                                                                     ...prev,
                                                                                     [row.id]: { ...values, paymentMethodId: val }
                                                                                 }))}
-                                                                                options={(resolvedPaymentMethods || []).map((pm: any) => ({
-                                                                                    value: pm.id,
-                                                                                    label: pm.name,
-                                                                                }))}
+                                                                                options={STANDARD_PAYMENT_METHODS}
                                                                                 placeholder="Selecione"
-                                                                                disabled={!!row.paymentMethodId}
+                                                                                disabled={!!row.paymentMethodId && row.paymentMethodId !== "Pix"}
                                                                             />
                                                                         </td>
                                                                         <td className="p-2 border-b border-brand-border dark:border-dark-border" style={{ width: "112px" }}>
@@ -1798,17 +1833,14 @@ export default function TransactionsPage({
                                                                     />
                                                                     <FormDropdown
                                                                         label="Meio de Pagamento"
-                                                                        value={values.paymentMethodId}
+                                                                        value={values.paymentMethodId || "Pix"}
                                                                         setValue={(val: string) => setSettlePaymentsByInstallment((prev) => ({
                                                                             ...prev,
                                                                             [row.id]: { ...values, paymentMethodId: val }
                                                                         }))}
-                                                                        options={(resolvedPaymentMethods || []).map((pm: any) => ({
-                                                                            value: pm.id,
-                                                                            label: pm.name,
-                                                                        }))}
+                                                                        options={STANDARD_PAYMENT_METHODS}
                                                                         placeholder="Selecione"
-                                                                        disabled={!!row.paymentMethodId}
+                                                                        disabled={!!row.paymentMethodId && row.paymentMethodId !== "Pix"}
                                                                     />
                                                                     <MoneyInput
                                                                         label="Juros"
@@ -1873,6 +1905,7 @@ export default function TransactionsPage({
     }
 
     if (isViewing && entityState.entityType === "installment") {
+        const representativeTxId = installmentDetail?.installments?.[0]?.id || entityState.entityId
         return (
             <FadeIn>
                 <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
@@ -1886,6 +1919,7 @@ export default function TransactionsPage({
                                     <Button variant="filled" onClick={() => {
                                         closeEntity()
                                         setInstallmentDetail(null)
+                                        setInstallmentDetailTab("general")
                                     }}
                                         className="w-10 h-10 p-0 flex items-center justify-center">
                                         <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
@@ -1900,9 +1934,20 @@ export default function TransactionsPage({
                                         </h1>
 
                                         <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
-                                            Resumo completo e lista de parcelas
+                                            Resumo completo e gestão de parcelas
                                         </div>
                                     </div>
+                                </div>
+
+                                {/* Tabs */}
+                                <div className="w-full transition-all duration-500 md:mt-4">
+                                    <Tabs value={installmentDetailTab} onValueChange={(v) => setInstallmentDetailTab(v as any)}>
+                                        <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
+                                            <TabsTrigger value="general">Dados Gerais</TabsTrigger>
+                                            <TabsTrigger value="attachments">Anexos</TabsTrigger>
+                                            <TabsTrigger value="notes">Observações</TabsTrigger>
+                                        </TabsList>
+                                    </Tabs>
                                 </div>
                             </div>
                         </div>
@@ -1910,105 +1955,119 @@ export default function TransactionsPage({
                         {/* Scrollable Content */}
                         <div className="flex-1 overflow-y-auto custom-scrollbar">
                             <div className="max-w-[1300px] mx-auto px-4 md:px-6 py-6">
-                                {/* Cells grid */}
                                 {installmentDetailLoading ? (
                                     <p className="text-sm text-brand-inactive-text">Carregando parcelas...</p>
                                 ) : installmentDetail ? (
-                                    <div className="space-y-4">
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                            {(() => {
-                                                const total = Number(installmentDetail.group?.total_amount || 0)
-                                                const rows = installmentDetail.installments || []
-                                                const paid = rows.reduce((acc: number, row: any) => acc + Number(row.paidAmount || 0), 0)
-                                                const overdue = rows
-                                                    .filter((row: any) => row.status === "overdue")
-                                                    .reduce((acc: number, row: any) => acc + Number(row.remainingAmount || 0), 0)
-                                                const pending = Math.max(0, total - paid)
-                                                const cards = [
-                                                    {
-                                                        label: "Total",
-                                                        value: total,
-                                                        icon: FileIcon,
-                                                        bg: "bg-indigo-50 dark:bg-indigo-950/20",
-                                                        text: "text-indigo-600 dark:text-indigo-400",
-                                                    },
-                                                    {
-                                                        label: "Pago",
-                                                        value: paid,
-                                                        icon: CheckCircleIcon,
-                                                        bg: "bg-emerald-50 dark:bg-emerald-950/20",
-                                                        text: "text-emerald-600 dark:text-emerald-400",
-                                                    },
-                                                    {
-                                                        label: "Restante",
-                                                        value: pending,
-                                                        icon: ClockIcon,
-                                                        bg: "bg-amber-50 dark:bg-amber-950/20",
-                                                        text: "text-amber-600 dark:text-amber-400",
-                                                    },
-                                                    {
-                                                        label: "Vencido",
-                                                        value: overdue,
-                                                        icon: AlertTriangleIcon,
-                                                        bg: "bg-rose-50 dark:bg-rose-950/20",
-                                                        text: "text-rose-600 dark:text-rose-400",
-                                                    },
-                                                ]
-                                                return cards.map((card) => {
-                                                    const Icon = card.icon
-                                                    return (
-                                                        <div key={card.label} className="relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
-                                                            <div className="flex items-center gap-3 mb-6">
-                                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${card.bg} ${card.text} shrink-0`}>
-                                                                    <Icon className="w-5 h-5" />
-                                                                </div>
-                                                                <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading">
-                                                                    {card.label}
-                                                                </span>
-                                                            </div>
-                                                            <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none">
-                                                                {formatCurrency(card.value)}
-                                                            </span>
+                                    <>
+{installmentDetailTab === "general" && (
+                                                    <div className="space-y-4">
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                                            {(() => {
+                                                                const total = Number(installmentDetail.group?.total_amount || 0)
+                                                                const rows = installmentDetail.installments || []
+                                                                const paid = rows.reduce((acc: number, row: any) => acc + Number(row.paidAmount || 0), 0)
+                                                                const overdue = rows
+                                                                    .filter((row: any) => row.status === "overdue")
+                                                                    .reduce((acc: number, row: any) => acc + Number(row.remainingAmount || 0), 0)
+                                                                const pending = Math.max(0, total - paid)
+                                                                return (
+                                                                    <>
+                                                                        <KPICard title="Total" value={formatCurrency(total)} />
+                                                                        <KPICard title="Pago" value={formatCurrency(paid)} />
+                                                                        <KPICard title="Restante" value={formatCurrency(pending)} />
+                                                                        <KPICard title="Vencido" value={formatCurrency(overdue)} />
+                                                                    </>
+                                                                )
+                                                            })()}
                                                         </div>
-                                                    )
-                                                })
-                                            })()}
-                                        </div>
-                                        {/* Table / List Container */}
-                                        <FormSection hasSeparator title="Parcelas">
-                                            <InstallmentParcelsTable
-                                                rows={
-                                                    (installmentDetail.installments || []).map(
-                                                        (row: any): InstallmentParcelRow => ({
-                                                            id: row.id,
-                                                            installmentNumber: row.installmentNumber,
-                                                            totalCount: Number(installmentDetail.group?.installments_count) || 0,
-                                                            status: row.status,
-                                                            originalAmount: Number(row.originalAmount || 0),
-                                                            paidAmount: Number(row.paidAmount || 0),
-                                                            interestAmount: row.interestAmount != null ? Number(row.interestAmount) : undefined,
-                                                            discountAmount: row.discountAmount != null ? Number(row.discountAmount) : undefined,
-                                                            dueDate: row.dueDate ? String(row.dueDate) : null,
-                                                            finalizationDate: row.paymentDate ? String(row.paymentDate) : null,
-                                                            paymentType: row.paymentType ? String(row.paymentType) : null,
-                                                            reason: String(installmentDetail.group?.description || "Parcela"),
-                                                            reference: String(row.description || "-"),
-                                                            remainingAmount: row.remainingAmount !== undefined ? Number(row.remainingAmount) : undefined,
-                                                        }),
-                                                    )
-                                                }
-                                                getActionsSlot={(row) =>
-                                                    row.status === "paid" ? null : (
-                                                        <ActionsDropdown>
-                                                            <DropdownItem onClick={() => void handlePayInstallment(row.id)}>
-                                                                <MoneyIcon className="w-4 h-4" /> Registrar pagamento
-                                                            </DropdownItem>
-                                                        </ActionsDropdown>
-                                                    )
-                                                }
-                                            />
-                                        </FormSection>
-                                    </div>
+                                                {/* Table / List Container */}
+                                                <FormSection hasSeparator title="Parcelas">
+                                                    <InstallmentParcelsTable
+                                                        rows={
+                                                            (installmentDetail.installments || []).map(
+                                                                (row: any): InstallmentParcelRow => ({
+                                                                    id: row.id,
+                                                                    installmentNumber: row.installmentNumber,
+                                                                    totalCount: Number(installmentDetail.group?.installments_count) || 0,
+                                                                    status: row.status,
+                                                                    originalAmount: Number(row.originalAmount || 0),
+                                                                    paidAmount: Number(row.paidAmount || 0),
+                                                                    interestAmount: row.interestAmount != null ? Number(row.interestAmount) : undefined,
+                                                                    discountAmount: row.discountAmount != null ? Number(row.discountAmount) : undefined,
+                                                                    dueDate: row.dueDate ? String(row.dueDate) : null,
+                                                                    finalizationDate: row.paymentDate ? String(row.paymentDate) : null,
+                                                                    paymentType: row.paymentType ? String(row.paymentType) : null,
+                                                                    reason: String(installmentDetail.group?.description || "Parcela"),
+                                                                    reference: String(row.description || "-"),
+                                                                    remainingAmount: row.remainingAmount !== undefined ? Number(row.remainingAmount) : undefined,
+                                                                }),
+                                                            )
+                                                        }
+                                                        getActionsSlot={(row) =>
+                                                            row.status === "paid" ? null : (
+                                                                <ActionsDropdown>
+                                                                    <DropdownItem onClick={() => void handlePayInstallment(row.id)}>
+                                                                        <MoneyIcon className="w-4 h-4" /> Registrar pagamento
+                                                                    </DropdownItem>
+                                                                </ActionsDropdown>
+                                                            )
+                                                        }
+                                                    />
+                                                </FormSection>
+                                            </div>
+                                        )}
+                                        {installmentDetailTab === "attachments" && (
+                                            <div className="py-2">
+                                                <GenericAttachmentsTab
+                                                    entityId={representativeTxId}
+                                                    partnerId={partnerId}
+                                                    entityType="transaction"
+                                                    title="Anexos do Parcelamento"
+                                                    subtitle="Gerencie contratos, comprovantes ou documentos deste parcelamento."
+                                                    onMutation={() => void refreshTransactionsNow()}
+                                                />
+                                            </div>
+                                        )}
+                                        {installmentDetailTab === "notes" && (
+                                            <div className="space-y-4 max-w-3xl">
+                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Observações do Parcelamento</h3>
+                                                <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                                    Escreva observações ou notas internas para este parcelamento. Elas serão salvas para todas as parcelas do grupo.
+                                                </p>
+                                                <textarea
+                                                    value={installmentNotesText}
+                                                    onChange={(e) => setInstallmentNotesText(e.target.value)}
+                                                    rows={5}
+                                                    placeholder="Ex: Contrato assinado presencialmente, renegociação..."
+                                                    className="w-full rounded-xl border border-brand-border dark:border-dark-border p-4 bg-white dark:bg-dark-surface text-sm text-brand-dark dark:text-dark-heading outline-none focus:border-brand-primary"
+                                                />
+                                                <div className="flex justify-end">
+                                                    <Button
+                                                        onClick={async () => {
+                                                            if (!installmentDetail?.group?.id) return
+                                                            setSavingInstallmentNotes(true)
+                                                            const res = await updateInstallmentGroupNotesAction({
+                                                                partnerId,
+                                                                installmentGroupId: installmentDetail.group.id,
+                                                                notes: installmentNotesText,
+                                                            })
+                                                            setSavingInstallmentNotes(false)
+                                                            if (res.success) {
+                                                                notifySuccess("Observações do parcelamento salvas com sucesso!")
+                                                                void refreshTransactionsNow()
+                                                            } else {
+                                                                notifyError(res.error || "Erro ao salvar observações.")
+                                                            }
+                                                        }}
+                                                        disabled={savingInstallmentNotes}
+                                                        leftIcon={<SaveIcon size={18} />}
+                                                    >
+                                                        {savingInstallmentNotes ? "Salvando..." : "Salvar observações"}
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
                                 ) : (
                                     <p className="text-sm text-brand-inactive-text">Nenhum detalhe encontrado.</p>
                                 )}
@@ -2121,7 +2180,6 @@ export default function TransactionsPage({
                     onViewModeChange={setViewModeState}
                     hasActiveFilters={hasActiveFilters}
                     addDisabled={false}
-                    hideTabs={!!forcedTab}
                     tabCounts={tabCounts}
                     tabValues={tabValues}
                 />

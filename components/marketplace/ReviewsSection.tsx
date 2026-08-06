@@ -19,8 +19,8 @@ interface ReviewItem {
         avatar_url?: string | null
         profile_image_url?: string | null
     } | null
-    products?: { name: string; images?: string[] | null; slug?: string | null; unit?: string | null } | null
-    services?: { name: string; images?: string[] | null; slug?: string | null; unit?: string | null } | null
+    products?: { name: string; images?: string[] | null; unit?: string | null } | null
+    services?: { name: string; images?: string[] | null; unit?: string | null } | null
     product_name?: string | null
     service_name?: string | null
     quantity?: number | null

@@ -187,6 +187,10 @@ export function useEntityState() {
         // Guard: if it's already closed, do nothing. This prevents double-back history navigations
         // when close() is called multiple times or as cleanup.
         if (!localStateRef.current.isOpen) return
+        // Mark as closed synchronously in the ref so a second close() call in the same
+        // event tick (e.g. onSuccess + onBack both closing) becomes a no-op instead of
+        // triggering an extra history.back() that lands on the previous page.
+        localStateRef.current = CLOSED_STATE
 
         // Safety: if the current URL pathname doesn't match this page's pathname,
         // it means navigation already occurred. Don't replace the URL or we'd

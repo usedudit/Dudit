@@ -275,13 +275,13 @@ export default function POSShippingSheet({
                                     <span className="font-bold text-brand-dark dark:text-dark-heading">R$ {Number((breakdown as any)?.timeAdjustmentTotal || 0).toFixed(2)}</span>
                                 </div>
 
-                                <div className="mt-2 border-t border-brand-border pt-2 font-bold dark:border-dark-border flex justify-between items-center">
+                                <div className="mt-2 border-t border-brand-border pt-2 dark:border-dark-border flex justify-between items-center">
                                     <div className="flex justify-between items-center text-sm">
                                         <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Taxa do envio</span>
-                                        <div className="flex">
-                                            <span className="font-bold text-brand-dark dark:text-dark-heading">R$ {feeToDisplay.toFixed(2)}</span>
+                                        <span className="font-bold text-brand-dark dark:text-dark-heading">R$ {feeToDisplay.toFixed(2)}</span>
+                                        <div>
                                             {isSubsidized && (
-                                                <Badge variant="orange" className="ml-2">Subsidiado pela loja</Badge>
+                                                <p className="text-xs text-brand-orange">Subsidiado pela loja</p>
                                             )}
                                         </div>
                                     </div>

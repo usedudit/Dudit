@@ -19,6 +19,8 @@ import {
     InstallmentIcon,
     CalendarIcon,
     InfoIcon,
+    CancelCircleIcon,
+    AlertTriangleIcon,
 } from "@/lib/icons"
 import type { TransactionTab } from "../../../lib/services/transactions.types"
 import type { DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
@@ -52,9 +54,9 @@ interface TransactionPageControlsProps {
     addDisabled?: boolean
     /** When true, hides the tab selector (used when the tab is forced by the route) */
     hideTabs?: boolean
-    tabCounts?: { "Transações": number; "A pagar": number; "A receber": number }
+    tabCounts?: { "Transações": number; "A pagar": number; "A receber": number; "Vencidos": number; "Cancelados": number }
     /** Monetary values for each tab (used when forcedTab is set for Receber/Pagar pages) */
-    tabValues?: { "A pagar"?: { pending: number; overdue: number; completed: number }; "A receber"?: { pending: number; overdue: number; completed: number } }
+    tabValues?: { "A pagar"?: { pending: number; overdue: number; completed: number }; "A receber"?: { pending: number; overdue: number; completed: number }; "Vencidos"?: { total: number }; "Cancelados"?: { total: number } }
 }
 
 const TransactionPageControls: React.FC<TransactionPageControlsProps> = ({
@@ -98,15 +100,37 @@ const TransactionPageControls: React.FC<TransactionPageControlsProps> = ({
 
     const getTabBadge = (tab: TransactionTab) => {
         if (!tabValues) return null
-        // tabValues only has "A pagar" and "A receber"
+        if (tab === "Cancelados") {
+            const values = tabValues["Cancelados"]
+            if (!values || values.total <= 0) return null
+            return (
+                <TabCountBadge
+                    value={formatCurrency(values.total)}
+                    variant="gray"
+                />
+            )
+        }
+        if (tab === "Vencidos") {
+            const values = tabValues["Vencidos"]
+            if (!values || values.total <= 0) return null
+            return (
+                <TabCountBadge
+                    value={formatCurrency(values.total)}
+                    variant="red"
+                />
+            )
+        }
+        // tabValues for "A pagar" and "A receber"
         if (tab !== "A pagar" && tab !== "A receber") return null
         const values = tabValues[tab]
         if (!values) return null
         
-        // Show "Pendente" value as the main badge
+        // Show pending + overdue value (everything left to pay/receive) as the main badge
+        const tabTotal = values.pending + values.overdue
+        if (tabTotal <= 0) return null
         return (
             <TabCountBadge 
-                value={formatCurrency(values.pending)} 
+                value={formatCurrency(tabTotal)} 
                 variant={tab === "A receber" ? "green" : "red"} 
             />
         )
@@ -181,6 +205,12 @@ const TransactionPageControls: React.FC<TransactionPageControlsProps> = ({
                             </TabsTrigger>
                             <TabsTrigger value="A receber" icon={ArrowUpIcon} badge={getTabBadge("A receber") || (tabCounts && <TabCountBadge count={tabCounts["A receber"]} variant="green" />)}>
                                 A receber
+                            </TabsTrigger>
+                            <TabsTrigger value="Vencidos" icon={AlertTriangleIcon} badge={getTabBadge("Vencidos") || (tabCounts && <TabCountBadge count={tabCounts["Vencidos"]} variant="red" />)}>
+                                Vencidos
+                            </TabsTrigger>
+                            <TabsTrigger value="Cancelados" icon={CancelCircleIcon} badge={getTabBadge("Cancelados") || (tabCounts && <TabCountBadge count={tabCounts["Cancelados"]} variant="gray" />)}>
+                                Cancelados
                             </TabsTrigger>
                         </TabsList>
                     </Tabs>

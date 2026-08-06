@@ -27,8 +27,20 @@ export function pickBankThenCashDefaultFinanceAccountId(
   const rows = accounts.filter((a) => a.is_active !== false)
   return (
     rows.find((a) => a.type === "bank" && a.is_default)?.id ??
-    rows.find((a) => a.type === "cash" && a.is_default)?.id ??
     rows.find((a) => a.type === "bank")?.id ??
-    rows.find((a) => a.type === "cash")?.id
+    pickPreferredDefaultAccountId(accounts)
   )
 }
+
+
+export const STANDARD_PAYMENT_METHODS = [
+  { value: "Pix", label: "Pix" },
+  { value: "Dinheiro", label: "Dinheiro" },
+  { value: "Cartão de crédito", label: "Cartão de crédito" },
+  { value: "Cartão de débito", label: "Cartão de débito" },
+  { value: "Boleto", label: "Boleto" },
+  { value: "TEF", label: "TEF" },
+  { value: "Cheque", label: "Cheque" },
+  { value: "Outro", label: "Outro" },
+]
+

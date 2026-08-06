@@ -194,15 +194,18 @@ export async function addReturnMessageAction(input: {
       throw error
     }
 
-    await admin.from("return_events").insert({
-      return_request_id: input.returnRequestId,
+    await admin.from("audit_logs").insert({
+      table_name: "return_requests",
+      action: "MESSAGE_SENT",
+      action_type: "message_sent",
+      entity_type: "return_request",
+      entity_id: input.returnRequestId,
       partner_id: input.partnerId,
       actor_user_id: user.id,
-      event_type: "message",
-      message: `Nova mensagem (${input.senderRole === "seller" ? "vendedor" : "cliente"})`,
-      metadata: { message_id: inserted?.id },
+      user_id: user.id,
+      change_lines: [`Nova mensagem (${input.senderRole === "seller" ? "vendedor" : "cliente"})`],
       source: "user",
-      idempotency_key: `${idempotencyKey}:event`,
+      metadata: { message_id: inserted?.id, idempotency_key: `${idempotencyKey}:event` }
     })
 
     return successResponse({ id: inserted?.id, createdAt: inserted?.created_at })

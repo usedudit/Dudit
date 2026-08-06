@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { EditIcon, ChevronLeftIcon, ThreeDotsIcon, StarIcon, ShoppingCartIcon } from '@/lib/icons';
-import { Button, Badge, Tabs, TabsList, TabsTrigger, TabsContent, ActionsDropdown, ThreeDotsLoader, AlertModal } from '@/components/reusable';
+import { Button, Badge, Tabs, TabsList, TabsTrigger, TabsContent, ActionsDropdown, ThreeDotsLoader, AlertModal, CustomerCard } from '@/components/reusable';
 import Pagination from '@/components/reusable/Pagination';
 import { useNotification } from '@/hooks/use-notification';
 import { ReviewsSection } from '@/components/marketplace/ReviewsSection';
@@ -74,6 +74,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
     const [isLoadingOrders, setIsLoadingOrders] = useState(true);
     const [customerAddress, setCustomerAddress] = useState<string | null>(null);
     const [billingAddress, setBillingAddress] = useState<string | null>(null);
+    const [customerAddresses, setCustomerAddresses] = useState<any[]>([]);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [storeCredits, setStoreCredits] = useState<any[]>([]);
@@ -257,6 +258,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
             try {
                 const res = await getAddressesAction(realCustomerId, "customer");
                 if (res.addresses && res.addresses.length > 0) {
+                    setCustomerAddresses(res.addresses);
                     const primaryAddr = res.addresses.find((a: any) => a.address_type === "primary" || a.is_default) || res.addresses[0];
                     const billingAddr = res.addresses.find((a: any) => a.address_type === "billing");
 
@@ -860,70 +862,12 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
 
                                                 <div className="border-t border-brand-border dark:border-dark-border w-full"></div>
 
-                                                {/* Address */}
+                                                {/* Address + Contact (padronizado) */}
                                                 <div className="p-6 text-left">
-                                                    <div className="flex justify-between items-center mb-4">
-                                                        <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading">Endereço</h3>
-                                                    </div>
-
-                                                    {customerAddress ? (
-                                                        <div className="space-y-6">
-                                                            <div>
-                                                                <div className="w-full h-[120px] bg-brand-gray dark:bg-dark-border rounded-lg relative overflow-hidden mb-4 flex items-center justify-center cursor-pointer group">
-                                                                    <img src="https://img.dudit.com.br/static/MapLarge.png" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" alt="Mapa" />
-                                                                    <div className="absolute inset-0 flex items-center justify-center">
-                                                                        <div className="w-6 h-6 bg-brand-green rounded-full border-2 border-white flex items-center justify-center text-white z-10 transition-transform group-hover:scale-110">
-                                                                            <div className="w-2 h-2 bg-white rounded-full"></div>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                                <div className="mb-0">
-                                                                    <div className="flex justify-between items-start mb-1">
-                                                                        <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate pr-2">Endereço Principal</h4>
-                                                                        <a href="#" className="text-xs font-bold text-brand-dark dark:text-dark-heading underline decoration-brand-dark dark:decoration-dark-heading shrink-0">Ver Mapa</a>
-                                                                    </div>
-                                                                    <p className="text-[14px] text-brand-inactive-text dark:text-dark-body leading-relaxed">{customerAddress}</p>
-                                                                </div>
-                                                            </div>
-                                                            {billingAddress && (
-                                                                <div className="pt-4 border-t border-brand-border dark:border-dark-border">
-                                                                    <div className="flex justify-between items-start mb-1">
-                                                                        <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate pr-2">Endereço de Cobrança</h4>
-                                                                    </div>
-                                                                    <p className="text-[14px] text-brand-inactive-text dark:text-dark-body leading-relaxed">{billingAddress}</p>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    ) : (
-                                                        <div className="bg-brand-gray/30 dark:bg-dark-border/30 rounded-lg p-4 text-center">
-                                                            <p className="text-sm text-brand-inactive-text dark:text-dark-body italic">Nenhum endereço cadastrado para este cliente.</p>
-                                                        </div>
-                                                    )}
-
-                                                    {/* Contact */}
-                                                    <div className="mt-6 pt-6 border-t border-brand-border dark:border-dark-border">
-                                                        <div className="flex justify-between items-center mb-4">
-                                                            <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading">Contato</h3>
-                                                        </div>
-                                                        {(customer.email || customer.phone || customer.mobile) ? (
-                                                            <div className="space-y-3">
-                                                                {customer.email && (
-                                                                    <div className="flex items-center gap-2">
-                                                                        <span className="text-sm font-medium text-[#1e40af] dark:text-[#60a5fa] bg-blue-50 dark:bg-blue-900/20 px-3 py-1.5 rounded-lg border border-blue-100 dark:border-blue-900/30 truncate w-full">{customer.email}</span>
-                                                                    </div>
-                                                                )}
-                                                                {(customer.phone || customer.mobile) && (
-                                                                    <div className="flex items-center gap-2">
-                                                                        <span className="text-sm font-medium text-[#1e40af] dark:text-[#60a5fa] bg-blue-50 dark:bg-blue-900/20 px-3 py-1.5 rounded-lg border border-blue-100 dark:border-blue-900/30 w-fit">{customer.phone || customer.mobile}</span>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        ) : (
-                                                            <div className="bg-brand-gray/30 dark:bg-dark-border/30 rounded-lg p-4 text-center">
-                                                                <p className="text-sm text-brand-inactive-text dark:text-dark-body italic">Nenhuma informação de contato disponível.</p>
-                                                            </div>
-                                                        )}
-                                                    </div>
+                                                    <CustomerCard
+                                                        customer={{ ...customer, addresses: customerAddresses }}
+                                                        showMap={true}
+                                                    />
                                                 </div>
                                             </div>
                                         </section>

@@ -10,12 +10,13 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 export async function syncCancelledOrderAppointmentsAndTransactions(
   supabase: SupabaseClient,
   orderId: string,
+  options?: { refundMode?: 'store_credit' | 'financial' | 'none' }
 ): Promise<void> {
-  // Refund subscription credits if any were consumed
+  // Refund subscription credits or exchange credits if any were consumed
   try {
     const { data: order } = await supabase
       .from("orders")
-      .select("partner_id, buyer_id")
+      .select("id, partner_id, buyer_id, store_id, paid_amount, exchange_return_request_id, payment_breakdown")
       .eq("id", orderId)
       .single()
 
@@ -26,9 +27,38 @@ export async function syncCancelledOrderAppointmentsAndTransactions(
         customerId: order.buyer_id,
         orderId,
       })
+
+      if (order.exchange_return_request_id && options?.refundMode === "store_credit") {
+        const exchangeCreditAmount = Number(order.paid_amount || 0)
+        if (exchangeCreditAmount > 0) {
+          await supabase.from("store_credits").insert({
+            partner_id: order.partner_id,
+            store_id: order.store_id || null,
+            customer_id: order.buyer_id,
+            return_request_id: order.exchange_return_request_id,
+            amount: exchangeCreditAmount,
+            remaining_amount: exchangeCreditAmount,
+            metadata: { cancellation_notes: `Estorno do pedido de troca ${orderId}` },
+          })
+
+          const { data: customer } = await supabase
+            .from("customers")
+            .select("store_credit")
+            .eq("id", order.buyer_id)
+            .single()
+
+          await supabase
+            .from("customers")
+            .update({
+              store_credit: (Number(customer?.store_credit || 0) + exchangeCreditAmount),
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", order.buyer_id)
+        }
+      }
     }
   } catch (err) {
-    console.error("[syncCancelledOrder] Error refunding subscription credits:", err)
+    console.error("[syncCancelledOrder] Error refunding subscription or exchange credits:", err)
   }
 
   // 1. Fetch appointments linked to the order

@@ -482,21 +482,34 @@ function extractZipInfo(address: string): { fullZip: string | null; prefixZip: s
 
 function normalizeAddressGroupKey(address: string): { key: string; label: string } {
   const cleaned = String(address || "").trim()
-  const { fullZip, prefixZip } = extractZipInfo(cleaned)
-  if (fullZip) return { key: `cep:${fullZip}`, label: `CEP ${fullZip}` }
-  if (prefixZip) return { key: `zip:${prefixZip}`, label: `Região CEP ${prefixZip}` }
+  const { prefixZip } = extractZipInfo(cleaned)
+
+  const cityStateMatch = cleaned.match(/,\s*([^,]+)\s*-\s*([A-Z]{2})/i)
+  const city = cityStateMatch?.[1] ? cityStateMatch[1].trim() : ""
+  const state = cityStateMatch?.[2] ? cityStateMatch[2].trim().toUpperCase() : ""
+  const locationLabel = city ? (state ? `${city} - ${state}` : city) : ""
+
+  if (prefixZip) {
+    const label = locationLabel ? `${locationLabel} (Região CEP ${prefixZip})` : `Região CEP ${prefixZip}`
+    return { key: `region:${prefixZip}`, label }
+  }
 
   // Fallback: bairro / cidade
   const neighborhoodMatch = cleaned.match(/,\s*([^,]+),\s*([^,]+)\s*-\s*([A-Z]{2})/i)
   if (neighborhoodMatch?.[1]) {
-    return { key: `bairro:${neighborhoodMatch[1].trim().toLowerCase()}`, label: `Bairro ${neighborhoodMatch[1].trim()}` }
+    const neighborhood = neighborhoodMatch[1].trim()
+    const cityStr = neighborhoodMatch[2].trim()
+    return {
+      key: `bairro:${neighborhood.toLowerCase()}:${cityStr.toLowerCase()}`,
+      label: `${neighborhood} (${cityStr})`,
+    }
   }
 
-  const cityState = cleaned.match(/,\s*([^,]+)\s*-\s*([A-Z]{2})\s*$/i)
-  if (cityState?.[1] && cityState?.[2]) {
-    const city = String(cityState[1]).trim().toLowerCase()
-    const st = String(cityState[2]).trim().toUpperCase()
-    return { key: `city:${city}:${st}`, label: `${cityState[1].trim()} - ${st}` }
+  if (city && state) {
+    return {
+      key: `city:${city.toLowerCase()}:${state.toLowerCase()}`,
+      label: `Região ${city} - ${state}`,
+    }
   }
 
   return { key: "other", label: "Outros endereços" }
@@ -639,12 +652,16 @@ export async function getSmartDeliverySuggestionsAction(input: {
       return true
     })
 
-  // Estimate distances in parallel (cached geocoding)
+  // Enriquecer pedidos com coordenadas e distância da loja
   const enriched = await Promise.all(
     eligible.map(async (order: any) => {
-      const distanceKm = await estimateOrderDistanceKm({ supabase, partnerId: input.partnerId, order, originCoords })
       const address = formatAddress(order)
+      const coords = address ? await getOrCreateCachedCoords({ supabase, partnerId: input.partnerId, addressText: address }) : null
+      const distanceKm = coords && originCoords
+        ? Number(calculateDistance(originCoords, coords).toFixed(2))
+        : (order?.distance_km != null ? Number(order.distance_km) : null)
       const group = normalizeAddressGroupKey(address)
+
       return {
         id: String(order.id),
         orderNumber: order.order_number ? String(order.order_number) : null,
@@ -652,6 +669,7 @@ export async function getSmartDeliverySuggestionsAction(input: {
         customerName: String(order.customer_name || "Cliente"),
         address,
         createdAt: String(order.created_at || ""),
+        coords,
         distanceKm,
         groupKey: group.key,
         groupLabel: group.label,
@@ -659,64 +677,122 @@ export async function getSmartDeliverySuggestionsAction(input: {
     }),
   )
 
-  // Sort by group, then by createdAt desc, then by distance asc (if any)
-  enriched.sort((a, b) => {
-    if (a.groupKey !== b.groupKey) return a.groupKey.localeCompare(b.groupKey)
+  // 1. Ordenação FIFO: pedidos mais antigos primeiro (para que o pedido mais antigo seja a 'semente' do lote)
+  const unassigned = [...enriched]
+  unassigned.sort((a, b) => {
     const aT = a.createdAt ? new Date(a.createdAt).getTime() : 0
     const bT = b.createdAt ? new Date(b.createdAt).getTime() : 0
-    if (aT !== bT) return bT - aT
-    const aD = a.distanceKm == null ? Number.POSITIVE_INFINITY : a.distanceKm
-    const bD = b.distanceKm == null ? Number.POSITIVE_INFINITY : b.distanceKm
-    return aD - bD
+    return aT - bT
   })
-
-  const groupsByKey = new Map<string, { label: string; orders: SmartDeliverySuggestionOrder[] }>()
-  for (const o of enriched) {
-    const existing = groupsByKey.get(o.groupKey) || { label: o.groupLabel, orders: [] as SmartDeliverySuggestionOrder[] }
-    existing.orders.push({
-      id: o.id,
-      orderNumber: o.orderNumber,
-      displayId: o.displayId,
-      customerName: o.customerName,
-      address: o.address,
-      distanceKm: o.distanceKm,
-    })
-    groupsByKey.set(o.groupKey, existing)
-  }
 
   const suggestions: SmartDeliverySuggestionGroup[] = []
-  for (const [groupKey, group] of groupsByKey.entries()) {
-    // chunk orders to respect maxOrdersPerDelivery
-    for (let i = 0; i < group.orders.length; i += maxOrdersPerDelivery) {
-      const chunk = group.orders.slice(i, i + maxOrdersPerDelivery)
-      const totalDistance = chunk.some((o) => o.distanceKm == null)
-        ? null
-        : Number(chunk.reduce((sum, o) => sum + Number(o.distanceKm || 0), 0).toFixed(2))
-      const estimatedDurationMinutes = totalDistance == null ? null : estimateDeliveryTime(totalDistance)
+  const usedOrderIds = new Set<string>()
 
-      suggestions.push({
-        groupKey,
-        groupLabel: group.label,
-        totalDistanceKm: totalDistance,
-        estimatedDurationMinutes,
-        orders: chunk,
-      })
+  for (const seed of unassigned) {
+    if (usedOrderIds.has(seed.id)) continue
+
+    // 2. Agrupamento por Raio de Proximidade (até 4.5 km do pedido semente ou mesma região CEP/Bairro)
+    const candidates: typeof unassigned = []
+    candidates.push(seed)
+    usedOrderIds.add(seed.id)
+
+    for (const candidate of unassigned) {
+      if (usedOrderIds.has(candidate.id)) continue
+      if (candidates.length >= maxOrdersPerDelivery) break
+
+      let isClose = false
+      if (seed.coords && candidate.coords) {
+        const dist = calculateDistance(seed.coords, candidate.coords)
+        if (dist <= 4.5) {
+          isClose = true
+        }
+      } else if (seed.groupKey === candidate.groupKey && seed.groupKey !== "other") {
+        isClose = true
+      }
+
+      if (isClose) {
+        candidates.push(candidate)
+        usedOrderIds.add(candidate.id)
+      }
     }
+
+    // 3. Sequenciamento de Rota por Vizinho Mais Próximo (Nearest-Neighbor Sequencing) partindo da Loja/Semente
+    let currentLoc = originCoords || seed.coords
+    const sequencedCluster: typeof candidates = []
+    const remaining = [...candidates]
+
+    while (remaining.length > 0) {
+      if (!currentLoc) {
+        sequencedCluster.push(...remaining)
+        break
+      }
+      let bestIdx = 0
+      let minDist = Number.POSITIVE_INFINITY
+
+      for (let i = 0; i < remaining.length; i++) {
+        const item = remaining[i]
+        const d = item.coords ? calculateDistance(currentLoc, item.coords) : (item.distanceKm ?? 999)
+        if (d < minDist) {
+          minDist = d
+          bestIdx = i
+        }
+      }
+
+      const nextStop = remaining.splice(bestIdx, 1)[0]
+      sequencedCluster.push(nextStop)
+      if (nextStop.coords) {
+        currentLoc = nextStop.coords
+      }
+    }
+
+    // Calcular distância sequencial total da rota e tempo estimado
+    let totalRouteDist = 0
+    let lastPoint = originCoords
+    let hasAllDist = true
+
+    for (const item of sequencedCluster) {
+      if (lastPoint && item.coords) {
+        totalRouteDist += calculateDistance(lastPoint, item.coords)
+        lastPoint = item.coords
+      } else if (item.distanceKm != null) {
+        totalRouteDist += item.distanceKm
+      } else {
+        hasAllDist = false
+      }
+    }
+
+    const finalTotalDistanceKm = hasAllDist ? Number(totalRouteDist.toFixed(2)) : null
+    const estimatedDurationMinutes = finalTotalDistanceKm == null ? null : estimateDeliveryTime(finalTotalDistanceKm)
+
+    const mainLabel = seed.groupLabel.includes("(") ? seed.groupLabel : `${seed.groupLabel}`
+    const groupLabel = sequencedCluster.length > 1
+      ? `${mainLabel} • Rota com ${sequencedCluster.length} pedidos`
+      : mainLabel
+
+    suggestions.push({
+      groupKey: seed.groupKey,
+      groupLabel,
+      totalDistanceKm: finalTotalDistanceKm,
+      estimatedDurationMinutes,
+      orders: sequencedCluster.map((o) => ({
+        id: o.id,
+        orderNumber: o.orderNumber,
+        displayId: o.displayId,
+        customerName: o.customerName,
+        address: o.address,
+        distanceKm: o.distanceKm,
+      })),
+    })
   }
 
-  // Sort suggestion blocks by most "dense" first: more orders, smaller distance.
-  suggestions.sort((a, b) => {
-    if (b.orders.length !== a.orders.length) return b.orders.length - a.orders.length
-    const aD = a.totalDistanceKm == null ? Number.POSITIVE_INFINITY : a.totalDistanceKm
-    const bD = b.totalDistanceKm == null ? Number.POSITIVE_INFINITY : b.totalDistanceKm
-    return aD - bD
-  })
+  // Ordenar blocos de sugestões por densidade (quantidade de pedidos) e urgência
+  suggestions.sort((a, b) => b.orders.length - a.orders.length)
 
   return {
     success: true as const,
     maxOrdersPerDelivery,
     generatedAt: new Date().toISOString(),
-    items: suggestions.slice(0, 30), // keep UI light
+    items: suggestions.slice(0, 30),
   }
 }
 

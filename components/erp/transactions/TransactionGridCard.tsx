@@ -138,7 +138,11 @@ const TransactionGridCard = React.memo(
                         <div className="flex flex-col gap-0.5 items-end shrink-0 text-right">
                             <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Vencimento</span>
                             <span className={`text-sm font-bold ${transaction.isOverdue ? "text-brand-red" : "text-brand-dark dark:text-dark-heading"}`}>
-                                {transaction.dueDateShort} | <DueDateCountdown transaction={transaction} align="right" />
+                                {transaction.dueDateShort}
+                                {(() => {
+                                    const countdown = <DueDateCountdown transaction={transaction} align="right" />
+                                    return countdown === null ? null : (<><span className="text-brand-inactive-text"> | </span>{countdown}</>)
+                                })()}
                             </span>
                         </div>
                     </div>

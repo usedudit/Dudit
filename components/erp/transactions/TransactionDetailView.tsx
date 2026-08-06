@@ -559,18 +559,28 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                                 <div className="hidden xl:block">
                                                     <CustomerCard
                                                         customer={{
+                                                            id: detail.contactCard.id ?? undefined,
                                                             name: detail.contactCard.name,
                                                             email: detail.contactCard.email ?? undefined,
                                                             phone: detail.contactCard.phone ?? undefined,
                                                             image_url: detail.contactCard.image_url ?? undefined,
                                                         }}
                                                         address={detail.contactCard.address || undefined}
+                                                        billingAddress={detail.contactCard.billingAddress || undefined}
                                                         showMap={false}
                                                     />
                                                 </div>
                                             ) : (
                                                 <div className="hidden xl:block">
-                                                    <TransactionContactCard title={detail.contactCard.title} name={detail.contactCard.name} />
+                                                    <TransactionContactCard
+                                                        title={detail.contactCard.title}
+                                                        name={detail.contactCard.name}
+                                                        email={detail.contactCard.email ?? undefined}
+                                                        phone={detail.contactCard.phone ?? undefined}
+                                                        imageUrl={detail.contactCard.image_url ?? undefined}
+                                                        address={detail.contactCard.address || undefined}
+                                                        billingAddress={detail.contactCard.billingAddress || undefined}
+                                                    />
                                                 </div>
                                             )}
                                         </div>
@@ -620,16 +630,26 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                         {detail.contactCard?.isCustomer ? (
                             <CustomerCard
                                 customer={{
+                                    id: detail.contactCard?.id ?? undefined,
                                     name: detail.contactCard.name,
                                     email: detail.contactCard.email ?? undefined,
                                     phone: detail.contactCard.phone ?? undefined,
                                     image_url: detail.contactCard.image_url ?? undefined,
                                 }}
                                 address={detail.contactCard?.address || undefined}
+                                billingAddress={detail.contactCard?.billingAddress || undefined}
                                 showMap={false}
                             />
                         ) : (
-                            <TransactionContactCard title={detail.contactCard?.title} name={detail.contactCard?.name} />
+                            <TransactionContactCard
+                                title={detail.contactCard?.title || "Contato"}
+                                name={detail.contactCard?.name || "-"}
+                                email={detail.contactCard?.email ?? undefined}
+                                phone={detail.contactCard?.phone ?? undefined}
+                                imageUrl={detail.contactCard?.image_url ?? undefined}
+                                address={detail.contactCard?.address || undefined}
+                                billingAddress={detail.contactCard?.billingAddress || undefined}
+                            />
                         )}
                     </div>
                 </BottomSheet>

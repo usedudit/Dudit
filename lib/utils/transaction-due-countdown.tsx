@@ -6,6 +6,10 @@ function isPaidDisplayStatus(status: string): boolean {
   return s.includes("pago") || s.includes("recebido")
 }
 
+function isCancelledDisplayStatus(status: string): boolean {
+  return String(status || "").toLowerCase().includes("cancel")
+}
+
 /** Calendar days until due (Brazil) when raw YMD exists; else falls back to server field. */
 export function getCalendarDaysUntilDue(transaction: ERPTransaction): number {
   const raw = transaction.dueDateRaw || transaction.occurrenceDate
@@ -28,6 +32,7 @@ export function DueDateCountdown({
   align?: Align
 }) {
   if (isPaidDisplayStatus(transaction.status)) return null
+  if (isCancelledDisplayStatus(transaction.status)) return null
 
   const days = getCalendarDaysUntilDue(transaction)
   const alignCls = align === "right" ? "text-right block w-full" : ""

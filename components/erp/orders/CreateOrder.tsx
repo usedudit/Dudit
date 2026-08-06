@@ -208,26 +208,30 @@ function normalizeCustomerForCard(customer: any) {
         customer.addresses?.[0] ||
         null
 
+    const billingAddress = customer.addresses?.find((address: any) => address?.address_type === "billing") || null
+
+    const mapAddress = (address: any) => ({
+        address_type: address.address_type || "primary",
+        is_default: !!address.is_default,
+        zipCode: address.zipCode || address.zip_code || "",
+        street: address.street || "",
+        number: address.number || "",
+        complement: address.complement || "",
+        neighborhood: address.neighborhood || "",
+        city: address.city || "",
+        state: address.state || address.uf || "",
+        country: address.country || "BR",
+    })
+
     return {
         id: customer.id,
         name: customer.name,
         email: customer.email || null,
         phone: customer.phone || null,
         image_url: customer.image_url || customer.avatar_url || customer.avatar || customer.imageUrl || null,
-        addresses: primaryAddress
-            ? [{
-                address_type: "primary",
-                is_default: true,
-                zipCode: primaryAddress.zipCode || primaryAddress.zip_code || "",
-                street: primaryAddress.street || "",
-                number: primaryAddress.number || "",
-                complement: primaryAddress.complement || "",
-                neighborhood: primaryAddress.neighborhood || "",
-                city: primaryAddress.city || "",
-                state: primaryAddress.state || primaryAddress.uf || "",
-                country: primaryAddress.country || "BR",
-            }]
-            : [],
+        addresses: [primaryAddress, billingAddress]
+            .filter(Boolean)
+            .map(mapAddress),
     }
 }
 
@@ -748,6 +752,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
 
         if (!hasStreet || !hasCity || !hasNeighborhood || !hasUf) {
             setShippingFee("0")
+            setDeliveryBreakdown(null)
             return
         }
 
@@ -756,15 +761,22 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         const timer = setTimeout(async () => {
             const quote = await quoteDeliveryFeeAction({
                 partnerId,
+                storeId: selectedStore?.id || null,
                 destinationAddress,
                 orderSubtotal: subtotal,
+                allowOutsideRadius: true,
             })
             if (!active) return
 
             if (quote.success) {
-                setShippingFee(String(quote.fee || 0))
+                const originalFee = Number(quote.breakdown?.originalFee ?? quote.fee ?? 0)
+                const payer = quote.breakdown?.deliveryPayer === "seller" ? "seller" : "customer"
+                const effectiveFee = payer === "seller" ? 0 : originalFee
+                setShippingFee(String(Math.max(0, effectiveFee)))
+                setDeliveryBreakdown(quote.breakdown ? { ...quote.breakdown, deliveryPayer: payer, originalFee, deliverySubsidy: payer === "seller" ? originalFee : 0 } : null)
             } else {
                 setShippingFee("0")
+                setDeliveryBreakdown(null)
             }
         }, 300)
 
@@ -772,7 +784,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             active = false
             clearTimeout(timer)
         }
-    }, [deliveryMethod, cep, street, number, neighborhood, city, uf, partnerId, isCustomShipping])
+    }, [deliveryMethod, cep, street, number, neighborhood, city, uf, partnerId, isCustomShipping, selectedStore?.id])
 
     // --- Handlers ---
     const handleScroll = useCallback(() => {
@@ -1172,6 +1184,13 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             setFieldErrors(new Set(["productSearch"]))
             setActiveTab("general")
             setValidationMessage(stockValidationMessage)
+            setShowValidationModal(true)
+            return false
+        }
+
+        if (editOrderId && originalPaidAmount > 0 && totalAmount < (originalPaidAmount - 0.009)) {
+            setActiveTab("general")
+            setValidationMessage(`O valor total do pedido (R$ ${totalAmount.toFixed(2)}) não pode ser menor que o crédito de troca já aplicado (R$ ${originalPaidAmount.toFixed(2)}).`)
             setShowValidationModal(true)
             return false
         }
