@@ -54,6 +54,8 @@ import {
     getReturnEvidencePresignedUploadUrlAction
 } from "@/app/actions/erp/returns"
 
+import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+
 export type AttachmentEntityType = "order" | "service_order" | "stock_movement" | "transaction" | "return"
 
 interface GenericAttachmentsTabProps {
@@ -62,6 +64,8 @@ interface GenericAttachmentsTabProps {
     entityType: AttachmentEntityType
     title?: string
     subtitle?: string
+    isEditing?: boolean
+    readOnly?: boolean
     onMutation?: () => void
 }
 
@@ -119,14 +123,26 @@ const ACTIONS_MAP: Record<AttachmentEntityType, {
     }
 }
 
+const isImageFile = (att: any) => {
+    const type = String(att.file_type || att.file?.type || "").toLowerCase()
+    const name = String(att.file_name || att.name || "").toLowerCase()
+    return (
+        type.startsWith("image/") ||
+        /\.(jpg|jpeg|png|webp|gif|avif|bmp|svg)$/i.test(name)
+    )
+}
+
 export function GenericAttachmentsTab({
     entityId,
     partnerId,
     entityType,
     title = "Anexos",
     subtitle = "Gerencie contratos, faturas, ordens ou comprovantes deste registro.",
+    isEditing = true,
+    readOnly = false,
     onMutation
 }: GenericAttachmentsTabProps) {
+    const canEdit = isEditing && !readOnly
     const { toast } = useToast()
     const { planSlug } = usePermissions()
     const { openPlanUpgrade } = usePlanUpgrade()
@@ -182,12 +198,13 @@ export function GenericAttachmentsTab({
     }
 
     const requestDeleteDoc = (id: string) => {
+        if (!canEdit) return
         setDeletingId(id)
         setDeleteModalOpen(true)
     }
 
     const confirmDeleteDoc = async () => {
-        if (!deletingId) return
+        if (!deletingId || !canEdit) return
         try {
             const res = await actions.delete(partnerId, deletingId, entityId)
             if (res.success) {
@@ -206,6 +223,7 @@ export function GenericAttachmentsTab({
     }
 
     const handleUploadClick = () => {
+        if (!canEdit) return
         if (!advancedEnabled) {
             openPlanUpgrade("crescer")
             return
@@ -371,13 +389,26 @@ export function GenericAttachmentsTab({
         }
     }
 
+    const imageAttachments = (attachments || []).filter(isImageFile)
+    const docAttachments = (attachments || []).filter((att) => !isImageFile(att))
+
     return (
         <div>
             <div className="flex justify-between items-center mb-6">
                 <div>
                     <h3 className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading">{title}</h3>
-                    <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-6">{subtitle}</p>
+                    <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-2">{subtitle}</p>
                 </div>
+                {canEdit && (
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleUploadClick}
+                        leftIcon={<UploadIcon className="w-4 h-4" />}
+                    >
+                        Adicionar Anexo / Imagem
+                    </Button>
+                )}
             </div>
 
             {loading ? (
@@ -388,45 +419,110 @@ export function GenericAttachmentsTab({
                 <div className="py-8">
                     <IconPlaceholder
                         icon={FileIcon}
-                        title="Nenhum anexo"
-                        subtitle="Não foram encontrados anexos para este registro."
-                        itemButton={{
+                        title="Nenhum anexo ou imagem"
+                        subtitle={canEdit ? "Adicione comprovantes, contratos ou imagens para este registro." : "Não foram encontrados anexos para este registro."}
+                        itemButton={canEdit ? {
                             text: "Adicionar Anexo",
                             action: handleUploadClick,
                             variant: "outline",
-                        }}
+                        } : undefined}
                     />
                 </div>
             ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                    {attachments.map((att) => (
-                        <div
-                            key={att.id}
-                            className="flex items-center gap-3 p-3 bg-brand-gray dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl group relative"
-                        >
-                            <div
-                                onClick={() => handleDownloadDoc(att.file_key)}
-                                className="w-10 h-10 rounded-lg bg-white dark:bg-dark-border flex items-center justify-center border border-brand-border dark:border-dark-border shrink-0 cursor-pointer hover:bg-brand-gray/50"
-                            >
-                                <FileIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                <div className="space-y-8">
+                    {/* Seção de Imagens */}
+                    {imageAttachments.length > 0 && (
+                        <div className="space-y-3">
+                            <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
+                                Imagens ({imageAttachments.length})
+                            </h4>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                                {imageAttachments.map((att) => {
+                                    const imgUrl = getR2ImageUrl(att.file_key)
+                                    return (
+                                        <div
+                                            key={att.id}
+                                            className="group relative flex flex-col bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+                                        >
+                                            <div
+                                                onClick={() => handleDownloadDoc(att.file_key)}
+                                                className="w-full h-32 bg-gray-100 dark:bg-dark-border flex items-center justify-center overflow-hidden cursor-pointer relative"
+                                            >
+                                                <img
+                                                    src={imgUrl}
+                                                    alt={att.file_name || "Imagem"}
+                                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                                    onError={(e) => {
+                                                        (e.target as HTMLElement).style.display = "none"
+                                                    }}
+                                                />
+                                            </div>
+                                            <div className="p-2.5 flex flex-col min-w-0">
+                                                <p className="text-[12px] font-bold text-brand-dark dark:text-dark-heading truncate" title={att.file_name}>
+                                                    {att.file_name || "Imagem"}
+                                                </p>
+                                                <p className="text-[11px] text-brand-inactive-text dark:text-dark-body">
+                                                    {formatFileSize(att.file_size)}
+                                                </p>
+                                            </div>
+                                            {canEdit && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => requestDeleteDoc(att.id)}
+                                                    className="opacity-0 group-hover:opacity-100 transition-opacity bg-red-500 hover:bg-red-600 text-white rounded-full w-7 h-7 flex items-center justify-center shadow-lg absolute top-2 right-2 z-10"
+                                                    title="Remover imagem"
+                                                >
+                                                    <TrashIcon className="w-3.5 h-3.5" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    )
+                                })}
                             </div>
-                            <div className="flex-1 min-w-0">
-                                <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">
-                                    {att.file_name || "Anexo"}
-                                </p>
-                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                    {formatFileSize(att.file_size)}
-                                </p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => requestDeleteDoc(att.id)}
-                                className="opacity-0 group-hover:opacity-100 transition-opacity bg-red-500 hover:bg-red-600 text-white rounded-full w-7 h-7 flex items-center justify-center shadow-lg absolute -top-2.5 -right-2.5 z-10"
-                            >
-                                <TrashIcon className="w-3.5 h-3.5" />
-                            </button>
                         </div>
-                    ))}
+                    )}
+
+                    {/* Seção de Anexos e Documentos */}
+                    {docAttachments.length > 0 && (
+                        <div className="space-y-3">
+                            <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
+                                Anexos e Documentos ({docAttachments.length})
+                            </h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                {docAttachments.map((att) => (
+                                    <div
+                                        key={att.id}
+                                        className="flex items-center gap-3 p-3 bg-brand-gray dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl group relative"
+                                    >
+                                        <div
+                                            onClick={() => handleDownloadDoc(att.file_key)}
+                                            className="w-10 h-10 rounded-lg bg-white dark:bg-dark-border flex items-center justify-center border border-brand-border dark:border-dark-border shrink-0 cursor-pointer hover:bg-brand-gray/50"
+                                        >
+                                            <FileIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                        </div>
+                                        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleDownloadDoc(att.file_key)}>
+                                            <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">
+                                                {att.file_name || "Anexo"}
+                                            </p>
+                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                {formatFileSize(att.file_size)}
+                                            </p>
+                                        </div>
+                                        {canEdit && (
+                                            <button
+                                                type="button"
+                                                onClick={() => requestDeleteDoc(att.id)}
+                                                className="opacity-0 group-hover:opacity-100 transition-opacity bg-red-500 hover:bg-red-600 text-white rounded-full w-7 h-7 flex items-center justify-center shadow-lg absolute -top-2.5 -right-2.5 z-10"
+                                                title="Remover anexo"
+                                            >
+                                                <TrashIcon className="w-3.5 h-3.5" />
+                                            </button>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 

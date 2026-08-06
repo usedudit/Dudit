@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button, Checkbox, IconPlaceholder, Badge, FormDropdown, MoneyInput, ThreeDotsLoader, InfoCard, FormSection, ActionsDropdown, DropdownItem, SavingStatusModal, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
 import { KPICard } from "@/components/erp/dashboard/cards/KPICard"
+import { HorizontalKPICard } from "@/components/erp/dashboard/cards/HorizontalKPICard"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
@@ -12,7 +13,7 @@ import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { formatCurrency } from "@/lib/utils"
 import { diffCalendarDaysInSaoPaulo, formatBrazilDateFromDbInput } from "@/lib/utils/formatters"
-import { PlusIcon, ExportFileIcon, ArrowUpDownIcon, CreditCardIcon, FileIcon, MoneyIcon, EditIcon, ClockIcon, InstallmentIcon, CheckCircleIcon, CashierIcon, SaveIcon, AlertTriangleIcon, } from "@/lib/icons"
+import { PlusIcon, ExportFileIcon, ArrowUpDownIcon, CreditCardIcon, FileIcon, MoneyIcon, EditIcon, ClockIcon, InstallmentIcon, CheckCircleIcon, CashierIcon, SaveIcon, AlertTriangleIcon, ShoppingCartIcon, Users } from "@/lib/icons"
 import TransactionPageControls from "./TransactionPageControls"
 import TransactionListItem from "./TransactionListRow"
 import TransactionGridCard from "./TransactionGridCard"
@@ -1961,25 +1962,25 @@ export default function TransactionsPage({
                                     <>
 {installmentDetailTab === "general" && (
                                                     <div className="space-y-4">
-                                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                                            {(() => {
-                                                                const total = Number(installmentDetail.group?.total_amount || 0)
-                                                                const rows = installmentDetail.installments || []
-                                                                const paid = rows.reduce((acc: number, row: any) => acc + Number(row.paidAmount || 0), 0)
-                                                                const overdue = rows
-                                                                    .filter((row: any) => row.status === "overdue")
-                                                                    .reduce((acc: number, row: any) => acc + Number(row.remainingAmount || 0), 0)
-                                                                const pending = Math.max(0, total - paid)
-                                                                return (
-                                                                    <>
-                                                                        <KPICard title="Total" value={formatCurrency(total)} />
-                                                                        <KPICard title="Pago" value={formatCurrency(paid)} />
-                                                                        <KPICard title="Restante" value={formatCurrency(pending)} />
-                                                                        <KPICard title="Vencido" value={formatCurrency(overdue)} />
-                                                                    </>
-                                                                )
-                                                            })()}
-                                                        </div>
+                                                        {(() => {
+                                                            const total = Number(installmentDetail.group?.total_amount || 0)
+                                                            const rows = installmentDetail.installments || []
+                                                            const paid = rows.reduce((acc: number, row: any) => acc + Number(row.paidAmount || 0), 0)
+                                                            const overdue = rows
+                                                                .filter((row: any) => row.status === "overdue")
+                                                                .reduce((acc: number, row: any) => acc + Number(row.remainingAmount || 0), 0)
+                                                            const pending = Math.max(0, total - paid)
+                                                            return (
+                                                                <HorizontalKPICard
+                                                                    items={[
+                                                                        { title: "Total", value: formatCurrency(total), icon: FileIcon, iconBg: "bg-indigo-50 dark:bg-indigo-950/20", iconColor: "text-indigo-600 dark:text-indigo-400" },
+                                                                        { title: "Pago", value: formatCurrency(paid), icon: CheckCircleIcon, iconBg: "bg-emerald-50 dark:bg-emerald-950/20", iconColor: "text-emerald-600 dark:text-emerald-400" },
+                                                                        { title: "Restante", value: formatCurrency(pending), icon: ClockIcon, iconBg: "bg-amber-50 dark:bg-amber-950/20", iconColor: "text-amber-600 dark:text-amber-400" },
+                                                                        { title: "Vencido", value: formatCurrency(overdue), icon: AlertTriangleIcon, iconBg: "bg-rose-50 dark:bg-rose-950/20", iconColor: "text-rose-600 dark:text-rose-400" },
+                                                                    ]}
+                                                                />
+                                                            )
+                                                        })()}
                                                 {/* Table / List Container */}
                                                 <FormSection hasSeparator title="Parcelas">
                                                     <InstallmentParcelsTable

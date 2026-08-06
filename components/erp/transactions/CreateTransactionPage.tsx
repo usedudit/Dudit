@@ -28,6 +28,7 @@ import SelectCustomerSheet from "@/components/erp/clientes/SelectCustomerSheet"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { useSidebar } from "@/lib/sidebar-context"
+import { GenericAttachmentsTab } from "../shared/GenericAttachmentsTab"
 import { FadeIn } from "@/components/animations/FadeIn"
 import {
     SaveIcon,
@@ -227,6 +228,9 @@ export default function CreateTransactionPage({
     const isInstallmentTransaction = !!editTransaction?.installmentGroupId
     const isRecurringTransaction = !!editTransaction && !!editTransaction.recurringId
     const isSalesOrigin = !!editTransaction && String(editTransaction.category || "").toLowerCase() === "vendas"
+
+    const [draftTransactionId] = useState(() => crypto.randomUUID())
+    const transactionId = editTransaction?.id || draftTransactionId
 
     const [txKind, setTxKind] = useState<TxKind>(() => {
         if (editRecurringTemplate) return editRecurringTemplate.type || "income"
@@ -1109,6 +1113,7 @@ export default function CreateTransactionPage({
             }
 
             const res = await createManualTransactionAction({
+                id: transactionId,
                 partnerId,
                 storeId,
                 transactionType: txKind,
@@ -1934,15 +1939,16 @@ export default function CreateTransactionPage({
                             </TabsContent>
 
                             <TabsContent value="attachments" className="mt-0">
-                                <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
-                                    <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
-                                        <IconPlaceholder
-                                            icon={UserIcon}
-                                            title="Anexos em breve"
-                                            subtitle="Você poderá anexar comprovantes nesta aba."
-                                        />
-                                    </div>
-                                    <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border min-h-[120px]" />
+                                <div className="py-2">
+                                    <GenericAttachmentsTab
+                                        entityId={transactionId}
+                                        partnerId={partnerId}
+                                        entityType="transaction"
+                                        title="Comprovantes e Anexos"
+                                        subtitle="Gerencie faturas, comprovantes ou contratos desta transação."
+                                        isEditing={!isCancelledTx}
+                                        readOnly={isCancelledTx}
+                                    />
                                 </div>
                             </TabsContent>
                         </div>

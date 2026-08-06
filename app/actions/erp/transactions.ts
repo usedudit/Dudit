@@ -778,6 +778,7 @@ export async function getFinancialTransactionsAction(
 }
 
 export type CreateManualTransactionInput = {
+    id?: string | null
     partnerId: string
     transactionType: "income" | "expense" | "transfer" | "adjustment" | "refund"
     amount: number
@@ -876,6 +877,7 @@ export async function createManualTransactionAction(input: CreateManualTransacti
 
         const normalizedCategory = String(input.category || "").trim()
         const payload: Record<string, unknown> = {
+            ...(input.id ? { id: input.id } : {}),
             partner_id: input.partnerId,
             store_id: input.storeId || null,
             description: description,

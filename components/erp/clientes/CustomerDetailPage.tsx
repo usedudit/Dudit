@@ -1,7 +1,7 @@
 "use client"
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { EditIcon, ChevronLeftIcon, ThreeDotsIcon, StarIcon, ShoppingCartIcon } from '@/lib/icons';
+import { EditIcon, ChevronLeftIcon, ThreeDotsIcon, StarIcon, ShoppingCartIcon, MoneyIcon, Users, CreditCardIcon } from '@/lib/icons';
 import { Button, Badge, Tabs, TabsList, TabsTrigger, TabsContent, ActionsDropdown, ThreeDotsLoader, AlertModal, CustomerCard } from '@/components/reusable';
 import Pagination from '@/components/reusable/Pagination';
 import { useNotification } from '@/hooks/use-notification';
@@ -21,7 +21,8 @@ import { hasMinimumPlan } from '@/lib/subscription/plan-tier';
 import { usePermissions } from '@/lib/permission-context';
 import { useSidebar } from '@/lib/sidebar-context';
 import SavingStatusModal from '@/components/reusable/SavingStatusModal';
-import { KPICard } from '@/components/erp/dashboard/cards/KPICard';
+import { KPICard } from '@/components/erp/dashboard/cards/KPICard'
+import { HorizontalKPICard } from '@/components/erp/dashboard/cards/HorizontalKPICard';
 
 const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; width: string }[] = [
     { id: "order_id", label: "Pedido", align: "left", width: "200px" },
@@ -705,12 +706,14 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                             ) : (
                                                 <>
                                                     {/* Desktop: KPI Stats Row */}
-                                                    <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-10">
-                                                        <KPICard title="Pedidos" value={stats.totalOrders} />
-                                                        <KPICard title="Total Gasto" value={stats.totalSpent ? formatCurrency(stats.totalSpent) : "R$ 0,00"} />
-                                                        <KPICard title="Valor médio" value={stats.avgOrder ? formatCurrency(stats.avgOrder) : "R$ 0,00"} />
-                                                        <KPICard title="Última Compra" value={stats.lastOrderDate} />
-                                                    </div>
+                                                    <HorizontalKPICard
+                                                        items={[
+                                                            { title: "Pedidos", value: stats.totalOrders, icon: ShoppingCartIcon },
+                                                            { title: "Total Gasto", value: stats.totalSpent ? formatCurrency(stats.totalSpent) : "R$ 0,00", icon: MoneyIcon },
+                                                            { title: "Valor médio", value: stats.avgOrder ? formatCurrency(stats.avgOrder) : "R$ 0,00", icon: Users },
+                                                            { title: "Última Compra", value: stats.lastOrderDate, icon: CreditCardIcon },
+                                                        ]}
+                                                    />
 
                                                     {/* Desktop: Orders Table */}
                                                     <OrdersContent
@@ -736,12 +739,14 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                     {isTablet && (
                                         <TabsContent value="Orders" className="mt-0">
                                             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
-                                                <div className="grid grid-cols-2 gap-4 mb-6">
-                                                    <KPICard title="Pedidos" value={stats.totalOrders} />
-                                                    <KPICard title="Total Gasto" value={stats.totalSpent ? formatCurrency(stats.totalSpent) : "R$ 0,00"} />
-                                                    <KPICard title="Valor médio" value={stats.avgOrder ? formatCurrency(stats.avgOrder) : "R$ 0,00"} />
-                                                    <KPICard title="Última Compra" value={stats.lastOrderDate} />
-                                                </div>
+                                                <HorizontalKPICard
+                                                    items={[
+                                                        { title: "Pedidos", value: stats.totalOrders, icon: ShoppingCartIcon },
+                                                        { title: "Total Gasto", value: stats.totalSpent ? formatCurrency(stats.totalSpent) : "R$ 0,00", icon: MoneyIcon },
+                                                        { title: "Valor médio", value: stats.avgOrder ? formatCurrency(stats.avgOrder) : "R$ 0,00", icon: Users },
+                                                        { title: "Última Compra", value: stats.lastOrderDate, icon: CreditCardIcon },
+                                                    ]}
+                                                />
 
                                                 <OrdersContent
                                                     isLoadingOrders={isLoadingOrders}

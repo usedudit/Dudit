@@ -593,7 +593,9 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                         partnerId={partnerId}
                                         entityType="transaction"
                                         title="Comprovantes e Anexos"
-                                        subtitle="Gerencie faturas, comprovantes ou contratos desta transação."
+                                        subtitle="Visualize os comprovantes, faturas ou contratos desta transação."
+                                        isEditing={false}
+                                        readOnly={true}
                                     />
                                 </TabsContent>
 
