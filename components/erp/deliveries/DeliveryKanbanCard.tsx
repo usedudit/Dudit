@@ -5,24 +5,13 @@ import { motion } from "framer-motion"
 import { ActionsDropdown, Badge } from "@/components/reusable"
 import { DropdownItem } from "@/components/reusable/Dropdown"
 import { formatCurrency } from "@/lib/utils"
-import { getDeliveryStatusMeta } from "@/lib/orders/status"
+import { getDeliveryStatusMeta, getDeliveryStatusIcon } from "@/lib/orders/status"
 import { ClockIcon, MapPinIcon, TruckIcon, UserIcon, BlockedIcon, DeliverySentIcon, CheckCircleIcon, DeliveryPickupIcon, DeliveryFailedIcon } from "@/lib/icons"
 
 interface DeliveryKanbanCardProps {
   delivery: any
   onDetails: () => void
   onQuickStatusChange?: (deliveryId: string, status: string) => void
-}
-
-const statusIconMap: Record<string, React.ReactNode> = {
-  pending: <BlockedIcon size={12} />,
-  not_sent: <BlockedIcon size={12} />,
-  preparing: <ClockIcon size={12} />,
-  sent: <DeliverySentIcon size={12} />,
-  delivered: <CheckCircleIcon size={12} />,
-  pickup_available: <DeliveryPickupIcon size={12} />,
-  delivery_failed: <DeliveryFailedIcon size={12} />,
-  cancelled: <BlockedIcon size={12} />,
 }
 
 // Function to calculate relative time elapsed
@@ -100,9 +89,8 @@ export default function DeliveryKanbanCard({
               +{delivery.orderCount - 1} ped.
             </span>
           )}
-          <Badge variant={statusMeta.variant} className="flex items-center gap-1 scale-90 origin-left">
-            {statusIconMap[delivery.status] || <BlockedIcon size={12} />}
-            <span>{statusMeta.label}</span>
+          <Badge variant={statusMeta.variant} icon={getDeliveryStatusIcon(delivery.status)} className="scale-90 origin-left">
+            {statusMeta.label}
           </Badge>
         </div>
 

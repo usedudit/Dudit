@@ -5,7 +5,7 @@ import { motion } from "framer-motion"
 import { Badge, ActionsDropdown } from "@/components/reusable"
 import { DropdownItem } from "@/components/reusable/Dropdown"
 import { formatCurrency, formatDate, formatTime } from "@/lib/utils"
-import { getDeliveryStatusMeta } from "@/lib/orders/status"
+import { getDeliveryStatusMeta, getDeliveryStatusIcon } from "@/lib/orders/status"
 import { TruckIcon } from "@/lib/icons"
 
 interface DeliveryListItemProps {
@@ -49,7 +49,7 @@ const DeliveryListItem = React.memo(({ delivery, columns, onDetails, onQuickStat
       case "delivery_fee":
         return <span className="text-[13px] font-bold text-brand-primary">{formatCurrency(delivery.deliveryFee || 0)}</span>
       case "status":
-        return <Badge variant={statusMeta.variant}>{statusMeta.label}</Badge>
+        return <Badge variant={statusMeta.variant} icon={getDeliveryStatusIcon(delivery.status)}>{statusMeta.label}</Badge>
       case "delivery_person":
         return <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">{delivery.deliveryPersonName || "Não atribuído"}</span>
       case "estimated_time":

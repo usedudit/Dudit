@@ -1,3 +1,13 @@
+import React from "react"
+import {
+  BlockedIcon,
+  ClockIcon,
+  DeliverySentIcon,
+  CheckCircleIcon,
+  DeliveryPickupIcon,
+  DeliveryFailedIcon,
+} from "@/lib/icons"
+
 export type PaymentStatusValue =
   | "paid"
   | "partially_paid"
@@ -20,6 +30,22 @@ export type DeliveryStatusValue =
   | "cancelled"
 
 type BadgeVariant = "green" | "red" | "orange" | "blue" | "cyan" | "purple" | "gray"
+
+const DELIVERY_STATUS_ICONS: Record<string, React.ElementType> = {
+  pending: BlockedIcon,
+  not_sent: BlockedIcon,
+  preparing: ClockIcon,
+  sent: DeliverySentIcon,
+  delivered: CheckCircleIcon,
+  pickup_available: DeliveryPickupIcon,
+  delivery_failed: DeliveryFailedIcon,
+  cancelled: BlockedIcon,
+}
+
+export function getDeliveryStatusIcon(status?: string | null): React.ReactElement<{ className?: string }> {
+  const IconComp = (status && DELIVERY_STATUS_ICONS[status]) || BlockedIcon
+  return React.createElement(IconComp, { size: 12 })
+}
 
 const PAYMENT_STATUS_META: Record<string, { label: string; variant: BadgeVariant }> = {
   paid: { label: "Pago", variant: "green" },

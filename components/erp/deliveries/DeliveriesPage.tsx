@@ -348,8 +348,15 @@ export default function DeliveriesPage({
         }
     }
 
-    const handleQuickStatusChange = (deliveryId: string, currentStatus: string) => {
-        setStatusModal({ deliveryId, currentStatus, nextStatus: currentStatus })
+    const handleQuickStatusChange = (deliveryId: string, targetOrCurrentStatus?: string) => {
+        const item = (mapped || []).find((d: any) => d.id === deliveryId)
+        const currentStatus = item ? item.status : "pending"
+
+        if (targetOrCurrentStatus && targetOrCurrentStatus !== currentStatus) {
+            handleStatusTransition(deliveryId, currentStatus, targetOrCurrentStatus)
+        } else {
+            setStatusModal({ deliveryId, currentStatus, nextStatus: currentStatus })
+        }
     }
 
     const handleStatusTransition = (deliveryId: string, currentStatus: string, nextStatus: string) => {

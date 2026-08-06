@@ -92,6 +92,14 @@ export function DeliveryRouteMap({
         map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right")
         mapRef.current = map
 
+        console.log("[DeliveryRouteMap] coords:", {
+          origin,
+          initialLat,
+          initialLng,
+          pointsCount: points?.length,
+          pts: points?.map((p) => ({ id: p.displayId, lat: p.latitude, lng: p.longitude })),
+        })
+
         map.on("load", () => {
           if (cancelled) return
           readyRef.current = true

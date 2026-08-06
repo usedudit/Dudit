@@ -12,7 +12,7 @@ import { getERPDeliveryDetailsAction, getDeliveryRoutePointsAction, updateERPSin
 import { formatCurrency, formatDateTime, formatDate, formatQuantityWithUnit, formatUnitPriceWithUnit } from "@/lib/utils"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { getDeliveryStatusMeta, getPaymentStatusMeta, getDeliveryStatusLabel } from "@/lib/orders/status"
+import { getDeliveryStatusMeta, getPaymentStatusMeta, getDeliveryStatusLabel, getDeliveryStatusIcon } from "@/lib/orders/status"
 import { toast } from "@/hooks/use-notification"
 import { useSidebar } from "@/lib/sidebar-context"
 import Portal from "@/components/Portal"
@@ -314,7 +314,7 @@ export default function DeliveryDetailPage({
                             </div>
                         </div>
 
-                        <Badge variant={statusMeta.variant}>{statusMeta.label}</Badge>
+                        <Badge variant={statusMeta.variant} icon={getDeliveryStatusIcon(delivery?.status)}>{statusMeta.label}</Badge>
                     </div>
                 </div>
 
@@ -362,7 +362,7 @@ export default function DeliveryDetailPage({
                                                     <Badge variant={paymentMeta.variant}>
                                                         {paymentMeta.label}
                                                     </Badge>
-                                                    <Badge variant={deliveryMeta.variant}>
+                                                    <Badge variant={deliveryMeta.variant} icon={getDeliveryStatusIcon(link.status || order.delivery_status)}>
                                                         {deliveryMeta.label}
                                                     </Badge>
                                                 </div>
@@ -681,7 +681,7 @@ export default function DeliveryDetailPage({
                                             </div>
                                             <div className="flex justify-between items-center text-sm">
                                                 <span className="text-brand-inactive-text dark:text-dark-body font-medium">Status da Entrega</span>
-                                                <Badge variant={getDeliveryStatusMeta(activeLink.status || order.delivery_status).variant}>
+                                                <Badge variant={getDeliveryStatusMeta(activeLink.status || order.delivery_status).variant} icon={getDeliveryStatusIcon(activeLink.status || order.delivery_status)}>
                                                     {getDeliveryStatusMeta(activeLink.status || order.delivery_status).label}
                                                 </Badge>
                                             </div>

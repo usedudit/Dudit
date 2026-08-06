@@ -74,34 +74,19 @@ export default function DeliveryPageControls({
                     <Button onClick={onAdd} disabled={addDisabled} className="w-[42px] h-[42px] p-0 rounded-full"><PlusIcon className="w-5 h-5" /></Button>
                 </div>
 
-                <div className="hidden md:flex items-center w-full gap-4">
-                    <div className="flex items-center gap-3 shrink-0">
-                        <div className="w-80">
-                            <Input
-                                name="search"
-                                placeholder="Buscar por pedido ou cliente..."
-                                value={search}
-                                onChange={(e) => onSearchChange(e.target.value)}
-                                variant="full-rounded"
-                                label=""
-                                prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
-                            />
-                        </div>
-                        <Button variant="outline" onClick={onOpenFilter} leftIcon={<FilterIcon size={18} />}>Filtros</Button>
+                <div className="hidden md:flex items-center w-full gap-3">
+                    <div className="w-80">
+                        <Input
+                            name="search"
+                            placeholder="Buscar por pedido ou cliente..."
+                            value={search}
+                            onChange={(e) => onSearchChange(e.target.value)}
+                            variant="full-rounded"
+                            label=""
+                            prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
+                        />
                     </div>
-
-                    <div className="flex-1" />
-
-                    <div className="flex items-center gap-3 shrink-0">
-                        {onOpenSuggestions && (
-                            <Button variant="outline" onClick={onOpenSuggestions} leftIcon={<SparklesIcon size={18} />}>
-                                Gerar sugestões
-                            </Button>
-                        )}
-                        <Button onClick={onAdd} disabled={addDisabled} leftIcon={<PlusIcon size={18} />}>
-                            Nova entrega
-                        </Button>
-                    </div>
+                    <Button variant="outline" onClick={onOpenFilter} leftIcon={<FilterIcon size={18} />}>Filtros</Button>
                 </div>
             </div>
         </>
