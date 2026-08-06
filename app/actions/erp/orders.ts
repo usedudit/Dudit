@@ -2903,6 +2903,10 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         })
     }
 
+    if (data.deliveryStatus) {
+        await syncOrderDeliveryStatusToDeliveries(supabase, data.partnerId, [orderId], data.deliveryStatus)
+    }
+
     await invalidateInventoryItems(data.partnerId, stockItems)
     await revalidateOrders(data.partnerId)
 
@@ -3001,6 +3005,71 @@ export async function updateOrderNotesAction(input: {
 
     await revalidateOrders(input.partnerId)
     return { success: true as const }
+}
+
+export async function syncOrderDeliveryStatusToDeliveries(
+    supabase: any,
+    partnerId: string,
+    orderIds: string[],
+    nextStatus: string
+) {
+    if (!orderIds || orderIds.length === 0 || !nextStatus) return
+    const nowIso = new Date().toISOString()
+
+    try {
+        const { data: links } = await supabase
+            .from("delivery_orders")
+            .select("delivery_id, order_id")
+            .in("order_id", orderIds)
+
+        if (!links || links.length === 0) return
+
+        const linkPatch: Record<string, unknown> = {
+            status: nextStatus === "cancelled" ? "cancelled" : nextStatus,
+        }
+        if (nextStatus === "delivered") {
+            linkPatch.delivered_at = nowIso
+        }
+
+        await supabase
+            .from("delivery_orders")
+            .update(linkPatch)
+            .in("order_id", orderIds)
+
+        const deliveryIds = Array.from(new Set(links.map((l: any) => l.delivery_id).filter(Boolean)))
+        for (const deliveryId of deliveryIds) {
+            const { data: deliveryLinks } = await supabase
+                .from("delivery_orders")
+                .select("status")
+                .eq("delivery_id", deliveryId)
+
+            if (deliveryLinks && deliveryLinks.length > 0) {
+                const statuses = new Set(deliveryLinks.map((l: any) => l.status))
+                let targetDeliveryStatus = nextStatus
+                if (statuses.size === 1) {
+                    targetDeliveryStatus = Array.from(statuses)[0] as string
+                }
+
+                const deliveryPatch: Record<string, unknown> = { status: targetDeliveryStatus }
+                if (targetDeliveryStatus === "sent") {
+                    deliveryPatch.started_at = nowIso
+                    deliveryPatch.departure_time = nowIso
+                }
+                if (targetDeliveryStatus === "delivered") {
+                    deliveryPatch.delivered_at = nowIso
+                    deliveryPatch.completed_at = nowIso
+                }
+
+                await supabase
+                    .from("deliveries")
+                    .update(deliveryPatch)
+                    .eq("id", deliveryId)
+                    .eq("partner_id", partnerId)
+            }
+        }
+    } catch (err) {
+        console.warn("[syncOrderDeliveryStatusToDeliveries] error:", err)
+    }
 }
 
 export async function updateOrdersStatusInBatchAction(payload: {
@@ -3539,6 +3608,11 @@ export async function updateOrdersStatusInBatchAction(payload: {
 
         if (deliveryProcessedCount === 0) {
             return { error: "Nenhum pedido elegível para alteração de entrega." }
+        }
+
+        if (payload.statusValue) {
+            const allOrderIds = (currentOrders || []).map((o: any) => o.id).filter(Boolean)
+            await syncOrderDeliveryStatusToDeliveries(supabase, payload.partnerId, allOrderIds, payload.statusValue)
         }
     }
 

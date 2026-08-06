@@ -49,6 +49,8 @@ export function DeliveryRouteMap({
 
   useEffect(() => {
     let cancelled = false
+    let resizeObserver: ResizeObserver | null = null
+    let resizeTimers: ReturnType<typeof setTimeout>[] = []
 
     const init = async () => {
       if (cancelled || !mapContainerRef.current || !token) return
@@ -58,14 +60,14 @@ export function DeliveryRouteMap({
           const link = document.createElement("link")
           link.id = "mapbox-gl-css"
           link.rel = "stylesheet"
-          link.href = "https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.css"
+          link.href = "https://api.mapbox.com/mapbox-gl-js/v3.28.0/mapbox-gl.css"
           document.head.appendChild(link)
         }
 
         if (!(window as any).mapboxgl) {
           await new Promise((resolve, reject) => {
             const script = document.createElement("script")
-            script.src = "https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.js"
+            script.src = "https://api.mapbox.com/mapbox-gl-js/v3.28.0/mapbox-gl.js"
             script.async = true
             script.onload = resolve
             script.onerror = reject
@@ -92,6 +94,27 @@ export function DeliveryRouteMap({
         map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right")
         mapRef.current = map
 
+        // Container pode inicializar durante animações (FadeIn / DefaultModal scale).
+        // O Mapbox lê o tamanho no init; resize pós-montagem garante o paint dos tiles.
+        const resizeMap = () => {
+          if (cancelled || !mapRef.current) return
+          try {
+            mapRef.current.resize()
+          } catch {
+            /* noop */
+          }
+        }
+
+        if (typeof ResizeObserver !== "undefined" && mapContainerRef.current) {
+          resizeObserver = new ResizeObserver(() => resizeMap())
+          resizeObserver.observe(mapContainerRef.current)
+        }
+
+        resizeTimers = []
+        for (const ms of [200, 600, 1500]) {
+          resizeTimers.push(setTimeout(resizeMap, ms))
+        }
+
         console.log("[DeliveryRouteMap] coords:", {
           origin,
           initialLat,
@@ -104,6 +127,7 @@ export function DeliveryRouteMap({
           if (cancelled) return
           readyRef.current = true
           setReady(true)
+          resizeMap()
           console.log("[DeliveryRouteMap] mapa carregado (load) — token:", token.slice(0, 18) + "...")
         })
 
@@ -111,7 +135,7 @@ export function DeliveryRouteMap({
         map.on("idle", () => {
           if (cancelled || idleLogged) return
           idleLogged = true
-          console.log("[DeliveryRouteMap] mapa renderizado (primeiro idle) — tiles OK")
+          console.log("[DeliveryRouteMap] mapa em primeiro idle (sem erros de tile no evento)")
         })
 
         // Log de TODOS os erros do mapa (estilo/tiles/fontes) — essencial para diagnóstico
@@ -139,6 +163,8 @@ export function DeliveryRouteMap({
     return () => {
       cancelled = true
       readyRef.current = false
+      resizeObserver?.disconnect()
+      for (const t of resizeTimers) clearTimeout(t)
       if (mapRef.current) {
         mapRef.current.remove()
         mapRef.current = null

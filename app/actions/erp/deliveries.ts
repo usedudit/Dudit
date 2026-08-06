@@ -1392,21 +1392,14 @@ export async function updateERPDeliveryStatusAction(params: {
   if (error) return { success: false as const, error: error.message }
 
   const childPatch: Record<string, unknown> = {
-    status:
-      nextStatus === "cancelled"
-        ? "cancelled"
-        : nextStatus === "delivered"
-          ? "delivered"
-          : nextStatus === "sent"
-            ? "sent"
-            : "pending",
+    status: nextStatus,
   }
   if (nextStatus === "delivered") {
     childPatch.delivered_at = nowIso
   }
   await supabase.from("delivery_orders").update(childPatch).eq("delivery_id", params.deliveryId)
 
-  // Keep order timestamps in sync (best-effort)
+  // Keep order delivery_status and timestamps in sync (best-effort)
   try {
     const { data: links } = await supabase
       .from("delivery_orders")
@@ -1414,7 +1407,9 @@ export async function updateERPDeliveryStatusAction(params: {
       .eq("delivery_id", params.deliveryId)
     const orderIds = (links || []).map((l: any) => l?.order_id).filter(Boolean)
     if (orderIds.length > 0) {
-      const orderPatch: Record<string, unknown> = {}
+      const orderPatch: Record<string, unknown> = {
+        delivery_status: nextStatus,
+      }
       if (nextStatus === "sent") {
         orderPatch.delivery_departure_at = nowIso
       }
@@ -1423,12 +1418,10 @@ export async function updateERPDeliveryStatusAction(params: {
         orderPatch.delivery_arrived_at = nowIso
         orderPatch.delivery_completed_at = nowIso
       }
-      if (Object.keys(orderPatch).length > 0) {
-        await supabase.from("orders").update(orderPatch).in("id", orderIds).eq("partner_id", params.partnerId)
-      }
+      await supabase.from("orders").update(orderPatch).in("id", orderIds).eq("partner_id", params.partnerId)
     }
   } catch (err) {
-    console.warn("[updateERPDeliveryStatusAction] order timestamps patch failed:", err)
+    console.warn("[updateERPDeliveryStatusAction] order patch failed:", err)
   }
 
   await logDeliveryEvent({

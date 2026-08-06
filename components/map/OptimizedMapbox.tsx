@@ -74,14 +74,14 @@ export function OptimizedMapbox({
           const link = document.createElement("link")
           link.id = "mapbox-gl-css"
           link.rel = "stylesheet"
-          link.href = "https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.css"
+          link.href = "https://api.mapbox.com/mapbox-gl-js/v3.28.0/mapbox-gl.css"
           document.head.appendChild(link)
         }
 
         if (!(window as any).mapboxgl) {
           await new Promise((resolve, reject) => {
             const script = document.createElement("script")
-            script.src = "https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.js"
+            script.src = "https://api.mapbox.com/mapbox-gl-js/v3.28.0/mapbox-gl.js"
             script.async = true
             script.onload = resolve
             script.onerror = reject
