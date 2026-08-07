@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useMemo, useCallback, useRef, useEffect, Fragment } from "react"
+import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { Button, Checkbox, Input, IconPlaceholder, Badge, Spinner, SelectionBanner, ThreeDotsLoader, InfoCard, FormSection, ActionsDropdown, DropdownItem, FormTextarea, Separator, FormDropdown, ListItem, Tooltip } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -18,7 +18,7 @@ import { XmlImportHistoryTab } from "./XmlImportHistoryTab"
 import {
     UploadIcon, FileTextIcon, CheckCircleIcon, AlertTriangleIcon,
     SearchIcon, PlusIcon, ClockIcon, GridIcon, ListIcon,
-    PackageIcon, ArrowRightIcon, ChevronLeftIcon, InfoIcon, ArrowUpDownIcon,
+    PackageIcon, ChevronLeftIcon, InfoIcon, ArrowUpDownIcon,
     ReloadIcon, ExportFileIcon, MoneyIcon,
     FileIcon
 } from "@/lib/icons"
@@ -27,6 +27,7 @@ import { usePermissions } from "@/lib/permission-context"
 import ExportSelectionModal from "@/components/erp/export/ExportSelectionModal"
 import ExportColumnSelectionModal from "@/components/erp/export/ExportColumnSelectionModal"
 import { formatQuantityWithUnit } from "@/lib/utils/formatters"
+import { useEntityState } from "@/hooks/use-entity-state"
 
 type TabType = "all" | "pending" | "completed" | "failed"
 
@@ -81,14 +82,6 @@ const ITEM_COST_OPTIONS = [
     { value: "weighted_average", label: "Média ponderada" },
     { value: "ignore", label: "Não alterar" },
 ]
-
-function getItemStockLabel(v: string) {
-    return ITEM_STOCK_OPTIONS.find((o) => o.value === v)?.label || v
-}
-
-function getItemCostLabel(v: string) {
-    return ITEM_COST_OPTIONS.find((o) => o.value === v)?.label || v
-}
 
 function getItemDecisionOptions(item: any) {
     const opts: { value: string; label: string }[] = []
@@ -151,12 +144,7 @@ function ImportItemListRow({ item, d, isPreview, onOpenAction, supplierName, sup
                         <Badge variant={badge.variant} className="whitespace-nowrap shrink-0">{badge.label}</Badge>
                     </div>
                     {item.raw_sku && (
-                        <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">SKU: {item.raw_sku}</span>
-                    )}
-                    {isPreview && (
-                        <span className={`text-[11px] font-semibold ${getDecisionToneClass(d.decision)}`}>
-                            {getItemDecisionLabel(d.decision, item)}
-                        </span>
+                        <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">SKU: {item.raw_sku} • {isPreview && (<span className={`text-[11px] font-semibold ${getDecisionToneClass(d.decision)}`}> {getItemDecisionLabel(d.decision, item)} </span>)} </span>
                     )}
                     {isPreview && supplierConflictInfo && (
                         <div className="flex flex-col gap-1 w-full mt-1.5">
@@ -288,6 +276,21 @@ export function XmlImportPageContent({ partnerId, initialImports, planGate }: Xm
     const isTabletOrMobile = useMediaQuery("(max-width: 1023px)")
     const router = useRouter()
 
+    const { state: entityState, open, close, isViewing, isCreating } = useEntityState()
+    const viewingImportId = isViewing ? entityState.entityId : null
+    const showUploadModal = isCreating
+
+    useEffect(() => {
+        const handleReset = () => close()
+        window.addEventListener("erp-sidebar-reset", handleReset)
+        return () => window.removeEventListener("erp-sidebar-reset", handleReset)
+    }, [close])
+
+    const setShowUploadModal = useCallback((show: boolean) => {
+        if (show) open("create")
+        else close()
+    }, [open, close])
+
     const [activeTab, setActiveTab] = useState<TabType>("all")
     const [search, setSearch] = useState("")
     const [page, setPage] = useState(1)
@@ -296,8 +299,6 @@ export function XmlImportPageContent({ partnerId, initialImports, planGate }: Xm
     const [selection, setSelection] = useState<Set<string>>(new Set())
     const effectiveViewMode = isTabletOrMobile ? "grid" : viewMode
 
-    const [showUploadModal, setShowUploadModal] = useState(false)
-    const [viewingImportId, setViewingImportId] = useState<string | null>(null)
     const [pendingUploadId, setPendingUploadId] = useState<string | null>(null)
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null)
 
@@ -326,19 +327,19 @@ export function XmlImportPageContent({ partnerId, initialImports, planGate }: Xm
 
     const handleBackFromPreview = useCallback(() => {
         setPendingUploadId(null)
-        setViewingImportId(null)
         setReimportedFlag(false)
-    }, [])
+        close()
+    }, [close])
 
     const handleComplete = useCallback(() => {
         setPendingUploadId(null)
-        setViewingImportId(null)
         setReimportedFlag(false)
+        close()
         listImportsAction(partnerId, { limit: 50, storeId }).then((res) => {
             if (res.success && res.imports) setImports(res.imports as ImportItem[])
         })
         router.refresh()
-    }, [partnerId, router, storeId])
+    }, [partnerId, router, storeId, close])
 
     const isPreviewView = !!previewImportId
     const listViewKey = "list-view"
@@ -422,14 +423,14 @@ export function XmlImportPageContent({ partnerId, initialImports, planGate }: Xm
     }, [exportData, partnerId, selectedStore?.id, search, activeTab, selection, filtered.length])
 
     const handleClearFilters = useCallback(() => { setSearch(""); setActiveTab("all") }, [])
-    const handleOpenDetail = useCallback((imp: ImportItem) => setViewingImportId(imp.id), [])
+    const handleOpenDetail = useCallback((imp: ImportItem) => open("view", imp.id), [open])
     const [reimportedFlag, setReimportedFlag] = useState(false)
 
     const handleUploadModalSuccess = useCallback((importId: string, reimported?: boolean) => {
-        setShowUploadModal(false)
+        open("view", importId)
         setPendingUploadId(importId)
         setReimportedFlag(!!reimported)
-    }, [])
+    }, [open])
 
     const [revertTarget, setRevertTarget] = useState<ImportItem | null>(null)
     const [revertReason, setRevertReason] = useState("")
@@ -1361,7 +1362,7 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                                                             })}
                                                         </div>
                                                     ) : (
-                                                        <div className="w-full overflow-hidden rounded-xl border border-brand-border dark:border-dark-border">
+                                                        <div className="w-full overflow-hidden">
                                                             <table className="w-full text-left border-separate border-spacing-0">
                                                                 <thead>
                                                                     <tr className="bg-brand-gray dark:bg-dark-border/50">

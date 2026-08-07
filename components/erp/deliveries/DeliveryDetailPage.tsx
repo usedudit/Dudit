@@ -265,14 +265,13 @@ export default function DeliveryDetailPage({
     const linkedOrdersCard = (
         <div className="overflow-hidden rounded-2xl border border-brand-border dark:border-dark-border">
             <div className="border-b border-brand-border bg-brand-gray p-6 dark:border-dark-border dark:bg-dark-border/50 flex items-center justify-between gap-4">
-                <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                    Pedidos Vinculados ({links.length})
-                </h3>
+                <div className="text-left shrink-0">
+                    <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Pedidos Vinculados ({links.length})</span>
+                    <p className="font-bold text-brand-dark dark:text-dark-heading text-[16px]">Valor total da entrega: {formatCurrency(totalDeliveryFee)}</p>
+                </div>
                 <div className="text-right shrink-0">
-                    <p className="text-xs text-brand-inactive-text dark:text-dark-body font-medium uppercase">Entregador</p>
-                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-1">
-                        {driverName}
-                    </p>
+                    <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Entregador</span>
+                    <p className="font-bold text-brand-dark dark:text-dark-heading text-[16px]">{driverName}</p>
                 </div>
             </div>
             <div className="bg-white dark:bg-dark-surface divide-y divide-brand-border dark:divide-dark-border">
@@ -314,12 +313,6 @@ export default function DeliveryDetailPage({
                         )
                     })
                 )}
-            </div>
-            <div className="border-t border-brand-border bg-brand-gray p-6 dark:border-dark-border dark:bg-dark-border/50">
-                <div className="flex items-center justify-between gap-4">
-                    <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Valor Total da Entrega</span>
-                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(totalDeliveryFee)}</span>
-                </div>
             </div>
         </div>
     )

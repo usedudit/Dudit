@@ -1,6 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/server"
-import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getCurrentUser } from "@/lib/auth/authorization"
 import { SecureLogger } from "@/lib/secure-logger"
 import { withCSRFProtection } from "@/lib/security/csrf-middleware"
@@ -41,7 +40,7 @@ async function handler(request: NextRequest) {
     console.log("Request body:", { ...body, partnerId: body.partnerId ? "[HIDDEN]" : undefined })
 
     const user = await getCurrentUser()
-    const supabase = await getSupabaseServerClient()
+    const adminClient = createAdminClient()
 
     // SEGURANÃ‡A: Verificar que o usuário está autenticado
     if (!user?.id) {
@@ -59,7 +58,7 @@ async function handler(request: NextRequest) {
     let partnerId = body.partnerId
     if (!partnerId && items.length > 0) {
       // Tentar obter partner_id do primeiro item (pode ser produto ou variante)
-      const { data: product } = await supabase
+      const { data: product } = await adminClient
         .from("products")
         .select("partner_id")
         .eq("id", items[0].id)
@@ -69,7 +68,7 @@ async function handler(request: NextRequest) {
         partnerId = product.partner_id
       } else {
         // Pode ser uma variante â€” buscar via product_variants
-        const { data: variant } = await supabase
+        const { data: variant } = await adminClient
           .from("product_variants")
           .select("products(partner_id)")
           .eq("id", items[0].id)
@@ -85,7 +84,6 @@ async function handler(request: NextRequest) {
       return NextResponse.json({ error: "Vendedor não identificado" }, { status: 400 })
     }
 
-    const adminClient = createAdminClient()
     const { data: partner, error: partnerError } = await adminClient
       .from("partners")
       .select("id, mp_accepted_payment_methods")

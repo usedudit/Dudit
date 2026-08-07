@@ -264,6 +264,24 @@ O seed apaga os indices globais e os reconstrui item a item. Durante a janela, a
 
 Usar versionamento de indice (double-buffer), construir a nova versao em background e trocar um ponteiro atomico no final. Compartilhar um serializer unico com `redis-sync.ts`, incluindo versao/updated_at e os campos realmente usados na exibicao.
 
+### F-20 — `products_select_all` expõe a tabela operacional inteira
+
+Severity: Critical. Auditoria read-only em PostgreSQL e Data API em 2026-08-07.
+
+`products` tem RLS habilitado, mas nao forcado, 13 policies e a policy `products_select_all` com `TO public` e `USING (true)`. Como policies permissivas de SELECT sao combinadas por OR, essa policy torna as restricoes de `products_select_own`, `products_select_policy` e `admin_select_products` inefetivas para leitura. Os grants tambem permitem SELECT/INSERT/UPDATE/DELETE para `anon` e `authenticated`; RLS ainda bloqueia parte das escritas sem ownership, mas o grant amplo aumenta a superficie desnecessariamente. Ha ainda um risco separado e mais grave: `products_insert_authenticated` tem `TO authenticated WITH CHECK (true)`, entao qualquer usuario autenticado com acesso direto ao Data API pode tentar inserir produto em qualquer `partner_id`; nao executei INSERT para preservar os dados.
+
+Teste live como `anon`: 25 produtos legiveis, incluindo 16 que nao sao elegiveis para marketplace. A chamada REST anon conseguiu selecionar `cost_price`, `stock_reserved`, `deleted_at`, `show_in_marketplace` e `is_active`. No estado atual, 24 produtos possuem `cost_price`, 15 possuem `deleted_at` e todos os 25 possuem `stock_reserved`. O teste como `authenticated` sem claims tambem leu as 25 linhas, como esperado pela policy global.
+
+Fluxos que usam `getAdminClient` (marketplace, Redis, dashboard e varias rotinas administrativas) nao dependem dessa policy porque bypassam RLS. Fluxos com `getSupabaseServerClient`/browser client dependem das policies de leitura: import preview/batch, autorizacao de produto, telas ERP/PDV/etiquetas, consultas de loja e varias actions de ERP. O sitemap publico usa `getSupabaseServerClient` anon e consulta products diretamente, portanto uma remocao cega quebraria a indexacao publica. A proposta segura e remover a policy global somente depois de migrar esses poucos leitores anon para uma view/RPC publica com colunas explicitas e filtro de marketplace; em PostgreSQL 15+, a view deve usar `security_invoker = true` ou ficar protegida fora do schema exposto. As leituras ERP devem permanecer com predicado de partner/store e policies de ownership.
+
+Durante a auditoria read-only anterior a correcao, nenhuma RLS ou grant foi alterado.
+
+Status da correcao em 2026-08-07: aplicada a RPC `get_marketplace_products_public` com retorno tipado de 26 campos e filtro fixo de marketplace; `app/sitemap.ts` e `getCollectionItems()` foram migrados para ela. O endpoint de preferencia do Mercado Pago passou a usar `adminClient` no fallback de resolucao de produto/variante, pois e um fluxo autenticado de checkout e precisa validar a fonte de verdade do estoque/preco.
+
+Apos a migracao `20260807_restrict_products_public_access`, `products_select_all` nao existe mais e `products_insert_authenticated` exige ownership do parceiro ou membership com papel `owner`, `admin` ou `manager`. Nao houve alteracao de grants amplos. Validacao live: `anon` e `authenticated` sem claims leem 0 linhas diretamente de `products`, enquanto a view publica retorna 9 linhas e nenhum campo proibido (`cost_price`, `stock_reserved`, `deleted_at` ou internos). TypeScript e 22 arquivos/289 testes passaram.
+
+Os leitores autenticados de ERP/PDV/importacao continuam consultando `products` com as policies de parceiro existentes; nao foram migrados para a projecao publica. O teste de Data API autenticado com JWT de usuario real permanece pendente de uma sessao de teste; o papel PostgreSQL `authenticated` sem claims foi validado diretamente.
+
 ## RLS, Auth e Realtime
 
 Evidencia live adicional: a publication `supabase_realtime` foi inspecionada diretamente; ela cobre `notifications`, `reports` e `return_messages`, mas nao cobre as tabelas criticas do marketplace listadas em F-17. Tambem foram confirmados PostgreSQL 17.6, `pg_stat_statements` habilitado, uso dos indices de orders/notifications e o plano Seq Scan da consulta de appointments em uma base ainda pequena.

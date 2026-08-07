@@ -341,18 +341,10 @@ export async function getCollectionItems(collectionId: string, storeId?: string)
     productIds.length > 0
       ? (() => {
           let q = supabase
-            .from("products")
-            .select(`
-              id, name, price, promotional_price, images, rating, condition, created_at,
-              category_id, category:product_categories!category_id(name),
-              partners(id),
-              stores!inner(id, name, slug, logo_url, banner_url, addresses!store_id!left(city, state)),
-              product_variants(variant_options, price_adjustment, is_active),
-              show_price_in_store
-            `)
-            .in("id", productIds)
-            .eq("is_active", true)
-          if (storeId) q = q.eq("store_id", storeId)
+            .rpc("get_marketplace_products_public", {
+              p_product_ids: productIds,
+              p_store_id: storeId || null,
+            })
           return q
         })()
       : Promise.resolve({ data: [] }),
@@ -389,8 +381,17 @@ export async function getCollectionItems(collectionId: string, storeId?: string)
   // Normalize products for ItemCard compatibility
   const productMap = new Map<string, any>()
   for (const p of productsData) {
-    const rawPartner = Array.isArray(p.partners) ? p.partners[0] : p.partners
-    const rawStore = Array.isArray(p.stores) ? p.stores[0] : p.stores
+    const rawPartner = p.partner_id ? { id: p.partner_id } : null
+    const rawStore = p.store_id
+      ? {
+          id: p.store_id,
+          name: p.store_name,
+          slug: p.store_slug,
+          logo_url: p.store_logo_url,
+          banner_url: p.store_banner_url,
+          addresses: [{ city: p.store_city, state: p.store_state }],
+        }
+      : null
     const storeName = rawStore?.name || "Vendedor"
     const storeImage = rawStore?.logo_url || null
     const storeCity = rawStore?.addresses?.[0]?.city || null
@@ -406,14 +407,14 @@ export async function getCollectionItems(collectionId: string, storeId?: string)
         }
       : null
 
-    const variants = p.product_variants || []
+    const variants = p.variants || []
     const activeVariant = variants.find((v: any) => v.is_active)
     const fallbackPrice = activeVariant?.price_adjustment || null
 
-    const { product_variants, ...rest } = p
+    const { variants: _variants, ...rest } = p
     productMap.set(p.id, {
       ...rest,
-      category: (p.category as any)?.name || null,
+      category: p.category_name || null,
       itemType: "produto",
       partners: partner,
       fallback_variant_price: fallbackPrice,

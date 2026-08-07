@@ -134,6 +134,8 @@ export async function importProductsFromXMLAction(xmlContent: string, partnerId:
             .select("*")
             .eq("partner_id", partnerId)
             .eq("gtin", product.gtin)
+            .neq("status", "deleted")
+            .is("deleted_at", null)
             .maybeSingle()
           existingProduct = data
         }
@@ -144,6 +146,8 @@ export async function importProductsFromXMLAction(xmlContent: string, partnerId:
             .select("*")
             .eq("partner_id", partnerId)
             .ilike("name", `%${product.name}%`)
+            .neq("status", "deleted")
+            .is("deleted_at", null)
             .maybeSingle()
           existingProduct = data
         }

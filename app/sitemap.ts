@@ -74,12 +74,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
                 .order("created_at", { ascending: false })
                 .limit(1000),
 
-            // Top 500 most recent products in marketplace
+            // Top 500 most recent public products in marketplace.
+            // Keep this on the safe RPC so sitemap generation does not
+            // require direct access to the operational products table.
             supabase
-                .from("products")
-                .select("id, name, updated_at, created_at, status, partners(id), stores(id, name, addresses!store_id!left(city, state))")
-                .eq("status", "ativo")
-                .eq("show_in_marketplace", true)
+                .rpc("get_marketplace_products_public", { p_product_ids: null, p_store_id: null })
                 .order("created_at", { ascending: false })
                 .limit(500),
 
@@ -100,7 +99,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         // --- Products ---
         const products = productsResponse.data || []
         const productsSitemap: MetadataRoute.Sitemap = products.map((prod: any) => ({
-            url: `https://dudit.com.br${getProductUrl(prod, prod.partners)}`,
+            url: `https://dudit.com.br${getProductUrl(prod, { id: prod.partner_id })}`,
             lastModified: new Date(prod.updated_at || prod.created_at),
             changeFrequency: "daily",
             priority: 0.8,
