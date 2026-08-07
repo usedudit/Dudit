@@ -27,6 +27,8 @@ interface PreferenceRequest {
   buyerId?: string
   couponCode?: string | null
   deliveryFee?: number
+  deliveryType?: "delivery" | "pickup"
+  deliveryAddress?: string
   cartItemIds?: string[]
   payDepositOnly?: boolean
   checkoutPricing?: {
@@ -42,7 +44,7 @@ async function handler(request: NextRequest) {
     const user = await getCurrentUser()
     const adminClient = createAdminClient()
 
-    // SEGURANÃ‡A: Verificar que o usuário está autenticado
+    // SEGURANÇA: Verificar que o usuário está autenticado
     if (!user?.id) {
       return NextResponse.json({ error: "Não autenticado" }, { status: 401 })
     }
@@ -67,7 +69,7 @@ async function handler(request: NextRequest) {
       if (product) {
         partnerId = product.partner_id
       } else {
-        // Pode ser uma variante â€” buscar via product_variants
+        // Pode ser uma variante — buscar via product_variants
         const { data: variant } = await adminClient
           .from("product_variants")
           .select("products(partner_id)")
@@ -109,7 +111,7 @@ async function handler(request: NextRequest) {
     }
 
     let totalAmount = 0
-    const preferenceItems = []
+    const preferenceItems: any[] = []
     let couponItems: any[] = []
 
     const useUnifiedCart = Boolean(body.cartItemIds && body.cartItemIds.length > 0)
@@ -121,6 +123,16 @@ async function handler(request: NextRequest) {
         .update({ pay_deposit_only: Boolean(body.payDepositOnly), updated_at: new Date().toISOString() })
         .in("id", body.cartItemIds!)
         .eq("user_id", user.id)
+
+      if (body.deliveryType) {
+        const targetFulfillmentMode = body.deliveryType === "delivery" ? "delivery" : "pickup"
+        await adminClient
+          .from("cart_items")
+          .update({ fulfillment_mode: targetFulfillmentMode, updated_at: new Date().toISOString() })
+          .in("id", body.cartItemIds!)
+          .eq("user_id", user.id)
+          .or("item_type.eq.product,item_type.is.null,product_id.not.is.null")
+      }
 
       const resolved = await cachedResolveCheckoutCartLines(adminClient, user.id, body.cartItemIds!)
       if (!resolved.success) {
@@ -292,7 +304,7 @@ async function handler(request: NextRequest) {
     })
     totalAmount = pricingResult.finalTotal
 
-    // SEGURANÃ‡A: Validar total
+    // SEGURANÇA: Validar total
     const checkoutFinalTotal = Number(body.checkoutPricing?.finalTotal || 0)
     if (checkoutFinalTotal > 0) {
       const adjustment = Math.round((checkoutFinalTotal - totalAmount + Number.EPSILON) * 100) / 100
@@ -344,7 +356,6 @@ async function handler(request: NextRequest) {
     }
 
     // Adicionar expiração de 30 minutos (1800 segundos) para PIX
-    // Isso cria um deadline para o pagamento PIX
     const thirtyMinutesFromNow = new Date(Date.now() + 30 * 60 * 1000)
     preferencePayload.expiration_date_from = new Date().toISOString()
     preferencePayload.expiration_date_to = thirtyMinutesFromNow.toISOString()
@@ -367,7 +378,6 @@ async function handler(request: NextRequest) {
         mpErrorData = await mpResponse.json()
         console.error("MP Error Response (full):", JSON.stringify(mpErrorData, null, 2))
 
-        // Tentar extrair mensagem de erro do Mercado Pago
         if (mpErrorData?.message) {
           errorMessage = mpErrorData.message
         } else if (mpErrorData?.error?.message) {

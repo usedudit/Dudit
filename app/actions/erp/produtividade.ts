@@ -1,10 +1,12 @@
 "use server"
 
-import { revalidateTag, unstable_cache } from "next/cache"
+import { revalidateTag } from "next/cache"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { requireUser } from "@/lib/auth/authorization"
 import { calculateCommission } from "@/lib/services/commission.service"
+import type { Period, CompareMode } from "@/lib/period-types"
+import { getPeriodDateRange, getCompareDateRange } from "@/lib/period-types"
 
 export type ProductivityOverview = {
   totalSold: number
@@ -15,6 +17,9 @@ export type ProductivityOverview = {
   estimatedCommission: number
   paidCommission: number
   pendingCommission: number
+  totalSoldTrend?: string
+  totalSalesCountTrend?: string
+  averageTicketTrend?: string
 }
 
 export type ProductivityRankingRow = {
@@ -69,26 +74,46 @@ function money(value: number) {
   return Math.round(value * 100) / 100
 }
 
-export async function getProductivityOverviewAction(partnerId: string): Promise<{ success: boolean } & Partial<ProductivityOverview>> {
+function formatTrend(current: number, previous: number, label: string): string {
+  if (previous === 0) {
+    if (current > 0) return `+100% ${label}`
+    return `0% ${label}`
+  }
+  const pct = ((current - previous) / previous) * 100
+  const sign = pct >= 0 ? "+" : ""
+  return `${sign}${pct.toFixed(1)}% ${label}`
+}
+
+export async function getProductivityOverviewAction(
+  partnerId: string,
+  periodMode: Period = "monthly",
+  compareMode: CompareMode = "none",
+  compareFrom?: string,
+  compareTo?: string
+): Promise<{ success: boolean } & Partial<ProductivityOverview>> {
   await requireUser()
 
   const admin = getAdminClient()
-  const now = new Date()
-  const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+  const today = new Date().toISOString().slice(0, 10)
+  const currentRange = getPeriodDateRange(periodMode, today)
+  const startDate = `${currentRange.from}T00:00:00.000Z`
+  const endDate = `${currentRange.to}T23:59:59.999Z`
 
   const [ordersResult, commissionsResult, goalsResult] = await Promise.all([
     admin
       .from("orders")
       .select("id, total_amount, created_at, seller_partner_user_id", { count: "exact" })
       .eq("partner_id", partnerId)
-      .gte("created_at", firstOfMonth)
+      .gte("created_at", startDate)
+      .lte("created_at", endDate)
       .neq("situation", "cancelled"),
     admin
       .from("transactions")
       .select("id, amount, status, seller_partner_user_id")
       .eq("partner_id", partnerId)
       .eq("category", "Comissões")
-      .gte("created_at", firstOfMonth),
+      .gte("created_at", startDate)
+      .lte("created_at", endDate),
     admin
       .from("sales_goals")
       .select("id, target_amount")
@@ -120,6 +145,41 @@ export async function getProductivityOverviewAction(partnerId: string): Promise<
 
   const estimatedCommission = await calculateEstimatedCommission(admin, partnerId, orders)
 
+  let totalSoldTrend: string | undefined
+  let totalSalesCountTrend: string | undefined
+  let averageTicketTrend: string | undefined
+
+  if (compareMode !== "none") {
+    const compareRange = getCompareDateRange(compareMode, today, currentRange.from, compareFrom, compareTo)
+    if (compareRange) {
+      const prevStartDate = `${compareRange.from}T00:00:00.000Z`
+      const prevEndDate = `${compareRange.to}T23:59:59.999Z`
+
+      const { data: prevOrders } = await admin
+        .from("orders")
+        .select("total_amount")
+        .eq("partner_id", partnerId)
+        .gte("created_at", prevStartDate)
+        .lte("created_at", prevEndDate)
+        .neq("situation", "cancelled")
+
+      const prevList = prevOrders || []
+      const prevTotalSold = prevList.reduce((sum: number, o: any) => sum + money(Number(o.total_amount || 0)), 0)
+      const prevTotalSalesCount = prevList.length
+      const prevAverageTicket = prevTotalSalesCount > 0 ? money(prevTotalSold / prevTotalSalesCount) : 0
+
+      const label = compareMode === "previous-day" ? "vs dia anterior"
+        : compareMode === "previous-week" ? "vs semana anterior"
+          : compareMode === "previous-month" ? "vs mês anterior"
+            : compareMode === "custom" ? "vs período comp."
+              : "vs anterior"
+
+      totalSoldTrend = formatTrend(totalSold, prevTotalSold, label)
+      totalSalesCountTrend = formatTrend(totalSalesCount, prevTotalSalesCount, label)
+      averageTicketTrend = formatTrend(averageTicket, prevAverageTicket, label)
+    }
+  }
+
   return {
     success: true,
     totalSold,
@@ -130,6 +190,9 @@ export async function getProductivityOverviewAction(partnerId: string): Promise<
     estimatedCommission: money(estimatedCommission),
     paidCommission,
     pendingCommission: money(Math.max(0, estimatedCommission - paidCommission)),
+    totalSoldTrend,
+    totalSalesCountTrend,
+    averageTicketTrend,
   }
 }
 

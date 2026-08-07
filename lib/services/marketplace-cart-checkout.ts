@@ -48,6 +48,15 @@ export async function priceMarketplaceCartCheckout(
     paymentMethod?: PricingInput["paymentMethod"]
   },
 ): Promise<{ success: true; data: MarketplaceCartCheckoutPricing } | { success: false; error: string }> {
+  // Ensure cart fulfillment mode for products matches the requested deliveryType
+  const targetFulfillmentMode = params.deliveryType === "delivery" ? "delivery" : "pickup"
+  await adminClient
+    .from("cart_items")
+    .update({ fulfillment_mode: targetFulfillmentMode, updated_at: new Date().toISOString() })
+    .in("id", params.cartItemIds)
+    .eq("user_id", params.userId)
+    .or("item_type.eq.product,item_type.is.null,product_id.not.is.null")
+
   const resolved = await resolveCheckoutCartLines(adminClient, params.userId, params.cartItemIds)
   if (!resolved.success) return { success: false, error: resolved.error }
 

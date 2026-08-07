@@ -7,7 +7,7 @@ import { TabCountBadge } from "@/components/reusable/TabCountBadge"
 import FilterChip from "@/components/reusable/FilterChip"
 import { SearchIcon, PlusIcon, GridIcon, AwardIcon, RankingIcon, FilterIcon, CheckCircleIcon } from "@/lib/icons"
 
-type Tab = "Metas" | "Ranking" | "Resumo"
+type Tab = "Metas" | "Ranking"
 
 type FilterState = {
     status: string[]
@@ -34,7 +34,7 @@ export default function GoalsPageControls(props: {
     onRankingEndDateChange?: (val: string) => void
     onApplyRankingFilter?: () => void
     rankingLoading?: boolean
-    tabCounts?: { Metas: number; Ranking: number; Resumo: number }
+    tabCounts?: { Metas: number; Ranking: number }
 }) {
     return (
         <>
@@ -43,7 +43,6 @@ export default function GoalsPageControls(props: {
                     <TabsList className="px-0">
                         <TabsTrigger value="Metas" icon={AwardIcon} badge={props.tabCounts && <TabCountBadge count={props.tabCounts.Metas} variant="gray" />}>Metas</TabsTrigger>
                         <TabsTrigger value="Ranking" icon={RankingIcon} badge={props.tabCounts && <TabCountBadge count={props.tabCounts.Ranking} variant="gray" />}>Ranking</TabsTrigger>
-                        <TabsTrigger value="Resumo" icon={GridIcon} badge={props.tabCounts && <TabCountBadge count={props.tabCounts.Resumo} variant="gray" />}>Resumo</TabsTrigger>
                     </TabsList>
                 </Tabs>
             </div>

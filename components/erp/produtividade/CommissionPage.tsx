@@ -6,6 +6,7 @@ import { IconPlaceholder } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils"
 import { usePermissions } from "@/lib/permission-context"
 import { useMediaQuery } from "@/components/erp/hooks"
+import { KPICard } from "@/components/erp/dashboard/cards/KPICard"
 import CommissionPaymentModal from "@/components/erp/produtividade/CommissionPaymentModal"
 import CommissionPageControls from "@/components/erp/produtividade/CommissionPageControls"
 import CommissionListItem from "@/components/erp/produtividade/CommissionListRow"
@@ -145,37 +146,10 @@ export default function CommissionPage({ partnerId, overview }: Props) {
         />
 
         <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-6 mb-8">
-            {[
-              { title: "Total Pendente", value: formatCurrency(overview.totalPending) },
-              { title: "Total Pago", value: formatCurrency(overview.totalPaid) },
-              { title: "Total Geral", value: formatCurrency(overview.totalGeneral) },
-              { title: "Bônus de Metas", value: formatCurrency(overview.goalBonuses) },
-              { title: "Comissão Prevista", value: formatCurrency(overview.estimatedCommission) },
-            ].map((card, i) => {
-              const Icon = metricIcons[i]
-              const toneClass = metricTones[i]
-              return (
-                <div
-                  key={card.title}
-                  className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex flex-col justify-between"
-                >
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex items-center space-x-3">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${toneClass}`}>
-                        <Icon size={18} />
-                      </div>
-                      <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{card.title}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-baseline mt-2">
-                    <h2 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
-                      {card.value}
-                    </h2>
-                  </div>
-                </div>
-              )
-            })}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+            <KPICard title="Comissão Prevista" value={formatCurrency(overview.estimatedCommission)} />
+            <KPICard title="Comissão Paga" value={formatCurrency(overview.totalPaid)} />
+            <KPICard title="Comissão Pendente" value={formatCurrency(overview.totalPending)} />
           </div>
 
           {filteredSellers.length === 0 ? (

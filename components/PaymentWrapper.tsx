@@ -244,6 +244,8 @@ export function PaymentWrapper({
                         buyerId,
                         couponCode: orderDetails.couponCode,
                         deliveryFee: orderDetails.deliveryFee,
+                        deliveryType: orderDetails.deliveryType,
+                        deliveryAddress: orderDetails.deliveryAddress,
                         cartItemIds: orderDetails.cartItemIds,
                         payDepositOnly,
                         checkoutPricing: orderDetails.checkoutPricing,

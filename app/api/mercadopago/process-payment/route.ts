@@ -208,12 +208,25 @@ async function handler(request: NextRequest) {
     const useUnifiedCart = Boolean(cartItemIds && cartItemIds.length > 0)
 
     if (useUnifiedCart) {
-      // Update pay_deposit_only in DB
+      // Update pay_deposit_only and fulfillment_mode in DB for cart items
       await adminClient
         .from("cart_items")
-        .update({ pay_deposit_only: Boolean(payDepositOnly), updated_at: new Date().toISOString() })
+        .update({
+          pay_deposit_only: Boolean(payDepositOnly),
+          updated_at: new Date().toISOString(),
+        })
         .in("id", cartItemIds!)
         .eq("user_id", buyerId)
+
+      await adminClient
+        .from("cart_items")
+        .update({
+          fulfillment_mode: normalizedDeliveryType,
+          updated_at: new Date().toISOString(),
+        })
+        .in("id", cartItemIds!)
+        .eq("user_id", buyerId)
+        .or("item_type.eq.product,item_type.is.null,product_id.not.is.null")
 
       // Resolve local payment method config for the unified engine
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(paymentFormData?.payment_method_id || ""))

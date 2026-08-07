@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react"
 import { FadeIn } from "@/components/animations/FadeIn"
 import IconPlaceholder from "@/components/reusable/IconPlaceholder"
+import { KPICard } from "@/components/erp/dashboard/cards/KPICard"
 import {
   ResponsiveContainer,
   BarChart,
@@ -27,19 +28,6 @@ import {
 } from "@/lib/icons"
 
 const COLORS = ["#10B981", "#3B82F6", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899", "#14B8A6", "#F97316"]
-
-const iconsList = [MoneyIcon, ShoppingCartIcon, TrendingUpIcon, TargetIcon, AwardIcon, ChartIcon, MoneyIcon, MoneyIcon]
-
-const toneMap = [
-  "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400",
-  "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400",
-  "bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400",
-  "bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400",
-  "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400",
-  "bg-cyan-100 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400",
-  "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400",
-  "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400",
-]
 
 type Props = {
   overview: ProductivityOverview
@@ -93,50 +81,15 @@ export default function ProductivityPage({ overview, ranking }: Props) {
     [sortedRanking],
   )
 
-  const cardData = useMemo(
-    () => [
-      { title: "Total Vendido", value: formatCurrency(overview.totalSold) },
-      { title: "Qtd de Vendas", value: String(overview.totalSalesCount) },
-      { title: "Ticket Médio", value: formatCurrency(overview.averageTicket) },
-      { title: "Meta Geral", value: formatCurrency(overview.generalGoal) },
-      { title: "Meta Atingida", value: `${overview.goalAchievedPercent.toFixed(1)}%` },
-      { title: "Comissão Prevista", value: formatCurrency(overview.estimatedCommission) },
-      { title: "Comissão Paga", value: formatCurrency(overview.paidCommission) },
-      { title: "Comissão Pendente", value: formatCurrency(overview.pendingCommission) },
-    ],
-    [overview],
-  )
-
   return (
     <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
       <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
         <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-10 space-y-8">
-          {/* Cards - exato estilo do dashboard SummaryCards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
-            {cardData.map((card, i) => {
-              const Icon = iconsList[i % iconsList.length]
-              const toneClass = toneMap[i % toneMap.length]
-              return (
-                <div
-                  key={card.title}
-                  className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex flex-col justify-between"
-                >
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex items-center space-x-3">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${toneClass}`}>
-                        <Icon size={18} />
-                      </div>
-                      <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{card.title}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-baseline mt-2">
-                    <h2 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
-                      {card.value}
-                    </h2>
-                  </div>
-                </div>
-              )
-            })}
+          {/* KPICards - Total Vendido, Qtd de Vendas, Ticket Médio */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            <KPICard title="Total Vendido" value={formatCurrency(overview.totalSold)} trend={overview.totalSoldTrend} />
+            <KPICard title="Qtd de Vendas" value={overview.totalSalesCount} trend={overview.totalSalesCountTrend} />
+            <KPICard title="Ticket Médio" value={formatCurrency(overview.averageTicket)} trend={overview.averageTicketTrend} />
           </div>
 
           {/* Charts */}

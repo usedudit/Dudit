@@ -190,16 +190,6 @@ Informe o endereço completo. Digite o **CEP** para preenchimento automático.
             }
         ]
     },
-
-    {
-        id: "gestao",
-        title: "Gestão",
-        articles: [
-            { id: "pedidos", title: "Gestão de pedidos", description: "", slug: "pedidos", category: "gestao", content: "Conteúdo em breve..." },
-            { id: "clientes", title: "Clientes", description: "", slug: "clientes", category: "gestao", content: "Conteúdo em breve..." },
-            { id: "delivery", title: "Delivery", description: "", slug: "delivery", category: "gestao", content: "Conteúdo em breve..." },
-        ]
-    },
     {
         id: "produtos",
         title: "Produtos",
@@ -2613,6 +2603,1398 @@ Se você ativar o **lançamento automático**, sim. Caso contrário, o bônus é
 
 **Metas expiradas podem ser reativadas?**
 Não diretamente. Você pode criar uma nova meta com as mesmas configurações e datas ajustadas.
+
+---
+
+**Ainda com dúvidas?** Entre em contato com nosso suporte ou consulte o artigo específico sobre o assunto na Central de Ajuda.
+`
+            }
+        ]
+    },
+    {
+        id: "produtos-estoque",
+        title: "Produtos e Estoque",
+        icon: "📦",
+        articles: [
+            {
+                id: "visao-geral-produtos-estoque",
+                title: "Visão geral de Produtos e Estoque",
+                description: "Entenda o módulo completo de produtos, catálogo e controle de estoque.",
+                slug: "visao-geral-produtos-estoque",
+                category: "produtos-estoque",
+                content: `
+## Visão geral
+
+A seção **Produtos e Estoque** é onde você gerencia todo o seu catálogo: cadastra produtos, organiza por categorias e marcas, controla o estoque, registra entradas e saídas, importa notas fiscais e gera etiquetas. Tudo em um só lugar para manter sua operação funcionando.
+
+![Tela principal de Produtos](https://img.dudit.com.br/static/screens/Produtos_VisaoGeral.png)
+Legenda: Página inicial da seção de Produtos com listagem, busca, filtros e atalhos.
+
+## Conceitos importantes
+
+**Produto ativo vs. inativo**
+Um produto ativo aparece na vitrine e pode ser comprado. Produtos inativos ficam salvos no sistema mas não são exibidos. Use essa opção quando quiser pausar a venda de um item sem perder seus dados.
+
+**Exibir na vitrine**
+Controla se o produto aparece ou não na sua loja online. Diferente do status ativo/inativo, essa opção é específica para a vitrine. Você pode manter um produto ativo no sistema mas ocultá-lo da loja.
+
+**Preço com "Valor sob consulta"**
+Você pode optar por não exibir o preço do produto na vitrine. Nesse caso, o cliente verá a mensagem "Valor sob consulta" e precisará entrar em contato para saber o preço.
+
+**Produto com variações**
+Produtos que possuem diferentes versões, como roupas com cores e tamanhos. Em vez de criar um cadastro para cada variação, você cria um único produto e adiciona as opções dentro dele.
+
+**Estoque**
+Quantidade disponível do produto. Você define o estoque inicial e pode registrar movimentações ao longo do tempo (entradas e saídas).
+
+**Situação do estoque**
+Cada produto recebe um indicador visual baseado no seu estoque:
+- **Normal** (verde): estoque acima do mínimo configurado
+- **Baixo** (amarelo): estoque igual ou abaixo do mínimo
+- **Esgotado** (vermelho): estoque zero
+
+## O que você encontra nesta seção
+
+**Cadastro de produtos** - Crie produtos físicos, digitais ou serviços com todas as informações: nome, imagens, preços, estoque, dados fiscais, variações e muito mais.
+
+**Organização do catálogo** - Categorias, subcategorias, marcas, unidades de medida e localizações físicas para manter tudo organizado e fácil de encontrar.
+
+**Variações** - Gerencie diferentes versões de um mesmo produto (cor, tamanho, voltagem, etc.) com preço, estoque e imagem próprios para cada variação.
+
+**Controle de estoque** - Acompanhe a quantidade disponível, configure estoque mínimo, visualize a situação (Normal/Baixo/Esgotado) e faça ajustes rápidos.
+
+**Movimentações de estoque** - Registre entradas (compras, devoluções, ajustes) e saídas (avarias, perdas, uso interno, ajustes) com histórico completo e opção de desfazer.
+
+**Fornecedores** - Cadastre fornecedores, vincule aos produtos com SKU e custo próprio, veja histórico de compras e evolução de custos.
+
+**Importação de XML/NF-e** - Importe notas fiscais de entrada (modelo 55) para cadastrar ou atualizar produtos em lote, dar entrada no estoque e atualizar custos automaticamente.
+
+**Etiquetas** - Gere etiquetas com nome, preço, código de barras e outras informações para organizar sua loja física e estoque.
+
+## Como acessar
+
+1. No menu lateral do painel de controle, clique em **Produtos**.
+2. Você verá a lista de todos os produtos cadastrados.
+3. Use a barra de busca para encontrar produtos por nome ou SKU.
+4. Use as abas de estoque (**Todos**, **Normal**, **Baixo**, **Esgotado**, **Arquivados**) para filtrar rapidamente pela situação do estoque.
+5. Clique em **Filtros** para refinar por categoria, marca, status, faixa de preço e mais.
+
+![Menu lateral destacando a opção Produtos](https://img.dudit.com.br/static/screens/Menu_Produtos.png)
+Legenda: Acesso à seção de produtos pelo menu principal.
+
+## Dicas importantes
+
+- Mantenha os dados fiscais sempre corretos (NCM, origem) para emitir notas fiscais sem problemas.
+- Organize seus produtos em categorias desde o início - isso facilita a gestão e ajuda os clientes a encontrarem o que procuram.
+- Produtos com imagens de qualidade vendem mais. Tire fotos com boa iluminação e fundo neutro.
+- Configure o estoque mínimo para receber alertas visuais quando chegar a hora de reabastecer.
+- Registre todas as entradas e saídas de estoque para manter o histórico completo e evitar diferenças entre o estoque físico e o sistema.
+
+## Perguntas frequentes
+
+**Posso ter produtos físicos e digitais na mesma loja?**
+Sim. Ao cadastrar, você escolhe o tipo do produto: físico, digital ou serviço.
+
+**O que acontece quando desativo um produto?**
+Ele continua salvo com todas as informações, mas não aparece na vitrine e não pode ser comprado. Você pode reativá-lo quando quiser.
+
+**Qual a diferença entre "Inativo" e "Não exibir na vitrine"?**
+"Inativo" desativa o produto por completo. "Não exibir na vitrine" mantém o produto ativo no sistema (aparece em relatórios, pode ser vendido no PDV) mas não o mostra na loja online.
+
+**Preciso de plano específico para usar variações?**
+Alguns recursos avançados podem estar disponíveis apenas em determinados planos.
+
+**A importação de XML atualiza o preço de venda?**
+Não. A importação atualiza o estoque e o preço de custo. O preço de venda permanece o mesmo que você definiu.
+`
+            },
+            {
+                id: "como-cadastrar-produto",
+                title: "Como cadastrar um produto",
+                description: "Aprenda o passo a passo para cadastrar produtos físicos, digitais ou serviços.",
+                slug: "como-cadastrar-produto",
+                category: "produtos-estoque",
+                content: `
+## Visão geral
+
+O cadastro de produtos é o primeiro passo para vender. Você pode cadastrar produtos físicos, digitais ou serviços com todas as informações necessárias para a venda, emissão de notas fiscais e controle de estoque.
+
+![Tela de cadastro de produto](https://img.dudit.com.br/static/screens/Produto_Cadastro.png)
+Legenda: Formulário completo de cadastro de produto com abas laterais.
+
+## Quando usar
+
+Cadastre um produto sempre que quiser adicionar um novo item ao seu catálogo. Você pode fazer isso de três formas:
+
+- **Manual**: preenchendo o formulário um a um (explicado neste artigo)
+- **Importação por XML**: a partir de notas fiscais de fornecedores (ideal para muitos produtos de uma vez)
+- **Duplicação**: copiando um produto existente e ajustando as informações
+
+## Como fazer
+
+### 1. Acessar o cadastro
+
+1. No menu lateral, clique em **Produtos**.
+2. Clique no botão **Novo produto** no canto superior direito.
+
+![Botão Novo produto](https://img.dudit.com.br/static/screens/Botao_NovoProduto.png)
+Legenda: Clique em "Novo produto" para iniciar o cadastro.
+
+### 2. Preencher informações básicas
+
+**Nome do produto** (obrigatório): Escolha um nome claro e descritivo. Inclua informações como marca, modelo e característica principal.
+
+**Imagens**: Clique para adicionar fotos do produto. Você pode:
+- Enviar arquivos do computador
+- Ajustar o recorte da imagem
+- Definir uma imagem principal (primeira da lista)
+- Remover imagens indesejadas
+
+![Seção de imagens](https://img.dudit.com.br/static/screens/Produto_Imagens.png)
+Legenda: Adicione fotos do produto e defina qual será a imagem principal.
+
+**Status**: Define se o produto está ativo (disponível para venda) ou inativo.
+
+**Exibir na vitrine**: Controla se o produto aparece na sua loja online.
+
+### 3. Configurar preço
+
+- **Preço de custo**: quanto você pagou pelo produto (ou quanto custou para produzir).
+- **Preço de venda**: valor que será cobrado do cliente (obrigatório).
+- **Preço promocional**: valor promocional temporário. Enquanto estiver preenchido, será exibido no lugar do preço normal.
+- **Exibir o preço na vitrine online**: se desmarcar, o produto aparecerá com "Valor sob consulta" e os campos de preço serão zerados.
+
+> [!TIP]
+> Use a calculadora de margem ao lado do preço para ver qual será sua margem de lucro baseada no custo e no preço de venda.
+
+### 4. Definir estoque inicial
+
+- **Estoque atual**: quantidade disponível para venda.
+- **Estoque mínimo**: quantidade mínima ideal. Quando o estoque atingir esse valor, o sistema alerta que está baixo.
+- **Localização**: onde o produto fica armazenado (ex: "Prateleira A3", "Galpão 2"). Você pode criar novas localizações na hora.
+- **Permitir vender sem estoque**: quando ativado, o produto pode ser vendido mesmo com estoque zerado (útil para produtos sob encomenda).
+
+### 5. Informações de organização (barra lateral direita)
+
+**SKU (código do produto)**: Um código único para identificar o produto. Se não preencher, o sistema gera automaticamente. Você também pode clicar no ícone de dado para sortear um código aleatório.
+
+**Código de barras (EAN/GTIN)**: O código de barras do produto. Você pode digitar o número ou clicar no ícone de dado para gerar um código EAN-13 automaticamente.
+
+**Categoria**: Classifique o produto em uma categoria (ex: "Roupas", "Eletrônicos"). Se a categoria desejada não existir, você pode criar na hora clicando em "Criar nova categoria".
+
+**Subcategoria**: Disponível após selecionar uma categoria. Exemplo: dentro de "Roupas", você pode ter "Camisetas", "Calças", etc.
+
+**Marca**: Selecione a marca do produto. Também é possível criar uma nova marca durante o cadastro.
+
+**Unidade**: Unidade de medida do produto (UN, KG, LT, PC, CX, etc.).
+
+### 6. Preencher dados de envio (aba "Envio e Dimensões")
+
+Essa seção fica dentro do acordeão "Envio e Dimensões". Preencha estas informações para calcular o frete corretamente:
+
+- **Peso líquido e bruto** (em kg)
+- **Prazo de preparação**: quantos dias você leva para preparar o produto após a compra
+- **Tipo de embalagem**: pacote/caixa, cilindro/rolo ou envelope
+- **Dimensões**: largura, altura e profundidade (em cm)
+
+### 7. Informações fiscais (aba "Dados Fiscais")
+
+- **NCM**: código obrigatório de 8 dígitos. Se não souber, digite o nome do produto e clique no ícone de estrela para sugerir o NCM automaticamente.
+- **Origem da mercadoria**: nacional, importada, etc.
+- **CEST**: obrigatório apenas para produtos sujeitos a Substituição Tributária.
+- **CFOP, CSOSN, alíquotas**: campos para configuração tributária detalhada (o sistema preenche padrões baseados no seu regime).
+
+> [!IMPORTANT]
+> NCM e Origem da mercadoria são obrigatórios para emitir notas fiscais. Use o sugeridor automático de NCM sempre que tiver dúvida.
+
+### 8. Salvar
+
+Clique em **Salvar**. O produto será criado e aparecerá na sua lista de produtos.
+
+![Botão Salvar](https://img.dudit.com.br/static/screens/Botao_SalvarProduto.png)
+Legenda: Finalize o cadastro clicando em "Salvar".
+
+## Dicas importantes
+
+- **Fotos de qualidade fazem diferença**: produtos com imagens claras e bem iluminadas vendem mais.
+- **SKU único**: cada produto precisa ter um SKU diferente. Se tentar usar um SKU já existente, o sistema gera automaticamente um código alternativo.
+- **NCM correto**: usar o NCM errado pode gerar problemas fiscais. Use o sugeridor automático sempre que tiver dúvida.
+- **Produto sem estoque**: se não quiser controlar estoque, ative "Permitir vender sem estoque" e mantenha o estoque como 0.
+- **Duplicação**: para produtos similares, use a opção "Duplicar" no menu de ações do produto - economiza tempo preenchendo dados iguais.
+
+## Problemas comuns
+
+**"Preciso preencher todos os campos?"**
+Não. Apenas Nome e Preço de Venda são obrigatórios para salvar. NCM e Origem da Mercadoria também são obrigatórios para emissão de notas fiscais.
+
+**"Posso adicionar imagens depois?"**
+Sim. É possível editar o produto e adicionar ou remover imagens a qualquer momento.
+
+**"O que é SKU e para que serve?"**
+SKU é um código interno para identificar o produto. Ele ajuda na organização do estoque, na localização do produto no sistema e na integração com marketplaces e transportadoras.
+
+**"Como cadastrar um produto digital ou serviço?"**
+No campo "Tipo do Item", selecione "Digital" ou "Serviço". Produtos digitais não precisam de dados de envio nem de estoque físico. Serviços também não controlam estoque.
+
+**"Criei o produto mas não aparece na loja."**
+Verifique se: Status = Ativo, Exibir na Vitrine = Sim, e se tem preço de venda (ou "Valor sob consulta" está desmarcado).
+
+## Perguntas frequentes
+
+**Quantos produtos posso cadastrar?**
+Depende do seu plano. Se você tentar cadastrar e atingir o limite, o sistema avisa e sugere o upgrade para um plano superior.
+
+**Posso editar um produto depois de criado?**
+Sim. Clique no produto na listagem e depois em **Editar produto**. Todas as informações podem ser alteradas, inclusive imagens, preço e estoque.
+
+**Como duplicar um produto?**
+Na tela de detalhes do produto, clique no menu de ações (três pontos) e selecione **Duplicar**. O sistema cria uma cópia com "(Cópia)" no nome e um novo SKU.
+
+**Como excluir um produto?**
+Na tela de detalhes, clique no menu de ações e selecione **Excluir**. Confirme a exclusão. Atenção: esta ação não pode ser desfeita. O produto e suas imagens são removidos permanentemente.
+
+**É possível excluir vários produtos de uma vez?**
+Sim. Selecione os produtos usando os checkboxes na listagem e escolha a opção de exclusão em lote no menu de ações.
+`
+            },
+            {
+                id: "como-organizar-catalogo",
+                title: "Como organizar seu catálogo",
+                description: "Saiba como usar categorias, marcas, SKUs, filtros e ações em lote para manter seus produtos organizados.",
+                slug: "como-organizar-catalogo",
+                category: "produtos-estoque",
+                content: `
+## Visão geral
+
+Manter os produtos bem organizados facilita o dia a dia: você encontra qualquer item rapidamente, seus clientes navegam com mais facilidade na loja e a gestão do estoque fica mais simples.
+
+![Lista de produtos com filtros](https://img.dudit.com.br/static/screens/Produtos_Filtros.png)
+Legenda: Utilize filtros e busca para encontrar produtos rapidamente.
+
+## Quando usar
+
+A organização é útil em várias situações:
+
+- Você tem muitos produtos e precisa encontrar um específico
+- Quer agrupar produtos por tipo, marca ou departamento
+- Precisa entender quais produtos estão com estoque baixo
+- Deseja aplicar alterações em lote (preço, estoque, ativar/desativar)
+- Quer exportar a lista de produtos para uma planilha
+
+## Como organizar seus produtos
+
+### Categorias e subcategorias
+
+Categorias agrupam produtos por tipo. Exemplo: "Roupas", "Calçados", "Acessórios".
+
+As subcategorias são divisões dentro de uma categoria. Exemplo: dentro de "Roupas" você pode ter "Camisetas", "Calças", "Jaquetas".
+
+**Para criar uma categoria:**
+
+1. Ao cadastrar ou editar um produto, localize o campo **Categoria** na barra lateral direita.
+2. Clique no botão **Criar nova categoria** dentro do campo.
+3. Digite o nome e confirme.
+4. A categoria será criada e selecionada automaticamente no produto.
+
+**Para criar uma subcategoria:**
+
+1. Primeiro, selecione a categoria principal.
+2. No campo **Subcategoria**, clique em **Criar nova subcategoria**.
+3. Digite o nome e confirme.
+
+> [!TIP]
+> Ao trocar a categoria de um produto, a subcategoria é limpa automaticamente.
+
+**Gerenciar categorias existentes:**
+Acesse **Cadastros** no menu lateral > aba **Categorias**. Lá você pode editar, renomear, ativar/desativar ou excluir categorias e subcategorias.
+
+### Marcas
+
+Vincular marcas aos produtos ajuda na organização e na busca. Para criar uma marca:
+
+1. No campo **Marca**, clique em **Criar nova marca**.
+2. Digite o nome e confirme.
+
+![Campo de Marca](https://img.dudit.com.br/static/screens/Produto_Marca.png)
+Legenda: Crie marcas diretamente no cadastro do produto.
+
+**Gerenciar marcas existentes:**
+Acesse **Cadastros** > aba **Marcas**.
+
+### Localizações físicas
+
+Útil para saber onde cada produto está guardado no seu estoque físico (ex: "Prateleira A3", "Galpão 2", "Caixa 12").
+
+1. No campo **Localização**, clique em **Criar nova localização**.
+2. Digite o nome e confirme.
+
+**Gerenciar localizações existentes:**
+Acesse **Cadastros** > aba **Localizações**.
+
+### Unidades de medida
+
+Defina a unidade de cada produto (UN, KG, LT, PC, CX, M, M2, M3, etc.). A unidade aparece nos pedidos, notas fiscais e etiquetas.
+
+### SKU (código interno)
+
+O SKU é um código único que identifica cada produto no seu sistema. Diferente do código de barras, o SKU é definido por você.
+
+**Boas práticas para criar SKUs:**
+- Use códigos que sejam fáceis de identificar (ex: \`CAM-AZUL-M\` para "Camiseta Azul tamanho M")
+- Evite caracteres especiais e espaços
+- Mantenha um padrão para todos os produtos
+
+O sistema pode gerar um SKU automaticamente se você não informar um (clique no ícone de dado ao lado do campo).
+
+### Código de barras (EAN/GTIN)
+
+O código de barras é usado para identificação em lojas físicas e para integrações com marketplaces. Você pode:
+- **Digitar manualmente**: insira o código de barras oficial do produto
+- **Gerar automaticamente**: clique no ícone de dado ao lado do campo para gerar um código EAN-13 interno
+
+![Código de barras](https://img.dudit.com.br/static/screens/Produto_CodigoBarras.png)
+Legenda: Gere um código de barras automaticamente com um clique.
+
+### Busca e filtros na listagem
+
+A página de produtos oferece várias ferramentas para encontrar o que você precisa:
+
+**Busca por texto**: digite o nome ou SKU do produto na barra de busca.
+
+**Abas de estoque**: filtre rapidamente por:
+- **Todos**: exibe todos os produtos
+- **Normal**: produtos com estoque dentro do esperado
+- **Baixo**: produtos com estoque abaixo do mínimo configurado
+- **Esgotado**: produtos com estoque zero
+- **Arquivados**: produtos arquivados
+
+**Filtros avançados**: clique em **Filtros** para refinar por:
+- Status (Ativo / Inativo)
+- Faixa de preço
+- Categoria
+- Marca
+- Unidade
+- Situação de estoque
+- Tipo de produto (Físico, Digital, Serviço)
+- Com/sem preço de custo
+- Em promoção
+
+![Painel de filtros](https://img.dudit.com.br/static/screens/Produtos_FiltrosAvancados.png)
+Legenda: Utilize filtros para encontrar produtos específicos.
+
+**Ordenação**: clique nos cabeçalhos da tabela para ordenar por nome, preço, estoque, etc.
+
+### Ações em lote
+
+Selecione vários produtos usando os checkboxes para realizar ações em massa:
+
+- **Ativar / Desativar**: altera o status de todos os selecionados
+- **Editar em massa**: ajusta preço, estoque, visibilidade ou imagens de vários produtos de uma vez
+- **Arquivar / Desarquivar**: move produtos para fora da listagem principal sem excluir
+- **Excluir**: remove todos os selecionados (cuidado: ação irreversível)
+
+**Como editar em massa:**
+
+1. Selecione os produtos desejados.
+2. No menu de ações, escolha **Editar em massa**.
+3. Escolha o tipo de alteração:
+   - **Preço**: aumentar ou diminuir em percentual, ou definir valor fixo
+   - **Estoque**: somar, subtrair, definir valor fixo ou zerar
+   - **Visibilidade**: publicar ou ocultar da vitrine
+   - **Imagem**: adicionar uma imagem a todos os selecionados ou remover imagens
+
+![Modal de edição em massa](https://img.dudit.com.br/static/screens/Produtos_EdicaoMassa.png)
+Legenda: Aplique alterações a vários produtos de uma só vez.
+
+### Exportação de produtos
+
+Você pode exportar a lista de produtos atual para uma planilha Excel (.xlsx). A exportação considera os filtros e a busca aplicados no momento.
+
+1. Clique no menu **Ações**.
+2. Selecione **Exportar**.
+3. O arquivo será baixado com os dados dos produtos filtrados.
+
+## Dicas importantes
+
+- **Crie categorias antes de cadastrar produtos**: planeje sua árvore de categorias com antecedência para manter a organização desde o início.
+- **Use SKUs padronizados**: isso facilita a localização no sistema e a integração com marketplaces e transportadoras.
+- **Aproveite a busca por código de barras**: você pode usar um leitor de código de barras para localizar produtos rapidamente - o sistema identifica tanto GTIN quanto SKU.
+- **Edição em massa com cuidado**: antes de alterar preços ou estoques em lote, verifique se a seleção está correta.
+- **Arquive em vez de excluir**: se não vende mais um produto mas quer manter o histórico, use "Arquivar". Produtos arquivados não aparecem na vitrine nem na listagem principal, mas ficam salvos.
+
+## Problemas comuns
+
+**"Não consigo encontrar um produto que sei que existe."**
+Verifique se não há filtros ativos (abas de estoque, filtros avançados) que estejam escondendo o produto. Use a busca por nome ou SKU.
+
+**"Alterei a categoria mas a subcategoria sumiu."**
+É o comportamento esperado. Ao trocar a categoria, a subcategoria é limpa automaticamente. Selecione a nova subcategoria depois.
+
+**"A edição em massa não funcionou para todos os produtos."**
+Verifique se todos os produtos selecionados permitem a alteração. Por exemplo: produtos com variações não permitem editar preço/estoque do produto pai - você deve editar cada variação individualmente.
+
+## Perguntas frequentes
+
+**Posso ter um produto sem categoria?**
+Sim. A categoria não é obrigatória, mas recomendamos usar para organizar melhor.
+
+**Como faço para editar uma categoria existente?**
+Acesse **Cadastros** no menu lateral > aba **Categorias**. Lá você pode editar, renomear ou excluir categorias e marcas.
+
+**O que acontece se eu excluir uma categoria?**
+Os produtos que estavam nela ficam sem categoria. Você precisará reclassificá-los manualmente.
+
+**Posso ter subcategorias em vários níveis?**
+O sistema suporta dois níveis: Categoria > Subcategoria. Para estruturas mais complexas, use nomes compostos (ex: "Roupas > Camisetas > Manga Longa").
+
+**É possível imprimir a lista de produtos?**
+            Você pode exportar a lista para Excel e imprimir a planilha.
+
+            **Quantos produtos posso selecionar para edição em massa?**
+            Não há limite fixo, mas recomendamos selecionar grupos menores (até 50-100 por vez) para evitar problemas de performance.
+            `
+            },
+            {
+                id: "como-trabalhar-com-variacoes",
+                title: "Como trabalhar com variações",
+                description: "Aprenda a criar variações de cor, tamanho e outras opções para seus produtos.",
+                slug: "como-trabalhar-com-variacoes",
+                category: "produtos-estoque",
+                content: `
+## Visão geral
+
+Variações permitem vender diferentes versões de um mesmo produto sem precisar criar vários cadastros separados. Por exemplo, uma camiseta que existe nas cores azul, preta e branca e nos tamanhos P, M e G.
+
+![Aba de Variações](https://img.dudit.com.br/static/screens/Produto_Variacoes.png)
+Legenda: Gerencie cores, tamanhos e outras variações do produto.
+
+## Quando usar
+
+Use variações quando seu produto tiver diferentes opções que impactam o estoque ou o preço:
+
+- **Roupas e calçados**: cores e tamanhos
+- **Eletrônicos**: capacidade de armazenamento, cor
+- **Móveis**: acabamento, material
+- **Cosméticos**: fragrância, volume
+
+> [!TIP]
+> Este recurso pode estar disponível apenas em determinados planos.
+
+## Como criar variações
+
+### 1. Acessar a aba de Variações
+
+1. Cadastre ou edite um produto.
+2. Clique na aba **Variações**.
+
+![Aba Variações](https://img.dudit.com.br/static/screens/Produto_AbaVariacoes.png)
+Legenda: Acesse a aba de variações para configurar as opções do produto.
+
+### 2. Adicionar os tipos de variação
+
+Clique em **Adicionar variação**. Você pode criar combinações simples ou múltiplas:
+
+**Exemplo 1 - Variação simples (apenas cor):**
+- Tipo: "Cor"
+- Valores: "Azul", "Preto", "Branco"
+
+**Exemplo 2 - Variação combinada (cor + tamanho):**
+- Tipo: "Cor / Tamanho"
+- Valores: "Azul / P", "Azul / M", "Azul / G", "Preto / P", "Preto / M", "Preto / G"
+
+![Modal de adição de variantes](https://img.dudit.com.br/static/screens/Produto_AddVariacao.png)
+Legenda: Defina os tipos e valores das variações.
+
+### 3. Configurar cada variação
+
+Para cada variação criada, você pode definir individualmente:
+
+- **SKU**: um código único para cada variação. Se não preencher, o sistema gera automaticamente.
+- **Preço**: valor adicional em relação ao preço base do produto (pode ser positivo, negativo ou zero).
+- **Estoque**: quantidade disponível para cada variação.
+- **Status**: ativar ou desativar variações específicas.
+- **Imagem**: uma foto diferente para cada variação (útil quando as cores são muito diferentes).
+
+![Tabela de variações](https://img.dudit.com.br/static/screens/Produto_VariacoesTabela.png)
+Legenda: Configure cada variação individualmente.
+
+### 4. Salvar as variações
+
+Após configurar, clique em **Salvar** no formulário principal. As variações serão vinculadas ao produto.
+
+## Como o produto com variações aparece na vitrine
+
+Na loja online, o cliente vê o produto normalmente e escolhe as opções desejadas (cor, tamanho, etc.). O preço exibido é o preço base do produto, e ao selecionar uma variação, o preço pode ser ajustado conforme configurado.
+
+O estoque mostrado é a soma de todas as variações. Ao finalizar a compra, o sistema dá baixa no estoque da variação específica escolhida.
+
+## Editando e removendo variações
+
+1. Acesse a aba **Variações** do produto.
+2. Para alterar, clique em **Adicionar/Editar variações**.
+3. Para desativar uma variação sem excluí-la, use o botão de status (switch).
+4. Para excluir, use o menu de ações (três pontos) na linha da variação.
+
+> [!IMPORTANT]
+> Ao excluir uma variação, a ação não pode ser desfeita.
+
+### Ações em lote nas variações
+
+Selecione várias variações para aplicar alterações em massa:
+
+- **Ativar / Desativar**: altera o status de todas as selecionadas
+- **Editar em massa**: ajusta preço, estoque ou imagem
+- **Excluir em lote**: remove todas as variações selecionadas
+
+## Dicas importantes
+
+- **Defina o preço base primeiro**: o preço base do produto é o preço inicial. Cada variação pode ter um ajuste (para mais ou para menos). Exemplo: preço base R\$ 100, variação "Tamanho GG" com ajuste de R\$ 10 → preço final R\$ 110.
+- **Imagens por variação**: se as variações têm aparências diferentes (ex: cores diferentes), adicione imagens individuais para cada uma.
+- **Estoque separado**: cada variação tem seu próprio estoque. O estoque geral do produto é a soma de todas as variações.
+- **SKU único para cada variação**: assim como produtos, cada variação precisa de um SKU diferente.
+
+## Perguntas frequentes
+
+**Posso adicionar variações depois de criar o produto?**
+Sim. Edite o produto e vá até a aba **Variações** para adicionar, modificar ou remover.
+
+**Qual a diferença entre criar variações e criar produtos separados?**
+Variações mantêm o produto unificado na vitrine. O cliente escolhe as opções dentro da mesma página. Produtos separados aparecem como itens distintos.
+
+**Posso ter preços diferentes para cada variação?**
+Sim. Cada variação pode ter um ajuste de preço em relação ao preço base do produto.
+
+**O estoque das variações é somado ao estoque do produto principal?**
+Sim. O estoque total do produto é a soma dos estoques de todas as variações ativas.
+
+**Preciso cadastrar variações mesmo que todas tenham o mesmo preço?**
+Se o estoque é o mesmo e não há diferença de preço ou imagem, você pode optar por não usar variações e controlar o estoque de forma unificada.
+`
+            },
+            {
+                id: "como-controlar-estoque",
+                title: "Como controlar o estoque",
+                description: "Gerencie entradas e saídas, configure estoque mínimo e acompanhe a disponibilidade dos produtos.",
+                slug: "como-controlar-estoque",
+                category: "produtos-estoque",
+                content: `
+## Visão geral
+
+O controle de estoque ajuda você a saber exatamente quantos produtos têm disponíveis, evitar vendas de itens sem estoque e organizar as entradas e saídas da sua loja.
+
+![Listagem de produtos com indicadores de estoque](https://img.dudit.com.br/static/screens/Estoque_Listagem.png)
+Legenda: Acompanhe o estoque de cada produto diretamente na listagem.
+
+## Como funciona
+
+O estoque funciona de forma simples:
+
+- **Estoque atual**: quantidade disponível para venda
+- **Estoque mínimo**: quantidade ideal para reabastecer
+- **Estoque reservado**: itens que já foram vendidos mas ainda não saíram do estoque
+
+### Situações do estoque
+
+Cada produto recebe um indicador visual baseado no seu estoque:
+
+- **Normal** (verde): estoque acima do mínimo configurado
+- **Baixo** (amarelo): estoque igual ou abaixo do mínimo
+- **Esgotado** (vermelho): estoque zero
+
+![Abas de filtro de estoque](https://img.dudit.com.br/static/screens/Estoque_Abas.png)
+Legenda: Use as abas para ver rapidamente a situação do estoque.
+
+## Quando o estoque aumenta
+
+O estoque de um produto aumenta automaticamente quando:
+
+- Você **registra uma entrada manual** (compra de fornecedor, devolução de cliente)
+- Você **importa um XML** de uma nota fiscal de entrada
+- Você **estorna** uma saída (devolve itens que foram removidos)
+
+## Quando o estoque diminui
+
+O estoque diminui automaticamente quando:
+
+- Um **pedido é confirmado** na loja (baixa automática)
+- Você **registra uma saída manual** (venda, ajuste, perda, uso interno)
+- Você **estorna** uma entrada (remove itens que foram adicionados)
+
+## Como registrar movimentações
+
+Para controle mais detalhado ou ajustes manuais, use a seção **Movimentação de Estoque** no menu lateral.
+
+### Passo a passo
+
+1. No menu lateral, clique em **Movimentação de Estoque**.
+2. Clique em **Nova movimentação**.
+
+![Página de movimentações](https://img.dudit.com.br/static/screens/Estoque_Movimentacoes.png)
+Legenda: Inicie o registro de uma movimentação de estoque.
+
+### 3. Escolher o tipo
+
+- **Entrada**: para adicionar itens ao estoque
+- **Saída**: para remover itens do estoque
+
+### 4. Adicionar produtos
+
+Busque por nome ou SKU do produto. Você pode adicionar vários itens em uma mesma movimentação.
+
+![Busca de produtos](https://img.dudit.com.br/static/screens/Estoque_BuscaProduto.png)
+Legenda: Busque e adicione produtos à movimentação.
+
+### 5. Definir quantidades
+
+Para cada produto, informe a quantidade. Em saídas, a quantidade não pode ultrapassar o estoque disponível.
+
+### 6. Escolher o motivo
+
+**Para entradas:**
+- Compra de Fornecedor
+- Devolução de Cliente
+- Ajuste de Estoque
+- Outro (permitindo descrever o motivo)
+
+**Para saídas:**
+- Avaria / Perda
+- Ajuste de Estoque
+- Uso Interno
+- Outro (permitindo descrever o motivo)
+
+### 7. Salvar
+
+Clique em **Salvar** para registrar a movimentação. O estoque dos produtos será atualizado automaticamente.
+
+## Ajuste rápido no produto
+
+Você também pode fazer ajustes rápidos de estoque diretamente no cadastro do produto:
+
+1. Edite o produto.
+2. No campo **Estoque Atual** (ou clique em "Ajustar" ao lado do estoque na visualização), altere a quantidade.
+3. O sistema registrará automaticamente uma movimentação de "Ajuste de Estoque".
+
+## Permitir vender sem estoque
+
+Para cada produto, você pode ativar a opção **"Permitir vender sem estoque"**. Quando ativada:
+
+- O produto pode ser comprado mesmo com estoque zerado
+- O estoque fica negativo (representando vendas além do disponível)
+- Útil para produtos sob encomenda ou serviços
+
+## Dicas importantes
+
+- **Registre todas as entradas e saídas**: manter o histórico completo evita diferenças entre o estoque físico e o sistema.
+- **Configure o estoque mínimo**: assim você recebe alertas visuais quando chegar a hora de reabastecer.
+- **Use motivos descritivos**: ao registrar movimentações, escolher o motivo certo ajuda a entender o histórico depois.
+- **Verifique o estoque antes de registrar saídas**: o sistema bloqueia saídas com quantidade maior que o disponível.
+
+## Perguntas frequentes
+
+**Como vejo o histórico de movimentações de um produto?**
+Acesse a página de **Movimentação de Estoque** no menu lateral. Todas as entradas e saídas registradas aparecem listadas com data, motivo e quantidade.
+
+**Posso desfazer uma movimentação?**
+Sim. Na página de detalhes da movimentação, há a opção "Desfazer". O sistema cria automaticamente uma movimentação inversa para corrigir o estoque.
+
+**O que é "Estoque Reservado"?**
+São itens que foram comprados mas o pedido ainda não foi finalizado. Assim que o pedido é concluído, o estoque reservado se transforma em baixa definitiva.
+
+**O estoque mínimo impede a venda quando é atingido?**
+Não. O estoque mínimo é apenas um alerta visual. A venda continua normalmente, a menos que o estoque chegue a zero (a menos que "Permitir vender sem estoque" esteja ativado).
+`
+            },
+            {
+                id: "movimentacoes-de-estoque",
+                title: "Movimentações de estoque",
+                description: "Histórico completo de entradas, saídas e ajustes com opção de desfazer e exportar.",
+                slug: "movimentacoes-de-estoque",
+                category: "produtos-estoque",
+                content: `
+## Visão geral
+
+A página **Movimentação de Estoque** é o histórico completo de tudo que entra e sai do seu inventário. Aqui você consulta, filtra, exporta e pode desfazer movimentações feitas por engano.
+
+![Tela de movimentações](https://img.dudit.com.br/static/screens/Estoque_MovimentacoesListagem.png)
+Legenda: Listagem completa com filtros e abas por tipo.
+
+## Quando utilizar
+
+- Para conferir o histórico de entradas e saídas de um período
+- Para auditar uma movimentação suspeita
+- Para desfazer um lançamento feito por engano
+- Para exportar o histórico para o contador ou controle próprio
+
+## Como funciona
+
+### Abas de visualização
+
+- **Todas**: mostra entradas e saídas juntas, ordenadas por data (mais recente primeiro)
+- **Entradas**: apenas movimentações que aumentaram o estoque
+- **Saídas**: apenas movimentações que diminuíram o estoque
+
+### Informações exibidas
+
+Cada linha mostra:
+- **Data e hora** da movimentação
+- **Tipo** (Entrada/Saída) com badge colorido
+- **Motivo** (Compra, Venda, Ajuste, etc.)
+- **Produtos** afetados (clique para ver detalhes)
+- **Quantidade total** de itens
+- **Usuário** que registrou
+- **Referência** (número do pedido, NF-e, etc., se houver)
+
+## Como filtrar
+
+Clique em **Filtros** para refinar a busca:
+
+- **Período**: hoje, semana, mês, período personalizado
+- **Tipo de movimentação**: Venda, Compra, Devolução, Ajuste, Avaria, Perda, Uso Interno
+- **Produto**: busque por nome ou SKU específico
+
+## Como ver detalhes de uma movimentação
+
+Clique em qualquer linha para abrir os detalhes. Você verá:
+
+- Lista completa de produtos movimentados com quantidades individuais
+- Motivo e observações
+- Referência vinculada (pedido, nota fiscal)
+- Quem registrou e quando
+- Botão **Desfazer** (se disponível)
+
+## Como desfazer uma movimentação
+
+Se você lançou uma entrada ou saída por engano:
+
+1. Abra os detalhes da movimentação.
+2. Clique em **Desfazer**.
+3. Informe o motivo do estorno (opcional, mas recomendado).
+4. Confirme.
+
+O sistema criará automaticamente uma movimentação inversa:
+- Se era uma **entrada**, cria uma **saída** de "Ajuste" com a mesma quantidade
+- Se era uma **saída**, cria uma **entrada** de "Ajuste" com a mesma quantidade
+
+> [!IMPORTANT]
+> O desfazer só está disponível para movimentações manuais. Movimentações automáticas (vendas, importação XML) não podem ser desfeitas diretamente - você precisaria criar uma movimentação manual inversa.
+
+## Exportação do histórico
+
+Você pode exportar a listagem filtrada para Excel (.xlsx):
+
+1. Aplique os filtros desejados.
+2. Clique no menu **Ações** > **Exportar**.
+3. O arquivo será baixado com todas as colunas visíveis.
+
+## Dicas importantes
+
+- **Use motivos corretos**: "Ajuste de Estoque" é genérico. Prefira "Compra de Fornecedor" para entradas de compra e "Avaria/Perda" para quebras.
+- **Conferência periódica**: compare o estoque do sistema com o físico periodicamente. Diferenças indicam lançamentos faltando ou errados.
+- **Desfazer vs. Nova movimentação**: se o erro foi só na quantidade, use "Desfazer" e refaça certo. Se foi no motivo, crie uma nova movimentação inversa manual.
+
+## Problemas comuns
+
+**"Desfiz uma movimentação mas o estoque não voltou ao normal."**
+Verifique se a movimentação original já tinha sido compensada por outra (ex: venda já entregue). O desfazer cria o inverso matemático - se o estoque já mudou depois, o resultado final pode não ser o esperado.
+
+**"Não consigo desfazer uma movimentação de venda."**
+Movimentações automáticas de vendas não têm botão "Desfazer". Para corrigir, cancele o pedido (o estoque volta automaticamente) ou registre uma entrada manual de "Devolução de Cliente".
+
+**"A exportação não trouxe todos os dados."**
+A exportação respeita os filtros ativos. Limpe os filtros antes de exportar se quiser o histórico completo.
+`
+            },
+            {
+                id: "fornecedores",
+                title: "Fornecedores",
+                description: "Cadastre fornecedores, vincule aos produtos e acompanhe histórico de compras e custos.",
+                slug: "fornecedores",
+                category: "produtos-estoque",
+                content: `
+## Visão geral
+
+A seção **Fornecedores** centraliza o cadastro dos seus fornecedores e o relacionamento com os produtos. Você cadastra o fornecedor uma vez, vincula aos produtos e acompanha todo o histórico de compras e evolução de custos.
+
+![Tela de fornecedores](https://img.dudit.com.br/static/screens/Fornecedores_Listagem.png)
+Legenda: Listagem de fornecedores com quantidades de XMLs importados e valores totais.
+
+## Quando utilizar
+
+- Para cadastrar um novo fornecedor
+- Para vincular fornecedores aos produtos (SKU do fornecedor, custo, lead time)
+- Para consultar histórico de compras de um fornecedor
+- Para ver a evolução de custos de um produto por fornecedor
+- Para usar na importação de XML (o sistema cria/vincula automaticamente)
+
+## Como gerenciar fornecedores
+
+### Cadastrar um fornecedor
+
+1. No menu lateral, clique em **Fornecedores**.
+2. Clique em **Novo fornecedor**.
+
+![Cadastro de fornecedor](https://img.dudit.com.br/static/screens/Fornecedor_Cadastro.png)
+Legenda: Formulário de cadastro de fornecedor.
+
+3. Preencha as informações:
+   - **Nome** (obrigatório)
+   - **CNPJ/CPF**
+   - **E-mail** e **Telefone**
+   - **Endereço** completo (CEP preenche automaticamente)
+   - **Observações** (opcional)
+4. Clique em **Salvar**.
+
+### Editar ou desativar fornecedor
+
+Na listagem, use o menu de ações (três pontos) para:
+- **Editar**: alterar qualquer informação
+- **Desativar**: fornecedor desativado não aparece nas opções de vinculação, mas o histórico permanece
+
+## Vínculo com produtos
+
+Você pode vincular fornecedores de duas formas:
+
+### 1. No cadastro do produto (aba Fornecedores)
+
+1. Edite o produto e vá na aba **Fornecedores**.
+2. Clique em **Adicionar fornecedor**.
+3. Selecione o fornecedor e informe:
+   - **SKU do fornecedor**: código que ele usa para identificar o produto
+   - **Custo**: preço de compra praticado por este fornecedor
+   - **Lead time (dias)**: tempo médio de entrega
+4. Salve.
+
+Um produto pode ter vários fornecedores vinculados. O primeiro da lista é considerado o principal.
+
+### 2. Na importação de XML
+
+Ao importar uma NF-e, se o fornecedor da nota não existir no seu cadastro, ele será **criado automaticamente** com os dados da nota (CNPJ/CPF, nome, endereço). Os produtos da nota serão vinculados a ele.
+
+## Histórico de compras
+
+Ao clicar em um fornecedor na listagem, você vê:
+
+- **Total de NF-es importadas** desse fornecedor
+- **Valor total comprado**
+- **Última importação** (data)
+- Lista de **produtos vinculados** a este fornecedor
+
+## Histórico de custos e compras por produto
+
+Na aba **Fornecedores** do produto, ao selecionar um fornecedor vinculado, você vê na lateral direita:
+
+### Última compra
+- Data da última NF-e importada desse fornecedor para este produto
+- Último custo registrado
+- Custo atual cadastrado no produto
+
+### Histórico de custos (timeline)
+Linha do tempo mostrando cada vez que o custo mudou:
+- Data da alteração
+- Valor anterior → novo valor
+- Fornecedor responsável
+
+### Compras recentes
+Lista das últimas NF-es importadas contendo este produto desse fornecedor:
+- Data
+- Quantidade
+- Custo unitário
+- Valor total
+
+## Dicas importantes
+
+- **Mantenha o CNPJ/CPF correto**: isso evita duplicatas na importação de XML e garante que o sistema identifique o fornecedor automaticamente.
+- **Atualize o custo no vínculo**: quando o fornecedor reajusta preços, atualize o custo no vínculo do produto. Isso ajuda nas próximas importações e no cálculo de margem.
+- **Lead time realista**: informe o prazo real de entrega. Isso ajuda no planejamento de compras e reposição.
+- **Fornecedor principal**: o primeiro da lista é usado como padrão em relatórios e sugestões de compra.
+
+## Perguntas frequentes
+
+**Posso ter o mesmo produto com fornecedores diferentes?**
+Sim. Um produto pode ter vários fornecedores vinculados, cada um com seu SKU, custo e lead time próprios.
+
+**O que acontece se eu excluir um fornecedor que tem produtos vinculados?**
+Os vínculos são removidos, mas os produtos continuam existindo. O histórico de importações XML permanece vinculado ao fornecedor (mesmo desativado).
+
+**A importação de XML cria o fornecedor automaticamente?**
+Sim. Se o CNPJ/CPF da nota não existir no seu cadastro, o sistema cria o fornecedor com os dados da nota fiscal.
+
+**Posso importar uma planilha de fornecedores?**
+Atualmente a importação em lote de fornecedores não está disponível. Cadastre um a um ou deixe o sistema criar via importação de XML.
+
+**Como vejo quais produtos compram de um fornecedor específico?**
+            Acesse o detalhe do fornecedor (clique na listagem). A aba "Produtos vinculados" mostra todos os itens.
+            `
+            },
+            {
+                id: "importacao-xml-nfe",
+                title: "Importação de XML/NF-e",
+                description: "Cadastre produtos em lote a partir de notas fiscais eletrônicas dos seus fornecedores.",
+                slug: "importacao-xml-nfe",
+                category: "produtos-estoque",
+                content: `
+## Visão geral
+
+A importação por XML permite cadastrar produtos automaticamente a partir de notas fiscais eletrônicas (NF-e) dos seus fornecedores. Isso economiza tempo e evita erros de digitação.
+
+![Tela de importação XML](https://img.dudit.com.br/static/screens/XML_Importacao.png)
+Legenda: Acompanhe todas as importações realizadas.
+
+## Quando usar
+
+A importação por XML é ideal quando:
+
+- Você recebeu uma carga de produtos e quer cadastrá-los rapidamente
+- Quer atualizar o estoque e os preços de custo com base em notas fiscais
+- Deseja vincular fornecedores automaticamente aos produtos
+
+> [!IMPORTANT]
+> A importação aceita apenas NF-e modelo 55 (nota fiscal de entrada). Notas de saída e NFC-e (modelo 65) não são suportadas.
+
+## Como importar
+
+### 1. Acessar a importação
+
+1. No menu lateral, clique em **Produtos**.
+2. Clique no botão **Ações** e selecione **Importar XML**.
+
+![Botão Importar XML](https://img.dudit.com.br/static/screens/XML_BotaoImportar.png)
+Legenda: Acesse a importação pelo menu de ações na página de produtos.
+
+### 2. Fazer upload do XML
+
+1. Clique na área de upload para selecionar o arquivo XML da nota fiscal.
+2. O sistema analisa o XML e extrai todas as informações.
+3. Após o processamento, você verá uma prévia dos produtos encontrados.
+
+![Tela de upload XML](https://img.dudit.com.br/static/screens/XML_Upload.png)
+Legenda: Selecione o arquivo XML da NF-e para análise.
+
+### 3. Revisar os produtos
+
+Na tela de prévia, você verá:
+
+- **Dados da nota**: número, série, fornecedor, valor total, chave de acesso
+- **Produtos encontrados**: lista com nome, NCM, quantidade e valor unitário
+
+![Prévia da importação](https://img.dudit.com.br/static/screens/XML_Previa.png)
+Legenda: Revise cada produto antes de confirmar a importação.
+
+**Status de cada produto:**
+
+| Status | Significado |
+|--------|-------------|
+| **Novo** | Produto não encontrado no seu catálogo. Será criado do zero. |
+| **Match** | Produto encontrado no seu catálogo. O estoque e custo serão atualizados. |
+| **Conflito** | Produto encontrado mas com diferenças (nome, NCM, preço). Você decide o que fazer. |
+
+### 4. Decidir o que fazer com cada produto
+
+Para cada item, você pode escolher:
+
+- **Manter / Manter cadastro**: mantém o produto existente como está (apenas atualiza estoque)
+- **Atualizar campos**: substitui as informações do produto pelos dados do XML
+- **Criar novo**: cadastra como um produto novo (mesmo que já exista um similar)
+- **Ignorar**: não faz nada com este item
+
+![Botões de decisão](https://img.dudit.com.br/static/screens/XML_Decisoes.png)
+Legenda: Escolha a ação desejada para cada produto.
+
+### 5. Confirmar a importação
+
+Após revisar todos os itens:
+
+1. Clique em **Confirmar Importação**.
+2. O sistema cria ou atualiza os produtos conforme suas escolhas.
+3. O estoque é ajustado e o custo é atualizado.
+4. O fornecedor é automaticamente vinculado ao produto (se já existir no cadastro) ou criado.
+
+## Como funciona o matching automático
+
+Ao processar o XML, o sistema tenta encontrar produtos já existentes no seu catálogo usando estas estratégias, na ordem:
+
+1. **Código de barras (EAN/GTIN)**: busca pelo código de barras do produto
+2. **SKU interno**: busca pelo SKU igual ao código do produto na nota
+3. **SKU do fornecedor**: busca se o código do produto na nota está vinculado a algum fornecedor
+4. **NCM + EAN**: combina o NCM com o código de barras
+5. **Similaridade de nome**: compara o nome do produto com nomes existentes do mesmo NCM
+
+## Resolução de conflitos
+
+Quando o sistema encontra um produto similar mas com informações diferentes (nome, NCM, preço, dimensões), ele marca como **Conflito** e exibe as diferenças para você decidir:
+
+- Nome diferente
+- NCM diferente
+- GTIN diferente
+- Unidade diferente
+- Peso ou dimensões diferentes
+- Fornecedor diferente do atual
+
+## Dicas importantes
+
+- **Sempre revise a prévia**: antes de confirmar, verifique se os produtos foram corretamente identificados.
+- **Notas muito antigas**: o sistema alerta se a NF-e foi emitida há mais de 180 dias.
+- **Fornecedor é criado automaticamente**: se o fornecedor da nota não existir no seu cadastro, ele será criado com CNPJ/CPF e nome.
+- **Notas duplicadas**: o sistema impede a importação da mesma nota fiscal duas vezes.
+
+## Perguntas frequentes
+
+**Quais tipos de XML são aceitos?**
+Apenas NF-e modelo 55 (nota fiscal de entrada). NFC-e (modelo 65, notas de consumidor final) e NF-e de saída não são aceitas.
+
+**A importação cria o fornecedor automaticamente?**
+Sim. Se o fornecedor da nota ainda não estiver cadastrado, o sistema o cria com os dados da nota (CNPJ/CPF, nome, endereço).
+
+**O que acontece se eu importar a mesma nota duas vezes?**
+O sistema bloqueia. Cada nota é identificada pela chave de acesso única e só pode ser importada uma vez.
+
+**Posso importar apenas alguns produtos da nota?**
+Sim. Durante a revisão, você pode escolher "Ignorar" para os itens que não deseja importar.
+
+**A importação atualiza o preço de venda?**
+Não. A importação atualiza o estoque e o preço de custo. O preço de venda permanece o mesmo que você definiu.
+
+**E se o XML tiver erros?**
+O sistema valida o XML antes de processar. Se houver problemas (nota sem protocolo SEFAZ, nota cancelada, etc.), você receberá uma mensagem explicando o motivo.
+`
+            },
+            {
+                id: "como-gerar-etiquetas",
+                title: "Como gerar etiquetas",
+                description: "Imprima etiquetas com nome, preço e código de barras para organizar sua loja e estoque.",
+                slug: "como-gerar-etiquetas",
+                category: "produtos-estoque",
+                content: `
+## Visão geral
+
+A geração de etiquetas permite imprimir informações dos produtos para organizar sua loja física, facilitar a identificação no estoque ou precificar mercadorias.
+
+![Modal de etiquetas](https://img.dudit.com.br/static/screens/Etiquetas_Modal.png)
+Legenda: Selecione produtos, configure a etiqueta e visualize antes de imprimir.
+
+## Quando usar
+
+A geração de etiquetas é útil para:
+
+- **Precificar produtos**: imprima etiquetas com nome e preço para expor na loja
+- **Organizar estoque**: identifique prateleiras, caixas e lotes
+- **Código de barras**: gere etiquetas com código de barras para agilizar o checkout
+- **Promoções**: destaque preços promocionais nas etiquetas
+
+> [!TIP]
+> Este recurso pode estar disponível apenas em determinados planos.
+
+## Como gerar etiquetas
+
+### 1. Acessar a ferramenta
+
+1. Na página de **Produtos**, clique no menu **Ações**.
+2. Selecione **Gerar Etiquetas**.
+
+![Opção Gerar Etiquetas](https://img.dudit.com.br/static/screens/Etiquetas_Botao.png)
+Legenda: Acesse a ferramenta de etiquetas pelo menu de ações.
+
+### 2. Selecionar produtos
+
+Você pode selecionar produtos de duas formas:
+
+- **Na listagem**: use os checkboxes para selecionar e depois acesse Gerar Etiquetas
+- **No modal**: clique em **Adicionar** e busque pelos produtos desejados
+
+Para cada produto, defina a **quantidade de etiquetas** que deseja imprimir.
+
+![Lista de produtos para etiquetas](https://img.dudit.com.br/static/screens/Etiquetas_Selecao.png)
+Legenda: Defina quantas etiquetas imprimir para cada produto.
+
+### 3. Escolher o modelo da etiqueta
+
+Selecione o tamanho da etiqueta entre os modelos disponíveis. Os modelos são compatíveis com as marcas mais comuns do mercado.
+
+Se precisar de um tamanho diferente, escolha a opção **Customizado** e defina manualmente:
+- Largura e altura da etiqueta
+- Número de colunas e linhas por folha
+- Margens e espaçamentos
+
+### 4. Configurar o conteúdo
+
+Marque as informações que devem aparecer na etiqueta:
+
+- **Nome do produto**
+- **Preço**
+- **Preço promocional** (se houver, o preço normal aparece riscado e o promocional em destaque)
+- **Parcelamento** (ex: "ou 12x")
+- **SKU** (código interno)
+- **Código interno** (código do produto)
+- **Código de barras** (gerado automaticamente a partir do EAN/GTIN ou SKU)
+
+![Opções de conteúdo](https://img.dudit.com.br/static/screens/Etiquetas_Conteudo.png)
+Legenda: Escolha quais informações exibir na etiqueta.
+
+### 5. Visualizar e imprimir
+
+1. A pré-visualização mostra como as etiquetas vão ficar.
+2. Clique em **Imprimir** para abrir a impressão no navegador.
+3. Ou clique em **Salvar PDF** para baixar um arquivo PDF.
+
+> [!TIP]
+> Para impressão, use folhas adesivas compatíveis com o modelo selecionado (encontradas em papelarias).
+
+## Dicas importantes
+
+- **Código de barras**: se o produto não tiver um código de barras cadastrado, o sistema gera um automaticamente para a etiqueta.
+- **Preço promocional**: se o produto tiver um preço promocional, você pode ativar a opção para exibi-lo. O preço normal aparece riscado.
+- **Quantidade**: você pode imprimir múltiplas etiquetas do mesmo produto (ex: 10 etiquetas para 10 unidades em exposição).
+- **Teste em uma folha comum primeiro**: antes de usar a folha adesiva, imprima em papel comum para ajustar o posicionamento.
+
+## Perguntas frequentes
+
+**Quais tamanhos de etiqueta estão disponíveis?**
+O sistema oferece os modelos mais comuns do mercado (como Pimaco). Se precisar de medidas diferentes, use a opção "Customizado".
+
+**O código de barras funciona no checkout?**
+Sim. As etiquetas geram código de barras no formato EAN-13 ou conforme o código do produto.
+
+**Posso imprimir etiquetas apenas para alguns produtos selecionados?**
+Sim. Selecione os produtos na listagem antes de acessar a ferramenta, ou adicione manualmente dentro do modal.
+
+**Consigo salvar as configurações de etiqueta?**
+As configurações (modelo e conteúdo) são ajustadas a cada uso. Você pode reconfigurar sempre que precisar.
+
+**A etiqueta mostra o preço com desconto?**
+Se o produto tiver um preço promocional e você ativar a opção correspondente, sim. O preço normal aparece riscado e o promocional em destaque.
+`
+            },
+            {
+                id: "cadastros-auxiliares",
+                title: "Cadastros auxiliares",
+                description: "Gerencie categorias, marcas, unidades e localizações para organizar melhor seu catálogo.",
+                slug: "cadastros-auxiliares",
+                category: "produtos-estoque",
+                content: `
+## Visão geral
+
+A página **Cadastros** centraliza a gestão de categorias, subcategorias, marcas, unidades de medida e localizações físicas. Manter esses cadastros organizados facilita a criação de produtos, a busca, os relatórios e a navegação dos clientes na loja.
+
+![Página de Cadastros](https://img.dudit.com.br/static/screens/Cadastros_Pagina.png)
+Legenda: Abas para Categorias, Marcas, Unidades e Localizações.
+
+## Como acessar
+
+1. No menu lateral, clique em **Cadastros** (dentro da seção Produtos).
+2. Você verá 4 abas: **Categorias**, **Marcas**, **Unidades**, **Localizações**.
+
+## Categorias e subcategorias
+
+Aba **Categorias**: gerencie a árvore de categorias do seu catálogo.
+
+### Criar categoria principal
+
+1. Na aba Categorias, clique em **Nova categoria**.
+2. Digite o nome (ex: "Roupas", "Eletrônicos", "Acessórios").
+3. Marque como **Ativa** se quiser que possa ser usada.
+4. Salve.
+
+### Criar subcategoria
+
+1. Na lista, localize a categoria pai.
+2. Clique no menu de ações (três pontos) > **Adicionar subcategoria**.
+3. Digite o nome (ex: dentro de "Roupas": "Camisetas", "Calças").
+4. Salve.
+
+### Editar ou excluir
+
+- **Editar**: clique no nome ou no ícone de edição para alterar nome ou status.
+- **Excluir**: use o menu de ações. Atenção: ao excluir uma categoria que tem subcategorias, elas também serão excluídas. Produtos vinculados ficarão sem categoria.
+
+> [!TIP]
+> Crie a estrutura de categorias antes de começar a cadastrar produtos. Isso evita retrabalho depois.
+
+## Marcas
+
+Aba **Marcas**: cadastre as marcas dos seus produtos.
+
+1. Clique em **Nova marca**.
+2. Digite o nome da marca.
+3. Marque como **Ativa**.
+4. Salve.
+
+Marcas ajudam na organização, na busca por filtro e aparecem na ficha do produto e na vitrine.
+
+## Unidades de medida
+
+Aba **Unidades**: defina as unidades usadas nos seus produtos (UN, KG, LT, PC, CX, M, M2, M3, etc.).
+
+1. Clique em **Nova unidade**.
+2. Informe o **código** (ex: "UN", "KG") e a **descrição** (ex: "Unidade", "Quilograma").
+3. Salve.
+
+A unidade aparece nos pedidos, notas fiscais, etiquetas e relatórios de estoque.
+
+## Localizações físicas
+
+Aba **Localizações**: cadastre onde seus produtos ficam guardados no estoque físico.
+
+Exemplos: "Prateleira A3", "Galpão 2 - Corredor B", "Caixa 12 - Setor Eletrônicos", "Balcao Vitrine".
+
+1. Clique em **Nova localização**.
+2. Digite o nome descritivo.
+3. Salve.
+
+No cadastro do produto, selecione a localização no campo correspondente. Isso ajuda a equipe a encontrar o produto rapidamente na hora da separação.
+
+## Como esses cadastros ajudam no dia a dia
+
+| Cadastro | Para que serve |
+|----------|----------------|
+| **Categorias** | Agrupa produtos por tipo; clientes filtram por categoria na loja; relatórios de vendas por categoria |
+| **Subcategorias** | Refina a organização dentro de categorias grandes |
+| **Marcas** | Filtro de busca; identificação visual na vitrine; relatórios por marca |
+| **Unidades** | Padroniza medidas em pedidos, notas e etiquetas; evita confusão entre KG/UN/PC |
+| **Localizações** | Agiliza separação de pedidos; inventário físico mais rápido; controle de múltiplos estoques |
+
+## Dicas importantes
+
+- **Planeje a estrutura de categorias** antes de cadastrar produtos em massa.
+- **Mantenha nomes consistentes**: use sempre o mesmo padrão (ex: todas no singular, primeira letra maiúscula).
+- **Desative em vez de excluir**: se uma categoria/marca não é mais usada, desative. O histórico permanece.
+- **Unidades padrão**: o sistema já vem com as mais comuns. Adicione apenas as específicas do seu negócio.
+- **Localizações descritivas**: seja específico ("Prateleira A3 - Lado Esquerdo" é melhor que "A3").
+
+## Perguntas frequentes
+
+**Posso ter um produto sem categoria?**
+Sim. A categoria não é obrigatória, mas recomendamos usar para organizar melhor.
+
+**O que acontece se eu excluir uma categoria que tem produtos?**
+Os produtos ficam sem categoria. Você precisará editá-los para atribuir uma nova categoria.
+
+**As unidades de medida afetam a nota fiscal?**
+Sim. A unidade informada no produto é enviada na NF-e. Use códigos compatíveis com a tabela do governo (UN, KG, LT, M, M2, M3, PC, CX, etc.).
+
+**Consigo importar categorias/marcas em lote?**
+Atualmente a importação em lote desses cadastros não está disponível. Cadastre um a um ou crie durante o cadastro do produto.
+
+**Quantos níveis de subcategoria posso ter?**
+Dois níveis: Categoria > Subcategoria. Para estruturas mais complexas, use nomes compostos na categoria principal.
+`
+            },
+            {
+                id: "perguntas-frequentes-produtos-estoque",
+                title: "Perguntas frequentes sobre Produtos e Estoque",
+                description: "Respostas rápidas para as dúvidas mais comuns sobre cadastro, variações, estoque, XML, etiquetas e cadastros auxiliares.",
+                slug: "perguntas-frequentes-produtos-estoque",
+                category: "produtos-estoque",
+                content: `
+## Cadastro e edição
+
+**Quais campos são obrigatórios no cadastro de um produto?**
+Apenas **Nome do produto** e **Preço de venda** são obrigatórios para salvar. No entanto, **NCM** e **Origem da mercadoria** são obrigatórios para emitir notas fiscais.
+
+**Posso alterar um produto depois de criado?**
+Sim. Clique no produto na listagem e depois em **Editar produto**. Todas as informações podem ser alteradas, inclusive imagens, preço e estoque.
+
+**Como duplicar um produto?**
+Na tela de detalhes do produto, clique no menu de ações (três pontos) e selecione **Duplicar**. O sistema cria uma cópia com "(Cópia)" no nome e um novo SKU.
+
+**Como excluir um produto?**
+Na tela de detalhes, clique no menu de ações e selecione **Excluir**. Confirme a exclusão. Atenção: esta ação não pode ser desfeita. O produto e suas imagens são removidos permanentemente.
+
+**É possível excluir vários produtos de uma vez?**
+Sim. Selecione os produtos usando os checkboxes na listagem e escolha a opção de exclusão em lote.
+
+**O que acontece com as imagens quando excluo um produto?**
+As imagens são removidas permanentemente dos servidores.
+
+## Variações
+
+**Preciso de um plano específico para usar variações?**
+Alguns recursos avançados podem estar disponíveis apenas em determinados planos.
+
+**Quantas variações posso criar para um produto?**
+Não há um limite prático para a quantidade de variações, mas cada tipo de variação pode ter até 30 valores diferentes (ex: 30 cores, 30 tamanhos).
+
+**Posso ter preços diferentes em cada variação?**
+Sim. Cada variação pode ter um ajuste de preço em relação ao preço base do produto, tanto para mais quanto para menos.
+
+**Como funciona o estoque em produtos com variações?**
+Cada variação tem seu próprio estoque. O estoque total do produto é a soma de todas as variações. Quando um cliente compra, o sistema dá baixa no estoque da variação específica.
+
+**Preciso adicionar imagem para cada variação?**
+Não é obrigatório, mas recomendado quando as variações têm aparências diferentes (como cores). Se não adicionar, a imagem do produto principal será usada.
+
+## Estoque
+
+**O que significa "Permitir vender sem estoque"?**
+Quando ativado, o produto pode ser comprado mesmo com estoque zerado. O estoque fica negativo, representando vendas além do disponível. Útil para produtos sob encomenda.
+
+**Como vejo o histórico de movimentações de um produto?**
+Acesse a página **Movimentação de Estoque** no menu lateral. Lá você encontra todas as entradas e saídas registradas.
+
+**Posso desfazer uma movimentação de estoque?**
+Sim. Na página de detalhes da movimentação, clique em **Desfazer**. O sistema cria automaticamente uma movimentação inversa para corrigir o estoque.
+
+**Qual a diferença entre estoque "Baixo" e "Esgotado"?**
+- **Baixo**: o estoque está igual ou abaixo do mínimo configurado, mas ainda tem produtos
+- **Esgotado**: o estoque chegou a zero
+
+## Importação XML
+
+**Quais notas fiscais posso importar?**
+Apenas NF-e modelo 55 (nota fiscal de entrada). NFC-e (modelo 65) e notas de saída não são aceitas.
+
+**O que acontece se eu importar uma nota com produtos que já existem?**
+O sistema tenta fazer o "match" automático. Se encontrar o produto, atualiza o estoque e o custo. Se houver diferenças (nome, NCM, preço), ele mostra um alerta para você decidir.
+
+**A importação cria o fornecedor automaticamente?**
+Sim. Se o fornecedor da nota ainda não estiver cadastrado, ele é criado automaticamente com os dados da nota fiscal.
+
+**Posso importar a mesma nota mais de uma vez?**
+Não. O sistema bloqueia importações duplicadas usando a chave de acesso da nota.
+
+## Etiquetas
+
+**Preciso de uma impressora especial para imprimir etiquetas?**
+Não. Qualquer impressora serve. Você imprime em folhas adesivas próprias para etiquetas, vendidas em papelarias.
+
+**Consigo imprimir etiquetas com código de barras?**
+Sim. O código de barras é gerado automaticamente a partir do EAN/GTIN ou SKU do produto.
+
+**O código de barras da etiqueta funciona no leitor?**
+Sim. O código é gerado no formato adequado para leitura óptica.
+
+**Posso gerar etiquetas apenas para produtos selecionados?**
+Sim. Selecione os produtos na listagem antes de acessar a ferramenta, ou adicione manualmente dentro do modal.
+
+## Cadastros auxiliares
+
+**Como faço para editar uma categoria existente?**
+Acesse **Cadastros** > aba **Categorias**. Lá você pode editar, renomear ou excluir categorias e subcategorias.
+
+**O que acontece se eu excluir uma marca que está em uso?**
+Os produtos que usavam essa marca ficarão sem marca. Você precisará editá-los para atribuir uma nova.
+
+**As unidades de medida são fixas ou posso criar as minhas?**
+Você pode criar as unidades que precisar. O sistema já vem com as mais comuns (UN, KG, LT, PC, CX, etc.).
+
+**Para que serve a localização física?**
+Ajuda sua equipe a encontrar o produto no estoque na hora de separar pedidos. Exemplo: "Prateleira A3", "Galpão 2 - Caixa 12".
+
+## Geral
+
+**Como faço para um produto aparecer na minha loja online?**
+O produto precisa estar com **Status = Ativo** e **Exibir na Vitrine = Sim**. Se ambas as opções estiverem corretas, ele aparecerá na loja.
+
+**O que significa "Valor sob consulta"?**
+Quando você desmarca "Exibir o preço na vitrine online", o produto aparece sem preço, com a mensagem "Valor sob consulta". O cliente precisa entrar em contato para saber o valor.
+
+**Posso vender produtos digitais?**
+Sim. Ao cadastrar, escolha o tipo do produto como digital. Produtos digitais não precisam de dados de envio ou estoque físico.
+
+**O que é SKU e para que serve?**
+SKU é um código interno único para identificar cada produto. Ele ajuda na organização, na busca e na integração com marketplaces e transportadoras.
+
+**Meu plano atual tem limite de produtos?**
+Depende do seu plano. Se você tentar cadastrar e atingir o limite, o sistema avisa e sugere o upgrade para um plano superior.
 
 ---
 

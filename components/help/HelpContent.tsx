@@ -192,11 +192,11 @@ export default function HelpContent({ article }: { article: HelpArticle }) {
                         const categoryData = helpCategories.find(c => c.id === article.category);
                         const catIcon = categoryData?.icon || (
                             article.category === "login-registro" ? "🔐" :
-                            article.category === "gestao" ? "📊" :
                             article.category === "pedidos" ? "📦" :
                             article.category === "produtos" ? "🏷️" :
                             article.category === "vendas" ? "🛒" :
-                            article.category === "financeiro" ? "💰" : "📁"
+                            article.category === "financeiro" ? "💰" :
+                            article.category === "produtos-estoque" ? "📦" : "📁"
                         );
                         return (
                             <Badge variant="green" icon={null} className="px-3">
