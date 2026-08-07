@@ -81,15 +81,6 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  console.log("[customer-reviews DEBUG]", {
-    customerId,
-    foundCustomer: customer,
-    allCustomerIds,
-    orderBuyerIds,
-    candidateUserIds,
-    orConditions: orConditions.join(","),
-  })
-
   if (orConditions.length === 0) {
     return NextResponse.json({ reviews: [] })
   }

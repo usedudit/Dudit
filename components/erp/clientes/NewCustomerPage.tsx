@@ -20,7 +20,8 @@ import {
     FormTextarea,
     UnsavedChangesDialog,
     FormSection,
-    ThreeDotsLoader
+    ThreeDotsLoader,
+    Tooltip
 } from "@/components/reusable"
 import { CepInput } from "@/components/reusable/Inputs/CepInput"
 import { CpfCnpjInput } from "@/components/reusable/Inputs/CpfCnpjInput"
@@ -653,45 +654,52 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                                         />
                                                                         {isSearchingCnpj && <span className="text-[11px] text-brand-primary animate-pulse font-medium">Consultando CNPJ...</span>}
                                                                     </div>
-                                                                    <Input label="Inscrição Estadual" placeholder="Número da IE" value={ie} onChange={(e) => setIe(e.target.value)} disabled={ieIsento} />
-                                                                </div>
-                                                                <div className="flex items-center gap-3">
-                                                                    <Checkbox
-                                                                        id="customerIeIsento"
-                                                                        checked={ieIsento}
-                                                                        onChange={(e) => {
-                                                                            setIeIsento(e)
-                                                                            if (e) setIe("")
-                                                                        }}
+                                                                    <Input
+                                                                        label="Inscrição Estadual"
+                                                                        placeholder="Número da IE"
+                                                                        value={ie}
+                                                                        onChange={(e) => setIe(e.target.value)}
+                                                                        disabled={ieIsento}
+                                                                        suffix={
+                                                                            <Tooltip text="Inscrição Estadual isenta">
+                                                                                <Checkbox
+                                                                                    checked={ieIsento}
+                                                                                    onChange={(e) => {
+                                                                                        setIeIsento(e)
+                                                                                        if (e) setIe("")
+                                                                                    }}
+                                                                                    className="pointer-events-auto"
+                                                                                />
+                                                                            </Tooltip>
+                                                                        }
                                                                     />
-                                                                    <label htmlFor="customerIeIsento" className="text-sm font-medium text-brand-dark dark:text-dark-heading cursor-pointer select-none">
-                                                                        Inscrição Estadual isenta (IE Isento)
-                                                                    </label>
                                                                 </div>
                                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                                                     <Input label="Nome Fantasia" placeholder="Nome comercial" value={fantasia} onChange={(e) => setFantasia(e.target.value)} />
                                                                     <Input label="Inscrição Municipal" placeholder="Ex: 123456" value={inscricaoMunicipal} onChange={(e) => setInscricaoMunicipal(e.target.value)} />
                                                                 </div>
-                                                                <FormDropdown
-                                                                    label="CRT (Código de Regime Tributário)"
-                                                                    value={crt}
-                                                                    setValue={(val) => setCrt(val)}
-                                                                    options={[
-                                                                        { value: "1", label: "1 - Simples Nacional" },
-                                                                        { value: "3", label: "3 - Regime Normal" },
-                                                                        { value: "4", label: "4 - MEI" }
-                                                                    ]}
-                                                                />
-                                                                <FormDropdown
-                                                                    label="Contribuinte"
-                                                                    value={contribuinte}
-                                                                    setValue={(val) => setContribuinte(val)}
-                                                                    options={[
-                                                                        { value: "1", label: "1 - Contribuinte ICMS" },
-                                                                        { value: "2", label: "2 - Contribuinte Isento" },
-                                                                        { value: "9", label: "9 - Não Contribuinte" }
-                                                                    ]}
-                                                                />
+                                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                                                    <FormDropdown
+                                                                        label="CRT (Código de Regime Tributário)"
+                                                                        value={crt}
+                                                                        setValue={(val) => setCrt(val)}
+                                                                        options={[
+                                                                            { value: "1", label: "1 - Simples Nacional" },
+                                                                            { value: "3", label: "3 - Regime Normal" },
+                                                                            { value: "4", label: "4 - MEI" }
+                                                                        ]}
+                                                                    />
+                                                                    <FormDropdown
+                                                                        label="Contribuinte"
+                                                                        value={contribuinte}
+                                                                        setValue={(val) => setContribuinte(val)}
+                                                                        options={[
+                                                                            { value: "1", label: "1 - Contribuinte ICMS" },
+                                                                            { value: "2", label: "2 - Contribuinte Isento" },
+                                                                            { value: "9", label: "9 - Não Contribuinte" }
+                                                                        ]}
+                                                                    />
+                                                                </div>
                                                             </motion.div>
                                                         ) : (
                                                             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -996,39 +1004,41 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                     <p className="text-xs text-brand-inactive-text max-w-[200px]">Formatos aceitos: PNG, JPG ou WEBP (máx. 5MB)</p>
                                                 </div>
 
-                                                <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border mt-8 relative overflow-hidden">
-                                                    <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />
-                                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Informações adicionais</h3>
-                                                    <div className="space-y-5">
-                                                        <DatePicker
-                                                            label="Data de aniversário"
-                                                            value={birthDate}
-                                                            onChange={(date: Date | undefined) => {
-                                                                if (!date) {
-                                                                    setBirthDate("")
-                                                                    return
-                                                                }
+                                                {personType === "Pessoa Física" && (
+                                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border mt-8 relative overflow-hidden">
+                                                        <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />
+                                                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Informações adicionais</h3>
+                                                        <div className="space-y-5">
+                                                            <DatePicker
+                                                                label="Data de aniversário"
+                                                                value={birthDate}
+                                                                onChange={(date: Date | undefined) => {
+                                                                    if (!date) {
+                                                                        setBirthDate("")
+                                                                        return
+                                                                    }
 
-                                                                const year = date.getFullYear()
-                                                                const month = String(date.getMonth() + 1).padStart(2, "0")
-                                                                const day = String(date.getDate()).padStart(2, "0")
-                                                                setBirthDate(`${year}-${month}-${day}`)
-                                                            }}
-                                                        />
-                                                        <Input
-                                                            label="Nome da mãe"
-                                                            placeholder="Ex: Maria da Silva"
-                                                            value={motherName}
-                                                            onChange={(e) => setMotherName(e.target.value)}
-                                                        />
-                                                        <Input
-                                                            label="Nome do pai"
-                                                            placeholder="Ex: José da Silva"
-                                                            value={fatherName}
-                                                            onChange={(e) => setFatherName(e.target.value)}
-                                                        />
+                                                                    const year = date.getFullYear()
+                                                                    const month = String(date.getMonth() + 1).padStart(2, "0")
+                                                                    const day = String(date.getDate()).padStart(2, "0")
+                                                                    setBirthDate(`${year}-${month}-${day}`)
+                                                                }}
+                                                            />
+                                                            <Input
+                                                                label="Nome da mãe"
+                                                                placeholder="Ex: Maria da Silva"
+                                                                value={motherName}
+                                                                onChange={(e) => setMotherName(e.target.value)}
+                                                            />
+                                                            <Input
+                                                                label="Nome do pai"
+                                                                placeholder="Ex: José da Silva"
+                                                                value={fatherName}
+                                                                onChange={(e) => setFatherName(e.target.value)}
+                                                            />
+                                                        </div>
                                                     </div>
-                                                </div>
+                                                )}
                                             </div>
                                         ) : activeTab === 'address' ? (
                                             <div className="bg-white dark:bg-dark-surface p-0 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden flex flex-col">

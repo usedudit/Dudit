@@ -45,6 +45,7 @@ import { getServiceCheckoutSettingsAction } from "@/app/actions/marketplace/serv
 import { OrderGeneralTab } from "./OrderGeneralTab"
 import { AddressTab } from "./AddressTab"
 import { OrderObservationsTab } from "./OrderObservationsTab"
+import { OrderAttachmentsTab } from "./OrderAttachmentsTab"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency } from "@/lib/utils"
 import { calculateOrderPricing, type PricingCoupon } from "@/lib/services/pricing-engine"
@@ -252,6 +253,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
 
     // --- State ---
     const [isLoadingData, setIsLoadingData] = useState(!!editOrderId)
+    const [draftOrderId] = useState(() => crypto.randomUUID())
+    const orderId = editOrderId || draftOrderId
     const [activeTab, setActiveTab] = useState("general")
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -855,7 +858,9 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         const pricing = computeItemDisplayPrice(Number(product.price || 0), product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null, orderPromotions, { productId: product.id, categoryId: product.category_id || undefined })
         const newItem = {
             id: Math.random().toString(36).substr(2, 9),
-            productId: product.id,
+            productId: product.isService ? null : product.id,
+            serviceId: product.isService ? product.id : (product.serviceId || null),
+            lineType: product.isService ? 'service_booking' : (product.lineType || 'product'),
             name: product.name,
             unitPrice: pricing.bestPrice,
             originalPrice: Number(product.price || 0),
@@ -865,7 +870,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             image: product.image,
             sku: product.sku,
             stock: Number(product.stock || 0),
-            allowSellWithoutStock: forceBypass ? true : Boolean(product.allow_sell_without_stock),
+            allowSellWithoutStock: forceBypass || product.isService ? true : Boolean(product.allow_sell_without_stock),
             unit: product.unit || null,
             isEditing: false,
             isManual: false,
@@ -1234,6 +1239,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         }
 
         return {
+            id: orderId,
             partnerId,
             storeId: selectedStore?.id,
             customerId: selectedCustomer?.id,
@@ -1256,14 +1262,14 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 state: uf
             } : undefined,
             items: items.map((item, idx) => ({
-                productId: item.productId,
+                productId: item.isService || item.serviceId ? null : item.productId,
                 variantId: item.variantId,
                 customName: item.name,
                 quantity: item.quantity,
                 unitPrice: item.unitPrice,
                 sortOrder: idx,
-                serviceId: item.serviceId || null,
-                lineType: item.lineType || 'product',
+                serviceId: item.serviceId || (item.isService ? item.productId : null),
+                lineType: item.isService || item.serviceId ? 'service_booking' : (item.lineType || 'product'),
                 fulfillmentMode: item.fulfillmentMode || null,
             })),
             subtotal,
@@ -1538,6 +1544,9 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                                 {getTabErrorCount("observations") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
                                             </TabsTrigger>
                                         )}
+                                        <TabsTrigger value="attachments">
+                                            Anexos
+                                        </TabsTrigger>
                                     </TabsList>
                                 </div>
                             </div>
@@ -1886,6 +1895,17 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                         notes={notes}
                                         setNotes={setNotes}
                                         disabled={role === 'DELIVERY'}
+                                    />
+                                </FadeIn>
+                            </TabsContent>
+
+                            <TabsContent value="attachments" className="mt-0">
+                                <FadeIn key="attachments">
+                                    <OrderAttachmentsTab
+                                        orderId={orderId}
+                                        partnerId={partnerId}
+                                        isEditing={true}
+                                        readOnly={false}
                                     />
                                 </FadeIn>
                             </TabsContent>

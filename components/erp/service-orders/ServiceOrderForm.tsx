@@ -1772,7 +1772,7 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                                                                                         size="md"
                                                                                         disabled={isLocked}
                                                                                     />
-                                                                                    {!prod.isManual && Number(prod.stock || 0) <= 0 && (
+                                                                                    {!prod.isManual && Boolean(prod.product_id) && Number(prod.stock || 0) <= 0 && (
                                                                                         <Tooltip text="Produto sem estoque disponível no momento">
                                                                                             <Badge
                                                                                                 variant="orange"
@@ -1876,7 +1876,7 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                                                                                         onChange={(val) => updateProductQty(index, val)}
                                                                                         size="sm"
                                                                                     />
-                                                                                    {!prod.isManual && Number(prod.stock || 0) <= 0 && (
+                                                                                    {!prod.isManual && Boolean(prod.product_id) && Number(prod.stock || 0) <= 0 && (
                                                                                         <Tooltip text="Produto sem estoque disponível no momento">
                                                                                             <Badge
                                                                                                 variant="orange"

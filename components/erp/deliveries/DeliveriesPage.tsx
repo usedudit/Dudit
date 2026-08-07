@@ -409,7 +409,7 @@ export default function DeliveriesPage({
                 </FadeIn>
              ) : wrapper === "detail" && selectedDeliveryId ? (
                 <FadeIn key="detail" className="w-full h-full">
-                    <DeliveryDetailPage deliveryId={selectedDeliveryId} partnerId={partnerId} onBack={() => closeEntity()} />
+                    <DeliveryDetailPage deliveryId={selectedDeliveryId} partnerId={partnerId} onBack={() => closeEntity()} planSlug={planSlug} />
                 </FadeIn>
             ) : (
                 <FadeIn key="list" className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">

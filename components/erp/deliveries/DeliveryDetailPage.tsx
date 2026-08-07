@@ -53,49 +53,23 @@ const DeliveryRouteMap = dynamic(
     { ssr: false },
 )
 
-const MaximizeIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        {...props}
-    >
-        <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
-    </svg>
-)
-
-const SidebarCard = ({
-    children,
-    hasTopStrip = true,
-}: {
-    children: React.ReactNode
-    hasTopStrip?: boolean
-}) => (
-    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden text-left w-full">
-        {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-heading rounded-t-2xl" />}
-        {children}
-    </div>
-)
-
 export default function DeliveryDetailPage({
     deliveryId,
     partnerId,
     onBack,
+    planSlug = "free",
 }: {
     deliveryId: string
     partnerId: string
     onBack: () => void
+    planSlug?: string
 }) {
     const [delivery, setDelivery] = useState<any>(null)
     const [loading, setLoading] = useState(true)
     const [route, setRoute] = useState<any | null>(null)
     const [routeError, setRouteError] = useState<string | null>(null)
     const [routeLoading, setRouteLoading] = useState(false)
-    const [isMapModalOpen, setIsMapModalOpen] = useState(false)
+    const isEscalar = planSlug === "escalar"
     const [isScrolled, setIsScrolled] = useState(false)
     const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null)
     const [deliveryWarningModal, setDeliveryWarningModal] = useState<{
@@ -163,6 +137,7 @@ export default function DeliveryDetailPage({
     }, [loadDeliveryDetails])
 
     useEffect(() => {
+        if (!isEscalar) return
         let alive = true
         const run = async () => {
             setRouteLoading(true)
@@ -179,7 +154,7 @@ export default function DeliveryDetailPage({
         }
         run()
         return () => { alive = false }
-    }, [deliveryId, partnerId])
+    }, [deliveryId, partnerId, isEscalar])
 
     const confirmDeliveryWarningStatusChange = async () => {
         if (!deliveryWarningModal) return
@@ -238,9 +213,11 @@ export default function DeliveryDetailPage({
                         if (updatedLink) setSelectedLink(updatedLink)
                     }
                 }
-                const routeRes = await getDeliveryRoutePointsAction({ partnerId, deliveryId })
-                if (routeRes.success) {
-                    setRoute(routeRes.data)
+                if (isEscalar) {
+                    const routeRes = await getDeliveryRoutePointsAction({ partnerId, deliveryId })
+                    if (routeRes.success) {
+                        setRoute(routeRes.data)
+                    }
                 }
             } else {
                 toast.error(res.error || "Erro ao atualizar status do pedido.")
@@ -283,211 +260,182 @@ export default function DeliveryDetailPage({
 
     const totalDeliveryFee = links.reduce((sum: number, link: any) => sum + Number(link.orders?.delivery_fee || 0), 0)
 
-    return (
-        <FadeIn className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden relative">
-            <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-10 custom-scrollbar">
+    const driverName = delivery.partner_users?.user_profiles?.full_name || "Entrega própria"
 
-                {/* Sticky Header */}
-                <div className={`sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border transition-all duration-300 ${isScrolled ? "py-2 shadow-sm" : "py-4"}`}>
-                    <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 flex items-center justify-between">
-                        {/* Back button - desktop only */}
-                        <div className="absolute -left-12 top-1/2 -translate-y-1/2 hidden xl:flex">
-                            <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
-                                <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                            </Button>
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                            {/* Back button - mobile/tablet only */}
-                            <div className="xl:hidden">
-                                <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
-                                    <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                </Button>
-                            </div>
-                            <div>
-                                <h1 className="text-xl md:text-3xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-3">
-                                    Entrega {delivery?.delivery_number ? `#${delivery.delivery_number}` : ""}
-                                </h1>
-                                <p className="text-brand-inactive-text dark:text-dark-body text-xs md:text-sm mt-1">
-                                    Criado em {formatDateTime(delivery.created_at)} • {delivery.partner_users?.user_profiles?.full_name || "Entrega própria"}
-                                </p>
-                            </div>
-                        </div>
-
-                        <Badge variant={statusMeta.variant} icon={getDeliveryStatusIcon(delivery?.status)}>{statusMeta.label}</Badge>
-                    </div>
+    const linkedOrdersCard = (
+        <div className="overflow-hidden rounded-2xl border border-brand-border dark:border-dark-border">
+            <div className="border-b border-brand-border bg-brand-gray p-6 dark:border-dark-border dark:bg-dark-border/50 flex items-center justify-between gap-4">
+                <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                    Pedidos Vinculados ({links.length})
+                </h3>
+                <div className="text-right shrink-0">
+                    <p className="text-xs text-brand-inactive-text dark:text-dark-body font-medium uppercase">Entregador</p>
+                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-1">
+                        {driverName}
+                    </p>
                 </div>
-
-                {/* Content columns */}
-                <div className="max-w-[1300px] mx-auto w-full p-4 md:p-6 grid grid-cols-12 gap-y-8 xl:gap-y-0 relative mt-4">
-
-                    {/* Left Column */}
-                    <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12 space-y-8">
-
-                        {/* Linked Orders Card */}
-                        <div className="overflow-hidden rounded-2xl border border-brand-border dark:border-dark-border">
-                            <div className="border-b border-brand-border bg-brand-gray p-6 dark:border-dark-border dark:bg-dark-border/50">
-                                <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                    Pedidos Vinculados ({links.length})
-                                </h3>
-                            </div>
-                            <div className="bg-white dark:bg-dark-surface divide-y divide-brand-border dark:divide-dark-border">
-                                {links.length === 0 ? (
-                                    <div className="p-6 text-sm text-brand-inactive-text text-center">
-                                        Nenhum pedido vinculado a esta entrega.
-                                    </div>
-                                ) : (
-                                    links.map((link: any) => {
-                                        const order = link.orders
-                                        if (!order) return null
-                                        const paymentMeta = getPaymentStatusMeta(order.situation)
-                                        const deliveryMeta = getDeliveryStatusMeta(link.status || order.delivery_status)
-                                        const displayId = order.order_number || `#${String(order.id).slice(0, 8).toUpperCase()}`
-
-                                        return (
-                                            <div
-                                                key={link.id}
-                                                className="p-4 flex items-center justify-between gap-4 hover:bg-gray-50 dark:hover:bg-dark-border/40 cursor-pointer transition-colors"
-                                                onClick={() => setSelectedLink(link)}
-                                            >
-                                                <div className="min-w-0">
-                                                    <p className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">
-                                                        {displayId}
-                                                    </p>
-                                                    <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
-                                                        {order.customer_name || "Cliente"} • {formatCurrency(order.total_amount)}
-                                                    </p>
-                                                </div>
-                                                <div className="flex items-center gap-2 shrink-0">
-                                                    <Badge variant={paymentMeta.variant}>
-                                                        {paymentMeta.label}
-                                                    </Badge>
-                                                    <Badge variant={deliveryMeta.variant} icon={getDeliveryStatusIcon(link.status || order.delivery_status)}>
-                                                        {deliveryMeta.label}
-                                                    </Badge>
-                                                </div>
-                                            </div>
-                                        )
-                                    })
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Delivery Info Metrics Grid */}
-                        <FormSection title="Informações da Entrega" hasSeparator className="mb-8">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <ListItem icon={RouteIcon} title="Distância" description={`${Number(delivery.distance_km || 0).toFixed(2)} km`} className="px-4 py-3 gap-4" />
-                                <ListItem icon={EstimateTimeIcon} title="Duração Estimada" description={`${delivery.estimated_duration_minutes || 0} min`} className="px-4 py-3 gap-4" />
-                                <ListItem icon={ClockArrowUpIcon} title="Saída" description={delivery.departure_time ? formatDateTime(delivery.departure_time) : (delivery.started_at ? formatDateTime(delivery.started_at) : "-")} className="px-4 py-3 gap-4" />
-                                <ListItem icon={ClockCheckIcon} title="Conclusão" description={delivery.completed_at ? formatDateTime(delivery.completed_at) : (delivery.delivered_at ? formatDateTime(delivery.delivered_at) : "-")} className="px-4 py-3 gap-4" />
-                            </div>
-                        </FormSection>
-
-                        {/* Notes */}
-                        {delivery.notes && (
-                            <div>
-                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">
-                                    Observações da Entrega
-                                </h3>
-                                <InfoCard title="Observações" message={delivery.notes} color="gray" />
-                            </div>
-                        )}
+            </div>
+            <div className="bg-white dark:bg-dark-surface divide-y divide-brand-border dark:divide-dark-border">
+                {links.length === 0 ? (
+                    <div className="p-6 text-sm text-brand-inactive-text text-center">
+                        Nenhum pedido vinculado a esta entrega.
                     </div>
+                ) : (
+                    links.map((link: any) => {
+                        const order = link.orders
+                        if (!order) return null
+                        const paymentMeta = getPaymentStatusMeta(order.situation)
+                        const deliveryMeta = getDeliveryStatusMeta(link.status || order.delivery_status)
+                        const displayId = order.order_number || `#${String(order.id).slice(0, 8).toUpperCase()}`
 
-                    {/* Right Column */}
-                    <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
-
-                        {/* Driver and Route general information card */}
-                        <SidebarCard>
-                            <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">Informações Gerais</h3>
-                            <div className="space-y-4">
-                                <div>
-                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body font-medium uppercase">Entregador</p>
-                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-1">
-                                        {delivery.partner_users?.user_profiles?.full_name || "Entrega própria"}
+                        return (
+                            <div
+                                key={link.id}
+                                className="p-4 flex items-center justify-between gap-4 hover:bg-gray-50 dark:hover:bg-dark-border/40 cursor-pointer transition-colors"
+                                onClick={() => setSelectedLink(link)}
+                            >
+                                <div className="min-w-0">
+                                    <p className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">
+                                        {displayId}
+                                    </p>
+                                    <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
+                                        {order.customer_name || "Cliente"} • {formatCurrency(order.total_amount)}
                                     </p>
                                 </div>
-                                <div>
-                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body font-medium uppercase">Pedidos na Rota</p>
-                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-1">
-                                        {links.length} pedido(s)
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body font-medium uppercase">Valor Total da Entrega</p>
-                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-1">
-                                        {formatCurrency(totalDeliveryFee)}
-                                    </p>
+                                <div className="flex items-center gap-2 shrink-0">
+                                    <Badge variant={paymentMeta.variant}>
+                                        {paymentMeta.label}
+                                    </Badge>
+                                    <Badge variant={deliveryMeta.variant} icon={getDeliveryStatusIcon(link.status || order.delivery_status)}>
+                                        {deliveryMeta.label}
+                                    </Badge>
                                 </div>
                             </div>
-                        </SidebarCard>
+                        )
+                    })
+                )}
+            </div>
+            <div className="border-t border-brand-border bg-brand-gray p-6 dark:border-dark-border dark:bg-dark-border/50">
+                <div className="flex items-center justify-between gap-4">
+                    <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Valor Total da Entrega</span>
+                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(totalDeliveryFee)}</span>
+                </div>
+            </div>
+        </div>
+    )
 
-                        {/* Divider */}
-                        <div className="border-t border-brand-border dark:border-dark-border my-6"></div>
+    const deliveryInfoMetrics = (
+        <FormSection title="Informações da Entrega" hasSeparator className="mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <ListItem icon={RouteIcon} title="Distância" description={`${Number(delivery.distance_km || 0).toFixed(2)} km`} className="px-4 py-3 gap-4" />
+                <ListItem icon={EstimateTimeIcon} title="Duração Estimada" description={`${delivery.estimated_duration_minutes || 0} min`} className="px-4 py-3 gap-4" />
+                <ListItem icon={ClockArrowUpIcon} title="Saída" description={delivery.departure_time ? formatDateTime(delivery.departure_time) : (delivery.started_at ? formatDateTime(delivery.started_at) : "-")} className="px-4 py-3 gap-4" />
+                <ListItem icon={ClockCheckIcon} title="Conclusão" description={delivery.completed_at ? formatDateTime(delivery.completed_at) : (delivery.delivered_at ? formatDateTime(delivery.delivered_at) : "-")} className="px-4 py-3 gap-4" />
+            </div>
+        </FormSection>
+    )
 
-                        {/* Map Card */}
-                        <SidebarCard hasTopStrip={false}>
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading">Mapa da Rota</h3>
-                                {route?.points?.length > 0 && (
-                                    <button
-                                        type="button"
-                                        className="p-1.5 text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border rounded-lg transition-colors"
-                                        onClick={() => setIsMapModalOpen(true)}
-                                        title="Expandir mapa"
-                                    >
-                                        <MaximizeIcon className="w-4 h-4" />
-                                    </button>
-                                )}
-                            </div>
-                            <div className="h-[280px] w-full">
-                                {routeLoading ? (
-                                    <div className="h-full flex items-center justify-center rounded-2xl border border-brand-border dark:border-dark-border">
-                                        <span className="text-sm text-brand-inactive-text">Carregando mapa...</span>
-                                    </div>
-                                ) : route?.points?.length ? (
-                                    <DeliveryRouteMap
-                                        points={route.points}
-                                        origin={route.origin}
-                                        initialLat={route.origin?.lat ?? null}
-                                        initialLng={route.origin?.lng ?? null}
-                                    />
-                                ) : (
-                                    <div className="h-full flex items-center justify-center rounded-2xl border border-brand-border dark:border-dark-border bg-brand-gray/50 dark:bg-dark-surface/50 px-4">
-                                        <span className="text-sm text-brand-inactive-text text-center">{routeError || "Sem dados de rota para exibir."}</span>
-                                    </div>
-                                )}
-                            </div>
-                        </SidebarCard>
-                    </div>
+    const notesSection = delivery.notes ? (
+        <div>
+            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">
+                Observações da Entrega
+            </h3>
+            <InfoCard title="Observações" message={delivery.notes} color="gray" />
+        </div>
+    ) : null
+
+    const mapContent = routeLoading ? (
+        <div className="h-full flex items-center justify-center rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
+            <span className="text-sm text-brand-inactive-text">Carregando mapa...</span>
+        </div>
+    ) : route?.points?.length ? (
+        <DeliveryRouteMap
+            points={route.points}
+            origin={route.origin}
+            initialLat={route.origin?.lat ?? null}
+            initialLng={route.origin?.lng ?? null}
+        />
+    ) : (
+        <div className="h-full flex items-center justify-center rounded-2xl border border-brand-border dark:border-dark-border bg-brand-gray/50 dark:bg-dark-surface/50 px-4">
+            <span className="text-sm text-brand-inactive-text text-center">{routeError || "Sem dados de rota para exibir."}</span>
+        </div>
+    )
+
+    const pageHeader = (
+        <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 flex items-center justify-between">
+            {/* Back button - desktop only */}
+            <div className="absolute -left-12 top-1/2 -translate-y-1/2 hidden xl:flex">
+                <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
+                    <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                </Button>
+            </div>
+
+            <div className="flex items-center gap-3">
+                {/* Back button - mobile/tablet only */}
+                <div className="xl:hidden">
+                    <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
+                        <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                    </Button>
+                </div>
+                <div>
+                    <h1 className="text-xl md:text-3xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-3">
+                        Entrega {delivery?.delivery_number ? `#${delivery.delivery_number}` : ""}
+                    </h1>
+                    <p className="text-brand-inactive-text dark:text-dark-body text-xs md:text-sm mt-1">
+                        Criado em {formatDateTime(delivery.created_at)} • {driverName}
+                    </p>
                 </div>
             </div>
 
-            {/* Expanded Route Map Modal */}
-            <DefaultModal
-                isOpen={isMapModalOpen}
-                onClose={() => setIsMapModalOpen(false)}
-                title="Mapa da Rota Expandido"
-                maxWidth="5xl"
-                footer={
-                    <div className="flex justify-end w-full">
-                        <Button variant="outline" onClick={() => setIsMapModalOpen(false)}>
-                            Fechar
-                        </Button>
+            <Badge variant={statusMeta.variant} icon={getDeliveryStatusIcon(delivery?.status)}>{statusMeta.label}</Badge>
+        </div>
+    )
+
+    return (
+        <FadeIn className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden relative">
+            {isEscalar ? (
+                <div className="flex-1 flex flex-col lg:flex-row w-full overflow-hidden">
+                    {/* LEFT SIDE - CONTENT */}
+                    <div className="w-full lg:w-1/2 flex flex-col flex-1 min-h-0 lg:flex-none lg:shrink-0 lg:h-full border-r-0 lg:border-r border-brand-border dark:border-dark-border bg-white dark:bg-dark-background relative">
+                        {/* Header now inside the left column */}
+                        <div className={`shrink-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border transition-all duration-300 ${isScrolled ? "py-2 shadow-sm" : "py-4"}`}>
+                            {pageHeader}
+                        </div>
+
+                        <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto no-scrollbar relative">
+                            <div className="flex-1 pt-4 pb-12 px-4 md:px-6 space-y-8">
+                                {linkedOrdersCard}
+                                {deliveryInfoMetrics}
+                                {notesSection}
+                            </div>
+                        </div>
                     </div>
-                }
-            >
-                <div className="h-[550px] w-full p-2">
-                    {route?.points?.length && (
-                        <DeliveryRouteMap
-                            points={route.points}
-                            origin={route.origin}
-                            initialLat={route.origin?.lat ?? null}
-                            initialLng={route.origin?.lng ?? null}
-                        />
-                    )}
+
+                    {/* RIGHT SIDE - ROUTE MAP (preview area) */}
+                    <div className="w-full lg:w-1/2 bg-brand-gray dark:bg-dark-border/20 overflow-auto no-scrollbar">
+                        <div className="p-4 md:p-6 flex flex-col h-full">
+                            <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">Mapa da Rota</h3>
+                            <div className="flex-1 min-h-[300px] w-full">
+                                {mapContent}
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </DefaultModal>
+            ) : (
+                <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-10 custom-scrollbar">
+                    {/* Sticky Header */}
+                    <div className={`sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border transition-all duration-300 ${isScrolled ? "py-2 shadow-sm" : "py-4"}`}>
+                        {pageHeader}
+                    </div>
+
+                    {/* Content */}
+                    <div className="max-w-[1300px] mx-auto w-full p-4 md:p-6 space-y-8 relative mt-4">
+                        {linkedOrdersCard}
+                        {deliveryInfoMetrics}
+                        {notesSection}
+                    </div>
+                </div>
+            )}
 
             <AlertModal
                 isOpen={deliveryWarningModal?.isOpen ?? false}

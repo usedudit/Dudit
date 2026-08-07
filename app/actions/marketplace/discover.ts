@@ -6,8 +6,7 @@ import { getAdminClient } from "@/lib/supabase/admin"
 import { TAGS } from "@/lib/utils/revalidation-tags"
 import { calculateDistance } from "@/lib/services/location.service"
 
-
-const DISCOVER_DEBUG = true
+const DISCOVER_DEBUG = false
 
 function dLog(...args: unknown[]) {
     if (DISCOVER_DEBUG) console.log(...args)
@@ -745,7 +744,7 @@ async function fetchNearby(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
         const p = processProduct(item, { _distanceText: distText })
         if (p.partners) {
             (p.partners as Record<string, any>).distance_km = Number.isFinite(dist) ? dist : null
-            ; (p.partners as Record<string, any>).distance_km_formatted = distText
+                ; (p.partners as Record<string, any>).distance_km_formatted = distText
         }
         return p
     })

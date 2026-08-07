@@ -33,8 +33,11 @@ import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 import { resolveDeliverySettingsRow } from "@/app/actions/shared/delivery"
 
 export type ERPItemPayload = {
-    productId: string | null
+    productId?: string | null
     variantId?: string | null
+    serviceId?: string | null
+    lineType?: string | null
+    fulfillmentMode?: string | null
     customName?: string
     quantity: number
     unitPrice: number
@@ -42,6 +45,7 @@ export type ERPItemPayload = {
 }
 
 export type ERPOrderPayload = {
+    id?: string | null
     partnerId: string
     customerId?: string
     customerName?: string
@@ -597,17 +601,22 @@ function buildOrderChangeLines(currentOrder: any, payload: ERPOrderPayload) {
 }
 
 function sanitizeERPItems(items: ERPItemPayload[]) {
-    const sanitizedItems = items.map((item) => ({
-        ...item,
-        productId: item.productId || null,
-        variantId: item.variantId || null,
-        customName: item.customName?.trim() || undefined,
-        quantity: Number(item.quantity || 0),
-        unitPrice: Number(item.unitPrice || 0),
-    }))
+    const sanitizedItems = items.map((item) => {
+        const isServiceItem = Boolean(item.serviceId || item.lineType === 'service_booking' || item.lineType === 'service')
+        return {
+            ...item,
+            productId: isServiceItem ? null : (item.productId || null),
+            serviceId: item.serviceId || (isServiceItem ? item.productId : null) || null,
+            lineType: item.lineType || (isServiceItem ? 'service_booking' : 'product'),
+            variantId: item.variantId || null,
+            customName: item.customName?.trim() || undefined,
+            quantity: Number(item.quantity || 0),
+            unitPrice: Number(item.unitPrice || 0),
+        }
+    })
 
     for (const item of sanitizedItems) {
-        if (!item.productId && !item.customName) {
+        if (!item.productId && !item.serviceId && !item.customName) {
             return { error: "Preencha o nome dos itens adicionados manualmente antes de salvar o pedido." as const }
         }
 
@@ -615,7 +624,7 @@ function sanitizeERPItems(items: ERPItemPayload[]) {
             return { error: "A quantidade de todos os itens deve ser maior que zero." as const }
         }
 
-        if (!item.productId && item.unitPrice <= 0) {
+        if (!item.productId && !item.serviceId && item.unitPrice <= 0) {
             return { error: "Preencha o preço dos itens adicionados manualmente antes de salvar o pedido." as const }
         }
     }
@@ -629,14 +638,20 @@ async function validateERPItemsStock(params: {
     items: Array<{
         productId?: string | null
         variantId?: string | null
+        serviceId?: string | null
+        lineType?: string | null
         customName?: string
         quantity: number
     }>
 }) {
-    const productIds = Array.from(new Set(params.items.map((item) => item.productId).filter(Boolean))) as string[]
+    const stockItems = params.items.filter(
+        (item) => !item.serviceId && item.lineType !== 'service_booking' && item.lineType !== 'service' && item.productId
+    )
+
+    const productIds = Array.from(new Set(stockItems.map((item) => item.productId).filter(Boolean))) as string[]
     if (productIds.length === 0) return null
 
-    const variantIds = Array.from(new Set(params.items.map((item) => item.variantId).filter(Boolean))) as string[]
+    const variantIds = Array.from(new Set(stockItems.map((item) => item.variantId).filter(Boolean))) as string[]
 
     const { data: products, error: productsError } = await params.supabase
         .from("products")
@@ -647,6 +662,22 @@ async function validateERPItemsStock(params: {
     if (productsError) {
         console.error("[validateERPItemsStock] Products error:", productsError)
         return "Não foi possível validar o estoque dos itens."
+    }
+
+    const foundProductIds = new Set((products || []).map((p: any) => p.id))
+    const missingProductIds = productIds.filter((id) => !foundProductIds.has(id))
+
+    let serviceIdsFoundInMissing = new Set<string>()
+    if (missingProductIds.length > 0) {
+        const { data: foundServices } = await params.supabase
+            .from("services")
+            .select("id")
+            .eq("partner_id", params.partnerId)
+            .in("id", missingProductIds)
+
+        if (foundServices && foundServices.length > 0) {
+            serviceIdsFoundInMissing = new Set(foundServices.map((s: any) => s.id))
+        }
     }
 
     const productMap = new Map<string, { name: string; stock: number; allowSellWithoutStock: boolean }>((products || []).map((product: any) => [
@@ -686,8 +717,10 @@ async function validateERPItemsStock(params: {
         displayName: string
     }>()
 
-    for (const item of params.items) {
+    for (const item of stockItems) {
         if (!item.productId) continue
+        if (serviceIdsFoundInMissing.has(item.productId)) continue
+
         const key = item.variantId ? `variant:${item.variantId}` : `product:${item.productId}`
         const existing = requestedMap.get(key)
         if (existing) {
@@ -1728,6 +1761,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     const effectiveDeliveryPayer = (data.deliveryBreakdown?.deliveryPayer as "seller" | "customer") || deliveryPayer
 
     const orderInsertPayload: Record<string, unknown> = {
+        ...(data.id ? { id: data.id } : {}),
         partner_id: partnerId,
         customer_id: data.customerId || null,
         buyer_id: data.customerId || null,
@@ -3516,13 +3550,36 @@ export async function updateOrdersStatusInBatchAction(payload: {
             if (order.situation === "paid") {
                 continue
             }
+
+            let updateTotalAmount = Number(order.total_amount || 0)
+            let pmDiscountAmount = Number((order as any).payment_method_discount_amount || 0)
+            let pmExtraAmount = Number((order as any).payment_method_extra_amount || 0)
+
+            if (payload.paymentBreakdown && Array.isArray(payload.paymentBreakdown) && payload.paymentBreakdown.length > 0) {
+                let calcDiscount = 0
+                let calcExtra = 0
+                for (const leg of payload.paymentBreakdown) {
+                    if (leg.adjustmentType === 'discount' && Number(leg.adjustmentAmount || 0) > 0) {
+                        calcDiscount += Number(leg.adjustmentAmount)
+                    } else if (leg.adjustmentType === 'surcharge' && Number(leg.adjustmentAmount || 0) > 0) {
+                        calcExtra += Number(leg.adjustmentAmount)
+                    }
+                }
+                if (calcDiscount > 0 || calcExtra > 0) {
+                    pmDiscountAmount = calcDiscount
+                    pmExtraAmount = calcExtra
+                    const itemsBase = Number(order.total_amount || 0) + Number((order as any).payment_method_discount_amount || 0) - Number((order as any).payment_method_extra_amount || 0)
+                    updateTotalAmount = Math.max(0, Math.round((itemsBase - calcDiscount + calcExtra) * 100) / 100)
+                }
+            }
+
             const paymentState = resolvePaymentState({
                 requestedStatus,
-                totalAmount: Number(order.total_amount || 0),
+                totalAmount: updateTotalAmount,
                 paidAmount: payload.paidAmount !== undefined ? payload.paidAmount : undefined,
                 fallbackPaidAmount:
                     requestedStatus === "paid"
-                        ? Number(order.total_amount || 0)
+                        ? updateTotalAmount
                         : requestedStatus === "partially_paid"
                             ? Number(order.paid_amount || 0)
                             : 0,
@@ -3532,17 +3589,33 @@ export async function updateOrdersStatusInBatchAction(payload: {
                 ? Array.from(new Set(payload.paymentBreakdown.map((entry: any) => normalizePaymentMethodLabel(entry.method)).filter(Boolean))).join(', ') || 'Método não definido'
                 : undefined
 
-            const { error } = await supabase
+            const updateFields: Record<string, unknown> = {
+                situation: paymentState.situation,
+                paid_amount: paymentState.paidAmount,
+                total_amount: updateTotalAmount,
+                payment_method_discount_amount: pmDiscountAmount,
+                payment_method_extra_amount: pmExtraAmount,
+                ...(payload.paymentBreakdown ? { payment_breakdown: payload.paymentBreakdown } : {}),
+                ...(nextPaymentMethod ? { payment_method: nextPaymentMethod } : {}),
+                ...(payload.mpPaymentId ? { mp_payment_id: payload.mpPaymentId } : {}),
+            }
+
+            let { error } = await supabase
                 .from("orders")
-                .update({
-                    situation: paymentState.situation,
-                    paid_amount: paymentState.paidAmount,
-                    ...(payload.paymentBreakdown ? { payment_breakdown: payload.paymentBreakdown } : {}),
-                    ...(nextPaymentMethod ? { payment_method: nextPaymentMethod } : {}),
-                    ...(payload.mpPaymentId ? { mp_payment_id: payload.mpPaymentId } : {}),
-                })
+                .update(updateFields)
                 .eq("id", order.id)
                 .eq("partner_id", payload.partnerId)
+
+            if (error && isMissingOrdersPaymentMethodDeltaColumnsError(error)) {
+                delete updateFields.payment_method_discount_amount
+                delete updateFields.payment_method_extra_amount
+                const fallbackRes = await supabase
+                    .from("orders")
+                    .update(updateFields)
+                    .eq("id", order.id)
+                    .eq("partner_id", payload.partnerId)
+                error = fallbackRes.error
+            }
 
             if (error) return { error: error.message }
             paymentProcessedCount += 1
@@ -3626,9 +3699,6 @@ export async function updateOrdersStatusInBatchAction(payload: {
         const eligibleDeliveryOrders: any[] = []
         for (const order of currentOrders || []) {
             if (order.situation === "cancelled") {
-                continue
-            }
-            if (order.delivery_status === "delivered") {
                 continue
             }
             eligibleDeliveryOrders.push(order)

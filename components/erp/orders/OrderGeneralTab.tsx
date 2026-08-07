@@ -435,7 +435,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                                     onChange={(val) => updateItemQty(index, val)}
                                                                     size="md"
                                                                 />
-                                                                {!item.isService && Number(item.stock || 0) <= 0 && (
+                                                                {!item.isService && !item.isManual && Boolean(item.productId) && Number(item.stock || 0) <= 0 && (
                                                                     <Tooltip text="Produto sem estoque disponível no momento">
                                                                         <Badge
                                                                             variant="orange"
@@ -583,7 +583,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                                 onChange={(val) => updateItemQty(index, val)}
                                                                 size="sm"
                                                             />
-                                                            {!item.isService && Number(item.stock || 0) <= 0 && (
+                                                            {!item.isService && !item.isManual && Boolean(item.productId) && Number(item.stock || 0) <= 0 && (
                                                                 <Tooltip text="Produto sem estoque disponível no momento">
                                                                     <Badge
                                                                         variant="orange"
@@ -1232,7 +1232,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                                 onChange={(val) => updateItemQty(index, val)}
                                                                 size="sm"
                                                             />
-                                                            {!item.isService && Number(item.stock || 0) <= 0 && (
+                                                            {!item.isService && !item.isManual && Boolean(item.productId) && Number(item.stock || 0) <= 0 && (
                                                                 <Tooltip text="Produto sem estoque disponível no momento">
                                                                     <Badge
                                                                         variant="orange"

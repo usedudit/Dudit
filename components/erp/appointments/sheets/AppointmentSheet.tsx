@@ -49,6 +49,10 @@ export const AppointmentSheet = ({
     openingHours,
     onAppointmentUpdated,
     appointmentsList,
+    linkedOrderId: propLinkedOrderId,
+    linkedOrderItemId,
+    allowedOrderServices,
+    preselectedClient,
 }: {
     onClose: () => void,
     onDelete?: (id: string, notify?: boolean, note?: string) => Promise<boolean>,
@@ -73,8 +77,24 @@ export const AppointmentSheet = ({
     openingHours?: any,
     onAppointmentUpdated?: (item: any) => void,
     appointmentsList?: Appointment[],
+    linkedOrderId?: string,
+    linkedOrderItemId?: string,
+    allowedOrderServices?: any[],
+    preselectedClient?: any,
 }) => {
-    const servicesSource = servicesCatalog || [];
+    const servicesSource = useMemo(() => {
+        if (allowedOrderServices && allowedOrderServices.length > 0) {
+            const isCategorized = allowedOrderServices.some((c: any) => Array.isArray(c?.items));
+            if (isCategorized) return allowedOrderServices;
+            return [{
+                id: "order-services",
+                name: "Serviços deste Pedido",
+                colorClass: "bg-emerald-500",
+                items: allowedOrderServices,
+            }];
+        }
+        return servicesCatalog || [];
+    }, [allowedOrderServices, servicesCatalog]);
     const clientsSource = clientsCatalog || [];
     const staffSource = staffCatalog || [];
     const { canEdit, hasSpecific, canDelete } = usePermissions();
@@ -88,8 +108,17 @@ export const AppointmentSheet = ({
     const [isHistoryOverlayOpen, setIsHistoryOverlayOpen] = useState(false);
     const [isNotesOverlayOpen, setIsNotesOverlayOpen] = useState(false);
     const [isRecurrenceOverlayOpen, setIsRecurrenceOverlayOpen] = useState(false);
-    const [selectedServices, setSelectedServices] = useState<any[]>([]);
-    const [selectedClient, setSelectedClient] = useState<any>(null);
+    const [selectedServices, setSelectedServices] = useState<any[]>(() => {
+        if (allowedOrderServices && allowedOrderServices.length > 0) {
+            if (linkedOrderItemId) {
+                const found = allowedOrderServices.find(s => (s.orderItemId || s.order_item_id || s.id) === linkedOrderItemId);
+                if (found) return [found];
+            }
+            return [allowedOrderServices[0]];
+        }
+        return [];
+    });
+    const [selectedClient, setSelectedClient] = useState<any>(preselectedClient || null);
     const [editingServiceIndex, setEditingServiceIndex] = useState<number | null>(null);
     const [isAddingMore, setIsAddingMore] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -857,6 +886,8 @@ export const AppointmentSheet = ({
 
         // Apply staff assignments to generated payload
         const baseItem = {
+            orderId: propLinkedOrderId || null,
+            orderItemId: linkedOrderItemId || (selectedServices[0]?.orderItemId || selectedServices[0]?.order_item_id || null),
             customerName: selectedClient?.name || 'Cliente Sem Nome',
             customerId: selectedClient?.id || null,
             serviceName: selectedServices.map(s => s.name).join(', '),
@@ -894,6 +925,8 @@ export const AppointmentSheet = ({
 
                 return {
                     ...baseItem,
+                    orderId: propLinkedOrderId || null,
+                    orderItemId: svcs[0]?.orderItemId || svcs[0]?.order_item_id || linkedOrderItemId || null,
                     serviceName: combinedName,
                     price: combPrice,
                     duration: combDur,
@@ -1930,33 +1963,29 @@ export const AppointmentSheet = ({
                                 {mode === 'view' && appointment && (
                                     <div className="grid grid-cols-2 gap-3 text-xs">
                                         <div className="rounded-xl border border-brand-border dark:border-dark-border p-3">
-                                            <p className="font-bold text-brand-inactive-text uppercase tracking-wide mb-1">Canal</p>
+                                            <p className="text-brand-inactive-text dark:text-dark-body font-semibold mb-1">Canal</p>
                                             <p className="font-semibold text-brand-dark dark:text-dark-heading">
                                                 {displaySalesChannel}
                                             </p>
                                         </div>
                                         <div className="rounded-xl border border-brand-border dark:border-dark-border p-3">
-                                            <p className="font-bold text-brand-inactive-text uppercase tracking-wide mb-1">Pagamento</p>
+                                            <p className="text-brand-inactive-text dark:text-dark-body font-semibold mb-1">Pagamento</p>
                                             <p className="font-semibold text-brand-dark dark:text-dark-heading">
                                                 {displayPaymentStatus}
                                             </p>
                                         </div>
                                         <div className="rounded-xl border border-brand-border dark:border-dark-border p-3">
-                                            <p className="font-bold text-brand-inactive-text uppercase tracking-wide mb-1">Local</p>
+                                            <p className="text-brand-inactive-text dark:text-dark-body font-semibold mb-1">Local</p>
                                             <p className="font-semibold text-brand-dark dark:text-dark-heading">
                                                 {displayFulfillmentMode}
                                             </p>
                                         </div>
                                         <div className="rounded-xl border border-brand-border dark:border-dark-border p-3">
-                                            <p className="font-bold text-brand-inactive-text uppercase tracking-wide mb-1">Venda</p>
+                                            <p className="text-brand-inactive-text dark:text-dark-body font-semibold mb-1">Venda</p>
                                             {displayOrderNumber ? (
-                                                <button
-                                                    type="button"
-                                                    onClick={handleViewSale}
-                                                    className="font-semibold text-brand-green hover:underline text-left"
-                                                >
+                                                <Button variant="link" onClick={handleViewSale}>
                                                     #{displayOrderNumber}
-                                                </button>
+                                                </Button>
                                             ) : (
                                                 <p className="font-semibold text-brand-dark dark:text-dark-heading">-</p>
                                             )}

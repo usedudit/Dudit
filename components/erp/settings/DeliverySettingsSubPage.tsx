@@ -379,12 +379,12 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
                                                                         const finalFee = rule.type === "fixed" ? (baseFeeNum + Number(rule.value || 0)) : (baseFeeNum * Number(rule.value || 0));
                                                                         return (
                                                                             <tr key={rule.id} className="group hover:bg-brand-gray/50 dark:hover:bg-dark-border/10 transition-colors bg-white dark:bg-dark-background">
-                                                                                <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-dark dark:text-dark-heading">{rule.startTime}</td>
-                                                                                <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-dark dark:text-dark-heading">{rule.endTime}</td>
-                                                                                <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-dark dark:text-dark-heading">
+                                                                                <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-dark dark:text-dark-heading text-left">{rule.startTime}</td>
+                                                                                <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-dark dark:text-dark-heading text-left">{rule.endTime}</td>
+                                                                                <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-dark dark:text-dark-heading text-left">
                                                                                     {rule.type === "fixed" ? "Acréscimo" : "Multiplicador"}
                                                                                 </td>
-                                                                                <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-bold text-brand-dark dark:text-dark-heading">
+                                                                                <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-bold text-brand-dark dark:text-dark-heading text-left">
                                                                                     <div>{rule.type === "fixed" ? formatCurrency(rule.value) : `${rule.value}x`}</div>
                                                                                     <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5 font-normal">
                                                                                         Taxa final = {formatCurrency(finalFee)}

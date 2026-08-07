@@ -1,7 +1,6 @@
 "use client"
 
 import { useMemo, useState, useRef, useEffect, useCallback } from "react"
-import { useRouter, usePathname } from "next/navigation"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { AnimatePresence } from "framer-motion"
 import {
@@ -42,6 +41,7 @@ import { useErpExport } from "@/hooks/use-erp-export"
 import { usePermissions } from "@/lib/permission-context"
 import ExportColumnSelectionModal from "@/components/erp/export/ExportColumnSelectionModal"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
+import { useEntityState } from "@/hooks/use-entity-state"
 import CashRegisterPageControls from "./CashRegisterPageControls"
 import CashSessionGridCard from "./CashSessionGridCard"
 import CashSessionListItem from "./CashSessionListRow"
@@ -128,8 +128,15 @@ export default function CashRegisterPage({
     const { exportData, isExporting, columnSelectionModal, closeColumnSelectionModal, handleColumnConfirm } = useErpExport(planSlug)
     const isMobile = useMediaQuery("(max-width: 768px)")
     const isTablet = useMediaQuery("(max-width: 1024px)")
-    const router = useRouter()
-    const pathname = usePathname()
+
+    const { state: entityState, open, close, isViewing } = useEntityState()
+    const activeViewId = isViewing ? entityState.entityId : null
+
+    useEffect(() => {
+        const handleReset = () => close()
+        window.addEventListener('erp-sidebar-reset', handleReset)
+        return () => window.removeEventListener('erp-sidebar-reset', handleReset)
+    }, [close])
 
     const [activeSession, setActiveSession] = useState<any | null>(initialActiveSession || null)
     const [search, setSearch] = useState("")
@@ -140,7 +147,6 @@ export default function CashRegisterPage({
     const effectiveViewMode = isTablet ? "grid" : viewMode
     const [modals, setModals] = useState({ filter: false })
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null)
-    const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
     const [detailedSession, setDetailedSession] = useState<any | null>(null)
     const [isDetailLoading, setIsDetailLoading] = useState(false)
     const [openModal, setOpenModal] = useState(false)
@@ -200,7 +206,6 @@ export default function CashRegisterPage({
 
     useEffect(() => {
         const handleReset = () => {
-            setSelectedSessionId(null)
             setDetailedSession(null)
         }
         window.addEventListener('erp-sidebar-reset', handleReset)
@@ -209,10 +214,10 @@ export default function CashRegisterPage({
 
     // Auto-load session detail from URL ?view=id on initial mount
     useEffect(() => {
-        if (initialViewId && !selectedSessionId) {
+        if (initialViewId && !detailedSession) {
             handleViewDetails(initialViewId)
         }
-    }, [initialViewId, selectedSessionId])
+    }, [initialViewId, detailedSession])
 
     const operatorOptions = useMemo(() => {
         const names = new Set<string>()
@@ -304,34 +309,49 @@ export default function CashRegisterPage({
         await refetch()
     }
 
-    const handleViewDetails = useCallback(async (id: string) => {
-        setSelectedSessionId(id)
-        setDetailedSession(null)
-        setIsDetailLoading(true)
-        router.replace(`${pathname}?view=${id}`, { scroll: false })
-        try {
-            const res = await getCashSessionDetailsAction(partnerId, id)
-            if (res.success) {
-                setDetailedSession(res.data)
-            } else {
-                notifyError(res.error || "Erro ao carregar detalhes")
-                setSelectedSessionId(null)
-                router.replace(pathname, { scroll: false })
-            }
-        } catch {
-            notifyError("Erro de conexão ao carregar detalhes")
-            setSelectedSessionId(null)
-            router.replace(pathname, { scroll: false })
-        } finally {
-            setIsDetailLoading(false)
-        }
-    }, [partnerId, pathname, router])
+    const handleViewDetails = useCallback((id: string) => {
+        open("view", id)
+    }, [open])
 
     useEffect(() => {
-        if (initialViewId && !selectedSessionId) {
-            handleViewDetails(initialViewId)
+        if (initialViewId && !activeViewId) {
+            open("view", initialViewId)
         }
-    }, [initialViewId, handleViewDetails])
+    }, [initialViewId, activeViewId, open])
+
+    useEffect(() => {
+        if (!activeViewId) {
+            setDetailedSession(null)
+            return
+        }
+
+        let isMounted = true
+        setIsDetailLoading(true)
+        getCashSessionDetailsAction(partnerId, activeViewId)
+            .then((res) => {
+                if (isMounted) {
+                    if (res.success) {
+                        setDetailedSession(res.data)
+                    } else {
+                        notifyError(res.error || "Erro ao carregar detalhes")
+                        close()
+                    }
+                }
+            })
+            .catch(() => {
+                if (isMounted) {
+                    notifyError("Erro de conexão ao carregar detalhes")
+                    close()
+                }
+            })
+            .finally(() => {
+                if (isMounted) setIsDetailLoading(false)
+            })
+
+        return () => {
+            isMounted = false
+        }
+    }, [partnerId, activeViewId, close, notifyError])
 
     const resetOpenForm = () => {
         setOpeningBalance(0)
@@ -515,17 +535,13 @@ export default function CashRegisterPage({
     return (
         <>
             <AnimatePresence mode="wait">
-                {selectedSessionId ? (
+                {isViewing && activeViewId ? (
                     <CashSessionDetailPage
                         key="detail"
                         partnerId={partnerId}
                         details={detailedSession}
                         isLoading={isDetailLoading}
-                        onBack={() => {
-                            setSelectedSessionId(null)
-                            setDetailedSession(null)
-                            router.replace(pathname, { scroll: false })
-                        }}
+                        onBack={() => close()}
                     />
                 ) : (
                     <FadeIn

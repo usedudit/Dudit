@@ -91,19 +91,11 @@ const TransactionReceiptContent = ({
     totalOrder,
     totalPaid,
     totalRemaining,
-    customerName,
 }: any) => (
     <div className="bg-brand-gray dark:bg-dark-border/50 rounded-t-2xl p-6 pb-12 flex flex-col relative h-full border border-brand-border dark:border-dark-border border-b-0">
         <div className="mb-6 flex justify-between items-center">
             <h3 className="text-md font-bold text-brand-dark dark:text-dark-heading">Detalhes da Transação</h3>
         </div>
-
-        {customerName && (
-            <div className="mb-6 pb-4 border-b border-dashed border-brand-border dark:border-dark-border">
-                <span className="text-sm text-brand-inactive-text font-bold block mb-1">Cliente</span>
-                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{customerName}</span>
-            </div>
-        )}
 
         <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 mb-4 space-y-4">
             {cart.map((item: any, idx: number) => (
@@ -174,7 +166,7 @@ export default function PaymentStatusModal({
     }>({
         title: 'Receber saldo',
         canGoBack: false,
-        onGoBack: () => {},
+        onGoBack: () => { },
     });
     const [successSnapshot, setSuccessSnapshot] = useState<{
         displayOrderTotal: number;
@@ -376,8 +368,26 @@ export default function PaymentStatusModal({
                 }
             }
 
-            const nextPaidAmount = totalPaid + pendingNewAmount;
-            const nextSituation = resolveSituationFromPaid(nextPaidAmount, totalOrder);
+            let totalLegDiscount = 0;
+            let totalLegExtra = 0;
+            for (const leg of updatedBreakdown) {
+                if (leg.adjustmentType === 'discount' && Number(leg.adjustmentAmount || 0) > 0) {
+                    totalLegDiscount += Number(leg.adjustmentAmount);
+                } else if (leg.adjustmentType === 'surcharge' && Number(leg.adjustmentAmount || 0) > 0) {
+                    totalLegExtra += Number(leg.adjustmentAmount);
+                }
+            }
+
+            const currentDiscount = Number(targetOrder.payment_method_discount_amount || 0);
+            const currentExtra = Number(targetOrder.payment_method_extra_amount || 0);
+            const itemsBase = totalOrder + currentDiscount - currentExtra;
+            const newTotalOrder = (totalLegDiscount > 0 || totalLegExtra > 0)
+                ? Math.max(0, Math.round((itemsBase - totalLegDiscount + totalLegExtra) * 100) / 100)
+                : totalOrder;
+
+            const isFullPaymentOfBalance = pendingNewAmount >= totalRemaining - 0.005 || pendingNewAmount >= newTotalOrder - 0.005;
+            const nextPaidAmount = isFullPaymentOfBalance ? newTotalOrder : (totalPaid + pendingNewAmount);
+            const nextSituation = resolveSituationFromPaid(nextPaidAmount, newTotalOrder);
 
             const res = await updateOrdersStatusInBatchAction({
                 orderIds: [targetOrderId],
@@ -391,17 +401,21 @@ export default function PaymentStatusModal({
             if (res.success) {
                 const updated = {
                     ...targetOrder,
+                    total_amount: newTotalOrder,
+                    totalAmount: newTotalOrder,
                     paid_amount: nextPaidAmount,
                     paidAmount: nextPaidAmount,
                     situation: nextSituation,
                     payment_breakdown: updatedBreakdown,
+                    payment_method_discount_amount: totalLegDiscount,
+                    payment_method_extra_amount: totalLegExtra,
                 };
                 setCurrentOrder(updated);
                 setSuccessSnapshot({
-                    displayOrderTotal: totalOrder,
+                    displayOrderTotal: newTotalOrder,
                     totalPaid: nextPaidAmount,
                     isUnderpaid: nextSituation !== "paid",
-                    remainingPartial: Math.max(0, totalOrder - nextPaidAmount),
+                    remainingPartial: Math.max(0, newTotalOrder - nextPaidAmount),
                     paymentBreakdown: updatedBreakdown,
                 });
                 setPaymentStatus('success');
@@ -487,7 +501,7 @@ export default function PaymentStatusModal({
                     )}
 
                     {/* Content Area */}
-                    <div className="flex-1 overflow-y-auto px-6 md:px-10 pb-32 md:pb-10 relative custom-scrollbar flex flex-col justify-center">
+                    <div className="flex-1 overflow-y-auto px-6 md:px-10 pb-32 md:pb-10 relative custom-scrollbar flex flex-col">
                         <AnimatePresence mode="wait">
                             {/* === STATE: INPUT === */}
                             {paymentStatus === 'input' && (

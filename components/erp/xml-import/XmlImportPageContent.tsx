@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useCallback, useRef, useEffect, Fragment } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { Button, Checkbox, Input, IconPlaceholder, Badge, Spinner, SelectionBanner, ThreeDotsLoader, InfoCard, FormSection, ActionsDropdown, FormTextarea, Separator, FormDropdown, ListItem } from "@/components/reusable"
+import { Button, Checkbox, Input, IconPlaceholder, Badge, Spinner, SelectionBanner, ThreeDotsLoader, InfoCard, FormSection, ActionsDropdown, DropdownItem, FormTextarea, Separator, FormDropdown, ListItem, Tooltip } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
@@ -19,7 +19,7 @@ import {
     UploadIcon, FileTextIcon, CheckCircleIcon, AlertTriangleIcon,
     SearchIcon, PlusIcon, ClockIcon, GridIcon, ListIcon,
     PackageIcon, ArrowRightIcon, ChevronLeftIcon, InfoIcon, ArrowUpDownIcon,
-    ReloadIcon, ExportFileIcon,
+    ReloadIcon, ExportFileIcon, MoneyIcon,
     FileIcon
 } from "@/lib/icons"
 import { useErpExport } from "@/hooks/use-erp-export"
@@ -195,10 +195,18 @@ function ImportItemListRow({ item, d, isPreview, onOpenAction, supplierName, sup
             </td>
             <td className="py-3 px-4 border-b border-brand-border dark:border-dark-border align-top text-right">
                 {isPreview ? (
-                    <div className="flex items-center justify-end gap-1.5 action-btn">
-                        <Button variant="outline" size="sm" onClick={() => onOpenAction("stock")}>Estoque</Button>
-                        <Button variant="outline" size="sm" onClick={() => onOpenAction("cost")}>Custo</Button>
-                        <Button variant="outline" size="sm" onClick={() => onOpenAction("decision")}>Decisão</Button>
+                    <div className="flex items-center justify-end action-btn">
+                        <ActionsDropdown>
+                            <DropdownItem onClick={() => onOpenAction("stock")}>
+                                <PackageIcon size={18} /> Estoque
+                            </DropdownItem>
+                            <DropdownItem onClick={() => onOpenAction("cost")}>
+                                <MoneyIcon size={18} /> Custo
+                            </DropdownItem>
+                            <DropdownItem onClick={() => onOpenAction("decision")}>
+                                <CheckCircleIcon size={18} /> Decisão
+                            </DropdownItem>
+                        </ActionsDropdown>
                     </div>
                 ) : (
                     <span className="text-xs text-brand-inactive-text dark:text-dark-body">-</span>
@@ -423,6 +431,33 @@ export function XmlImportPageContent({ partnerId, initialImports, planGate }: Xm
         setReimportedFlag(!!reimported)
     }, [])
 
+    const [revertTarget, setRevertTarget] = useState<ImportItem | null>(null)
+    const [revertReason, setRevertReason] = useState("")
+    const [isReverting, setIsReverting] = useState(false)
+
+    const handleOpenRevert = useCallback((imp: ImportItem) => {
+        setRevertReason("")
+        setRevertTarget(imp)
+    }, [])
+
+    const handleRevert = useCallback(async () => {
+        if (!revertTarget) return
+        setIsReverting(true)
+        const result = await revertImportAction(revertTarget.id, partnerId, revertReason, storeId)
+        if (result.success) {
+            notifySuccess("Importação revertida!", result.message)
+            setRevertTarget(null)
+            setRevertReason("")
+            listImportsAction(partnerId, { limit: 50, storeId }).then((res) => {
+                if (res.success && res.imports) setImports(res.imports as ImportItem[])
+            })
+            router.refresh()
+        } else {
+            notifyError("Erro", result.error || "Falha ao reverter")
+        }
+        setIsReverting(false)
+    }, [revertTarget, partnerId, revertReason, storeId, notifySuccess, notifyError, router])
+
     if (planGate) {
         return (
             <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
@@ -467,6 +502,7 @@ export function XmlImportPageContent({ partnerId, initialImports, planGate }: Xm
                     handleSelectAll={handleSelectAll}
                     handleClearFilters={handleClearFilters}
                     handleOpenDetail={handleOpenDetail}
+                    onRevert={handleOpenRevert}
                     showUploadModal={showUploadModal}
                     setShowUploadModal={setShowUploadModal}
                     handleUploadModalSuccess={handleUploadModalSuccess}
@@ -505,6 +541,31 @@ export function XmlImportPageContent({ partnerId, initialImports, planGate }: Xm
                 onExportAll={handleExportAll}
                 onClose={closeSelectionModal}
             />
+
+            {revertTarget && (
+                <DefaultModal isOpen={!!revertTarget} onClose={() => { setRevertTarget(null); setRevertReason("") }} title="Desfazer Importação">
+                    <div className="space-y-4">
+                        <InfoCard color="red" title="Atenção" message="Esta ação irá desfazer toda a importação, incluindo movimentações de estoque e contas a pagar geradas. Esta operação é irreversível." />
+                        <div>
+                            <FormTextarea
+                                name="revert-reason"
+                                value={revertReason}
+                                onChange={(e) => setRevertReason(e.target.value)}
+                                label="Motivo da reversão"
+                                rows={3}
+                            />
+                        </div>
+                        <div className="flex items-center justify-end gap-3 pt-2">
+                            <Button variant="outline" onClick={() => { setRevertTarget(null); setRevertReason("") }}>
+                                Cancelar
+                            </Button>
+                            <Button onClick={handleRevert} disabled={isReverting} className="bg-red-600 hover:bg-red-700 text-white">
+                                {isReverting ? <span className="flex items-center gap-2"><Spinner size={18} /> Revertendo...</span> : "Confirmar Reversão"}
+                            </Button>
+                        </div>
+                    </div>
+                </DefaultModal>
+            )}
         </div>
     )
 }
@@ -515,7 +576,7 @@ function ListContent({
     imports, search, setSearch, page, setPage, activeTab, handleTabChange,
     filtered, totalPages, paginated, hasActiveFilters, effectiveViewMode,
     viewMode, setViewMode, selection, handleSelect, handleSelectAll,
-    handleClearFilters, handleOpenDetail, showUploadModal, setShowUploadModal,
+    handleClearFilters, handleOpenDetail, onRevert, showUploadModal, setShowUploadModal,
     handleUploadModalSuccess, partnerId, storeId, sortConfig, handleSort,
     onExport, isExporting,
 }: {
@@ -528,6 +589,7 @@ function ListContent({
     selection: Set<string>; handleSelect: (id: string) => void;
     handleSelectAll: () => void; handleClearFilters: () => void;
     handleOpenDetail: (imp: ImportItem) => void;
+    onRevert: (imp: ImportItem) => void;
     showUploadModal: boolean; setShowUploadModal: (v: boolean) => void;
     handleUploadModalSuccess: (importId: string) => void;
     partnerId: string; storeId: string;
@@ -659,7 +721,7 @@ function ListContent({
                                     <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
                                         {paginated.map((imp) => (
                                             <ImportGridCard key={imp.id} item={imp} selected={selection.has(imp.id)}
-                                                onSelect={() => handleSelect(imp.id)} onClick={() => handleOpenDetail(imp)} />
+                                                onSelect={() => handleSelect(imp.id)} onClick={() => handleOpenDetail(imp)} onRevert={onRevert} />
                                         ))}
                                     </div>
                                 ) : (
@@ -706,7 +768,7 @@ function ListContent({
                                                 <tbody>
                                                     {paginated.map((imp) => (
                                                         <ImportListRow key={imp.id} item={imp} selected={selection.has(imp.id)}
-                                                            onSelect={() => handleSelect(imp.id)} onClick={() => handleOpenDetail(imp)} />
+                                                            onSelect={() => handleSelect(imp.id)} onClick={() => handleOpenDetail(imp)} onRevert={onRevert} />
                                                     ))}
                                                 </tbody>
                                             </table>
@@ -733,7 +795,7 @@ function ListContent({
 
 // ─── List Row ───────────────────────────────────────────────────────────────
 
-function ImportListRow({ item, selected, onSelect, onClick }: { item: ImportItem; selected: boolean; onSelect: () => void; onClick: () => void }) {
+function ImportListRow({ item, selected, onSelect, onClick, onRevert }: { item: ImportItem; selected: boolean; onSelect: () => void; onClick: () => void; onRevert?: (imp: ImportItem) => void }) {
     const meta = STATUS_META[item.status] || { label: item.status, variant: "gray" as const }
     const dateStr = item.created_at
         ? new Date(item.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })
@@ -783,9 +845,13 @@ function ImportListRow({ item, selected, onSelect, onClick }: { item: ImportItem
             </td>
             <td className="p-2 border-b border-brand-border dark:border-dark-border" onClick={(e) => e.stopPropagation()}>
                 <div className="flex justify-center action-btn">
-                    <ActionsDropdown
-                        onView={() => onClick()}
-                    />
+                    {item.status === "completed" && onRevert && (
+                        <ActionsDropdown>
+                            <DropdownItem onClick={() => onRevert(item)}>
+                                <ReloadIcon size={18} /> Desfazer importação
+                            </DropdownItem>
+                        </ActionsDropdown>
+                    )}
                 </div>
             </td>
         </motion.tr>
@@ -794,7 +860,7 @@ function ImportListRow({ item, selected, onSelect, onClick }: { item: ImportItem
 
 // ─── Grid Card ──────────────────────────────────────────────────────────────
 
-function ImportGridCard({ item, selected, onSelect, onClick }: { item: ImportItem; selected: boolean; onSelect: () => void; onClick: () => void }) {
+function ImportGridCard({ item, selected, onSelect, onClick, onRevert }: { item: ImportItem; selected: boolean; onSelect: () => void; onClick: () => void; onRevert?: (imp: ImportItem) => void }) {
     const meta = STATUS_META[item.status] || { label: item.status, variant: "gray" as const }
 
     return (
@@ -813,14 +879,12 @@ function ImportGridCard({ item, selected, onSelect, onClick }: { item: ImportIte
                     <div className="flex items-center gap-2 min-w-0 pr-1">
                         <div className="flex items-center gap-2 min-w-0 flex-1">
                             <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">NF-e {item.invoice_number || "-"}</h3>
+                            <Tooltip text={`Status: ${meta.label}`}>
+                                <Badge variant={meta.variant} className="whitespace-nowrap scale-90 shrink-0" />
+                            </Tooltip>
                         </div>
-                        <div className="flex items-center gap-1">
-                            <div onClick={(e) => e.stopPropagation()}>
-                                <ActionsDropdown onView={() => onClick()} />
-                            </div>
-                            <div className="shrink-0 -mt-1 -mr-1" onClick={(e) => e.stopPropagation()}>
-                                <Checkbox checked={selected} onChange={() => onSelect()} />
-                            </div>
+                        <div className="shrink-0 -mt-1 -mr-1" onClick={(e) => e.stopPropagation()}>
+                            <Checkbox checked={selected} onChange={() => onSelect()} />
                         </div>
                     </div>
                     <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">{item.supplier_name || "Fornecedor"}</span>
@@ -830,7 +894,15 @@ function ImportGridCard({ item, selected, onSelect, onClick }: { item: ImportIte
                 <div className="flex items-center gap-2 text-xs text-brand-inactive-text dark:text-dark-body">
                     <span>{item.imported_items || 0}/{item.items_count || 0} itens</span>
                 </div>
-                <Badge variant={meta.variant}>{meta.label}</Badge>
+                <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+                    {item.status === "completed" && onRevert && (
+                        <ActionsDropdown>
+                            <DropdownItem onClick={() => onRevert(item)}>
+                                <ReloadIcon size={18} /> Desfazer importação
+                            </DropdownItem>
+                        </ActionsDropdown>
+                    )}
+                </div>
             </div>
         </motion.div>
     )

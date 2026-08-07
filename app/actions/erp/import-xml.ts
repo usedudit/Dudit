@@ -180,7 +180,7 @@ export async function importProductsFromXMLAction(xmlContent: string, partnerId:
               sku: generatedSku,
               partner_id: partnerId,
               store_id: storeId,
-              is_active: true,
+              status: "ativo",
               created_at: brasiliaTime.toISOString(),
               updated_at: brasiliaTime.toISOString(),
               description: product.name,

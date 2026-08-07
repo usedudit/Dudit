@@ -407,15 +407,73 @@ export async function getSalesGoalByIdAction(partnerId: string, goalId: string) 
   await requireUser()
   await requirePermission(partnerId, "goals", "view")
   const supabase = await getSupabaseServerClient()
-  const { data, error } = await supabase
-    .from("sales_goals")
-    .select("*")
-    .eq("partner_id", partnerId)
-    .eq("id", goalId)
-    .maybeSingle()
 
-  if (error || !data) {
-    return { success: false as const, error: error?.message || "Meta não encontrada." }
+  const [goalRes, progressRes, sellerNameMap] = await Promise.all([
+    supabase
+      .from("sales_goals")
+      .select("*")
+      .eq("partner_id", partnerId)
+      .eq("id", goalId)
+      .maybeSingle(),
+    supabase
+      .from("sales_goal_progress")
+      .select("id, goal_id, user_id, current_amount, achieved, achieved_at")
+      .eq("goal_id", goalId),
+    resolveSellerNameMap(partnerId),
+  ])
+
+  if (goalRes.error || !goalRes.data) {
+    return { success: false as const, error: goalRes.error?.message || "Meta não encontrada." }
   }
-  return { success: true as const, goal: data as any }
+
+  const goal = goalRes.data as any
+  const progressRows = progressRes.data || []
+
+  let bonusAccountName: string | null = null
+  if (goal.bonus_account_id) {
+    const { data: acc } = await supabase
+      .from("finance_accounts")
+      .select("name")
+      .eq("id", goal.bonus_account_id)
+      .maybeSingle()
+    if (acc) bonusAccountName = acc.name
+  }
+
+  const assignedUserIds: string[] = goal.assigned_user_ids || (goal.user_id ? [goal.user_id] : [])
+  const assignedUserNames = assignedUserIds.map((id) => sellerNameMap.get(id) || "Vendedor")
+
+  const progressDetail = progressRows.map((p: any) => ({
+    id: p.id,
+    user_id: p.user_id,
+    seller_name: sellerNameMap.get(p.user_id) || "Vendedor",
+    current_amount: money(Number(p.current_amount || 0)),
+    achieved: Boolean(p.achieved),
+    achieved_at: p.achieved_at,
+  }))
+
+  const totalCurrentAmount = progressDetail.reduce((sum, p) => sum + p.current_amount, 0)
+  const targetAmount = money(Number(goal.target_amount || 0))
+  const progressPercent = targetAmount > 0 ? Math.min(100, Math.round((totalCurrentAmount / targetAmount) * 100)) : 0
+
+  const nowDate = new Date().toISOString().slice(0, 10)
+  let computedStatus: "Em andamento" | "Concluída" | "Expirada" = "Em andamento"
+  if (progressPercent >= 100) {
+    computedStatus = "Concluída"
+  } else if (goal.end_date && String(goal.end_date) < nowDate) {
+    computedStatus = "Expirada"
+  }
+
+  return {
+    success: true as const,
+    goal: {
+      ...goal,
+      assigned_user_names: assignedUserNames,
+      bonus_account_name: bonusAccountName,
+      current_amount: totalCurrentAmount,
+      progress_percent: progressPercent,
+      status: computedStatus,
+      progress_detail: progressDetail,
+    },
+  }
 }
+

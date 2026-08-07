@@ -997,8 +997,8 @@ export async function confirmImportAction(
       }
     }
 
-    // Criar contas a pagar se solicitado
-    if (createPayables && xmlImport.total_value && xmlImport.supplier_id) {
+    // Criar contas a pagar apenas se a importação realmente deu certo (sem erros)
+    if (createPayables && !(result.errors?.length > 0) && xmlImport.total_value && xmlImport.supplier_id) {
       // Busca supplier para obter nome
       const { data: supplier } = await supabase
         .from("suppliers")
@@ -1040,7 +1040,7 @@ export async function confirmImportAction(
               store_id: storeId,
               contact_id: contact.id,
               transaction_type: "expense" as const,
-              category: "purchasing",
+              category: "Compras",
               amount: d.valor,
               description: `NF ${xmlImport.invoice_number || ""} - Parcela ${d.numero || "1"}`,
               due_date: d.vencimento || new Date(Date.now() + 30 * 86400000).toISOString(),
@@ -1052,7 +1052,7 @@ export async function confirmImportAction(
               store_id: storeId,
               contact_id: contact.id,
               transaction_type: "expense" as const,
-              category: "purchasing",
+              category: "Compras",
               amount: duplicatas.length === 1 ? duplicatas[0].valor : xmlImport.total_value,
               description: `NF ${xmlImport.invoice_number || ""} - À vista`,
               due_date: duplicatas.length === 1

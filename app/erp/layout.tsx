@@ -8,7 +8,7 @@ import { cookies } from "next/headers"
 import { NotificationsRealtimeProvider } from "@/providers/notifications-realtime-provider"
 
 export const metadata: Metadata = {
-  title: "Dudit - Gerenciamento",
+  title: "Gerenciamento",
   robots: {
     index: false,
     follow: false,

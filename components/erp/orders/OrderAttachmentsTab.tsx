@@ -6,6 +6,9 @@ import { GenericAttachmentsTab } from "@/components/erp/shared/GenericAttachment
 interface OrderAttachmentsTabProps {
   orderId: string
   partnerId: string
+  isEditing?: boolean
+  readOnly?: boolean
+  onMutation?: () => void
 }
 
 export function formatFileSize(size: any): string {
@@ -19,7 +22,7 @@ export function formatFileSize(size: any): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i]
 }
 
-export function OrderAttachmentsTab({ orderId, partnerId }: OrderAttachmentsTabProps) {
+export function OrderAttachmentsTab({ orderId, partnerId, isEditing = true, readOnly = false, onMutation }: OrderAttachmentsTabProps) {
   return (
     <GenericAttachmentsTab
       entityId={orderId}
@@ -27,6 +30,9 @@ export function OrderAttachmentsTab({ orderId, partnerId }: OrderAttachmentsTabP
       entityType="order"
       title="Documentos e Anexos"
       subtitle="Selecione e envie os arquivos desejados para este pedido"
+      isEditing={isEditing}
+      readOnly={readOnly}
+      onMutation={onMutation}
     />
   )
 }

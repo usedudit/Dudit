@@ -8,8 +8,10 @@ import {
     XIcon,
     ClockIcon,
     MoneyIcon,
-    ReturnIcon
+    ReturnIcon,
+    CalendarIcon
 } from "@/lib/icons"
+import { AppointmentSheet } from "@/components/erp/appointments/sheets/AppointmentSheet"
 import {
     Button,
     Badge,
@@ -57,10 +59,13 @@ const formatProductUnitPrice = (price: number, unit?: string | null) => {
 const getServiceScheduleInfo = (item: any, order: any) => {
     const appointments = order?.appointments || [];
     const matchingAppt = appointments.find((appt: any) =>
-        appt.service_name?.toLowerCase() === item.product_name?.toLowerCase()
+        (appt.order_item_id && appt.order_item_id === item.id) ||
+        (appt.service_id && item.service_id && appt.service_id === item.service_id) ||
+        (appt.service_name?.toLowerCase() === item.product_name?.toLowerCase())
     );
     if (matchingAppt && matchingAppt.start_date && matchingAppt.start_time) {
         return {
+            appointment: matchingAppt,
             date: matchingAppt.start_date,
             time: matchingAppt.start_time
         };
@@ -73,6 +78,7 @@ const getServiceScheduleInfo = (item: any, order: any) => {
     );
     if (matchingLine?.bookingMetadata?.date && matchingLine?.bookingMetadata?.time) {
         return {
+            appointment: null,
             date: matchingLine.bookingMetadata.date,
             time: matchingLine.bookingMetadata.time
         };
@@ -195,7 +201,30 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const [financialLoading, setFinancialLoading] = useState(false)
     const ITEMS_PER_PAGE = 8
     const [itemPage, setItemPage] = useState(1)
-    const { error: notifyError } = useNotification()
+    const { error: notifyError, success: notifySuccess } = useNotification()
+    const [isAppointmentSheetOpen, setIsAppointmentSheetOpen] = useState(false)
+    const [selectedOrderItemForAppointment, setSelectedOrderItemForAppointment] = useState<any>(null)
+
+    const handleSaveAppointmentFromOrder = async (data: any) => {
+        try {
+            const { createAppointmentsAction } = await import("@/app/actions/erp/appointments")
+            const payload = Array.isArray(data) ? data : [data]
+            const res = await createAppointmentsAction(payload)
+            if (res && res.success) {
+                if (notifySuccess) notifySuccess("Agendamento criado", "Agendamento vinculado ao pedido com sucesso.")
+                setIsAppointmentSheetOpen(false)
+                setSelectedOrderItemForAppointment(null)
+                const refreshed = await getOrderDetailsAction(orderId, partnerId)
+                if (refreshed && 'success' in refreshed && refreshed.success) {
+                    setOrder(refreshed.data)
+                }
+            } else {
+                if (notifyError) notifyError("Erro", res?.error || "Erro ao criar agendamento.")
+            }
+        } catch (err: any) {
+            if (notifyError) notifyError("Erro", err?.message || "Erro ao criar agendamento.")
+        }
+    }
 
     const handleBack = useCallback(() => onBack(), [onBack])
 
@@ -857,8 +886,18 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                                         Data do agendamento: {formatServiceSchedule(scheduleInfo.date, scheduleInfo.time)}
                                                                                     </div>
                                                                                 ) : (
-                                                                                    <div className="text-xs text-brand-inactive-text dark:text-dark-body mb-2">
-                                                                                        SKU: {item.product_variants?.sku || item.products?.sku || item.sku || "N/A"}
+                                                                                    <div className="my-1.5 mb-2">
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={() => {
+                                                                                                setSelectedOrderItemForAppointment(item)
+                                                                                                setIsAppointmentSheetOpen(true)
+                                                                                            }}
+                                                                                            className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-green hover:underline cursor-pointer bg-brand-green/10 dark:bg-brand-green/20 px-2.5 py-1 rounded-md transition-colors"
+                                                                                        >
+                                                                                            <CalendarIcon className="w-3.5 h-3.5" />
+                                                                                            Criar agendamento
+                                                                                        </button>
                                                                                     </div>
                                                                                 )
                                                                             ) : (
@@ -1362,8 +1401,18 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                                     Data do agendamento: {formatServiceSchedule(scheduleInfo.date, scheduleInfo.time)}
                                                                                 </div>
                                                                             ) : (
-                                                                                <div className="text-xs text-brand-inactive-text dark:text-dark-body mb-2">
-                                                                                    SKU: {item.product_variants?.sku || item.products?.sku || item.sku || "N/A"}
+                                                                                <div className="my-1.5 mb-2">
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => {
+                                                                                            setSelectedOrderItemForAppointment(item)
+                                                                                            setIsAppointmentSheetOpen(true)
+                                                                                        }}
+                                                                                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-green hover:underline cursor-pointer bg-brand-green/10 dark:bg-brand-green/20 px-2.5 py-1 rounded-md transition-colors"
+                                                                                    >
+                                                                                        <CalendarIcon className="w-3.5 h-3.5" />
+                                                                                        Criar agendamento
+                                                                                    </button>
                                                                                 </div>
                                                                             )
                                                                         ) : (
@@ -1620,7 +1669,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                 )}
                                             </div>
                                         </FadeIn>
-                                    </TabsContent>
+                                                                    </TabsContent>
 
                                     <TabsContent value="history" className="mt-0">
                                         <FadeIn key="history">
@@ -1630,7 +1679,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
                                     <TabsContent value="attachments" className="mt-0">
                                         <FadeIn key="attachments">
-                                            <OrderAttachmentsTab orderId={order.id} partnerId={partnerId} />
+                                            <OrderAttachmentsTab orderId={order.id} partnerId={partnerId} isEditing={false} readOnly={true} />
                                         </FadeIn>
                                     </TabsContent>
                                 </Tabs>
@@ -1706,6 +1755,36 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                     isOpen={!!printModalOrderId}
                     onClose={() => setPrintModalOrderId(null)}
                     orderId={printModalOrderId}
+                />
+            )}
+
+            {isAppointmentSheetOpen && (
+                <AppointmentSheet
+                    mode="create"
+                    defaultDate={new Date()}
+                    linkedOrderId={order?.id}
+                    linkedOrderItemId={selectedOrderItemForAppointment?.id}
+                    allowedOrderServices={(order?.order_items || [])
+                        .filter((i: any) => i.service_id || i.line_type === "service_booking" || Boolean(i.services))
+                        .map((i: any) => ({
+                            id: i.service_id || i.id,
+                            orderItemId: i.id,
+                            order_item_id: i.id,
+                            name: i.product_name,
+                            price: Number(i.product_price || 0),
+                            duration: i.services?.duration_minutes || 30,
+                            category_id: i.services?.category_id || null,
+                        }))
+                    }
+                    preselectedClient={order?.buyer_id || order?.customer_name ? { id: order?.buyer_id || null, name: order?.customer_name || 'Cliente' } : null}
+                    partnerId={partnerId}
+                    storeId={order?.store_id}
+                    onClose={() => {
+                        setIsAppointmentSheetOpen(false)
+                        setSelectedOrderItemForAppointment(null)
+                    }}
+                    onSave={handleSaveAppointmentFromOrder}
+                    onEnterSelectionMode={() => {}}
                 />
             )}
         </>

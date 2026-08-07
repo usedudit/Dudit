@@ -70,8 +70,8 @@ export default function DeliveryPageControls({
                             prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
                         />
                     </div>
-                    <Button variant="outline" onClick={onOpenFilter} className="w-[42px] h-[42px] p-0"><FilterIcon className="w-4 h-4" /></Button>
-                    <Button onClick={onAdd} disabled={addDisabled} className="w-[42px] h-[42px] p-0 rounded-full"><PlusIcon className="w-5 h-5" /></Button>
+                    <Button variant="outline" onClick={onOpenFilter} className="w-[42px] h-[42px]"><FilterIcon size={18} /></Button>
+                    <Button onClick={onAdd} disabled={addDisabled} className="w-[42px] h-[42px]"><PlusIcon size={18} /></Button>
                 </div>
 
                 <div className="hidden md:flex items-center w-full gap-3">

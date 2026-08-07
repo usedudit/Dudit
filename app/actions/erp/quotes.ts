@@ -206,6 +206,8 @@ async function assertQuoteAllowsItemEdits(
 
 type QuoteItemPayload = {
     productId?: string | null
+    serviceId?: string | null
+    lineType?: string | null
     customName?: string
     description?: string
     quantity: number
@@ -245,7 +247,8 @@ function validateQuotePayload(items: QuoteItemPayload[] = [], shippingCost = 0, 
 }
 
 async function validateQuoteItemsStock(partnerId: string, items: QuoteItemPayload[], supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>) {
-    const productIds = Array.from(new Set(items.map((item) => item.productId).filter(Boolean))) as string[]
+    const stockItems = items.filter(item => !item.serviceId && item.lineType !== 'service_booking' && item.lineType !== 'service' && item.productId)
+    const productIds = Array.from(new Set(stockItems.map((item) => item.productId).filter(Boolean))) as string[]
     if (productIds.length === 0) return null
 
     const { data: products, error } = await supabase
@@ -259,6 +262,22 @@ async function validateQuoteItemsStock(partnerId: string, items: QuoteItemPayloa
         return "Não foi possível validar o estoque dos itens do orçamento."
     }
 
+    const foundProductIds = new Set((products || []).map((p: any) => p.id))
+    const missingProductIds = productIds.filter((id) => !foundProductIds.has(id))
+
+    let serviceIdsFoundInMissing = new Set<string>()
+    if (missingProductIds.length > 0) {
+        const { data: foundServices } = await supabase
+            .from("services")
+            .select("id")
+            .eq("partner_id", partnerId)
+            .in("id", missingProductIds)
+
+        if (foundServices && foundServices.length > 0) {
+            serviceIdsFoundInMissing = new Set(foundServices.map((s: any) => s.id))
+        }
+    }
+
     const stockMap = new Map<string, { name: string; stock: number }>((products || []).map((product: any) => [
         product.id,
         {
@@ -268,8 +287,8 @@ async function validateQuoteItemsStock(partnerId: string, items: QuoteItemPayloa
     ]))
 
     const requestedMap = new Map<string, number>()
-    for (const item of items) {
-        if (!item.productId) continue
+    for (const item of stockItems) {
+        if (!item.productId || serviceIdsFoundInMissing.has(item.productId)) continue
         requestedMap.set(item.productId, (requestedMap.get(item.productId) || 0) + Number(item.quantity || 0))
     }
 

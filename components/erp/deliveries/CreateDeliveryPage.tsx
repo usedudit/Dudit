@@ -710,27 +710,6 @@ export default function CreateDeliveryPage({
                                             maxLength={500}
                                             showCharacterCount
                                         />
-
-                                        <div className="flex items-center gap-3">
-                                            <Button
-                                                onClick={() => {
-                                                    if (isBlocked) {
-                                                        openPlanUpgrade("crescer")
-                                                        return
-                                                    }
-                                                    void handleSave()
-                                                }}
-                                                disabled={isSaving || selectedOrderIds.length === 0 || !date || !time}
-                                            >
-                                                <SaveIcon className="mr-2 h-4 w-4" />
-                                                {isSaving ? "Salvando..." : "Criar entrega"}
-                                            </Button>
-                                            {isBlocked ? (
-                                                <Button variant="outline" onClick={() => openPlanUpgrade("crescer")}>
-                                                    Ver plano
-                                                </Button>
-                                            ) : null}
-                                        </div>
                                     </FadeIn>
                                 </TabsContent>
                             </AnimatePresence>

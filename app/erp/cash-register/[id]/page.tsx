@@ -1,31 +1,9 @@
-import { ERPPageHeader } from "@/components/erp/page-header-state"
-import { AccessDenied } from "@/components/erp/access-denied"
-import { FadeIn } from "@/components/animations/FadeIn"
-import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
-import { getCashSessionDetailsAction } from "@/app/actions/erp/cash-register"
-import CashSessionDetailPage from "@/components/erp/cash-register/CashSessionDetailPage"
+import { redirect } from "next/navigation"
 
 export const dynamic = "force-dynamic"
 
-export default async function CashSessionDetailsServer({ params }: { params: Promise<{ id: string }> }) {
+export default async function CashSessionDetailPageServer({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const context = await getCurrentPartnerContext()
-  if (!context) return <AccessDenied />
-  if (context.businessInfo?.mode === "quick") return <AccessDenied />
-
-  const partnerId = context.partnerId
-  const [detailsResult] = await Promise.all([
-    getCashSessionDetailsAction(partnerId, id),
-  ])
-
-  if (!detailsResult.success) return <AccessDenied />
-
-  return (
-    <>
-      <ERPPageHeader title="Detalhes do Caixa" backHref="/erp/cash-register" isSubPage />
-      <FadeIn className="p-4">
-        <CashSessionDetailPage partnerId={partnerId} details={detailsResult.data} />
-      </FadeIn>
-    </>
-  )
+  redirect(`/erp/cash-register?view=${id}`)
 }
+

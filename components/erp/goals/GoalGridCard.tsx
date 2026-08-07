@@ -23,6 +23,7 @@ type GoalRow = {
 
 interface GoalGridCardProps {
   goal: GoalRow
+  onDetails?: () => void
   onEdit: () => void
   onDuplicate: () => void
   onDelete: () => void
@@ -42,6 +43,7 @@ function statusVariant(status: GoalRow["status"]) {
 
 const GoalGridCard = React.memo(function GoalGridCard({
   goal,
+  onDetails,
   onEdit,
   onDuplicate,
   onDelete,
@@ -52,7 +54,8 @@ const GoalGridCard = React.memo(function GoalGridCard({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.2 }}
-      className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all duration-300 flex flex-col h-full"
+      onClick={onDetails}
+      className={`bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all duration-300 flex flex-col h-full ${onDetails ? "cursor-pointer" : ""}`}
     >
       <div className="flex gap-4 mb-2">
         <div className="w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border/50 flex border border-brand-border dark:border-dark-border items-center justify-center shrink-0">

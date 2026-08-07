@@ -179,7 +179,7 @@ export function AppointmentItemsStep({ items, onItemsChange, services, partnerPl
                                                         `Estoque após: ${projectedStock} ${minStock > 0 ? `(mín: ${minStock})` : ''}`
                                                     )}
                                                 </span>
-                                                {item.stock <= 0 && (
+                                                {Boolean(item.productId) && item.stock !== undefined && item.stock <= 0 && (
                                                     <span className="flex items-center gap-1 text-[10px] text-amber-600 font-medium">
                                                         <AlertTriangleIcon size={10} />
                                                         Sem estoque disponível

@@ -20,7 +20,7 @@
   }
 
   .dark .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: #374151;
+    background: #24252b80;
   }
 
   @media (max-width: 1024px) {

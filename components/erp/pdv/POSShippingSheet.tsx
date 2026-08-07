@@ -279,12 +279,10 @@ export default function POSShippingSheet({
                                     <div className="flex justify-between items-center text-sm">
                                         <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Taxa do envio</span>
                                         <span className="font-bold text-brand-dark dark:text-dark-heading">R$ {feeToDisplay.toFixed(2)}</span>
-                                        <div>
-                                            {isSubsidized && (
-                                                <p className="text-xs text-brand-orange">Subsidiado pela loja</p>
-                                            )}
-                                        </div>
                                     </div>
+                                    {isSubsidized && (
+                                        <p className="text-xs text-brand-orange">Subsidiado pela loja</p>
+                                    )}
                                 </div>
 
                                 {isQuoteLoading && <p className="mt-2 text-xs text-brand-inactive-text">Recalculando valores...</p>}

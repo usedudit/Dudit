@@ -156,7 +156,7 @@ export function ReturnPolicySubPage({ partnerId, onBack }: { partnerId: string; 
                                     </div>
                                 </FormSection>
 
-                                <FormSection title="Política comercial">
+                                <FormSection title="Política comercial" hasSeparator>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                         <Checkbox label="Aceita troca por tamanho" checked={policy.acceptsSizeExchange} onCheckedChange={(v) => update("acceptsSizeExchange", Boolean(v))} />
                                         <Checkbox label="Aceita troca por cor" checked={policy.acceptsColorExchange} onCheckedChange={(v) => update("acceptsColorExchange", Boolean(v))} />
@@ -209,6 +209,7 @@ export function ReturnPolicySubPage({ partnerId, onBack }: { partnerId: string; 
                                 <FormSection
                                     title="Política completa"
                                     description="Texto livre exibido ao cliente. Use o template e edite conforme necessário."
+                                    hasSeparator
                                 >
                                     <div className="flex justify-end mb-2">
                                         <Button variant="outline" size="sm" onClick={fillTemplate}>Usar template padrão</Button>

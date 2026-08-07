@@ -74,6 +74,7 @@ export type PDVPaymentBreakdownEntry = PaymentBreakdownEntry
 export type PDVCartItem = {
   id: string
   productId: string | null
+  serviceId?: string | null
   variantId: string | null
   name: string
   variantName: string | null

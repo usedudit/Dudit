@@ -7,7 +7,7 @@ import { requireUser } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { sanitizeNotes } from "@/lib/input-validator"
-import { revalidateEntityTimeline, revalidateStockMovements } from "@/lib/utils/revalidation"
+import { revalidateEntityTimeline } from "@/lib/utils/revalidation"
 import { revalidatePath, revalidateTag } from "next/cache"
 import { TAGS } from "@/lib/utils/revalidation-tags"
 import { applyServiceOrderToGoals } from "@/lib/services/sales-goals.service"
@@ -15,8 +15,7 @@ import { resolveMarketplaceOrderFinanceAccountId } from "@/app/actions/erp/finan
 import { startOfDay } from "@/lib/date"
 import { getAdminTimeline } from "@/lib/services/timeline.service"
 import { checkLimit, increment_usage_counter } from "@/lib/services/subscription.service"
-import { reserveOrderInventory, releaseOrderInventory, finalizeOrderInventory } from "@/lib/stock/reservations"
-import { invalidateProductCache } from "@/lib/cache/invalidation"
+import { reserveOrderInventory } from "@/lib/stock/reservations"
 import { DASHBOARD_TAGS } from "@/lib/data/dashboard"
 import { calculateOrderPricing } from "@/lib/services/pricing-engine"
 
@@ -73,6 +72,9 @@ export type AppointmentInput = {
   fulfillmentMode?: string | null
   salesChannel?: string | null
   storeId?: string | null
+  orderId?: string | null
+  marketplaceOrderId?: string | null
+  orderItemId?: string | null
   services?: AppointmentServiceInfo[]
   items?: AppointmentItemInput[]
 }
@@ -96,7 +98,7 @@ function sanitizeStatus(value?: string | null): AppointmentStatus {
   return "Reservado"
 }
 
-function toDbPayload(input: AppointmentInput, partnerId: string) {
+function toDbPayload(input: AppointmentInput, partnerId: string, defaultStoreId?: string | null) {
   return {
     partner_id: partnerId,
     customer_id: input.customerId || null,
@@ -120,7 +122,9 @@ function toDbPayload(input: AppointmentInput, partnerId: string) {
     recurrence_group_id: input.recurrenceGroupId || null,
     fulfillment_mode: input.fulfillmentMode || null,
     sales_channel: input.salesChannel || "manual",
-    store_id: input.storeId || null,
+    store_id: input.storeId || defaultStoreId || null,
+    marketplace_order_id: input.orderId || input.marketplaceOrderId || null,
+    order_item_id: input.orderItemId || null,
   }
 }
 
@@ -129,7 +133,7 @@ async function getPartnerContextWithPermission(permission: "view" | "create" | "
   const context = await getCurrentPartnerContext()
   if (!context) throw new Error("Contexto ERP não encontrado")
   await requirePermission(context.partnerId, "appointments", permission, user)
-  return { user, partnerId: context.partnerId }
+  return { user, partnerId: context.partnerId, storeId: context.activeStoreId || null }
 }
 
 function isPaidStatus(status: string | null | undefined) {
@@ -152,33 +156,19 @@ async function createAppointmentSaleAndSyncGoals(params: {
   const paidAmount = Math.max(0, Number(params.paidAmount || 0))
   if (paidAmount <= 0.009) return { saleId: null, paymentTransactionId: null as string | null }
 
-  const saleRefNote = `appointment:${params.appointment.id}:sale`
   const txRefNote = `appointment:${params.appointment.id}:payment`
 
-  const [{ data: existingSale }, { data: existingPaymentTx }] = await Promise.all([
-    params.supabase
-      .from("sales")
-      .select("id, sale_number")
-      .eq("partner_id", params.partnerId)
-      .eq("notes", saleRefNote)
-      .limit(1)
-      .maybeSingle(),
-    params.supabase
-      .from("transactions")
-      .select("id")
-      .eq("partner_id", params.partnerId)
-      .eq("reference_note", txRefNote)
-      .limit(1)
-      .maybeSingle(),
-  ])
-
-  let saleId = existingSale?.id || null
-  let activeSaleNumber = existingSale?.sale_number || null
+  const { data: existingPaymentTx } = await params.supabase
+    .from("transactions")
+    .select("id")
+    .eq("partner_id", params.partnerId)
+    .eq("reference_note", txRefNote)
+    .limit(1)
+    .maybeSingle()
 
   let orderDiscount = 0
   let orderExtra = 0
   let orderPaymentMethod: string | null = null
-  let orderPaymentMethodId: string | null = null
   if (params.appointment.marketplace_order_id) {
     const { data: orderData } = await params.supabase
       .from("orders")
@@ -191,134 +181,13 @@ async function createAppointmentSaleAndSyncGoals(params: {
       orderDiscount = Number(orderData.payment_method_discount_amount || 0)
       orderExtra = Number(orderData.payment_method_extra_amount || 0)
       orderPaymentMethod = orderData.payment_method || null
-      orderPaymentMethodId = (orderData as any).payment_method_id || null
     }
   }
 
   const baseAmount = Number(params.appointment.price || 0)
   const finalAmount = Math.max(0, baseAmount - orderDiscount + orderExtra)
   const financeAccountId = await resolveMarketplaceOrderFinanceAccountId(params.supabase as any, params.partnerId, false)
-
-  if (!saleId) {
-    const { data: saleNumberData } = await params.supabase.rpc("generate_sale_number")
-    const saleNumber = String(saleNumberData || "").trim() || `DDT-${String(params.appointment.id).slice(0, 8).toUpperCase()}`
-    activeSaleNumber = saleNumber
-
-    const { data: sale, error: saleError } = await params.supabase
-      .from("sales")
-      .insert({
-        partner_id: params.partnerId,
-        customer_id: params.appointment.customer_id || null,
-        total_amount: baseAmount,
-        discount_amount: orderDiscount,
-        final_amount: finalAmount,
-        paid_amount: paidAmount,
-        payment_status: paidAmount >= finalAmount - 0.009 ? "paid" : "partially_paid",
-        status: paidAmount >= finalAmount - 0.009 ? "paid" : "partially_paid",
-        finance_account_id: financeAccountId || null,
-        notes: saleRefNote,
-        finalized_by_user_id: params.userId,
-        sale_number: saleNumber,
-      })
-      .select("id")
-      .single()
-
-    if (saleError) throw saleError
-    saleId = sale?.id || null
-
-    if (saleId) {
-      const rawServices = (params.appointment.services || []) as Array<{ name: string; price: number }>
-      let saleItems: any[]
-      if (rawServices.length > 0) {
-        saleItems = rawServices.map((svc: { name: string; price: number }) => ({
-          sale_id: saleId,
-          partner_id: params.partnerId,
-          product_id: null,
-          variant_id: null,
-          product_name: svc.name,
-          variant_name: null,
-          unit_price: Number(svc.price || 0),
-          quantity: 1,
-          subtotal: Number(svc.price || 0),
-          total_price: Number(svc.price || 0),
-        }))
-      } else {
-        const svcNames = String(params.appointment.service_name || "Serviço").split(',').map((s: string) => s.trim()).filter(Boolean)
-        const svcCount = svcNames.length
-        const svcUnitPrice = svcCount > 1 ? Math.round((baseAmount / svcCount) * 100) / 100 : baseAmount
-        saleItems = svcNames.map((name: string) => ({
-          sale_id: saleId,
-          partner_id: params.partnerId,
-          product_id: null,
-          variant_id: null,
-          product_name: name,
-          variant_name: null,
-          unit_price: svcUnitPrice,
-          quantity: 1,
-          subtotal: svcUnitPrice,
-          total_price: svcUnitPrice,
-        }))
-      }
-      await params.supabase.from("sale_items").insert(saleItems)
-    }
-  } else {
-    const { error: saleUpdateError } = await params.supabase
-      .from("sales")
-      .update({
-        total_amount: baseAmount,
-        discount_amount: orderDiscount,
-        final_amount: finalAmount,
-        paid_amount: paidAmount,
-        payment_status: paidAmount >= finalAmount - 0.009 ? "paid" : "partially_paid",
-        status: paidAmount >= finalAmount - 0.009 ? "paid" : "partially_paid",
-      })
-      .eq("id", saleId)
-      .eq("partner_id", params.partnerId)
-
-    if (saleUpdateError) throw saleUpdateError
-
-    // Delete and recreate sale_items to support multiple services
-    await params.supabase
-      .from("sale_items")
-      .delete()
-      .eq("sale_id", saleId)
-
-    const rawServices = (params.appointment.services || []) as Array<{ name: string; price: number }>
-    let saleItems: any[]
-    if (rawServices.length > 0) {
-      saleItems = rawServices.map((svc: { name: string; price: number }) => ({
-        sale_id: saleId,
-        partner_id: params.partnerId,
-        product_id: null,
-        variant_id: null,
-        product_name: svc.name,
-        variant_name: null,
-        unit_price: Number(svc.price || 0),
-        quantity: 1,
-        subtotal: Number(svc.price || 0),
-        total_price: Number(svc.price || 0),
-      }))
-    } else {
-      const svcNames = String(params.appointment.service_name || "Serviço").split(',').map((s: string) => s.trim()).filter(Boolean)
-      const svcCount = svcNames.length
-      const svcUnitPrice = svcCount > 1 ? Math.round((baseAmount / svcCount) * 100) / 100 : baseAmount
-      saleItems = svcNames.map((name: string) => ({
-        sale_id: saleId,
-        partner_id: params.partnerId,
-        product_id: null,
-        variant_id: null,
-        product_name: name,
-        variant_name: null,
-        unit_price: svcUnitPrice,
-        quantity: 1,
-        subtotal: svcUnitPrice,
-        total_price: svcUnitPrice,
-      }))
-    }
-    await params.supabase.from("sale_items").insert(saleItems)
-  }
-
-  const fallbackSaleNumber = activeSaleNumber || `DDT-${String(params.appointment.id).slice(0, 8).toUpperCase()}`
+  const fallbackSaleNumber = `DDT-${String(params.appointment.id).slice(0, 8).toUpperCase()}`
 
   let paymentTransactionId = existingPaymentTx?.id || null
   if (!paymentTransactionId) {
@@ -327,6 +196,7 @@ async function createAppointmentSaleAndSyncGoals(params: {
       .from("transactions")
       .insert({
         partner_id: params.partnerId,
+        store_id: params.appointment.store_id || null,
         description: fallbackSaleNumber,
         category: "Vendas",
         customer_id: params.appointment.customer_id || null,
@@ -338,7 +208,6 @@ async function createAppointmentSaleAndSyncGoals(params: {
         status: "paid",
         notes: null,
         payment_type: orderPaymentMethod || "Agendamento",
-        payment_method_id: orderPaymentMethodId || null,
         original_amount: paidAmount,
         interest_amount: null,
         fee_amount: 0,
@@ -363,35 +232,21 @@ async function createAppointmentSaleAndSyncGoals(params: {
         console.error("[createAppointmentSaleAndSyncGoals] Erro ao atualizar saldo da conta:", balanceError.message)
       }
     }
-  } else {
-    // Sync the correct payment method / ID to the existing transaction row
-    await params.supabase
-      .from("transactions")
-      .update({
-        payment_type: orderPaymentMethod || "Agendamento",
-        payment_method_id: orderPaymentMethodId || null,
-      })
-      .eq("id", paymentTransactionId)
-      .eq("partner_id", params.partnerId)
   }
 
-  const { data: partnerUser } = await params.supabase
-    .from("partner_users")
-    .select("user_id")
-    .eq("id", params.appointment.staff_partner_user_id)
-    .eq("partner_id", params.partnerId)
-    .maybeSingle()
+  try {
+    await applyServiceOrderToGoals({
+      supabase: params.supabase as any,
+      partnerId: params.partnerId,
+      sellerUserId: params.appointment.staff_partner_user_id || params.userId,
+      saleAmount: finalAmount > 0 ? finalAmount : paidAmount,
+      createdByUserId: params.userId,
+    })
+  } catch (err: any) {
+    console.error("[createAppointmentSaleAndSyncGoals] Erro ao sincronizar metas:", err.message)
+  }
 
-  const sellerUserId = String(partnerUser?.user_id || params.userId)
-  await applyServiceOrderToGoals({
-    supabase: createAdminClient() as any,
-    partnerId: params.partnerId,
-    sellerUserId,
-    saleAmount: Number(params.appointment.price || 0),
-    createdByUserId: params.userId,
-  })
-
-  return { saleId, paymentTransactionId }
+  return { saleId: params.appointment.marketplace_order_id || null, paymentTransactionId }
 }
 
 export async function syncAppointmentReceivable(params: {
@@ -422,19 +277,13 @@ export async function syncAppointmentReceivable(params: {
   if (params.appointment.marketplace_order_id) {
     const { data: existingOrder } = await params.supabase
       .from("orders")
-      .select("order_number, payment_method, payment_method_id")
+      .select("order_number")
       .eq("id", params.appointment.marketplace_order_id)
       .eq("partner_id", params.partnerId)
       .limit(1)
       .maybeSingle()
     if (existingOrder?.order_number) {
       saleNumber = existingOrder.order_number
-    }
-    if (existingOrder?.payment_method) {
-      orderPaymentMethod = existingOrder.payment_method
-    }
-    if (existingOrder?.payment_method_id) {
-      orderPaymentMethodId = existingOrder.payment_method_id
     }
   } else {
     const saleRefNote = `appointment:${params.appointment.id}:sale`
@@ -573,10 +422,11 @@ export async function getAppointmentsByDateRangeAction(
   startDate: string,
   endDate: string,
   staffId?: string | null,
-  storeId?: string | null
+  storeIdParam?: string | null
 ) {
   try {
-    const { partnerId } = await getPartnerContextWithPermission("view")
+    const { partnerId, storeId: contextStoreId } = await getPartnerContextWithPermission("view")
+    const activeStoreId = storeIdParam ?? contextStoreId
     const supabase = await getSupabaseServerClient()
 
     let query = supabase
@@ -592,9 +442,9 @@ export async function getAppointmentsByDateRangeAction(
       query = query.eq("staff_partner_user_id", staffId)
     }
 
-    // Store filtering: if storeId provided, filter by it; if not, show all (unfiltered = visible to user)
-    if (storeId) {
-      query = query.eq("store_id", storeId)
+    // Store filtering: if storeId provided or available in context, filter by store (or store_id IS NULL for unassigned)
+    if (activeStoreId) {
+      query = query.or(`store_id.eq.${activeStoreId},store_id.is.null`)
     }
 
     const { data, error } = await query
@@ -726,24 +576,38 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
       return { success: false, error: "Nenhum agendamento enviado", created: [] }
     }
 
-    const { user, partnerId } = await getPartnerContextWithPermission("create")
+    const { user, partnerId, storeId: contextStoreId } = await getPartnerContextWithPermission("create")
     const supabase = await getSupabaseServerClient()
-    const rows = payload.map((item) => toDbPayload(item, partnerId))
+    const rows = payload.map((item) => toDbPayload(item, partnerId, contextStoreId))
+
+    // -- Idempotency guard for order_item_id --
+    if (rows[0] && rows[0].order_item_id) {
+      const { data: existingOrderItemAppt } = await supabase
+        .from("appointments")
+        .select("*")
+        .eq("partner_id", partnerId)
+        .eq("order_item_id", rows[0].order_item_id)
+        .limit(1)
+
+      if (existingOrderItemAppt && existingOrderItemAppt.length > 0) {
+        return { success: true, created: existingOrderItemAppt }
+      }
+    }
 
     // -- Idempotency guard: reject duplicate submissions within 30 seconds --
     // Checks the first item in the batch against recent inserts
-    const firstRow = rows[0]
-    if (firstRow) {
+    const firstRowItem = rows[0]
+    if (firstRowItem) {
       const thirtySecondsAgo = new Date(Date.now() - 30000).toISOString()
       const { data: recentDup } = await supabase
         .from("appointments")
         .select("id")
         .eq("partner_id", partnerId)
-        .eq("customer_name", firstRow.customer_name)
-        .eq("service_name", firstRow.service_name)
-        .eq("start_date", firstRow.start_date)
-        .eq("start_time", firstRow.start_time)
-        .eq("staff_partner_user_id", firstRow.staff_partner_user_id)
+        .eq("customer_name", firstRowItem.customer_name)
+        .eq("service_name", firstRowItem.service_name)
+        .eq("start_date", firstRowItem.start_date)
+        .eq("start_time", firstRowItem.start_time)
+        .eq("staff_partner_user_id", firstRowItem.staff_partner_user_id)
         .gte("created_at", thirtySecondsAgo)
         .limit(1)
 
@@ -770,6 +634,35 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
     for (let i = 0; i < createdRows.length; i++) {
       const row = createdRows[i]
       const price = Number(row.price || 0)
+      const linkedOrderId = row.marketplace_order_id || payload[i]?.orderId || payload[i]?.marketplaceOrderId
+
+      if (linkedOrderId) {
+        // Appointment is linked to an existing order (ERP/POS service sale)
+        // Skip creating a new order and skip creating new receivables!
+        const { data: existingOrder } = await supabase
+          .from("orders")
+          .select("id, situation")
+          .eq("id", linkedOrderId)
+          .maybeSingle()
+
+        const targetPaymentStatus = existingOrder?.situation === "paid"
+          ? "paid"
+          : (existingOrder?.situation === "partially_paid" ? "partially_paid" : "unpaid")
+
+        await supabase
+          .from("appointments")
+          .update({
+            marketplace_order_id: linkedOrderId,
+            payment_status: targetPaymentStatus,
+          })
+          .eq("id", row.id)
+          .eq("partner_id", partnerId)
+
+        row.marketplace_order_id = linkedOrderId
+        row.payment_status = targetPaymentStatus
+        continue
+      }
+
       if (price > 0.009 && row.source !== "unavailable") {
         const isMarketplace = !!row.marketplace_order_id
 
@@ -1616,7 +1509,7 @@ export async function getAppointmentDetailsDataAction(params: {
         .from("finance_accounts")
         .select("id, is_active, type")
         .eq("partner_id", partnerId),
-        
+
       // 2. Partner plan
       supabase
         .from("subscriptions")
@@ -1700,10 +1593,10 @@ export async function getAppointmentDetailsDataAction(params: {
           createdAt: item.created_at,
           updatedAt: item.updated_at,
           product: p ? {
-              name: p.name,
-              sku: p.sku || 'N/A',
-              image: p.images?.[0] || null,
-              stock: p.stock_available ?? 0,
+            name: p.name,
+            sku: p.sku || 'N/A',
+            image: p.images?.[0] || null,
+            stock: p.stock_available ?? 0,
           } : null,
           serviceName: s?.name || null,
         }

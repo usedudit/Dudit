@@ -140,6 +140,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
     // New states and computations
     const [isCameraOpen, setIsCameraOpen] = useState(false)
     const [itemTypeTab, setItemTypeTab] = useState<"product" | "service">("product")
+    const [isTypeFilterModalOpen, setIsTypeFilterModalOpen] = useState(false)
 
     const [pdvPromotions, setPdvPromotions] = useState<any[]>(initialPromotions || [])
     const [isGiftModalOpen, setIsGiftModalOpen] = useState(false)
@@ -536,7 +537,9 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
 
         const proceedAddToCart = (forceBypass?: boolean) => {
             setCart((prev) => {
-                const found = prev.find((item) => item.productId === product.id && item.variantId === (variantId || null))
+                const targetId = product.id
+                const isService = product.product_type === "service" || product.product_type === "Serviço"
+                const found = prev.find((item) => (item.productId === targetId || item.serviceId === targetId) && item.variantId === (variantId || null))
                 if (!found) {
                     const listUnit = Number(product.price || 0) + Number(selectedVariant?.price_adjustment || 0)
                     const prodAny = product as any
@@ -546,7 +549,8 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                         ...prev,
                         {
                             id: crypto.randomUUID(),
-                            productId: product.id,
+                            productId: isService ? null : product.id,
+                            serviceId: isService ? product.id : null,
                             variantId: variantId || null,
                             name: product.name,
                             variantName: selectedVariant?.variant_name || null,
@@ -556,7 +560,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                             price: effectiveUnit,
                             qty: normalizedQty,
                             image: (selectedVariant?.variant_options?.image as string | undefined) || product.images?.[0] || null,
-                            allowSellWithoutStock: forceBypass ? true : Boolean(product.allow_sell_without_stock)
+                            allowSellWithoutStock: forceBypass ? true : (isService ? true : Boolean(product.allow_sell_without_stock))
                         },
                     ]
                 }
@@ -570,8 +574,10 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
             })
         }
 
-        if (!force && !product.allow_sell_without_stock) {
-            const existingItem = cart.find((item) => item.productId === product.id && item.variantId === (variantId || null))
+        const isServiceItem = product.product_type === "service" || product.product_type === "Serviço"
+        if (!force && !isServiceItem && !product.allow_sell_without_stock) {
+            const targetId = product.id
+            const existingItem = cart.find((item) => (item.productId === targetId || item.serviceId === targetId) && item.variantId === (variantId || null))
             if (existingItem) {
                 const nextQty = existingItem.qty + normalizedQty
                 if (nextQty > availableStock && !existingItem.allowSellWithoutStock) {
@@ -830,7 +836,8 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                 deliveryBreakdown,
                 otherCosts,
                 items: cart.filter(item => !item.isGift).map((item) => ({
-                    productId: item.productId,
+                    productId: item.productId || null,
+                    serviceId: item.serviceId || null,
                     variantId: item.variantId,
                     variantName: item.variantName,
                     name: item.name,
@@ -896,6 +903,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                 return {
                     id: crypto.randomUUID(),
                     productId: item.product_id ?? item.productId ?? null,
+                    serviceId: item.service_id ?? item.serviceId ?? null,
                     variantId: item.variant_id ?? item.variantId ?? null,
                     variantName: item.variant_name || item.variantName || null,
                     name: item.name,
@@ -1369,7 +1377,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                     customerId: selectedCustomerId || null,
                     subtotal,
                     shippingCost: shippingFee,
-                    items: cart.map((item) => ({ productId: item.productId || null })),
+                    items: cart.map((item) => ({ productId: item.productId || null, serviceId: item.serviceId || null })),
                 })
                 : await validateCouponAction({
                     partnerId,
@@ -1377,7 +1385,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                     customerId: selectedCustomerId || null,
                     subtotal,
                     shippingCost: shippingFee,
-                    items: cart.map((item) => ({ productId: item.productId || null })),
+                    items: cart.map((item) => ({ productId: item.productId || null, serviceId: item.serviceId || null })),
                 })
 
             if (!(res as any)?.valid && !(res as any)?.success) {
@@ -1530,6 +1538,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                                 itemTypeTab={itemTypeTab}
                                 onItemTypeTabChange={handleItemTypeTabChange}
                                 hasBothProductsAndServices={hasBothProductsAndServices}
+                                onOpenTypeFilterModal={() => setIsTypeFilterModalOpen(true)}
                             />
 
 
@@ -1720,7 +1729,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                         <div className="space-y-3 px-1 pb-2">
                             <div>
                                 <h3 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Selecionar categoria</h3>
-                                <p className="mt-1 text-sm text-brand-inactive-text dark:text-dark-body">Escolha uma categoria para filtrar os produtos do PDV.</p>
+                                <p className="mt-1 text-sm text-brand-inactive-text dark:text-dark-body">Escolha uma categoria para filtrar no PDV.</p>
                             </div>
                             <div className="space-y-2">
                                 {categories.map((category) => (
@@ -1743,6 +1752,50 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                             </div>
                         </div>
                     </BottomSheet>
+
+                    <DefaultModal
+                        isOpen={isTypeFilterModalOpen}
+                        onClose={() => setIsTypeFilterModalOpen(false)}
+                        title="Filtrar por Produtos ou Serviços"
+                        maxWidth="sm"
+                    >
+                        <div className="space-y-4 p-1">
+                            <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                                Escolha se deseja visualizar os produtos ou serviços no catálogo e nas categorias do PDV.
+                            </p>
+                            <div className="grid grid-cols-2 gap-3 pt-1">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        handleItemTypeTabChange("product")
+                                        setIsTypeFilterModalOpen(false)
+                                    }}
+                                    className={`flex flex-col items-center justify-center gap-3 rounded-2xl border p-5 text-center transition-all ${itemTypeTab === "product"
+                                        ? "border-brand-primary bg-green-50/70 text-brand-primary dark:bg-brand-primary/10 shadow-sm"
+                                        : "border-brand-border bg-white text-brand-dark hover:border-brand-primary/50 dark:border-dark-border dark:bg-dark-surface dark:text-dark-heading"
+                                        }`}
+                                >
+                                    <PackageIcon size={32} />
+                                    <span className="font-bold text-base">Produtos</span>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        handleItemTypeTabChange("service")
+                                        setIsTypeFilterModalOpen(false)
+                                    }}
+                                    className={`flex flex-col items-center justify-center gap-3 rounded-2xl border p-5 text-center transition-all ${itemTypeTab === "service"
+                                        ? "border-brand-primary bg-green-50/70 text-brand-primary dark:bg-brand-primary/10 shadow-sm"
+                                        : "border-brand-border bg-white text-brand-dark hover:border-brand-primary/50 dark:border-dark-border dark:bg-dark-surface dark:text-dark-heading"
+                                        }`}
+                                >
+                                    <FileIcon size={32} />
+                                    <span className="font-bold text-base">Serviços</span>
+                                </button>
+                            </div>
+                        </div>
+                    </DefaultModal>
 
                     <BottomSheet isOpen={isMobileSummarySheetOpen} onClose={() => setIsMobileSummarySheetOpen(false)}>
                         <div className="space-y-5 px-1 pb-2">

@@ -33,6 +33,7 @@ type Props = {
   itemTypeTab: "product" | "service"
   onItemTypeTabChange: (value: "product" | "service") => void
   hasBothProductsAndServices: boolean
+  onOpenTypeFilterModal?: () => void
 }
 
 const POSHeader = memo(function POSHeader({
@@ -55,6 +56,7 @@ const POSHeader = memo(function POSHeader({
   itemTypeTab,
   onItemTypeTabChange,
   hasBothProductsAndServices,
+  onOpenTypeFilterModal,
 }: Props) {
   // Focus Lock State and Effect
   const [focusLock, setFocusLock] = useState(false)

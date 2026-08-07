@@ -335,6 +335,12 @@ export async function getLimit(partnerId: string, limitName: string): Promise<nu
   const value = plan.limits_json[limitName]
 
   if (value === undefined || value === null) {
+    if (limitName === "customers") return "unlimited"
+    if (limitName === "services" && plan.limits_json["items"] !== undefined) {
+      const itemsVal = plan.limits_json["items"]
+      if (itemsVal === "unlimited") return "unlimited"
+      return typeof itemsVal === "number" ? itemsVal : parseInt(String(itemsVal), 10) || 0
+    }
     // Unknown limit - default to 0 (deny by default)
     console.warn(`[SUBSCRIPTION] Unknown limit "${limitName}" for plan "${plan.slug}"`)
     return 0
@@ -438,8 +444,10 @@ const LIMIT_NAME_TO_RESOURCE_LABEL: Record<string, string> = {
   monthly_appointments: "agendamentos/mês",
   monthly_service_orders: "ordens de serviço/mês",
   users: "usuários",
+  customers: "clientes",
   // Aliases
   products: "itens",
+  services: "serviços",
   total_images: "imagens",
   quotes_per_month: "orçamentos/mês",
   orders_per_month: "pedidos/mês",

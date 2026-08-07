@@ -487,7 +487,7 @@ export const ShowcaseSubPage = ({
                                             </div>
                                         </div>
                                         <div className="flex-1">
-                                            <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Logo da Empresa</p>
+                                            <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Logo</p>
                                             <p className="text-xs text-brand-inactive-text dark:text-dark-body">Máx 3MB (PNG, JPG, WEBP)</p>
                                         </div>
                                         <input ref={fileInputRef} type="file" hidden accept="image/*" onChange={handleImageChange} />

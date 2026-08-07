@@ -359,7 +359,6 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
                                     <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                                         <TabsTrigger value="summary">Resumo</TabsTrigger>
                                         <TabsTrigger value="movements" badge={<span className="text-xs text-brand-inactive-text">{String(sangriasReforcos.length).padStart(2, "0")}</span>}>Sangrias e reforços</TabsTrigger>
-                                        <TabsTrigger value="returns">Devoluções</TabsTrigger>
                                     </TabsList>
                                 </div>
                             </div>
@@ -372,10 +371,7 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
                                         <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden mb-8">
                                             <div className="bg-brand-gray dark:bg-dark-border/50 p-6 border-b border-brand-border dark:border-dark-border">
                                                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">Operador da abertura:</span>
-                                                        <div className="flex items-center gap-1.5 font-bold text-brand-dark dark:text-dark-heading text-sm">{details.operators.open_name}</div>
-                                                    </div>
+                                                    <div className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">Operador da abertura: <strong className="text-brand-dark dark:text-dark-heading">{details.operators.open_name}</strong></div>
                                                     <div className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">Status atual: <strong className="text-brand-dark dark:text-dark-heading">{isOpen ? "Caixa aberto" : "Caixa fechado"}</strong></div>
                                                 </div>
                                             </div>
@@ -493,126 +489,128 @@ Diferença final: ${formatCurrency(details.totals.difference)}`} color={details.
                             </TabsContent>
 
                             <TabsContent value="movements" className="mt-0">
-                                <div className="grid grid-cols-12 gap-y-8 md:gap-y-0 relative">
-                                    <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
-                                        {sangriasReforcos.length > 0 ? (
-                                            <>
-                                                <div className="lg:hidden flex flex-col border-b border-brand-border dark:border-dark-border">
-                                                    {movementRows.map((m: any) => (
-                                                        <button
-                                                            type="button"
-                                                            key={m.originalId}
-                                                            className="py-5 flex items-start gap-4 border-b border-gray-50 dark:border-dark-border/50 last:border-none text-left w-full bg-transparent"
-                                                            onClick={() => setDetailMovement(m)}
-                                                        >
-                                                            <div className="flex-1 min-w-0">
-                                                                <div className="flex justify-between items-start gap-3 mb-0.5">
-                                                                    <h3 className="font-bold text-[16px] text-brand-dark dark:text-dark-heading truncate pr-2">{m.displayId}</h3>
-                                                                    <div className="flex flex-col items-end gap-2 shrink-0">
-                                                                        <Badge variant={m.statusColor}>{m.statusLabel}</Badge>
-                                                                        {isOpen && !m.reversed_at ? (
-                                                                            <Button
-                                                                                type="button"
-                                                                                variant="outline"
-                                                                                className="h-8"
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation()
-                                                                                    handleReverse(m.originalId)
-                                                                                }}
-                                                                            >
-                                                                                Estornar
-                                                                            </Button>
-                                                                        ) : null}
+                                <div className={sangriasReforcos.length > 0 ? "grid grid-cols-12 gap-y-8 md:gap-y-0 relative" : "grid gap-y-8 md:gap-y-0 relative"}>
+                                    <div className={sangriasReforcos.length > 0 ? "col-span-12 xl:col-span-8 pr-0 xl:pr-12" : "col-span-12 xl:col-span-8 pr-0"}>
+                                        {
+                                            sangriasReforcos.length > 0 ? (
+                                                <>
+                                                    <div className="lg:hidden flex flex-col border-b border-brand-border dark:border-dark-border">
+                                                        {movementRows.map((m: any) => (
+                                                            <button
+                                                                type="button"
+                                                                key={m.originalId}
+                                                                className="py-5 flex items-start gap-4 border-b border-gray-50 dark:border-dark-border/50 last:border-none text-left w-full bg-transparent"
+                                                                onClick={() => setDetailMovement(m)}
+                                                            >
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="flex justify-between items-start gap-3 mb-0.5">
+                                                                        <h3 className="font-bold text-[16px] text-brand-dark dark:text-dark-heading truncate pr-2">{m.displayId}</h3>
+                                                                        <div className="flex flex-col items-end gap-2 shrink-0">
+                                                                            <Badge variant={m.statusColor}>{m.statusLabel}</Badge>
+                                                                            {isOpen && !m.reversed_at ? (
+                                                                                <Button
+                                                                                    type="button"
+                                                                                    variant="outline"
+                                                                                    className="h-8"
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation()
+                                                                                        handleReverse(m.originalId)
+                                                                                    }}
+                                                                                >
+                                                                                    Estornar
+                                                                                </Button>
+                                                                            ) : null}
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate mb-1">{m.formattedDate}</div>
+                                                                    <div className="flex flex-wrap items-center gap-2 text-[14px]">
+                                                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">{m.creator_subtitle || (m.creator_name ? `Por ${m.creator_name}` : "-")}</span>
+                                                                        <span className="text-gray-300 dark:text-gray-600 font-medium font-bold">•</span>
+                                                                        <span className="font-bold text-brand-primary">{formatCurrency(m.total_amount)}</span>
                                                                     </div>
                                                                 </div>
-                                                                <div className="text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate mb-1">{m.formattedDate}</div>
-                                                                <div className="flex flex-wrap items-center gap-2 text-[14px]">
-                                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">{m.creator_subtitle || (m.creator_name ? `Por ${m.creator_name}` : "-")}</span>
-                                                                    <span className="text-gray-300 dark:text-gray-600 font-medium font-bold">•</span>
-                                                                    <span className="font-bold text-brand-primary">{formatCurrency(m.total_amount)}</span>
-                                                                </div>
-                                                            </div>
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                                <div className="hidden lg:block w-full overflow-hidden rounded-xl relative">
-                                                    <div
-                                                        className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${movementsScroll.left ? "opacity-100" : "opacity-0"}`}
-                                                    />
-                                                    <div
-                                                        className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${movementsScroll.right ? "opacity-100" : "opacity-0"}`}
-                                                    />
-                                                    <div className="overflow-x-auto pb-4 custom-scrollbar" ref={movementsTableRef} onScroll={checkMovementsScroll}>
-                                                        <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
-                                                            <thead>
-                                                                <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                                    {MOVEMENT_COLUMNS.map((col, idx) => {
-                                                                        const isSorted = movementsSortConfig?.key === col.id
-                                                                        const isFirst = idx === 0
-                                                                        const isLast = idx === MOVEMENT_COLUMNS.length - 1
-                                                                        return (
-                                                                            <th
-                                                                                key={col.id}
-                                                                                className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors ${isFirst ? "rounded-l-lg pl-6" : ""} ${isLast ? "rounded-r-lg pr-6" : ""}`}
-                                                                                style={{ width: col.width }}
-                                                                                onClick={() => setMovementsSortConfig((prev) => ({ key: col.id, direction: prev?.key === col.id && prev.direction === "asc" ? "desc" : "asc" }))}
-                                                                            >
-                                                                                <div className={`relative flex items-center gap-1.5 ${col.align === "center" ? "justify-center" : col.align === "right" ? "justify-end" : "justify-start"}`}>
-                                                                                    <span>{col.label}</span>
-                                                                                    <div className="w-4 shrink-0 flex items-center justify-center">
-                                                                                        <ArrowUpDownIcon
-                                                                                            size={14}
-                                                                                            className={`transition-all duration-200 ${isSorted ? "text-brand-dark dark:text-dark-heading opacity-100" : "text-brand-inactive-text opacity-0 group-hover:opacity-40"} ${isSorted && movementsSortConfig?.direction === "desc" ? "rotate-180" : ""}`}
-                                                                                        />
-                                                                                    </div>
-                                                                                </div>
-                                                                            </th>
-                                                                        )
-                                                                    })}
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody>
-                                                                {movementRows.map((m: any) => (
-                                                                    <OrderListItem
-                                                                        key={m.originalId}
-                                                                        order={m}
-                                                                        columns={MOVEMENT_COLUMNS}
-                                                                        selected={false}
-                                                                        onSelect={() => { }}
-                                                                        onEdit={() => { }}
-                                                                        onCancel={
-                                                                            isOpen && !m.reversed_at
-                                                                                ? () => {
-                                                                                    handleReverse(m.originalId)
-                                                                                }
-                                                                                : undefined
-                                                                        }
-                                                                        onDetails={() => setDetailMovement(m)}
-                                                                        canEdit={false}
-                                                                        cancelLabel="Estornar"
-                                                                        showCheckbox={false}
-                                                                        rowVariant="cash_movement"
-                                                                        actionMenuExtra={
-                                                                            <DropdownItem onClick={() => setDetailMovement(m)}>
-                                                                                <EyeIcon className="w-4 h-4 shrink-0" /> Ver detalhes
-                                                                            </DropdownItem>
-                                                                        }
-                                                                    />
-                                                                ))}
-                                                            </tbody>
-                                                        </table>
+                                                            </button>
+                                                        ))}
                                                     </div>
-                                                </div>
-                                            </>
-                                        ) : (
-                                            <IconPlaceholder
-                                                placeholderType="image"
-                                                imageSrc="https://img.dudit.com.br/static/mascots/PDV.png"
-                                                imageAlt="Nenhuma sangria ou reforço"
-                                                title="Nenhuma sangria ou reforço"
-                                                subtitle="Nenhuma sangria ou reforço registrado nesta sessão."
-                                            />
-                                        )}
+                                                    <div className="hidden lg:block w-full overflow-hidden rounded-xl relative">
+                                                        <div
+                                                            className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${movementsScroll.left ? "opacity-100" : "opacity-0"}`}
+                                                        />
+                                                        <div
+                                                            className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${movementsScroll.right ? "opacity-100" : "opacity-0"}`}
+                                                        />
+                                                        <div className="overflow-x-auto pb-4 custom-scrollbar" ref={movementsTableRef} onScroll={checkMovementsScroll}>
+                                                            <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
+                                                                <thead>
+                                                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                                        {MOVEMENT_COLUMNS.map((col, idx) => {
+                                                                            const isSorted = movementsSortConfig?.key === col.id
+                                                                            const isFirst = idx === 0
+                                                                            const isLast = idx === MOVEMENT_COLUMNS.length - 1
+                                                                            return (
+                                                                                <th
+                                                                                    key={col.id}
+                                                                                    className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors ${isFirst ? "rounded-l-lg pl-6" : ""} ${isLast ? "rounded-r-lg pr-6" : ""}`}
+                                                                                    style={{ width: col.width }}
+                                                                                    onClick={() => setMovementsSortConfig((prev) => ({ key: col.id, direction: prev?.key === col.id && prev.direction === "asc" ? "desc" : "asc" }))}
+                                                                                >
+                                                                                    <div className={`relative flex items-center gap-1.5 ${col.align === "center" ? "justify-center" : col.align === "right" ? "justify-end" : "justify-start"}`}>
+                                                                                        <span>{col.label}</span>
+                                                                                        <div className="w-4 shrink-0 flex items-center justify-center">
+                                                                                            <ArrowUpDownIcon
+                                                                                                size={14}
+                                                                                                className={`transition-all duration-200 ${isSorted ? "text-brand-dark dark:text-dark-heading opacity-100" : "text-brand-inactive-text opacity-0 group-hover:opacity-40"} ${isSorted && movementsSortConfig?.direction === "desc" ? "rotate-180" : ""}`}
+                                                                                            />
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </th>
+                                                                            )
+                                                                        })}
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody>
+                                                                    {movementRows.map((m: any) => (
+                                                                        <OrderListItem
+                                                                            key={m.originalId}
+                                                                            order={m}
+                                                                            columns={MOVEMENT_COLUMNS}
+                                                                            selected={false}
+                                                                            onSelect={() => { }}
+                                                                            onEdit={() => { }}
+                                                                            onCancel={
+                                                                                isOpen && !m.reversed_at
+                                                                                    ? () => {
+                                                                                        handleReverse(m.originalId)
+                                                                                    }
+                                                                                    : undefined
+                                                                            }
+                                                                            onDetails={() => setDetailMovement(m)}
+                                                                            canEdit={false}
+                                                                            cancelLabel="Estornar"
+                                                                            showCheckbox={false}
+                                                                            rowVariant="cash_movement"
+                                                                            actionMenuExtra={
+                                                                                <DropdownItem onClick={() => setDetailMovement(m)}>
+                                                                                    <EyeIcon className="w-4 h-4 shrink-0" /> Ver detalhes
+                                                                                </DropdownItem>
+                                                                            }
+                                                                        />
+                                                                    ))}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <IconPlaceholder
+                                                    placeholderType="image"
+                                                    imageSrc="https://img.dudit.com.br/static/mascots/PDV.png"
+                                                    imageAlt="Nenhuma sangria ou reforço"
+                                                    title="Nenhuma sangria ou reforço"
+                                                    subtitle="Nenhuma sangria ou reforço registrado nesta sessão."
+                                                />
+                                            )
+                                        }
                                     </div>
                                     {sangriasReforcos.length > 0 && (
                                         <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
@@ -626,17 +624,6 @@ Diferença final: ${formatCurrency(details.totals.difference)}`} color={details.
                                             </div>
                                         </div>
                                     )}
-                                </div>
-                            </TabsContent>
-
-                            <TabsContent value="returns" className="mt-0">
-                                <div className="grid grid-cols-12 gap-y-8 md:gap-y-0 relative">
-                                    <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
-                                        <div className="border border-dashed border-brand-border dark:border-dark-border rounded-2xl p-8 text-sm text-brand-inactive-text dark:text-dark-body">Módulo de devoluções será integrado em seguida.</div>
-                                    </div>
-                                    <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
-                                        <InfoCard title="Devoluções" message="A estrutura visual desta aba já foi alinhada com as outras páginas de detalhes. Falta apenas conectar o módulo." color="orange" />
-                                    </div>
                                 </div>
                             </TabsContent>
                         </div>
@@ -831,8 +818,8 @@ Diferença final: ${formatCurrency(details.totals.difference)}`} color={details.
                             </div>
                         ) : null}
                     </DefaultModal>
-                </Tabs>
-            </div>
-        </FadeIn>
+                </Tabs >
+            </div >
+        </FadeIn >
     )
 }

@@ -9,6 +9,8 @@ import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import GoalsPageControls from "./GoalsPageControls"
 import GoalGridCard from "./GoalGridCard"
 import GoalFormPage from "./GoalFormPage"
+import GoalDetailPage from "./GoalDetailPage"
+import { useEntityState } from "@/hooks/use-entity-state"
 import {
     deleteSalesGoalAction,
     getSalesGoalsModuleAction,
@@ -70,18 +72,22 @@ export default function GoalsPage(props: {
     initialSummary: Summary
     planGate?: { requiredPlanSlug: "crescer" | "escalar" }
 }) {
-    const router = useRouter()
-    const searchParams = useSearchParams()
     const { toast } = useToast()
     const { openPlanUpgrade } = usePlanUpgrade()
-
     const planGate = props.planGate
 
-    // URL CRUD parameters
-    const isCreate = searchParams.get("create") === "true"
-    const editId = searchParams.get("edit")
-    const duplicateId = searchParams.get("duplicate")
-    const formMode = isCreate ? "create" : editId ? "edit" : duplicateId ? "duplicate" : null
+    const { state: entityState, open, close, isViewing, isEditing, isCreating, isDuplicating } = useEntityState()
+
+    const editId = isEditing ? entityState.entityId : null
+    const duplicateId = isDuplicating ? entityState.entityId : null
+    const viewId = isViewing ? entityState.entityId : null
+    const formMode = isCreating ? "create" : isEditing ? "edit" : isDuplicating ? "duplicate" : null
+
+    useEffect(() => {
+        const handleReset = () => close()
+        window.addEventListener("erp-sidebar-reset", handleReset)
+        return () => window.removeEventListener("erp-sidebar-reset", handleReset)
+    }, [close])
 
     const [formAccounts, setFormAccounts] = useState<any[] | null>(null)
     const [editingGoal, setEditingGoal] = useState<any | null>(null)
@@ -149,10 +155,7 @@ export default function GoalsPage(props: {
                         setEditingGoal(goalRes.goal)
                     } else {
                         toast({ title: "Erro", description: goalRes.error || "Meta não encontrada.", variant: "destructive" })
-                        const params = new URLSearchParams(searchParams.toString())
-                        params.delete("edit")
-                        params.delete("duplicate")
-                        router.push(`/erp/produtividade/metas?${params.toString()}`)
+                        close()
                     }
                 } else {
                     setEditingGoal(null)
@@ -165,7 +168,7 @@ export default function GoalsPage(props: {
         }
 
         loadFormRequirements()
-    }, [formMode, editId, duplicateId, props.partnerId, router, searchParams, toast])
+    }, [formMode, editId, duplicateId, props.partnerId, toast, close])
 
     async function refreshData() {
         const [goalsRes, rankingRes, summaryRes] = await Promise.all([
@@ -306,6 +309,21 @@ export default function GoalsPage(props: {
         toast({ title: "Sucesso", description: "Meta excluída." })
     }
 
+    // Render Detail Page if viewing
+    if (isViewing && viewId) {
+        return (
+            <GoalDetailPage
+                partnerId={props.partnerId}
+                goalId={viewId}
+                initialGoalData={goals.find((g) => g.id === viewId)}
+                onBack={() => close()}
+                onEdit={(id) => open("edit", id)}
+                onDuplicate={(id) => open("duplicate", id)}
+                onSuccessMutation={() => refreshData()}
+            />
+        )
+    }
+
     // Render Form Page instead of the list if formMode URL parameter is active
     if (formMode) {
         if (isLoadingFormOptions || ((formMode === "edit" || formMode === "duplicate") && !editingGoal)) {
@@ -323,7 +341,10 @@ export default function GoalsPage(props: {
                 sellers={props.sellers}
                 accounts={formAccounts || []}
                 initialGoal={editingGoal}
-                onBack={() => router.push("/erp/produtividade/metas")}
+                onBack={() => {
+                    close()
+                    refreshData()
+                }}
             />
         )
     }
@@ -361,7 +382,7 @@ export default function GoalsPage(props: {
                     </div>
                     {activeTab === "Metas" && (
                         <div className="flex items-center gap-3">
-                            <Button onClick={() => router.push("/erp/produtividade/metas?create=true")} leftIcon={<PlusIcon size={18} />}>
+                            <Button onClick={() => open("create")} leftIcon={<PlusIcon size={18} />}>
                                 Nova meta
                             </Button>
                         </div>
@@ -373,7 +394,7 @@ export default function GoalsPage(props: {
                     onTabChange={setActiveTab}
                     search={search}
                     onSearchChange={setSearch}
-                    onCreate={() => router.push("/erp/produtividade/metas?create=true")}
+                    onCreate={() => open("create")}
                     onOpenFilter={() => setIsFilterSheetOpen(true)}
                     filters={filters}
                     setFilters={setFilters}
@@ -399,7 +420,7 @@ export default function GoalsPage(props: {
                                         imageAlt="Sem metas"
                                         title={hasActiveFilters ? "Nenhuma meta encontrada" : "Nenhuma meta criada"}
                                         subtitle={hasActiveFilters ? "Ajuste os filtros ou tente outra busca." : "Crie metas para acompanhar e premiar o desempenho da equipe."}
-                                        itemButton={{ text: "Nova meta", action: () => router.push("/erp/produtividade/metas?create=true") }}
+                                        itemButton={{ text: "Nova meta", action: () => open("create") }}
                                     />
                                 </div>
                             ) : (
@@ -408,8 +429,9 @@ export default function GoalsPage(props: {
                                         <GoalGridCard
                                             key={goal.id}
                                             goal={goal}
-                                            onEdit={() => router.push(`/erp/produtividade/metas?edit=${goal.id}`)}
-                                            onDuplicate={() => router.push(`/erp/produtividade/metas?duplicate=${goal.id}`)}
+                                            onDetails={() => open("view", goal.id)}
+                                            onEdit={() => open("edit", goal.id)}
+                                            onDuplicate={() => open("duplicate", goal.id)}
                                             onDelete={() => setGoalToDelete(goal)}
                                         />
                                     ))}

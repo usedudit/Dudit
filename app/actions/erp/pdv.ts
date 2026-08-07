@@ -26,9 +26,11 @@ import { formatPaymentMethodLabel } from "@/lib/payments/payment-method"
 import { resolveDeliverySettingsRow } from "@/app/actions/shared/delivery"
 import { resolvePaymentMethodsForStore } from "@/lib/data/payment-methods"
 import { listStoreProducts } from "@/lib/store-products"
+import { listStoreServices } from "@/lib/store-services"
 
 type DraftItemInput = {
     productId?: string | null
+    serviceId?: string | null
     variantId?: string | null
     variantName?: string | null
     name: string
@@ -203,6 +205,7 @@ function safeMoney(n: number) {
 function normalizeDraftItems(items: DraftItemInput[]) {
     const normalized = (items || []).map((item) => ({
         product_id: item.productId || null,
+        service_id: item.serviceId || null,
         variant_id: item.variantId || null,
         variant_name: item.variantName?.trim() || null,
         name: String(item.name || "").trim(),
@@ -640,21 +643,58 @@ export async function getPOSInitialDataAction(partnerId: string, storeId?: strin
     // Read with admin client after authz so invited users can load POS datasets.
     const supabase = createAdminClient()
 
-    // Use listStoreProducts when storeId is provided for store-aware product listing
+    // Use listStoreProducts and listStoreServices when storeId is provided for store-aware catalog listing
     let products: any[] = []
+    let rawServices: any[] = []
     if (storeId) {
-        products = await listStoreProducts(partnerId, storeId, { isActive: true, includeVariants: true })
+        const [pList, sList] = await Promise.all([
+            listStoreProducts(partnerId, storeId, { isActive: true, includeVariants: true }),
+            listStoreServices(partnerId, storeId, { isActive: true }).catch(() => []),
+        ])
+        products = pList || []
+        rawServices = sList || []
     } else {
-        const productsRes = await supabase
-            .from("products")
-            .select("id, name, sku, price, promotional_price, category:product_categories!category_id(id, name), stock_available, min_stock, allow_sell_without_stock, images, product_type, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
-            .eq("partner_id", partnerId)
-            .eq("is_active", true)
-            .order("created_at", { ascending: false })
-            .limit(150)
+        const [productsRes, servicesRes] = await Promise.all([
+            supabase
+                .from("products")
+                .select("id, name, sku, price, promotional_price, category:product_categories!category_id(id, name), stock_available, min_stock, allow_sell_without_stock, images, product_type, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
+                .eq("partner_id", partnerId)
+                .eq("is_active", true)
+                .order("created_at", { ascending: false })
+                .limit(150),
+            supabase
+                .from("services")
+                .select("id, name, service_name, sku, price, promotional_price, category:service_categories!category_id(id, name), images, status, is_active")
+                .eq("partner_id", partnerId)
+                .or("status.eq.ativo,is_active.eq.true")
+                .order("created_at", { ascending: false })
+                .limit(150),
+        ])
         if (productsRes.error) return { success: false as const, error: productsRes.error.message }
         products = productsRes.data || []
+        rawServices = servicesRes.error ? [] : (servicesRes.data || [])
     }
+
+    const formattedServices = (rawServices || []).map((s: any) => {
+        const categoryName = typeof s.category === "string" ? s.category : (s.category?.name || "Serviços")
+        const categoryId = s.category_id || s.category?.id || "service_cat"
+        return {
+            id: s.id,
+            name: String(s.name || s.service_name || "Serviço").trim(),
+            category: { id: categoryId, name: categoryName },
+            sku: s.sku || null,
+            price: Number(s.price || s.resolved_price || 0),
+            promotional_price: s.promotional_price != null ? Number(s.promotional_price) : null,
+            stock_available: 999999,
+            min_stock: 0,
+            allow_sell_without_stock: true,
+            images: Array.isArray(s.images) ? s.images : (s.image_url ? [s.image_url] : null),
+            product_type: "service",
+            product_variants: [],
+        }
+    })
+
+    products = [...products, ...formattedServices]
 
     // Build pre_sales query with optional store_id filter
     let draftsQuery = supabase
@@ -775,6 +815,7 @@ export async function upsertPreSaleDraftAction(input: DraftUpsertInput) {
             if (prod) {
                 normalizedItems.push({
                     product_id: prod.id,
+                    service_id: null,
                     variant_id: null,
                     variant_name: null,
                     name: `[BRINDE] ${prod.name}`,
@@ -796,6 +837,7 @@ export async function upsertPreSaleDraftAction(input: DraftUpsertInput) {
                 if (serv) {
                     normalizedItems.push({
                         product_id: null,
+                        service_id: serv.id,
                         variant_id: null,
                         variant_name: null,
                         name: `[BRINDE] ${serv.name}`,
@@ -1043,13 +1085,18 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
 
     // Map draft items to ERPItemPayload
     const draftItemsList = Array.isArray(preSaleDraft.items) ? preSaleDraft.items : []
-    const erpItems: import("./orders").ERPItemPayload[] = draftItemsList.map((item: any, index: number) => ({
-        productId: item.product_id || item.productId || undefined,
-        variantId: item.variant_id || item.variantId || undefined,
-        unitPrice: safeMoney(Number(item.unit_price ?? item.price ?? 0)),
-        quantity: Math.max(1, Math.floor(Number(item.quantity ?? item.qty ?? 1))),
-        sortOrder: index,
-    }))
+    const erpItems: import("./orders").ERPItemPayload[] = draftItemsList.map((item: any, index: number) => {
+        const isService = Boolean(item.service_id || item.serviceId || item.line_type === 'service_booking' || item.line_type === 'service')
+        return {
+            productId: isService ? undefined : (item.product_id || item.productId || undefined),
+            serviceId: item.service_id || item.serviceId || (isService ? (item.product_id || item.productId) : undefined),
+            lineType: item.line_type || item.lineType || (isService ? 'service_booking' : 'product'),
+            variantId: item.variant_id || item.variantId || undefined,
+            unitPrice: safeMoney(Number(item.unit_price ?? item.price ?? 0)),
+            quantity: Math.max(1, Math.floor(Number(item.quantity ?? item.qty ?? 1))),
+            sortOrder: index,
+        }
+    })
 
     const { createERPOrderAction } = await import("./orders")
     const orderResult = await createERPOrderAction({

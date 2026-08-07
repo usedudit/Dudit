@@ -253,8 +253,7 @@ export default function GoalFormPage({ partnerId, mode, sellers, accounts, initi
     }
 
     toast({ title: "Sucesso", description: mode === "edit" ? "Meta atualizada." : "Meta criada." })
-    router.push("/erp/produtividade/metas")
-    router.refresh()
+    onBack()
   }
 
   return (

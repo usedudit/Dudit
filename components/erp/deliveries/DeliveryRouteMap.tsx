@@ -115,45 +115,27 @@ export function DeliveryRouteMap({
           resizeTimers.push(setTimeout(resizeMap, ms))
         }
 
-        console.log("[DeliveryRouteMap] coords:", {
-          origin,
-          initialLat,
-          initialLng,
-          pointsCount: points?.length,
-          pts: points?.map((p) => ({ id: p.displayId, lat: p.latitude, lng: p.longitude })),
-        })
-
         map.on("load", () => {
           if (cancelled) return
           readyRef.current = true
           setReady(true)
           resizeMap()
-          console.log("[DeliveryRouteMap] mapa carregado (load) — token:", token.slice(0, 18) + "...")
         })
 
         let idleLogged = false
         map.on("idle", () => {
           if (cancelled || idleLogged) return
           idleLogged = true
-          console.log("[DeliveryRouteMap] mapa em primeiro idle (sem erros de tile no evento)")
         })
 
-        // Log de TODOS os erros do mapa (estilo/tiles/fontes) — essencial para diagnóstico
         map.on("error", (e: any) => {
           const err = e?.error || e
           const status = Number(err?.status ?? err?.code)
-          console.error("[DeliveryRouteMap] erro do mapa:", {
-            status: status || "sem status",
-            url: err?.url ?? err?.message,
-            message: err?.message || "sem mensagem",
-          })
           if (cancelled) return
-          // Só mostra overlay em falha crítica: antes do load (estilo/token) ou auth 401/403
           if (readyRef.current && status !== 401 && status !== 403) return
           setMapError((prev) => prev || { message: err?.message || "Falha ao carregar o mapa.", status: status || null })
         })
       } catch (err) {
-        console.error("[DeliveryRouteMap] map init error:", err)
         if (!cancelled) setMapError({ message: "Falha ao carregar o mapa.", status: null })
       }
     }
@@ -233,7 +215,7 @@ export function DeliveryRouteMap({
     if (!bounds.isEmpty()) {
       try {
         mapRef.current?.resize()
-      } catch {}
+      } catch { }
       mapRef.current.fitBounds(bounds, { padding: 48, maxZoom: 14, duration: 500 })
     }
   }, [points, origin, ready])
