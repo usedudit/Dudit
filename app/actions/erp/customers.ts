@@ -15,7 +15,7 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { sanitizeNotes } from "@/lib/input-validator"
 import { createAddressAction } from "@/app/actions/shared/addresses"
 import { validateCPF, validateCNPJ, validateEmail, validatePhoneBR, validateURL, validateCEP } from "@/lib/input-validator"
-import { buildSoftDeletePayload, buildRestorePayload, buildArchivePayload, scopeActiveOnly, scopeArchivedOnly } from "@/lib/supabase/query-helpers"
+import { buildSoftDeletePayload, buildRestorePayload, buildArchivePayload, scopeActiveOnly, scopeArchivedOnly, scopeWithArchived } from "@/lib/supabase/query-helpers"
 import { checkLimit } from "@/lib/services/subscription.service"
 
 async function prepareEncryptedCpf(
@@ -996,6 +996,8 @@ export async function getERPCustomersPageAction(
       q = scopeArchivedOnly(q)
     } else if (!options?.filters?.includeArchived) {
       q = scopeActiveOnly(q)
+    } else {
+      q = scopeWithArchived(q)
     }
 
     if (cursor) {

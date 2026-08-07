@@ -370,6 +370,7 @@ export default function ServicesPage({
 
     const filteredServices = useMemo(() => {
         return services.filter((s) => {
+            if (s.status === "deleted" || s.status === "deletado" || (s as any).deleted_at != null) return false
             const term = debouncedSearch.toLowerCase()
             const minPrice = filters.priceRange.min ? Number.parseFloat(filters.priceRange.min) : 0
             const maxPrice = filters.priceRange.max ? Number.parseFloat(filters.priceRange.max) : Number.POSITIVE_INFINITY

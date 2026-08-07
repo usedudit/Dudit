@@ -25,7 +25,7 @@ import { checkLimit, canUseFeature, increment_usage_counter, decrement_usage_cou
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import { EMPTY_VIDEO_METADATA, normalizeVideoMetadata, type VideoType } from "@/lib/video/shared"
 import { ALLOWED_VIDEO_MIME_TYPES, MAX_FILE_SIZE, MAX_VIDEO_FILE_SIZE } from "@/lib/r2/config"
-import { buildSoftDeletePayload, buildRestorePayload, buildArchivePayload, scopeActiveOnly, scopeArchivedOnly } from "@/lib/supabase/query-helpers"
+import { buildSoftDeletePayload, buildRestorePayload, buildArchivePayload, scopeActiveOnly, scopeArchivedOnly, scopeWithArchived } from "@/lib/supabase/query-helpers"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { headers } from "next/headers"
 
@@ -2112,6 +2112,8 @@ export async function getERPProductsPageAction(
             q = scopeArchivedOnly(q)
         } else if (!options?.filters?.includeArchived) {
             q = scopeActiveOnly(q)
+        } else {
+            q = scopeWithArchived(q)
         }
 
         if (cursor) {

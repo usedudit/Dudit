@@ -359,6 +359,7 @@ export default function ProductsPage({
     const tabCounts = useMemo(() => {
         let normal = 0, low = 0, out_of_stock = 0, archived = 0, allActive = 0
         for (const p of products) {
+            if (p.status === "deleted" || p.status === "excluido" || (p.status as string) === "deletado" || (p as any).deleted_at != null) continue
             const isArchived = p.status === "arquivado" || p.status === "archived"
             if (isArchived) {
                 archived++
@@ -439,6 +440,7 @@ export default function ProductsPage({
 
     const filteredProducts = useMemo(() => {
         return products.filter((p) => {
+            if (p.status === "deleted" || p.status === "excluido" || (p.status as string) === "deletado" || (p as any).deleted_at != null) return false
             const term = debouncedSearch.toLowerCase()
             const stock = p.stock_quantity ?? (p as any).stock ?? 0
             const stockInfo = getStockStatus(stock, p.min_stock ?? undefined)

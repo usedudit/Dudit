@@ -6,6 +6,8 @@ Auditoria estática de app, components, hooks, lib, trigger, scripts e migration
 
 Validação local: npm test passou com 289 testes em 22 arquivos; npx tsc --noEmit passou.
 
+Atualizacao desta auditoria: alem da revisao estatica, foram executadas verificacoes read-only no PostgreSQL e no Redis conectados em 2026-08-07. Nao foram executadas escritas, migrations, deletes ou alteracoes de dados. Os achados live abaixo complementam e mantem os achados anteriores.
+
 ## Top 10 highest-impact fixes
 
 | Priority | Issue | Area | Impact |
@@ -196,7 +198,75 @@ Optimized version: separar claramente leitura pública de marketplace em view/RP
 
 Impacto: menor avaliação de RLS e menor risco de vazamento/carga por leitura ampla. Validar com testes anon/authenticated e EXPLAIN sob os roles reais antes de alterar.
 
+### F-12 — Divergencia live entre PostgreSQL e Redis no marketplace
+
+Severity: Critical. Verificacao direta em PostgreSQL e Upstash Redis em 2026-08-07.
+
+Entre 14 candidatos ativos do marketplace no banco, a comparacao das chaves `data:v2:{type}:{id}` encontrou 6 objetos ausentes no Redis, 1 objeto stale e 7 correspondentes. O servico `653eaeac-6efc-4eb7-a384-b6379b2b4bbb` estava atualizado no banco em `2026-08-07T15:47:13Z`, mas no Redis ainda tinha `2026-08-03T16:02:51Z`. Cinco payloads de produtos tambem nao continham `stock_available`. Os zsets tinham 9 itens em `explore:index:all`, 6 produtos e 3 servicos, enquanto o banco tinha 14 candidatos ativos.
+
+Isso confirma que Redis hoje nao pode ser tratado como fonte autoritativa para preco, estoque, visibilidade ou disponibilidade. O banco deve ser a fonte de verdade; Redis pode acelerar descoberta/ranking, mas checkout e reserva devem sempre reler e validar no PostgreSQL.
+
+### F-13 — Sincronizacao Redis nao e atomica e engole falhas
+
+Severity: High. Location: `lib/redis-sync.ts:64-72,233-250` e `app/api/webhooks/supabase/route.ts:37-88`.
+
+Uma sincronizacao grava/remover chave e zsets com `Promise.all`, sem transacao, e captura o erro retornando normalmente. O webhook pode responder `processed` mesmo quando a escrita no Redis falhou. Como os caminhos usam `silent: true` em varios casos, a versao global de cache tambem pode nao ser invalidada.
+
+Usar pipeline/transaction atomica para objeto + indices, incluir `source_updated_at`/versao monotonicamente e rejeitar writes atrasados. Falha deve entrar em outbox/retry observavel; o endpoint precisa diferenciar recebido de processado.
+
+### F-14 — Reconciliacao por LIMIT nao garante recuperacao de eventos perdidos
+
+Severity: High. Location: `app/api/cron/sync-redis/route.ts:17-68`.
+
+O cron revisa apenas os ultimos 100 produtos, 50 servicos e 50 parceiros, sem watermark/cursor. Se houver mais mudancas que esse limite entre duas execucoes, eventos antigos podem ficar divergentes para sempre. O job tambem dispara sincronizacoes em paralelo sem limite e usa `Promise.allSettled`, descartando o detalhe das falhas.
+
+Trocar por outbox com `event_id`, `updated_at`/cursor, tentativas e dead-letter; manter um reconciliador paginado como rede de seguranca. Limitar concorrencia para nao transformar uma recuperacao em rajada contra Redis/Postgres.
+
+### F-15 — Caches de busca e variantes podem ficar stale por ate 24h/1h
+
+Severity: High. Location: `app/actions/marketplace/search.ts:373-425` e `app/actions/marketplace/products.ts:231-256`.
+
+O cache de IDs de consultas tem TTL de 24h e retorna cedo quando os objetos existem, sem conferir freshness no banco. Variantes usam cache de 1h. Uma atualizacao de preco/estoque pode atualizar o objeto Redis, mas nao necessariamente invalidar o cache de IDs ou todas as listas relacionadas; a sincronizacao de variantes e disparada fire-and-forget em `app/actions/erp/products.ts:1171-1174`.
+
+Para campos criticos, invalidar por versao do item/tenant e nao apenas por TTL; aguardar a escrita/invalidation antes de confirmar a mutacao. Para estoque e preco exibidos no checkout, fazer leitura autoritativa no banco.
+
+### F-16 — Disponibilidade de servicos tem custo extra e corrida de reserva
+
+Severity: Critical para consistencia. Location: `app/actions/marketplace/services.ts:231-357,363-510,512-549`.
+
+Os horarios sao calculados consultando appointments em tempo real, o que e correto para freshness, mas o plano medido para staff/data/store fez Seq Scan em `appointments` (base pequena hoje: 10 linhas no exemplo). Falta um indice parcial composto alinhado ao predicado real, por exemplo `(staff_partner_user_id, start_date, store_id, start_time) WHERE status <> 'Cancelado'`, a validar com volume representativo.
+
+Mais importante: a criacao consulta disponibilidade e depois insere o appointment sem constraint de exclusao ou operacao atomica. Dois clientes concorrentes podem observar o mesmo slot livre e ambos reservar. A validacao de varios itens tambem chama `isStaffSlotAvailable` em loop sequencial (N+1). Implementar RPC transacional com lock/constraint de intervalo, idempotency key e validacao final no mesmo commit; agrupar a leitura de varios itens.
+
+No frontend, `ServiceDetailsPage` nao cancela/ordena respostas concorrentes ao trocar data/staff, entao uma resposta lenta pode sobrescrever os horarios da selecao atual.
+
+### F-17 — Supabase Realtime nao cobre os dados criticos do marketplace
+
+Severity: High. Verificacao direta em `pg_publication_tables` em 2026-08-07.
+
+A publication `supabase_realtime` contem apenas `notifications`, `reports` e `return_messages`. `products`, `product_variants`, `services`, `stores`, `appointments`, `orders` e `stock_movements` nao estao publicados. Portanto, preco/estoque/visibilidade/disponibilidade nao chegam ao cliente via Realtime do Supabase; dependem de webhook + Redis + reconciliacao, que ja demonstraram divergencia.
+
+Se a UX precisar de atualizacao instantanea, publicar eventos de dominio/outbox para os consumidores. Realtime pode notificar a UI, mas nao deve substituir a leitura/lock transacional do banco para checkout, estoque ou reserva.
+
+### F-18 — Drift entre migrations e funcao instalada de busca
+
+Severity: Critical. Verificacao direta no banco.
+
+O arquivo `migrations/20260610_marketplace_search_v2.sql` define uma assinatura de seis argumentos sem `risk_score`, enquanto a funcao instalada `search_marketplace` tem sete argumentos e referencia `pt.risk_score`/`st.risk_score`, colunas que nao foram encontradas em `partners`/`stores`. A falha live de `search_marketplace('a','tudo',20,null,null,null)` e evidencia de migration aplicada fora de sincronia com o repositorio.
+
+Gerar um diff do schema instalado contra migrations versionadas, corrigir a funcao em uma migration nova e testar todas as assinaturas chamadas pelo app (`search_marketplace_fts`, browse e search). Nao adicionar colunas ou remover overloads sem confirmar consumidores.
+
+### F-19 — Seed/rebuild do Redis pode expor estado parcial
+
+Severity: Medium/High. Location: `scripts/seed-explore-redis.ts:62-110`.
+
+O seed apaga os indices globais e os reconstrui item a item. Durante a janela, a vitrine pode ficar vazia ou parcialmente indexada; objeto e indices tambem nao formam uma escrita atomica. O seed nao carrega todos os campos criticos de estoque/disponibilidade.
+
+Usar versionamento de indice (double-buffer), construir a nova versao em background e trocar um ponteiro atomico no final. Compartilhar um serializer unico com `redis-sync.ts`, incluindo versao/updated_at e os campos realmente usados na exibicao.
+
 ## RLS, Auth e Realtime
+
+Evidencia live adicional: a publication `supabase_realtime` foi inspecionada diretamente; ela cobre `notifications`, `reports` e `return_messages`, mas nao cobre as tabelas criticas do marketplace listadas em F-17. Tambem foram confirmados PostgreSQL 17.6, `pg_stat_statements` habilitado, uso dos indices de orders/notifications e o plano Seq Scan da consulta de appointments em uma base ainda pequena.
 
 - 20260610_marketplace_search_v2.sql:82-90 usa auth.role() = service_role; migrar para TO explícito/grants conforme o modelo atual.
 - Policies de notifications em 20260609_create_notifications_system.sql:114-121 devem manter índice por user_id; preferir (select auth.uid()) para evitar avaliação repetida.
@@ -210,7 +280,7 @@ Impacto: menor avaliação de RLS e menor risco de vazamento/carga por leitura a
 | 10k | Overfetch/refetch e counts |
 | 100k | Customers/import e cache global |
 | 1M | Search ranking, reports e counts exatos |
-| 10M | Eventos/transactions/audit exigem retenção, agregados e possível particionamento |
+| 10M | Eventos/transactions/audit exigem retenção, agregados e possível particionamento |  
 
 Para 1k–100k empresas, toda operação deve filtrar partner_id/store_id e ter índice compatível; nunca depender de filtro no cliente.
 

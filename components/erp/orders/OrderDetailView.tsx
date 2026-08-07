@@ -836,7 +836,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                     <FormSection title="Itens do Pedido" hasSeparator className="mb-8">
                                                         <div className="space-y-4">
                                                             {paginatedItems.map((item: any) => {
-                                                                const isService = !!item.service_id || item.line_type === "service_booking";
+                                                                const isService = !!item.service_id || item.line_type === "service_booking" || item.line_type === "service" || Boolean(item.services) || item.products?.type === "service" || (!item.product_id && !item.variant_id);
                                                                 const scheduleInfo = isService ? getServiceScheduleInfo(item, order) : null;
                                                                 return (
                                                                     <div key={item.id} className="flex items-start gap-4">
@@ -887,17 +887,16 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                                     </div>
                                                                                 ) : (
                                                                                     <div className="my-1.5 mb-2">
-                                                                                        <button
-                                                                                            type="button"
+                                                                                        <Button
+                                                                                            variant="link"
                                                                                             onClick={() => {
                                                                                                 setSelectedOrderItemForAppointment(item)
                                                                                                 setIsAppointmentSheetOpen(true)
                                                                                             }}
-                                                                                            className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-green hover:underline cursor-pointer bg-brand-green/10 dark:bg-brand-green/20 px-2.5 py-1 rounded-md transition-colors"
+                                                                                            leftIcon={<CalendarIcon size={12} />}
                                                                                         >
-                                                                                            <CalendarIcon className="w-3.5 h-3.5" />
                                                                                             Criar agendamento
-                                                                                        </button>
+                                                                                        </Button>
                                                                                     </div>
                                                                                 )
                                                                             ) : (
@@ -1351,7 +1350,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                 <FormSection title="Itens do Pedido" hasSeparator={false} className="mb-8">
                                                     <div className="space-y-4">
                                                         {paginatedItems.map((item: any) => {
-                                                            const isService = !!item.service_id || item.line_type === "service_booking";
+                                                            const isService = !!item.service_id || item.line_type === "service_booking" || item.line_type === "service" || Boolean(item.services) || item.products?.type === "service" || (!item.product_id && !item.variant_id);
                                                             const scheduleInfo = isService ? getServiceScheduleInfo(item, order) : null;
                                                             return (
                                                                 <div key={item.id} className="flex items-start gap-4">
@@ -1669,7 +1668,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                 )}
                                             </div>
                                         </FadeIn>
-                                                                    </TabsContent>
+                                    </TabsContent>
 
                                     <TabsContent value="history" className="mt-0">
                                         <FadeIn key="history">
@@ -1765,14 +1764,22 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                     linkedOrderId={order?.id}
                     linkedOrderItemId={selectedOrderItemForAppointment?.id}
                     allowedOrderServices={(order?.order_items || [])
-                        .filter((i: any) => i.service_id || i.line_type === "service_booking" || Boolean(i.services))
+                        .filter((i: any) =>
+                            Boolean(i.service_id) ||
+                            i.line_type === "service_booking" ||
+                            i.line_type === "service" ||
+                            Boolean(i.services) ||
+                            i.products?.type === "service" ||
+                            i.id === selectedOrderItemForAppointment?.id ||
+                            (!i.product_id && !i.variant_id)
+                        )
                         .map((i: any) => ({
-                            id: i.service_id || i.id,
+                            id: i.service_id || i.product_id || i.id,
                             orderItemId: i.id,
                             order_item_id: i.id,
-                            name: i.product_name,
-                            price: Number(i.product_price || 0),
-                            duration: i.services?.duration_minutes || 30,
+                            name: i.product_name || i.services?.name || "Serviço",
+                            price: Number(i.product_price || i.subtotal || 0),
+                            duration: i.services?.duration_minutes || i.duration || 30,
                             category_id: i.services?.category_id || null,
                         }))
                     }
@@ -1784,7 +1791,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                         setSelectedOrderItemForAppointment(null)
                     }}
                     onSave={handleSaveAppointmentFromOrder}
-                    onEnterSelectionMode={() => {}}
+                    onEnterSelectionMode={() => { }}
                 />
             )}
         </>

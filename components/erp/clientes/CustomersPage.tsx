@@ -229,6 +229,7 @@ export default function CustomersPage({
                 return nameMatch || emailMatch || phoneMatch
             })
             .filter((c: any) => {
+                if (c.status === "deleted" || c.status === "deletado" || c.deleted_at != null) return false
                 const isArchived = c.status === "arquivado" || c.status === "archived"
                 const statusLabel = isArchived ? "Arquivado" : (c.status === 'bloqueado' ? "Bloqueado" : (c.status === 'inativo' ? "Inativo" : "Ativo"))
 
