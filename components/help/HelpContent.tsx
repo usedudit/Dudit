@@ -193,7 +193,6 @@ export default function HelpContent({ article }: { article: HelpArticle }) {
                         const catIcon = categoryData?.icon || (
                             article.category === "login-registro" ? "🔐" :
                             article.category === "pedidos" ? "📦" :
-                            article.category === "produtos" ? "🏷️" :
                             article.category === "vendas" ? "🛒" :
                             article.category === "financeiro" ? "💰" :
                             article.category === "produtos-estoque" ? "📦" : "📁"

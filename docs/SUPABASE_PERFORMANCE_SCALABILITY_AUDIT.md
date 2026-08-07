@@ -282,6 +282,16 @@ Apos a migracao `20260807_restrict_products_public_access`, `products_select_all
 
 Os leitores autenticados de ERP/PDV/importacao continuam consultando `products` com as policies de parceiro existentes; nao foram migrados para a projecao publica. O teste de Data API autenticado com JWT de usuario real permanece pendente de uma sessao de teste; o papel PostgreSQL `authenticated` sem claims foi validado diretamente.
 
+## Fase 3 — implementação incremental concluída em 2026-08-07
+
+O checkout Mercado Pago agora deriva o `partner_id` canônico do carrinho/produtos antes de consultar configuração ou token MP; divergências com o `partnerId` informado pelo client são rejeitadas. O fluxo continua autenticado e o `process-payment` já validava o parceiro do carrinho antes de criar o pedido.
+
+Redis continua sendo apenas cache de descoberta/ranking. A sincronização agora aplica uma projeção explícita sem `cost_price`, `stock_reserved`, `deleted_at`, `status` ou `moderation_status`, e exige `is_active`, `status = ativo`, `moderation_status = approved`, `deleted_at IS NULL` e `show_in_marketplace = true` para produtos/serviços. O webhook tenta três vezes e retorna erro quando a sincronização falha, permitindo retry do provedor; as escritas são determinísticas/idempotentes. O cron audita até 250 membros do índice global e reconcilia objetos ausentes.
+
+Também foram sincronizadas as mutações relevantes de serviços no ERP, corrigidos os membros prefixados no purge de exclusão de conta e adicionada autorização/validação de parceiro às sessões de importação, inclusive no `applyMappingAction`.
+
+Validação live pós-correção: 6 membros no índice global, 0 objetos ausentes, 0 violações de projeção, 0 itens inelegíveis e 0 stale contra PostgreSQL. Foi removido 1 membro órfão correspondente a produto já deletado e reconciliado 1 serviço defasado. Suíte local: 23 arquivos e 292 testes aprovados. O `tsc --noEmit` permanece bloqueado por erro de sintaxe preexistente em `lib/help-data.ts`, fora do escopo da Fase 3.
+
 ## RLS, Auth e Realtime
 
 Evidencia live adicional: a publication `supabase_realtime` foi inspecionada diretamente; ela cobre `notifications`, `reports` e `return_messages`, mas nao cobre as tabelas criticas do marketplace listadas em F-17. Tambem foram confirmados PostgreSQL 17.6, `pg_stat_statements` habilitado, uso dos indices de orders/notifications e o plano Seq Scan da consulta de appointments em uma base ainda pequena.

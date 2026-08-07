@@ -45,6 +45,10 @@ export async function getImportSession(
       console.warn(`[ImportSession] Session not found in Redis - key=${key}, partnerId=${partnerId}, sessionId=${sessionId}`)
       return null
     }
+    if (data.partnerId && data.partnerId !== partnerId) {
+      console.error(`[ImportSession] Partner mismatch for session ${sessionId}`)
+      return null
+    }
     return data
   } catch (err) {
     console.error(`[ImportSession] Redis GET error for key ${key}:`, err)

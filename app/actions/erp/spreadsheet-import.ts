@@ -222,11 +222,14 @@ export async function applyMappingAction(
   error?: string
 }> {
   try {
+    const user = await requireUser()
     const session = await getImportSession(partnerId, sessionId)
     if (!session) {
       console.warn(`[applyMappingAction] Session not found: partnerId=${partnerId}, sessionId=${sessionId}`)
       return { success: false, error: "Sessão de importação expirada ou inválida." }
     }
+
+    await requirePermission(partnerId, session.entityType as any, "create", user)
 
     const previewProducts = session.rows.slice(0, 50).map((row, i) =>
       rowToPreviewEntity(session.entityType, row, mapping, i)

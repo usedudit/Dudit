@@ -3,6 +3,43 @@ import { getAdminClient } from '@/lib/supabase/admin'
 import { redis } from '@/lib/redis'
 import { syncToExploreRedis, getExploreRedisDataKey } from '@/lib/redis-sync'
 
+const ORPHAN_AUDIT_LIMIT = 250
+
+async function reconcileOrphanedExploreIndex() {
+  const members = await redis.zrange(
+    "explore:index:all",
+    "+inf",
+    "-inf",
+    { byScore: true, rev: true, offset: 0, count: ORPHAN_AUDIT_LIMIT },
+  ) as string[]
+
+  if (!members.length) return { audited: 0, missingObjects: 0, repaired: 0 }
+
+  const keys = members.map(member => {
+    const [type, ...idParts] = String(member).split(":")
+    return getExploreRedisDataKey(type, idParts.join(":"))
+  })
+  const objects = await redis.mget(...keys)
+  const missing = members.filter((_, index) => !objects.at(index))
+  let repaired = 0
+
+  const results = await Promise.allSettled(missing.map(member => {
+    const [type, ...idParts] = String(member).split(":")
+    if (!['produto', 'servico', 'loja'].includes(type) || !idParts.length) return Promise.resolve(false)
+    return syncToExploreRedis({
+      id: idParts.join(":"),
+      type: type as 'produto' | 'servico' | 'loja',
+      data: {},
+      silent: true,
+      throwOnError: true,
+    })
+  }))
+  repaired = results.filter(result => result.status === 'fulfilled' && result.value === true).length
+
+  console.log(`[Cron Reconciliation] indexAudited=${members.length} missingObjects=${missing.length} repaired=${repaired}`)
+  return { audited: members.length, missingObjects: missing.length, repaired }
+}
+
 export async function GET(req: Request) {
   const start = Date.now()
   try {
@@ -16,8 +53,8 @@ export async function GET(req: Request) {
     
     // Buscar itens modificados recentemente dos 3 tipos
     const [prodRes, servRes, partRes] = await Promise.all([
-      supabase.from("products").select("id, updated_at").eq("status", "ativo").eq("show_in_marketplace", true).order("updated_at", { ascending: false }).limit(100),
-      supabase.from("services").select("id, updated_at").eq("status", "ativo").order("updated_at", { ascending: false }).limit(50),
+      supabase.from("products").select("id, updated_at").eq("status", "ativo").eq("is_active", true).eq("moderation_status", "approved").is("deleted_at", null).eq("show_in_marketplace", true).order("updated_at", { ascending: false }).limit(100),
+      supabase.from("services").select("id, updated_at").eq("status", "ativo").eq("is_active", true).eq("moderation_status", "approved").is("deleted_at", null).eq("show_in_marketplace", true).order("updated_at", { ascending: false }).limit(50),
       supabase.from("partners").select("id, updated_at").eq("is_active", true).order("updated_at", { ascending: false }).limit(50)
     ])
 
@@ -68,12 +105,15 @@ export async function GET(req: Request) {
       await Promise.allSettled(batches)
     }
 
+    const orphanReconciliation = await reconcileOrphanedExploreIndex()
+
     const elapsed = Date.now() - start
     return NextResponse.json({
       status: 'success',
       audited: recentItems.length,
       synced,
       missed,
+      orphanReconciliation,
       elapsedMs: Math.round(elapsed)
     })
   } catch (error: any) {

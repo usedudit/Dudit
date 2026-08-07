@@ -254,6 +254,7 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
 
         if (insertError) return errorResponse(insertError.message)
 
+        if (inserted?.id) await syncToExploreRedis({ id: inserted.id, type: "servico", data: {}, silent: true })
         revalidatePath("/erp/servicos")
         return successResponse(inserted)
     } catch (error: any) {
@@ -374,6 +375,7 @@ export async function updateServiceAction(data: any): Promise<ActionResponse<any
             Promise.all(cleanup).catch(console.error)
         }
 
+        await syncToExploreRedis({ id: serviceId, type: "servico", data: {}, silent: true })
         revalidatePath("/erp/servicos")
         return successResponse(updated)
     } catch (error: any) {
@@ -397,6 +399,8 @@ export async function deleteServiceAction(serviceId: string, reason?: string | n
         const payload = buildSoftDeletePayload(user.id, reason)
         const { error } = await admin.from("services").update(payload).eq("id", serviceId)
         if (error) return errorResponse(error.message)
+
+        await removeFromExploreRedis(serviceId, "servico", true)
 
         // 2. Fetch IP and write to audit logs (logAuditEvent)
         const reqHeaders = await headers()
@@ -441,6 +445,8 @@ export async function restoreServiceAction(serviceId: string): Promise<ActionRes
         const { error } = await admin.from("services").update(payload).eq("id", serviceId)
         if (error) return errorResponse(error.message)
 
+        await syncToExploreRedis({ id: serviceId, type: "servico", data: {}, silent: true })
+
         const reqHeaders = await headers()
         const ip = reqHeaders.get("x-forwarded-for") || "127.0.0.1"
 
@@ -481,6 +487,8 @@ export async function archiveServiceAction(serviceId: string): Promise<ActionRes
         const payload = buildArchivePayload("arquivado")
         const { error } = await admin.from("services").update(payload).eq("id", serviceId)
         if (error) return errorResponse(error.message)
+
+        await syncToExploreRedis({ id: serviceId, type: "servico", data: {}, silent: true })
 
         const reqHeaders = await headers()
         const ip = reqHeaders.get("x-forwarded-for") || "127.0.0.1"
@@ -568,6 +576,8 @@ export async function deleteServicesInBatchAction(serviceIds: string[], reason?:
         const { error } = await admin.from("services").update(payload).in("id", serviceIds)
         if (error) return errorResponse(error.message)
 
+        await Promise.all(serviceIds.map(id => removeFromExploreRedis(id, "servico", true)))
+
         // 2. Log audit event for each service in batch
         const reqHeaders = await headers()
         const ip = reqHeaders.get("x-forwarded-for") || "127.0.0.1"
@@ -619,6 +629,7 @@ export async function toggleServicesStatusAction(serviceIds: string[], isActive:
 
         if (error) return errorResponse(error.message)
 
+        await Promise.all(serviceIds.map(id => syncToExploreRedis({ id, type: "servico", data: {}, silent: true })))
         revalidatePath("/erp/servicos")
         return successResponse({ count: serviceIds.length })
     } catch (error: any) {
@@ -654,6 +665,7 @@ export async function batchUpdateServicesAction(updates: any[]): Promise<ActionR
         const firstError = results.find(r => r.error)
         if (firstError) return errorResponse(firstError.error?.message || "Erro no batch update")
 
+        await Promise.all(serviceIds.map(id => syncToExploreRedis({ id, type: "servico", data: {}, silent: true })))
         revalidatePath("/erp/servicos")
         return successResponse({ count: updates.length })
     } catch (error: any) {
@@ -702,6 +714,7 @@ export async function duplicateServiceAction(serviceId: string) {
 
         if (insertError) return errorResponse(insertError.message)
 
+        if (inserted?.id) await syncToExploreRedis({ id: inserted.id, type: "servico", data: {}, silent: true })
         revalidatePath("/erp/servicos")
         return successResponse({ newServiceId: inserted.id, product: inserted })
     } catch (error: any) {

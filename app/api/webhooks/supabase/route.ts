@@ -8,6 +8,28 @@ const WEBHOOK_SECRET = process.env.SUPABASE_WEBHOOK_SECRET
 // DEBOUNCE: Prevent revalidateTag storms when multiple updates arrive in quick succession
 let revalidationScheduled = false
 const REVALIDATION_DEBOUNCE_MS = 500
+const REDIS_SYNC_ATTEMPTS = 3
+
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function retryRedisSync<T>(label: string, operation: () => Promise<T>): Promise<T> {
+  let lastError: unknown
+  for (let attempt = 1; attempt <= REDIS_SYNC_ATTEMPTS; attempt++) {
+    try {
+      console.log(`[Webhook][RedisSync] ${label} attempt=${attempt}`)
+      const result = await operation()
+      console.log(`[Webhook][RedisSync] ${label} success attempt=${attempt}`)
+      return result
+    } catch (error) {
+      lastError = error
+      console.error(`[Webhook][RedisSync] ${label} failed attempt=${attempt}`, error)
+      if (attempt < REDIS_SYNC_ATTEMPTS) await sleep(100 * 2 ** (attempt - 1))
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(`Redis sync failed: ${label}`)
+}
 
 async function debouncedRevalidate() {
   if (revalidationScheduled) return // Already scheduled, coalesce
@@ -41,25 +63,25 @@ export async function POST(req: Request) {
         const partnerId = record?.partner_id || old_record?.partner_id
 
         if (table === 'products') {
-          if (type === 'DELETE' || (type === 'UPDATE' && record.show_in_marketplace === false) || (type === 'UPDATE' && record.is_active === false)) {
-            await removeFromExploreRedis(id, 'produto', true)
+          if (type === 'DELETE') {
+            await retryRedisSync(`products:${id}:remove`, () => removeFromExploreRedis(id, 'produto', true, true))
           } else if (type === 'INSERT' || type === 'UPDATE') {
-            await syncToExploreRedis({ id, type: 'produto', data: {}, silent: true })
+            await retryRedisSync(`products:${id}:sync`, () => syncToExploreRedis({ id, type: 'produto', data: {}, silent: true, throwOnError: true }))
           }
         }
         else if (table === 'services') {
-          if (type === 'DELETE' || (type === 'UPDATE' && record.is_active === false)) {
-            await removeFromExploreRedis(id, 'servico', true)
+          if (type === 'DELETE') {
+            await retryRedisSync(`services:${id}:remove`, () => removeFromExploreRedis(id, 'servico', true, true))
           } else if (type === 'INSERT' || type === 'UPDATE') {
-            await syncToExploreRedis({ id, type: 'servico', data: {}, silent: true })
+            await retryRedisSync(`services:${id}:sync`, () => syncToExploreRedis({ id, type: 'servico', data: {}, silent: true, throwOnError: true }))
           }
         }
         else if (table === 'partners') {
-          if (type === 'DELETE' || (type === 'UPDATE' && record.is_active === false)) {
-            await removeFromExploreRedis(id, 'loja', true)
+          if (type === 'DELETE') {
+            await retryRedisSync(`partners:${id}:remove`, () => removeFromExploreRedis(id, 'loja', true, true))
           } else if (type === 'INSERT' || type === 'UPDATE') {
-            await syncToExploreRedis({ id: id, type: 'loja', data: {}, silent: true })
-            await syncPartnerItemsToExploreRedis(id)
+            await retryRedisSync(`partners:${id}:sync`, () => syncToExploreRedis({ id: id, type: 'loja', data: {}, silent: true, throwOnError: true }))
+            await retryRedisSync(`partners:${id}:items`, () => syncPartnerItemsToExploreRedis(id, { throwOnError: true }))
           }
         }
 
@@ -80,6 +102,7 @@ export async function POST(req: Request) {
         console.log(`[Webhook] Processed ${type} on ${table} (${record?.id || old_record?.id}) in ${(performance.now() - startTime).toFixed(2)}ms`)
       } catch (err) {
         console.error(`[Webhook Error] Failed to process ${type} on ${table}:`, err)
+        throw err
       }
     }
 

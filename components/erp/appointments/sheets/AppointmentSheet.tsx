@@ -395,11 +395,11 @@ export const AppointmentSheet = ({
     const isSelectingClientRef = useRef(false);
 
     // Services Catalog selection, search & quick-add states
-    const [localServices, setLocalServices] = useState<any[]>(() => servicesCatalog || []);
+    const [localServices, setLocalServices] = useState<any[]>(() => servicesSource || []);
 
     useEffect(() => {
-        setLocalServices(servicesCatalog || []);
-    }, [servicesCatalog]);
+        setLocalServices(servicesSource || []);
+    }, [servicesSource]);
 
     const [serviceSearch, setServiceSearch] = useState('');
     const filteredServices = useMemo(() => {

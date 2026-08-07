@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js"
 import { Redis } from "@upstash/redis"
 import path from "path"
 import fs from "fs"
+import { isExploreProductPublic, isExploreServicePublic, isExploreStorePublic, serializeExploreItem } from "../lib/redis-explore-serializer"
 
 // @ts-nocheck
 
@@ -78,14 +79,17 @@ async function seedRedis() {
     const { data: produtos } = await supabase
         .from("products")
         .select(`
-            id, name, description, price, promotional_price, images, rating, status,
-            category_id, category:product_categories!category_id(name), created_at,
+            id, name, description, price, promotional_price, images, rating, status, is_active, moderation_status, deleted_at, show_in_marketplace,
+            category_id, category:product_categories!category_id(name), created_at, updated_at,
             marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
             partners(id, is_showcase_active),
             stores(id, name, logo_url, banner_url, is_showcase_active, addresses!store_id!left(city, state, latitude, longitude)),
             product_variants(variant_options, price_adjustment, is_active)
         `)
         .eq("status", "ativo")
+        .eq("is_active", true)
+        .eq("moderation_status", "approved")
+        .is("deleted_at", null)
         .eq("show_in_marketplace", true)
 
     if (produtos) {
@@ -117,7 +121,8 @@ async function seedRedis() {
             const mCat = item.marketplace_category as any
             const categoryName = mCat?.parent?.name || mCat?.name || (item.category as any)?.name || null
             const subcategoryName = mCat?.parent ? mCat.name : null
-            const produtoNormalizado = { ...rest, category: categoryName, subcategoryName, itemType: 'produto', partners: partner, ...variantFallback }
+            if (!isExploreProductPublic(item)) continue
+            const produtoNormalizado = serializeExploreItem({ ...rest, category: categoryName, subcategoryName, itemType: 'produto', partners: partner, ...variantFallback }, "produto")
             const score = new Date(item.created_at).getTime()
             const globalId = `produto:${item.id}`
 
@@ -139,12 +144,17 @@ async function seedRedis() {
     const { data: servicos } = await supabase
         .from("services")
         .select(`
-            id, name, description, price, images, rating, created_at,
+            id, name, description, price, promotional_price, images, rating, updated_at, is_active, status, moderation_status, deleted_at, show_in_marketplace,
+            created_at,
             marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
             partners(id, is_showcase_active),
             stores(id, name, logo_url, banner_url, addresses(city, state, latitude, longitude))
         `)
         .eq("status", "ativo")
+        .eq("is_active", true)
+        .eq("moderation_status", "approved")
+        .is("deleted_at", null)
+        .eq("show_in_marketplace", true)
 
     if (servicos) {
         for (const item of (servicos as any[])) {
@@ -170,7 +180,8 @@ async function seedRedis() {
                 is_showcase_active: rawStore?.is_showcase_active ?? rawPartner?.is_showcase_active ?? true
             } : null
             
-            const servicoNormalizado = { ...item, itemType: 'servico', partners: partner }
+            if (!isExploreServicePublic(item)) continue
+            const servicoNormalizado = serializeExploreItem({ ...item, itemType: 'servico', partners: partner }, "servico")
             const score = new Date(item.created_at).getTime()
             const globalId = `servico:${item.id}`
 
@@ -207,7 +218,8 @@ async function seedRedis() {
             const categoryName = cat?.parent?.name || cat?.name || 'Loja Parceira'
             const storeName = item.name || "Loja"
             const storeImage = item.logo_url
-            const vitrineNormalizada = {
+            if (!isExploreStorePublic(item)) continue
+            const vitrineNormalizada = serializeExploreItem({
                 id: item.id,
                 name: storeName,
                 slug: item.slug || undefined,
@@ -228,7 +240,7 @@ async function seedRedis() {
                     longitude,
                     city, state, reviewsCount
                 }
-            }
+            }, "loja")
             const score = new Date(item.created_at).getTime()
             const globalId = `loja:${item.id}`
 

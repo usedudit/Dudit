@@ -2,8 +2,14 @@ import "server-only"
 import { redis } from './redis'
 import { getAdminClient } from './supabase/admin'
 import { revalidateExploreSearch } from './utils/revalidation'
+import {
+  isExploreProductPublic,
+  isExploreServicePublic,
+  isExploreStorePublic,
+  serializeExploreItem,
+} from './redis-explore-serializer'
 
-type ItemType = 'produto' | 'servico' | 'loja'
+export type ItemType = 'produto' | 'servico' | 'loja'
 
 export function getExploreRedisDataKey(type: string, id: string): string {
   return `data:v2:${type}:${id}`
@@ -16,6 +22,7 @@ interface SyncItemOptions {
   score?: number // Se não informado, usa marketplace_score + desempate por created_at
   removeFromRedis?: boolean
   silent?: boolean
+  throwOnError?: boolean
 }
 
 /** Redis ZSET score: higher marketplace_score ranks first; created_at breaks ties. */
@@ -53,8 +60,9 @@ export async function syncToExploreRedis({
   data,
   score,
   removeFromRedis = false,
-  silent = false
-}: SyncItemOptions): Promise<void> {
+  silent = false,
+  throwOnError = false
+}: SyncItemOptions): Promise<boolean> {
   const typeIndexKey = `explore:index:${type === 'produto' ? 'produtos' : type === 'servico' ? 'servicos' : 'vitrines'}`
   const globalIndexKey = `explore:index:all`
   const dataKey = getExploreRedisDataKey(type, id)
@@ -71,7 +79,7 @@ export async function syncToExploreRedis({
       // Invalidate Next.js cache so home/explore reflect the removal immediately
       await revalidateExploreSearch({ silent })
       console.log(`[RedisSync] Removido: ${memberId} silent:${silent}`)
-      return
+      return true
     }
 
     // Validação básica para evitar lixo no Redis
@@ -79,7 +87,12 @@ export async function syncToExploreRedis({
 
     // Se a data estiver vazia e não for remoção, tentamos buscar o objeto completo
     // para garantir que o Redis tenha todos os joins (parceiro, endereço, etc)
-    if (!removeFromRedis && (Object.keys(data).length <= 1 || !data.partners)) {
+    const needsAuthoritativeLookup = type === 'produto'
+      ? !isExploreProductPublic(data)
+      : type === 'servico'
+        ? !isExploreServicePublic(data)
+        : !isExploreStorePublic(data)
+    if (!removeFromRedis && (Object.keys(data).length <= 1 || !data.partners || needsAuthoritativeLookup)) {
       const admin = getAdminClient()
 
       if (type === 'produto') {
@@ -88,7 +101,7 @@ export async function syncToExploreRedis({
           .select(`
             id, name, description, price, promotional_price, images, video_thumbnail, rating,
             marketplace_score, sales_last_30_days, favorites_count, views_last_30_days,
-            category_id, category:product_categories!category_id(name), created_at, updated_at, is_active, show_in_marketplace,
+            category_id, category:product_categories!category_id(name), created_at, updated_at, is_active, status, moderation_status, deleted_at, show_in_marketplace,
             marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
             partners(id),
             stores(id, name, logo_url, addresses!store_id!left(city, state, latitude, longitude)),
@@ -100,14 +113,14 @@ export async function syncToExploreRedis({
 
         if (!dbData) {
           console.warn(`[RedisSync] Produto ${id} não encontrado no DB. Removendo do Redis.`)
-          return await removeFromExploreRedis(id, type)
+          return await removeFromExploreRedis(id, type, silent, throwOnError)
         }
 
         // Verifica se o produto pode ser público no marketplace
-        const isPublic = dbData.is_active && dbData.show_in_marketplace !== false
+        const isPublic = isExploreProductPublic(dbData)
         if (!isPublic) {
           console.log(`[MarketplaceTrace] produto:${id} removido do Redis - is_active=${dbData.is_active} show_in_marketplace=${dbData.show_in_marketplace}`)
-          return await removeFromExploreRedis(id, type)
+          return await removeFromExploreRedis(id, type, silent, throwOnError)
         }
 
         console.log(`[MarketplaceTrace] produto:${id} sincronizado no Redis (db ok, query ok)`)
@@ -144,7 +157,7 @@ export async function syncToExploreRedis({
           .from("services")
           .select(`
             id, name, price, promotional_price, images, rating, marketplace_score, bookings_last_30_days, favorites_count, views_count,
-            category_id, duration_minutes, created_at, updated_at, is_active, show_in_marketplace,
+            category_id, duration_minutes, created_at, updated_at, is_active, status, moderation_status, deleted_at, show_in_marketplace,
             marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
             partners(id),
             stores(id, name, logo_url, addresses!store_id!left(city, state, latitude, longitude)),
@@ -154,11 +167,11 @@ export async function syncToExploreRedis({
           .single()
 
         if (!dbData) {
-          return await removeFromExploreRedis(id, type)
+          return await removeFromExploreRedis(id, type, silent, throwOnError)
         }
 
-        if (dbData.is_active === false || dbData.show_in_marketplace !== true) {
-          return await removeFromExploreRedis(id, type)
+        if (!isExploreServicePublic(dbData)) {
+          return await removeFromExploreRedis(id, type, silent, throwOnError)
         }
 
         const rawPartner = Array.isArray(dbData.partners) ? dbData.partners[0] : dbData.partners
@@ -179,14 +192,18 @@ export async function syncToExploreRedis({
         const { data: dbData } = await admin
           .from("stores")
           .select(`
-            id, name, slug, description, logo_url, banner_url, rating, marketplace_reputation, created_at, updated_at, partner_id,
+            id, name, slug, description, logo_url, banner_url, rating, marketplace_reputation, created_at, updated_at, partner_id, is_active,
             addresses!store_id!left(city, state, latitude, longitude),
             partners!inner(id, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), reviews(count))
           `)
           .eq("id", id)
           .single()
 
-        if (dbData) {
+        if (!dbData || !isExploreStorePublic(dbData)) {
+          return await removeFromExploreRedis(id, type, silent, throwOnError)
+        }
+
+        if (dbData && isExploreStorePublic(dbData)) {
           const addr = dbData.addresses?.[0]
           const city = addr?.city || null
           const state = addr?.state || null
@@ -227,16 +244,17 @@ export async function syncToExploreRedis({
 
     if (!removeFromRedis && !finalData.name && !finalData.store_name) {
       console.warn(`[RedisSync] Dados insuficientes para sincronizar ${memberId}. Ignorando.`)
-      return
+      return false
     }
 
-    const finalScore = computeExploreRedisScore(finalData, score)
+    const publicData = { ...serializeExploreItem({ ...finalData, itemType: type }, type), itemType: type }
+    const finalScore = computeExploreRedisScore((publicData as any), score)
 
     // 1. Atualiza o Cache do Objeto (JSON) com TTL de 7 dias
     // 2. Atualiza o Índice Específico (zset)
     // 3. Atualiza o Índice Global (zset)
     await Promise.all([
-      redis.set(dataKey, JSON.stringify({ ...finalData, itemType: type }), { ex: 604800 }),
+      redis.set(dataKey, JSON.stringify(publicData), { ex: 604800 }),
       redis.zadd(typeIndexKey, { score: finalScore, member: memberId }),
       redis.zadd(globalIndexKey, { score: finalScore, member: memberId })
     ])
@@ -245,8 +263,11 @@ export async function syncToExploreRedis({
     await revalidateExploreSearch({ silent })
 
     console.log(`[RedisSync] Sincronizado com sucesso: ${memberId}`)
+    return true
   } catch (error) {
     console.error(`[RedisSync] Erro ao sincronizar ${memberId}:`, error)
+    if (throwOnError) throw error
+    return false
     // Não lançamos erro para não quebrar a Action principal (graceful degradation)
   }
 }
@@ -254,44 +275,48 @@ export async function syncToExploreRedis({
 /**
  * Helper para remover item do Redis (ex: deleção de produto)
  */
-export async function removeFromExploreRedis(id: string, type: ItemType, silent: boolean = false): Promise<void> {
-  return syncToExploreRedis({ id, type, data: {}, removeFromRedis: true, silent })
+export async function removeFromExploreRedis(id: string, type: ItemType, silent: boolean = false, throwOnError: boolean = false): Promise<boolean> {
+  return syncToExploreRedis({ id, type, data: {}, removeFromRedis: true, silent, throwOnError })
 }
 
 /**
  * Atualiza todos os produtos e serviços de um parceiro no Redis.
  * Útil quando o parceiro altera o nome da loja ou endereço, o que afeta a URL dos itens.
  */
-export async function syncPartnerItemsToExploreRedis(partnerId: string): Promise<void> {
+export async function syncPartnerItemsToExploreRedis(partnerId: string, options: { throwOnError?: boolean } = {}): Promise<void> {
   const admin = getAdminClient()
 
   // Buscar produtos ativos
-  const { data: products } = await admin
+  const { data: products, error: productsError } = await admin
     .from("products")
     .select("id")
     .eq("partner_id", partnerId)
     .eq("status", "ativo")
-    .neq("show_in_marketplace", false)
+    .eq("show_in_marketplace", true)
 
   // Buscar serviços ativos
-  const { data: services } = await admin
+  const { data: services, error: servicesError } = await admin
     .from("services")
     .select("id")
     .eq("partner_id", partnerId)
     .eq("status", "ativo")
     .eq("show_in_marketplace", true)
 
-  const promises: Promise<void>[] = []
+  if (options.throwOnError && (productsError || servicesError)) {
+    throw productsError || servicesError
+  }
+
+  const promises: Promise<boolean>[] = []
 
   if (products && products.length > 0) {
     for (const prod of products) {
-      promises.push(syncToExploreRedis({ id: prod.id, type: "produto", data: {}, silent: true }))
+      promises.push(syncToExploreRedis({ id: prod.id, type: "produto", data: {}, silent: true, throwOnError: options.throwOnError }))
     }
   }
 
   if (services && services.length > 0) {
     for (const serv of services) {
-      promises.push(syncToExploreRedis({ id: serv.id, type: "servico", data: {}, silent: true }))
+      promises.push(syncToExploreRedis({ id: serv.id, type: "servico", data: {}, silent: true, throwOnError: options.throwOnError }))
     }
   }
 

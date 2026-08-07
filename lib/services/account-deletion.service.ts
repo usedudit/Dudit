@@ -472,8 +472,8 @@ export class AccountDeletionService {
       if (partnerId) {
         // 2. Delete Vitrine cache
         pipeline.del(`data:v2:loja:${partnerId}`)
-        pipeline.zrem("explore:index:vitrines", partnerId)
-        pipeline.zrem("explore:index:all", partnerId)
+        pipeline.zrem("explore:index:vitrines", `loja:${partnerId}`)
+        pipeline.zrem("explore:index:all", `loja:${partnerId}`)
 
         // 3. Find and queue deletion of all products
         const { data: products } = await admin
@@ -484,8 +484,8 @@ export class AccountDeletionService {
         if (products) {
           for (const prod of products) {
             pipeline.del(`data:v2:produto:${prod.id}`)
-            pipeline.zrem("explore:index:produtos", prod.id)
-            pipeline.zrem("explore:index:all", prod.id)
+            pipeline.zrem("explore:index:produtos", `produto:${prod.id}`)
+            pipeline.zrem("explore:index:all", `produto:${prod.id}`)
           }
         }
 
@@ -498,8 +498,8 @@ export class AccountDeletionService {
         if (services) {
           for (const serv of services) {
             pipeline.del(`data:v2:servico:${serv.id}`)
-            pipeline.zrem("explore:index:servicos", serv.id)
-            pipeline.zrem("explore:index:all", serv.id)
+            pipeline.zrem("explore:index:servicos", `servico:${serv.id}`)
+            pipeline.zrem("explore:index:all", `servico:${serv.id}`)
           }
         }
       }

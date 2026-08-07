@@ -56,8 +56,44 @@ async function handler(request: NextRequest) {
       return NextResponse.json({ error: "Nenhum produto fornecido" }, { status: 400 })
     }
 
-    // Se houver partnerId, validar
-    let partnerId = body.partnerId
+    // O partnerId do client Ã© apenas uma alegação. Resolva o parceiro real
+    // diretamente no carrinho/produtos antes de consultar configuração/token MP.
+    let partnerId: string | undefined
+    const useUnifiedCart = Boolean(body.cartItemIds && body.cartItemIds.length > 0)
+
+    if (useUnifiedCart) {
+      const resolved = await cachedResolveCheckoutCartLines(adminClient, user.id, body.cartItemIds!)
+      if (!resolved.success) {
+        return NextResponse.json({ error: resolved.error }, { status: 400 })
+      }
+      partnerId = resolved.partnerId
+    } else {
+      const productIds = items.filter(i => !i.variant_id).map(i => i.id)
+      const variantIds = items.map(i => i.variant_id || i.id).filter(Boolean) as string[]
+      const [productsRes, variantsRes] = await Promise.all([
+        adminClient.from("products").select("id, partner_id").in("id", productIds),
+        adminClient.from("product_variants").select("id, products!inner(partner_id)").in("id", variantIds),
+      ])
+      const productsMap = new Map<string, any>(productsRes.data?.map((p: any) => [p.id, p]))
+      const variantsMap = new Map<string, any>(variantsRes.data?.map((v: any) => [v.id, v]))
+      const resolvedPartnerIds = items.map(item => {
+        const variant = item.variant_id ? variantsMap.get(item.variant_id) : variantsMap.get(item.id)
+        return variant?.products?.partner_id || productsMap.get(item.id)?.partner_id
+      })
+      if (resolvedPartnerIds.some(id => !id) || new Set(resolvedPartnerIds).size !== 1) {
+        return NextResponse.json({ error: "Itens de vendedores diferentes ou inválidos" }, { status: 400 })
+      }
+      partnerId = resolvedPartnerIds[0]
+    }
+
+    if (!partnerId) {
+      return NextResponse.json({ error: "Vendedor não identificado" }, { status: 400 })
+    }
+    if (body.partnerId && body.partnerId !== partnerId) {
+      SecureLogger.warn("Client partnerId mismatch in preference", { claimedPartnerId: body.partnerId, resolvedPartnerId: partnerId })
+      return NextResponse.json({ error: "Vendedor inválido para os itens informados" }, { status: 400 })
+    }
+
     if (!partnerId && items.length > 0) {
       // Tentar obter partner_id do primeiro item (pode ser produto ou variante)
       const { data: product } = await adminClient
@@ -113,8 +149,6 @@ async function handler(request: NextRequest) {
     let totalAmount = 0
     const preferenceItems: any[] = []
     let couponItems: any[] = []
-
-    const useUnifiedCart = Boolean(body.cartItemIds && body.cartItemIds.length > 0)
 
     if (useUnifiedCart) {
       // Update pay_deposit_only in DB

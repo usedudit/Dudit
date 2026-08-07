@@ -21,7 +21,6 @@ export default function HelpSidebar({
     const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({
         "boas-vindas": true,
         "login-registro": true,
-        "produtos": true,
         "vendas": true,
         "produtos-estoque": true
     })
@@ -42,7 +41,6 @@ export default function HelpSidebar({
     const getCategoryEmoji = (id: string) => {
         if (id === "boas-vindas") return "👋"
         if (id === "login-registro") return "🔐"
-        if (id === "produtos") return "🏷️"
         if (id === "vendas") return "🛒"
         if (id === "financeiro") return "💰"
         if (id === "produtos-estoque") return "📦"
