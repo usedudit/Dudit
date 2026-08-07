@@ -31,6 +31,7 @@ export enum RateLimitCategory {
   PAYMENT = "PAYMENT",
   API_GENERAL = "API_GENERAL",
   WEBHOOK = "WEBHOOK",
+  INTERNAL_CRON = "INTERNAL_CRON",
   ADMIN = "ADMIN",
   ADMIN_ACTION = "ADMIN_ACTION",
   ADMIN_STEP_UP = "ADMIN_STEP_UP",
@@ -181,7 +182,13 @@ export const RATE_LIMIT_CONFIGS: Record<RateLimitCategory, RateLimitConfig> = {
     maxRequests: 500,
     window: "1 m",
     identifierType: IdentifierType.ENDPOINT,
-    failClosed: false,
+    failClosed: true,
+  },
+  [RateLimitCategory.INTERNAL_CRON]: {
+    maxRequests: 10,
+    window: "1 m",
+    identifierType: IdentifierType.ENDPOINT,
+    failClosed: true,
   },
   [RateLimitCategory.ADMIN]: {
     maxRequests: 100,

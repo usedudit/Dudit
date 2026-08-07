@@ -63,3 +63,12 @@ export function serializeExploreItem(
 
   return pickFields(data, fields)
 }
+
+export function isExploreItemProjection(
+  data: Record<string, any> | null | undefined,
+  type: ExploreItemType,
+): boolean {
+  if (!data) return false
+  const projected = serializeExploreItem(data, type)
+  return Object.keys(data).every(field => Object.prototype.hasOwnProperty.call(projected, field))
+}

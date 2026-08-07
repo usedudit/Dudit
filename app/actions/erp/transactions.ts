@@ -353,6 +353,81 @@ async function applyFinanceAccountBalanceDelta(
     }
 }
 
+// ─── Histórico de pagamento de parcelas no pedido ────────────────────────────
+// Ao pagar uma parcela, além do audit da própria transação, registra no audit
+// do PEDIDO uma linha legível: "Recebido R$ 150,00 da parcela 1/10 de um total
+// de R$ 1500,00, restante R$ 1350,00" (+ juros/desconto quando houver).
+
+async function getInstallmentGroupPrincipal(
+    supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
+    partnerId: string,
+    groupId: string | null,
+): Promise<{ total: number; paidPrincipal: number }> {
+    if (!groupId) return { total: 0, paidPrincipal: 0 }
+    const { data: txs } = await supabase
+        .from("transactions")
+        .select("id, original_amount")
+        .eq("partner_id", partnerId)
+        .eq("installment_group_id", groupId)
+    const ids = (txs || []).map((t: any) => t.id)
+    let paidPrincipal = 0
+    if (ids.length > 0) {
+        const { data: pays } = await supabase
+            .from("transaction_payments")
+            .select("base_amount, amount")
+            .eq("partner_id", partnerId)
+            .in("transaction_id", ids)
+        paidPrincipal = (pays || []).reduce((sum: number, p: any) => sum + Number(p.base_amount ?? p.amount ?? 0), 0)
+    }
+    const total = (txs || []).reduce((sum: number, t: any) => sum + Math.abs(Number(t.original_amount ?? 0)), 0)
+    return { total, paidPrincipal }
+}
+
+async function resolveOrderIdForSaleTransaction(
+    supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
+    partnerId: string,
+    tx: { payment_id?: string | null; description?: string | null },
+): Promise<string | null> {
+    if (tx.payment_id) {
+        const { data: pay } = await supabase
+            .from("payments")
+            .select("order_id")
+            .eq("id", tx.payment_id)
+            .eq("partner_id", partnerId)
+            .maybeSingle()
+        if (pay?.order_id) return pay.order_id
+    }
+    const description = String(tx.description || "").trim()
+    if (description) {
+        const { data: order } = await supabase
+            .from("orders")
+            .select("id")
+            .eq("partner_id", partnerId)
+            .eq("order_number", description)
+            .maybeSingle()
+        if (order?.id) return order.id
+    }
+    return null
+}
+
+function buildInstallmentPaymentHistoryLine(params: {
+    dir: "Recebido" | "Pago"
+    finalPaid: number
+    installmentNumber?: number | null
+    totalInstallments?: number | null
+    groupTotal: number
+    remaining: number
+    interestAmount: number
+    discountAmount: number
+    methodLabel?: string | null
+}): string {
+    let line = `${params.dir} R$ ${params.finalPaid.toFixed(2)} da parcela ${params.installmentNumber ?? "?"}/${params.totalInstallments ?? "?"} de um total de R$ ${params.groupTotal.toFixed(2)}, restante R$ ${params.remaining.toFixed(2)}`
+    if (params.methodLabel) line += ` utilizando ${params.methodLabel}`
+    if (params.interestAmount > 0) line += ` (Juros: R$ ${params.interestAmount.toFixed(2)})`
+    if (params.discountAmount > 0) line += ` (Desconto: R$ ${params.discountAmount.toFixed(2)})`
+    return line
+}
+
 const FINANCIAL_TX_LIST_SELECT = `
         id, description, category, amount, original_amount, interest_amount, discount_amount, paid_amount, due_date, payment_date, created_at, status, notes, payment_type, transaction_type, contact_id, customer_id, contact_type, store_id,
         transfer_group_id, refund_kind, reference_note, origin, account_id, category_id, subcategory_id, recurring_id, payment_method_id, installment_group_id, installment_number,
@@ -1642,7 +1717,7 @@ export async function recordInstallmentPaymentAction(input: {
 
         const { data: tx, error: txErr } = await supabase
             .from("transactions")
-            .select("id, status, partner_id, store_id, payment_method_id, installment_group_id, installment_number, description, category, category_id, subcategory_id, account_id, contact_id, customer_id, contact_type, payment_type, notes, due_date, original_amount, amount, transaction_type, refund_kind")
+            .select("id, status, partner_id, store_id, payment_method_id, installment_group_id, installment_number, total_installments, description, payment_id, category, category_id, subcategory_id, account_id, contact_id, customer_id, contact_type, payment_type, notes, due_date, original_amount, amount, transaction_type, refund_kind")
             .eq("id", input.transactionId)
             .eq("partner_id", input.partnerId)
             .single()
@@ -1788,16 +1863,28 @@ export async function recordInstallmentPaymentAction(input: {
             .eq("partner_id", input.partnerId)
         if (updateErr) throw updateErr
 
-        const installmentDir = tx.transaction_type === "income" ? "recebido" : "pago"
+        const installmentDir = tx.transaction_type === "income" ? "Recebido" : "Pago"
         const installmentPmLabel = installmentNewPmLabel
-        let installmentHistoryLine = fullyPaid
-            ? `Quitou a parcela - R$ ${finalPaid.toFixed(2)} ${installmentDir}`
-            : `Pagamento parcial de R$ ${finalPaid.toFixed(2)} ${installmentDir}`
-        if (installmentPmLabel || tx.payment_type) {
-            installmentHistoryLine += ` utilizando ${installmentPmLabel || tx.payment_type}`
-        }
-        if (interestAmount > 0) installmentHistoryLine += ` (Juros: R$ ${interestAmount.toFixed(2)})`
-        if (discountAmount > 0) installmentHistoryLine += ` (Desconto: R$ ${discountAmount.toFixed(2)})`
+        const methodLabel = installmentPmLabel || tx.payment_type || null
+
+        const { total: groupTotal, paidPrincipal: groupPaidPrincipal } = await getInstallmentGroupPrincipal(
+            supabase,
+            input.partnerId,
+            tx.installment_group_id,
+        )
+        const remainingGroup = Math.max(0, Math.round((groupTotal - groupPaidPrincipal) * 100) / 100)
+
+        const installmentHistoryLine = buildInstallmentPaymentHistoryLine({
+            dir: installmentDir,
+            finalPaid,
+            installmentNumber: tx.installment_number,
+            totalInstallments: tx.total_installments,
+            groupTotal,
+            remaining: remainingGroup,
+            interestAmount,
+            discountAmount,
+            methodLabel,
+        })
 
         await logAuditEvent({
             partnerId: input.partnerId,
@@ -1811,6 +1898,30 @@ export async function recordInstallmentPaymentAction(input: {
                 : { oldStatus: "Pendente", paidSoFar: totalPaidAmount, remaining: Math.max(0, originalAmount - paidAfter) },
             source: "manual",
         })
+
+        // Histórico do pedido: o recebimento da parcela também aparece no pedido.
+        const orderIdForAudit = await resolveOrderIdForSaleTransaction(supabase, input.partnerId, tx)
+        if (orderIdForAudit) {
+            await logAuditEvent({
+                partnerId: input.partnerId,
+                actorUserId: userId,
+                entityType: "order",
+                entityId: orderIdForAudit,
+                actionType: fullyPaid ? "installment_paid" : "installment_partial_paid",
+                changeLines: [installmentHistoryLine],
+                metadata: {
+                    oldStatus: "Pendente",
+                    newStatus: fullyPaid ? "Pago" : "Pago parcialmente",
+                    installmentNumber: tx.installment_number,
+                    totalInstallments: tx.total_installments,
+                    paidNow: finalPaid,
+                    interestAmount,
+                    discountAmount,
+                    remaining: remainingGroup,
+                },
+                source: "manual",
+            })
+        }
         await revalidateEntityTimeline("transaction", input.transactionId)
 
         await revalidateTransactions(input.partnerId)
@@ -2031,7 +2142,7 @@ export async function settleInstallmentGroupAction(input: {
         // Pre-fetch pending transactions to log audit events after successful settlement
         const { data: pendingTxs } = await supabase
             .from("transactions")
-            .select("id, payment_method_id")
+            .select("id, payment_method_id, payment_type, installment_number, total_installments, transaction_type, description, payment_id, original_amount")
             .eq("partner_id", input.partnerId)
             .eq("installment_group_id", input.installmentGroupId)
             .neq("status", "paid")
@@ -2064,17 +2175,56 @@ export async function settleInstallmentGroupAction(input: {
 
         // Log audit events for the transactions that were just settled
         const settleCustomPayments = sanitizedPayments
+
+        const { total: groupTotal, paidPrincipal: groupPaidPrincipal } = await getInstallmentGroupPrincipal(
+            supabase,
+            input.partnerId,
+            input.installmentGroupId,
+        )
+        const remainingGroup = Math.max(0, Math.round((groupTotal - groupPaidPrincipal) * 100) / 100)
+
         if (txIdsToLog.length > 0) {
+            const { data: paidPerTx } = await supabase
+                .from("transaction_payments")
+                .select("transaction_id, base_amount, amount")
+                .eq("partner_id", input.partnerId)
+                .in("transaction_id", txIdsToLog)
+            const paidPrincipalByTx = new Map<string, number>()
+            for (const p of paidPerTx || []) {
+                paidPrincipalByTx.set(p.transaction_id, (paidPrincipalByTx.get(p.transaction_id) || 0) + Number(p.base_amount ?? p.amount ?? 0))
+            }
+
             await Promise.allSettled(
-                txIdsToLog.map((transactionId: string) => {
-                    const matchedPayment = settleCustomPayments.find(p => p.transactionId === transactionId)
+                txIdsToLog.map(async (transactionId: string) => {
+                    const txRow = (pendingTxs || []).find((t: any) => t.id === transactionId)
+                    const matchedPayment = settleCustomPayments.find((p) => p.transactionId === transactionId)
                     const pAmt = matchedPayment?.paymentAmount || 0
                     const pInt = matchedPayment?.interestAmount || 0
                     const pDisc = matchedPayment?.discountAmount || 0
-                    let settleMsg = `Quitou a parcela - R$ ${(pAmt + pInt - pDisc).toFixed(2)}`
-                    if (pInt > 0) settleMsg += ` (Juros: R$ ${pInt.toFixed(2)})`
-                    if (pDisc > 0) settleMsg += ` (Desconto: R$ ${pDisc.toFixed(2)})`
-                    return logAuditEvent({
+                    const txRemaining = Math.max(
+                        0,
+                        Math.round((Math.abs(Number(txRow?.original_amount ?? 0)) - (paidPrincipalByTx.get(transactionId) || 0)) * 100) / 100,
+                    )
+                    const baseApplied = Math.round(Math.min(pAmt || txRemaining, txRemaining) * 100) / 100
+                    const finalPaid = Math.round((baseApplied + pInt - pDisc) * 100) / 100
+
+                    const methodLabel = txRow?.payment_method_id
+                        ? await paymentMethodDisplayLabel(supabase, input.partnerId, txRow.payment_method_id).catch(() => null)
+                        : null
+
+                    const settleMsg = buildInstallmentPaymentHistoryLine({
+                        dir: String(txRow?.transaction_type) === "income" ? "Recebido" : "Pago",
+                        finalPaid,
+                        installmentNumber: txRow?.installment_number ?? null,
+                        totalInstallments: txRow?.total_installments ?? null,
+                        groupTotal,
+                        remaining: remainingGroup,
+                        interestAmount: pInt,
+                        discountAmount: pDisc,
+                        methodLabel: methodLabel || txRow?.payment_type || null,
+                    })
+
+                    await logAuditEvent({
                         partnerId: input.partnerId,
                         actorUserId: userId,
                         entityType: "transaction",
@@ -2084,6 +2234,30 @@ export async function settleInstallmentGroupAction(input: {
                         metadata: { oldStatus: "Pendente", newStatus: "Pago" },
                         source: "manual",
                     })
+
+                    // Histórico do pedido: o recebimento da parcela também aparece no pedido.
+                    const orderIdForAudit = await resolveOrderIdForSaleTransaction(supabase, input.partnerId, txRow || {})
+                    if (orderIdForAudit) {
+                        await logAuditEvent({
+                            partnerId: input.partnerId,
+                            actorUserId: userId,
+                            entityType: "order",
+                            entityId: orderIdForAudit,
+                            actionType: "settled",
+                            changeLines: [settleMsg],
+                            metadata: {
+                                oldStatus: "Pendente",
+                                newStatus: "Pago",
+                                installmentNumber: txRow?.installment_number ?? null,
+                                totalInstallments: txRow?.total_installments ?? null,
+                                paidNow: finalPaid,
+                                interestAmount: pInt,
+                                discountAmount: pDisc,
+                                remaining: remainingGroup,
+                            },
+                            source: "manual",
+                        })
+                    }
                 }),
             )
         }

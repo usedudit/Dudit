@@ -514,6 +514,13 @@ export async function createTransactionFromOrder(
             // Fluxo antigo (legado) já processou esta entrada → não misturar modelos
             if (existingByNote.has(baseRef)) continue
 
+            // Idempotência do ledger: se qualquer linha desta entrada já existe
+            // (fee/settlement), a entrada já foi totalmente processada → não duplicar.
+            // (Recognition sozinho ainda pode estar no caminho de refine.)
+            const hasLedgerEntry = [feeRef, settlementRef, ...Array.from({ length: installments }, (_, i) => `${settlementRef}:${i + 1}`)]
+                .some((ref) => existingByNote.has(ref))
+            if (hasLedgerEntry) continue
+
             const recognitionTx = existingByNote.get(recognitionRef)
 
             if (recognitionTx) {
@@ -531,38 +538,44 @@ export async function createTransactionFromOrder(
                 continue
             }
 
-            // 1) Reconhecimento — DRE bruto, não move saldo
-            const { error: recError } = await supabase.from("transactions").insert({
-                partner_id: orderData.partner_id,
-                store_id: orderData.store_id || null,
-                description: orderData.order_number,
-                category: "Vendas",
-                contact_id: null,
-                contact_type: "customer",
-                customer_id: orderData.customer_id || null,
-                amount: entry.gross,
-                original_amount: entry.gross,
-                due_date: null,
-                payment_date: paymentDate,
-                status: "paid",
-                notes: null,
-                installment_number: null,
-                total_installments: null,
-                interest_amount: entry.interestAmount,
-                fee_amount: round2(entry.feeAmount + entry.fixedFeeAmount),
-                discount_amount: entry.discountAmount,
-                payment_type: entry.method,
-                payment_method_id: entry.paymentMethodId,
-                transaction_type: "income" as const,
-                origin: normalizeOrigin(orderData.order_source),
-                account_id: null,
-                kind: "recognition" as const,
-                payment_id: paymentRowId,
-                reference_note: recognitionRef,
-            })
-            if (recError) {
-                console.error(`[TRANSACTION] Erro ao criar reconhecimento do pedido ${orderData.order_number}:`, recError.message)
-                continue
+            // 1) Reconhecimento — DRE bruto, não move saldo.
+            // Venda parcelada (2+ parcelas): NÃO cria movimentação com o valor
+            // total — o valor ainda não foi recebido; só os settlements (contas
+            // a receber) representam o que virá, e cada parcela paga gera o
+            // registro de recebimento.
+            if (installments <= 1) {
+                const { error: recError } = await supabase.from("transactions").insert({
+                    partner_id: orderData.partner_id,
+                    store_id: orderData.store_id || null,
+                    description: orderData.order_number,
+                    category: "Vendas",
+                    contact_id: null,
+                    contact_type: "customer",
+                    customer_id: orderData.customer_id || null,
+                    amount: entry.gross,
+                    original_amount: entry.gross,
+                    due_date: null,
+                    payment_date: paymentDate,
+                    status: "paid",
+                    notes: null,
+                    installment_number: null,
+                    total_installments: null,
+                    interest_amount: entry.interestAmount,
+                    fee_amount: round2(entry.feeAmount + entry.fixedFeeAmount),
+                    discount_amount: entry.discountAmount,
+                    payment_type: entry.method,
+                    payment_method_id: entry.paymentMethodId,
+                    transaction_type: "income" as const,
+                    origin: normalizeOrigin(orderData.order_source),
+                    account_id: null,
+                    kind: "recognition" as const,
+                    payment_id: paymentRowId,
+                    reference_note: recognitionRef,
+                })
+                if (recError) {
+                    console.error(`[TRANSACTION] Erro ao criar reconhecimento do pedido ${orderData.order_number}:`, recError.message)
+                    continue
+                }
             }
 
             // 2) Taxa do gateway — despesa DRE, não move saldo

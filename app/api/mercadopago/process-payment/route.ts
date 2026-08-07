@@ -17,6 +17,7 @@ import {
   priceMarketplaceCartCheckout,
   mapOrderItemsForPaymentInsert,
 } from "@/lib/services/marketplace-cart-checkout"
+import { resolveCheckoutCartLinesFresh } from "@/lib/cache/checkout-cache"
 import { buildDepositCheckoutMeta } from "@/lib/services/marketplace-checkout-amounts"
 import { patchDepositCheckoutOnPayment } from "@/lib/payments/order-financial-state"
 import { resolveDeliverySettingsRow } from "@/app/actions/shared/delivery"
@@ -101,7 +102,8 @@ async function handler(request: NextRequest) {
     }
 
     const body: ProcessPaymentRequest = await request.json()
-    const { paymentFormData, items, partnerId, buyerId, deliveryType, deliveryAddress, notes, cartItemIds, couponCode, payDepositOnly, storeId } = body
+    const { paymentFormData, items, buyerId, deliveryType, deliveryAddress, notes, cartItemIds, couponCode, payDepositOnly, storeId } = body
+    const claimedPartnerId = body.partnerId
     const checkoutPricing = normalizeCheckoutPricing(body.checkoutPricing)
     if (body.checkoutPricing && !checkoutPricing) {
       return NextResponse.json({ error: "Os valores do checkout nÃ£o conferem. Atualize a pÃ¡gina e tente novamente." }, { status: 400 })
@@ -113,11 +115,13 @@ async function handler(request: NextRequest) {
       return NextResponse.json({ error: "Método de pagamento não informado" }, { status: 400 })
     }
 
-    if (!items || items.length === 0) {
+    const useUnifiedCart = Boolean(cartItemIds && cartItemIds.length > 0)
+
+    if ((!items || items.length === 0) && !useUnifiedCart) {
       return NextResponse.json({ error: "Nenhum item informado" }, { status: 400 })
     }
 
-    if (!partnerId || !buyerId) {
+    if (!claimedPartnerId || !buyerId) {
       return NextResponse.json({ error: "Dados incompletos" }, { status: 400 })
     }
 
@@ -136,6 +140,65 @@ async function handler(request: NextRequest) {
 
     // SEGURANÃ‡A: Validar parceiro e token MP (usa admin client para bypass RLS â€” dados sensíveis)
     const adminClient = createAdminClient()
+
+    // The client partnerId is only a claim. Resolve the canonical partner
+    // from owned cart/products before reading any Mercado Pago configuration.
+    let canonicalPartnerId: string | undefined
+    if (useUnifiedCart) {
+      const resolved = await resolveCheckoutCartLinesFresh(adminClient, buyerId, cartItemIds!)
+      if (!resolved.success) {
+        return NextResponse.json({ error: resolved.error }, { status: 400 })
+      }
+      canonicalPartnerId = resolved.partnerId
+    } else {
+      const productIds = items.filter(item => !item.variant_id).map(item => item.id)
+      const variantIds = items.filter(item => Boolean(item.variant_id)).map(item => item.variant_id!)
+      const [productsRes, variantsRes] = await Promise.all([
+        adminClient.from("products").select("id, partner_id").in("id", productIds),
+        variantIds.length > 0
+          ? adminClient.from("product_variants").select("id, products!inner(partner_id)").in("id", variantIds)
+          : Promise.resolve({ data: [], error: null }),
+      ])
+
+      if (productsRes.error || variantsRes.error) {
+        SecureLogger.error("Failed to resolve canonical checkout partner", {
+          productError: productsRes.error?.message,
+          variantError: variantsRes.error?.message,
+        })
+        return NextResponse.json({ error: "NÃ£o foi possÃ­vel validar os itens do checkout" }, { status: 400 })
+      }
+
+      const productsMap = new Map<string, { partner_id: string }>(
+        (productsRes.data || []).map((product: any) => [product.id, product]),
+      )
+      const variantsMap = new Map<string, any>(
+        (variantsRes.data || []).map((variant: any) => [variant.id, variant]),
+      )
+      const resolvedPartnerIds = items.map(item =>
+        item.variant_id
+          ? variantsMap.get(item.variant_id)?.products?.partner_id
+          : productsMap.get(item.id)?.partner_id,
+      )
+
+      if (resolvedPartnerIds.some(id => !id) || new Set(resolvedPartnerIds).size !== 1) {
+        return NextResponse.json({ error: "Itens de vendedores diferentes ou invÃ¡lidos" }, { status: 400 })
+      }
+      canonicalPartnerId = resolvedPartnerIds[0]
+    }
+
+    if (!canonicalPartnerId) {
+      return NextResponse.json({ error: "Vendedor nÃ£o identificado" }, { status: 400 })
+    }
+
+    if (claimedPartnerId !== canonicalPartnerId) {
+      SecureLogger.warn("Client partnerId mismatch in process-payment", {
+        claimedPartnerId,
+        canonicalPartnerId,
+      })
+      return NextResponse.json({ error: "Vendedor invÃ¡lido para os itens informados" }, { status: 400 })
+    }
+
+    const partnerId = canonicalPartnerId
     const { data: partner, error: partnerError } = await adminClient
       .from("partners")
       .select("id")
@@ -204,8 +267,6 @@ async function handler(request: NextRequest) {
     let fullOrderTotal = 0
     let depositPercent = 50
     let cartPmtConfig: import("@/lib/services/pricing-engine").PricingInput["paymentMethod"] = null
-
-    const useUnifiedCart = Boolean(cartItemIds && cartItemIds.length > 0)
 
     if (useUnifiedCart) {
       // Update pay_deposit_only and fulfillment_mode in DB for cart items

@@ -6,7 +6,7 @@ import { withCSRFProtection } from "@/lib/security/csrf-middleware"
 import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
 import { validateCoupon } from "@/lib/services/coupons"
 import { calculateOrderPricing } from "@/lib/services/pricing-engine"
-import { cachedResolveCheckoutCartLines } from "@/lib/cache/checkout-cache"
+import { resolveCheckoutCartLinesFresh } from "@/lib/cache/checkout-cache"
 
 interface PreferenceRequest {
   items?: Array<{
@@ -62,7 +62,7 @@ async function handler(request: NextRequest) {
     const useUnifiedCart = Boolean(body.cartItemIds && body.cartItemIds.length > 0)
 
     if (useUnifiedCart) {
-      const resolved = await cachedResolveCheckoutCartLines(adminClient, user.id, body.cartItemIds!)
+      const resolved = await resolveCheckoutCartLinesFresh(adminClient, user.id, body.cartItemIds!)
       if (!resolved.success) {
         return NextResponse.json({ error: resolved.error }, { status: 400 })
       }
@@ -168,7 +168,7 @@ async function handler(request: NextRequest) {
           .or("item_type.eq.product,item_type.is.null,product_id.not.is.null")
       }
 
-      const resolved = await cachedResolveCheckoutCartLines(adminClient, user.id, body.cartItemIds!)
+      const resolved = await resolveCheckoutCartLinesFresh(adminClient, user.id, body.cartItemIds!)
       if (!resolved.success) {
         return NextResponse.json({ error: resolved.error }, { status: 400 })
       }

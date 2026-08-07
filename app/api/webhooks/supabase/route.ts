@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { syncPartnerItemsToExploreRedis, syncToExploreRedis, removeFromExploreRedis } from '@/lib/redis-sync'
 import { revalidateExploreSearch, revalidateProducts, revalidatePartnerProfile } from '@/lib/utils/revalidation'
+import { checkRateLimitForAPI } from '@/lib/security/require-rate-limit'
+import { RateLimitCategory } from '@/lib/rate-limiter'
 
 // Secret header to prevent unauthorized access
 const WEBHOOK_SECRET = process.env.SUPABASE_WEBHOOK_SECRET
@@ -51,6 +53,11 @@ export async function POST(req: Request) {
     const authHeader = req.headers.get('Authorization')
     if (!WEBHOOK_SECRET || authHeader !== `Bearer ${WEBHOOK_SECRET}`) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const rateLimitResult = await checkRateLimitForAPI(RateLimitCategory.WEBHOOK, 'supabase-webhook')
+    if (rateLimitResult.limited) {
+      return NextResponse.json(rateLimitResult.body, { status: rateLimitResult.status })
     }
 
     const body = await req.json()

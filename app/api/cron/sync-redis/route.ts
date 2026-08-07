@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server'
 import { getAdminClient } from '@/lib/supabase/admin'
 import { redis } from '@/lib/redis'
 import { syncToExploreRedis, getExploreRedisDataKey } from '@/lib/redis-sync'
+import { removeFromExploreRedis } from '@/lib/redis-sync'
+import { isExploreItemProjection, isExploreProductPublic, isExploreServicePublic, isExploreStorePublic } from '@/lib/redis-explore-serializer'
+import { checkRateLimitForAPI } from '@/lib/security/require-rate-limit'
+import { RateLimitCategory } from '@/lib/rate-limiter'
 
 const ORPHAN_AUDIT_LIMIT = 250
 
@@ -20,9 +24,52 @@ async function reconcileOrphanedExploreIndex() {
     return getExploreRedisDataKey(type, idParts.join(":"))
   })
   const objects = await redis.mget(...keys)
-  const missing = members.filter((_, index) => !objects.at(index))
+  const typedMembers = members.map(member => {
+    const [type, ...idParts] = String(member).split(":")
+    return { member: String(member), type, id: idParts.join(":") }
+  })
+  const productIds = typedMembers.filter(item => item.type === 'produto' && item.id).map(item => item.id)
+  const serviceIds = typedMembers.filter(item => item.type === 'servico' && item.id).map(item => item.id)
+  const storeIds = typedMembers.filter(item => item.type === 'loja' && item.id).map(item => item.id)
+  const admin = getAdminClient()
+  const [productsRes, servicesRes, storesRes] = await Promise.all([
+    productIds.length > 0
+      ? admin.from('products').select('id, is_active, status, moderation_status, deleted_at, show_in_marketplace').in('id', productIds)
+      : Promise.resolve({ data: [], error: null }),
+    serviceIds.length > 0
+      ? admin.from('services').select('id, is_active, status, moderation_status, deleted_at, show_in_marketplace').in('id', serviceIds)
+      : Promise.resolve({ data: [], error: null }),
+    storeIds.length > 0
+      ? admin.from('stores').select('id, is_active').in('id', storeIds)
+      : Promise.resolve({ data: [], error: null }),
+  ])
+
+  if (productsRes.error || servicesRes.error || storesRes.error) {
+    throw productsRes.error || servicesRes.error || storesRes.error
+  }
+
+  const eligible = new Set<string>()
+  for (const row of productsRes.data || []) {
+    if (isExploreProductPublic(row)) eligible.add(`produto:${row.id}`)
+  }
+  for (const row of servicesRes.data || []) {
+    if (isExploreServicePublic(row)) eligible.add(`servico:${row.id}`)
+  }
+  for (const row of storesRes.data || []) {
+    if (isExploreStorePublic(row)) eligible.add(`loja:${row.id}`)
+  }
+
+  const ineligibleMembers = typedMembers
+    .filter(item => !eligible.has(item.member))
+    .map(item => item.member)
+  const missing = members.filter((member, index) => !objects.at(index) && !ineligibleMembers.includes(String(member)))
   let repaired = 0
 
+  const removeResults = await Promise.allSettled(ineligibleMembers.map(member => {
+    const [type, ...idParts] = String(member).split(":")
+    if (!['produto', 'servico', 'loja'].includes(type) || !idParts.length) return Promise.resolve(false)
+    return removeFromExploreRedis(idParts.join(":"), type as 'produto' | 'servico' | 'loja', true, true)
+  }))
   const results = await Promise.allSettled(missing.map(member => {
     const [type, ...idParts] = String(member).split(":")
     if (!['produto', 'servico', 'loja'].includes(type) || !idParts.length) return Promise.resolve(false)
@@ -35,9 +82,10 @@ async function reconcileOrphanedExploreIndex() {
     })
   }))
   repaired = results.filter(result => result.status === 'fulfilled' && result.value === true).length
+  const removed = removeResults.filter(result => result.status === 'fulfilled' && result.value === true).length
 
-  console.log(`[Cron Reconciliation] indexAudited=${members.length} missingObjects=${missing.length} repaired=${repaired}`)
-  return { audited: members.length, missingObjects: missing.length, repaired }
+  console.log(`[Cron Reconciliation] indexAudited=${members.length} missingObjects=${missing.length} ineligible=${ineligibleMembers.length} repaired=${repaired} removed=${removed}`)
+  return { audited: members.length, missingObjects: missing.length, ineligible: ineligibleMembers.length, repaired, removed }
 }
 
 export async function GET(req: Request) {
@@ -47,6 +95,11 @@ export async function GET(req: Request) {
     const secret = process.env.CRON_SECRET
     if (!secret || authHeader !== `Bearer ${secret}`) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const rateLimitResult = await checkRateLimitForAPI(RateLimitCategory.INTERNAL_CRON, 'sync-redis')
+    if (rateLimitResult.limited) {
+      return NextResponse.json(rateLimitResult.body, { status: rateLimitResult.status })
     }
 
     const supabase = getAdminClient()
@@ -80,7 +133,8 @@ export async function GET(req: Request) {
         try {
            const obj = typeof rawJson === 'string' ? JSON.parse(rawJson) : rawJson
            // Comparar datas. Se o BD for mais novo ou o Redis não tiver a data, é STALE!
-           if (!obj.updated_at) return true 
+            if (!obj.updated_at) return true
+            if (!isExploreItemProjection(obj, dbItem.type)) return true
            
            const dbTime = new Date(dbItem.updated_at).getTime()
            const redisTime = new Date(obj.updated_at).getTime()

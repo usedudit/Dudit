@@ -7,9 +7,21 @@ import {
 } from "@/app/actions/shared/promotions"
 import type { PricingPromotion } from "@/lib/types/promotion"
 
+/**
+ * Resolve the current database state without request memoization.
+ * Callers that mutate cart_items must use this function afterwards.
+ */
+export async function resolveCheckoutCartLinesFresh(
+  supabase: SupabaseClient,
+  userId: string,
+  cartItemIds: string[],
+): Promise<ResolveCartResult> {
+  return resolveCheckoutCartLines(supabase, userId, cartItemIds)
+}
+
 export const cachedResolveCheckoutCartLines = cache(
   async (supabase: SupabaseClient, userId: string, cartItemIds: string[]): Promise<ResolveCartResult> => {
-    return resolveCheckoutCartLines(supabase, userId, cartItemIds)
+    return resolveCheckoutCartLinesFresh(supabase, userId, cartItemIds)
   },
 )
 

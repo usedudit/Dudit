@@ -854,6 +854,56 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                                     {item.is_gift && (
                                                                                         <Badge variant="blue" icon={null}>Brinde</Badge>
                                                                                     )}
+                                                                                    {(() => {
+                                                                                        const itemReturns = (order.return_requests || []).flatMap((rr: any) => {
+                                                                                            const matchingItems = (rr.return_items || []).filter((ri: any) => ri.order_item_id === item.id);
+                                                                                            return matchingItems.map((ri: any) => ({
+                                                                                                ...ri,
+                                                                                                requestStatus: rr.status,
+                                                                                                requestId: rr.id,
+                                                                                                createdAt: rr.created_at || rr.returnDate,
+                                                                                            }));
+                                                                                        });
+
+                                                                                        if (itemReturns.length === 0) return null;
+
+                                                                                        const tooltipContent = (
+                                                                                            <div className="space-y-2 text-left p-1 min-w-[220px]">
+                                                                                                <div className="flex items-center gap-1.5 font-bold border-b border-brand-border/30 dark:border-dark-border/30 pb-1.5 text-xs text-brand-dark dark:text-dark-heading">
+                                                                                                    <ReturnIcon className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
+                                                                                                    <span>Histórico de Devolução / Troca</span>
+                                                                                                </div>
+                                                                                                <div className="space-y-2 divide-y divide-brand-border/20 dark:divide-dark-border/20 text-xs">
+                                                                                                    {itemReturns.map((ret: any, idx: number) => {
+                                                                                                        const statusMeta = getReturnStatusMeta(ret.requestStatus);
+                                                                                                        return (
+                                                                                                            <div key={idx} className="pt-1.5 first:pt-0 space-y-1">
+                                                                                                                <div className="flex items-center justify-between gap-2">
+                                                                                                                    <span className="font-mono text-[10px] bg-white/70 dark:bg-black/30 px-1.5 py-0.5 rounded border border-brand-border/50 dark:border-dark-border">
+                                                                                                                        DVL-{ret.requestId.slice(0, 6).toUpperCase()}
+                                                                                                                    </span>
+                                                                                                                    <Badge variant={statusMeta.variant} className="scale-90 font-medium">
+                                                                                                                        {statusMeta.label}
+                                                                                                                    </Badge>
+                                                                                                                </div>
+                                                                                                                <div className="text-[11px] text-brand-inactive-text dark:text-dark-body space-y-0.5">
+                                                                                                                    <p><strong>Quantidade:</strong> {formatQuantityWithUnit(ret.quantity, ret.unit || item.products?.unit)}</p>
+                                                                                                                    <p><strong>Condição:</strong> {formatReturnConditionLabel(ret.condition)}</p>
+                                                                                                                    <p><strong>Motivo:</strong> {formatReturnReasonLabel(ret.reason)}</p>
+                                                                                                                </div>
+                                                                                                            </div>
+                                                                                                        );
+                                                                                                    })}
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        );
+
+                                                                                        return (
+                                                                                            <Tooltip text={tooltipContent}>
+                                                                                                <Badge variant="purple" icon={<ReturnIcon className="w-3.5 h-3.5 text-purple-600 dark:text-purple-300" />} className="cursor-pointer hover:opacity-90 px-1.5 py-0.5 min-w-0" />
+                                                                                            </Tooltip>
+                                                                                        );
+                                                                                    })()}
                                                                                 </div>
                                                                                 <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading">
                                                                                     {(() => {
@@ -930,61 +980,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                                 </span>
                                                                             </div>
 
-                                                                            {/* Return History for this item */}
-                                                                            {(() => {
-                                                                                const itemReturns = (order.return_requests || []).flatMap((rr: any) => {
-                                                                                    const matchingItems = (rr.return_items || []).filter((ri: any) => ri.order_item_id === item.id);
-                                                                                    return matchingItems.map((ri: any) => ({
-                                                                                        ...ri,
-                                                                                        requestStatus: rr.status,
-                                                                                        requestId: rr.id,
-                                                                                        createdAt: rr.created_at || rr.returnDate,
-                                                                                    }));
-                                                                                });
 
-                                                                                if (itemReturns.length === 0) return null;
-
-                                                                                const tooltipContent = (
-                                                                                    <div className="space-y-2 text-left p-1 min-w-[220px]">
-                                                                                        <div className="flex items-center gap-1.5 font-bold border-b border-brand-border/30 dark:border-dark-border/30 pb-1.5 text-xs text-brand-dark dark:text-dark-heading">
-                                                                                            <ReturnIcon className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
-                                                                                            <span>Histórico de Devolução / Troca</span>
-                                                                                        </div>
-                                                                                        <div className="space-y-2 divide-y divide-brand-border/20 dark:divide-dark-border/20 text-xs">
-                                                                                            {itemReturns.map((ret: any, idx: number) => {
-                                                                                                const statusMeta = getReturnStatusMeta(ret.requestStatus);
-                                                                                                return (
-                                                                                                    <div key={idx} className="pt-1.5 first:pt-0 space-y-1">
-                                                                                                        <div className="flex items-center justify-between gap-2">
-                                                                                                            <span className="font-mono text-[10px] bg-white/70 dark:bg-black/30 px-1.5 py-0.5 rounded border border-brand-border/50 dark:border-dark-border">
-                                                                                                                DVL-{ret.requestId.slice(0, 6).toUpperCase()}
-                                                                                                            </span>
-                                                                                                            <Badge variant={statusMeta.variant} className="scale-90 font-medium">
-                                                                                                                {statusMeta.label}
-                                                                                                            </Badge>
-                                                                                                        </div>
-                                                                                                        <div className="text-[11px] text-brand-inactive-text dark:text-dark-body space-y-0.5">
-                                                                                                            <p><strong>Quantidade:</strong> {formatQuantityWithUnit(ret.quantity, ret.unit || item.products?.unit)}</p>
-                                                                                                            <p><strong>Condição:</strong> {formatReturnConditionLabel(ret.condition)}</p>
-                                                                                                            <p><strong>Motivo:</strong> {formatReturnReasonLabel(ret.reason)}</p>
-                                                                                                        </div>
-                                                                                                    </div>
-                                                                                                );
-                                                                                            })}
-                                                                                        </div>
-                                                                                    </div>
-                                                                                );
-
-                                                                                return (
-                                                                                    <div className="mt-1.5">
-                                                                                        <Tooltip text={tooltipContent}>
-                                                                                            <Badge variant="purple" icon={<ReturnIcon className="w-3 h-3" />} className="scale-90 whitespace-nowrap cursor-pointer hover:opacity-90">
-                                                                                                {itemReturns.length > 1 ? `Devolução / Troca (${itemReturns.length})` : "Devolução / Troca"}
-                                                                                            </Badge>
-                                                                                        </Tooltip>
-                                                                                    </div>
-                                                                                );
-                                                                            })()}
                                                                         </div>
                                                                     </div>
                                                                 );
@@ -1445,61 +1441,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                             </span>
                                                                         </div>
 
-                                                                        {/* Return History for this item */}
-                                                                        {(() => {
-                                                                            const itemReturns = (order.return_requests || []).flatMap((rr: any) => {
-                                                                                const matchingItems = (rr.return_items || []).filter((ri: any) => ri.order_item_id === item.id);
-                                                                                return matchingItems.map((ri: any) => ({
-                                                                                    ...ri,
-                                                                                    requestStatus: rr.status,
-                                                                                    requestId: rr.id,
-                                                                                    createdAt: rr.created_at || rr.returnDate,
-                                                                                }));
-                                                                            });
 
-                                                                            if (itemReturns.length === 0) return null;
-
-                                                                            const tooltipContentMobile = (
-                                                                                <div className="space-y-2 text-left p-1 min-w-[220px]">
-                                                                                    <div className="flex items-center gap-1.5 font-bold border-b border-brand-border/30 dark:border-dark-border/30 pb-1.5 text-xs text-brand-dark dark:text-dark-heading">
-                                                                                        <ReturnIcon className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
-                                                                                        <span>Histórico de Devolução / Troca</span>
-                                                                                    </div>
-                                                                                    <div className="space-y-2 divide-y divide-brand-border/20 dark:divide-dark-border/20 text-xs">
-                                                                                        {itemReturns.map((ret: any, idx: number) => {
-                                                                                            const statusMeta = getReturnStatusMeta(ret.requestStatus);
-                                                                                            return (
-                                                                                                <div key={idx} className="pt-1.5 first:pt-0 space-y-1">
-                                                                                                    <div className="flex items-center justify-between gap-2">
-                                                                                                        <span className="font-mono text-[10px] bg-white/70 dark:bg-black/30 px-1.5 py-0.5 rounded border border-brand-border/50 dark:border-dark-border">
-                                                                                                            DVL-{ret.requestId.slice(0, 6).toUpperCase()}
-                                                                                                        </span>
-                                                                                                        <Badge variant={statusMeta.variant} className="scale-90 font-medium">
-                                                                                                            {statusMeta.label}
-                                                                                                        </Badge>
-                                                                                                    </div>
-                                                                                                    <div className="text-[11px] text-brand-inactive-text dark:text-dark-body space-y-0.5">
-                                                                                                        <p><strong>Quantidade:</strong> {formatQuantityWithUnit(ret.quantity, ret.unit || item.products?.unit)}</p>
-                                                                                                        <p><strong>Condição:</strong> {formatReturnConditionLabel(ret.condition)}</p>
-                                                                                                        <p><strong>Motivo:</strong> {formatReturnReasonLabel(ret.reason)}</p>
-                                                                                                    </div>
-                                                                                                </div>
-                                                                                            );
-                                                                                        })}
-                                                                                    </div>
-                                                                                </div>
-                                                                            );
-
-                                                                            return (
-                                                                                <div className="mt-1.5">
-                                                                                    <Tooltip text={tooltipContentMobile}>
-                                                                                        <Badge variant="purple" icon={<ReturnIcon className="w-3 h-3" />} className="scale-90 whitespace-nowrap cursor-pointer hover:opacity-90">
-                                                                                            {itemReturns.length > 1 ? `Devolução / Troca (${itemReturns.length})` : "Devolução / Troca"}
-                                                                                        </Badge>
-                                                                                    </Tooltip>
-                                                                                </div>
-                                                                            );
-                                                                        })()}
                                                                     </div>
                                                                 </div>
                                                             );

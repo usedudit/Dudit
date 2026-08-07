@@ -24,7 +24,7 @@ import { cachedListActivePromotionsForMarketplaceAction } from "@/lib/cache/chec
 import {
   buildFulfillmentPayload,
 } from "@/lib/services/marketplace-cart-resolver"
-import { cachedResolveCheckoutCartLines } from "@/lib/cache/checkout-cache"
+import { resolveCheckoutCartLinesFresh } from "@/lib/cache/checkout-cache"
 import { fulfillMarketplaceOrder } from "@/lib/services/marketplace-checkout-fulfillment"
 
 export type MarketplaceCheckoutPricingSnapshot = {
@@ -711,7 +711,7 @@ export async function checkoutCartAction(
     ),
   )
 
-  const resolved = await cachedResolveCheckoutCartLines(adminClient, user.id, cartItemIds)
+  const resolved = await resolveCheckoutCartLinesFresh(adminClient, user.id, cartItemIds)
   if (!resolved.success) return { error: resolved.error }
 
   const { lines: resolvedLines, partnerId, hasProducts, hasDeliveryLines } = resolved
