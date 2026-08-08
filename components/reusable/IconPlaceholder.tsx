@@ -8,8 +8,8 @@ interface IconPlaceholderProps {
   icon?: React.ElementType
   imageSrc?: string
   imageAlt?: string
-  title?: string
-  subtitle?: string
+  title?: React.ReactNode
+  subtitle?: React.ReactNode
   containerSize?: string
   iconSize?: string
   imageClass?: string

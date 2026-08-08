@@ -22,7 +22,9 @@ export default function HelpSidebar({
         "boas-vindas": true,
         "login-registro": true,
         "vendas": true,
-        "produtos-estoque": true
+        "produtos-estoque": true,
+        "servicos": true,
+        "clientes": true
     })
 
     const toggleCategory = (id: string) => {
@@ -44,6 +46,8 @@ export default function HelpSidebar({
         if (id === "vendas") return "🛒"
         if (id === "financeiro") return "💰"
         if (id === "produtos-estoque") return "📦"
+        if (id === "servicos") return "🛠️"
+        if (id === "clientes") return "👥"
         return "📁"
     }
 

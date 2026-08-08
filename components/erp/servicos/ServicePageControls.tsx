@@ -202,6 +202,7 @@ const ServicePageControls: React.FC<ServicePageControlsProps> = ({
                             }
                             align="right"
                             showChevron={false}
+                            className="w-fit"
                         >
                             <DropdownItem onClick={onOpenImport}>
                                 <UploadIcon size={14} /> Importar XML

@@ -30,7 +30,6 @@ import { getMarketplaceCategoriesClient, getMarketplaceServiceCategoriesClient, 
 import { ExplorarMobileControls } from "./ExplorarMobileControls"
 import { ExplorarHeaderSection } from "./ExplorarHeaderSection"
 import { ExplorarViewControls } from "./ExplorarViewControls"
-import { ExplorarFilterSidebar } from "./ExplorarFilterSidebar"
 import { ExplorarFiltersBottomSheet } from "./ExplorarFiltersBottomSheet"
 import { ExplorarSortBottomSheet } from "./ExplorarSortBottomSheet"
 import { ExploreContentSkeleton } from "./explorar-skeleton"
@@ -174,8 +173,6 @@ export function ExplorarPageClient({
             }
         })
     }, [])
-
-    const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
     // Modal states
     const [isCityModalOpen, setIsCityModalOpen] = useState(false)
@@ -852,40 +849,123 @@ export function ExplorarPageClient({
     }, [query, currentType, selectedCategories, selectedCitySlug, selectedSection])
 
     const emptySubtitle = useMemo(() => {
-        const cityNameOnly = selectedCitySlug ? formatCitySlug(selectedCitySlug).split(" - ")[0] : ""
-        const term = query || (selectedCategories.length > 0 ? selectedCategories[0] : "")
+        const cityNameOnly = selectedCitySlug
+            ? formatCitySlug(selectedCitySlug).split(" - ")[0]
+            : ""
+
+        const term =
+            query || (selectedCategories.length > 0 ? selectedCategories[0] : "")
+
         if (term) {
-            return `Ainda não encontramos resultados para <strong class='text-brand-dark'>"${term}"</strong> em <strong class='text-brand-dark'>${cityNameOnly}</strong>. Conhece alguém que vende? Convide pra Dudit!`
+            return (
+                <>
+                    Ainda não encontramos resultados para{" "}
+                    <strong className="text-brand-dark">"{term}"</strong> em{" "}
+                    <strong className="text-brand-dark">{cityNameOnly}</strong>.
+                    Conhece alguém que vende? Convide pra Dudit!
+                </>
+            )
         }
+
         if (currentType === "produtos") {
-            return `Nenhum produto cadastrado em <strong class='text-brand-dark'>${cityNameOnly}</strong> ainda. Seja o primeiro a vender aqui - é gratuito e sem comissão!`
+            return (
+                <>
+                    Nenhum produto cadastrado em{" "}
+                    <strong className="text-brand-dark">{cityNameOnly}</strong> ainda.
+                    Seja o primeiro a vender aqui - é gratuito e sem comissão!
+                </>
+            )
         }
+
         if (currentType === "servicos") {
-            return `Nenhum serviço cadastrado em <strong class='text-brand-dark'>${cityNameOnly}</strong> ainda. Seja o primeiro a oferecer seus serviços - é gratuito e sem comissão!`
+            return (
+                <>
+                    Nenhum serviço cadastrado em{" "}
+                    <strong className="text-brand-dark">{cityNameOnly}</strong> ainda.
+                    Seja o primeiro a oferecer seus serviços - é gratuito e sem comissão!
+                </>
+            )
         }
+
         if (currentType === "planos") {
-            return `Nenhum plano recorrente cadastrado em <strong class='text-brand-dark'>${cityNameOnly}</strong> ainda. Seja o primeiro a oferecer assinaturas - é gratuito e sem comissão!`
+            return (
+                <>
+                    Nenhum plano recorrente cadastrado em{" "}
+                    <strong className="text-brand-dark">{cityNameOnly}</strong> ainda.
+                    Seja o primeiro a oferecer assinaturas - é gratuito e sem comissão!
+                </>
+            )
         }
+
         if (currentType === "vitrines") {
-            return `Nenhuma loja cadastrada em <strong class='text-brand-dark'>${cityNameOnly}</strong> ainda. Crie sua vitrine - é gratuito e sem comissão!`
+            return (
+                <>
+                    Nenhuma loja cadastrada em{" "}
+                    <strong className="text-brand-dark">{cityNameOnly}</strong> ainda.
+                    Crie sua vitrine - é gratuito e sem comissão!
+                </>
+            )
         }
+
         if (currentType === "negocios") {
-            return `Nenhum negócio cadastrado em <strong class='text-brand-dark'>${cityNameOnly}</strong> ainda. Seja o primeiro a vender aqui - é gratuito e sem comissão!`
+            return (
+                <>
+                    Nenhum negócio cadastrado em{" "}
+                    <strong className="text-brand-dark">{cityNameOnly}</strong> ainda.
+                    Seja o primeiro a vender aqui - é gratuito e sem comissão!
+                </>
+            )
         }
+
         if (currentType === "bem-avaliados") {
-            return `Nenhum item bem avaliado cadastrado em <strong class='text-brand-dark'>${cityNameOnly}</strong> ainda. Seja o primeiro a vender aqui - é gratuito e sem comissão!`
+            return (
+                <>
+                    Nenhum item bem avaliado cadastrado em{" "}
+                    <strong className="text-brand-dark">{cityNameOnly}</strong> ainda.
+                    Seja o primeiro a vender aqui - é gratuito e sem comissão!
+                </>
+            )
         }
+
         if (currentType === "em-oferta") {
-            return `Nenhum item em oferta cadastrado em <strong class='text-brand-dark'>${cityNameOnly}</strong> ainda. Seja o primeiro a vender aqui - é gratuito e sem comissão!`
+            return (
+                <>
+                    Nenhum item em oferta cadastrado em{" "}
+                    <strong className="text-brand-dark">{cityNameOnly}</strong> ainda.
+                    Seja o primeiro a vender aqui - é gratuito e sem comissão!
+                </>
+            )
         }
+
         if (currentType === "em-alta") {
-            return `Nenhum item em alta cadastrado em <strong class='text-brand-dark'>${cityNameOnly}</strong> ainda. Seja o primeiro a vender aqui - é gratuito e sem comissão!`
+            return (
+                <>
+                    Nenhum item em alta cadastrado em{" "}
+                    <strong className="text-brand-dark">{cityNameOnly}</strong> ainda.
+                    Seja o primeiro a vender aqui - é gratuito e sem comissão!
+                </>
+            )
         }
+
         if (currentType === "novos-anunciados") {
-            return `Nenhum item novo cadastrado em <strong class='text-brand-dark'>${cityNameOnly}</strong> ainda. Seja o primeiro a vender aqui - é gratuito e sem comissão!`
+            return (
+                <>
+                    Nenhum item novo cadastrado em{" "}
+                    <strong className="text-brand-dark">{cityNameOnly}</strong> ainda.
+                    Seja o primeiro a vender aqui - é gratuito e sem comissão!
+                </>
+            )
         }
-        return `Nenhum vendedor cadastrado em <strong class='text-brand-dark'>${cityNameOnly}</strong> ainda. Seja o primeiro ou convide quem você conhece!`
+
+        return (
+            <>
+                Nenhum vendedor cadastrado em{" "}
+                <strong className="text-brand-dark">{cityNameOnly}</strong> ainda.
+                Seja o primeiro ou convide quem você conhece!
+            </>
+        )
     }, [currentType, selectedCitySlug, query, selectedCategories])
+
 
     const handleInvite = useCallback(() => {
         const cityNameOnly = selectedCitySlug ? formatCitySlug(selectedCitySlug).split(" - ")[0] : ""
@@ -1306,272 +1386,234 @@ export function ExplorarPageClient({
                     {/* ─── CATEGORY DISCOVERY SECTIONS ─── */}
                     {renderCategoryDiscoverSections()}
 
-                    <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-                        {/* SIDEBAR (Desktop only) - contextualizado */}
-                        <ExplorarFilterSidebar
-                            userProfile={userProfile}
-                            selectedCitySlug={selectedCitySlug}
-                            formatCitySlug={formatCitySlug}
-                            onCitySelect={() => setIsCityModalOpen(true)}
-                            currentType={currentType}
-                            typeOptions={[
-                                { value: "tudo", label: "Tudo" },
-                                { value: "produtos", label: "Produtos" },
-                                { value: "servicos", label: "Serviços" },
-                                { value: "negocios", label: "Negócios" },
-                                { value: "bem-avaliados", label: "Bem avaliados" },
-                                { value: "em-oferta", label: "Em oferta" },
-                                { value: "em-alta", label: "Em alta" },
-                                { value: "novos-anunciados", label: "Novos anunciados" },
-                                { value: "planos", label: "Assinaturas" },
-                                { value: "vitrines", label: "Lojas" },
-                            ]}
-                            onTypeChange={handleTypeChange}
-                            activeCategoriesList={activeCategoriesList}
-                            selectedCategories={selectedCategories}
-                            onToggleCategory={toggleCategory}
-                            selectedRadius={selectedRadius}
-                            onRadiusChange={handleRadiusChange}
-                            minPrice={minPrice}
-                            onMinPriceChange={setMinPrice}
-                            maxPrice={maxPrice}
-                            onMaxPriceChange={setMaxPrice}
-                            sortBy={sortBy}
-                            sortOptions={contextualSortOptions}
-                            onSortChange={(val) => setSortBy(val as any)}
-                            promoOn={promoOn}
-                            onPromoToggle={() => setPromoOn(!promoOn)}
-                            activeFiltersCount={activeFiltersCount}
-                            onClearFilters={clearFilters}
-                            filterConfig={filterConfig}
-                            pageMode={pageMode}
-                            sectionId={selectedSection}
-                            collapsed={sidebarCollapsed}
-                        />
+                    <div className="min-w-0 flex-1">
+                        {/* Title Section - ABOVE BANNER */}
+                        {!isLandingPage && (
+                            <ExplorarHeaderSection
+                                title={pageTitle}
+                                resultsCount={filteredResults.length}
+                                showBackButton={!!query || !!selectedSection}
+                                onBack={() => {
+                                    if (selectedSection) {
+                                        setSelectedSection(null)
+                                        updateUrl(selectedCitySlug, selectedCategories, query, currentType, selectedRadius, null)
+                                    } else {
+                                        router.back()
+                                    }
+                                }}
+                            />
+                        )}
 
-                        <div className="min-w-0 flex-1">
-                            {/* Title Section - ABOVE BANNER */}
-                            {!isLandingPage && (
-                                <ExplorarHeaderSection
-                                    title={pageTitle}
-                                    resultsCount={filteredResults.length}
-                                    showBackButton={!!query || !!selectedSection}
-                                    onBack={() => {
-                                        if (selectedSection) {
-                                            setSelectedSection(null)
-                                            updateUrl(selectedCitySlug, selectedCategories, query, currentType, selectedRadius, null)
-                                        } else {
-                                            router.back()
-                                        }
-                                    }}
-                                />
-                            )}
-
-                            {/* Sponsored Ad Banner */}
-                            {exploreAds.length > 0 && (
-                                <div className="mb-6 rounded-lg overflow-hidden bg-gradient-to-r from-gray-100 to-gray-50 aspect-[16/5] lg:max-w-[900px]">
-                                    <div className="w-full h-full flex items-center justify-center cursor-pointer">
-                                        {exploreAds[0]?.image_url ? (
-                                            <img
-                                                src={exploreAds[0].image_url}
-                                                alt="Patrocinado"
-                                                className="w-full h-full object-cover"
-                                                onClick={() => {
-                                                    if (exploreAds[0]?.destination_url) {
-                                                        window.open(exploreAds[0].destination_url, "_blank")
-                                                    }
-                                                }}
-                                            />
-                                        ) : (
-                                            <div className="text-center text-brand-inactive-text">
-                                                <p className="text-sm font-bold">Anúncio Patrocinado</p>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-
-                            <div
-                                key={`${currentType}-${selectedCategories.join(",")}-${selectedCitySlug}-${isLoading || (isFetching && !isFetchingNextPage)}`}
-                                style={{ animation: 'fadeIn 0.2s ease-out' }}
-                            >
-                                {isLoading || (isFetching && !isFetchingNextPage) ? (
-                                    <ExploreContentSkeleton type={currentType} hasSection={!!selectedSection} />
-                                ) : !selectedCitySlug ? (
-                                    <div className="flex justify-center">
-                                        <IconPlaceholder
-                                            placeholderType="image"
-                                            imageSrc="https://img.dudit.com.br/static/mascots/OndeVoceEsta.png"
-                                            imageAlt="Onde você está?"
-                                            title="Onde você está?"
-                                            subtitle="Para encontrar os melhores produtos, serviços e negócios locais pertinho de você, precisamos saber a sua localização."
-                                            itemButton={{
-                                                text: "Escolher Cidade",
-                                                action: () => {
-                                                    setIsCityModalOpen(true)
-                                                },
-                                                variant: "default"
+                        {/* Sponsored Ad Banner */}
+                        {exploreAds.length > 0 && (
+                            <div className="mb-6 rounded-lg overflow-hidden bg-gradient-to-r from-gray-100 to-gray-50 aspect-[16/5] lg:max-w-[900px]">
+                                <div className="w-full h-full flex items-center justify-center cursor-pointer">
+                                    {exploreAds[0]?.image_url ? (
+                                        <img
+                                            src={exploreAds[0].image_url}
+                                            alt="Patrocinado"
+                                            className="w-full h-full object-cover"
+                                            onClick={() => {
+                                                if (exploreAds[0]?.destination_url) {
+                                                    window.open(exploreAds[0].destination_url, "_blank")
+                                                }
                                             }}
                                         />
-                                    </div>
-                                ) : rawItems.length === 0 && !isCategoryMode ? (
-                                    <div className="flex justify-center">
-                                        <IconPlaceholder
-                                            placeholderType="image"
-                                            imageSrc="https://img.dudit.com.br/static/mascots/EstamosChegando.png"
-                                            imageAlt="Estamos Chegando!"
-                                            title="Estamos Chegando!"
-                                            subtitle={emptySubtitle}
-                                            buttons={[
-                                                {
-                                                    text: "Eu vendo algo",
-                                                    action: () => {
-                                                        router.push(userProfile ? "/erp/switch" : "/auth/login?mode=partner")
-                                                    },
-                                                    variant: "default"
-                                                },
-                                                {
-                                                    text: "Conheço quem vende",
-                                                    action: handleInvite,
-                                                    variant: "outline"
-                                                }
-                                            ]}
-                                        />
-                                    </div>
-                                ) : isLandingPage ? (
-                                    <div className="space-y-12">
-                                        {/* Landing page content */}
-                                    </div>
-                                ) : (
-                                    <>
-                                        {/* Carrossel de Lojas Locais na Busca */}
-                                        {!!query && currentType === 'tudo' && vitrinesDestaque.length > 0 && (
-                                            <div className="mb-6">
-                                                <HorizontalCarousel
-                                                    title="Lojas encontradas"
-                                                    items={vitrinesDestaque}
-                                                    renderItem={(vitrine) => (
-                                                        <VitrineCard key={vitrine.id} vitrine={vitrine} hideCity={!!selectedCitySlug} className="w-full" />
-                                                    )}
-                                                    onSeeAll={() => {
-                                                        setCurrentType("vitrines")
-                                                        updateUrl(selectedCitySlug, selectedCategories, query, "vitrines")
-                                                    }}
-                                                    itemWidthClass="w-[270px] sm:w-[320px]"
-                                                />
-                                            </div>
-                                        )}
-
-                                        {/* Carrossel de Lojas Distantes na Busca */}
-                                        {!!query && currentType === 'tudo' && moreDistantSellers.length > 0 && (
-                                            <div className="mb-6">
-                                                <HorizontalCarousel
-                                                    title="Lojas um pouco mais distantes do seu raio de busca"
-                                                    items={moreDistantSellers}
-                                                    renderItem={(vitrine) => (
-                                                        <VitrineCard key={vitrine.id} vitrine={vitrine} hideCity={false} className="w-full" />
-                                                    )}
-                                                    onSeeAll={() => {
-                                                        const stateSlug = userProfile?.state ? `estado-${userProfile.state.toLowerCase()}` : "brasil"
-                                                        setSelectedCitySlug(stateSlug)
-                                                        setCurrentType("vitrines")
-                                                        updateUrl(stateSlug, selectedCategories, query, "vitrines")
-                                                    }}
-                                                    itemWidthClass="w-[270px] sm:w-[320px]"
-                                                />
-                                            </div>
-                                        )}
-
-                                        {/* View Controls and Results */}
-                                        <ExplorarViewControls
-                                            viewMode={viewMode}
-                                            onViewModeChange={setViewMode}
-                                            sidebarCollapsed={sidebarCollapsed}
-                                            onToggleFilters={() => setSidebarCollapsed(prev => !prev)}
-                                            activeFilterChips={activeFilterChips}
-                                        />
-
-
-                                        {filteredResults.length === 0 && !hasNextPage ? (
-                                            <div className="py-12 flex flex-col items-center">
-                                                <IconPlaceholder
-                                                    placeholderType="image"
-                                                    imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
-                                                    imageAlt="Nada encontrado"
-                                                    title="Nada encontrado"
-                                                    subtitle="Ainda não temos itens nessa cidade ou com essa combinação de filtros. Tente limpar os filtros ou trocar a cidade."
-                                                />
-                                                {activeFiltersCount > 0 && (
-                                                    <button
-                                                        onClick={clearFilters}
-                                                        className="mt-6 px-6 py-2.5 bg-brand-green text-white font-bold rounded-xl text-xs shadow-md hover:bg-brand-dark transition-colors duration-200 select-none cursor-pointer"
-                                                    >
-                                                        Limpar filtros
-                                                    </button>
-                                                )}
-                                            </div>
-                                        ) : (
-                                            <div className={viewMode === "grid"
-                                                ? `grid ${currentType === 'vitrines' ? 'grid-cols sm:grid-cols-2 md:grid-cols-3' : 'grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'} gap-3 md:gap-4 lg:gap-6 mt-4`
-                                                : "rounded-lg border border-gray-100 bg-white mt-4"
-                                            }>
-                                                {filteredResults.map((item, index) => {
-                                                    const resultNode = renderListingItem(item)
-                                                    const shouldInjectSearchAds = !!query && searchAds.length > 0 && index === 5
-
-                                                    if (!shouldInjectSearchAds) return resultNode
-
-                                                    return (
-                                                        <Fragment key={`result-with-ads-${item.id}`}>
-                                                            {resultNode}
-                                                            <SponsoredAdsSearchInline ads={searchAds} />
-                                                        </Fragment>
-                                                    )
-                                                })}
-
-                                                {hasNextPage && (
-                                                    <div
-                                                        ref={observerTarget}
-                                                        className={viewMode === "grid" ? "col-span-full py-12 flex flex-col items-center justify-center min-h-[120px]" : "py-12 flex flex-col items-center justify-center min-h-[120px]"}
-                                                    >
-                                                        {isFetchingNextPage ? (
-                                                            <div className="flex flex-col items-center gap-2 animate-pulse">
-                                                                <SkeletonLoader height={24} width={180} />
-                                                                <span className="text-[11px] font-bold text-brand-inactive-text">Carregando mais opcoes...</span>
-                                                            </div>
-                                                        ) : null}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-
-                                        {/* Carrossel de Itens Distantes na Busca */}
-                                        {!!query && moreDistantItems.length > 0 && (
-                                            <div className="mt-12 pt-8 border-t border-gray-100">
-                                                <HorizontalCarousel
-                                                    title="Um pouco mais distantes do seu raio de busca"
-                                                    items={moreDistantItems}
-                                                    renderItem={(item) => (
-                                                        <ItemCard
-                                                            key={item.id}
-                                                            product={item}
-                                                            userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null}
-                                                            className="w-full"
-                                                        />
-                                                    )}
-                                                    onSeeAll={() => {
-                                                        const stateSlug = userProfile?.state ? `estado-${userProfile.state.toLowerCase()}` : "brasil"
-                                                        setSelectedCitySlug(stateSlug)
-                                                        updateUrl(stateSlug, selectedCategories, query, currentType)
-                                                    }}
-                                                    itemWidthClass="w-[190px] sm:w-[210px]"
-                                                />
-                                            </div>
-                                        )}
-                                    </>
-                                )}
-
+                                    ) : (
+                                        <div className="text-center text-brand-inactive-text">
+                                            <p className="text-sm font-bold">Anúncio Patrocinado</p>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
+                        )}
+
+                        <div
+                            key={`${currentType}-${selectedCategories.join(",")}-${selectedCitySlug}-${isLoading || (isFetching && !isFetchingNextPage)}`}
+                            style={{ animation: 'fadeIn 0.2s ease-out' }}
+                        >
+                            {isLoading || (isFetching && !isFetchingNextPage) ? (
+                                <ExploreContentSkeleton type={currentType} hasSection={!!selectedSection} />
+                            ) : !selectedCitySlug ? (
+                                <div className="flex justify-center">
+                                    <IconPlaceholder
+                                        placeholderType="image"
+                                        imageSrc="https://img.dudit.com.br/static/mascots/OndeVoceEsta.png"
+                                        imageAlt="Onde você está?"
+                                        title="Onde você está?"
+                                        subtitle="Para encontrar os melhores produtos, serviços e negócios locais pertinho de você, precisamos saber a sua localização."
+                                        itemButton={{
+                                            text: "Escolher Cidade",
+                                            action: () => {
+                                                setIsCityModalOpen(true)
+                                            },
+                                            variant: "default"
+                                        }}
+                                    />
+                                </div>
+                            ) : rawItems.length === 0 && !isCategoryMode ? (
+                                <div className="flex justify-center">
+                                    <IconPlaceholder
+                                        placeholderType="image"
+                                        imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                                        imageAlt="Não temos nada assim ainda!"
+                                        title="Não temos nada assim ainda!"
+                                        subtitle={emptySubtitle}
+                                        buttons={[
+                                            {
+                                                text: "Eu vendo algo",
+                                                action: () => {
+                                                    router.push(userProfile ? "/erp/switch" : "/auth/login?mode=partner")
+                                                },
+                                                variant: "default"
+                                            },
+                                            {
+                                                text: "Conheço quem vende",
+                                                action: handleInvite,
+                                                variant: "outline"
+                                            }
+                                        ]}
+                                    />
+                                </div>
+                            ) : isLandingPage ? (
+                                <div className="space-y-12">
+                                    {/* Landing page content */}
+                                </div>
+                            ) : (
+                                <>
+                                    {/* Carrossel de Lojas Locais na Busca */}
+                                    {!!query && currentType === 'tudo' && vitrinesDestaque.length > 0 && (
+                                        <div className="mb-6">
+                                            <HorizontalCarousel
+                                                title="Lojas encontradas"
+                                                items={vitrinesDestaque}
+                                                renderItem={(vitrine) => (
+                                                    <VitrineCard key={vitrine.id} vitrine={vitrine} hideCity={!!selectedCitySlug} className="w-full" />
+                                                )}
+                                                onSeeAll={() => {
+                                                    setCurrentType("vitrines")
+                                                    updateUrl(selectedCitySlug, selectedCategories, query, "vitrines")
+                                                }}
+                                                itemWidthClass="w-[270px] sm:w-[320px]"
+                                            />
+                                        </div>
+                                    )}
+
+                                    {/* Carrossel de Lojas Distantes na Busca */}
+                                    {!!query && currentType === 'tudo' && moreDistantSellers.length > 0 && (
+                                        <div className="mb-6">
+                                            <HorizontalCarousel
+                                                title="Lojas um pouco mais distantes do seu raio de busca"
+                                                items={moreDistantSellers}
+                                                renderItem={(vitrine) => (
+                                                    <VitrineCard key={vitrine.id} vitrine={vitrine} hideCity={false} className="w-full" />
+                                                )}
+                                                onSeeAll={() => {
+                                                    const stateSlug = userProfile?.state ? `estado-${userProfile.state.toLowerCase()}` : "brasil"
+                                                    setSelectedCitySlug(stateSlug)
+                                                    setCurrentType("vitrines")
+                                                    updateUrl(stateSlug, selectedCategories, query, "vitrines")
+                                                }}
+                                                itemWidthClass="w-[270px] sm:w-[320px]"
+                                            />
+                                        </div>
+                                    )}
+
+                                    {/* View Controls and Results */}
+                                    <ExplorarViewControls
+                                        viewMode={viewMode}
+                                        onViewModeChange={setViewMode}
+                                        onOpenFilters={() => setIsFiltersBottomSheetOpen(true)}
+                                        hasActiveFilters={activeFiltersCount > 0}
+                                        activeFilterChips={activeFilterChips}
+                                    />
+
+
+                                    {filteredResults.length === 0 && !hasNextPage ? (
+                                        <div className="py-12 flex flex-col items-center">
+                                            <IconPlaceholder
+                                                placeholderType="image"
+                                                imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                                                imageAlt="Não temos nada assim ainda!"
+                                                title="Não temos nada assim ainda!"
+                                                subtitle="Ainda não temos itens nessa cidade ou com essa combinação de filtros. Que tal limpar os filtros?"
+                                                buttons={[
+                                                    {
+                                                        text: "Eu vendo algo",
+                                                        action: () => {
+                                                            router.push(userProfile ? "/erp/switch" : "/auth/login?mode=partner")
+                                                        },
+                                                        variant: "default"
+                                                    },
+                                                    {
+                                                        text: "Conheço quem vende",
+                                                        action: handleInvite,
+                                                        variant: "outline"
+                                                    }
+                                                ]}
+                                            />
+                                        </div>
+                                    ) : (
+                                        <div className={viewMode === "grid"
+                                            ? `grid ${currentType === 'vitrines' ? 'grid-cols sm:grid-cols-2 md:grid-cols-3' : 'grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'} gap-3 md:gap-4 lg:gap-6 mt-4`
+                                            : "rounded-lg border border-gray-100 bg-white mt-4"
+                                        }>
+                                            {filteredResults.map((item, index) => {
+                                                const resultNode = renderListingItem(item)
+                                                const shouldInjectSearchAds = !!query && searchAds.length > 0 && index === 5
+
+                                                if (!shouldInjectSearchAds) return resultNode
+
+                                                return (
+                                                    <Fragment key={`result-with-ads-${item.id}`}>
+                                                        {resultNode}
+                                                        <SponsoredAdsSearchInline ads={searchAds} />
+                                                    </Fragment>
+                                                )
+                                            })}
+
+                                            {hasNextPage && (
+                                                <div
+                                                    ref={observerTarget}
+                                                    className={viewMode === "grid" ? "col-span-full py-12 flex flex-col items-center justify-center min-h-[120px]" : "py-12 flex flex-col items-center justify-center min-h-[120px]"}
+                                                >
+                                                    {isFetchingNextPage ? (
+                                                        <div className="flex flex-col items-center gap-2 animate-pulse">
+                                                            <SkeletonLoader height={24} width={180} />
+                                                            <span className="text-[11px] font-bold text-brand-inactive-text">Carregando mais opcoes...</span>
+                                                        </div>
+                                                    ) : null}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Carrossel de Itens Distantes na Busca */}
+                                    {!!query && moreDistantItems.length > 0 && (
+                                        <div className="mt-12 pt-8 border-t border-gray-100">
+                                            <HorizontalCarousel
+                                                title="Um pouco mais distantes do seu raio de busca"
+                                                items={moreDistantItems}
+                                                renderItem={(item) => (
+                                                    <ItemCard
+                                                        key={item.id}
+                                                        product={item}
+                                                        userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null}
+                                                        className="w-full"
+                                                    />
+                                                )}
+                                                onSeeAll={() => {
+                                                    const stateSlug = userProfile?.state ? `estado-${userProfile.state.toLowerCase()}` : "brasil"
+                                                    setSelectedCitySlug(stateSlug)
+                                                    updateUrl(stateSlug, selectedCategories, query, currentType)
+                                                }}
+                                                itemWidthClass="w-[190px] sm:w-[210px]"
+                                            />
+                                        </div>
+                                    )}
+                                </>
+                            )}
+
                         </div>
                     </div>
                 </div>

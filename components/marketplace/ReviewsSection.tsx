@@ -130,23 +130,23 @@ export function ReviewsSection({ reviews, showItemInfo = false, className = "" }
 
     return (
         <div className={className}>
-            <div className="border border-brand-border rounded-xl p-5 mb-8 flex gap-8 items-center">
+            <div className="border border-brand-border dark:border-dark-border rounded-xl p-5 mb-8 flex gap-8 items-center">
                 <div className="text-center shrink-0">
-                    <p className="text-5xl font-black text-brand-dark leading-none mb-2">{avgRating.toFixed(1)}</p>
+                    <p className="text-5xl font-black text-brand-dark dark:text-dark-heading leading-none mb-2">{avgRating.toFixed(1)}</p>
                     <div className="flex justify-center mb-1.5"><StarRow rating={avgRating} size={14} /></div>
-                    <p className="text-xs text-brand-inactive-text">Média de {reviews.length} avaliações</p>
+                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">Média de {reviews.length} avaliações</p>
                 </div>
                 <div className="flex-1 space-y-2">
                     {ratingDistribution.map(({ star, count }) => {
                         const pct = reviews.length > 0 ? (count / reviews.length) * 100 : 0
                         return (
                             <div key={star} className="flex items-center gap-2">
-                                <span className="text-xs text-brand-inactive-text w-3 shrink-0">{star}</span>
+                                <span className="text-xs text-brand-inactive-text dark:text-dark-body w-3 shrink-0">{star}</span>
                                 <StarIcon size={10} strokeWidth={0} className="text-brand-inactive-text fill-gray-400 shrink-0" />
-                                <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                <div className="flex-1 h-2 bg-brand-gray dark:bg-dark-border/50 rounded-full overflow-hidden">
                                     <div className="h-full bg-brand-green rounded-full" style={{ width: `${pct}%` }} />
                                 </div>
-                                <span className="text-xs text-brand-inactive-text w-4 text-right shrink-0">{count}</span>
+                                <span className="text-xs text-brand-inactive-text dark:text-dark-body w-4 text-right shrink-0">{count}</span>
                             </div>
                         )
                     })}
@@ -175,10 +175,10 @@ export function ReviewsSection({ reviews, showItemInfo = false, className = "" }
                                 />
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center justify-between gap-2">
-                                        <span className="font-semibold text-sm text-brand-dark truncate">
+                                        <span className="font-semibold text-sm text-brand-dark dark:text-dark-heading truncate">
                                             {rev.profiles?.full_name || "Usuário"}
                                         </span>
-                                        <span className="text-xs text-brand-inactive-text shrink-0">
+                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body shrink-0">
                                             {formatReviewDate(rev.created_at)}
                                         </span>
                                     </div>
@@ -203,13 +203,13 @@ export function ReviewsSection({ reviews, showItemInfo = false, className = "" }
                                     {(() => {
                                         const card = (
                                             <>
-                                                <div className="w-12 h-12 bg-white border border-brand-border rounded-[8px] flex items-center justify-center shrink-0">
+                                                <div className="w-12 h-12 bg-white dark:bg-dark-border/50 border border-brand-border dark:border-dark-border rounded-[8px] flex items-center justify-center shrink-0">
                                                     <img src={itemImage} alt={itemName} className="w-full h-full object-contain mix-blend-multiply rounded-[4px]" />
                                                 </div>
                                                 <div className="flex-1 min-w-0 flex flex-col justify-center">
-                                                    <h4 className="font-bold text-sm text-brand-dark mb-0.5 truncate">{itemName}</h4>
+                                                    <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading mb-0.5 truncate">{itemName}</h4>
                                                     {variantLabel && (
-                                                        <div className="text-xs text-brand-inactive-text mt-0.5 truncate">{variantLabel}</div>
+                                                        <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5 truncate">{variantLabel}</div>
                                                     )}
                                                     {rev.quantity != null && (
                                                         <div className="flex items-center gap-2 text-xs mt-1">

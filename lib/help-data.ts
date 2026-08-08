@@ -1,4 +1,4 @@
-﻿export interface HelpArticle {
+export interface HelpArticle {
     id: string
     title: string
     description: string
@@ -187,7 +187,7 @@ Informe o endereço completo. Digite o **CEP** para preenchimento automático.
 > [!TIP]
 > No campo **Descrição**, use palavras-chave que seus clientes usariam para buscar seus produtos.
 `
-}
+            }
         ]
     },
     {
@@ -3099,6 +3099,1765 @@ Depende do seu plano. Se você tentar cadastrar e atingir o limite, o sistema av
 **Ainda com dúvidas?** Entre em contato com nosso suporte ou consulte o artigo específico sobre o assunto na Central de Ajuda.
 `
             }
+        ]
+    },
+    {
+        id: "servicos",
+        title: "Serviços",
+        icon: "🛠️",
+        articles: [
+            {
+                id: "visao-geral-servicos",
+                title: "Visão geral de Serviços",
+                description: "Entenda o módulo de Serviços: agendamentos, ordens de serviço e catálogo.",
+                slug: "visao-geral-servicos",
+                category: "servicos",
+                content: `
+## Visão geral
+
+O módulo **Serviços** reúne tudo o que você precisa para gerenciar atendimentos presenciais ou técnicos: desde o agendamento do horário com o cliente até a conclusão da ordem de serviço. Ele é composto por três partes que trabalham juntas:
+
+![Tela principal de Serviços](https://img.dudit.com.br/static/screens/Servicos_VisaoGeral.png)
+Legenda: Menu de serviços com acesso rápido a Agendamentos e Ordens de Serviço.
+
+**Agendamentos** — Calendário visual (dia, semana, mês) para marcar horários, escolher cliente, serviço e profissional. Permite recorrência, bloqueio de indisponibilidades e checkout integrado.
+
+**Ordens de Serviço (OS)** — Acompanhamento completo da execução: etapas, responsável, previsão, serviços e produtos utilizados, especificações, anexos e assinatura online.
+
+**Catálogo de Serviços** — Cadastro dos seus serviços com preço, duração, categoria e recursos de estoque. Esses serviços aparecem tanto nos agendamentos quanto nas ordens de serviço.
+
+## Conceitos importantes
+
+**Agendamento vs. Ordem de Serviço**
+- **Agendamento**: foca no horário e na reserva de tempo na agenda do profissional.
+- **Ordem de Serviço**: foca na execução técnica, com etapas, materiais, diagnóstico e conclusão.
+- Um agendamento pode virar uma OS, mas você também pode criar OS direto sem agendamento prévio.
+
+**Profissionais (Equipe)**
+São os colaboradores que executam os serviços. No agendamento, você escolhe quem atende. Na OS, define o responsável.
+
+**Status da Ordem de Serviço**
+A OS passa por etapas até a entrega:
+- **Aberta** → recém-criada, aguardando início
+- **Aprovada** → cliente autorizou, pode começar
+- **Em andamento** → execução em progresso
+- **Aguardando peça** → pausa por falta de material
+- **Concluída** → serviço finalizado
+- **Entregue** → cliente retirou ou recebeu
+- **Cancelada** → não será realizada
+
+**Recursos de estoque nos serviços**
+Ao cadastrar um serviço, você pode vincular produtos que ele costuma consumir (ex: tinta, filtro, peça). Ao usar o serviço em agendamento ou OS, o sistema sugere esses itens para baixar do estoque automaticamente.
+
+## Como acessar
+
+1. No menu lateral, clique em **Serviços**.
+2. Escolha **Agendamentos** ou **Ordens de Serviço**.
+3. No Agendamentos, use as abas **Dia**, **Semana**, **Mês** ou **Lista**.
+4. Na OS, use as abas de status: **Todas**, **Abertas**, **Em Andamento**, **Concluídas**, **Canceladas**.
+
+![Menu lateral destacando Serviços](https://img.dudit.com.br/static/screens/Menu_Servicos.png)
+Legenda: Acesso ao módulo de Serviços pelo menu principal.
+
+## Dicas importantes
+
+- Cadastre seus serviços **antes** de começar a agendar — isso agiliza muito o dia a dia.
+- Configure **categorias de serviço** (ex: "Corte", "Manutenção", "Instalação") para organizar a seleção.
+- Defina **duração realista** nos serviços; o calendário usa isso para mostrar horários disponíveis.
+- Use **indisponibilidades** (férias, manutenção, feriado) para bloquear horários dos profissionais.
+- Na OS, preencha **diagnóstico** e **observações internas** — ajuda na comunicação com a equipe e no histórico.
+
+## Perguntas frequentes
+
+**Qual a diferença entre criar um agendamento e criar uma OS direto?**
+Agendamento é para reservar horário na agenda (cliente vem no horário marcado). OS direta é quando o serviço não depende de horário fixo (ex: equipamento deixado na loja, visita técnica externa).
+
+**Preciso ter agendamento para criar uma OS?**
+Não. Você pode criar uma OS do zero em **Ordens de Serviço > Nova OS**.
+
+**O que são "recursos" de um serviço?**
+São produtos ou materiais que o serviço costuma usar. Ao adicionar o serviço no agendamento ou OS, o sistema sugere esses itens para você confirmar a quantidade e baixar do estoque.
+
+**Posso ter serviços com preço por hora ou por dia?**
+Sim. No cadastro do serviço, a unidade de cobrança pode ser **Por Serviço** (preço fixo), **Por Hora** (preço × horas) ou **Por Dia** (preço × dias).
+
+**A assinatura online da OS funciona como?**
+Disponível a partir do plano Crescer. Você gera um link público da OS, envia para o cliente (WhatsApp/e-mail), ele visualiza e assina digitalmente. A assinatura fica salva na OS.
+`
+            },
+            {
+                id: "cadastro-organizacao-servicos",
+                title: "Cadastro e organização de serviços",
+                description: "Como criar, editar e organizar seus serviços com categorias, preços e duração.",
+                slug: "cadastro-organizacao-servicos",
+                category: "servicos",
+                content: `
+## Visão geral
+
+O **catálogo de serviços** é a base para agendamentos e ordens de serviço. Cada serviço cadastrado fica disponível para seleção rápida, já com preço, duração e categoria definidos.
+
+![Tela de cadastro de serviço](https://img.dudit.com.br/static/screens/Servico_Cadastro.png)
+Legenda: Formulário de cadastro rápido de serviço.
+
+## Quando usar
+
+- Para criar um novo serviço que sua empresa oferece
+- Para ajustar preço, duração ou categoria de um serviço existente
+- Para organizar a lista com categorias e facilitar a busca
+
+## Como fazer
+
+### 1. Acessar o cadastro
+
+Você pode cadastrar serviços de duas formas:
+
+**Opção A — No Agendamento (rápido):**
+1. Em **Agendamentos**, clique em **Novo agendamento**.
+2. Na etapa "Selecionar Serviços", clique no botão **"+"** ao lado da busca.
+3. Preencha o nome, preço e duração. O serviço é salvo no catálogo e já adicionado ao agendamento.
+
+**Opção B — No cadastro completo (recomendado para organizar):**
+1. Em **Agendamentos**, clique no menu **Ações** > **Cadastrar serviço** (ou acesse via OS ao adicionar serviço).
+2. Preencha todas as informações.
+
+### 2. Preencher as informações
+
+**Nome do serviço** (obrigatório): nome claro que o cliente entenda (ex: "Corte de cabelo", "Manutenção de ar condicionado").
+
+**Preço**: valor cobrado pelo serviço.
+
+**Duração (minutos)**: tempo que o serviço leva. O calendário usa isso para calcular horários disponíveis.
+
+**Unidade de cobrança**:
+- **Por Serviço** — preço fixo (padrão)
+- **Por Hora** — preço × horas gastas
+- **Por Dia** — preço × dias de execução
+
+**Categoria**: agrupe por tipo (ex: "Corte", "Barba", "Hidratação", "Manutenção", "Instalação"). Se não existir, crie na hora.
+
+**Buffer (minutos)**: tempo extra entre um atendimento e outro (ex: 10 min para limpeza/preparação).
+
+**Profissional padrão** (opcional): se o serviço sempre é feito pela mesma pessoa.
+
+**Recursos de estoque** (opcional): produtos que o serviço consome. Adicione itens com quantidade. Ex: serviço "Pintura de parede" → recursos: "Tinta branca (2 latas)", "Lixa (1 pacote)".
+
+### 3. Salvar
+
+Clique em **Salvar**. O serviço aparece no catálogo e fica disponível em agendamentos e OS.
+
+## Como organizar com categorias
+
+As categorias aparecem como grupos na seleção de serviços:
+
+1. Ao cadastrar/editar serviço, clique em **Criar nova categoria**.
+2. Digite o nome (ex: "Cabelo", "Barba", "Sobrancelha").
+3. A categoria é criada e selecionada.
+
+> [!TIP]
+> Planeje suas categorias antes de cadastrar muitos serviços. Ex: se é salão, use "Corte", "Química", "Tratamento". Se é assistência técnica, use "Diagnóstico", "Reparo", "Instalação".
+
+## Editando e excluindo
+
+- **Editar**: clique no serviço no catálogo (ou na seleção do agendamento/OS) > ícone de lápis.
+- **Excluir**: menu de ações (três pontos) > **Excluir**. Atenção: se o serviço já foi usado em agendamentos/OS passados, ele fica inativo no catálogo mas o histórico permanece.
+
+## Dicas importantes
+
+- **Duração realista**: evite colocar 30 min se o serviço leva 1 hora. Isso bagunça a agenda.
+- **Buffer**: use para tempos de preparação/limpeza entre clientes.
+- **Recursos de estoque**: cadastre para serviços que sempre usam os mesmos materiais. Agiliza e evita esquecer itens.
+- **Preço por hora/dia**: útil para serviços variáveis (ex: "Consultoria técnica — Por Hora").
+
+## Perguntas frequentes
+
+**Posso cadastrar serviço sem preço?**
+Sim. Deixe o preço como 0 e defina na hora do agendamento/OS (útil para orçamentos personalizados).
+
+**O que acontece se eu excluir uma categoria?**
+Os serviços dessa categoria ficam sem categoria. Você pode reatribuir depois.
+
+**Consigo duplicar um serviço?**
+Não há botão "Duplicar", mas você pode criar um novo copiando as informações.
+
+**Serviço cadastrado no agendamento aparece na OS?**
+Sim. O catálogo é compartilhado entre Agendamentos e Ordens de Serviço.
+`
+            },
+            {
+                id: "agendamentos",
+                title: "Agendamentos",
+                description: "Como criar, editar e organizar agendamentos de serviços.",
+                slug: "agendamentos",
+                category: "servicos",
+                content: `
+## Visão geral
+
+O **Agendamentos** é sua agenda visual de serviços. Você vê dia, semana ou mês, marca horários com clientes e gerencia a disponibilidade dos profissionais.
+
+![Tela de Agendamentos](https://img.dudit.com.br/static/screens/Agendamentos_Calendario.png)
+Legenda: Calendário em visualização semanal com agendamentos coloridos por profissional.
+
+## Quando usar
+
+- Para marcar horário de atendimento com cliente (presencial ou visita)
+- Para bloquear horários de indisponibilidade (férias, manutenção, feriado)
+- Para visualizar a semana da equipe e evitar conflitos
+- Para fazer checkout e receber pagamento no atendimento
+
+## Como fazer
+
+### 1. Criar um agendamento
+
+1. Em **Agendamentos**, clique em **Novo agendamento** (ou clique direto em um horário livre no calendário).
+2. **Serviços**: selecione um ou mais serviços do catálogo. Adicione quantos precisar.
+3. **Cliente**: escolha cliente existente ou crie novo na hora (nome, telefone, e-mail).
+4. **Profissional**: escolha quem vai atender. O calendário mostra só horários livres dele.
+5. **Data e hora**: confirme data, horário de início e fim (baseado na duração dos serviços).
+6. **Recorrência** (opcional): **Não se repete** (padrão), **Diário**, **Semanal**. Defina até quando ou número de ocorrências.
+7. **Observações** (opcional): notas internas ou para o cliente.
+8. Clique em **Salvar agendamento**.
+
+![Fluxo de agendamento](https://img.dudit.com.br/static/screens/Agendamento_Fluxo.png)
+Legenda: Etapas: Serviços → Cliente → Data/Hora → Itens → Resumo.
+
+### 2. Itens de estoque (opcional)
+
+Se os serviços têm **recursos vinculados** (produtos que consomem), a etapa "Itens" abre automaticamente. Confira as quantidades sugeridas, ajuste se precisar e continue.
+
+### 3. Checkout (opcional)
+
+Após salvar, você pode ir direto para o **Checkout** para registrar o pagamento (dinheiro, cartão, PIX, parcelado).
+
+## Visualizações do calendário
+
+- **Dia**: visão detalhada de um dia, horários por profissional
+- **Semana** (padrão): 7 dias, fácil ver a semana toda
+- **Mês**: visão compacta, clique no dia para ver detalhes
+- **Lista**: todos os agendamentos em ordem cronológica
+
+Use os botões no topo para alternar. Clique em **Hoje** para voltar ao dia atual.
+
+## Indisponibilidades (bloquear horários)
+
+Para impedir agendamentos em certos horários:
+
+1. No calendário, clique em **Ações** > **Horário indisponível** (ou clique em horário livre > "Indisponível").
+2. Escolha: **Profissional**, **Data/hora**, **Tipo** (ex: "Férias", "Manutenção", "Feriado", "Almoço").
+3. Para recorrentes (ex: almoço todo dia), use recorrência **Diária** ou **Semanal**.
+
+## Editando, cancelando e reagendando
+
+- **Editar**: clique no agendamento > **Editar**. Altere serviço, cliente, profissional, horário, recorrência.
+- **Cancelar**: clique no agendamento > **Cancelar**. Opcional: notificar cliente e adicionar motivo.
+- **Reagendar**: edite e mude data/hora. Ou arraste o agendamento no calendário (visualização dia/semana) para novo horário.
+
+> [!IMPORTANT]
+> Ao cancelar, o sistema pode notificar o cliente automaticamente (WhatsApp/e-mail) se tiver contato cadastrado.
+
+## Conflitos de horário
+
+O sistema avisa se você tenta marcar sobre outro agendamento do mesmo profissional. Na visualização dia/semana, horários ocupados ficam bloqueados.
+
+## Dicas importantes
+
+- **Configure horário de funcionamento** em Configurações > Horários — o calendário respeita isso.
+- **Use cores dos profissionais** — cada membro da equipe tem cor, facilita visualizar a agenda.
+- **Recorrência para clientes fixos** — cliente que vem toda semana? Crie recorrente semanal.
+- **Indisponibilidade de almoço** — crie recorrente diária "Almoço" para bloquear 12h–13h automaticamente.
+
+## Perguntas frequentes
+
+**Posso agendar sem cliente cadastrado?**
+Sim. Crie o cliente na hora do agendamento (nome + telefone já bastam).
+
+**O que acontece se o profissional não estiver disponível no horário?**
+O sistema não mostra o horário como livre. Se forçar, avisa sobre conflito.
+
+**Consigo ver agendamentos de todos os profissionais junto?**
+Sim. Na visualização Semana/Dia, todos aparecem lado a lado (colunas) ou em lista única.
+
+**Agendamento recorrente pode ter exceções?**
+Sim. Você pode editar/cancelar uma ocorrência específica da série sem afetar as outras.
+
+**O cliente recebe lembrete?**
+Se tiver WhatsApp/e-mail cadastrado, o sistema envia lembrete automático antes do horário.
+`
+            },
+            {
+                id: "gerenciando-agendamentos",
+                title: "Gerenciando agendamentos",
+                description: "Edite, cancele, reagende e acompanhe o status dos seus agendamentos.",
+                slug: "gerenciando-agendamentos",
+                category: "servicos",
+                content: `
+## Visão geral
+
+Depois que o agendamento é criado, você precisa acompanhar o dia a dia: confirmar a presença, reagendar quando o cliente pede, bloquear horários e saber o que já foi atendido.
+
+![Detalhes do agendamento](https://img.dudit.com.br/static/screens/Agendamento_Detalhes.png)
+Legenda: Tela de detalhes com status, histórico e ações.
+
+## Quando usar
+
+- Para confirmar ou cancelar um atendimento
+- Para reagendar um horário (cliente pediu troca de dia/hora)
+- Para registrar que o cliente não compareceu
+- Para bloquear horários de indisponibilidade
+- Para conferir o histórico de um atendimento
+
+## Como fazer
+
+### 1. Abrir um agendamento
+
+Clique no agendamento no calendário (ou na lista) para abrir os detalhes. Você vê:
+- **Cliente**, **serviço(s)**, **profissional**, **data/hora**
+- **Status atual** (Reservado, Concluído, Cancelado, etc.)
+- **Histórico de alterações** (linha do tempo)
+
+### 2. Alterar dados do agendamento
+
+Clique em **Editar** para mudar:
+- Serviço(s) selecionado(s)
+- Cliente
+- Profissional
+- Data/hora
+- Recorrência
+- Observações
+
+O sistema valida conflitos de horário e avisa se o novo horário não está disponível.
+
+### 3. Cancelar um agendamento
+
+1. Abra o agendamento > **Cancelar**.
+2. Opcional: marque **notificar cliente** e adicione o **motivo**.
+3. Confirme.
+
+> [!TIP]
+> Se o cliente só vai trocar de horário, prefira **reagendar** (editar data/hora) em vez de cancelar — mantém o histórico.
+
+### 4. Registrar não comparecimento
+
+Se o cliente não apareceu, use a opção de **ausência** nos status. Isso ajuda a ver no relatório quais atendimentos não foram realizados.
+
+### 5. Bloquear horários (indisponibilidade)
+
+1. Clique em **Ações** > **Horário indisponível**.
+2. Escolha profissional, data/hora e tipo (Férias, Manutenção, Feriado, Almoço).
+3. Para repetir (ex: almoço diário), use recorrência.
+
+### 6. Acompanhar histórico
+
+Na tela de detalhes, a aba **Histórico** mostra tudo que aconteceu com o agendamento: criação, alterações, cancelamentos, com quem e quando.
+
+## Dicas importantes
+
+- **Reagende em vez de cancelar** sempre que possível — preserva o histórico e evita refazer o agendamento do zero.
+- **Use tipos de indisponibilidade** para saber o motivo do bloqueio no calendário (almoço, férias, feriado).
+- **Notifique o cliente** ao cancelar para evitar falta sem aviso e cliente chateado.
+- **Confira o histórico** antes de duplicar um agendamento — evita erros repetidos.
+
+## Perguntas frequentes
+
+**Posso mudar o profissional depois de criar?**
+Sim. Edite o agendamento e troque o profissional. O sistema verifica disponibilidade do novo profissional.
+
+**O que acontece se eu cancelar um agendamento recorrente?**
+Ao abrir o cancelamento, escolha entre cancelar **apenas esta ocorrência** ou **toda a série**.
+
+**Consigo desfazer um cancelamento?**
+Não. Se cancelou por engano, crie um novo agendamento com os mesmos dados.
+
+**Como vejo os agendamentos do dia?**
+Use a visualização **Dia** no calendário, ou filtre a lista por data. Também dá para filtrar por profissional.
+`
+            },
+            {
+                id: "ordens-de-servico",
+                title: "Ordens de serviço",
+                description: "Crie e preencha ordens de serviço com serviços, produtos, especificações e anexos.",
+                slug: "ordens-de-servico",
+                category: "servicos",
+                content: `
+## Visão geral
+
+A **Ordem de Serviço (OS)** é o registro completo de um atendimento técnico ou serviço. Ela reúne o que será feito (serviços), os materiais usados (produtos), informações importantes (especificações, diagnóstico) e os arquivos de apoio (anexos).
+
+![Tela de Ordens de Serviço](https://img.dudit.com.br/static/screens/OS_Listagem.png)
+Legenda: Listagem de OS com abas de status, busca e filtros.
+
+## Quando usar
+
+- Manutenção, conserto ou reparo de equipamentos
+- Serviços de instalação ou montagem
+- Visitas técnicas
+- Serviços que precisam de acompanhamento por etapas
+- Quando o cliente deixa o equipamento/material na loja
+
+## Como criar uma OS
+
+1. Em **Ordens de Serviço**, clique em **Nova OS**.
+2. Preencha as abas abaixo.
+3. Clique em **Criar OS**.
+
+![Formulário de OS](https://img.dudit.com.br/static/screens/OS_Formulario.png)
+Legenda: Formulário dividido em abas: Dados Gerais, Serviços, Produtos, Especificações, Anexos, Observações.
+
+### Aba "Dados Gerais"
+
+- **Título** (obrigatório): resumo do serviço (ex: "Manutenção de ar condicionado")
+- **Descrição**: o que será feito
+- **Diagnóstico**: problema identificado (preencha no início)
+- **Data e hora de abertura** (padrão: agora)
+- **Data prevista de conclusão** + **hora** (prazo estimado)
+- **Status**: inicial (Aberta)
+- **Prioridade**: Baixa, Média, Alta, Urgente
+- **Responsável**: membro da equipe que vai executar
+- **Cliente** (obrigatório): busque ou crie na hora
+
+![Aba Dados Gerais](https://img.dudit.com.br/static/screens/OS_DadosGerais.png)
+Legenda: Campos principais da OS.
+
+### Aba "Serviços" (Mão de obra)
+
+Adicione os serviços executados:
+1. Clique em **Adicionar serviço**.
+2. Busque no catálogo ou **crie um serviço avulso** (nome + preço na hora).
+3. Defina **quantidade** (ex: 2 horas de mão de obra).
+
+Os serviços do catálogo já trazem preço e duração. Serviços avulsos servem para itens que não estão no catálogo.
+
+### Aba "Produtos" (Materiais)
+
+Adicione os produtos/materiais usados:
+1. Clique em **Adicionar produto**.
+2. Busque no catálogo ou **crie um produto avulso** (nome + preço).
+3. Defina **quantidade**.
+
+O sistema verifica o estoque e avisa se o produto está sem estoque (você pode prosseguir com autorização).
+
+### Aba "Especificações"
+
+Adicione campos chave/valor úteis para a execução (ex: "Marca do aparelho: Samsung", "Número de série: XYZ123", "Modelo: Inverter 12000").
+
+1. Clique em **Adicionar especificação**.
+2. Informe **nome** (chave) e **valor**.
+3. Adicione quantas precisar.
+
+![Aba Especificações](https://img.dudit.com.br/static/screens/OS_Especificacoes.png)
+Legenda: Informações técnicas importantes da OS.
+
+### Aba "Anexos"
+
+Anexe arquivos e imagens (fotos do antes/depois, laudos, orçamentos):
+1. Clique em **Adicionar anexo**.
+2. Selecione o arquivo (imagem, PDF, etc.).
+3. Opcional: escolha a **categoria** do anexo.
+
+### Aba "Observações"
+
+- **Observações internas**: notas para a equipe (não aparecem para o cliente).
+- Descontos e cupons também podem ser aplicados aqui (aba de valores no formulário).
+
+## Dicas importantes
+
+- **Preencha o diagnóstico no início** e a descrição da solução no fim — deixa o histórico completo.
+- **Use especificações** para modelos, números de série, garantias — facilita a consulta depois.
+- **Anexe fotos do equipamento** antes de mexer — protege contra reclamações.
+- **Serviços avulsos**: use com moderação. Se repete sempre, cadastre no catálogo.
+- **Campos congelados após pagamento**: depois que a OS é paga, os campos principais ficam bloqueados (só status, prioridade e previsão continuam editáveis).
+
+## Perguntas frequentes
+
+**Posso criar OS sem serviço cadastrado?**
+Sim. Use **serviço avulso** — preencha nome e preço na hora.
+
+**O que significa "Serviço avulso"?**
+É um serviço que não está no catálogo. Você digita o nome e o valor manualmente. Útil para itens pontuais.
+
+**Consigo vincular produtos do estoque na OS?**
+Sim. Na aba Produtos, busque produtos do catálogo. O sistema verifica o estoque automaticamente.
+
+**Como aplico desconto na OS?**
+No formulário, na seção de valores, aplique desconto em valor fixo ou percentual. Também aceita cupom.
+
+**Uma OS pode ter mais de um serviço?**
+Sim. Adicione quantos serviços e produtos precisar. O total é calculado automaticamente.
+`
+            },
+            {
+                id: "acompanhando-finalizando-os",
+                title: "Acompanhando e finalizando ordens de serviço",
+                description: "Atualize status, acompanhe etapas, compartilhe com o cliente e conclua a OS.",
+                slug: "acompanhando-finalizando-os",
+                category: "servicos",
+                content: `
+## Visão geral
+
+Depois de criar a OS, o acompanhamento é feito pela **tela de detalhes**: você atualiza o status conforme a execução avança, vê o histórico, registra a conclusão e, quando disponível, compartilha com o cliente para assinatura online.
+
+![Detalhes da OS](https://img.dudit.com.br/static/screens/OS_Detalhes.png)
+Legenda: Tela de detalhes com timeline de etapas, informações e abas.
+
+## Quando usar
+
+- Para avançar a OS para a próxima etapa (aprovar, iniciar, concluir)
+- Para registrar pausa por falta de peça
+- Para ver se está dentro do prazo
+- Para compartilhar a OS com o cliente (assinatura online)
+- Para finalizar e entregar
+
+## Status da OS (de forma simples)
+
+A OS passa por etapas na ordem. Você só avança uma por vez:
+
+| Etapa | O que significa |
+|---|---|
+| **Aberta** | Recém-criada, aguardando início |
+| **Aguardando aprovação** | Esperando cliente autorizar o orçamento/serviço |
+| **Aprovada** | Cliente autorizou, pode começar |
+| **Em andamento** | Execução em progresso |
+| **Aguardando peça** | Pausa por falta de material/peça |
+| **Concluída** | Serviço finalizado |
+| **Entregue** | Cliente retirou ou recebeu |
+| **Cancelada** | Não será realizada |
+
+## Como atualizar o status
+
+1. Abra a OS.
+2. Clique no **status atual** (ou menu de ações > **Alterar status**).
+3. Escolha o próximo status disponível (o sistema mostra só os permitidos).
+4. Confirme.
+
+![Alteração de status](https://img.dudit.com.br/static/screens/OS_Status.png)
+Legenda: Escolha o próximo status da OS.
+
+> [!TIP]
+> **Em andamento → Aguardando peça**: use quando parar por falta de material. Volte para **Em andamento** quando a peça chegar.
+
+## Acompanhamento de prazo
+
+Na tela de detalhes, você vê:
+- **Data prevista de conclusão** (definida na criação)
+- **Tempo decorrido** desde a abertura
+- **Atrasado/No prazo**: indicador visual se a OS passou do prazo
+
+## Concluindo e entregando
+
+1. Quando o serviço estiver pronto, mude o status para **Concluída**.
+2. O sistema registra a **data/hora de conclusão** e calcula o tempo total.
+3. Quando o cliente retirar, mude para **Entregue**.
+
+## Compartilhamento e assinatura online
+
+Quando disponível no seu plano:
+
+1. Abra a OS > menu de ações > **Compartilhar**.
+2. O sistema gera um **link público** da OS.
+3. Envie para o cliente (WhatsApp, e-mail).
+4. O cliente visualiza a OS e pode **assinar digitalmente**.
+5. A assinatura fica salva na OS com data e hora.
+
+> [!IMPORTANT]
+> O link público mostra a OS ao cliente. Você pode regenerar o código de assinatura se necessário.
+
+## Histórico da OS
+
+A aba **Histórico** mostra a linha do tempo completa:
+- Criação da OS
+- Cada mudança de status (de → para, quem, quando)
+- Assinatura realizada
+- Alterações em serviços, produtos ou valores
+
+## Dicas importantes
+
+- **Atualize o status em cada etapa** — a timeline e os relatórios dependem disso.
+- **Use "Aguardando peça"** para pausas por falta de material em vez de deixar parado em "Em andamento".
+- **Compartilhe a OS** assim que aprovar — o cliente acompanha o andamento e assina online.
+- **Só marque como Entregue** quando o cliente realmente retirou/recebeu.
+
+## Perguntas frequentes
+
+**Consigo voltar um status?**
+Depende. O sistema permite algumas voltas (ex: "Em andamento" → "Aguardando aprovação") enquanto a OS não chegou a estados finais (Entregue, Cancelada).
+
+**O que fazer se a OS está atrasada?**
+Abra a OS, edite a **data prevista de conclusão** e atualize o status. Converse com o cliente pelo link compartilhado.
+
+**O cliente vê o valor na OS compartilhada?**
+Sim, o link público mostra a OS completa com serviços, produtos e valores.
+
+**Posso excluir uma OS?**
+Sim, via menu de ações. Mas é irreversível. Prefira cancelar (mantém o histórico) em vez de excluir.
+`
+            },
+            {
+                id: "perguntas-frequentes-servicos",
+                title: "Perguntas frequentes sobre Serviços",
+                description: "Respostas rápidas sobre agendamentos, ordens de serviço e catálogo de serviços.",
+                slug: "perguntas-frequentes-servicos",
+                category: "servicos",
+                content: `
+## Agendamentos
+
+**Qual a diferença entre agendamento e ordem de serviço?**
+Agendamento reserva um horário na agenda do profissional (cliente vem no horário). Ordem de serviço acompanha a execução técnica por etapas, com materiais, diagnóstico e conclusão.
+
+**Posso agendar um serviço sem cadastrar o cliente?**
+Sim. Crie o cliente na hora do agendamento (nome e telefone bastam).
+
+**Como bloqueio horários de almoço ou férias?**
+Use **Horário indisponível** no calendário. Para almoço diário, crie com recorrência diária.
+
+**O cliente recebe lembrete do agendamento?**
+Se tiver WhatsApp/e-mail cadastrado, o sistema envia lembrete automático antes do horário.
+
+**Agendamento recorrente pode ter uma ocorrência alterada?**
+Sim. Você pode editar/cancelar uma ocorrência específica sem afetar as demais.
+
+## Ordens de serviço
+
+**Quando devo usar uma OS?**
+Quando o serviço tem execução por etapas (manutenção, reparo, instalação) ou quando o equipamento/material fica com você. Para serviços rápidos de balcão, um agendamento ou venda pode bastar.
+
+**Preciso ter agendamento para criar uma OS?**
+Não. Você pode criar uma OS do zero em **Ordens de Serviço > Nova OS**.
+
+**O que é "serviço avulso"?**
+É um serviço que você digita na hora (nome + preço) sem estar no catálogo. Útil para itens pontuais.
+
+**Como adiciono produtos na OS?**
+Na aba **Produtos**, busque produtos do catálogo ou crie avulso. O sistema verifica o estoque.
+
+**Posso aplicar desconto na OS?**
+Sim. Na seção de valores, aplique desconto fixo ou percentual, ou use cupom.
+
+## Status da OS
+
+**Quais são os status da OS?**
+Aberta → Aguardando aprovação → Aprovada → Em andamento → Aguardando peça → Concluída → Entregue. E Cancelada, se não for realizada.
+
+**Preciso seguir a ordem dos status?**
+Sim, normalmente você avança uma etapa por vez. O sistema mostra apenas os próximos status permitidos.
+
+**Posso cancelar uma OS depois de concluída?**
+Não depois de entregue. Prefira pensar antes: "Concluída" e "Entregue" são etapas finais.
+
+## Assinatura online
+
+**Como o cliente assina a OS?**
+Gere o link público (menu **Compartilhar**), envie para o cliente. Ele visualiza e assina digitalmente. A assinatura fica salva.
+
+**A assinatura online está disponível em todos os planos?**
+Está disponível a partir do plano Crescer.
+
+**O cliente precisa criar conta para assinar?**
+Não. Ele acessa o link e assina diretamente.
+
+## Recursos e estoque
+
+**O que são "recursos" de um serviço?**
+Produtos/materiais que o serviço costuma consumir. Ao usar o serviço, o sistema sugere esses itens para baixar do estoque.
+
+**Posso usar produtos sem estoque na OS?**
+O sistema avisa quando o produto está sem estoque. Você pode prosseguir com autorização, dependendo da configuração.
+
+## Preços
+
+**Posso cobrar serviço por hora ou por dia?**
+Sim. No cadastro do serviço, escolha a unidade de cobrança: **Por Serviço**, **Por Hora** ou **Por Dia**.
+
+**Como funciona o preço por hora na OS?**
+Você informa a quantidade de horas. O sistema calcula preço × horas automaticamente.
+
+---
+
+**Ainda com dúvidas?** Entre em contato com nosso suporte ou consulte o artigo específico sobre o assunto na Central de Ajuda.
+`
+            }
+        ]
+    },
+    {
+        id: "clientes",
+        title: "Clientes",
+        icon: "👥",
+        articles: [
+            {
+                id: "visao-geral-clientes",
+                title: "Visão geral de Clientes",
+                description: "Entenda o módulo de Clientes: cadastro, lista, detalhes e integração com vendas e serviços.",
+                slug: "visao-geral-clientes",
+                category: "clientes",
+                content: `
+## Visão geral
+
+O módulo **Clientes** é sua base de contatos centralizada. Nele você cadastra, organiza e consulta informações de pessoas físicas e jurídicas que compram seus produtos ou contratam seus serviços.
+
+![Tela principal de Clientes](https://img.dudit.com.br/static/screens/Clientes_VisaoGeral.png)
+Legenda: Lista de clientes com abas de status, busca e ações rápidas.
+
+Tudo que você faz aqui reflete nos outros módulos:
+
+- **Vendas e PDV** → cliente selecionado no pedido/orçamento
+- **Serviços e Agendamentos** → cliente vinculado ao horário
+- **Ordens de Serviço** → cliente dono do equipamento/serviço
+- **Entregas** → endereço do cliente como padrão
+
+## O que você encontra no módulo
+
+**Lista de clientes** — visualização em grade (cards) ou tabela, com rolagem infinita. Mostra nome, avatar, total de pedidos, valor gasto, crédito disponível, último pedido e status.
+
+**Abas de status** — Todos · Ativo · Inativo · Bloqueado · Arquivado (cada uma com contador).
+
+**Busca unificada** — encontra por nome, e-mail ou telefone digitando qualquer parte.
+
+**Filtros laterais** — refina por status (checkbox).
+
+**Ordenação** — clique no cabeçalho da coluna: Nome, Pedidos, Total Gasto, Crédito, Status, Último Pedido.
+
+**Ações por cliente** — Ver detalhes · Editar · Arquivar/Desarquivar · Excluir.
+
+**Seleção múltipla** — marque vários para ativar/desativar em massa, excluir ou exportar.
+
+**Importar/Exportar** — planilha .xlsx/.csv com mapeamento inteligente.
+
+## Detalhes do cliente
+
+Ao clicar em um cliente, abre a tela de detalhes com três abas:
+
+| Aba | O que mostra |
+|-----|--------------|
+| **Dados Gerais** | KPIs (pedidos, total gasto, ticket médio, última compra), dados cadastrais completos, endereços, documentos, observações internas, vales-compra |
+| **Pedidos** | Histórico de compras com ID, total, status, canal, data — clique para abrir o pedido |
+| **Avaliações** | Reviews recebidos no marketplace (se houver) |
+
+## Status dos clientes
+
+- **Ativo** — aparece nas buscas e seleções normais
+- **Inativo** — oculto da seleção padrão, mas mantido no histórico
+- **Bloqueado** — impedido de novas compras/agendamentos
+- **Arquivado** — removido da lista principal, recuperável quando precisar
+- **Excluído** — soft delete (mantém histórico, não aparece mais)
+
+> [!TIP]
+> Use **Arquivado** para clientes antigos que não compram mais, mas cujo histórico você quer preservar. Use **Inativo** para pausa temporária. **Bloqueado** é para casos de inadimplência ou restrição.
+
+## Como acessar
+
+1. No menu lateral, clique em **Clientes**.
+2. A lista abre na aba **Todos** por padrão.
+3. Use as abas, busca, filtros e ordenação para encontrar o que precisa.
+4. Clique no cliente para ver detalhes ou use os botões de ação (Editar, Arquivar, Excluir).
+
+## Dicas importantes
+
+- **Cadastre antes de vender** — ter o cliente no sistema agiliza PDV, orçamentos e agendamentos.
+- **Preencha CPF/CNPJ** — evita duplicatas e permite emissão de nota fiscal.
+- **Use observações internas** — anote preferências, restrições, histórico de conversas; só sua equipe vê.
+- **Mantenha endereços atualizados** — essenciais para entregas e notas fiscais.
+- **Aproveite a importação** — se tem base antiga em planilha, importe de uma vez (até 2.000 linhas).
+
+## Perguntas frequentes
+
+**Qual a diferença entre Inativo, Bloqueado e Arquivado?**
+- **Inativo**: cliente pausado, não aparece na seleção rápida, mas continua existindo.
+- **Bloqueado**: impedido de comprar/agendar (ex: inadimplência).
+- **Arquivado**: removido da lista principal para organizar; pode ser desarquivado a qualquer momento.
+
+**Posso ter dois clientes com o mesmo CPF/CNPJ?**
+Não. O sistema impede CPF/CNPJ duplicado na mesma loja. Se tentar cadastrar, avisará que já existe.
+
+**Cliente arquivado some do histórico de vendas?**
+Não. Pedidos, orçamentos, agendamentos e OSs antigos continuam vinculados e visíveis.
+
+**Como faço para ver apenas clientes que compraram nos últimos 30 dias?**
+Use a ordenação por **Último Pedido** (decrescente) ou filtre pela aba **Ativo** e ordene por data.
+
+**O que acontece se eu excluir um cliente?**
+Vira "Excluído" (soft delete). O histórico de compras/serviços permanece, mas o cliente não aparece mais nas listas nem buscas. Para recuperar, contate o suporte.
+`
+            },
+            {
+                id: "como-cadastrar-editar-clientes",
+                title: "Como cadastrar e editar clientes",
+                description: "Passo a passo completo do formulário: dados pessoais/empresariais, contatos, endereços, observações e imagem.",
+                slug: "como-cadastrar-editar-clientes",
+                category: "clientes",
+                content: `
+## Visão geral
+
+Cadastrar um cliente preenche a ficha que será usada em vendas, serviços, entregas e notas fiscais. O formulário tem 3 abas: **Dados Gerais**, **Endereço** e **Observações**.
+
+![Formulário de cadastro - aba Dados Gerais](https://img.dudit.com.br/static/screens/Cliente_Cadastro_DadosGerais.png)
+Legenda: Aba Dados Gerais com identificação, dados tributários e contatos.
+
+## Quando utilizar
+
+- Para adicionar um novo cliente à base
+- Para atualizar informações de um cliente existente (trocar telefone, endereço, status, etc.)
+- Para cadastrar cliente rápido durante uma venda/agendamento (versão simplificada)
+
+## Como fazer
+
+### 1. Abrir o cadastro
+
+**Opção A — Lista de Clientes (completo):**
+1. Em **Clientes**, clique em **Novo cliente**.
+2. Preencha as 3 abas e salve.
+
+**Opção B — Durante Venda/PDV/Agendamento (rápido):**
+1. No seletor de cliente, clique no botão **"+"** ou **"Novo cliente"**.
+2. Preencha apenas nome, e-mail e telefone.
+3. O cliente é salvo e já selecionado no fluxo atual.
+
+> [!TIP]
+> Use a **Opção A** para cadastros completos (com endereço, documentos, observações). Use a **Opção B** para agilizar no balcão/PDV e complete depois na lista de Clientes.
+
+### 2. Aba "Dados Gerais"
+
+#### Identificação
+- **Nome ou Razão Social** (obrigatório) — nome que aparecerá em documentos e buscas.
+- **Status** — Ativo / Inativo / Bloqueado. Padrão: Ativo.
+
+#### Dados Tributários
+**Tipo de pessoa** — escolha no início, muda os campos abaixo:
+
+| Pessoa Física | Pessoa Jurídica |
+|---------------|-----------------|
+| CPF (validado) | CNPJ (validado + consulta automática) |
+| RG | Inscrição Estadual (com opção "Isento") |
+| Data de nascimento | Nome Fantasia |
+| Nome da mãe | Inscrição Municipal |
+| Nome do pai | CRT: 1-Simples / 3-Normal / 4-MEI |
+| | Contribuinte: 1-ICMS / 2-Isento / 9-Não contribuinte |
+
+**Consulta CNPJ automática** — ao sair do campo CNPJ (14 dígitos), o sistema busca na Receita Federal e preenche: razão social, nome fantasia, endereço, telefone, e-mail, regime tributário (CRT). Funciona só para PJ.
+
+#### Contatos
+- **E-mail** — validado; usado para notas fiscais, comunicações, login no marketplace.
+- **Celular (WhatsApp)** — principal; usado para notificações, WhatsApp de aniversário, agendamentos.
+- **Telefone Fixo** — opcional.
+- **Site** — opcional; validado como URL.
+
+#### Imagem do cliente
+- Clique na área da foto para enviar imagem (PNG, JPG, WEBP até 5 MB).
+- Recorte quadrado automático.
+- Aparece no avatar da lista, detalhes e seleção em vendas/serviços.
+
+### 3. Aba "Endereço"
+
+#### Endereço Principal
+1. **CEP** — digite e o sistema preenche rua, bairro, cidade, UF (busca automática).
+2. Complete: **Número** (ou marque "S/N"), **Complemento**, **Tipo** (Casa, Apartamento, Comercial, Outro).
+3. Este endereço é usado como padrão em entregas e notas fiscais.
+
+#### Endereço de Cobrança (opcional)
+- Marque **"Endereço de cobrança diferente"** se a nota fiscal deve ir para outro endereço.
+- Preencha os mesmos campos do endereço principal.
+- Se desmarcar depois, o endereço de cobrança salvo é removido.
+
+> [!IMPORTANT]
+> Endereços são salvos em tabela separada. Um cliente pode ter múltiplos endereços cadastrados via API, mas o formulário mostra/edita apenas o principal e o de cobrança.
+
+### 4. Aba "Observações"
+
+- Campo livre para **anotações internas**.
+- Exemplos: "Prefere atendimento pela manhã", "Alergia a látex", "Cliente VIP - dar prioridade", "Não ligar após 18h".
+- **Só sua equipe vê** — não aparece para o cliente em nenhum canal.
+
+### 5. Salvar
+
+- Clique em **Salvar** (ou **Salvar e continuar** se estiver editando).
+- Validações: nome obrigatório, CPF/CNPJ válidos e únicos, e-mail/telefone/CEP/URL válidos.
+- Se houver erro, a aba com erro ganha indicador vermelho e o campo fica destacado.
+
+## Editando um cliente existente
+
+1. Na lista, clique em **Editar** (ícone de lápis) no card/linha do cliente.
+2. Ou no detalhe, clique em **Editar cliente**.
+3. Altere o que precisar — os mesmos campos e validações do cadastro.
+4. Salve.
+
+> [!TIP]
+> Ao editar, o sistema mostra o indicador de alterações não salvas. Se sair sem salvar, pergunta se deseja descartar.
+
+## Pessoa Física vs Pessoa Jurídica — resumo prático
+
+| Situação | Use |
+|----------|-----|
+| Consumidor final, autônomo sem CNPJ | **Pessoa Física** (CPF + RG) |
+| Empresa, MEI, loja, prestador com CNPJ | **Pessoa Jurídica** (CNPJ + IE + CRT) |
+| Estrangeiro sem CPF/CNPJ brasileiro | Selecione PJ e deixe CNPJ vazio (campo "foreign" interno) |
+
+## Dicas importantes
+
+- **CPF/CNPJ único** — não cadastra duplicado. Se avisar "já existe", busque o cliente existente e edite.
+- **Consulta CNPJ** — funciona só para PJ com CNPJ válido de 14 dígitos. Se não encontrar, preencha manualmente.
+- **Data de nascimento** — habilita automações de aniversário (cupom, WhatsApp, notificação) no plano Crescer.
+- **E-mail** — se o cliente for comprar no marketplace, use o mesmo e-mail da conta dele.
+- **Observações** — use para contextualizar a equipe; evite dados sensíveis (LGPD).
+
+## Problemas comuns
+
+| Problema | Causa provável | Solução |
+|----------|----------------|---------|
+| "CPF inválido" | Dígitos verificadores errados | Confira o CPF; use só números ou formato 000.000.000-00 |
+| "CNPJ não encontrado" | CNPJ inexistente ou Receita indisponível | Preencha manualmente; tente novamente depois |
+| "Já existe cliente com este CPF/CNPJ" | Duplicata real | Busque o cliente existente e edite |
+| "CEP não encontrado" | CEP novo ou digitado errado | Confira no site dos Correios; preencha manualmente |
+| Imagem não carrega | Arquivo > 5 MB ou formato não suportado | Use PNG/JPG/WEBP até 5 MB |
+
+## Perguntas frequentes
+
+**Posso cadastrar cliente sem CPF/CNPJ?**
+Sim, mas não recomendado. Sem documento, não emite nota fiscal e o sistema não impede duplicatas por nome.
+
+**Como mudo o endereço principal?**
+Edite o cliente, vá na aba **Endereço**, altere o CEP e campos, salve.
+
+**O endereço de cobrança aparece na nota fiscal?**
+Sim, se preenchido e marcado como diferente. Caso contrário, usa o endereço principal.
+
+**Consigo ver quem editou o cliente por último?**
+Não há log de alterações visível na interface. Para auditoria, contate o suporte.
+
+**Posso cadastrar vários telefones/e-mails?**
+O formulário tem 1 e-mail, 1 celular e 1 fixo. Para mais contatos, use **Observações** ou cadastre como clientes separados (ex: "Empresa X - Compras", "Empresa X - Financeiro").
+
+**A imagem do cliente aparece no PDV?**
+Sim, no seletor de cliente do PDV e na tela de venda.
+`
+            },
+            {
+                id: "como-organizar-gerenciar-base-clientes",
+                title: "Como organizar e gerenciar sua base de clientes",
+                description: "Abas de status, busca, filtros, ordenação, ações em massa, arquivar/desarquivar e exportar.",
+                slug: "como-organizar-gerenciar-base-clientes",
+                category: "clientes",
+                content: `
+## Visão geral
+
+A lista de Clientes foi feita para você encontrar, filtrar e agir sobre sua base rapidamente — seja para localizar um contato, fazer uma ação em lote ou exportar dados.
+
+![Lista de Clientes com abas e filtros](https://img.dudit.com.br/static/screens/Clientes_Lista_Filtros.png)
+Legenda: Abas de status (Todos, Ativo, Inativo, Bloqueado, Arquivado), busca, filtro lateral e ordenação.
+
+## Quando utilizar
+
+- Para localizar um cliente específico (nome, e-mail, telefone)
+- Para ver apenas clientes ativos, inativos ou arquivados
+- Para ordenar por maior gasto, mais pedidos, último pedido, etc.
+- Para ativar/desativar/excluir vários de uma vez
+- Para exportar a base para planilha
+
+## Como fazer
+
+### 1. Navegar pelas abas de status
+
+No topo da lista, clique nas abas:
+
+| Aba | Mostra | Quando usar |
+|-----|--------|-------------|
+| **Todos** | Ativos + Inativos + Bloqueados (sem arquivados) | Visão geral do dia a dia |
+| **Ativo** | Só status "Ativo" | Seleção para vendas/agendamentos |
+| **Inativo** | Só status "Inativo" | Reativar clientes pausados |
+| **Bloqueado** | Só status "Bloqueado" | Gerenciar restrições |
+| **Arquivado** | Só status "Arquivado" | Recuperar clientes antigos |
+
+Cada aba mostra um **contador** ao lado do nome.
+
+### 2. Buscar cliente
+
+Digite no campo **Buscar** (canto superior direito):
+- Parte do **nome** ("joão", "silva", "empresa")
+- **E-mail** completo ou parcial ("@gmail", "joao@")
+- **Telefone** com ou sem formatação ("1199999", "(11) 99999-9999")
+
+A busca é **instantânea** (debounced) e filtra todas as colunas visíveis.
+
+### 3. Filtrar por status (painel lateral)
+
+1. Clique no ícone de **Filtro** (funil) ao lado da busca.
+2. Marque/desmarque os status desejados (checkbox).
+3. O painel mostra só os status que existem na sua base.
+4. Clique em **Limpar filtros** para voltar ao padrão.
+
+> [!TIP]
+> Combine **aba** + **filtro**: ex: aba "Todos" + filtro "Bloqueado" = vê só bloqueados entre os não-arquivados.
+
+### 4. Ordenar a lista
+
+Clique no **cabeçalho da coluna** na visualização tabela:
+
+| Coluna | Ordena por |
+|--------|------------|
+| **Cliente** | Nome A–Z / Z–A |
+| **Pedidos** | Quantidade de pedidos (maior/menor) |
+| **Total Gasto** | Valor total gasto (maior/menor) |
+| **Crédito** | Saldo de vale-compra (maior/menor) |
+| **Status** | Alfabético do status |
+| **Último Pedido** | Data mais recente/antiga |
+
+Clique novamente na mesma coluna para inverter (asc/desc). Uma seta indica a direção.
+
+### 5. Alternar visualização
+
+- **Lista (tabela)** — padrão no desktop; mais colunas, ordenação, seleção em massa.
+- **Grade (cards)** — padrão no mobile/tablet; mostra avatar, nome, pedidos, total gasto, status.
+- Botão no canto superior direito alterna entre as duas.
+
+### 6. Ações em um cliente (individual)
+
+Passe o mouse sobre a linha (tabela) ou use o menu ⋮ no card (grade):
+
+- **Ver detalhes** — abre tela completa com histórico, pedidos, vales, endereços.
+- **Editar** — abre formulário de cadastro preenchido.
+- **Arquivar** — move para aba "Arquivado" (sai das listas normais).
+- **Desarquivar** — volta para "Ativo" (disponível só na aba Arquivado).
+- **Excluir** — soft delete; mantém histórico, remove da base. Confirmação obrigatória.
+
+### 7. Ações em massa (vários clientes)
+
+1. Marque a **checkbox** na primeira coluna (tabela) ou segure/ative seleção múltipla (grade).
+2. Selecione quantos quiser — contador na barra flutuante inferior.
+3. Escolha a ação na **Barra Flutuante**:
+   - **Ativar / Desativar** — alterna status entre Ativo ↔ Inativo para todos selecionados.
+   - **Excluir** — soft delete em lote (confirmação com contador).
+4. Ou use **Exportar** → "Selecionados" para baixar só os marcados.
+
+> [!IMPORTANT]
+> **Arquivar** não está na ação em massa — faça individualmente para confirmar cada um.
+
+### 8. Exportar clientes
+
+Dois caminhos:
+
+**Exportar tudo (com filtros atuais):**
+1. Clique em **Exportar** no cabeçalho.
+2. Escolha colunas (padrão: todas visíveis + algumas extras).
+3. Formato: **.xlsx** (Excel).
+4. O arquivo baixa com os clientes que estão na lista respeitando aba, busca, filtro e ordenação atuais.
+
+**Exportar seleção:**
+1. Marque os clientes desejados.
+2. Na barra flutuante, clique **Exportar** → "Selecionados".
+
+> [!TIP]
+> Use exportação para: backup periódico, enviar para contador, criar mala direta, analisar no Excel.
+
+### 9. Importar clientes (planilha)
+
+1. No cabeçalho, clique **Importar** (ou acesse \`/erp/customers/import\`).
+2. **Passo 1 — Upload:** arraste .xlsx, .xls ou .csv (até 10 MB, 2.000 linhas).
+3. **Passo 2 — Mapeamento:** o sistema sugere mapear colunas da planilha para campos do cadastro (nome, e-mail, CPF, etc.). Cada coluna tem **confiança** (Exato/Alto/Médio/Baixo). Ajuste o que precisar.
+4. **Passo 3 — Preview:** veja os primeiros clientes como ficarão. Confira.
+5. **Importar:** opções "Pular duplicatas" (por CPF/CNPJ/e-mail) e "Pular erros". Clique **Importar**.
+
+![Importação - etapa de mapeamento](https://img.dudit.com.br/static/screens/Clientes_Importacao_Mapeamento.png)
+Legenda: Mapeamento de colunas com indicador de confiança.
+
+## Dicas importantes
+
+- **Mantenha a aba "Ativo" como padrão** — é a que o PDV e agendamentos usam para busca rápida.
+- **Arquive, não exclua** — cliente arquivado some da lista mas volta com 1 clique. Excluído some de vez.
+- **Use ordenação "Total Gasto" desc** — identifica seus melhores clientes (top 20% = 80% da receita).
+- **Combine busca + aba** — ex: aba "Inativo" + busca "joão" = acha "João" inativo rápido.
+- **Exporte antes de importar em massa** — faz backup da base atual.
+- **Limpe duplicatas antes de importar** — a opção "Pular duplicatas" usa CPF/CNPJ/e-mail como chave.
+
+## Problemas comuns
+
+| Problema | Causa | Solução |
+|----------|-------|---------|
+| Cliente não aparece na busca | Está arquivado ou inativo | Mude para aba "Todos" ou "Arquivado"/"Inativo" |
+| Ordenação não funciona | Visualização em grade (cards) | Mude para **Lista (tabela)** — ordenação só funciona lá |
+| Exportação vem vazia | Filtro muito restritivo | Limpe filtros/aba/busca antes de exportar |
+| Importação falha em algumas linhas | CPF/CNPJ inválido ou duplicado | Ative "Pular erros" e "Pular duplicatas"; revise planilha |
+| Não consegue desarquivar | Limite do plano atingido | Upgrade do plano ou exclua/arquive outros para abrir vaga |
+
+## Perguntas frequentes
+
+**Quantos clientes posso cadastrar?**
+Depende do seu plano. O sistema avisa quando atingir o limite. Clientes arquivados não contam para o limite.
+
+**Posso restaurar um cliente excluído?**
+Excluído é soft delete (não aparece mais). Para restaurar, contate o suporte técnico.
+
+**A importação atualiza clientes existentes?**
+Não. A importação só **cria novos**. Se encontrar CPF/CNPJ/e-mail já cadastrado, pula (se "Pular duplicatas" ligado) ou dá erro. Para atualizar em massa, edite individualmente ou use API.
+
+**Como vejo clientes que não compram há 6 meses?**
+Ordene por **Último Pedido** (ascendente) na aba "Ativo". Os sem data ficam no final. Ou exporte e filtre no Excel.
+
+**Posso criar listas/tag personalizadas?**
+Não há tags nativas. Use **Observações** no cadastro (ex: "TAG: VIP", "TAG: Revenda") e busque por "TAG: VIP" na busca global.
+
+**A busca acha por observações?**
+Não. Busca só nome, e-mail e telefone. Para achar por observação, use a exportação e filtre no Excel.
+`
+            },
+            {
+                id: "como-consultar-historico-cliente",
+                title: "Como consultar informações e histórico do cliente",
+                description: "Acesse detalhes, veja KPIs, histórico de pedidos, serviços relacionados e informações importantes.",
+                slug: "como-consultar-historico-cliente",
+                category: "clientes",
+                content: `
+## Visão geral
+
+A tela de **Detalhes do Cliente** centraliza tudo o que você precisa saber sobre um contato: dados cadastrais, indicadores de compra, histórico de pedidos, vales-compra, endereços e observações da equipe.
+
+![Tela de detalhes do cliente](https://img.dudit.com.br/static/screens/Cliente_Detalhes_VisaoGeral.png)
+Legenda: Aba Dados Gerais com KPIs, informações cadastrais, endereços e vales-compra.
+
+## Quando utilizar
+
+- Para ver o perfil completo de um cliente antes de atender
+- Para consultar histórico de compras (pedidos, valores, status)
+- Para conferir endereços, documentos e observações internas
+- Para verificar vales-compra disponíveis
+- Para acessar pedidos e serviços vinculados
+
+## Como fazer
+
+### 1. Abrir os detalhes
+
+**Da lista de Clientes:**
+- Visualização **Tabela**: clique na linha ou no botão **Ver detalhes** (ícone de olho)
+- Visualização **Grade (cards)**: clique no card ou no menu ⋮ > **Ver detalhes**
+
+**De outros módulos:**
+- Em Vendas/PDV/Orçamentos: clique no nome do cliente já selecionado
+- Em Serviços/Agendamentos/OS: clique no cliente no detalhe do agendamento/OS
+
+### 2. Aba "Dados Gerais" — Visão 360°
+
+#### KPIs do cliente (topo)
+| Indicador | O que mostra |
+|-----------|--------------|
+| **Pedidos** | Total de pedidos não cancelados |
+| **Total Gasto** | Soma dos valores (pedidos pagos/entregues) |
+| **Valor médio** | Total Gasto ÷ Pedidos |
+| **Última Compra** | Data do pedido mais recente |
+
+> [!TIP]
+> Use esses números para classificar o cliente: "Top 10%", "Cliente em risco (sem compra > 90 dias)", "Novo (1º pedido)".
+
+#### Dados cadastrais
+- Nome, status (badge colorido), tipo (PF/PJ), ID curto (#ABC12)
+- CPF ou CNPJ (formatado)
+- Data de nascimento (se preenchida)
+- E-mail, celular, telefone fixo, site
+- **Cliente desde** — data do primeiro cadastro
+
+#### Endereços
+- **Endereço principal** — usado em entregas e notas fiscais
+- **Endereço de cobrança** — se diferente do principal (aparece separado)
+
+#### Observações internas
+- Caixa laranja com anotações da equipe (ex: "Prefere WhatsApp", "Alérgico a látex")
+- Só sua equipe vê — não vai para o cliente
+
+#### Vales-compra (Crédito da loja)
+Lista de vales gerados para este cliente:
+- **Valor original** / **Utilizado** / **Restante**
+- **Status**: Disponível (verde) · Utilizado (cinza) · Expirado (vermelho)
+- Data de criação e validade (se houver)
+- Clique para ver detalhes do vale
+
+![Vales-compra no detalhe](https://img.dudit.com.br/static/screens/Cliente_ValesCompra.png)
+Legenda: Lista de vales-compra com saldo restante e status.
+
+### 3. Aba "Pedidos" — Histórico de compras
+
+Tabela com todos os pedidos do cliente (não cancelados), ordenados do mais recente para o mais antigo:
+
+| Coluna | Descrição |
+|--------|-----------|
+| **Pedido** | ID curto (#ABC12) — clique para abrir o pedido |
+| **Total** | Valor do pedido |
+| **Status** | Pago, Pendente, Enviado, Entregue, Cancelado, etc. |
+| **Canal** | Manual, PDV, Marketplace, Loja Virtual, etc. |
+| **Data** | Data e hora da criação |
+
+**Ações:**
+- Clique no **ID do pedido** → abre tela de detalhes do pedido
+- Ordene clicando nos cabeçalhos (Data, Total, Status, Canal)
+- Paginação automática (8 por página)
+
+> [!IMPORTANT]
+> A aba **Pedidos** agrega pedidos feitos pelo \`customer_id\` do ERP **OU** pelo \`user_id\`/\`marketplace_user_id\` vinculados (conta do cliente no marketplace). Por isso, compras feitas pelo cliente logado no site também aparecem aqui.
+
+### 4. Aba "Avaliações" — Reviews do Marketplace
+
+Se o cliente avaliou produtos/loja no marketplace, aparecem aqui:
+- Estrelas (1 a 5)
+- Comentário
+- Data
+- Produto avaliado
+
+### 5. Card de Aniversário (quando aplicável)
+
+Se o cliente tem **data de nascimento** cadastrada e o aniversário é **hoje** ou **próximos dias**, um card roxo destaca no topo (aba Dados Gerais, desktop) ou no início (mobile/tablet):
+
+**Ações rápidas (plano Crescer):**
+- **Criar cupom** → gera cupom de aniversário e abre tela de Cupons
+- **Enviar WhatsApp** → abre wa.me com mensagem pronta + cupom
+- **Enviar notificação** → push/app para o cliente (1x por ano)
+
+## Dicas importantes
+
+- **KPIs ajudam na abordagem** — cliente com "Total Gasto alto + Última compra antiga" = reativação
+- **Vales-compra** — antes de fechar venda, confira se o cliente tem saldo disponível
+- **Observações** — leia antes de ligar/visitar; evita repetir informações
+- **Endereço de cobrança** — confira se nota fiscal deve ir para endereço diferente
+- **Pedidos do marketplace** — aparecem junto dos manuais; filtre pelo canal se precisar separar
+
+## Problemas comuns
+
+| Problema | Causa | Solução |
+|----------|-------|---------|
+| Pedido não aparece no histórico | Feito com e-mail/CPF diferente do cadastrado | Verifique se \`marketplace_user_id\` ou \`user_id\` estão vinculados no cadastro |
+| Vale-compra não aparece | Status "Expirado" ou "Utilizado" integralmente | Filtre por status; expirados não somam no saldo |
+| Aniversário não destaca | Data de nascimento não preenchida | Edite o cliente e preencha a data |
+| KPIs zerados | Cliente nunca fez pedido pelo ERP | Compras só no marketplace antigo podem não agregar; contate suporte |
+
+## Perguntas frequentes
+
+**Posso ver agendamentos e ordens de serviço do cliente aqui?**
+Não diretamente nesta tela. Em **Serviços > Agendamentos** ou **Ordens de Serviço**, use a busca pelo nome do cliente para filtrar os dele.
+
+**O "Total Gasto" inclui pedidos cancelados?**
+Não. Só pedidos com situação diferente de "cancelado".
+
+**Como sei se o cliente tem vale-compra disponível?**
+Na aba Dados Gerais, a seção **Vales-compra** mostra badges: verde = disponível, cinza = usado, vermelho = expirado. O badge no topo da seção mostra o saldo total.
+
+**Consigo editar o cliente a partir dos detalhes?**
+Sim, botão **Editar cliente** no cabeçalho (desktop) ou no menu de ações (mobile).
+
+**O cliente vê as observações internas?**
+Não. Observações são só para sua equipe.
+`
+            },
+    {
+        id: "importar-exportar-clientes",
+        title: "Importar e exportar clientes",
+        description: "Migre sua base por planilha (upload, mapeamento, preview) e exporte para backup ou análise.",
+        slug: "importar-exportar-clientes",
+        category: "clientes",
+        content: `
+## Visão geral
+
+A **importação** traz clientes de planilhas (.xlsx, .xls, .csv) em lote — ideal para migração de sistema antigo ou cadastro inicial. A **exportação** baixa a base atual para Excel — útil para backup, análise ou envio ao contador.
+
+![Importação - tela de upload](https://img.dudit.com.br/static/screens/Clientes_Importacao_Upload.png)
+Legenda: Arraste a planilha ou clique para selecionar (até 10 MB, 2.000 linhas).
+
+## Quando utilizar
+
+**Importar:**
+- Migração de outro sistema/planilha
+- Cadastro inicial em massa
+- Atualização periódica de lista externa (ex: leads de marketing)
+
+**Exportar:**
+- Backup periódico da base
+- Análise no Excel (filtros avançados, tabelas dinâmicas)
+- Envio para contador/parceiro
+- Mala direta / segmentação externa
+
+## Como importar
+
+### 1. Preparar a planilha
+
+**Formatos aceitos:** .xlsx (recomendado), .xls, .csv
+**Limites:** até **10 MB** e **2.000 linhas** por importação
+**Colunas sugeridas (cabeçalhos):**
+
+| Coluna na planilha | Campo no sistema | Obrigatório? |
+|--------------------|------------------|--------------|
+| Nome / Razão Social | name | Sim |
+| E-mail | email | Não |
+| Celular / WhatsApp | phone | Não |
+| Telefone Fixo | phone_fixed | Não |
+| CPF | cpf | PF: sim |
+| CNPJ | cnpj | PJ: sim |
+| RG | rg | Não |
+| IE / Inscrição Estadual | inscricao_estadual | PJ: não |
+| Nome Fantasia | nome_fantasia | PJ: não |
+| Inscrição Municipal | inscricao_municipal | Não |
+| CRT (1/3/4) | crt | PJ: não |
+| Contribuinte (1/2/9) | contribuinte | PJ: não |
+| CEP | zip_code | Não |
+| Endereço / Rua | street | Não |
+| Número | number | Não |
+| Complemento | complement | Não |
+| Bairro | neighborhood | Não |
+| Cidade | city | Não |
+| UF / Estado | state | Não |
+| Tipo Endereço (Casa/Apto/Comercial) | address_type | Não |
+| Data Nascimento | birth_date | Não |
+| Observações | notes | Não |
+| Status (Ativo/Inativo/Bloqueado) | status | Não |
+| Tipo Pessoa (PF/PJ) | person_type | Não |
+
+> [!TIP]
+> Não precisa ter todas as colunas. O sistema mapeia o que você enviar. Colunas não mapeadas são ignoradas.
+
+### 2. Fazer o upload
+
+1. Em **Clientes**, clique em **Importar** (botão no cabeçalho).
+2. Arraste o arquivo ou clique em **Selecionar Planilha**.
+3. Aguarde a leitura — mostra total de linhas e colunas detectadas.
+
+### 3. Revisar o mapeamento
+
+O sistema sugere mapear cada coluna da planilha para um campo do cadastro:
+
+- **Confiança** — badge colorido: **Exato** (verde) · **Alto** (azul) · **Médio** (laranja) · **Baixo** (vermelho)
+- Ajuste manualmente se o sistema errou
+- Colunas sem mapeamento = **Ignorada** (não importa)
+
+![Importação - mapeamento](https://img.dudit.com.br/static/screens/Clientes_Importacao_Mapeamento.png)
+Legenda: Cada linha = coluna da planilha. Escolha o campo do sistema no dropdown.
+
+**Campos obrigatórios do sistema** (marcados com * no dropdown): \`Nome\`, \`CPF\` (se PF), \`CNPJ\` (se PJ).
+
+### 4. Preview e importar
+
+1. Clique **Continuar** → abre **Preview** com os primeiros clientes como ficarão.
+2. Confira: nomes, documentos, e-mails, endereços.
+3. Opções antes de importar:
+   - **Pular duplicatas** (recomendado ON) — ignora linhas com CPF/CNPJ/e-mail já cadastrados
+   - **Pular erros** (recomendado ON) — importa o que der certo, pula linhas com erro de validação
+4. Clique **Importar X cliente(s)**.
+
+### 5. Resultado
+
+Tela de sucesso mostra: **X de Y clientes importados**.
+- Botão **Ver Clientes** → volta para lista
+- Botão **Nova Importação** → repete o processo
+
+## Como exportar
+
+### Exportar tudo (com filtros atuais)
+
+1. Na lista de Clientes, clique **Exportar** no cabeçalho.
+2. Modal abre com seleção de colunas (todas marcadas por padrão).
+3. Desmarque colunas que não quer (ex: \`mother_name\`, \`father_name\`).
+4. Clique **Exportar** → baixa \`.xlsx\`.
+
+> [!TIP]
+> A exportação respeita **aba ativa**, **busca**, **filtros** e **ordenação** atuais. Para exportar só ativos: aba "Ativo" > Exportar.
+
+### Exportar seleção
+
+1. Marque clientes na tabela (checkbox) ou grade (seleção múltipla).
+2. Na **barra flutuante inferior**, clique **Exportar** > **Selecionados**.
+3. Escolhe colunas > **Exportar**.
+
+## Dicas importantes
+
+- **Exporte antes de importar em massa** — backup da base atual.
+- **Limpe a planilha antes** — remova linhas vazias, corrija CPF/CNPJ inválidos, padronize telefone (DDD + número).
+- **Use "Pular duplicatas"** — evita erro se rodar a importação duas vezes.
+- **CPF/CNPJ são chaves únicas** — o sistema usa eles (e e-mail) para detectar duplicatas.
+- **Importação só CRIA** — não atualiza clientes existentes. Para atualizar em massa, edite individualmente ou use API.
+- **Endereços** — a importação cria endereço principal; endereço de cobrança diferente não é suportado na importação (cadastre depois manualmente).
+
+## Problemas comuns
+
+| Problema | Causa | Solução |
+|----------|-------|---------|
+| "Erro ao processar arquivo" | Arquivo corrompido, senha, ou formato não suportado | Salve como .xlsx padrão; remova senha; evite .ods |
+| Linhas não importadas | Validação falhou (CPF inválido, e-mail malformado) | Ative "Pular erros"; revise linhas no preview; corrija planilha |
+| Duplicatas não puladas | CPF/CNPJ com formatação diferente (pontos/tracos) | O sistema normaliza (só números); confira se realmente igual |
+| Exportação vazia | Filtro/aba restritiva demais | Limpe busca, filtros, mude para aba "Todos" |
+| Planilha > 2.000 linhas | Limite de segurança | Divida em vários arquivos de ≤ 2.000 linhas |
+
+## Perguntas frequentes
+
+**Posso importar clientes com endereço de cobrança diferente?**
+Não na importação padrão. Importe o endereço principal; depois edite cada cliente e marque "Endereço de cobrança diferente".
+`
+},
+{
+    id: "clientes-em-outros-modulos",
+        title: "Clientes em Vendas, Serviços e outros módulos",
+            description: "Como selecionar, criar e usar clientes no PDV, Vendas, Orçamentos, Serviços, Agendamentos e OS.",
+                slug: "clientes-em-outros-modulos",
+                    category: "clientes",
+                        content: `
+## Visão geral
+
+O cadastro de clientes não fica isolado — ele alimenta **Vendas, PDV, Orçamentos, Serviços, Agendamentos, Ordens de Serviço e Entregas**. Entender como o cliente é selecionado e criado nesses fluxos agiliza o dia a dia.
+
+![Seletor de cliente no PDV](https://img.dudit.com.br/static/screens/Cliente_Seletor_PDV.png)
+Legenda: Seletor de cliente com busca, fixados e botão de novo cliente rápido.
+
+## Quando utilizar
+
+- Para vincular cliente a uma venda, orçamento, pedido ou serviço
+- Para criar cliente rápido durante o atendimento (sem sair do fluxo)
+- Para usar endereço do cliente como padrão em entrega
+- Para consultar histórico do cliente enquanto atende
+
+---
+
+## Fluxo comum: Seletor de Cliente
+
+Na maioria dos módulos (Vendas, PDV, Orçamentos, Serviços, Agendamentos, OS), ao iniciar um novo atendimento, abre o **Seletor de Cliente** com:
+
+1. **Busca** — digite nome, e-mail ou telefone; filtra em tempo real
+2. **Fixados / Recentes** — clientes marcados como favoritos ou usados recentemente aparecem no topo
+3. **Lista completa** — todos os clientes ativos (rolagem infinita)
+4. **Botão "Novo cliente" (+)** — cria cliente rápido (nome, e-mail, telefone)
+5. **Botão "Remover"** — limpa seleção (venda para consumidor final)
+
+> [!TIP]
+> O seletor **só mostra clientes com status "Ativo"**. Inativos, bloqueados e arquivados não aparecem. Para usar um inativo, reative antes na lista de Clientes.
+
+---
+
+## Vendas / PDV / Orçamentos
+
+### Selecionar cliente existente
+1. Inicie **Nova Venda**, **Novo Pedido** ou **Novo Orçamento**.
+2. No campo **Cliente**, clique para abrir o seletor.
+3. Busque ou escolha da lista de fixados/recentes.
+4. Cliente selecionado → nome aparece no cabeçalho da venda.
+
+### Criar cliente rápido (durante a venda)
+1. No seletor, clique no botão **"+"** (Novo cliente).
+2. Preencha: **Nome** (obrigatório), **E-mail**, **Telefone**.
+3. Salva → cliente criado com status **Ativo**, tipo **Pessoa Física** (padrão), sem endereço/documentos.
+4. Cliente já fica selecionado na venda.
+
+> [!IMPORTANT]
+> Cliente rápido **não tem CPF/CNPJ, endereço, dados fiscais**. Complete depois em **Clientes > Editar** se for emitir nota fiscal.
+
+### Consumidor final (sem cliente)
+- Clique **Remover** (X) no cliente selecionado.
+- Venda fica como "Consumidor final" — não vincula a ninguém, não exige CPF na nota (exceto se valor > limite legal).
+
+### Endereço de entrega
+- Se o cliente tem **endereço principal** cadastrado, ele pré-preenche o endereço de entrega da venda.
+- Pode alterar na hora (não salva no cadastro do cliente).
+
+---
+
+## Serviços / Agendamentos
+
+### Agendar com cliente
+1. Em **Agendamentos > Novo agendamento**.
+2. Etapa **Cliente** — abra seletor, escolha ou crie rápido.
+3. Cliente selecionado → aparece no card do agendamento no calendário.
+4. No dia do atendimento, clique no agendamento > **Ver detalhes do cliente** abre a ficha completa.
+
+### Cliente no agendamento recorrente
+- Cliente fixo toda semana? Crie agendamento **recorrente semanal** com o mesmo cliente.
+- O sistema replica o agendamento mantendo o cliente vinculado.
+
+---
+
+## Ordens de Serviço (OS)
+
+### Criar OS para cliente
+1. Em **Ordens de Serviço > Nova OS**.
+2. Campo **Cliente** — seletor padrão (busca, fixados, novo rápido).
+3. Cliente vinculado → aparece no cabeçalho da OS.
+4. **Endereço principal** do cliente pré-preenche o endereço da OS (se for visita técnica).
+
+### Histórico de OS do cliente
+- No detalhe do cliente, **não há aba de OS** diretamente.
+- Para ver OSs do cliente: vá em **Ordens de Serviço** > use a busca pelo nome do cliente.
+
+---
+
+## Entregas
+
+### Endereço do cliente como padrão
+1. Ao criar **Nova Entrega** (ou no fluxo de venda com entrega), o campo **Endereço** busca no cadastro do cliente.
+2. Se cliente tem endereço principal → preenche automaticamente.
+3. Se tem **endereço de cobrança diferente** → use o botão "Usar endereço de cobrança" se aplicável.
+
+---
+
+## Marketplace / Vitrine
+
+### Cliente logado no site
+- Quando cliente compra logado na vitrine/marketplace, o sistema **vincula automaticamente** o \`marketplace_user_id\` ao cadastro do cliente (pelo e-mail).
+- Pedidos feitos logados aparecem no **histórico do cliente** (aba Pedidos no detalhe).
+- Avaliações (reviews) do cliente aparecem na aba **Avaliações**.
+
+### Cupons de aniversário
+- Cupom gerado no card de aniversário → fica disponível para o cliente usar no checkout do marketplace.
+- Cliente recebe via WhatsApp/notificação e aplica no carrinho.
+
+---
+
+## Dicas importantes
+
+- **Sempre selecione o cliente** antes de fechar venda/OS — garante histórico, nota fiscal correta, endereço de entrega e vales-compra.
+- **Cliente rápido = complete depois** — nome+e-mail+telefone resolve na hora; volte em Clientes para por CPF, endereço, dados fiscais.
+- **Fixados** — marque clientes frequentes como fixados (estrela no seletor) para aparecerem no topo.
+- **Consumidor final** — use só para vendas rápidas de balcão sem nota fiscal nominal.
+- **Endereço de entrega** — alterar na venda **não altera** o cadastro do cliente. Para mudar definitivo, edite em Clientes.
+
+## Problemas comuns
+
+| Problema | Causa | Solução |
+|----------|-------|---------|
+| Cliente não aparece no seletor | Status Inativo/Bloqueado/Arquivado | Ative/desarquive em Clientes |
+| Cliente rápido não emite nota fiscal | Falta CPF/CNPJ e endereço | Edite o cliente depois e complete dados fiscais |
+| Endereço de entrega não preenche | Cliente sem endereço principal | Cadastre endereço na aba Endereço do cliente |
+| Pedido do site não aparece no histórico | Cliente não logou ou e-mail diferente | Verifique se \`marketplace_user_id\` está vinculado no cadastro |
+| Vale-compra não aparece no PDV | Status não é "Disponível" | Confira no detalhe do cliente; só disponíveis somam |
+
+## Perguntas frequentes
+
+**Posso obrigar seleção de cliente em toda venda?**
+Não há configuração nativa para obrigar. Treine a equipe. Para nota fiscal, sem cliente = consumidor final (limite de valor sem CPF).
+
+**Cliente criado no PDV aparece na lista de Clientes?**
+Sim, imediatamente. Status Ativo, tipo Pessoa Física, sem documento/endereço.
+
+**Consigo ver o limite de crédito do cliente na venda?**
+Não há "limite de crédito" nativo. Use **Vales-compra** como crédito pré-pago. Para pós-pago (faturamento), controle externo ou observação interna.
+
+**Como vinculo um cliente do marketplace ao ERP?**
+Automático: se e-mail do pedido logado = e-mail do cliente no ERP, o sistema vincula \`marketplace_user_id\`. Se não vinculou, edite o cliente e confira se e-mails batem.
+
+**Posso ter preços diferentes por cliente?**
+Não há tabela de preços por cliente nativa. Use **cupons personalizados** ou **observação interna** com "Preço especial: X%".
+`
+},
+{
+    id: "perguntas-frequentes-clientes",
+        title: "Perguntas frequentes sobre Clientes",
+            description: "Respostas rápidas sobre cadastro, organização, histórico, importação, recursos e integração.",
+                slug: "perguntas-frequentes-clientes",
+                    category: "clientes",
+                        content: `
+## Cadastro e edição
+
+**Posso cadastrar cliente sem CPF/CNPJ?**
+Sim, mas não recomendado. Sem documento, não emite nota fiscal nominal e o sistema não impede duplicatas por nome.
+
+**Qual a diferença entre Pessoa Física e Pessoa Jurídica no cadastro?**
+**PF:** CPF, RG, data de nascimento, nome da mãe/pai. **PJ:** CNPJ (com consulta automática), IE, nome fantasia, inscrição municipal, CRT, contribuinte. O tipo muda os campos exibidos.
+
+**Como funciona a consulta CNPJ automática?**
+Ao digitar CNPJ válido (14 dígitos) e sair do campo, o sistema consulta a Receita Federal e preenche: razão social, nome fantasia, endereço, telefone, e-mail, regime tributário (CRT). Funciona só para PJ.
+
+**Posso alterar o tipo de pessoa depois de cadastrado?**
+Sim, edite o cliente e mude "Tipo de pessoa". Os campos se adaptam (PF ↔ PJ). Dados do tipo anterior ficam salvos mas ocultos.
+
+**O que acontece se eu deixar de preencher campos obrigatórios?**
+O sistema destaca a aba e o campo em vermelho e não permite salvar até corrigir.
+
+---
+
+## Status e organização
+
+**Qual a diferença entre Inativo, Bloqueado e Arquivado?**
+- **Inativo:** pausa temporária, não aparece na seleção de vendas/agendamentos.
+- **Bloqueado:** impedido de comprar/agendar (ex: inadimplência).
+- **Arquivado:** removido da lista principal para organizar; recuperável com 1 clique.
+
+**Cliente arquivado some do histórico de vendas?**
+Não. Pedidos, orçamentos, agendamentos e OSs antigos continuam vinculados e visíveis nos detalhes.
+
+**Como reativo um cliente arquivado?**
+Vá na aba **Arquivado**, clique em **Desarquivar** no menu do cliente. Volta para "Ativo".
+
+**Posso excluir um cliente permanentemente?**
+Excluir faz **soft delete** — some das listas e buscas, mas histórico permanece. Para restaurar, contate o suporte.
+
+**Quantos clientes posso cadastrar?**
+Depende do seu plano. Clientes arquivados **não contam** para o limite. O sistema avisa ao atingir.
+
+---
+
+## Busca, filtros e exportação
+
+**A busca acha por observações internas?**
+Não. Busca só por **nome, e-mail e telefone**. Para achar por observação, exporte para Excel e filtre lá.
+
+**Como exporto apenas clientes ativos?**
+Clique na aba **Ativo** > botão **Exportar**. A exportação respeita a aba/visão atual.
+
+**A importação atualiza clientes existentes?**
+Não. Importação **só cria novos**. Se CPF/CNPJ/e-mail já existe, pula (se "Pular duplicatas" ligado) ou erro. Para atualizar em massa, edite individualmente.
+
+**Qual o limite da importação?**
+Até **10 MB** e **2.000 linhas** por arquivo. Divida bases maiores em vários arquivos.
+
+**Posso importar endereço de cobrança diferente?**
+Não na importação padrão. Importe o endereço principal; depois edite cada cliente e marque "Endereço de cobrança diferente".
+
+---
+
+## Histórico e detalhes
+
+**O "Total Gasto" inclui pedidos cancelados?**
+Não. Só pedidos com situação diferente de "cancelado".
+
+**Pedidos feitos no site (marketplace) aparecem no histórico?**
+Sim, se o cliente fez login e o e-mail bate com o cadastro do ERP. O sistema vincula automaticamente via \`marketplace_user_id\`.
+- **Cliente rápido = complete depois** — nome+e-mail+telefone resolve na hora; volte em Clientes para por CPF, endereço, dados fiscais.
+- **Fixados** — marque clientes frequentes como fixados (estrela no seletor) para aparecerem no topo.
+- **Consumidor final** — use só para vendas rápidas de balcão sem nota fiscal nominal.
+- **Endereço de entrega** — alterar na venda **não altera** o cadastro do cliente. Para mudar definitivo, edite em Clientes.
+
+## Problemas comuns
+
+| Problema | Causa | Solução |
+|----------|-------|---------|
+| Cliente não aparece no seletor | Status Inativo/Bloqueado/Arquivado | Ative/desarquive em Clientes |
+| Cliente rápido não emite nota fiscal | Falta CPF/CNPJ e endereço | Edite o cliente depois e complete dados fiscais |
+| Endereço de entrega não preenche | Cliente sem endereço principal | Cadastre endereço na aba Endereço do cliente |
+| Pedido do site não aparece no histórico | Cliente não logou ou e-mail diferente | Verifique se \`marketplace_user_id\` está vinculado no cadastro |
+| Vale-compra não aparece no PDV | Status não é "Disponível" | Confira no detalhe do cliente; só disponíveis somam |
+
+## Perguntas frequentes
+
+**Posso obrigar seleção de cliente em toda venda?**
+Não há configuração nativa para obrigar. Treine a equipe. Para nota fiscal, sem cliente = consumidor final (limite de valor sem CPF).
+
+**Cliente criado no PDV aparece na lista de Clientes?**
+Sim, imediatamente. Status Ativo, tipo Pessoa Física, sem documento/endereço.
+
+**Consigo ver o limite de crédito do cliente na venda?**
+Não há "limite de crédito" nativo. Use **Vales-compra** como crédito pré-pago. Para pós-pago (faturamento), controle externo ou observação interna.
+
+**Como vinculo um cliente do marketplace ao ERP?**
+Automático: se e-mail do pedido logado = e-mail do cliente no ERP, o sistema vincula \`marketplace_user_id\`. Se não vinculou, edite o cliente e confira se e-mails batem.
+
+**Posso ter preços diferentes por cliente?**
+Não há tabela de preços por cliente nativa. Use **cupons personalizados** ou **observação interna** com "Preço especial: X%".
+`
+},
+{
+    id: "perguntas-frequentes-clientes",
+        title: "Perguntas frequentes sobre Clientes",
+            description: "Respostas rápidas sobre cadastro, organização, histórico, importação, recursos e integração.",
+                slug: "perguntas-frequentes-clientes",
+                    category: "clientes",
+                        content: `
+## Cadastro e edição
+
+**Posso cadastrar cliente sem CPF/CNPJ?**
+Sim, mas não recomendado. Sem documento, não emite nota fiscal nominal e o sistema não impede duplicatas por nome.
+
+**Qual a diferença entre Pessoa Física e Pessoa Jurídica no cadastro?**
+**PF:** CPF, RG, data de nascimento, nome da mãe/pai. **PJ:** CNPJ (com consulta automática), IE, nome fantasia, inscrição municipal, CRT, contribuinte. O tipo muda os campos exibidos.
+
+**Como funciona a consulta CNPJ automática?**
+Ao digitar CNPJ válido (14 dígitos) e sair do campo, o sistema consulta a Receita Federal e preenche: razão social, nome fantasia, endereço, telefone, e-mail, regime tributário (CRT). Funciona só para PJ.
+
+**Posso alterar o tipo de pessoa depois de cadastrado?**
+Sim, edite o cliente e mude "Tipo de pessoa". Os campos se adaptam (PF ↔ PJ). Dados do tipo anterior ficam salvos mas ocultos.
+
+**O que acontece se eu deixar de preencher campos obrigatórios?**
+O sistema destaca a aba e o campo em vermelho e não permite salvar até corrigir.
+
+---
+
+## Status e organização
+
+**Qual a diferença entre Inativo, Bloqueado e Arquivado?**
+- **Inativo:** pausa temporária, não aparece na seleção de vendas/agendamentos.
+- **Bloqueado:** impedido de comprar/agendar (ex: inadimplência).
+- **Arquivado:** removido da lista principal para organizar; recuperável com 1 clique.
+
+**Cliente arquivado some do histórico de vendas?**
+Não. Pedidos, orçamentos, agendamentos e OSs antigos continuam vinculados e visíveis nos detalhes.
+
+**Como reativo um cliente arquivado?**
+Vá na aba **Arquivado**, clique em **Desarquivar** no menu do cliente. Volta para "Ativo".
+
+**Posso excluir um cliente permanentemente?**
+Excluir faz **soft delete** — some das listas e buscas, mas histórico permanece. Para restaurar, contate o suporte.
+
+**Quantos clientes posso cadastrar?**
+Depende do seu plano. Clientes arquivados **não contam** para o limite. O sistema avisa ao atingir.
+
+---
+
+## Busca, filtros e exportação
+
+**A busca acha por observações internas?**
+Não. Busca só por **nome, e-mail e telefone**. Para achar por observação, exporte para Excel e filtre lá.
+
+**Como exporto apenas clientes ativos?**
+Clique na aba **Ativo** > botão **Exportar**. A exportação respeita a aba/visão atual.
+
+**A importação atualiza clientes existentes?**
+Não. Importação **só cria novos**. Se CPF/CNPJ/e-mail já existe, pula (se "Pular duplicatas" ligado) ou erro. Para atualizar em massa, edite individualmente.
+
+**Qual o limite da importação?**
+Até **10 MB** e **2.000 linhas** por arquivo. Divida bases maiores em vários arquivos.
+
+**Posso importar endereço de cobrança diferente?**
+Não na importação padrão. Importe o endereço principal; depois edite cada cliente e marque "Endereço de cobrança diferente".
+
+---
+
+## Histórico e detalhes
+
+**O "Total Gasto" inclui pedidos cancelados?**
+Não. Só pedidos com situação diferente de "cancelado".
+
+**Pedidos feitos no site (marketplace) aparecem no histórico?**
+Sim, se o cliente fez login e o e-mail bate com o cadastro do ERP. O sistema vincula automaticamente via \`marketplace_user_id\`.
+
+**Consigo ver agendamentos e OSs do cliente no detalhe dele?**
+Não diretamente. Em **Serviços > Agendamentos** ou **Ordens de Serviço**, use a busca pelo nome do cliente.
+
+**Como sei se o cliente tem vale-compra disponível?**
+No detalhe do cliente (aba Dados Gerais), seção **Vales-compra**: badge verde = disponível, cinza = usado, vermelho = expirado. Badge no topo soma o saldo total.
+
+---
+
+## Recursos adicionais
+
+**Como configurar endereço de cobrança diferente?**
+Edite o cliente > aba **Endereço** > marque "Endereço de cobrança diferente" > preencha campos > salve. Usado na nota fiscal.
+
+**Vales-compra expiram?**
+Só se você definir **data de validade** na criação (via devolução ou cupom). Sem data, não expiram.
+
+**Como funciona o aniversário do cliente?**
+Se tem **data de nascimento** cadastrada e plano **Crescer**, no dia/próximos dias aparece card com 3 ações: criar cupom, enviar WhatsApp (precisa celular), enviar notificação (1x/ano).
+
+**Posso enviar WhatsApp de aniversário sem cupom?**
+Sim, a ação "Enviar WhatsApp" abre \`wa.me\` com mensagem padrão. Se já criou cupom, ele vai no texto.
+
+---
+
+## Integração com outros módulos
+
+**Cliente criado no PDV aparece na lista de Clientes?**
+Sim, imediatamente. Status Ativo, tipo Pessoa Física, sem documento/endereço. Complete depois.
+
+**Cliente inativo aparece no seletor do PDV/Vendas?**
+Não. Seletor só mostra **Ativos**. Reative antes de usar.
+
+**Como uso vale-compra no PDV?**
+Selecione o cliente > se tem vale "Disponível", aparece opção **Vale-compra/Crédito** nas formas de pagamento. Abate do vale mais antigo (FIFO).
+
+**Posso ter preços diferentes por cliente?**
+Não há tabela de preços por cliente nativa. Use **cupons personalizados** ou **observação interna** com "Preço especial: X%".
+
+**O endereço de entrega da venda altera o cadastro do cliente?**
+Não. Alterar na venda é só para aquela entrega. Para mudar definitivo, edite em **Clientes > Endereço**.
+
+---
+
+**Ainda com dúvidas?** Entre em contato com nosso suporte ou consulte o artigo específico sobre o assunto na Central de Ajuda.
+`
+}
         ]
     }
 ]

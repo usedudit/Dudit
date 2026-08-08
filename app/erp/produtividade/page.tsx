@@ -6,6 +6,7 @@ import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { normalizeToRoutePermissions } from "@/lib/permissions/route-permissions"
 import { canAccessRoute } from "@/lib/permissions/route-permissions"
 import type { PartnerRole } from "@/lib/permissions/types"
+import { DashboardProvider } from "@/components/erp/dashboard/DashboardContext"
 import ProductivityPage from "@/components/erp/produtividade/ProductivityPage"
 import { GlobalPeriodFilter } from "@/components/erp/GlobalPeriodFilter"
 import type { Period, CompareMode } from "@/lib/period-types"
@@ -72,22 +73,24 @@ export default async function ProdutividadePage(props: {
     <>
       <ERPPageHeader title="Visão Geral" />
       <FadeIn className="p-4">
-        <div className="w-full space-y-6 pt-2 px-4 md:px-8">
-          <header className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                Visão Geral
-              </h1>
-              <p className="mt-1 text-sm font-medium text-brand-inactive-text dark:text-dark-body">
-                Desempenho de vendas e produtividade da equipe
-              </p>
-            </div>
-            <Suspense fallback={<div className="h-8 w-48 animate-pulse rounded-full bg-brand-gray/40 dark:bg-dark-border/20" />}>
-              <GlobalPeriodFilter />
-            </Suspense>
-          </header>
-          <ProductivityPage overview={overview} ranking={ranking} />
-        </div>
+        <DashboardProvider>
+          <div className="w-full space-y-6 pt-2 px-4 md:px-8">
+            <header className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+              <div>
+                <h1 className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading flex items-center gap-2">
+                  Visão Geral
+                </h1>
+                <p className="mt-1 text-sm font-medium text-brand-inactive-text dark:text-dark-body">
+                  Desempenho de vendas e produtividade da equipe
+                </p>
+              </div>
+              <Suspense fallback={<div className="h-8 w-48 animate-pulse rounded-full bg-brand-gray/40 dark:bg-dark-border/20" />}>
+                <GlobalPeriodFilter />
+              </Suspense>
+            </header>
+            <ProductivityPage overview={overview} ranking={ranking} />
+          </div>
+        </DashboardProvider>
       </FadeIn>
     </>
   )

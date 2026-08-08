@@ -8,6 +8,7 @@ import {
     TruckIcon,
     UserIcon,
     ShoppingBagIcon,
+    ServiceIcon,
     BriefcaseIcon,
     MoneyIcon,
     FileTextIcon,
@@ -132,6 +133,8 @@ export default function HelpHome() {
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                     <ModuleCard icon={<ShoppingBagIcon size={24} />} title="Produtos e Estoque" link="/ajuda/produtos-estoque/visao-geral-produtos-estoque" color="green" />
                     <ModuleCard icon={<ShoppingBagIcon size={24} />} title="Vendas" link="/ajuda/vendas/visao-geral-vendas" color="green" />
+                    <ModuleCard icon={<ServiceIcon size={24} />} title="Serviços" link="/ajuda/servicos/visao-geral-servicos" color="green" />
+                    <ModuleCard icon={<UserIcon size={24} />} title="Clientes" link="/ajuda/clientes/visao-geral-clientes" color="green" />
                     <ModuleCard icon={<HelpCircleIcon size={24} />} title="Primeiros Passos" link="/ajuda/login-registro/acessando-conta" color="blue" />
                 </div>
             </section>

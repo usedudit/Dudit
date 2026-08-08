@@ -9,6 +9,7 @@ import { formatDate, formatTime } from "@/lib/utils"
 import { decryptCPF, encryptCPF } from "@/lib/crypto"
 import { getDeliveryStatusMeta, getDeliveryStatusLabelForType } from "@/lib/orders/status"
 import { requireUser, requireCustomerOwnership } from "@/lib/auth/authorization"
+import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { requirePermission } from "@/lib/permissions/access"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
@@ -17,6 +18,25 @@ import { createAddressAction } from "@/app/actions/shared/addresses"
 import { validateCPF, validateCNPJ, validateEmail, validatePhoneBR, validateURL, validateCEP } from "@/lib/input-validator"
 import { buildSoftDeletePayload, buildRestorePayload, buildArchivePayload, scopeActiveOnly, scopeArchivedOnly, scopeWithArchived } from "@/lib/supabase/query-helpers"
 import { checkLimit } from "@/lib/services/subscription.service"
+
+/**
+ * Resolve the partner authorized by the authenticated ERP context.
+ *
+ * The partner is intentionally never accepted from a client argument in
+ * customer/order reads. The active partner context is server-side and the
+ * granular permission check is performed before any service-role query.
+ */
+async function resolveAuthorizedCustomerPartner(user: Awaited<ReturnType<typeof requireUser>>) {
+  const context = await getCurrentPartnerContext(user)
+  if (!context) {
+    return null
+  }
+
+  const access = await requirePermission(context.partnerId, "customers", "view", user)
+  return {
+    partnerId: access.partnerId,
+  }
+}
 
 async function prepareEncryptedCpf(
   supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
@@ -545,9 +565,14 @@ export async function getCustomerByIdAction(customerId: string) {
   const user = await requireUser()
   if (!user) return { error: "Não autenticado" }
 
+  // SECURITY: derive the tenant from the authenticated ERP context. Do not
+  // trust a partner id supplied by the client for any customer/order read.
+  const authorizedPartner = await resolveAuthorizedCustomerPartner(user)
+  if (!authorizedPartner) return { error: "Acesso não autorizado" }
+
   const supabase = await getSupabaseServerClient()
 
-  const { data: customer } = await supabase
+  const { data: customer, error: customerError } = await supabase
     .from("customers")
     .select(`
       id, partner_id, name, email, phone, phone_fixed, status, person_type,
@@ -557,7 +582,12 @@ export async function getCustomerByIdAction(customerId: string) {
       addresses!customer_id(address_type, zip_code, street, number, complement, neighborhood, city, state, country, is_default)
     `)
     .eq("id", customerId)
+    .eq("partner_id", authorizedPartner.partnerId)
     .maybeSingle()
+
+  if (customerError) {
+    console.error("[getCustomerByIdAction] Customer lookup error:", customerError)
+  }
 
   if (!customer) {
     return { error: "Cliente nÃ£o encontrado" }
@@ -605,6 +635,7 @@ export async function getCustomerByIdAction(customerId: string) {
           .from("customers")
           .update({ marketplace_user_id: marketplaceUserId })
           .eq("id", customer.id)
+          .eq("partner_id", authorizedPartner.partnerId)
       }
     } catch (e) {
       console.error("[getCustomerAction] Auto-link error:", e)
@@ -623,6 +654,7 @@ export async function getCustomerByIdAction(customerId: string) {
   const { data: orderAgg } = await adminDbForStats
     .from("orders")
     .select("total_amount, created_at")
+    .eq("partner_id", authorizedPartner.partnerId)
     .or(orParts.join(","))
     .neq("situation", "cancelled")
 
@@ -654,17 +686,40 @@ export async function getCustomerOrdersAction(customerId: string) {
   const user = await requireUser()
   if (!user) return { error: "Não autenticado" }
 
-  const adminDb = createAdminClient()
+  // SECURITY: authorize the active partner before creating the service-role
+  // client. The client supplies only customerId; partnerId comes from the
+  // authenticated server-side ERP context.
+  const authorizedPartner = await resolveAuthorizedCustomerPartner(user)
+  if (!authorizedPartner) return { error: "Acesso não autorizado" }
 
-  const { data: customer } = await adminDb
+  const supabase = await getSupabaseServerClient()
+
+  // RLS-bound lookup plus an explicit tenant predicate prevents an id from
+  // another partner from becoming an input to the admin path.
+  const { data: customer, error: customerError } = await supabase
     .from("customers")
     .select("id, partner_id, user_id, marketplace_user_id, email, phone")
     .eq("id", customerId)
+    .eq("partner_id", authorizedPartner.partnerId)
     .maybeSingle()
+
+  if (customerError) {
+    console.error("[getCustomerOrdersAction] Customer lookup error:", customerError)
+  }
 
   if (!customer) {
     return { orders: [], stats: null }
   }
+
+  const partnerId = authorizedPartner.partnerId
+  // The service-role client is created only after authentication, partner
+  // permission and the RLS-bound customer lookup have all succeeded.
+  const adminDb = createAdminClient()
+
+  // Customer history is partner-scoped today; customers are not store-owned
+  // in this flow and the existing UI expects the partner-wide history. If a
+  // store-scoped variant is introduced, its storeId must come from the
+  // server-side context and be added as another predicate here.
 
   let userId = customer.user_id
   let marketplaceUserId = customer.marketplace_user_id
@@ -678,6 +733,7 @@ export async function getCustomerOrdersAction(customerId: string) {
           .from("customers")
           .update({ marketplace_user_id: marketplaceUserId })
           .eq("id", customer.id)
+          .eq("partner_id", partnerId)
       }
     } catch (e) {
       console.error("[getCustomerOrdersAction] Auto-link error:", e)
@@ -712,6 +768,7 @@ export async function getCustomerOrdersAction(customerId: string) {
       notes,
       order_items ( id, quantity, service_id, line_type )
     `)
+    .eq("partner_id", partnerId)
     .or(filter)
     .order("created_at", { ascending: false })
     .limit(50)
@@ -733,6 +790,7 @@ export async function getCustomerOrdersAction(customerId: string) {
   const { data: statsRaw } = await adminDb
     .from("orders")
     .select("total_amount, created_at, situation")
+    .eq("partner_id", partnerId)
     .or(filter)
     .neq("situation", "cancelled")
 
@@ -804,7 +862,7 @@ export async function getPartnerCustomersAction(partnerId: string, currentStoreI
 
     let q = supabase
       .from("customers")
-      .select("id, name, email, phone, cpf, status, store_credit, created_at, partner_id, person_type, birth_date, image_url")
+      .select("id, name, email, phone, status, store_credit, created_at, partner_id, person_type, birth_date, image_url")
       .eq("partner_id", partnerId)
 
     q = scopeActiveOnly(q)
@@ -819,17 +877,6 @@ export async function getPartnerCustomersAction(partnerId: string, currentStoreI
     }
 
     let result = customers || []
-
-    // Decrypt CPFs in parallel
-    await Promise.all(result.map(async (c: any) => {
-      if (c.cpf) {
-        try {
-          c.cpf = await decryptCPF(c.cpf)
-        } catch (e) {
-          // Keep encrypted if decryption fails
-        }
-      }
-    }))
 
     return { customers: result }
   } catch (err: any) {
@@ -989,7 +1036,7 @@ export async function getERPCustomersPageAction(
 
     let q = supabase
       .from("customers")
-      .select("id, partner_id, name, email, phone, phone_fixed, status, is_active, store_credit, created_at, cpf, person_type, cnpj, birth_date, user_id, image_url")
+      .select("id, partner_id, name, email, phone, phone_fixed, status, is_active, store_credit, created_at, person_type, birth_date, user_id, image_url")
       .eq("partner_id", partnerId)
 
     if (options?.filters?.status === "archived" || options?.filters?.tab === "archived" || options?.filters?.status === "arquivado") {
@@ -1015,30 +1062,22 @@ export async function getERPCustomersPageAction(
     const hasMore = rows.length > limit
     const items: any[] = hasMore ? rows.slice(0, limit) : rows
 
-    // Decrypt CPFs in parallel
-    await Promise.all(items.map(async (item: any) => {
-      if (item.cpf) {
-        try {
-          item.cpf = await decryptCPF(item.cpf)
-        } catch (e) {
-          // Keep encrypted if decryption fails
-        }
-      }
-    }))
-
     // Aggregate order stats for this page of customers (by buyer_id OR customer_id)
     const customerIds = items.map((c: any) => c.id).filter(Boolean)
     if (customerIds.length > 0) {
       const { data: orderAgg } = await supabase
         .from("orders")
         .select("buyer_id, customer_id, total_amount, created_at")
+        .eq("partner_id", partnerId)
         .or(`buyer_id.in.(${customerIds.join(",")}),customer_id.in.(${customerIds.join(",")})`)
         .neq("situation", "cancelled")
 
       if (orderAgg) {
         const statsMap = new Map<string, { orders_count: number; total_spent: number; last_order_at: string | null }>()
         for (const o of orderAgg) {
-          const key = customerIds.includes(o.buyer_id) ? o.buyer_id : o.customer_id
+          // Prefer the canonical ERP customer id when both fields happen to
+          // match an id in the current page.
+          const key = customerIds.includes(o.customer_id) ? o.customer_id : o.buyer_id
           if (!key) continue
           const prev = statsMap.get(key) || { orders_count: 0, total_spent: 0, last_order_at: null }
           prev.orders_count++

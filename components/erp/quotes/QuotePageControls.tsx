@@ -16,7 +16,8 @@ import {
     CancelCircleIcon,
     ExportFileIcon,
     CalendarIcon,
-    InfoIcon
+    InfoIcon,
+    Settings2Icon
 } from "@/lib/icons"
 import type { DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
 import {
@@ -162,12 +163,13 @@ const QuotePageControls: React.FC<QuotePageControlsProps> = ({
                         </Button>
                         <Dropdown
                             trigger={
-                                <Button variant="outline" className="w-[42px] h-[42px] p-0 rounded-full">
-                                    <ExportFileIcon className="w-4 h-4" />
+                                <Button variant="outline" className="w-[42px] h-[42px] p-0">
+                                    <Settings2Icon className="w-4 h-4" />
                                 </Button>
                             }
                             align="right"
                             showChevron={false}
+                            className="w-fit"
                         >
                             <DropdownItem onClick={onExport}>
                                 <ExportFileIcon size={14} className="mr-2" /> Exportar Planilha

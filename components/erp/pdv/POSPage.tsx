@@ -1554,6 +1554,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                                                 pdvPromotions,
                                                 { productId: product.id, categoryId: product.category?.id || undefined }
                                             )
+                                            const isServiceItem = product.product_type === "service" || product.product_type === "Serviço"
                                             const stock = Number(product.stock_available || 0)
                                             const minStock = product.min_stock != null ? Number(product.min_stock) : null
                                             let stockVariant: "green" | "orange" | "red" = "green"
@@ -1580,11 +1581,13 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                                                                 )}
                                                             </div>
                                                         )}
-                                                        <div className="absolute right-2 top-2 z-10">
-                                                            <Badge variant={stockVariant} icon={<PackageIcon className="h-3 w-3" />} className="whitespace-nowrap">
-                                                                {stock}
-                                                            </Badge>
-                                                        </div>
+                                                        {!isServiceItem && (
+                                                            <div className="absolute right-2 top-2 z-10">
+                                                                <Badge variant={stockVariant} icon={<PackageIcon className="h-3 w-3" />} className="whitespace-nowrap">
+                                                                    {stock}
+                                                                </Badge>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                     <div>
                                                         <p className="truncate text-sm font-bold text-brand-dark dark:text-dark-heading">{product.name}</p>

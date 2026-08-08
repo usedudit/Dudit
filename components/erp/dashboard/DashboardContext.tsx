@@ -31,10 +31,14 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+const defaultContext: DashboardContextType = {
+  insights: null,
+  setInsights: () => {},
+  exportHandler: null,
+  setExportHandler: () => {},
+};
+
 export function useDashboard() {
   const context = useContext(DashboardContext);
-  if (!context) {
-    throw new Error("useDashboard must be used within a DashboardProvider");
-  }
-  return context;
+  return context ?? defaultContext;
 }

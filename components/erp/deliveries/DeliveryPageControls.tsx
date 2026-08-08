@@ -1,8 +1,7 @@
-import React from "react"
-import { Button, Input } from "@/components/reusable"
+import { Button, Dropdown, DropdownItem, Input } from "@/components/reusable"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import { TabCountBadge } from "@/components/reusable/TabCountBadge"
-import { SearchIcon, FilterIcon, PlusIcon, TruckIcon, BlockedIcon, SparklesIcon } from "@/lib/icons"
+import { SearchIcon, FilterIcon, PlusIcon, TruckIcon, BlockedIcon, SparklesIcon, Settings2Icon } from "@/lib/icons"
 
 interface DeliveryPageControlsProps {
     activeTab: "active" | "closed"
@@ -59,7 +58,7 @@ export default function DeliveryPageControls({
             {/* --- CONTROLS BAR --- */}
             <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4 flex-none px-4 md:px-8">
                 <div className="md:hidden flex items-center gap-2 w-full">
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                         <Input
                             name="search"
                             placeholder="Buscar entregas..."
@@ -70,8 +69,32 @@ export default function DeliveryPageControls({
                             prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
                         />
                     </div>
-                    <Button variant="outline" onClick={onOpenFilter} className="w-[42px] h-[42px]"><FilterIcon size={18} /></Button>
-                    <Button onClick={onAdd} disabled={addDisabled} className="w-[42px] h-[42px]"><PlusIcon size={18} /></Button>
+                    <Button
+                        variant="outline"
+                        onClick={onOpenFilter}
+                        className="w-[42px] h-[42px] p-0"
+                    >
+                        <FilterIcon className="w-4 h-4" />
+                    </Button>
+                    <Dropdown
+                        trigger={
+                            <Button variant="outline" className="w-[42px] h-[42px] p-0">
+                                <Settings2Icon className="w-4 h-4" />
+                            </Button>
+                        }
+                        align="right"
+                        showChevron={false}
+                        className="w-fit"
+                    >
+                        <DropdownItem onClick={onOpenSuggestions}>
+                            <SparklesIcon size={14} /> Gerar sugestões
+                        </DropdownItem>
+                    </Dropdown>
+                    <Button
+                        onClick={onAdd}
+                        className="w-[42px] h-[42px] p-0 flex items-center justify-center"
+                        leftIcon={<PlusIcon size={18} />}
+                    />
                 </div>
 
                 <div className="hidden md:flex items-center w-full gap-3">
