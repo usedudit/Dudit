@@ -1370,7 +1370,7 @@ export default function CreateTransactionPage({
             )}
 
             {isIncomeExpense && (
-                <FormSection title="Detalhes do lançamento" hasSeparator>
+                <FormSection title="Detalhes do lançamento">
                     <MoneyInput
                         label="Valor"
                         value={amount}

@@ -1705,26 +1705,32 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                     defaultDate={new Date()}
                     linkedOrderId={order?.id}
                     linkedOrderItemId={selectedOrderItemForAppointment?.id}
-                    allowedOrderServices={(order?.order_items || [])
-                        .filter((i: any) =>
-                            Boolean(i.service_id) ||
+                    allowedOrderServices={(() => {
+                        const rawItems = order?.order_items || order?.items || order?.orderItems || [];
+                        const filtered = rawItems.filter((i: any) =>
+                            Boolean(i.service_id || i.serviceId) ||
                             i.line_type === "service_booking" ||
                             i.line_type === "service" ||
+                            i.is_service === true ||
+                            i.item_type === "service" ||
                             Boolean(i.services) ||
                             i.products?.type === "service" ||
-                            i.id === selectedOrderItemForAppointment?.id ||
+                            (selectedOrderItemForAppointment && i.id === selectedOrderItemForAppointment.id) ||
                             (!i.product_id && !i.variant_id)
-                        )
-                        .map((i: any) => ({
-                            id: i.service_id || i.product_id || i.id,
+                        );
+                        if (selectedOrderItemForAppointment && !filtered.some((i: any) => i.id === selectedOrderItemForAppointment.id)) {
+                            filtered.unshift(selectedOrderItemForAppointment);
+                        }
+                        return filtered.map((i: any) => ({
+                            id: i.service_id || i.serviceId || i.product_id || i.id,
                             orderItemId: i.id,
                             order_item_id: i.id,
-                            name: i.product_name || i.services?.name || "Serviço",
-                            price: Number(i.product_price || i.subtotal || 0),
-                            duration: i.services?.duration_minutes || i.duration || 30,
+                            name: i.product_name || i.services?.name || i.name || "Serviço",
+                            price: Number(i.product_price || i.subtotal || i.price || 0),
+                            duration: i.services?.duration_minutes || i.duration_minutes || i.duration || 30,
                             category_id: i.services?.category_id || null,
-                        }))
-                    }
+                        }));
+                    })()}
                     preselectedClient={order?.buyer_id || order?.customer_name ? { id: order?.buyer_id || null, name: order?.customer_name || 'Cliente' } : null}
                     partnerId={partnerId}
                     storeId={order?.store_id}

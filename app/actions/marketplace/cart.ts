@@ -373,30 +373,15 @@ export async function addToCartAction(productId: string, quantity = 1, csrf_toke
     resolvedProductId = entity.product_id
     const parentProduct = entity.products as any
     partnerId = parentProduct.partner_id
-    partnerUserId = parentProduct.partners?.user_id
   } else {
     partnerId = entity.partner_id
-    // @ts-ignore
-    partnerUserId = entity.partners?.user_id
   }
 
-  // 3. Segurança: Bloqueia compra da própria loja
-  if (partnerUserId === user.id) {
-    return { error: "Você não pode comprar produtos da sua própria loja" }
-  }
-
-  // Segurança: Membros da equipe não podem comprar
-  if (partnerId) {
-    const { data: teamMembership } = await supabase
-      .from("partner_users")
-      .select("id")
-      .eq("partner_id", partnerId)
-      .eq("user_id", user.id)
-      .maybeSingle()
-
-    if (teamMembership) {
-      return { error: "Você não pode comprar produtos de uma loja da qual faz parte da equipe" }
-    }
+  // 3. Segurança: Bloqueia compra da própria loja ou de loja da qual faz parte da equipe
+  const { assertCanBuyFromStore } = await import("@/app/actions/marketplace/cart-extensions")
+  const canBuyGuard = await assertCanBuyFromStore(user.id, partnerId, storeId)
+  if (canBuyGuard.error) {
+    return { error: canBuyGuard.error }
   }
 
   // 4. Executa Inserção ou Atualização
@@ -1062,10 +1047,11 @@ export async function checkoutCartAction(
   }
 
   // Fetch delivery_payer setting for snapshot (store-aware)
-  const deliveryRow = await resolveDeliverySettingsRow(getAdminClient(), partnerId, storeId)
-  const deliveryPayer: "customer" | "seller" = deliveryRow?.delivery_payer === "seller" ? "seller" : "customer"
-  if (storeId && deliveryRow?.store_id === storeId) {
-    console.log(`[delivery_payer] Marketplace checkout using store override: store=${storeId}, partner=${partnerId}, payer=${deliveryPayer}`)
+  const deliveryRow = await resolveDeliverySettingsRow(getAdminClient(), partnerId, targetStoreId)
+  const fallbackDeliveryPayer: "customer" | "seller" = deliveryRow?.delivery_payer === "seller" ? "seller" : "customer"
+  const effectiveDeliveryPayer: "customer" | "seller" = (deliveryBreakdown?.deliveryPayer as "seller" | "customer") || fallbackDeliveryPayer
+  if (targetStoreId && deliveryRow?.store_id === targetStoreId) {
+    console.log(`[delivery_payer] Marketplace checkout using store override: store=${targetStoreId}, partner=${partnerId}, payer=${effectiveDeliveryPayer}`)
   }
 
   // For marketplace orders (customer-initiated), seller_commission_amount is 0
@@ -1169,7 +1155,7 @@ export async function checkoutCartAction(
       delivery_type: orderDelivery,
       delivery_address: hasDeliveryLines ? deliveryAddress : deliveryAddress || null,
       payment_method: finalPaymentMethodLabel,
-      delivery_payer: deliveryPayer,
+      delivery_payer: effectiveDeliveryPayer,
       seller_commission_amount: sellerCommissionAmount,
       payment_breakdown: finalPaymentBreakdown,
       payment_provider: isFullyPaidWithStoreCredit ? null : (useMercadoPago ? "Mercado Pago" : null),

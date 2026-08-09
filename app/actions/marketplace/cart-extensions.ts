@@ -9,26 +9,65 @@ import { revalidateCart } from "@/lib/utils/revalidation"
 import type { ServiceBookingMetadata } from "@/lib/types/marketplace-cart"
 import { addToCartAction } from "@/app/actions/marketplace/cart"
 
-async function assertCanBuyFromPartner(
-  supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
+export async function assertCanBuyFromStore(
   userId: string,
   partnerId: string,
-) {
+  storeId?: string | null,
+): Promise<{ success?: boolean; error?: string }> {
   const admin = getAdminClient()
-  const { data: partner } = await admin.from("partners").select("user_id").eq("id", partnerId).single()
+
+  const { data: partner } = await admin
+    .from("partners")
+    .select("user_id")
+    .eq("id", partnerId)
+    .maybeSingle()
+
   if (partner?.user_id === userId) {
     return { error: "Você não pode comprar da sua própria loja." }
   }
-  const { data: team } = await supabase
+
+  const { data: teamMember } = await admin
     .from("partner_users")
-    .select("id")
+    .select("id, role_id")
     .eq("partner_id", partnerId)
     .eq("user_id", userId)
     .maybeSingle()
-  if (team) {
+
+  if (!teamMember) {
+    return { success: true }
+  }
+
+  const roleUpper = String(teamMember.role_id || "").toUpperCase()
+  if (roleUpper === "OWNER" || roleUpper === "ADMIN") {
     return { error: "Você não pode comprar de uma loja da qual faz parte da equipe." }
   }
-  return { success: true }
+
+  if (!storeId) {
+    return { error: "Você não pode comprar de uma loja da qual faz parte da equipe." }
+  }
+
+  const { data: storeAccess } = await admin
+    .from("store_members")
+    .select("id")
+    .eq("partner_user_id", teamMember.id)
+    .eq("store_id", storeId)
+    .maybeSingle()
+
+  if (storeAccess) {
+    return { error: "Você não pode comprar de uma loja da qual faz parte da equipe." }
+  }
+
+  const { data: allMemberStores } = await admin
+    .from("store_members")
+    .select("id")
+    .eq("partner_user_id", teamMember.id)
+    .limit(1)
+
+  if (allMemberStores && allMemberStores.length > 0) {
+    return { success: true }
+  }
+
+  return { error: "Você não pode comprar de uma loja da qual faz parte da equipe." }
 }
 
 export async function addServiceBookingToCartAction(
@@ -48,7 +87,7 @@ export async function addServiceBookingToCartAction(
 
   const supabase = await getSupabaseServerClient()
   const user = await requireUser()
-  const guard = await assertCanBuyFromPartner(supabase, user.id, input.partnerId)
+  const guard = await assertCanBuyFromStore(user.id, input.partnerId, input.storeId)
   if (guard.error) return { error: guard.error }
 
   const admin = getAdminClient()
@@ -156,7 +195,7 @@ export async function addSubscriptionToCartAction(
 
   const supabase = await getSupabaseServerClient()
   const user = await requireUser()
-  const guard = await assertCanBuyFromPartner(supabase, user.id, input.partnerId)
+  const guard = await assertCanBuyFromStore(user.id, input.partnerId)
   if (guard.error) return { error: guard.error }
 
   const admin = getAdminClient()
@@ -214,7 +253,7 @@ export async function addPurchasableServiceToCartAction(
 
   const supabase = await getSupabaseServerClient()
   const user = await requireUser()
-  const guard = await assertCanBuyFromPartner(supabase, user.id, input.partnerId)
+  const guard = await assertCanBuyFromStore(user.id, input.partnerId, input.storeId)
   if (guard.error) return { error: guard.error }
 
   const admin = getAdminClient()

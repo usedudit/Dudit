@@ -38,7 +38,16 @@ export async function resolveDeliverySettingsRow(supabase: any, partnerId: strin
     .eq("partner_id", partnerId)
     .is("store_id", null)
     .maybeSingle()
-  return data
+  if (data) return data
+
+  const { data: fallback } = await supabase
+    .from("delivery_settings")
+    .select("*")
+    .eq("partner_id", partnerId)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  return fallback
 }
 
 function mapRuleRow(row: any): DeliveryFeeRule {

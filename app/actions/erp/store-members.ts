@@ -2,7 +2,7 @@
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { revalidatePath } from "next/cache"
-import { requireUser, requireStorePermission } from "@/lib/auth/authorization"
+import { requireUser, requireStorePermission, requirePartnerAccess } from "@/lib/auth/authorization"
 import { logAudit } from "@/lib/observability/audit-log"
 import type { ActionResponse } from "@/lib/types/action-response"
 
@@ -37,8 +37,12 @@ export async function addStoreMemberAction(
     permissions?: unknown
 ): Promise<ActionResponse<void>> {
     try {
-        await requireUser()
-        await requireStorePermission(storeId, partnerId, "stores", "manage_members")
+        const user = await requireUser()
+        const access = await requirePartnerAccess(partnerId, user)
+        const roleUpper = String(access.roleId || "").toUpperCase()
+        if (roleUpper !== "OWNER" && roleUpper !== "ADMIN") {
+            return { success: false, error: "Apenas Proprietários e Administradores podem adicionar membros." }
+        }
 
         const supabase = await getSupabaseServerClient()
         const { error } = await supabase
@@ -135,14 +139,80 @@ export async function removeStoreMemberAction(
 export async function listUserStoresAction(
     partnerUserId: string,
     partnerId: string
-): Promise<{ store_id: string; role: string | null }[]> {
+): Promise<{ id: string; store_id: string; role: string | null }[]> {
     await requireUser()
     const supabase = await getSupabaseServerClient()
     const { data, error } = await supabase
         .from("store_members")
-        .select("store_id, role")
+        .select("id, store_id, role")
         .eq("partner_user_id", partnerUserId)
 
     if (error) throw new Error(error.message)
     return data || []
+}
+
+export async function saveMemberStoreAccessAction(params: {
+    partnerUserId: string
+    partnerId: string
+    storeAccesses: Array<{ storeId: string; role: string }>
+}): Promise<ActionResponse<void>> {
+    try {
+        const user = await requireUser()
+        const { partnerUserId, partnerId, storeAccesses } = params
+
+        const access = await requirePartnerAccess(partnerId, user)
+        const roleUpper = String(access.roleId || "").toUpperCase()
+        if (roleUpper !== "OWNER" && roleUpper !== "ADMIN") {
+            return { success: false, error: "Apenas Proprietários e Administradores podem alterar os acessos às lojas dos membros." }
+        }
+
+        const supabase = await getSupabaseServerClient()
+
+        const { data: existing, error: fetchErr } = await supabase
+            .from("store_members")
+            .select("id, store_id, role")
+            .eq("partner_user_id", partnerUserId)
+
+        if (fetchErr) throw new Error(fetchErr.message)
+
+        const existingMap = new Map((existing || []).map((e: any) => [e.store_id, e]))
+        const targetMap = new Map(storeAccesses.map(a => [a.storeId, a.role]))
+
+        for (const [storeId, sm] of existingMap.entries()) {
+            if (!targetMap.has(storeId)) {
+                await supabase.from("store_members").delete().eq("id", sm.id)
+            }
+        }
+
+        for (const access of storeAccesses) {
+            const sm = existingMap.get(access.storeId)
+            if (sm) {
+                if (sm.role !== access.role) {
+                    await supabase
+                        .from("store_members")
+                        .update({ role: access.role })
+                        .eq("id", sm.id)
+                }
+            } else {
+                await supabase
+                    .from("store_members")
+                    .insert({
+                        partner_user_id: partnerUserId,
+                        store_id: access.storeId,
+                        role: access.role || "OPERATOR",
+                    })
+            }
+        }
+
+        logAudit("store_member.role_updated", {
+            partnerId,
+            targetPartnerUserId: partnerUserId,
+            storeCount: storeAccesses.length,
+        })
+
+        revalidatePath("/erp/settings")
+        return { success: true, data: undefined }
+    } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : "Erro ao salvar acessos às lojas" }
+    }
 }

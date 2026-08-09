@@ -878,10 +878,12 @@ async function handler(request: NextRequest) {
             : "pending"
 
     // Fetch delivery_payer setting for snapshot (store-aware)
-    const deliveryRow = await resolveDeliverySettingsRow(adminClient, partnerId, storeId)
-    const deliveryPayer: "customer" | "seller" = deliveryRow?.delivery_payer === "seller" ? "seller" : "customer"
-    if (storeId && deliveryRow?.store_id === storeId) {
-      console.log(`[delivery_payer] MP payment using store override: store=${storeId}, partner=${partnerId}, payer=${deliveryPayer}`)
+    const rawMpStoreId = (orderItemsForInsert || []).find((l: any) => l.store_id)?.store_id
+    const targetMpStoreId = typeof rawMpStoreId === "string" ? rawMpStoreId : null
+    const deliveryRow = await resolveDeliverySettingsRow(adminClient, partnerId, targetMpStoreId)
+    const effectiveDeliveryPayer: "customer" | "seller" = deliveryRow?.delivery_payer === "seller" ? "seller" : "customer"
+    if (targetMpStoreId && deliveryRow?.store_id === targetMpStoreId) {
+      console.log(`[delivery_payer] MP payment using store override: store=${targetMpStoreId}, partner=${partnerId}, payer=${effectiveDeliveryPayer}`)
     }
     // For MP orders (customer-initiated), seller_commission_amount is 0
     const sellerCommissionAmount = 0
@@ -914,7 +916,7 @@ async function handler(request: NextRequest) {
         payment_method_discount_amount: paymentMethodDiscountAmount,
         payment_method_extra_amount: paymentMethodExtraAmount,
         delivery_fee: deliveryFee,
-        delivery_payer: deliveryPayer,
+        delivery_payer: effectiveDeliveryPayer,
         seller_commission_amount: sellerCommissionAmount,
         payment_breakdown: [{
           method: paymentMethodDisplayName,

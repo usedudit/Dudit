@@ -115,7 +115,9 @@ export default async function ERPLayout({
     console.error("Error pre-fetching stores in layout:", e)
   }
 
-  const effectiveActiveStoreId = activeStoreId || (initialStores.length > 0 ? (initialStores.find(s => s.is_headquarters)?.id || initialStores[0].id) : null)
+  const effectiveActiveStoreId = (activeStoreId && initialStores.some(s => s.id === activeStoreId))
+    ? activeStoreId
+    : (initialStores.length > 0 ? (initialStores.find(s => s.is_headquarters)?.id || initialStores[0].id) : null)
 
   return (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>

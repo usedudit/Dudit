@@ -39,8 +39,8 @@ export interface TeamMember {
 const ROLE_ORDER: Record<string, number> = { OWNER: 0, ADMIN: 1, MANAGER: 2, OPERATOR: 3, DELIVERY: 4 }
 
 // Cached version of fetchPartnerTeamMembers - revalidates on team changes
-const fetchPartnerTeamMembersCached = unstable_cache(
-    async (partnerId: string): Promise<{ members: TeamMember[]; error?: string }> => {
+const fetchPartnerTeamMembersCached = (partnerId: string) => unstable_cache(
+    async (): Promise<{ members: TeamMember[]; error?: string }> => {
         const admin = getAdminClient()
 
         const { data: partner } = await admin
@@ -70,17 +70,25 @@ const fetchPartnerTeamMembersCached = unstable_cache(
 
         const userIds = partnerUsers.map((pu: any) => pu.user_id)
 
-        // Emails via a single listUsers batch (1-2 HTTP calls) instead of N sequential
-        // auth.admin.getUserById calls, which were the main latency source of this fetch.
+        // Fetch emails and metadata in parallel via getUserById for exact resolution
         const emailMap: Record<string, string> = {}
-        const PAGE_SIZE = 200
-        for (let page = 1; ; page++) {
-            const { data: pageData, error } = await admin.auth.admin.listUsers({ page, perPage: PAGE_SIZE })
-            if (error || !pageData?.users || pageData.users.length === 0) break
-            for (const u of pageData.users) {
-                if (u.email && userIds.includes(u.id)) emailMap[u.id] = u.email
+        const nameMap: Record<string, string> = {}
+        if (userIds.length > 0) {
+            const userResults = await Promise.allSettled(
+                userIds.map((uid: string) => admin.auth.admin.getUserById(uid))
+            )
+            for (let i = 0; i < userIds.length; i++) {
+                const res = userResults[i]
+                if (res.status === "fulfilled" && res.value.data?.user) {
+                    const u = res.value.data.user
+                    if (u.email) emailMap[userIds[i]] = u.email
+                    const meta = u.user_metadata || {}
+                    const metaName = meta.full_name || meta.name || meta.display_name
+                    if (metaName && typeof metaName === "string" && metaName.trim()) {
+                        nameMap[userIds[i]] = metaName.trim()
+                    }
+                }
             }
-            if (pageData.users.length < PAGE_SIZE) break
         }
 
         const { data: profilesRes } = await admin
@@ -88,21 +96,40 @@ const fetchPartnerTeamMembersCached = unstable_cache(
             .select("user_id, full_name")
             .in("user_id", userIds)
 
-        const profileMap: Record<string, { full_name: string | null }> = {}
-        if (profilesRes.data) for (const p of profilesRes.data) profileMap[p.user_id] = { full_name: p.full_name }
+        if (profilesRes) {
+            for (const p of profilesRes as any[]) {
+                if (p.full_name && typeof p.full_name === "string" && p.full_name.trim()) {
+                    nameMap[p.user_id] = p.full_name.trim()
+                }
+            }
+        }
+
+        const formatEmailAsName = (email: string): string => {
+            if (!email) return "Membro"
+            const username = email.split("@")[0] || ""
+            return username
+                .replace(/[._-]/g, " ")
+                .split(" ")
+                .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+                .join(" ")
+        }
 
         const members: TeamMember[] = partnerUsers
-            .map((pu: any) => ({
-                id: pu.id,
-                userId: pu.user_id,
-                email: emailMap[pu.user_id] || "",
-                fullName: profileMap[pu.user_id]?.full_name || null,
-                avatarUrl: null,
-                role: String(pu.role_id || "delivery").toUpperCase() as PartnerRole,
-                permissions: null,
-                createdAt: pu.created_at,
-                isOwner: pu.user_id === ownerUserId,
-            }) as TeamMember)
+            .map((pu: any) => {
+                const email = emailMap[pu.user_id] || ""
+                const resolvedName = nameMap[pu.user_id] || (email ? formatEmailAsName(email) : "Membro")
+                return {
+                    id: pu.id,
+                    userId: pu.user_id,
+                    email,
+                    fullName: resolvedName,
+                    avatarUrl: null,
+                    role: String(pu.role_id || "delivery").toUpperCase() as PartnerRole,
+                    permissions: null,
+                    createdAt: pu.created_at,
+                    isOwner: pu.user_id === ownerUserId,
+                } as TeamMember
+            })
             .sort((a: TeamMember, b: TeamMember) => {
                 if (a.isOwner && !b.isOwner) return -1
                 if (!a.isOwner && b.isOwner) return 1
@@ -111,15 +138,15 @@ const fetchPartnerTeamMembersCached = unstable_cache(
 
         return { members }
     },
-    ["team-members"],
+    [TAGS.teamMembers(partnerId)],
     {
-        tags: ["team-members"],
+        tags: [TAGS.teamMembers(partnerId)],
         revalidate: 300, // 5 minutes
     }
 )
 
 async function fetchPartnerTeamMembers(partnerId: string): Promise<{ members: TeamMember[]; error?: string }> {
-    return fetchPartnerTeamMembersCached(partnerId)
+    return fetchPartnerTeamMembersCached(partnerId)()
 }
 
 // ─── Server Actions ─────────────────────────────────────────────────────────

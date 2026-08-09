@@ -148,7 +148,7 @@ const checkPartnerAccess = async (
   const admin = getAdminClient()
   const template = await getPermissionTemplate()
   const [invitedAccessRes, ownedPartnerRes] = await Promise.all([
-    admin.from("partner_users").select("role_id, roles:roles!inner(permissions)").eq("partner_id", partnerId).eq("user_id", userId).maybeSingle(),
+    admin.from("partner_users").select("role_id, permissions").eq("partner_id", partnerId).eq("user_id", userId).maybeSingle(),
     admin.from("partners").select("user_id, is_active, erp_disabled").eq("id", partnerId).single()
   ]);
 
@@ -175,7 +175,12 @@ const checkPartnerAccess = async (
   // Explicitly validate returned truthy data
   if (invitedAccessRes.data && invitedAccessRes.data.role_id) {
     const roleId = String(invitedAccessRes.data.role_id || "delivery").toLowerCase() as RoleId
-    const permissions = normalizePermissions(template, (invitedAccessRes.data as any).roles?.permissions)
+    let rawPerms = invitedAccessRes.data.permissions
+    if (!rawPerms) {
+      const { data: roleRow } = await admin.from("roles").select("permissions").eq("id", roleId).maybeSingle()
+      rawPerms = roleRow?.permissions
+    }
+    const permissions = normalizePermissions(template, rawPerms)
     return { roleId, permissions }
   }
 

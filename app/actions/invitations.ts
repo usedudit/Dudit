@@ -462,7 +462,24 @@ export async function listPartnerInvitations(partnerId: string): Promise<{
             return { success: false, error: "Erro ao listar convites." }
         }
 
-        return { success: true, invitations: data || [] }
+        const invitations = data || []
+        if (invitations.length > 0) {
+            const usedByIds = ([...new Set(invitations.map((i: any) => i.used_by).filter(Boolean))] as string[])
+            if (usedByIds.length > 0) {
+                const { data: profiles } = await admin
+                    .from("user_profiles")
+                    .select("user_id, full_name")
+                    .in("user_id", usedByIds)
+                const nameMap = new Map<string, string>((profiles || []).map((p: any) => [p.user_id, p.full_name]))
+                for (const inv of invitations) {
+                    if (inv.used_by) {
+                        inv.used_by_name = nameMap.get(inv.used_by) || null
+                    }
+                }
+            }
+        }
+
+        return { success: true, invitations }
     } catch (error) {
         console.error("[Invitations] listPartnerInvitations error:", error)
         return { success: false, error: "Erro ao listar convites." }

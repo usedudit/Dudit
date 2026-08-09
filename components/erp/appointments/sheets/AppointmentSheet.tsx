@@ -26,6 +26,7 @@ import { fetchPartnerCustomersBucket } from '@/app/actions/erp/client-loaders';
 import { createServiceAction } from '@/app/actions/erp/servicos';
 import { getFulfillmentModeLabel, getPaymentStatusLabel, getSalesChannelLabel } from '@/lib/orders/status';
 import { useCSRFToken } from '@/hooks/use-csrf-token';
+import { normalizeOpeningHours } from '@/lib/utils/opening-hours';
 
 export const AppointmentSheet = ({
     onClose,
@@ -39,13 +40,15 @@ export const AppointmentSheet = ({
     defaultDate,
     initialDraft,
     initialStaffId,
+    onCheckout,
+    onViewSale,
     onStatusChangeRequest,
     servicesCatalog,
     clientsCatalog,
     staffCatalog,
     isSaving,
     partnerId,
-    storeId: storeIdProp,
+    storeId,
     openingHours,
     onAppointmentUpdated,
     appointmentsList,
@@ -83,18 +86,27 @@ export const AppointmentSheet = ({
     preselectedClient?: any,
 }) => {
     const servicesSource = useMemo(() => {
+        const groups: any[] = [];
         if (allowedOrderServices && allowedOrderServices.length > 0) {
             const isCategorized = allowedOrderServices.some((c: any) => Array.isArray(c?.items));
-            if (isCategorized) return allowedOrderServices;
-            return [{
-                id: "order-services",
-                name: "Serviços deste Pedido",
-                colorClass: "bg-emerald-500",
-                items: allowedOrderServices,
-            }];
+            if (isCategorized) {
+                groups.push(...allowedOrderServices);
+            } else {
+                groups.push({
+                    id: "order-services",
+                    name: "Serviços deste Pedido",
+                    category: "Serviços deste Pedido",
+                    category_display: true,
+                    colorClass: "bg-emerald-500",
+                    items: allowedOrderServices,
+                });
+            }
         }
-        return servicesCatalog || [];
-    }, [allowedOrderServices, servicesCatalog]);
+        if (servicesCatalog && servicesCatalog.length > 0) {
+            groups.push(...servicesCatalog);
+        }
+        return groups;
+    }, [allowedOrderServices, servicesCatalog]);;
     const clientsSource = clientsCatalog || [];
     const staffSource = staffCatalog || [];
     const { canEdit, hasSpecific, canDelete } = usePermissions();
@@ -151,7 +163,14 @@ export const AppointmentSheet = ({
     const [newCustomerPhone, setNewCustomerPhone] = useState('');
 
     const checkOutsideOperatingHours = (aptDateStr: string, aptTimeStr: string, durationMinutes: number) => {
-        if (!openingHours) return false;
+        if (!openingHours || (typeof openingHours === "object" && Object.keys(openingHours).length === 0)) return false;
+
+        let parsedHours: any = openingHours;
+        if (typeof openingHours === "string") {
+            try { parsedHours = JSON.parse(openingHours); } catch (e) { return false; }
+        }
+
+        const normalized = normalizeOpeningHours(parsedHours);
         const DAYS_OF_WEEK = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
         const parseLocalDate = (dateStr: string): Date => {
             if (!dateStr) return new Date();
@@ -160,12 +179,14 @@ export const AppointmentSheet = ({
         };
         const dateObj = parseLocalDate(aptDateStr);
         const dName = DAYS_OF_WEEK[dateObj.getDay()];
-        const dConfig = openingHours[dName];
-        if (!dConfig || !dConfig.enabled) return true;
+        const dConfig = normalized[dName];
+
+        if (!dConfig || dConfig.enabled === false) return false;
 
         const parseTimeToMinutes = (timeStr: string) => {
             if (!timeStr || !timeStr.includes(':')) return -1;
             const [h, m] = timeStr.split(':').map(Number);
+            if (isNaN(h) || isNaN(m)) return -1;
             return h * 60 + m;
         };
 
@@ -173,7 +194,9 @@ export const AppointmentSheet = ({
         const toMin = parseTimeToMinutes(dConfig.to);
 
         const aptStartMin = parseTimeToMinutes(aptTimeStr);
-        const aptEndMin = aptStartMin + durationMinutes;
+        if (aptStartMin < 0 || fromMin < 0 || toMin < 0) return false;
+
+        const aptEndMin = aptStartMin + (durationMinutes || 30);
 
         return aptStartMin < fromMin || aptEndMin > toMin;
     };
@@ -473,7 +496,7 @@ export const AppointmentSheet = ({
         let cancelled = false;
         setIsLoadingSlots(true);
 
-        getAvailableTimeSlotsAction(targetDate, selectedStaffId, totalDuration, maxBuffer, storeIdProp)
+        getAvailableTimeSlotsAction(targetDate, selectedStaffId, totalDuration, maxBuffer, storeId)
             .then((res) => {
                 if (cancelled) return;
                 if (res.success) {
@@ -3319,7 +3342,7 @@ export const AppointmentSheet = ({
                 isOpen={isAddItemSheetOpen}
                 onClose={() => setIsAddItemSheetOpen(false)}
                 partnerId={partnerId}
-                storeId={storeIdProp}
+                storeId={storeId}
                 onConfirm={(newItem) => {
                     const item = {
                         ...newItem,

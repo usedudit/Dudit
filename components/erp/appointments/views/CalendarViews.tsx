@@ -21,7 +21,7 @@ const checkOutsideOperatingHours = (aptDateStr: string, aptTimeStr: string, dura
     const dateObj = parseLocalDate(aptDateStr);
     const dName = DAYS_OF_WEEK[dateObj.getDay()];
     const dConfig = openingHours[dName];
-    if (!dConfig || !dConfig.enabled) return true;
+    if (!dConfig || dConfig.enabled === false) return false;
 
     const parseTimeToMinutes = (timeStr: string) => {
         if (!timeStr || !timeStr.includes(':')) return -1;

@@ -168,59 +168,93 @@ import { normalizePermissions } from "@/lib/permissions/rbac-normalize"
 // We load access by userId using the service role; userId is always resolved from
 // getCurrentUser() outside this scope, so rows cannot cross users.
 
-const fetchUserAccessStatic = unstable_cache(
-    async (userId: string) => {
+const fetchUserAccessStatic = (userId: string) => unstable_cache(
+    async (): Promise<PartnerAccessRecord[]> => {
         const admin = createAdminClient()
         const template = await getPermissionTemplate()
 
-        const [invitedDataRes, ownedDataRes] = await Promise.all([
-            admin.from("partner_users").select(`
-                    partner_id, user_id, role_id,
-                    roles:roles!inner (id, permissions),
-                    partners!inner (id, user_id, business_info, is_active, erp_disabled, stores(name))
-                `).eq("user_id", userId),
-            admin.from("partners").select(`
-                    id, user_id, business_info, is_active, erp_disabled, stores(name)
-                `).eq("user_id", userId)
+        const [ownedPartnersRes, invitedRowsRes] = await Promise.all([
+            admin.from("partners")
+                .select("id, user_id, business_info, is_active, erp_disabled, stores(name)")
+                .eq("user_id", userId),
+            admin.from("partner_users")
+                .select("id, partner_id, user_id, role_id, permissions")
+                .eq("user_id", userId)
         ])
 
-        const invitedData = invitedDataRes.data || []
-        const ownedData = ownedDataRes.data || []
+        const ownedPartners = ownedPartnersRes.data || []
+        const invitedRows = invitedRowsRes.data || []
 
         const accessRecords: Record<string, PartnerAccessRecord> = {}
-        const ownerUserIds = new Set<string>()
+        const ownedPartnerIds = new Set<string>()
 
-        if (ownedData) {
-            for (const partner of ownedData) {
-                if (partner.is_active === false || partner.erp_disabled === true) {
-                    continue
-                }
-                const storeName = partner.stores?.[0]?.name || "Loja sem nome"
-                accessRecords[partner.id] = {
-                    partnerId: partner.id,
-                    userId: userId,
-                    role: "OWNER" as PartnerRole,
-                    roleId: "owner",
-                    permissions: normalizePermissions(template, {}),
-                    storeName,
-                    ownerName: "Você",
-                    businessInfo: normalizeBusinessInfo(partner.business_info),
-                }
+        for (const partner of ownedPartners) {
+            if (partner.is_active === false || partner.erp_disabled === true) {
+                continue
+            }
+            ownedPartnerIds.add(partner.id)
+            const storeName = partner.stores?.[0]?.name || "Loja sem nome"
+            accessRecords[partner.id] = {
+                partnerId: partner.id,
+                userId: userId,
+                role: "OWNER" as PartnerRole,
+                roleId: "owner",
+                permissions: normalizePermissions(template, {}),
+                storeName,
+                ownerName: "Você",
+                businessInfo: normalizeBusinessInfo(partner.business_info),
             }
         }
 
-        if (invitedData) {
-            for (const record of invitedData as any[]) {
-                if (record.partners?.is_active === false || record.partners?.erp_disabled === true) {
-                    continue
-                }
-                if (!accessRecords[record.partner_id]) {
-                    const ownerId = record.partners.user_id
-                    if (ownerId) ownerUserIds.add(ownerId)
+        const invitedPartnerIds = ([...new Set(invitedRows.map((r: any) => String(r.partner_id)))] as string[])
+            .filter((id: string) => !ownedPartnerIds.has(id))
 
+        if (invitedPartnerIds.length > 0) {
+            const [invitedPartnersRes, storesRes, rolesRes] = await Promise.all([
+                admin.from("partners")
+                    .select("id, user_id, business_info, is_active, erp_disabled")
+                    .in("id", invitedPartnerIds),
+                admin.from("stores")
+                    .select("id, name, partner_id, is_headquarters")
+                    .in("partner_id", invitedPartnerIds),
+                admin.from("roles")
+                    .select("id, permissions")
+            ])
+
+            const partnerMap = new Map<string, any>((invitedPartnersRes.data || []).map((p: any) => [p.id, p]))
+            const storeNameMap = new Map<string, string>()
+            for (const s of (storesRes.data || []) as any[]) {
+                if (!storeNameMap.has(s.partner_id) || s.is_headquarters) {
+                    storeNameMap.set(s.partner_id, s.name)
+                }
+            }
+            const rolePermsMap = new Map<string, any>((rolesRes.data || []).map((r: any) => [String(r.id).toLowerCase(), r.permissions]))
+
+            const ownerUserIds = new Set<string>()
+            for (const p of (invitedPartnersRes.data || []) as any[]) {
+                if (p.user_id) ownerUserIds.add(p.user_id)
+            }
+
+            let ownerNameMap = new Map<string, string>()
+            if (ownerUserIds.size > 0) {
+                const { data: profiles } = await admin.from("user_profiles")
+                    .select("user_id, full_name")
+                    .in("user_id", Array.from(ownerUserIds))
+                if (profiles) {
+                    ownerNameMap = new Map((profiles as any[]).map((p: any) => [p.user_id, p.full_name]))
+                }
+            }
+
+            for (const record of invitedRows as any[]) {
+                const partner = partnerMap.get(record.partner_id)
+                if (!partner) continue
+                if (partner.is_active === false || partner.erp_disabled === true) continue
+
+                if (!accessRecords[record.partner_id]) {
                     const roleId = (String(record.role_id || "delivery").toLowerCase() as RoleId)
-                    const dbPerms = record.roles?.permissions
-                    const storeName = record.partners?.stores?.[0]?.name || "Loja sem nome"
+                    const dbPerms = record.permissions || rolePermsMap.get(roleId) || undefined
+                    const storeName = storeNameMap.get(record.partner_id) || "Loja sem nome"
+                    const ownerName = partner.user_id ? (ownerNameMap.get(partner.user_id) || "Desconhecido") : "Desconhecido"
 
                     accessRecords[record.partner_id] = {
                         partnerId: record.partner_id,
@@ -229,40 +263,23 @@ const fetchUserAccessStatic = unstable_cache(
                         roleId,
                         permissions: normalizePermissions(template, dbPerms),
                         storeName,
-                        ownerName: ownerId, // temporary
-                        businessInfo: normalizeBusinessInfo(record.partners.business_info),
+                        ownerName,
+                        businessInfo: normalizeBusinessInfo(partner.business_info),
                     }
                 }
             }
         }
 
-        let records = Object.values(accessRecords)
-
-        if (ownerUserIds.size > 0) {
-            const { data: profiles } = await admin.from("user_profiles").select("user_id, full_name").in("user_id", Array.from(ownerUserIds))
-            if (profiles) {
-                const names = Object.fromEntries(profiles.map((p: any) => [p.user_id, p.full_name]))
-                records = records.map(record => {
-                    if (record.roleId !== "owner" && record.ownerName && names[record.ownerName]) {
-                        record.ownerName = names[record.ownerName]
-                    } else if (record.roleId !== "owner") {
-                        record.ownerName = "Desconhecido"
-                    }
-                    return record
-                })
-            }
-        }
-
-        return records
+        return Object.values(accessRecords)
     },
-    ["user-access-records-static"],
+    [TAGS.userAccess(userId)],
     {
-        tags: ["user-access"],
-        revalidate: 900 // 15 mins (strictly short TTL)
+        tags: [TAGS.userAccess(userId)],
+        revalidate: 900
     }
 );
 
-const getCachedUserAccess = async (userId: string) => fetchUserAccessStatic(userId)
+const getCachedUserAccess = async (userId: string) => fetchUserAccessStatic(userId)()
 
 import type { User } from "@supabase/supabase-js"
 
@@ -587,7 +604,13 @@ export const getCurrentPartnerContext = cache(async (resolvedUser?: any): Promis
             }
 
             let activeStoreId = await getActiveStoreId()
-            if (!activeStoreId) {
+            if (activeStoreId) {
+                const admin = createAdminClient()
+                const { data: validStore } = await admin.from("stores").select("id").eq("id", activeStoreId).eq("partner_id", match.partnerId).maybeSingle()
+                if (!validStore) {
+                    activeStoreId = await resolveDefaultStoreId(match.partnerId)
+                }
+            } else {
                 activeStoreId = await resolveDefaultStoreId(match.partnerId)
             }
 
