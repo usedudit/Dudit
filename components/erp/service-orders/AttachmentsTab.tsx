@@ -107,6 +107,11 @@ export default function AttachmentsTab({
         e.target.value = ""
         if (!file) return
 
+        if (file.type.startsWith("image/") || /\.(jpg|jpeg|png|webp|gif|avif|bmp|svg)$/i.test(file.name)) {
+            toast({ description: "Arquivos de imagem não são permitidos no upload de documentos. Utilize a seção de Imagens." })
+            return
+        }
+
         const newAtt = {
             id: `new-${Date.now()}-${Math.random()}`,
             file,
@@ -426,7 +431,7 @@ export default function AttachmentsTab({
             <input
                 ref={docInputRef}
                 type="file"
-                accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.odt,.ppt,.pptx,.zip,.rar,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/plain,application/zip,application/x-rar-compressed"
                 className="hidden"
                 onChange={handleDocChange}
             />

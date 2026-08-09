@@ -1520,13 +1520,14 @@ export function ExplorarPageClient({
                                     )}
 
                                     {/* View Controls and Results */}
-                                    <ExplorarViewControls
-                                        viewMode={viewMode}
-                                        onViewModeChange={setViewMode}
-                                        onOpenFilters={() => setIsFiltersBottomSheetOpen(true)}
-                                        hasActiveFilters={activeFiltersCount > 0}
-                                        activeFilterChips={activeFilterChips}
-                                    />
+                                        <ExplorarViewControls
+                                            viewMode={viewMode}
+                                            onViewModeChange={setViewMode}
+                                            onOpenFilters={() => setIsFiltersBottomSheetOpen(true)}
+                                            onOpenSort={() => setIsSortBottomSheetOpen(true)}
+                                            hasActiveFilters={activeFiltersCount > 0}
+                                            activeFilterChips={activeFilterChips}
+                                        />
 
 
                                     {filteredResults.length === 0 && !hasNextPage ? (

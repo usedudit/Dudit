@@ -17,6 +17,7 @@ import {
   getFieldsForEntity,
 } from "@/lib/erp/import"
 import type { EntityType, ColumnMapping } from "@/lib/erp/import/types"
+import { requireActivePartnerContext, requireAuthorizedPartnerContext } from "@/lib/services/authorized-customer-access"
 
 export async function uploadPlanilhaAction(
   formData: FormData,
@@ -35,32 +36,26 @@ export async function uploadPlanilhaAction(
   try {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
 
-    const user = await requireUser()
-
     const file = formData.get("file") as File
     if (!file) {
       return { success: false, error: "Nenhum arquivo enviado." }
     }
 
     const entityTypeParam = formData.get("entityType") as string | null
-    const partnerId = formData.get("partnerId") as string
+    let partnerId = formData.get("partnerId") as string
     const storeId = formData.get("storeId") as string
 
     if (!partnerId) {
       return { success: false, error: "Parceiro não identificado." }
     }
 
-    const entityType = entityTypeParam as EntityType | null
-    if (entityType) {
-      await requirePermission(partnerId, entityType as any, "create", user)
-    } else {
-      await requirePermission(partnerId, "products", "create", user)
-    }
-
     const buffer = await file.arrayBuffer()
     const readResult = await readSpreadsheet(buffer, file.name)
 
+    const entityType = entityTypeParam as EntityType | null
     const detectedEntity = entityType || detectEntity(readResult.headers)
+    const access = await requireAuthorizedPartnerContext(partnerId, detectedEntity as any, "create")
+    partnerId = access.partnerId
     const mapping = suggestMapping(readResult.headers, detectedEntity, readResult.rows)
     const fields = getFieldsForEntity(detectedEntity)
     const availableFields = fields
@@ -115,14 +110,14 @@ export async function previewImportAction(
   error?: string
 }> {
   try {
-    const user = await requireUser()
-    const session = await getImportSession(partnerId, sessionId)
+    const access = await requireActivePartnerContext(partnerId)
+    const session = await getImportSession(access.partnerId, sessionId)
 
     if (!session) {
       return { success: false, error: "Sessão de importação expirada ou inválida." }
     }
 
-    await requirePermission(partnerId, session.entityType as any, "create", user)
+    await requirePermission(access.partnerId, session.entityType as any, "create", access.user)
 
     const preview = await generatePreview(session, mapping)
 
@@ -146,16 +141,19 @@ export async function confirmImportAction(
   const startTime = Date.now()
 
   let user: any
+  let canonicalPartnerId = partnerId
   try {
-    user = await requireUser()
-    const session = await getImportSession(partnerId, sessionId)
+    const access = await requireActivePartnerContext(partnerId)
+    user = access.user
+    canonicalPartnerId = access.partnerId
+    const session = await getImportSession(canonicalPartnerId, sessionId)
 
     if (!session) {
       console.warn(`[confirmImportAction] Session not found: partnerId=${partnerId}, sessionId=${sessionId}`)
       return { success: false, error: "Sessão de importação expirada ou inválida." }
     }
 
-    await requirePermission(partnerId, session.entityType as any, "create", user)
+    await requirePermission(canonicalPartnerId, session.entityType as any, "create", user)
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
 
     const result = await executeImport(session, mapping, options)
@@ -164,7 +162,7 @@ export async function confirmImportAction(
     const status = (result.successRows === 0 && result.errorRows > 0) ? "failed" : "completed"
 
     await supabase.from("erp_imports").insert({
-      partner_id: partnerId,
+      partner_id: canonicalPartnerId,
       entity_type: session.entityType,
       file_name: session.fileName,
       total_rows: session.totalRows,
@@ -177,7 +175,7 @@ export async function confirmImportAction(
       created_by: user.id,
     })
 
-    await deleteImportSession(partnerId, sessionId)
+    await deleteImportSession(canonicalPartnerId, sessionId)
 
     if (status === "failed") {
       return { success: false, error: result.errorMessage || "Nenhum dado pôde ser importado. Verifique os erros na planilha." }
@@ -189,10 +187,10 @@ export async function confirmImportAction(
 
     try {
       const supabase = await getSupabaseServerClient()
-      const session = await getImportSession(partnerId, sessionId)
+      const session = await getImportSession(canonicalPartnerId, sessionId)
       if (session) {
         await supabase.from("erp_imports").insert({
-          partner_id: partnerId,
+          partner_id: canonicalPartnerId,
           entity_type: session.entityType,
           file_name: session.fileName,
           total_rows: session.totalRows,
@@ -204,7 +202,7 @@ export async function confirmImportAction(
           status: "failed",
           created_by: user?.id || "",
         })
-        await deleteImportSession(partnerId, sessionId)
+        await deleteImportSession(canonicalPartnerId, sessionId)
       }
     } catch { }
 
@@ -222,14 +220,14 @@ export async function applyMappingAction(
   error?: string
 }> {
   try {
-    const user = await requireUser()
-    const session = await getImportSession(partnerId, sessionId)
+    const access = await requireActivePartnerContext(partnerId)
+    const session = await getImportSession(access.partnerId, sessionId)
     if (!session) {
       console.warn(`[applyMappingAction] Session not found: partnerId=${partnerId}, sessionId=${sessionId}`)
       return { success: false, error: "Sessão de importação expirada ou inválida." }
     }
 
-    await requirePermission(partnerId, session.entityType as any, "create", user)
+    await requirePermission(access.partnerId, session.entityType as any, "create", access.user)
 
     const previewProducts = session.rows.slice(0, 50).map((row, i) =>
       rowToPreviewEntity(session.entityType, row, mapping, i)

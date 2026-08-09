@@ -6,6 +6,7 @@ import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 import { logAuditEvent } from "@/lib/services/timeline.service"
+import { requireAuthorizedCustomerContext } from "@/lib/services/authorized-customer-access"
 
 export type RecurringFrequency = "daily" | "weekly" | "monthly" | "yearly"
 export type RecurringType = "income" | "expense"
@@ -487,6 +488,7 @@ export async function generateRecurringOccurrencesAction(partnerId: string) {
     const authStart = performance.now()
     await requirePermission(partnerId, "financial", "view")
     const supabase = await getSupabaseServerClient()
+    const customerAccess = await requireAuthorizedCustomerContext(partnerId, "view")
 
     // ── Single bulk RPC call replaces N×400 serial round trips ─────────
     const t1 = performance.now()
@@ -520,7 +522,7 @@ export async function generateRecurringOccurrencesAction(partnerId: string) {
         ? supabase.from("transaction_contacts").select("id,name").in("id", contactIds)
         : Promise.resolve({ data: [] as { id: string; name: string | null }[] }),
       customerIds.length
-        ? supabase.from("customers").select("id,name").in("id", customerIds).eq("partner_id", partnerId)
+        ? customerAccess.admin.from("customers").select("id,name").in("id", customerIds).eq("partner_id", customerAccess.partnerId)
         : Promise.resolve({ data: [] as { id: string; name: string | null }[] }),
       pmIds.length
         ? supabase.from("payment_methods").select("id,name,payment_type").in("id", pmIds).eq("partner_id", partnerId)

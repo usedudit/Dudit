@@ -3,6 +3,7 @@
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { requirePermission } from "@/lib/permissions/access"
+import { requireAuthorizedPartnerContext } from "@/lib/services/authorized-customer-access"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { sanitizeNotes } from "@/lib/input-validator"
@@ -346,8 +347,9 @@ export async function getSubscriptionBillingPanelAction(partnerId: string) {
 
 export async function getSubscriptionForecastAction(partnerId: string) {
   try {
-    await requirePermission(partnerId, "recurring_subscriptions", "view")
-    const supabase = await getSupabaseServerClient()
+    const access = await requireAuthorizedPartnerContext(partnerId, "recurring_subscriptions", "view")
+    partnerId = access.partnerId
+    const supabase = access.admin
 
     // Get active subscriptions and calculate their upcoming executions in the next 30 days
     const { data: subs, error } = await supabase
@@ -386,8 +388,9 @@ export async function getSubscriptionForecastAction(partnerId: string) {
 
 export async function getSubscriptionCreditsAction(partnerId: string, search: string = "") {
   try {
-    await requirePermission(partnerId, "recurring_subscriptions", "view")
-    const supabase = await getSupabaseServerClient()
+    const access = await requireAuthorizedPartnerContext(partnerId, "recurring_subscriptions", "view")
+    partnerId = access.partnerId
+    const supabase = access.admin
 
     let query = supabase
       .from("subscription_item_credits")

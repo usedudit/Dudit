@@ -8,6 +8,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { scopeActiveOnly } from "@/lib/supabase/query-helpers"
 import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
+import { requireAuthorizedCustomerContext } from "@/lib/services/authorized-customer-access"
 
 export const dynamic = "force-dynamic"
 
@@ -18,6 +19,7 @@ export const dynamic = "force-dynamic"
  */
 async function loadCatalogs(partnerId: string, storeId?: string | null) {
   const supabase = await getSupabaseServerClient()
+  const customerAccess = await requireAuthorizedCustomerContext(partnerId, "view")
 
   let servicesQuery = scopeActiveOnly(supabase
     .from("services")
@@ -41,7 +43,7 @@ async function loadCatalogs(partnerId: string, storeId?: string | null) {
       .select("user_id, stores(id, opening_hours)")
       .eq("id", partnerId)
       .single(),
-    supabase
+    customerAccess.admin
       .from("customers")
       .select("id, name, email, phone, image_url")
       .eq("partner_id", partnerId)

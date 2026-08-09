@@ -29,6 +29,7 @@ import { checkLimit, increment_usage_counter, decrement_usage_counter } from "@/
 import { withTelemetry } from "@/lib/utils/action-logger"
 import { notifyQuoteEvent } from "@/lib/services/quote-notifications.service"
 import { endOfDay, getTodayYmd } from "@/lib/date"
+import { requireAuthorizedCustomerContext, requireAuthorizedPartnerContext } from "@/lib/services/authorized-customer-access"
 
 export type ERPQuoteListCursor = { createdAt: string; id: string }
 
@@ -56,10 +57,10 @@ export async function getERPQuotesPageAction(
 > {
     return withTelemetry("getERPQuotesPageAction", async () => {
         try {
-            const user = await requireUser()
-            await requirePermission(partnerId, "quotes", "view", user)
-
-            const supabase = await getSupabaseServerClient()
+            const quoteAccess = await requireAuthorizedPartnerContext(partnerId, "quotes", "view")
+            const user = quoteAccess.user
+            partnerId = quoteAccess.partnerId
+            const supabase = quoteAccess.admin
             const cursor = options?.cursor ?? null
             const storeId = options?.storeId ?? null
             const limit = Math.max(1, Math.min(250, Math.floor(Number(options?.limit || ERP_QUOTES_PAGE_SIZE))))
@@ -748,10 +749,11 @@ async function saveQuoteSnapshot(supabase: any, quoteId: string, partnerId: stri
     // 4. Fetch customer and address
     let customerInfo = null
     if (quote.customer_id) {
-        const { data: customer } = await supabase
+        const { data: customer } = await getAdminClient()
             .from("customers")
             .select("id, name, email, phone, image_url")
             .eq("id", quote.customer_id)
+            .eq("partner_id", partnerId)
             .maybeSingle()
 
         if (customer) {
@@ -897,10 +899,11 @@ export async function updateQuoteStatusAction(data: {
             }
 
             // Fetch fully updated quote for notifications and RLS / details
-            const { data: updatedQuote } = await supabase
+            const { data: updatedQuote } = await getAdminClient()
                 .from("quotes")
                 .select("*, customers(*)")
                 .eq("id", data.quoteId)
+                .eq("partner_id", data.partnerId)
                 .single()
 
             // Trigger notification for customer if transitioned from draft to sent/pending_client
@@ -1317,14 +1320,11 @@ export async function searchCustomersForQuote(query?: string) {
     await requireRateLimit(RateLimitCategory.API_GENERAL)
 
     try {
-        const ctx = await getCurrentPartnerContext()
-        if (!ctx?.partnerId) return []
-
-        const supabase = await getSupabaseServerClient()
-        let queryBuilder = supabase
+        const customerAccess = await requireAuthorizedCustomerContext(undefined, "view")
+        let queryBuilder = customerAccess.admin
             .from("customers")
             .select("id, name, email, phone, created_at")
-            .eq("partner_id", ctx.partnerId)
+            .eq("partner_id", customerAccess.partnerId)
             .limit(10)
 
         if (query && query.trim().length >= 2) {
@@ -1434,8 +1434,9 @@ export async function convertQuoteToOrderAction(data: {
         await requireRateLimit(RateLimitCategory.ERP_GENERAL)
 
         try {
-            const user = await requireUser()
-            await requirePermission(data.partnerId, "quotes", "edit", user)
+            const quoteAccess = await requireAuthorizedPartnerContext(data.partnerId, "quotes", "edit")
+            const user = quoteAccess.user
+            data.partnerId = quoteAccess.partnerId
             await requirePermission(data.partnerId, "orders", "create", user)
 
             const { requireCSRF } = await import("@/lib/security/csrf-action-wrapper")
@@ -1479,7 +1480,7 @@ export async function convertQuoteToOrderAction(data: {
                 })
             }
 
-            const { data: quote, error: quoteError } = await supabase
+            const { data: quote, error: quoteError } = await getAdminClient()
                 .from("quotes")
                 .select(`
                     id,
@@ -1769,8 +1770,8 @@ export async function getQuoteHistoryAction(quoteId: string, partnerId: string) 
 
 export async function getQuoteDetailsAction(quoteId: string, partnerId: string) {
     try {
-        const user = await requireUser()
-        await requirePermission(partnerId, "quotes", "view", user)
+        const quoteAccess = await requireAuthorizedPartnerContext(partnerId, "quotes", "view")
+        partnerId = quoteAccess.partnerId
 
         const quoteCache = await getQuoteWithItemsCached(quoteId, partnerId)
 

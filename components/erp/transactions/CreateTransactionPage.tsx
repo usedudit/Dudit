@@ -20,6 +20,7 @@ import {
     FormDropdown,
     Checkbox,
     InfoCard,
+    FormSection,
 } from "@/components/reusable"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import AlertModal from "@/components/reusable/AlertModal"
@@ -29,6 +30,7 @@ import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { useSidebar } from "@/lib/sidebar-context"
 import { GenericAttachmentsTab } from "../shared/GenericAttachmentsTab"
+import { uploadAndSavePendingAttachments } from "@/lib/utils/attachment-uploader"
 import { FadeIn } from "@/components/animations/FadeIn"
 import {
     SaveIcon,
@@ -231,6 +233,23 @@ export default function CreateTransactionPage({
 
     const [draftTransactionId] = useState(() => crypto.randomUUID())
     const transactionId = editTransaction?.id || draftTransactionId
+
+    const [stagedDocFiles, setStagedDocFiles] = useState<File[]>([])
+    const [stagedImageFiles, setStagedImageFiles] = useState<(string | File)[]>([])
+
+    const uploadStagedAttachments = async (targetTxId: string) => {
+        if (stagedDocFiles.length === 0 && stagedImageFiles.length === 0) return
+        const res = await uploadAndSavePendingAttachments({
+            partnerId,
+            entityId: targetTxId,
+            entityType: "transaction",
+            files: stagedDocFiles,
+            images: stagedImageFiles,
+        })
+        if (!res.success && res.errors) {
+            console.error("Aviso no upload de anexos:", res.errors)
+        }
+    }
 
     const [txKind, setTxKind] = useState<TxKind>(() => {
         if (editRecurringTemplate) return editRecurringTemplate.type || "income"
@@ -1137,6 +1156,8 @@ export default function CreateTransactionPage({
             })
 
             if (!res.success) return error(res.error || "Erro ao salvar transação")
+            const createdTxId = (res.data as { id?: string } | undefined)?.id || transactionId
+            await uploadStagedAttachments(createdTxId)
             success("Transação criada com sucesso!")
             onSuccess?.()
             debouncedRefresh()
@@ -1349,8 +1370,7 @@ export default function CreateTransactionPage({
             )}
 
             {isIncomeExpense && (
-                <section className="space-y-4">
-                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Detalhes do lançamento</h3>
+                <FormSection title="Detalhes do lançamento" hasSeparator>
                     <MoneyInput
                         label="Valor"
                         value={amount}
@@ -1415,14 +1435,7 @@ export default function CreateTransactionPage({
                     )}
 
                     {isIncomeExpense && (!isEditMode || isRecurringTemplateEdit) && (
-                        <div className="mt-8">
-                            <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
-                            <div className="flex items-center justify-between">
-                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">
-                                    {enableRecurrence && "Detalhes da recorrência"}
-                                    {installmentModeEnabled && "Detalhes das parcelas"}
-                                </h3>
-                            </div>
+                        <FormSection title={enableRecurrence && "Detalhes da recorrência" || installmentModeEnabled && "Detalhes das parcelas"} hasSeparator>
                             {!enableRecurrence && !isRecurringTemplateEdit && recurringModeEnabled && (
                                 <Checkbox
                                     name="enable_recurrence"
@@ -1555,7 +1568,7 @@ export default function CreateTransactionPage({
                                     </div>
                                 </>
                             )}
-                        </div>
+                        </FormSection>
                     )}
 
                     {isEditMode && isRecurringTransaction && (
@@ -1563,7 +1576,7 @@ export default function CreateTransactionPage({
                             <InfoCard message="Esta transação faz parte de uma recorrência. Campos financeiros estão bloqueados. Para alterar valores futuros, edite a recorrência diretamente." color="blue" />
                         </div>
                     )}
-                </section>
+                </FormSection>
             )}
         </>
     )
@@ -1838,10 +1851,7 @@ export default function CreateTransactionPage({
                                         >
                                             {(!forcedTab || forcedTab === "Transações") && (
                                                 <>
-                                                    <section>
-                                                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">
-                                                            Tipo de lançamento
-                                                        </h3>
+                                                    <FormSection title="Tipo de lançamento">
                                                         <div className="lg:hidden -mx-4 px-4">
                                                             <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-2 pt-0.5 no-scrollbar scroll-pl-4 pl-4 pr-2">
                                                                 {typeButtons.map((b) => (
@@ -1906,9 +1916,7 @@ export default function CreateTransactionPage({
                                                                 </button>
                                                             ))}
                                                         </div>
-                                                    </section>
-
-                                                    <div className="h-px bg-brand-border dark:bg-dark-border w-full" />
+                                                    </FormSection>
                                                 </>
                                             )}
 
@@ -1948,6 +1956,11 @@ export default function CreateTransactionPage({
                                         subtitle="Gerencie faturas, comprovantes ou contratos desta transação."
                                         isEditing={!isCancelledTx}
                                         readOnly={isCancelledTx}
+                                        isNew={!isEditMode}
+                                        stagedFiles={stagedDocFiles}
+                                        onStagedFilesChange={setStagedDocFiles}
+                                        stagedImages={stagedImageFiles}
+                                        onStagedImagesChange={setStagedImageFiles}
                                     />
                                 </div>
                             </TabsContent>

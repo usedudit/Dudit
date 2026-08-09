@@ -1,13 +1,19 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requireUser, requireCustomerOwnership } from "@/lib/auth/authorization"
+import { requireUser, requireCustomerOwnership, ForbiddenError } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
 import { createNotification, resolveCustomerUserId } from "@/lib/services/notification.service"
+import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
+import { requireAuthorizedCustomerRecord } from "@/lib/services/authorized-customer-access"
 
 export async function getBirthdayCouponCodeAction(partnerId: string): Promise<string> {
   await requireUser()
-  await requirePermission(partnerId, "coupons", "view")
+  const context = await getCurrentPartnerContext()
+  if (!context?.partnerId || context.partnerId !== partnerId) {
+    throw new ForbiddenError("O parceiro informado não corresponde ao contexto ativo")
+  }
+  await requirePermission(context.partnerId, "coupons", "view")
 
   const supabase = await getSupabaseServerClient()
 
@@ -45,19 +51,15 @@ export async function sendBirthdayNotificationAction(
   customerId: string,
   partnerId: string,
 ): Promise<{ success: boolean; error?: string; notified?: boolean }> {
-  const user = await requireUser()
-  
-  // Security checks
-  await requireCustomerOwnership(customerId)
-  await requirePermission(partnerId, "customers", "edit", user)
-
-  const supabase = await getSupabaseServerClient()
+  const customerAccess = await requireAuthorizedCustomerRecord(customerId, "edit")
+  const canonicalPartnerId = customerAccess.partnerId
+  const supabase = customerAccess.admin
 
   // Fetch store name
   const { data: store } = await supabase
     .from("stores")
     .select("name")
-    .eq("partner_id", partnerId)
+    .eq("partner_id", canonicalPartnerId)
     .order("is_headquarters", { ascending: false })
     .limit(1)
     .maybeSingle()
@@ -76,7 +78,7 @@ export async function sendBirthdayNotificationAction(
   }
 
   // Get active coupon code
-  const couponCode = await getBirthdayCouponCodeAction(partnerId)
+  const couponCode = await getBirthdayCouponCodeAction(canonicalPartnerId)
 
   // Resolve customer user_id
   const customerUserId = await resolveCustomerUserId({ customerId })

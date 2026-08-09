@@ -14,6 +14,8 @@ import {
 import { revalidatePath, revalidateTag } from "next/cache"
 import { DASHBOARD_TAGS } from "@/lib/data/dashboard"
 import { sanitizeNotes } from "@/lib/input-validator"
+import { getAdminClient } from "@/lib/supabase/admin"
+import { requireActivePartnerContext } from "@/lib/services/authorized-customer-access"
 
 export type ERPDeliveryListCursor = { createdAt: string; id: string }
 
@@ -798,6 +800,7 @@ export async function getSmartDeliverySuggestionsAction(input: {
 
 export async function fetchDeliveryOrderBucketAction(partnerId: string) {
   await requireUser()
+  await requireActivePartnerContext(partnerId)
   const actor = await getDeliveryActorScope(partnerId)
   if (actor.roleId === "delivery") return []
   const planCheck = await enforceDeliveryPlanAccess(partnerId, 1)
@@ -847,9 +850,10 @@ export async function fetchDeliveryOrderBucketAction(partnerId: string) {
   let customerMap = new Map<string, any>()
   if (buyerIds.length > 0) {
     const [{ data: customerRows }, { data: addressRows }] = await Promise.all([
-      supabase
+      getAdminClient()
         .from("customers")
         .select("id, name, email, phone, image_url")
+        .eq("partner_id", partnerId)
         .in("id", buyerIds),
       supabase
         .from("addresses")
@@ -1287,6 +1291,7 @@ export async function getERPDeliveriesPageAction(
 
 export async function getERPDeliveryDetailsAction(deliveryId: string, partnerId: string) {
   await requireUser()
+  await requireActivePartnerContext(partnerId)
   const actor = await getDeliveryActorScope(partnerId)
   await requirePartnerRouteAccess(partnerId, "logistics", { specificPermission: "can_view_delivery_details" })
   const planCheck = await enforceDeliveryPlanAccess(partnerId, 1)
@@ -1353,9 +1358,10 @@ export async function getERPDeliveryDetailsAction(deliveryId: string, partnerId:
   let customerMap = new Map<string, any>()
   if (buyerIds.length > 0) {
     const [{ data: customerRows }, { data: addressRows }] = await Promise.all([
-      supabase
+      getAdminClient()
         .from("customers")
         .select("id, name, email, phone, image_url")
+        .eq("partner_id", partnerId)
         .in("id", buyerIds),
       supabase
         .from("addresses")

@@ -4738,126 +4738,1084 @@ Automático: se e-mail do pedido logado = e-mail do cliente no ERP, o sistema vi
 Não há tabela de preços por cliente nativa. Use **cupons personalizados** ou **observação interna** com "Preço especial: X%".
 `
 },
-{
-    id: "perguntas-frequentes-clientes",
-        title: "Perguntas frequentes sobre Clientes",
-            description: "Respostas rápidas sobre cadastro, organização, histórico, importação, recursos e integração.",
-                slug: "perguntas-frequentes-clientes",
-                    category: "clientes",
-                        content: `
-## Cadastro e edição
+        ]
+    },
+    {
+        id: "financeiro",
+        title: "Financeiro",
+        icon: "💰",
+        articles: [
+            {
+                id: "visao-geral-financeiro",
+                title: "Visão geral de Financeiro",
+                description: "Entenda o módulo Financeiro: transações, contas, categorias e integração com os demais módulos.",
+                slug: "visao-geral-financeiro",
+                category: "financeiro",
+                content: `
+## Visão geral
 
-**Posso cadastrar cliente sem CPF/CNPJ?**
-Sim, mas não recomendado. Sem documento, não emite nota fiscal nominal e o sistema não impede duplicatas por nome.
+O módulo **Financeiro** centraliza todo o dinheiro que entra e sai do seu negócio. Nele você acompanha pagamentos e recebimentos, controla contas bancárias e em dinheiro, organiza tudo em categorias e tira relatórios para decidir com segurança.
 
-**Qual a diferença entre Pessoa Física e Pessoa Jurídica no cadastro?**
-**PF:** CPF, RG, data de nascimento, nome da mãe/pai. **PJ:** CNPJ (com consulta automática), IE, nome fantasia, inscrição municipal, CRT, contribuinte. O tipo muda os campos exibidos.
+![Tela principal de Financeiro](https://img.dudit.com.br/static/screens/Financeiro_VisaoGeral.png)
+Legenda: Lista de transações com abas de situação, busca, filtros e resumo de valores.
 
-**Como funciona a consulta CNPJ automática?**
-Ao digitar CNPJ válido (14 dígitos) e sair do campo, o sistema consulta a Receita Federal e preenche: razão social, nome fantasia, endereço, telefone, e-mail, regime tributário (CRT). Funciona só para PJ.
+Tudo que acontece nos outros módulos reflete aqui automaticamente:
 
-**Posso alterar o tipo de pessoa depois de cadastrado?**
-Sim, edite o cliente e mude "Tipo de pessoa". Os campos se adaptam (PF ↔ PJ). Dados do tipo anterior ficam salvos mas ocultos.
+- **Vendas e PDV** → recebimentos de vendas
+- **Serviços, agendamentos e Ordens de Serviço** → recebimentos de serviços
+- **Compras e despesas** → contas a pagar
+- **Comissões e metas** → lançamentos gerados pelo sistema
+- **Marketplace e assinaturas (Mercado Pago)** → recebimentos de vendas online
 
-**O que acontece se eu deixar de preencher campos obrigatórios?**
-O sistema destaca a aba e o campo em vermelho e não permite salvar até corrigir.
+## O que você encontra no módulo
 
----
+**Lista de transações** — cada linha é um lançamento com descrição, categoria, contato, data de vencimento, forma de pagamento, status e valor. Clique em qualquer uma para ver os detalhes.
 
-## Status e organização
+**Abas de situação** — cinco abas organizam os lançamentos:
 
-**Qual a diferença entre Inativo, Bloqueado e Arquivado?**
-- **Inativo:** pausa temporária, não aparece na seleção de vendas/agendamentos.
-- **Bloqueado:** impedido de comprar/agendar (ex: inadimplência).
-- **Arquivado:** removido da lista principal para organizar; recuperável com 1 clique.
+| Aba | O que mostra |
+|-----|--------------|
+| **Transações** | Todos os lançamentos do período |
+| **A pagar** | O que você deve pagar (saídas em aberto) |
+| **A receber** | O que você deve receber (entradas em aberto) |
+| **Vencidos** | Lançamentos com data de vencimento passada e sem baixa |
+| **Cancelados** | Lançamentos que foram cancelados |
 
-**Cliente arquivado some do histórico de vendas?**
-Não. Pedidos, orçamentos, agendamentos e OSs antigos continuam vinculados e visíveis nos detalhes.
+**Resumo por aba** — cada aba mostra o total pendente, vencido e concluído, facilitando saber quanto está em aberto.
 
-**Como reativo um cliente arquivado?**
-Vá na aba **Arquivado**, clique em **Desarquivar** no menu do cliente. Volta para "Ativo".
+**Busca e filtros** — encontre lançamentos por descrição, categoria, contato, forma de pagamento, data e valor.
 
-**Posso excluir um cliente permanentemente?**
-Excluir faz **soft delete** — some das listas e buscas, mas histórico permanece. Para restaurar, contate o suporte.
+**Tipos de lançamento** — ao criar, você escolhe um dos cinco tipos: **Entrada**, **Saída**, **Transferência**, **Ajuste** ou **Reembolso**.
 
-**Quantos clientes posso cadastrar?**
-Depende do seu plano. Clientes arquivados **não contam** para o limite. O sistema avisa ao atingir.
+## Como acessar
 
----
+1. No menu lateral, clique em **Financeiro**.
+2. A lista abre na aba **Transações** por padrão.
+3. Use as abas, busca e filtros para encontrar o que precisa.
+4. Clique em **Nova transação** para lançar entrada, saída, transferência, ajuste ou reembolso.
 
-## Busca, filtros e exportação
+## Dicas importantes
 
-**A busca acha por observações internas?**
-Não. Busca só por **nome, e-mail e telefone**. Para achar por observação, exporte para Excel e filtre lá.
+- **Cadastre suas contas e categorias antes de lançar** — facilita a organização e os relatórios.
+- **Use as abas A pagar e A receber** para saber exatamente o que vence no mês.
+- **Confira a aba Vencidos** com frequência para evitar juros e cobranças atrasadas.
+- **Aproveite as transações automáticas** — vendas, comissões e assinaturas já entram sozinhas no financeiro.
 
-**Como exporto apenas clientes ativos?**
-Clique na aba **Ativo** > botão **Exportar**. A exportação respeita a aba/visão atual.
+## Perguntas frequentes
 
-**A importação atualiza clientes existentes?**
-Não. Importação **só cria novos**. Se CPF/CNPJ/e-mail já existe, pula (se "Pular duplicatas" ligado) ou erro. Para atualizar em massa, edite individualmente.
+**O que aparece na aba Transações?**
+Todos os lançamentos do período, incluindo entradas, saídas, transferências, ajustes e reembolsos.
 
-**Qual o limite da importação?**
-Até **10 MB** e **2.000 linhas** por arquivo. Divida bases maiores em vários arquivos.
+**Vendas feitas no PDV entram no Financeiro?**
+Sim, automaticamente. Cada venda gera um recebimento vinculado à forma de pagamento usada.
 
-**Posso importar endereço de cobrança diferente?**
-Não na importação padrão. Importe o endereço principal; depois edite cada cliente e marque "Endereço de cobrança diferente".
+**Posso cancelar uma transação?**
+Sim. Abra o lançamento e use a opção de cancelar. Ele passa para a aba **Cancelados** e não conta mais nos totais.
 
----
+**O módulo Financeiro substitui meu controle em planilha?**
+Sim. Com contas, categorias, parcelamentos e relatórios, ele centraliza tudo que você controlava em planilhas — com menos retrabalho.
+`
+            },
+            {
+                id: "primeiros-passos-financeiro",
+                title: "Primeiros passos no Financeiro",
+                description: "Configuração inicial recomendada: contas, categorias, contatos e primeiros lançamentos.",
+                slug: "primeiros-passos-financeiro",
+                category: "financeiro",
+                content: `
+## Visão geral
 
-## Histórico e detalhes
+Começar o Financeiro organizado evita retrabalho. Em poucos passos você cadastra suas contas, define categorias, adiciona contatos e lança as primeiras transações.
 
-**O "Total Gasto" inclui pedidos cancelados?**
-Não. Só pedidos com situação diferente de "cancelado".
+## Ordem recomendada
 
-**Pedidos feitos no site (marketplace) aparecem no histórico?**
-Sim, se o cliente fez login e o e-mail bate com o cadastro do ERP. O sistema vincula automaticamente via \`marketplace_user_id\`.
+### 1. Cadastre suas contas
 
-**Consigo ver agendamentos e OSs do cliente no detalhe dele?**
-Não diretamente. Em **Serviços > Agendamentos** ou **Ordens de Serviço**, use a busca pelo nome do cliente.
+Crie as contas onde o dinheiro circula: **caixa**, **conta bancária** e **cartão de crédito**. Cada transação aponta para uma conta, e o saldo dela é atualizado automaticamente.
 
-**Como sei se o cliente tem vale-compra disponível?**
-No detalhe do cliente (aba Dados Gerais), seção **Vales-compra**: badge verde = disponível, cinza = usado, vermelho = expirado. Badge no topo soma o saldo total.
+### 2. Crie categorias e subcategorias
 
----
+Organize entradas e saídas por tipo, por exemplo:
 
-## Recursos adicionais
+- **Entradas**: Vendas, Serviços, Outras receitas
+- **Saídas**: Fornecedores, Salários, Impostos, Aluguel, Internet
 
-**Como configurar endereço de cobrança diferente?**
-Edite o cliente > aba **Endereço** > marque "Endereço de cobrança diferente" > preencha campos > salve. Usado na nota fiscal.
+Você pode criar quantas precisar e ainda usar subcategorias para detalhar (ex: Saídas > Fornecedores > Matéria-prima).
 
-**Vales-compra expiram?**
-Só se você definir **data de validade** na criação (via devolução ou cupom). Sem data, não expiram.
+### 3. Cadastre contatos
 
-**Como funciona o aniversário do cliente?**
-Se tem **data de nascimento** cadastrada e plano **Crescer**, no dia/próximos dias aparece card com 3 ações: criar cupom, enviar WhatsApp (precisa celular), enviar notificação (1x/ano).
+Adicione fornecedores, funcionários e outros parceiros. Isso permite saber, no relatório, para quem você paga e de quem você recebe.
 
-**Posso enviar WhatsApp de aniversário sem cupom?**
-Sim, a ação "Enviar WhatsApp" abre \`wa.me\` com mensagem padrão. Se já criou cupom, ele vai no texto.
+### 4. Faça os primeiros lançamentos
 
----
+Registre as entradas e saídas que já aconteceram para deixar os saldos corretos. Se tiver parcelas ou valores que se repetem, use **parcelado** ou **recorrente** desde o início.
 
-## Integração com outros módulos
+### 5. Acompanhe pelos relatórios
 
-**Cliente criado no PDV aparece na lista de Clientes?**
-Sim, imediatamente. Status Ativo, tipo Pessoa Física, sem documento/endereço. Complete depois.
+Depois dos lançamentos, acesse os relatórios para ver seu resultado do mês, despesas por categoria e saldo das contas.
 
-**Cliente inativo aparece no seletor do PDV/Vendas?**
-Não. Seletor só mostra **Ativos**. Reative antes de usar.
+## Quando utilizar
 
-**Como uso vale-compra no PDV?**
-Selecione o cliente > se tem vale "Disponível", aparece opção **Vale-compra/Crédito** nas formas de pagamento. Abate do vale mais antigo (FIFO).
+- Na configuração inicial do sistema
+- Ao migrar de planilha ou outro software
+- Quando quiser começar a controlar despesas e receitas com mais precisão
 
-**Posso ter preços diferentes por cliente?**
-Não há tabela de preços por cliente nativa. Use **cupons personalizados** ou **observação interna** com "Preço especial: X%".
+## Dicas importantes
 
-**O endereço de entrega da venda altera o cadastro do cliente?**
-Não. Alterar na venda é só para aquela entrega. Para mudar definitivo, edite em **Clientes > Endereço**.
+- **Comece pelo que é essencial** — contas e categorias principais já resolvem a maioria dos casos.
+- **Use categorias consistentes** — evite criar nomes diferentes para a mesma coisa (ex: "Energia" e "Conta de luz").
+- **Lançamentos antigos** — se precisar de histórico completo, inclua meses anteriores; se quiser começar do zero, lance apenas o saldo atual.
 
----
+## Perguntas frequentes
+
+**Preciso cadastrar tudo de uma vez?**
+Não. O mínimo para começar é ter uma conta e lançar. Categorias e contatos podem ser criados durante o próprio lançamento.
+
+**Posso alterar uma categoria depois?**
+Sim. As categorias podem ser editadas, renomeadas e ter subcategorias a qualquer momento.
+
+**O que acontece se eu lançar sem categoria?**
+O sistema permite, mas seus relatórios ficam menos detalhados. Use categorias sempre que possível.
+`
+            },
+            {
+                id: "categorias-subcategorias-financeiras",
+                title: "Categorias e subcategorias financeiras",
+                description: "Como criar e usar categorias de entradas e saídas para organizar seus lançamentos e relatórios.",
+                slug: "categorias-subcategorias-financeiras",
+                category: "financeiro",
+                content: `
+## Visão geral
+
+Categorias organizam suas transações por tipo. Elas aparecem nos lançamentos, filtros e relatórios, permitindo entender para onde vai o dinheiro e de onde ele vem.
+
+## Categorias de entrada e de saída
+
+Cada categoria é de um tipo:
+
+- **Categoria de entrada (receita)** — para lançamentos que trazem dinheiro: vendas, serviços, outras receitas.
+- **Categoria de saída (despesa)** — para lançamentos que tiram dinheiro: fornecedores, aluguel, impostos, salários.
+
+## Subcategorias
+
+Você pode criar subcategorias dentro de uma categoria para detalhar ainda mais. Exemplo:
+
+| Categoria | Subcategoria |
+|-----------|--------------|
+| Fornecedores | Matéria-prima |
+| Fornecedores | Embalagens |
+| Despesas fixas | Aluguel |
+| Despesas fixas | Internet |
+
+## Como criar
+
+1. No módulo **Financeiro**, acesse o menu de **Cadastros** e escolha **Categorias**.
+2. Clique em **Nova categoria**.
+3. Informe o **nome** e o **tipo** (entrada ou saída).
+4. Para criar subcategoria, escolha a categoria-pai e preencha o nome.
+5. Salve. A categoria já fica disponível nos lançamentos.
+
+## Quando utilizar
+
+- Na organização inicial do financeiro
+- Sempre que lançar despesas ou receitas que ainda não têm categoria adequada
+
+## Dicas importantes
+
+- **Padronize os nomes** — categorias bem nomeadas geram relatórios limpos.
+- **Crie subcategorias com parcimônia** — subcategorias demais dificultam a leitura.
+- **Use o tipo correto** — uma categoria de entrada não aparece para saídas e vice-versa.
+
+## Perguntas frequentes
+
+**Posso mudar o tipo de uma categoria?**
+Não após criar. Crie uma nova categoria com o tipo correto e use-a nos lançamentos seguintes.
+
+**O que acontece com lançamentos antigos se eu renomear a categoria?**
+Eles passam a exibir o novo nome, já que apontam para a mesma categoria.
+
+**Preciso de categoria para transferência entre contas?**
+Não. Transferências não usam categoria de entrada ou saída — o sistema as trata de forma específica.
+`
+            },
+            {
+                id: "contas-financeiras",
+                title: "Contas financeiras",
+                description: "Cadastro e uso de contas: caixa, conta bancária e cartão. Saldos atualizados automaticamente.",
+                slug: "contas-financeiras",
+                category: "financeiro",
+                content: `
+## Visão geral
+
+**Contas financeiras** representam onde o dinheiro está: **caixa**, **conta bancária** ou **cartão de crédito**. Cada transação é lançada em uma conta, e o saldo dela é atualizado automaticamente a cada movimento.
+
+## Tipos de conta
+
+- **Caixa** — dinheiro em espécie (gaveta, retiradas do dia).
+- **Conta bancária** — conta corrente ou poupança (cheque, transferência, Pix).
+- **Cartão de crédito** — para lançar gastos no cartão e acompanhar a fatura.
+
+## Como criar uma conta
+
+1. No módulo **Financeiro**, acesse **Cadastros > Contas**.
+2. Clique em **Nova conta**.
+3. Informe o **nome** (ex: "Caixa da loja", "Banco X - corrente") e o **tipo**.
+4. Defina o **saldo inicial** — o valor que a conta tem hoje.
+5. Salve. A conta aparece na seleção dos lançamentos.
+
+## Como funciona o saldo
+
+- **Entradas** aumentam o saldo da conta.
+- **Saídas** diminuem o saldo.
+- **Transferências** movem o valor entre contas (uma sai, outra entra).
+- **Ajustes** corrigem o saldo manualmente quando necessário (ex: conciliação bancária).
+
+## Quando utilizar
+
+- Para separar dinheiro em espécie do dinheiro em banco
+- Para acompanhar gastos no cartão de crédito
+- Para controlar múltiplas contas bancárias
+
+## Dicas importantes
+
+- **Mantenha o saldo inicial real** — ele é a base para tudo que virá depois.
+- **Lançamento na conta certa** — um gasto pago pelo cartão deve ser lançado no cartão, não no caixa.
+- **Revise saldos periodicamente** — compare com seu banco e use **Ajuste** para corrigir diferenças.
+
+## Perguntas frequentes
+
+**Posso ter mais de uma conta?**
+Sim, quantas precisar. Cada transação é vinculada a uma conta.
+
+**Transferência entre contas altera meu resultado?**
+Não. Ela move o dinheiro entre contas sem mudar o total do seu negócio.
+
+**Como corrijo um saldo errado?**
+Use o tipo de lançamento **Ajuste** para corrigir o saldo da conta para o valor correto.
+`
+            },
+            {
+                id: "contatos-financeiros",
+                title: "Contatos financeiros",
+                description: "Fornecedores, funcionários e outros contatos: como cadastrar e vincular aos lançamentos.",
+                slug: "contatos-financeiros",
+                category: "financeiro",
+                content: `
+## Visão geral
+
+**Contatos financeiros** são as pessoas e empresas com quem você transaciona: **fornecedores**, **funcionários**, **clientes** e **outros**. Vincular o contato ao lançamento permite saber com quem você pagou ou recebeu.
+
+## Tipos de contato
+
+- **Fornecedor** — quem te vende produtos, matéria-prima ou serviços (despesas).
+- **Funcionário** — pagamentos de salários, comissões e adiantamentos.
+- **Cliente** — quem compra de você (receitas).
+- **Outro** — demais pessoas ou empresas (ex: sócio, prestador eventual).
+
+## Como criar um contato
+
+1. No módulo **Financeiro**, acesse **Cadastros > Contatos**.
+2. Clique em **Novo contato**.
+3. Informe o **nome** e o **tipo** (fornecedor, funcionário, cliente ou outro).
+4. Preencha os demais dados opcionais (documento, telefone, e-mail).
+5. Salve. O contato fica disponível nos lançamentos.
+
+## Quando utilizar
+
+- Para saber para quem e de quem o dinheiro se move
+- Para gerar relatórios por contato (total pago a cada fornecedor)
+- Para organizar contas a pagar e a receber
+
+## Dicas importantes
+
+- **Reutilize contatos** — o mesmo fornecedor deve ser usado em todos os lançamentos, assim o relatório fica agrupado.
+- **Vincule sempre que possível** — lançamentos sem contato aparecem como "Sem contato" nos relatórios.
+- **Clientes já cadastrados** — clientes do módulo de Clientes podem aparecer automaticamente aqui nas receitas.
+
+## Perguntas frequentes
+
+**Preciso cadastrar contato para lançar?**
+Não é obrigatório, mas recomendado para um relatório completo.
+
+**Contato de fornecedor é o mesmo do módulo Clientes?**
+O módulo Financeiro tem contatos próprios para fornecedores, funcionários e outros. Para receitas, você também pode vincular clientes da sua base.
+
+**Posso ter contatos que nunca lançam?**
+Sim, cadastre à vontade. Eles só aparecem quando usados.
+`
+            },
+            {
+                id: "como-lancar-entrada-saida",
+                title: "Como lançar entrada e saída",
+                description: "Passo a passo para registrar receitas e despesas no Financeiro, com parcelas e formas de pagamento.",
+                slug: "como-lancar-entrada-saida",
+                category: "financeiro",
+                content: `
+## Visão geral
+
+O lançamento mais comum no Financeiro é registrar uma **entrada** (dinheiro que entra) ou uma **saída** (dinheiro que sai). O processo é rápido e você pode repeti-lo todos os dias.
+
+## Quando utilizar
+
+- Para registrar uma venda recebida manualmente
+- Para lançar uma despesa (compra, conta, salário)
+- Para registrar dinheiro que entrou ou saiu do caixa
+
+## Como fazer
+
+### 1. Abrir o novo lançamento
+
+No módulo **Financeiro**, clique em **Nova transação**.
+
+### 2. Escolher o tipo
+
+Selecione **Entrada** para receita ou **Saída** para despesa.
+
+### 3. Preencher os dados
+
+- **Descrição** — o que é (ex: "Venda balcão", "Compra de matéria-prima").
+- **Valor** — o total do lançamento.
+- **Categoria** — escolha a categoria (e subcategoria, se houver).
+- **Conta** — onde o dinheiro entra ou sai.
+- **Contato** — para quem paga ou de quem recebe (opcional).
+- **Data de vencimento** — quando vence ou foi pago.
+- **Forma de pagamento** — Pix, dinheiro, cartão, etc.
+- **Observações** — anotações internas (opcional).
+
+### 4. Opcionais
+
+- **Parcelado** — divida o valor em parcelas (veja o artigo sobre lançamentos parcelados).
+- **Recorrente** — repita automaticamente todos os meses (veja o artigo sobre transações recorrentes).
+
+### 5. Salvar
+
+Clique em **Salvar**. O lançamento aparece na aba correspondente e atualiza o saldo da conta.
+
+## Dicas importantes
+
+- **Escolha a categoria certa** — entradas usam categorias de entrada e saídas, de saída.
+- **Confira a conta** — o saldo da conta indicada será alterado.
+- **Use a data de vencimento** — lançamentos em aberto aparecem em A pagar/A receber até serem baixados.
+
+## Perguntas frequentes
+
+**Um lançamento em aberto aparece onde?**
+Em **A pagar** (saída) ou **A receber** (entrada), até ser marcado como pago.
+
+**Como marco como pago?**
+Abra o lançamento e use a opção de baixar/marcar como pago, informando a data do pagamento.
+
+**Posso lançar uma entrada e uma saída de uma vez?**
+Cada lançamento é individual. Para movimentações entre contas, use **Transferência**.
+`
+            },
+            {
+                id: "como-fazer-transferencia-entre-contas",
+                title: "Como fazer transferência entre contas",
+                description: "Mova dinheiro entre caixa, banco e cartão sem alterar seu resultado financeiro.",
+                slug: "como-fazer-transferencia-entre-contas",
+                category: "financeiro",
+                content: `
+## Visão geral
+
+A **transferência** move dinheiro de uma conta para outra — por exemplo, do **caixa** para a **conta bancária**, ou do **banco** para o **cartão** para pagar a fatura. Ela não gera receita nem despesa: apenas muda onde o dinheiro está.
+
+## Quando utilizar
+
+- Quando você retira dinheiro do caixa e deposita no banco
+- Quando paga a fatura do cartão com a conta bancária
+- Quando faz um Pix entre contas suas
+
+## Como fazer
+
+1. No módulo **Financeiro**, clique em **Nova transação**.
+2. Escolha o tipo **Transferência**.
+3. Selecione a **conta de origem** (de onde sai o dinheiro) e a **conta de destino** (para onde vai).
+4. Informe o **valor**.
+5. Adicione uma **descrição** (ex: "Depósito do caixa no banco").
+6. Salve. O valor sai da origem e entra no destino.
+
+## Como funciona no resultado
+
+A transferência **não altera** seu resultado do mês, porque uma conta reduz e a outra aumenta na mesma proporção. Ela aparece no histórico de cada conta envolvida.
+
+## Dicas importantes
+
+- **Origem e destino diferentes** — se informar a mesma conta, o sistema não permite ou não faz sentido; confira antes de salvar.
+- **Use descrições claras** — facilita entender o histórico depois.
+- **Não confunda com Ajuste** — transferência move entre contas; ajuste corrige saldo.
+
+## Perguntas frequentes
+
+**Transferência gera imposto ou taxa no sistema?**
+Não. É apenas o registro da movimentação entre contas.
+
+**Consigo desfazer uma transferência?**
+Abra a transferência e cancele o lançamento. Os saldos das duas contas voltam ao estado anterior.
+
+**A transferência aparece nos relatórios de resultado?**
+Não nos totais de receitas/despesas, mas aparece no detalhamento de cada conta.
+`
+            },
+            {
+                id: "como-ajustar-saldo-conta",
+                title: "Como ajustar o saldo de uma conta",
+                description: "Corrija saldos de caixa e banco com lançamentos de ajuste, inclusive para conciliação.",
+                slug: "como-ajustar-saldo-conta",
+                category: "financeiro",
+                content: `
+## Visão geral
+
+O **Ajuste** é o lançamento usado para corrigir o saldo de uma conta quando ele não bate com a realidade — por exemplo, após uma **conciliação bancária** ou quando o saldo do caixa físico está diferente do registrado.
+
+## Quando utilizar
+
+- Quando o saldo da conta no sistema difere do extrato do banco
+- Quando o caixa físico não confere com o saldo registrado (sobra ou falta)
+- Para fazer a correção de arredondamentos ou lançamentos antigos incorretos
+
+## Como fazer
+
+1. No módulo **Financeiro**, clique em **Nova transação**.
+2. Escolha o tipo **Ajuste**.
+3. Selecione a **conta** que terá o saldo corrigido.
+4. Informe o **valor** da diferença.
+5. Adicione uma **descrição** (ex: "Ajuste após conciliação bancária").
+6. Salve. O saldo da conta passa a refletir o valor ajustado.
+
+## Dicas importantes
+
+- **Ajuste não é despesa nem receita** — ele só corrige o saldo da conta.
+- **Documente o motivo** — a descrição do ajuste é essencial para auditoria depois.
+- **Prefira lançar o correto** — se a diferença tem causa conhecida (ex: uma saída esquecida), lance a saída em vez do ajuste.
+
+## Perguntas frequentes
+
+**Qual a diferença entre Ajuste e Transferência?**
+Transferência move dinheiro entre contas. Ajuste corrige o saldo de uma única conta sem mover valor para outra.
+
+**O ajuste aparece nos relatórios?**
+Sim, com a categoria "Ajuste de saldo", para você identificar facilmente.
+
+**Posso fazer ajuste para cima e para baixo?**
+Sim. Informe o valor do ajuste conforme a correção necessária.
+`
+            },
+            {
+                id: "como-registrar-reembolso-estorno",
+                title: "Como registrar reembolso e estorno",
+                description: "Lance reembolsos de despesa e de receita, para estornos de vendas e devoluções de dinheiro.",
+                slug: "como-registrar-reembolso-estorno",
+                category: "financeiro",
+                content: `
+## Visão geral
+
+O **Reembolso** registra quando o dinheiro volta ou sai por uma devolução. Existem dois tipos:
+
+- **Reembolso de despesa** — quando uma despesa paga volta (ex: fornecedor devolve o valor de uma compra).
+- **Reembolso de receita / estorno** — quando você devolve o dinheiro de uma venda (ex: devolução de produto ou cancelamento).
+
+## Quando utilizar
+
+- Devolução de mercadoria ao fornecedor com retorno do valor pago
+- Estorno de uma venda cancelada
+- Devolução de dinheiro a um cliente (reembolso de pagamento)
+- Crédito em loja (vale-compra) gerado por devolução
+
+## Como fazer
+
+1. No módulo **Financeiro**, clique em **Nova transação**.
+2. Escolha o tipo **Reembolso**.
+3. Selecione o **tipo de reembolso**:
+   - **Reembolso de despesa** — o dinheiro volta para você.
+   - **Reembolso de receita** — você devolve dinheiro ao cliente.
+4. Preencha descrição, valor, conta, contato e data.
+5. Salve. O lançamento fica marcado como reembolso no histórico.
+
+## Dicas importantes
+
+- **Use a categoria Reembolsos** — o sistema registra nessa categoria para facilitar a identificação.
+- **Vincule o cliente** — ao reembolsar uma receita, vincule o cliente para controle.
+- **Confira o saldo da conta** — o reembolso mexe no saldo da conta escolhida.
+
+## Perguntas frequentes
+
+**Reembolso de receita é o mesmo que estorno de venda?**
+No financeiro, sim: é o registro de que o dinheiro da venda voltou. Se a venda foi cancelada, o recebimento dela também é tratado no fluxo de estorno.
+
+**Reembolso reduz minhas receitas do mês?**
+Ele aparece como lançamento de reembolso, e o resultado do período reflete a devolução.
+
+**Como lanço crédito em loja por devolução?**
+O vale-compra/crédito em loja é gerado no fluxo de devolução de venda. No financeiro, o estorno correspondente é registrado como reembolso.
+`
+            },
+            {
+                id: "contas-a-pagar",
+                title: "Contas a pagar",
+                description: "Acompanhe suas despesas em aberto: o que vence, o que está atrasado e o que já foi pago.",
+                slug: "contas-a-pagar",
+                category: "financeiro",
+                content: `
+## Visão geral
+
+A aba **A pagar** reúne todas as **saídas em aberto** do seu negócio: fornecedores, aluguel, impostos, salários, boletos e qualquer outra despesa que ainda não foi paga.
+
+![Aba A pagar](https://img.dudit.com.br/static/screens/Financeiro_Apagar.png)
+Legenda: Despesas em aberto com total pendente, vencido e concluído.
+
+## O que você vê
+
+- **Total pendente** — quanto ainda falta pagar
+- **Total vencido** — o que já passou do vencimento
+- **Total concluído** — o que já foi pago no período
+
+A lista é ordenada por **data de vencimento**, então o que vence primeiro aparece primeiro.
+
+## Como pagar uma conta
+
+1. Na aba **A pagar**, encontre o lançamento.
+2. Abra os detalhes.
+3. Use a opção **Marcar como pago**.
+4. Informe a **data do pagamento** (se necessário).
+5. O lançamento sai de "em aberto" e passa a contar como concluído.
+
+## Quando utilizar
+
+- Todos os dias, para saber o que vence hoje e nos próximos dias
+- Para evitar atrasos e multas
+- Para planejar o caixa do mês
+
+## Dicas importantes
+
+- **Pague com folga** — acompanhe o que vence nos próximos dias, não só o que já venceu.
+- **Use os vencidos** — a aba **Vencidos** concentra tudo que está atrasado para você priorizar.
+- **Parcelas e recorrências** — parcelas em aberto e ocorrências recorrentes futuras aparecem aqui automaticamente.
+
+## Perguntas frequentes
+
+**Por que uma conta aparece em A pagar?**
+Toda saída com data de vencimento futura ou presente e sem baixa aparece como conta a pagar.
+
+**Paguei mas continua aparecendo?**
+Verifique se o lançamento foi marcado como pago e se a conta indicada está correta.
+
+**Recorrências futuras aparecem em A pagar?**
+Sim. As próximas ocorrências de uma despesa recorrente aparecem com suas respectivas datas de vencimento.
+`
+            },
+            {
+                id: "contas-a-receber",
+                title: "Contas a receber",
+                description: "Acompanhe suas receitas em aberto: vendas a prazo, serviços agendados e valores que ainda entrarão.",
+                slug: "contas-a-receber",
+                category: "financeiro",
+                content: `
+## Visão geral
+
+A aba **A receber** reúne todas as **entradas em aberto**: vendas a prazo, parcelas de clientes, serviços prestados e qualquer recebimento agendado que ainda não foi recebido.
+
+## O que você vê
+
+- **Total pendente** — quanto ainda falta receber
+- **Total vencido** — o que já passou do vencimento sem receber
+- **Total concluído** — o que já foi recebido no período
+
+A lista é ordenada por **data de vencimento**, mostrando primeiro o que deve entrar antes.
+
+## Como receber um valor
+
+1. Na aba **A receber**, encontre o lançamento.
+2. Abra os detalhes.
+3. Use a opção **Marcar como recebido**.
+4. Informe a **data do recebimento** (se necessário).
+5. O lançamento sai de "em aberto" e passa a contar como concluído.
+
+## Quando utilizar
+
+- Para saber quanto vai entrar no mês
+- Para cobrar valores em atraso
+- Para planejar o caixa e evitar surpresas
+
+## Dicas importantes
+
+- **Acompanhe os vencidos** — vendas a prazo não pagas aparecem em **Vencidos** para você cobrar.
+- **Vendas a prazo já entram automaticamente** — a parcela da venda aparece como a receber.
+- **Serviços e agendamentos** — recebimentos de serviços podem ser lançados como a receber.
+
+## Perguntas frequentes
+
+**Por que uma parcela de venda aparece em A receber?**
+Vendas a prazo geram recebimentos com datas de vencimento. Enquanto não recebidos, ficam em aberto.
+
+**Como registro o recebimento de um cliente?**
+Abra o lançamento e use **Marcar como recebido**. O saldo da conta indicada aumenta.
+
+**O que é o total vencido em A receber?**
+São recebimentos que passaram do vencimento e ainda não entraram — sinal de que vale cobrar.
+`
+            },
+            {
+                id: "parcelado-transacoes",
+                title: "Lançamentos parcelados",
+                description: "Divida um valor em parcelas mensais: como criar, acompanhar e receber/pagar cada parcela.",
+                slug: "parcelado-transacoes",
+                category: "financeiro",
+                content: `
+## Visão geral
+
+**Parcelado** divide um lançamento em várias parcelas mensais. Você informa o valor total e o número de parcelas, e o sistema cria cada parcela com sua própria data de vencimento.
+
+## Quando utilizar
+
+- Compra de equipamento paga em 6x no cartão
+- Venda a prazo para cliente em 3x
+- Qualquer valor que será pago ou recebido em partes
+
+## Como criar um parcelamento
+
+1. No módulo **Financeiro**, clique em **Nova transação**.
+2. Escolha **Entrada** ou **Saída**.
+3. Preencha descrição, valor total, categoria, conta e contato.
+4. Ative a opção **Parcelado**.
+5. Informe a **quantidade de parcelas**.
+6. Confira as datas de vencimento geradas (uma por mês).
+7. Salve. Cada parcela vira um lançamento próprio.
+
+## Como funciona na prática
+
+- Cada parcela aparece com **número da parcela** (ex: 2/6).
+- Elas ficam em **A pagar** ou **A receber** conforme a data de vencimento.
+- Cada parcela é baixada individualmente (marcar como pago/recebido).
+- O detalhe da transação mostra o **grupo de parcelas** com o total.
+
+## Dicas importantes
+
+- **Confira a primeira data** — ela define o vencimento de todas as parcelas seguintes.
+- **Baixe parcela a parcela** — o saldo da conta é atualizado a cada baixa.
+- **Parcelas atrasadas** — aparecem na aba **Vencidos** para você não esquecer.
+
+## Perguntas frequentes
+
+**Posso pagar uma parcela antes do vencimento?**
+Sim. Marque a parcela como paga quando quiser, informando a data do pagamento.
+
+**E se eu pagar a vista o que estava parcelado?**
+Baixe todas as parcelas como pagas na data em que o pagamento ocorreu, ou registre cada baixa.
+
+**Posso alterar o número de parcelas depois?**
+Não diretamente. Você pode cancelar o grupo e refazer o lançamento com as novas parcelas.
+`
+            },
+            {
+                id: "transacoes-recorrentes",
+                title: "Transações recorrentes",
+                description: "Automatize despesas e receitas fixas que se repetem todos os meses, como aluguel e assinaturas.",
+                slug: "transacoes-recorrentes",
+                category: "financeiro",
+                content: `
+## Visão geral
+
+**Transações recorrentes** são lançamentos que se repetem em intervalo fixo, geralmente **mensal**. Você configura uma vez e o sistema gera as próximas ocorrências automaticamente.
+
+## Quando utilizar
+
+- Despesas fixas: aluguel, internet, telefone, mensalidade de sistemas
+- Receitas fixas: mensalidades de clientes, planos de manutenção
+- Qualquer valor que se repete todo mês
+
+## Como criar
+
+1. No módulo **Financeiro**, clique em **Nova transação**.
+2. Escolha **Entrada** ou **Saída**.
+3. Preencha descrição, valor, categoria, conta e contato.
+4. Ative a opção **Recorrente**.
+5. Defina a **frequência** (ex: mensal) e a **data da primeira ocorrência**.
+6. Salve. O sistema cria o modelo da recorrência.
+
+## Como funciona na prática
+
+- As próximas ocorrências aparecem em **A pagar** ou **A receber**, com as datas de vencimento.
+- Cada ocorrência é baixada individualmente.
+- Se algo mudar (valor, dia), você pode **editar a recorrência** e as próximas ocorrências acompanham.
+
+## Dicas importantes
+
+- **Baixe a ocorrência do mês** — pagar a ocorrência não altera o modelo; cada mês é uma nova baixa.
+- **Revise o dia de vencimento** — o dia escolhido na criação vale para todas as ocorrências.
+- **Recorrência não é parcela** — parcela tem fim definido; recorrência continua até você cancelar.
+
+## Perguntas frequentes
+
+**Onde vejo as ocorrências futuras?**
+Em **A pagar** ou **A receber**, conforme a data de vencimento de cada ocorrência.
+
+**Como paro uma recorrência?**
+Edite a recorrência e cancele-a, ou cancele as ocorrências futuras conforme o caso.
+
+**Uma recorrência gera lançamento automaticamente?**
+Ela gera as ocorrências previstas. O pagamento/recebimento de cada uma é feito por você, como nos demais lançamentos.
+`
+            },
+            {
+                id: "transacoes-automaticas",
+                title: "Transações automáticas",
+                description: "Lançamentos criados pelo sistema: vendas, serviços, comissões, metas e assinaturas entram sozinhos.",
+                slug: "transacoes-automaticas",
+                category: "financeiro",
+                content: `
+## Visão geral
+
+O sistema gera **transações automáticas** a partir de movimentações em outros módulos. Você não precisa lançar manualmente — elas entram no Financeiro sozinhas, com origem identificada.
+
+## Origens das transações automáticas
+
+| Origem | O que gera |
+|--------|-----------|
+| **Vendas (PDV e pedidos)** | Recebimentos de cada venda, conforme a forma de pagamento |
+| **Vendas no marketplace** | Recebimentos de pedidos online integrados |
+| **Serviços, agendamentos e Ordens de Serviço** | Recebimentos de serviços prestados |
+| **Comissões** | Lançamentos de comissões de funcionários/vendedores |
+| **Metas e bônus** | Lançamentos gerados por bonificações de metas |
+| **Assinaturas / Mercado Pago** | Recebimentos de assinaturas e pré-aprovações |
+| **Recorrências** | Ocorrências das transações recorrentes que você configurou |
+
+## Como identificar
+
+Transações automáticas aparecem na lista com sua **origem** indicada (ex: venda, comissão, assinatura). Ao abrir o lançamento, você vê de qual venda, serviço ou pedido ele veio.
+
+## Quando utilizar
+
+- Não é necessário fazer nada — a integração é automática
+- Use para conferir se tudo que foi vendido entrou no financeiro
+
+## Dicas importantes
+
+- **Confira periodicamente** — compare as vendas do dia com os recebimentos no Financeiro.
+- **Não duplique** — não relance manualmente o que o sistema já gerou, ou o valor contará duas vezes.
+- **Estornos** — cancelamentos e devoluções também geram lançamentos automáticos de estorno/reembolso.
+
+## Perguntas frequentes
+
+**Toda venda no PDV gera lançamento no Financeiro?**
+Sim. Cada venda gera o recebimento vinculado à forma de pagamento usada.
+
+**Posso editar uma transação automática?**
+Em geral, não é necessário. Se algo estiver errado, verifique a venda original no módulo de Vendas.
+
+**Preciso lançar manualmente as vendas do site?**
+Não. Pedidos do marketplace integrados entram automaticamente no Financeiro.
+`
+            },
+            {
+                id: "detalhes-e-historico-transacao",
+                title: "Detalhes e histórico de uma transação",
+                description: "O que você vê ao abrir um lançamento: dados, forma de pagamento, parcelas, origem e histórico.",
+                slug: "detalhes-e-historico-transacao",
+                category: "financeiro",
+                content: `
+## Visão geral
+
+Ao clicar em um lançamento na lista, abre a **tela de detalhes** com todas as informações da transação e o histórico de movimentações dela.
+
+![Detalhes de uma transação](https://img.dudit.com.br/static/screens/Financeiro_DetalheTransacao.png)
+Legenda: Detalhes do lançamento com dados gerais, forma de pagamento e histórico.
+
+## O que você encontra
+
+**Informações principais** — descrição, valor, categoria, subcategoria, conta, contato, data de vencimento, forma de pagamento e status (pago/recebido ou em aberto).
+
+**Origem** — se a transação é manual ou veio de outro módulo (venda, serviço, comissão, assinatura, recorrência).
+
+**Parcelas** — se o lançamento é parcelado, mostra o grupo com número da parcela e total.
+
+**Valores auxiliares** — juros, descontos e valor já pago (pagamentos parciais), quando aplicáveis.
+
+**Histórico** — linha do tempo com o que aconteceu com a transação: criação, alterações, baixas de pagamento e cancelamentos.
+
+## Como abrir
+
+1. No módulo **Financeiro**, encontre o lançamento na lista.
+2. Clique nele (ou no botão de detalhes).
+3. Navegue pelas seções e pelo histórico.
+
+## Quando utilizar
+
+- Para conferir se um lançamento está correto
+- Para entender de onde veio uma transação automática
+- Para ver quando um pagamento foi baixado e por quem
+- Para acompanhar parcelas e pagamentos parciais
+
+## Dicas importantes
+
+- **Use o histórico para auditoria** — ele mostra alterações e baixas, útil para conciliação.
+- **Confira a origem** — em transações automáticas, abra a venda/serviço original se precisar corrigir.
+- **Observações** — o campo de observações internas aparece aqui e ajuda a lembrar o contexto do lançamento.
+
+## Perguntas frequentes
+
+**O que é o histórico da transação?**
+Uma linha do tempo com os eventos do lançamento: criação, edições, pagamentos e cancelamentos.
+
+**Consigo ver pagamentos parciais no detalhe?**
+Sim. Se um lançamento teve pagamento parcial, o valor pago e o saldo restante aparecem nos detalhes.
+
+**Transações automáticas têm detalhes?**
+Sim. Elas mostram a origem e podem ser abertas normalmente.
+`
+            },
+            {
+                id: "caixa-pdv-abertura-sangria-reforco-fechamento",
+                title: "Caixa do PDV: abertura, sangria, reforço e fechamento",
+                description: "Gerencie o caixa do PDV: como abrir, retirar (sangria), reforçar e fechar o caixa do dia.",
+                slug: "caixa-pdv-abertura-sangria-reforco-fechamento",
+                category: "financeiro",
+                content: `
+## Visão geral
+
+O **caixa do PDV** controla o dinheiro em espécie do balcão ao longo do dia. Você abre o caixa no início, registra retiradas (**sangria**) e depósitos (**reforço**), e no fim fecha o caixa conferindo o valor.
+
+## Como abrir o caixa
+
+1. No PDV, acesse o **Caixa**.
+2. Clique em **Abrir caixa**.
+3. Informe o **valor inicial** (quanto há em espécie no início).
+4. Confirme. O caixa fica aberto para as vendas do dia.
+
+## Sangria
+
+**Sangria** é a retirada de dinheiro do caixa durante o dia — por exemplo, para pagar uma despesa ou depositar no banco.
+
+1. Com o caixa aberto, use a opção **Sangria**.
+2. Informe o **valor** e o **motivo**.
+3. Confirme. O valor sai do caixa.
+
+## Reforço
+
+**Reforço** é a entrada de dinheiro no caixa durante o dia — por exemplo, quando você repõe troco.
+
+1. Com o caixa aberto, use a opção **Reforço**.
+2. Informe o **valor** e o **motivo**.
+3. Confirme. O valor entra no caixa.
+
+## Fechamento
+
+No fim do dia:
+
+1. Clique em **Fechar caixa**.
+2. O sistema mostra o **total esperado** (valor inicial + vendas em dinheiro + reforços − sangrias).
+3. Confira com o dinheiro físico.
+4. Confirme o fechamento. O resultado do dia fica registrado.
+
+## Quando utilizar
+
+- Todos os dias, em lojas com atendimento de balcão
+- Sempre que retirar ou acrescentar dinheiro ao caixa durante o expediente
+- No encerramento do expediente
+
+## Dicas importantes
+
+- **Registre toda retirada como sangria** — evita diferença no fechamento.
+- **Confira o caixa antes de fechar** — conte o dinheiro físico e compare com o esperado.
+- **Vendas em dinheiro entram no caixa automaticamente** — você só registra o que sai ou entra por fora das vendas.
+
+## Perguntas frequentes
+
+**O caixa do PDV aparece no Financeiro?**
+Sim. As vendas e movimentações do caixa do PDV são refletidas no Financeiro, e o artigo de Vendas explica o fluxo do PDV em detalhes.
+
+**Esqueci de abrir o caixa no início do dia. E agora?**
+Abra o caixa com o valor inicial correto o quanto antes. O importante é que o registro reflita a realidade do dia.
+
+**Sangria e reforço geram lançamentos no Financeiro?**
+Sim. Sangrias e reforços ficam registrados como movimentações do caixa.
+
+**Posso abrir o caixa sem informar valor inicial?**
+Em geral o sistema pede um valor inicial. Se o caixa começa zerado, informe zero.
+`
+            },
+            {
+                id: "relatorios-financeiros",
+                title: "Relatórios financeiros",
+                description: "Resultado do período, despesas e receitas por categoria, saldo das contas e outros indicadores.",
+                slug: "relatorios-financeiros",
+                category: "financeiro",
+                content: `
+## Visão geral
+
+Os **relatórios financeiros** mostram o panorama do seu dinheiro: quanto entrou, quanto saiu, qual o resultado do período e como o valor se distribui entre categorias e contas.
+
+## Relatórios disponíveis
+
+**Resultado (receitas x despesas)** — total de entradas, total de saídas e o resultado do período (positivo ou negativo).
+
+**Por categoria** — quanto foi movimentado em cada categoria de entrada e de saída, para identificar onde o dinheiro vai.
+
+**Por conta** — saldo e movimentação de cada conta (caixa, banco, cartão).
+
+**Por contato** — total pago a cada fornecedor e recebido de cada cliente.
+
+**Vencidos** — o que está atrasado, tanto a pagar quanto a receber.
+
+## Como acessar
+
+1. No menu lateral, acesse **Relatórios**.
+2. Selecione o módulo **Financeiro**.
+3. Escolha o relatório desejado.
+4. Use os **filtros de período** (ex: este mês, mês passado, intervalo personalizado) para ajustar a visão.
+
+## Quando utilizar
+
+- No fim do mês, para ver o resultado do período
+- Para decidir onde cortar gastos (relatório por categoria)
+- Para conferir quanto está vencido e cobrar/pagar
+- Para acompanhar saldo das contas
+
+## Dicas importantes
+
+- **Use períodos comparáveis** — compare o mesmo intervalo entre meses diferentes.
+- **Confira as categorias** — relatórios dependem de lançamentos bem categorizados.
+- **Exporte para compartilhar** — os relatórios podem ser exportados para planilha.
+
+## Perguntas frequentes
+
+**O resultado considera transferências e ajustes?**
+Não. Transferências e ajustes não entram no total de receitas e despesas, pois não representam ganho ou perda.
+
+**Os relatórios consideram lançamentos em aberto?**
+O resultado do período considera as receitas e despesas do período conforme as regras do relatório (data de vencimento/pagamento). Confira o filtro selecionado.
+
+**Posso ver relatório de um período passado?**
+Sim. Use o filtro de período para selecionar qualquer intervalo.
+`
+            },
+            {
+                id: "exportar-transacoes",
+                title: "Exportar transações",
+                description: "Exporte seus lançamentos para planilha (Excel/CSV) para análise externa ou contador.",
+                slug: "exportar-transacoes",
+                category: "financeiro",
+                content: `
+## Visão geral
+
+A **exportação** gera um arquivo de planilha com os lançamentos do Financeiro. É útil para análise no Excel, repasse ao contador ou arquivamento.
+
+## Como exportar
+
+1. No módulo **Financeiro**, aplique os **filtros desejados** (período, aba, busca).
+2. Clique no botão **Exportar**.
+3. O sistema gera o arquivo no formato escolhido (planilha).
+4. Salve ou abra o arquivo no seu computador.
+
+## O que vai no arquivo
+
+Cada linha é uma transação com informações como descrição, categoria, conta, contato, data de vencimento, forma de pagamento, status e valor.
+
+## Quando utilizar
+
+- Para analisar o financeiro em planilha
+- Para enviar dados ao contador
+- Para criar relatórios personalizados fora do sistema
+- Para arquivamento e auditoria
+
+## Dicas importantes
+
+- **Filtre antes de exportar** — a exportação respeita a visão/filtro atual.
+- **Confira o período** — exporte apenas o intervalo que precisa.
+- **Não altere no sistema** — o arquivo é um retrato dos dados no momento da exportação.
+
+## Perguntas frequentes
+
+**A exportação respeita a aba selecionada?**
+Sim. Se você está na aba A pagar com um filtro de período, a exportação traz apenas os lançamentos dessa visão.
+
+**Em que formato sai o arquivo?**
+Em formato de planilha compatível com Excel e editores de planilha.
+
+**Posso exportar todos os lançamentos de uma vez?**
+Sim, desde que a visão atual contenha os lançamentos desejados.
+`
+            },
+            {
+                id: "perguntas-frequentes-financeiro",
+                title: "Perguntas frequentes sobre Financeiro",
+                description: "Respostas rápidas sobre lançamentos, abas, contas, parcelas, recorrências, reembolsos e integrações.",
+                slug: "perguntas-frequentes-financeiro",
+                category: "financeiro",
+                content: `
+## Lançamentos e abas
+
+**Qual a diferença entre as abas Transações, A pagar, A receber, Vencidos e Cancelados?**
+- **Transações**: todos os lançamentos do período.
+- **A pagar**: saídas em aberto (você ainda deve).
+- **A receber**: entradas em aberto (ainda vai receber).
+- **Vencidos**: lançamentos com vencimento passado e sem baixa.
+- **Cancelados**: lançamentos cancelados, que não contam nos totais.
+
+**O que é uma transação manual?**
+É um lançamento criado por você (entrada, saída, transferência, ajuste ou reembolso), em contraste com os automáticos criados pelo sistema.
+
+**Posso cancelar um lançamento?**
+Sim. Abra o lançamento e use a opção de cancelar. Ele passa para a aba **Cancelados**.
+
+## Contas e categorias
+
+**Quantas contas posso ter?**
+Quantas precisar: caixa, contas bancárias, cartões.
+
+**Transferência entre contas altera meu resultado?**
+Não. Ela apenas move o dinheiro entre contas.
+
+**Como corrijo um saldo de conta errado?**
+Use um lançamento do tipo **Ajuste**, informando a conta e o valor da correção.
+
+**Preciso de categoria para transferência?**
+Não. Transferências não usam categoria de entrada ou saída.
+
+## Parcelas e recorrências
+
+**Como funciona um lançamento parcelado?**
+O valor é dividido em parcelas mensais, cada uma com sua data de vencimento, baixadas individualmente.
+
+**Qual a diferença entre parcelado e recorrente?**
+Parcelado tem fim definido (ex: 6x). Recorrente se repete até você cancelar (ex: aluguel mensal).
+
+**Onde vejo as ocorrências de uma recorrência?**
+Em **A pagar** ou **A receber**, conforme a data de vencimento de cada ocorrência.
+
+## Reembolsos e estornos
+
+**O que é reembolso de despesa?**
+Quando uma despesa paga volta — por exemplo, o fornecedor devolve o valor de uma compra.
+
+**O que é reembolso de receita (estorno)?**
+Quando você devolve o dinheiro de uma venda — por exemplo, em uma devolução ou cancelamento.
+
+## Integrações automáticas
+
+**Vendas do PDV entram no Financeiro?**
+Sim, automaticamente, cada uma com sua forma de pagamento.
+
+**Vendas do site (marketplace) entram no Financeiro?**
+Sim, quando o pedido online é integrado ao sistema.
+
+**Comissões e metas geram lançamentos?**
+Sim. Lançamentos de comissões e bonificações de metas são criados pelo sistema.
+
+**Assinaturas (Mercado Pago) geram lançamentos?**
+Sim. Recebimentos de assinaturas e pré-aprovações entram automaticamente.
+
+## Diversos
+
+**O Financeiro substitui meu controle em planilha?**
+Sim. Ele centraliza lançamentos, contas, categorias, parcelas, recorrências e relatórios.
+
+**Posso exportar os lançamentos?**
+Sim, para planilha, respeitando a visão e os filtros atuais.
 
 **Ainda com dúvidas?** Entre em contato com nosso suporte ou consulte o artigo específico sobre o assunto na Central de Ajuda.
 `
-}
+            }
         ]
     }
 ]

@@ -4,10 +4,15 @@ import React from "react"
 import { GenericAttachmentsTab } from "@/components/erp/shared/GenericAttachmentsTab"
 
 interface OrderAttachmentsTabProps {
-  orderId: string
+  orderId?: string
   partnerId: string
   isEditing?: boolean
   readOnly?: boolean
+  isNew?: boolean
+  stagedFiles?: File[]
+  onStagedFilesChange?: (files: File[]) => void
+  stagedImages?: (string | File)[]
+  onStagedImagesChange?: (images: (string | File)[]) => void
   onMutation?: () => void
 }
 
@@ -22,7 +27,18 @@ export function formatFileSize(size: any): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i]
 }
 
-export function OrderAttachmentsTab({ orderId, partnerId, isEditing = true, readOnly = false, onMutation }: OrderAttachmentsTabProps) {
+export function OrderAttachmentsTab({
+  orderId,
+  partnerId,
+  isEditing = true,
+  readOnly = false,
+  isNew,
+  stagedFiles,
+  onStagedFilesChange,
+  stagedImages,
+  onStagedImagesChange,
+  onMutation
+}: OrderAttachmentsTabProps) {
   return (
     <GenericAttachmentsTab
       entityId={orderId}
@@ -32,7 +48,13 @@ export function OrderAttachmentsTab({ orderId, partnerId, isEditing = true, read
       subtitle="Selecione e envie os arquivos desejados para este pedido"
       isEditing={isEditing}
       readOnly={readOnly}
+      isNew={isNew}
+      stagedFiles={stagedFiles}
+      onStagedFilesChange={onStagedFilesChange}
+      stagedImages={stagedImages}
+      onStagedImagesChange={onStagedImagesChange}
       onMutation={onMutation}
     />
   )
 }
+

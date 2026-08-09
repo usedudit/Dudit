@@ -9,7 +9,6 @@ import { formatDate, formatTime } from "@/lib/utils"
 import { decryptCPF, encryptCPF } from "@/lib/crypto"
 import { getDeliveryStatusMeta, getDeliveryStatusLabelForType } from "@/lib/orders/status"
 import { requireUser, requireCustomerOwnership } from "@/lib/auth/authorization"
-import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { requirePermission } from "@/lib/permissions/access"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
@@ -18,25 +17,7 @@ import { createAddressAction } from "@/app/actions/shared/addresses"
 import { validateCPF, validateCNPJ, validateEmail, validatePhoneBR, validateURL, validateCEP } from "@/lib/input-validator"
 import { buildSoftDeletePayload, buildRestorePayload, buildArchivePayload, scopeActiveOnly, scopeArchivedOnly, scopeWithArchived } from "@/lib/supabase/query-helpers"
 import { checkLimit } from "@/lib/services/subscription.service"
-
-/**
- * Resolve the partner authorized by the authenticated ERP context.
- *
- * The partner is intentionally never accepted from a client argument in
- * customer/order reads. The active partner context is server-side and the
- * granular permission check is performed before any service-role query.
- */
-async function resolveAuthorizedCustomerPartner(user: Awaited<ReturnType<typeof requireUser>>) {
-  const context = await getCurrentPartnerContext(user)
-  if (!context) {
-    return null
-  }
-
-  const access = await requirePermission(context.partnerId, "customers", "view", user)
-  return {
-    partnerId: access.partnerId,
-  }
-}
+import { requireAuthorizedCustomerContext, requireAuthorizedCustomerRecord } from "@/lib/services/authorized-customer-access"
 
 async function prepareEncryptedCpf(
   supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
@@ -140,9 +121,10 @@ export async function createComprehensiveCustomerAction(data: {
     return { error: csrfValidation.error || "Token CSRF invÃ¡lido" }
   }
 
-  const user = await requireUser()
-
-  await requirePermission(data.partnerId, "customers", "create")
+  const customerAccess = await requireAuthorizedCustomerContext(data.partnerId, "create")
+  const user = customerAccess.user
+  const partnerId = customerAccess.partnerId
+  const admin = customerAccess.admin
 
   if (!data.name.trim()) {
     return { error: "Nome é obrigatório" }
@@ -187,7 +169,7 @@ export async function createComprehensiveCustomerAction(data: {
   if (data.email || data.cpf) {
     const { findExistingCustomer } = await import("@/lib/services/marketplace-customer")
     const match = await findExistingCustomer({
-      partnerId: data.partnerId,
+      partnerId,
       email: data.email || null,
       cpf: data.cpf || null,
     })
@@ -199,14 +181,13 @@ export async function createComprehensiveCustomerAction(data: {
     }
   }
 
-  const supabase = await getSupabaseServerClient()
-  const cpfResult = await prepareEncryptedCpf(supabase, data.partnerId, data.cpf)
+  const cpfResult = await prepareEncryptedCpf(admin, partnerId, data.cpf)
   if (cpfResult.error) {
     return { error: cpfResult.error }
   }
 
-  const { data: newCustomer, error } = await supabase.from("customers").insert({
-    partner_id: data.partnerId,
+  const { data: newCustomer, error } = await admin.from("customers").insert({
+    partner_id: partnerId,
     name: data.name,
     email: data.email || null,
     phone: data.phone || null,
@@ -229,7 +210,7 @@ export async function createComprehensiveCustomerAction(data: {
     mother_name: data.motherName || null,
     father_name: data.fatherName || null,
     image_url: data.image_url || null,
-  }).select().single()
+  }).select("id").single()
 
   if (error) {
     return { error: error.message }
@@ -282,7 +263,7 @@ export async function createComprehensiveCustomerAction(data: {
     }
   }
 
-  revalidateCustomers(data.partnerId)
+  revalidateCustomers(partnerId)
   revalidatePath("/erp/customers")
   return { success: true }
 }
@@ -373,12 +354,9 @@ export async function updateComprehensiveCustomerAction(data: {
     return { error: csrfValidation.error || "Token CSRF invÃ¡lido" }
   }
 
-  const user = await requireUser()
-
-  await requireCustomerOwnership(data.customerId)
-  await requirePermission(data.partnerId, "customers", "edit", user)
-
-  const supabase = await getSupabaseServerClient()
+  const customerAccess = await requireAuthorizedCustomerRecord(data.customerId, "edit")
+  const partnerId = customerAccess.partnerId
+  const supabase = customerAccess.admin
 
   if (data.email && !validateEmail(data.email)) {
     return { error: "E-mail inválido" }
@@ -414,22 +392,30 @@ export async function updateComprehensiveCustomerAction(data: {
   if (data.hasDifferentBillingAddress && data.billingZipCode && !validateCEP(data.billingZipCode)) {
     return { error: "CEP de cobrança inválido" }
   }
-  const cpfResult = await prepareEncryptedCpf(supabase, data.partnerId, data.cpf, data.customerId)
+  const cpfResult: { cpf?: string | null; error?: string } = customerAccess.roleId === "operator"
+    ? { cpf: null as string | null }
+    : await prepareEncryptedCpf(supabase, partnerId, data.cpf, data.customerId)
   if (cpfResult.error) {
     return { error: cpfResult.error }
   }
 
   // SECURITY: partner_id is intentionally excluded from the update payload.
   // A customer's tenant ownership must NEVER be changeable via update.
-  const { error } = await supabase
-    .from("customers")
-    .update({
-      name: data.name,
-      email: data.email || null,
-      phone: data.phone || null,
-      phone_fixed: data.phoneFixed || null,
-      website: data.website || null,
-      person_type: data.personType,
+  // Operators can edit operational fields, but do not receive or overwrite
+  // sensitive fiscal/family/internal fields they do not need for the flow.
+  const customerUpdatePayload: Record<string, any> = {
+    name: data.name,
+    email: data.email || null,
+    phone: data.phone || null,
+    phone_fixed: data.phoneFixed || null,
+    website: data.website || null,
+    person_type: data.personType,
+    status: data.status || "ativo",
+    image_url: data.image_url || null,
+  }
+
+  if (customerAccess.roleId !== "operator") {
+    Object.assign(customerUpdatePayload, {
       cpf: cpfResult.cpf,
       contribuinte: data.contribuinte || null,
       cnpj: data.cnpj ? data.cnpj.replace(/\D/g, "") : null,
@@ -439,15 +425,18 @@ export async function updateComprehensiveCustomerAction(data: {
       ie_isento: data.ieIsento ?? false,
       inscricao_municipal: data.inscricaoMunicipal || null,
       crt: data.crt || null,
-      status: data.status || "ativo",
       notes: sanitizeNotes(data.notes),
       birth_date: data.birthDate || null,
       mother_name: data.motherName || null,
       father_name: data.fatherName || null,
-      image_url: data.image_url || null,
     })
+  }
+
+  const { error } = await supabase
+    .from("customers")
+    .update(customerUpdatePayload)
     .eq("id", data.customerId)
-    .eq("partner_id", data.partnerId) // Defense in depth
+    .eq("partner_id", partnerId) // Defense in depth
 
   if (error) {
     return { error: error.message }
@@ -556,21 +545,15 @@ export async function updateComprehensiveCustomerAction(data: {
       .eq("address_type", "billing")
   }
 
-  revalidateCustomers(data.partnerId)
+  revalidateCustomers(partnerId)
   revalidatePath("/erp/customers")
   return { success: true }
 }
 
 export async function getCustomerByIdAction(customerId: string) {
-  const user = await requireUser()
-  if (!user) return { error: "Não autenticado" }
-
-  // SECURITY: derive the tenant from the authenticated ERP context. Do not
-  // trust a partner id supplied by the client for any customer/order read.
-  const authorizedPartner = await resolveAuthorizedCustomerPartner(user)
-  if (!authorizedPartner) return { error: "Acesso não autorizado" }
-
-  const supabase = await getSupabaseServerClient()
+  const customerAccess = await requireAuthorizedCustomerContext(undefined, "view")
+  const authorizedPartner = { partnerId: customerAccess.partnerId }
+  const supabase = customerAccess.admin
 
   const { data: customer, error: customerError } = await supabase
     .from("customers")
@@ -679,20 +662,32 @@ export async function getCustomerByIdAction(customerId: string) {
     ;(customer as any).last_order_at = null
   }
 
+  if (customerAccess.roleId === "operator") {
+    for (const field of [
+      "cpf",
+      "cnpj",
+      "contribuinte",
+      "inscricao_estadual",
+      "ie_isento",
+      "inscricao_municipal",
+      "crt",
+      "notes",
+      "mother_name",
+      "father_name",
+      "marketplace_user_id",
+      "user_id",
+    ]) {
+      delete (customer as any)[field]
+    }
+  }
+
   return { customer }
 }
 
 export async function getCustomerOrdersAction(customerId: string) {
-  const user = await requireUser()
-  if (!user) return { error: "Não autenticado" }
-
-  // SECURITY: authorize the active partner before creating the service-role
-  // client. The client supplies only customerId; partnerId comes from the
-  // authenticated server-side ERP context.
-  const authorizedPartner = await resolveAuthorizedCustomerPartner(user)
-  if (!authorizedPartner) return { error: "Acesso não autorizado" }
-
-  const supabase = await getSupabaseServerClient()
+  const customerAccess = await requireAuthorizedCustomerContext(undefined, "view")
+  const authorizedPartner = { partnerId: customerAccess.partnerId }
+  const supabase = customerAccess.admin
 
   // RLS-bound lookup plus an explicit tenant predicate prevents an id from
   // another partner from becoming an input to the admin path.
@@ -714,7 +709,7 @@ export async function getCustomerOrdersAction(customerId: string) {
   const partnerId = authorizedPartner.partnerId
   // The service-role client is created only after authentication, partner
   // permission and the RLS-bound customer lookup have all succeeded.
-  const adminDb = createAdminClient()
+  const adminDb = customerAccess.admin
 
   // Customer history is partner-scoped today; customers are not store-owned
   // in this flow and the existing UI expects the partner-wide history. If a
@@ -855,10 +850,9 @@ export async function getCustomerOrdersAction(customerId: string) {
  */
 export async function getPartnerCustomersAction(partnerId: string, currentStoreId?: string | null) {
   try {
-    const user = await requireUser()
-    await requirePermission(partnerId, "customers", "view", user)
-
-    const supabase = await getSupabaseServerClient()
+    const customerAccess = await requireAuthorizedCustomerContext(partnerId, "view")
+    const supabase = customerAccess.admin
+    partnerId = customerAccess.partnerId
 
     let q = supabase
       .from("customers")
@@ -877,6 +871,12 @@ export async function getPartnerCustomersAction(partnerId: string, currentStoreI
     }
 
     let result = customers || []
+    if (customerAccess.roleId === "operator") {
+      result = result.map((customer: any) => {
+        const { birth_date: _birthDate, ...safeCustomer } = customer
+        return safeCustomer
+      })
+    }
 
     return { customers: result }
   } catch (err: any) {
@@ -926,10 +926,11 @@ export async function deleteCustomersInBatchAction(customerIds: string[]) {
 }
 
 export async function archiveCustomerAction(customerId: string) {
+  const customerAccess = await requireAuthorizedCustomerRecord(customerId, "edit")
   const user = await requireUser()
   if (!user) return { error: "Não autenticado" }
 
-  const supabase = await getSupabaseServerClient()
+  const supabase = customerAccess.admin
   const { data: customer } = await supabase.from("customers").select("partner_id, name").eq("id", customerId).single()
   if (!customer) return { error: "Cliente não encontrado" }
 
@@ -945,10 +946,11 @@ export async function archiveCustomerAction(customerId: string) {
 }
 
 export async function unarchiveCustomerAction(customerId: string) {
+  const customerAccess = await requireAuthorizedCustomerRecord(customerId, "edit")
   const user = await requireUser()
   if (!user) return { error: "Não autenticado" }
 
-  const supabase = await getSupabaseServerClient()
+  const supabase = customerAccess.admin
   const { data: customer } = await supabase.from("customers").select("partner_id, name").eq("id", customerId).single()
   if (!customer) return { error: "Cliente não encontrado" }
 
@@ -969,10 +971,11 @@ export async function unarchiveCustomerAction(customerId: string) {
 }
 
 export async function toggleCustomersStatusAction(customerIds: string[], isActive: boolean) {
+  const customerAccess = await requireAuthorizedCustomerContext(undefined, "edit")
   const user = await requireUser()
   if (!user) return { error: "NÃ£o autenticado" }
 
-  const supabase = await getSupabaseServerClient()
+  const supabase = customerAccess.admin
 
   const { data: customers } = await supabase
     .from("customers")
@@ -1027,8 +1030,9 @@ export async function getERPCustomersPageAction(
   | { success: false; error: string }
 > {
   try {
-    await requirePermission(partnerId, "customers", "view")
-    const supabase = await getSupabaseServerClient()
+    const customerAccess = await requireAuthorizedCustomerContext(partnerId, "view")
+    const supabase = customerAccess.admin
+    partnerId = customerAccess.partnerId
 
     const cursor = options?.cursor ?? null
     const limit = Math.max(1, Math.min(250, Math.floor(Number(options?.limit || ERP_CUSTOMERS_PAGE_SIZE))))
@@ -1061,6 +1065,13 @@ export async function getERPCustomersPageAction(
     const rows = data || []
     const hasMore = rows.length > limit
     const items: any[] = hasMore ? rows.slice(0, limit) : rows
+
+    if (customerAccess.roleId === "operator") {
+      for (const item of items) {
+        delete item.birth_date
+        delete item.user_id
+      }
+    }
 
     // Aggregate order stats for this page of customers (by buyer_id OR customer_id)
     const customerIds = items.map((c: any) => c.id).filter(Boolean)

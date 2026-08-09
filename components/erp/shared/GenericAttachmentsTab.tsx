@@ -1,13 +1,15 @@
 "use client"
 
 import React, { useState, useEffect, useRef } from "react"
-import { Button, Spinner, DefaultModal, IconPlaceholder, AlertModal, FormSection } from "@/components/reusable"
+import { Button, Spinner, DefaultModal, IconPlaceholder, AlertModal, FormSection, Badge } from "@/components/reusable"
 import { UploadIcon, TrashIcon, FileIcon, XIcon, CheckCircleIcon, AlertCircleIcon } from "@/lib/icons"
 import { useToast } from "@/hooks/use-toast"
 import { usePermissions } from "@/lib/permission-context"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { formatFileSize } from "@/components/erp/orders/OrderAttachmentsTab"
+import ProductImagesSection from "@/components/erp/product/ProductImagesSection"
+import { uploadSingleFile } from "@/lib/utils/attachment-uploader"
 
 // Import order actions
 import {
@@ -59,13 +61,18 @@ import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 export type AttachmentEntityType = "order" | "service_order" | "stock_movement" | "transaction" | "return"
 
 interface GenericAttachmentsTabProps {
-    entityId: string
+    entityId?: string
     partnerId: string
     entityType: AttachmentEntityType
     title?: string
     subtitle?: string
     isEditing?: boolean
     readOnly?: boolean
+    isNew?: boolean
+    stagedFiles?: File[]
+    onStagedFilesChange?: (files: File[]) => void
+    stagedImages?: (string | File)[]
+    onStagedImagesChange?: (images: (string | File)[]) => void
     onMutation?: () => void
 }
 
@@ -140,8 +147,14 @@ export function GenericAttachmentsTab({
     subtitle = "Gerencie contratos, faturas, ordens ou comprovantes deste registro.",
     isEditing = true,
     readOnly = false,
+    isNew: isNewProp,
+    stagedFiles: externalStagedFiles,
+    onStagedFilesChange,
+    stagedImages: externalStagedImages,
+    onStagedImagesChange,
     onMutation
 }: GenericAttachmentsTabProps) {
+    const isNewMode = isNewProp ?? (!entityId || entityId.startsWith("draft-"))
     const canEdit = isEditing && !readOnly
     const { toast } = useToast()
     const { planSlug } = usePermissions()
@@ -155,6 +168,28 @@ export function GenericAttachmentsTab({
     const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
     const [isSaving, setIsSaving] = useState(false)
 
+    // Local staged states when not controlled by parent
+    const [internalStagedFiles, setInternalStagedFiles] = useState<File[]>([])
+    const [internalStagedImages, setInternalStagedImages] = useState<(string | File)[]>([])
+
+    const currentStagedFiles = externalStagedFiles !== undefined ? externalStagedFiles : internalStagedFiles
+    const updateStagedFiles = (newFiles: File[]) => {
+        if (onStagedFilesChange) {
+            onStagedFilesChange(newFiles)
+        } else {
+            setInternalStagedFiles(newFiles)
+        }
+    }
+
+    const currentStagedImages = externalStagedImages !== undefined ? externalStagedImages : internalStagedImages
+    const updateStagedImages = (newImages: (string | File)[]) => {
+        if (onStagedImagesChange) {
+            onStagedImagesChange(newImages)
+        } else {
+            setInternalStagedImages(newImages)
+        }
+    }
+
     const [deleteModalOpen, setDeleteModalOpen] = useState(false)
     const [deletingId, setDeletingId] = useState<string | null>(null)
 
@@ -163,6 +198,10 @@ export function GenericAttachmentsTab({
     const planLimit = planSlug === "crescer" ? 2 : planSlug === "escalar" ? 5 : 0
 
     const loadAttachments = async () => {
+        if (!entityId || isNewMode) {
+            setAttachments([])
+            return
+        }
         setLoading(true)
         try {
             const res = await actions.fetch(entityId)
@@ -179,12 +218,11 @@ export function GenericAttachmentsTab({
     }
 
     useEffect(() => {
-        if (entityId) {
-            loadAttachments()
-        }
-    }, [entityId, entityType])
+        loadAttachments()
+    }, [entityId, entityType, isNewMode])
 
     const handleDownloadDoc = async (fileKey: string) => {
+        if (!entityId || isNewMode) return
         try {
             const res = await actions.url(entityId, fileKey, partnerId)
             if (res.success && res.downloadUrl) {
@@ -205,6 +243,23 @@ export function GenericAttachmentsTab({
 
     const confirmDeleteDoc = async () => {
         if (!deletingId || !canEdit) return
+
+        // Check if deleting a staged file
+        if (deletingId.startsWith("staged-doc-")) {
+            const indexStr = deletingId.replace("staged-doc-", "")
+            const index = parseInt(indexStr, 10)
+            if (!isNaN(index)) {
+                const nextDocs = currentStagedFiles.filter((_, i) => i !== index)
+                updateStagedFiles(nextDocs)
+                toast({ description: "Anexo pendente removido." })
+            }
+            setDeleteModalOpen(false)
+            setDeletingId(null)
+            return
+        }
+
+        if (!entityId) return
+
         try {
             const res = await actions.delete(partnerId, deletingId, entityId)
             if (res.success) {
@@ -232,25 +287,31 @@ export function GenericAttachmentsTab({
         setIsModalOpen(true)
     }
 
-    const addFilesToPending = (files: FileList) => {
-        const totalCurrent = attachments.length
+    const addFilesToPending = (files: FileList | File[]) => {
+        const totalCurrent = (attachments.filter(att => !isImageFile(att))).length + currentStagedFiles.length
         const totalPending = pendingFiles.length
         const newFilesList: PendingFile[] = []
+
+        const allowedDocExts = [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".csv", ".txt", ".odt", ".ppt", ".pptx", ".zip", ".rar"]
 
         for (let i = 0; i < files.length; i++) {
             const file = files[i]
 
-            const ext = file.name.substring(file.name.lastIndexOf(".")).toLowerCase()
-            const allowedExts = [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".csv", ".txt", ".odt", ".ppt", ".pptx", ".jpg", ".jpeg", ".png", ".webp", ".avif"]
-            if (!allowedExts.includes(ext)) {
-                toast({ description: `Tipo de arquivo não permitido: ${file.name}` })
+            const isImg = file.type.startsWith("image/") || /\.(jpg|jpeg|png|webp|gif|avif|bmp|svg)$/i.test(file.name)
+            if (isImg) {
+                toast({ description: `Arquivos de imagem não são permitidos na seção de Anexos. Para enviar imagens, utilize a seção de Imagens abaixo.` })
                 continue
             }
 
-            const isImg = file.type.startsWith("image/")
-            const maxSize = isImg ? 5 * 1024 * 1024 : 10 * 1024 * 1024
+            const ext = file.name.substring(file.name.lastIndexOf(".")).toLowerCase()
+            if (!allowedDocExts.includes(ext)) {
+                toast({ description: `Tipo de arquivo não permitido: ${file.name}. Envie apenas documentos (PDF, Word, Excel, CSV, Zip, etc.).` })
+                continue
+            }
+
+            const maxSize = 10 * 1024 * 1024
             if (file.size > maxSize) {
-                toast({ description: `Arquivo muito grande (${formatFileSize(file.size)}). Máximo: ${isImg ? "5MB" : "10MB"}.` })
+                toast({ description: `Arquivo muito grande (${formatFileSize(file.size)}). Máximo: 10MB.` })
                 continue
             }
 
@@ -298,6 +359,18 @@ export function GenericAttachmentsTab({
 
     const handleSaveUploads = async () => {
         if (pendingFiles.length === 0) return
+
+        // In new/creation mode, stage files locally without uploading immediately to DB/R2
+        if (isNewMode) {
+            const newFiles = pendingFiles.map(pf => pf.file)
+            updateStagedFiles([...currentStagedFiles, ...newFiles])
+            toast({ description: `${newFiles.length} documento(s) adicionado(s). Eles serão salvos ao guardar o registro.` })
+            setIsModalOpen(false)
+            setPendingFiles([])
+            return
+        }
+
+        if (!entityId) return
         setIsSaving(true)
 
         const uploadPromises = pendingFiles.map(async (pending) => {
@@ -308,60 +381,14 @@ export function GenericAttachmentsTab({
             )
 
             try {
-                const urlRes = await actions.presigned(
+                const res = await uploadSingleFile({
                     partnerId,
                     entityId,
-                    pending.name,
-                    pending.file.type,
-                    pending.file.size
-                )
-                if (!urlRes.success) throw new Error(urlRes.error || "Erro ao gerar URL de upload")
-
-                let fileHash = ""
-                try {
-                    const buffer = await pending.file.arrayBuffer()
-                    const hashBuffer = await crypto.subtle.digest("SHA-256", buffer)
-                    const hashArray = Array.from(new Uint8Array(hashBuffer))
-                    fileHash = hashArray.map(b => b.toString(16).padStart(2, "0")).join("")
-                } catch (hashErr) {
-                    console.error("Erro ao calcular hash no cliente:", hashErr)
-                }
-
-                await new Promise<void>((resolve, reject) => {
-                    const xhr = new XMLHttpRequest()
-                    xhr.upload.onprogress = (event) => {
-                        if (event.lengthComputable) {
-                            const pct = Math.round((event.loaded / event.total) * 100)
-                            setPendingFiles((prev) =>
-                                prev.map((f) => (f.id === pending.id ? { ...f, progress: Math.max(5, pct) } : f))
-                            )
-                        }
-                    }
-                    xhr.onload = () => {
-                        if (xhr.status >= 200 && xhr.status < 300) {
-                            resolve()
-                        } else {
-                            reject(new Error(`Erro upload R2: ${xhr.statusText || xhr.status}`))
-                        }
-                    }
-                    xhr.onerror = () => reject(new Error("Erro de conexão no upload"))
-                    xhr.onabort = () => reject(new Error("Upload cancelado"))
-
-                    xhr.open("PUT", urlRes.uploadUrl)
-                    xhr.setRequestHeader("Content-Type", pending.file.type || "application/octet-stream")
-                    xhr.send(pending.file)
+                    entityType,
+                    file: pending.file,
                 })
 
-                const saveRes = await actions.save(
-                    partnerId,
-                    entityId,
-                    urlRes.key,
-                    pending.name,
-                    pending.file.type || "application/octet-stream",
-                    pending.file.size,
-                    fileHash
-                )
-                if (!saveRes.success) throw new Error(saveRes.error || "Erro ao salvar no banco")
+                if (!res.success) throw new Error(res.error || "Erro no upload")
 
                 setPendingFiles((prev) =>
                     prev.map((f) => (f.id === pending.id ? { ...f, status: "completed", progress: 100 } : f))
@@ -382,6 +409,7 @@ export function GenericAttachmentsTab({
         if (!hasFailures) {
             toast({ description: "Todos os anexos foram enviados com sucesso." })
             setIsModalOpen(false)
+            setPendingFiles([])
             loadAttachments()
             onMutation?.()
         } else {
@@ -389,8 +417,80 @@ export function GenericAttachmentsTab({
         }
     }
 
-    const imageAttachments = (attachments || []).filter(isImageFile)
-    const docAttachments = (attachments || []).filter((att) => !isImageFile(att))
+    // Image section handling via ProductImagesSection
+    const dbImageAttachments = (attachments || []).filter(isImageFile)
+    const dbDocAttachments = (attachments || []).filter((att) => !isImageFile(att))
+
+    const allImages: (string | File)[] = [
+        ...dbImageAttachments.map(att => att.file_key),
+        ...currentStagedImages
+    ]
+
+    const handleImageSectionUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!canEdit) return
+        const files = e.target.files
+        if (!files || files.length === 0) return
+
+        const newFiles = Array.from(files).filter(f => f.type.startsWith("image/"))
+        if (newFiles.length === 0) {
+            toast({ description: "Selecione apenas arquivos de imagem." })
+            return
+        }
+
+        if (isNewMode) {
+            updateStagedImages([...currentStagedImages, ...newFiles])
+            toast({ description: `${newFiles.length} imagem(ns) adicionada(s). Elas serão salvas ao guardar o registro.` })
+        } else if (entityId) {
+            setLoading(true)
+            try {
+                const results = await Promise.all(
+                    newFiles.map(file => uploadSingleFile({ partnerId, entityId, entityType, file }))
+                )
+                const hasErrors = results.some(r => !r.success)
+                if (hasErrors) {
+                    toast({ description: "Erro ao enviar algumas imagens." })
+                } else {
+                    toast({ description: "Imagens enviadas com sucesso." })
+                }
+                loadAttachments()
+                onMutation?.()
+            } catch (err) {
+                toast({ description: "Erro ao enviar imagens." })
+            } finally {
+                setLoading(false)
+            }
+        }
+    }
+
+    const handleRemoveImageFromSection = async (index: number) => {
+        if (!canEdit) return
+
+        const dbImgCount = dbImageAttachments.length
+        if (index < dbImgCount) {
+            // It's a DB image
+            const target = dbImageAttachments[index]
+            if (target && entityId) {
+                try {
+                    const res = await actions.delete(partnerId, target.id, entityId)
+                    if (res.success) {
+                        toast({ description: "Imagem removida com sucesso." })
+                        loadAttachments()
+                        onMutation?.()
+                    } else {
+                        toast({ description: res.error || "Erro ao remover imagem." })
+                    }
+                } catch (err) {
+                    toast({ description: "Erro ao remover imagem." })
+                }
+            }
+        } else {
+            // It's a staged image
+            const stagedIndex = index - dbImgCount
+            const nextStaged = currentStagedImages.filter((_, idx) => idx !== stagedIndex)
+            updateStagedImages(nextStaged)
+            toast({ description: "Imagem pendente removida." })
+        }
+    }
 
     return (
         <div className="space-y-8">
@@ -401,15 +501,15 @@ export function GenericAttachmentsTab({
             ) : (
                 <>
                     {/* Seção 1: Anexos (Documentos) */}
-                    {(canEdit || docAttachments.length > 0) && (
+                    {(canEdit || dbDocAttachments.length > 0 || currentStagedFiles.length > 0) && (
                         <FormSection title="Anexos">
-                            {docAttachments.length === 0 ? (
+                            {dbDocAttachments.length === 0 && currentStagedFiles.length === 0 ? (
                                 canEdit && (
                                     <div className="flex flex-col items-center justify-center text-center py-8">
                                         <IconPlaceholder
                                             icon={FileIcon}
                                             title="Nenhum documento adicionado"
-                                            subtitle="Adicione documentos em PDF, Word, Excel, CSV, etc."
+                                            subtitle="Adicione documentos em PDF, Word, Excel, CSV, Zip, etc."
                                             itemButton={{
                                                 text: "Adicionar Documento",
                                                 action: handleUploadClick,
@@ -421,7 +521,8 @@ export function GenericAttachmentsTab({
                             ) : (
                                 <div className="space-y-4">
                                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                                        {docAttachments.map((att) => (
+                                        {/* Documentos salvos no banco */}
+                                        {dbDocAttachments.map((att) => (
                                             <div
                                                 key={att.id}
                                                 className="flex items-center gap-3 p-3 bg-brand-gray dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl group relative"
@@ -452,87 +553,37 @@ export function GenericAttachmentsTab({
                                                 )}
                                             </div>
                                         ))}
-                                    </div>
-                                    {canEdit && (
-                                        <div className="flex justify-end pt-2">
-                                            <Button
-                                                type="button"
-                                                variant="link"
-                                                onClick={handleUploadClick}
-                                                className="text-xs gap-1.5"
-                                            >
-                                                <UploadIcon className="w-4 h-4" />
-                                                Adicionar Documento (PDF, etc.)
-                                            </Button>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </FormSection>
-                    )}
 
-                    {/* Seção 2: Imagens */}
-                    {(canEdit || imageAttachments.length > 0) && (
-                        <FormSection title="Imagens">
-                            {imageAttachments.length === 0 ? (
-                                canEdit && (
-                                    <div className="flex flex-col items-center justify-center text-center py-8">
-                                        <IconPlaceholder
-                                            icon={UploadIcon}
-                                            title="Nenhuma imagem adicionada"
-                                            subtitle="Adicione fotos ou comprovantes em formato de imagem."
-                                            itemButton={{
-                                                text: "Enviar Imagem",
-                                                action: handleUploadClick,
-                                                variant: "outline",
-                                            }}
-                                        />
-                                    </div>
-                                )
-                            ) : (
-                                <div className="space-y-4">
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                                        {imageAttachments.map((att) => {
-                                            const imgUrl = getR2ImageUrl(att.file_key)
-                                            return (
-                                                <div
-                                                    key={att.id}
-                                                    className="group relative flex flex-col bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
-                                                >
-                                                    <div
-                                                        onClick={() => handleDownloadDoc(att.file_key)}
-                                                        className="w-full h-32 bg-gray-100 dark:bg-dark-border flex items-center justify-center overflow-hidden cursor-pointer relative"
-                                                    >
-                                                        <img
-                                                            src={imgUrl}
-                                                            alt={att.file_name || "Imagem"}
-                                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                                            onError={(e) => {
-                                                                (e.target as HTMLElement).style.display = "none"
-                                                            }}
-                                                        />
-                                                    </div>
-                                                    <div className="p-2.5 flex flex-col min-w-0">
-                                                        <p className="text-[12px] font-bold text-brand-dark dark:text-dark-heading truncate" title={att.file_name}>
-                                                            {att.file_name || "Imagem"}
-                                                        </p>
-                                                        <p className="text-[11px] text-brand-inactive-text dark:text-dark-body">
-                                                            {formatFileSize(att.file_size)}
-                                                        </p>
-                                                    </div>
-                                                    {canEdit && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => requestDeleteDoc(att.id)}
-                                                            className="opacity-0 group-hover:opacity-100 transition-opacity bg-red-500 hover:bg-red-600 text-white rounded-full w-7 h-7 flex items-center justify-center shadow-lg absolute top-2 right-2 z-10"
-                                                            title="Remover imagem"
-                                                        >
-                                                            <TrashIcon className="w-3.5 h-3.5" />
-                                                        </button>
-                                                    )}
+                                        {/* Documentos staged/pendentes de envio */}
+                                        {currentStagedFiles.map((stagedFile, index) => (
+                                            <div
+                                                key={`staged-doc-${index}`}
+                                                className="flex items-center gap-3 p-3 bg-brand-primary/5 dark:bg-brand-primary/10 border border-brand-primary/30 rounded-xl group relative"
+                                            >
+                                                <div className="w-10 h-10 rounded-lg bg-white dark:bg-dark-border flex items-center justify-center border border-brand-primary/40 shrink-0">
+                                                    <FileIcon className="w-5 h-5 text-brand-primary" />
                                                 </div>
-                                            )
-                                        })}
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">
+                                                        {stagedFile.name}
+                                                    </p>
+                                                    <p className="text-xs text-brand-primary flex items-center gap-1">
+                                                        <span>{formatFileSize(stagedFile.size)}</span>
+                                                        <span>• Pendente de envio</span>
+                                                    </p>
+                                                </div>
+                                                {canEdit && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => requestDeleteDoc(`staged-doc-${index}`)}
+                                                        className="opacity-0 group-hover:opacity-100 transition-opacity bg-red-500 hover:bg-red-600 text-white rounded-full w-7 h-7 flex items-center justify-center shadow-lg absolute -top-2.5 -right-2.5 z-10"
+                                                        title="Remover anexo pendente"
+                                                    >
+                                                        <TrashIcon className="w-3.5 h-3.5" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ))}
                                     </div>
                                     {canEdit && (
                                         <div className="flex justify-end pt-2">
@@ -543,7 +594,7 @@ export function GenericAttachmentsTab({
                                                 className="text-xs gap-1.5"
                                             >
                                                 <UploadIcon className="w-4 h-4" />
-                                                Adicionar Imagem
+                                                Adicionar Documento (PDF, Word, Excel, etc.)
                                             </Button>
                                         </div>
                                     )}
@@ -552,7 +603,21 @@ export function GenericAttachmentsTab({
                         </FormSection>
                     )}
 
-                    {!canEdit && docAttachments.length === 0 && imageAttachments.length === 0 && (
+                    {/* Seção 2: Imagens usando ProductImagesSection */}
+                    {(canEdit || allImages.length > 0) && (
+                        <FormSection title="Imagens">
+                            <ProductImagesSection
+                                images={allImages}
+                                onImageUpload={handleImageSectionUpload}
+                                onRemoveImage={handleRemoveImageFromSection}
+                                onSetPrimaryImage={() => { }}
+                                isEditing={canEdit}
+                                isSaving={isSaving}
+                            />
+                        </FormSection>
+                    )}
+
+                    {!canEdit && dbDocAttachments.length === 0 && currentStagedFiles.length === 0 && allImages.length === 0 && (
                         <div className="flex flex-col items-center justify-center text-center py-8">
                             <IconPlaceholder
                                 icon={FileIcon}
@@ -564,17 +629,17 @@ export function GenericAttachmentsTab({
                 </>
             )}
 
-            {/* Upload files modal */}
+            {/* Modal de upload de documentos */}
             {isModalOpen && (
                 <DefaultModal
                     isOpen={isModalOpen}
                     onClose={() => !isSaving && setIsModalOpen(false)}
-                    title="Upload de arquivos"
+                    title="Upload de Documentos"
                     maxWidth="md"
                 >
                     <div className="space-y-6">
                         <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                            Selecione e envie os arquivos desejados. Limites do seu plano: máximo de {planLimit} anexos.
+                            Selecione e envie os documentos desejados (PDF, Word, Excel, CSV, Zip, etc.). Limite: máximo de {planLimit} anexos.
                         </p>
 
                         <div
@@ -590,16 +655,16 @@ export function GenericAttachmentsTab({
                                 onChange={handleFileChange}
                                 className="hidden"
                                 multiple
-                                accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.odt,.ppt,.pptx,image/jpeg,image/png,image/webp,image/avif"
+                                accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.odt,.ppt,.pptx,.zip,.rar,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/plain,application/zip,application/x-rar-compressed"
                             />
                             <div className="w-12 h-12 rounded-full bg-white dark:bg-dark-border flex items-center justify-center border border-brand-border dark:border-dark-border mb-4">
                                 <UploadIcon className="w-6 h-6 text-brand-inactive-text dark:text-dark-body" />
                             </div>
                             <p className="text-sm font-bold text-brand-dark dark:text-dark-heading text-center">
-                                Selecione um arquivo ou arraste & solte aqui.
+                                Selecione um documento ou arraste & solte aqui.
                             </p>
                             <p className="text-xs text-brand-inactive-text dark:text-dark-body text-center mt-1">
-                                Formatos suportados: PDF, Word, Excel, CSV, Imagens. Até 10MB por arquivo.
+                                Formatos suportados: PDF, Word, Excel, CSV, Zip. Até 10MB por arquivo. (Imagens devem ser enviadas na seção de Imagens).
                             </p>
                         </div>
 
@@ -704,3 +769,4 @@ export function GenericAttachmentsTab({
         </div>
     )
 }
+

@@ -24,7 +24,8 @@ export default function HelpSidebar({
         "vendas": true,
         "produtos-estoque": true,
         "servicos": true,
-        "clientes": true
+        "clientes": true,
+        "financeiro": true
     })
 
     const toggleCategory = (id: string) => {

@@ -46,6 +46,7 @@ import { OrderGeneralTab } from "./OrderGeneralTab"
 import { AddressTab } from "./AddressTab"
 import { OrderObservationsTab } from "./OrderObservationsTab"
 import { OrderAttachmentsTab } from "./OrderAttachmentsTab"
+import { uploadAndSavePendingAttachments } from "@/lib/utils/attachment-uploader"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency } from "@/lib/utils"
 import { calculateOrderPricing, type PricingCoupon } from "@/lib/services/pricing-engine"
@@ -255,6 +256,23 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     const [isLoadingData, setIsLoadingData] = useState(!!editOrderId)
     const [draftOrderId] = useState(() => crypto.randomUUID())
     const orderId = editOrderId || draftOrderId
+
+    const [stagedDocFiles, setStagedDocFiles] = useState<File[]>([])
+    const [stagedImageFiles, setStagedImageFiles] = useState<(string | File)[]>([])
+
+    const uploadStagedAttachments = async (targetOrderId: string) => {
+        if (stagedDocFiles.length === 0 && stagedImageFiles.length === 0) return
+        const res = await uploadAndSavePendingAttachments({
+            partnerId,
+            entityId: targetOrderId,
+            entityType: "order",
+            files: stagedDocFiles,
+            images: stagedImageFiles,
+        })
+        if (!res.success && res.errors) {
+            console.error("Aviso no upload de anexos do pedido:", res.errors)
+        }
+    }
     const [activeTab, setActiveTab] = useState("general")
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -1355,6 +1373,11 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
 
             if (result.success) {
                 const createdOrderId = 'orderId' in result ? result.orderId : undefined
+                const targetOrderId = createdOrderId || editOrderId
+                if (targetOrderId) {
+                    await uploadStagedAttachments(targetOrderId)
+                }
+
                 if (!editOrderId && payload.deliveryMethod === "delivery" && createdOrderId) {
                     const autoDeliveryResult = await createERPDeliveryAction({
                         partnerId,
@@ -1906,6 +1929,11 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                         partnerId={partnerId}
                                         isEditing={true}
                                         readOnly={false}
+                                        isNew={!editOrderId}
+                                        stagedFiles={stagedDocFiles}
+                                        onStagedFilesChange={setStagedDocFiles}
+                                        stagedImages={stagedImageFiles}
+                                        onStagedImagesChange={setStagedImageFiles}
                                     />
                                 </FadeIn>
                             </TabsContent>

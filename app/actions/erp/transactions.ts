@@ -2877,30 +2877,27 @@ export async function getTransactionDetailsAction(
             if (igGroup && igGroup.total_amount != null) {
                 installmentGroupTotalAmount = Math.abs(Number(igGroup.total_amount) || 0) || null
             }
-            const txIds = (groupRows || []).map((g: any) => g.id)
             const paymentByTx = new Map<string, { base: number; cash: number; interest: number; discount: number }>()
             let paymentRows: any[] = []
-            if (txIds.length > 0) {
-                const res = await supabase
-                    .from("transaction_payments")
-                    .select("transaction_id, amount, base_amount, interest_amount, discount_amount, payment_method_id")
-                    .eq("partner_id", partnerId)
-                    .in("transaction_id", txIds)
-                paymentRows = res.data || []
-                for (const p of paymentRows) {
-                    const tid = String((p as any).transaction_id || "")
-                    const pBase = Number((p as any).base_amount ?? (p as any).amount ?? 0)
-                    const pCash = Number((p as any).amount || 0)
-                    const pInt = Number((p as any).interest_amount || 0)
-                    const pDisc = Number((p as any).discount_amount || 0)
-                    const cur = paymentByTx.get(tid) || { base: 0, cash: 0, interest: 0, discount: 0 }
-                    paymentByTx.set(tid, {
-                        base: cur.base + pBase,
-                        cash: cur.cash + pCash,
-                        interest: cur.interest + pInt,
-                        discount: cur.discount + pDisc,
-                    })
-                }
+            const res = await supabase
+                .from("transaction_payments")
+                .select("transaction_id, amount, base_amount, interest_amount, discount_amount, payment_method_id")
+                .eq("partner_id", partnerId)
+                .eq("transaction_id", row.id)
+            paymentRows = res.data || []
+            for (const p of paymentRows) {
+                const tid = String((p as any).transaction_id || "")
+                const pBase = Number((p as any).base_amount ?? (p as any).amount ?? 0)
+                const pCash = Number((p as any).amount || 0)
+                const pInt = Number((p as any).interest_amount || 0)
+                const pDisc = Number((p as any).discount_amount || 0)
+                const cur = paymentByTx.get(tid) || { base: 0, cash: 0, interest: 0, discount: 0 }
+                paymentByTx.set(tid, {
+                    base: cur.base + pBase,
+                    cash: cur.cash + pCash,
+                    interest: cur.interest + pInt,
+                    discount: cur.discount + pDisc,
+                })
             }
 
             const pmIds = [...new Set(paymentRows.map((p: any) => p.payment_method_id).filter(Boolean) || [])]
@@ -2930,7 +2927,8 @@ export async function getTransactionDetailsAction(
 
             currentTxPaymentAgg = paymentByTx.get(row.id) || { base: 0, cash: 0, interest: 0, discount: 0 }
             const totalCount = groupRows?.length || 0
-            installmentBreakdown = (groupRows || []).map((g: any) => {
+            const targetGroupRows = (groupRows || []).filter((g: any) => String(g.id) === String(row.id))
+            installmentBreakdown = (targetGroupRows.length > 0 ? targetGroupRows : groupRows || []).map((g: any) => {
                 const original = Math.abs(Number(g.original_amount ?? g.amount ?? 0))
                 const agg = paymentByTx.get(String(g.id)) || { base: 0, cash: 0, interest: 0, discount: 0 }
                 const paidFlagFromStatus = String(g.status || "").toLowerCase() === "paid"
@@ -2971,7 +2969,7 @@ export async function getTransactionDetailsAction(
                     status: (paidFlag ? "paid" : overdue ? "overdue" : "pending") as "paid" | "overdue" | "pending",
                 }
             })
-            const allInstallmentsPaid = (installmentBreakdown?.length ?? 0) > 0 && installmentBreakdown?.every((i) => i.status === "paid")
+            const allInstallmentsPaid = (groupRows || []).length > 0 && (groupRows || []).every((g: any) => String(g.status || "").toLowerCase() === "paid")
             if (allInstallmentsPaid) {
                 const latestPayment = (groupRows || [])
                     .map((g: any) => (g.payment_date ? new Date(String(g.payment_date)).getTime() : 0))

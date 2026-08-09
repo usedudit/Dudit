@@ -135,6 +135,7 @@ export default function HelpHome() {
                     <ModuleCard icon={<ShoppingBagIcon size={24} />} title="Vendas" link="/ajuda/vendas/visao-geral-vendas" color="green" />
                     <ModuleCard icon={<ServiceIcon size={24} />} title="Serviços" link="/ajuda/servicos/visao-geral-servicos" color="green" />
                     <ModuleCard icon={<UserIcon size={24} />} title="Clientes" link="/ajuda/clientes/visao-geral-clientes" color="green" />
+                    <ModuleCard icon={<MoneyIcon size={24} />} title="Financeiro" link="/ajuda/financeiro/visao-geral-financeiro" color="green" />
                     <ModuleCard icon={<HelpCircleIcon size={24} />} title="Primeiros Passos" link="/ajuda/login-registro/acessando-conta" color="blue" />
                 </div>
             </section>

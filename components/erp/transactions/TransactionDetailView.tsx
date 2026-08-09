@@ -297,11 +297,7 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                                 </div>
                                             </div>
 
-                                            <div className="mt-8">
-                                                <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
-                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">
-                                                    {detail.installmentBreakdown?.length ? "Parcelas da transação" : "Itens da Transação"}
-                                                </h3>
+                                            <FormSection title={detail.installmentBreakdown?.length ? "Parcelas da transação" : "Itens da Transação"} hasSeparator>
                                                 <div className="space-y-4">
                                                     {detail.installmentBreakdown?.length ? (
                                                         <InstallmentParcelsTable
@@ -423,11 +419,9 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                                         ))
                                                     )}
                                                 </div>
-                                            </div>
+                                            </FormSection>
 
-                                            <div className="mt-8">
-                                                <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
-                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Detalhes da Transação</h3>
+                                            <FormSection title="Detalhes da Transação" hasSeparator>
                                                 <div className="space-y-3">
                                                     <PaymentRow label="Categoria" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{detail.categoryLine}</span>} />
                                                     {detail.subcategoryLine && (
@@ -537,7 +531,7 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                                         );
                                                     })()}
                                                 </div>
-                                            </div>
+                                            </FormSection>
                                         </div>
 
                                         <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">

@@ -140,7 +140,7 @@ export async function executeImport(
       }
     } else if (entityType === "customers") {
       const result = await importCustomerBatch(
-        supabase,
+        admin,
         partnerId,
         batch,
         startIndex,

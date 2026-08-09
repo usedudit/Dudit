@@ -2,7 +2,7 @@
 
 import { Button, Badge } from "@/components/reusable"
 import { GridIcon, ListIcon, FilterIcon } from "@/lib/icons"
-import { X } from "lucide-react"
+import { X, ListOrdered } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 
 type ViewMode = "grid" | "list"
@@ -18,6 +18,7 @@ interface ExplorarViewControlsProps {
     viewMode: ViewMode
     onViewModeChange: (mode: ViewMode) => void
     onOpenFilters: () => void
+    onOpenSort: () => void
     hasActiveFilters: boolean
     activeFilterChips?: ActiveFilterChip[]
 }
@@ -26,6 +27,7 @@ export function ExplorarViewControls({
     viewMode,
     onViewModeChange,
     onOpenFilters,
+    onOpenSort,
     hasActiveFilters,
     activeFilterChips = [],
 }: ExplorarViewControlsProps) {
@@ -40,6 +42,16 @@ export function ExplorarViewControls({
                     className="shrink-0 hidden lg:inline-flex"
                 >
                     Filtros
+                </Button>
+
+                {/* Sort button */}
+                <Button
+                    variant="outline"
+                    onClick={onOpenSort}
+                    leftIcon={<ListOrdered className="w-4 h-4" />}
+                    className="shrink-0 hidden lg:inline-flex"
+                >
+                    Ordenar
                 </Button>
 
                 {hasActiveFilters && (

@@ -54,29 +54,12 @@ export async function fetchCustomersWithStorePriority(partnerId: string, current
     console.error("[fetchCustomersWithStorePriority] Server Action threw:", err)
   }
 
-  console.warn("[fetchCustomersWithStorePriority] Using client-side fallback for partnerId:", partnerId)
-  try {
-    let query = supabase
-      .from("customers")
-      .select("id, name, email, phone, status, store_credit, created_at, partner_id, person_type")
-      .eq("partner_id", partnerId)
-      .order("created_at", { ascending: false })
-      .limit(500)
-
-    const { data, error } = await query
-
-    if (error) {
-      console.error("[fetchCustomersWithStorePriority] Client fallback error:", error)
-      throw new Error(error.message)
-    }
-
-    let result = data || []
-
-    return result
-  } catch (fallbackErr) {
-    console.error("[fetchCustomersWithStorePriority] All attempts failed:", fallbackErr)
-    throw fallbackErr
-  }
+  // Do not fall back to the browser Data API for the operational table. That
+  // path would recreate the PII exposure that the customers cutover removes.
+  console.error("[fetchCustomersWithStorePriority] Secure server action failed; browser fallback disabled", {
+    partnerId,
+  })
+  throw new Error("Não foi possível carregar clientes pelo caminho seguro")
 }
 
 export async function fetchStoreOrders(partnerId: string, storeId: string | null) {

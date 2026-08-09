@@ -1,5 +1,6 @@
 import "server-only"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
+import { getAdminClient } from "@/lib/supabase/admin"
 import type { ColumnMapping, EntityType, PreviewSummary, ImportSession } from "./types"
 import { validateRows } from "./validators"
 import { resolveCategories } from "./category-resolver"
@@ -131,13 +132,14 @@ async function detectDuplicates(
   }
 
   if (session.entityType === "customers") {
+    const customerDb = getAdminClient()
     const emails = mappedRows
       .map((r, i) => ({ email: r["email"]?.trim(), index: i }))
       .filter((e): e is { email: string; index: number } => !!e.email)
 
     if (emails.length > 0) {
       const uniqueEmails = [...new Set(emails.map((e) => e.email))]
-      const { data: existing } = await supabase
+      const { data: existing } = await customerDb
         .from("customers")
         .select("email")
         .eq("partner_id", session.partnerId)
@@ -160,7 +162,7 @@ async function detectDuplicates(
 
     if (rawCpfs.length > 0) {
       const uniqueCpfs = [...new Set(rawCpfs.map((c) => c.cpf))]
-      const { data: allCpfs } = await supabase
+      const { data: allCpfs } = await customerDb
         .from("customers")
         .select("cpf")
         .eq("partner_id", session.partnerId)
