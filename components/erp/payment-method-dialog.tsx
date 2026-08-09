@@ -718,7 +718,7 @@ export function PaymentMethodDialog({ open, onClose, partnerId, storeId: propSto
             <DefaultModal
                 isOpen={installmentsModalOpen}
                 onClose={() => setInstallmentsModalOpen(false)}
-                title="Configurar taxas por parcela"
+                title="Custo de Parcelamento"
                 maxWidth="lg"
             >
                 <div className="max-h-[60vh] overflow-y-auto custom-scrollbar pr-2">

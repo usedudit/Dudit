@@ -32,19 +32,42 @@ export async function resolveDeliverySettingsRow(supabase: any, partnerId: strin
       .maybeSingle()
     if (data) return data
   }
-  const { data } = await supabase
+
+  // Se não tem storeId explícito, tenta a loja matriz/padrão do parceiro
+  const { data: stores } = await supabase
+    .from("stores")
+    .select("id")
+    .eq("partner_id", partnerId)
+    .order("is_headquarters", { ascending: false })
+    .order("created_at", { ascending: true })
+    .limit(1)
+
+  const defaultStoreId = stores?.[0]?.id || null
+  if (defaultStoreId && defaultStoreId !== storeId) {
+    const { data: storeSettings } = await supabase
+      .from("delivery_settings")
+      .select("*")
+      .eq("partner_id", partnerId)
+      .eq("store_id", defaultStoreId)
+      .maybeSingle()
+    if (storeSettings) return storeSettings
+  }
+
+  // Tenta store_id IS NULL
+  const { data: nullStoreData } = await supabase
     .from("delivery_settings")
     .select("*")
     .eq("partner_id", partnerId)
     .is("store_id", null)
     .maybeSingle()
-  if (data) return data
+  if (nullStoreData) return nullStoreData
 
+  // Fallback: retorna a configuração mais recente cadastrada para o parceiro
   const { data: fallback } = await supabase
     .from("delivery_settings")
     .select("*")
     .eq("partner_id", partnerId)
-    .order("created_at", { ascending: true })
+    .order("updated_at", { ascending: false })
     .limit(1)
     .maybeSingle()
   return fallback

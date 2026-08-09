@@ -411,7 +411,7 @@ export function PaymentMethodEditPage({ partnerId, storeId: propStoreId, editing
 
                                                 {formData.supports_installments && formData.max_installments > 1 && (
                                                     <div className="flex items-center justify-between py-2">
-                                                        <label className="text-sm font-bold text-brand-dark dark:text-dark-heading">Taxas por parcela</label>
+                                                        <label className="text-sm font-bold text-brand-dark dark:text-dark-heading">Custo de parcelamento</label>
                                                         <Button variant="link" onClick={() => setIsInstallmentModalOpen(true)}>Configurar</Button>
                                                     </div>
                                                 )}
@@ -609,12 +609,12 @@ export function PaymentMethodEditPage({ partnerId, storeId: propStoreId, editing
                 <DefaultModal
                     isOpen={isInstallmentModalOpen}
                     onClose={() => setIsInstallmentModalOpen(false)}
-                    title="Taxas por Parcela"
+                    title="Custo de Parcelamento"
                     maxWidth="md"
                 >
                     <div className="space-y-4">
                         <p className="text-sm text-brand-inactive-text">
-                            Defina a taxa administrativa (em %) que será cobrada para cada quantidade de parcelas.
+                            Defina o custo de parcelamento (em %) que será cobrada para cada quantidade de parcelas.
                         </p>
                         <div className="max-h-[60vh] overflow-y-auto space-y-3 pr-2">
                             {Array.from({ length: formData.max_installments }).map((_, i) => {
@@ -820,7 +820,7 @@ export function PaymentMethodEditPage({ partnerId, storeId: propStoreId, editing
                                                         {formData.supports_installments && (
                                                             <div className="space-y-4">
                                                                 <div className="flex items-center justify-between">
-                                                                    <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading">Taxas por Parcela</label>
+                                                                    <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading">Custo de Parcelamento</label>
                                                                     {formData.installment_fees.length > 0 && formData.installment_fees.some(f => f.feePercent > 0) && (
                                                                         <Button variant="link" size="sm" onClick={() => setIsInstallmentModalOpen(true)} className="p-0 h-auto font-bold text-brand-green">
                                                                             Configurar Taxas
@@ -1062,12 +1062,12 @@ export function PaymentMethodEditPage({ partnerId, storeId: propStoreId, editing
                 <DefaultModal
                     isOpen={isInstallmentModalOpen}
                     onClose={() => setIsInstallmentModalOpen(false)}
-                    title="Taxas por Parcela"
+                    title="Custo de Parcelamento"
                     maxWidth="md"
                 >
                     <div className="space-y-4">
                         <p className="text-sm text-brand-inactive-text">
-                            Defina a taxa administrativa (em %) que será cobrada para cada quantidade de parcelas.
+                            Defina o custo de parcelamento (em %) que será cobrado para cada quantidade de parcelas.
                         </p>
                         <div className="max-h-[60vh] overflow-y-auto space-y-3 pr-2">
                             {Array.from({ length: formData.max_installments }).map((_, i) => {

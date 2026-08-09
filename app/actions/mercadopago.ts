@@ -81,6 +81,7 @@ export async function disconnectMercadoPagoAction() {
       mp_access_token_encrypted: null,
       mp_refresh_token_encrypted: null,
       mp_public_key: null,
+      mp_live_mode: null,
       mp_token_expires_at: null,
       mp_connected_at: null,
     })
@@ -111,7 +112,7 @@ const getCachedMercadoPagoStatus = (partnerId: string) => unstable_cache(
     const supabase = getAdminClient()
     const { data: partner } = await supabase
       .from("partners")
-      .select("mp_user_id, mp_connected_at, mp_public_key, mp_accepted_payment_methods")
+      .select("mp_user_id, mp_connected_at, mp_public_key, mp_live_mode, mp_accepted_payment_methods")
       .eq("id", partnerId)
       .single()
 
@@ -128,6 +129,7 @@ const getCachedMercadoPagoStatus = (partnerId: string) => unstable_cache(
       connected: !!partner.mp_user_id,
       connectedAt: partner.mp_connected_at,
       publicKey: partner.mp_public_key,
+      liveMode: partner.mp_live_mode ?? null,
       acceptedPaymentMethods,
     }
   },

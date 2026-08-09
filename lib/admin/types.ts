@@ -328,6 +328,7 @@ export interface SubscriptionEntry {
     mp_user_id: string | null
     mp_connected_at: string | null
     mp_public_key: string | null
+    mp_live_mode: boolean | null
     mp_token_expires_at: string | null
     suspended_at: string | null
     erp_disabled: boolean

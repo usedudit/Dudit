@@ -93,10 +93,12 @@ async function performTokenRefreshOrReturnValid(partnerId: string): Promise<stri
             throw new Error(`MercadoPago refresh failed with status ${tokenResponse.status}`)
         }
 
-        interface MercadoPagoRefreshResponse {
+    interface MercadoPagoRefreshResponse {
             access_token: string
             refresh_token?: string
             expires_in?: number
+            public_key?: string
+            live_mode?: boolean
         }
 
         const tokenData = (await tokenResponse.json()) as MercadoPagoRefreshResponse
@@ -121,6 +123,14 @@ async function performTokenRefreshOrReturnValid(partnerId: string): Promise<stri
         // MercadoPago typically rotates the refresh token, store the new one if provided
         if (tokenData.refresh_token) {
             updatePayload.mp_refresh_token_encrypted = encrypt(tokenData.refresh_token, "mercadopago")
+        }
+
+        // Keep environment metadata in sync on every refresh
+        if (typeof tokenData.live_mode === "boolean") {
+            updatePayload.mp_live_mode = tokenData.live_mode
+        }
+        if (tokenData.public_key) {
+            updatePayload.mp_public_key = tokenData.public_key
         }
 
         // Store the updated tokens

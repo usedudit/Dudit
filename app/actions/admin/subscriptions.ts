@@ -69,6 +69,7 @@ export async function getSubscriptions(
         mp_user_id: p.mp_user_id,
         mp_connected_at: p.mp_connected_at,
         mp_public_key: p.mp_public_key,
+        mp_live_mode: p.mp_live_mode,
         mp_token_expires_at: p.mp_token_expires_at,
         suspended_at: p.suspended_at,
         erp_disabled: p.erp_disabled,
@@ -97,7 +98,7 @@ export async function getSubscriptionDetail(
     const { data: partner, error: fetchError } = await supabase
         .from("partners")
         .select(
-            "id, user_id, is_active, mp_user_id, mp_connected_at, mp_public_key, mp_token_expires_at, suspended_at, erp_disabled, created_at, stores(name)"
+            "id, user_id, is_active, mp_user_id, mp_connected_at, mp_public_key, mp_live_mode, mp_token_expires_at, suspended_at, erp_disabled, created_at, stores(name)"
         )
         .eq("id", partnerId)
         .single()
@@ -117,6 +118,7 @@ export async function getSubscriptionDetail(
             mp_user_id: partner.mp_user_id,
             mp_connected_at: partner.mp_connected_at,
             mp_public_key: partner.mp_public_key,
+            mp_live_mode: partner.mp_live_mode,
             mp_token_expires_at: partner.mp_token_expires_at,
             suspended_at: partner.suspended_at,
             erp_disabled: partner.erp_disabled,

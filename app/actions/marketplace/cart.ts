@@ -1147,7 +1147,7 @@ export async function checkoutCartAction(
       customer_id: resolvedCustomerId,
       customer_name: buyerProfile?.full_name || null,
       partner_id: partnerId,
-      store_id: storeId || null,
+      store_id: targetStoreId,
       total_amount: persistedTotal,
       delivery_fee: persistedDeliveryFee,
       distance_km: distanceKm,

@@ -86,6 +86,8 @@ export async function GET(request: NextRequest) {
       refresh_token?: string
       user_id: number
       expires_in?: number
+      public_key?: string
+      live_mode?: boolean
     }
 
     const tokenController = new AbortController()
@@ -165,7 +167,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const publicKey = process.env.MP_PUBLIC_KEY || null
+    const publicKey = tokenData.public_key || process.env.MP_PUBLIC_KEY || null
 
     const expiresAt = tokenData.expires_in
       ? new Date(Date.now() + tokenData.expires_in * 1000)
@@ -183,6 +185,7 @@ export async function GET(request: NextRequest) {
           ? encrypt(tokenData.refresh_token, "mercadopago")
           : null,
         mp_public_key: publicKey,
+        mp_live_mode: tokenData.live_mode ?? null,
         mp_token_expires_at: expiresAt?.toISOString(),
         mp_connected_at: new Date().toISOString(),
       })

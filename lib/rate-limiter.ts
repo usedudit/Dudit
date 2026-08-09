@@ -93,7 +93,7 @@ export interface RateLimitConfig {
  */
 export const RATE_LIMIT_CONFIGS: Record<RateLimitCategory, RateLimitConfig> = {
   [RateLimitCategory.AUTH_LOGIN]: {
-    maxRequests: 5,
+    maxRequests: 10,
     window: "15 m",
     identifierType: IdentifierType.IP,
     failClosed: true,
