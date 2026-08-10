@@ -2,7 +2,7 @@ import "server-only"
 import { createAdminClient } from "@/lib/supabase/server"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import type { PartnerRole, PartnerPermissions } from "@/lib/permissions/types"
-import { normalizePermissions } from "@/lib/permissions/rbac-normalize"
+import { normalizePermissions, mergePermissionsWithRole } from "@/lib/permissions/rbac-normalize"
 import { getPermissionTemplate } from "@/lib/permissions/rbac-template-loader"
 import { can as checkCan } from "@/lib/permissions/can"
 import type { RbacUserLike } from "@/lib/permissions/rbac-types"
@@ -75,11 +75,16 @@ export async function resolveEffectivePermissions(
         }
     }
 
+    const template = await getPermissionTemplate()
+
     // 3. Contexto global (sem store específica)
     if (!storeId) {
+        const globalRoleId = String(pu.role_id || pu.role || "delivery").toLowerCase()
+        const { data: roleRow } = await supabase.from("roles").select("permissions").eq("id", globalRoleId).maybeSingle()
+        const mergedPerms = mergePermissionsWithRole(template, roleRow?.permissions, pu.permissions)
         return {
             role: (pu.role || pu.role_id || "delivery").toUpperCase() as PartnerRole,
-            permissions: pu.permissions as unknown as PartnerPermissions,
+            permissions: mergedPerms as unknown as PartnerPermissions,
         }
     }
 
@@ -91,28 +96,26 @@ export async function resolveEffectivePermissions(
         .eq("store_id", storeId)
         .maybeSingle()
 
-    // 4b. Sem store_member → acesso negado
-    if (!sm) return null
-
-    // 4c. Com store_member → aplicar fallback
-    const effectiveRole = (sm.role || pu.role || pu.role_id || "delivery").toUpperCase() as PartnerRole
-    const basePermissions = pu.permissions as unknown as PartnerPermissions
-
-    let effectivePermissions: PartnerPermissions
-    if (!sm.permissions) {
-        // Fallback: usa permissions do partner_user
-        effectivePermissions = basePermissions
-    } else {
-        // Merge: base = partner_user, overrides = store_member
-        effectivePermissions = deepMergePermissions(
-            basePermissions,
-            sm.permissions as unknown as Partial<PartnerPermissions>
-        )
+    // 4b. Sem store_member: verificar se há restrição explícita de lojas em _store_ids_
+    const storeIdsArray = Array.isArray((pu.permissions as any)?._store_ids_) ? (pu.permissions as any)._store_ids_ : null
+    if (!sm && storeIdsArray && !storeIdsArray.includes(storeId)) {
+        return null
     }
 
+    // 4c. Com store_member ou fallback para o cargo em partner_users
+    const effectiveRoleUpper = (sm?.role || pu.role || pu.role_id || "delivery").toUpperCase() as PartnerRole
+    const effectiveRoleIdLower = effectiveRoleUpper.toLowerCase()
+    const { data: roleRow } = await supabase.from("roles").select("permissions").eq("id", effectiveRoleIdLower).maybeSingle()
+
+    const rawUserStorePerms = sm.permissions
+        ? deepMergePermissions(pu.permissions as unknown as PartnerPermissions, sm.permissions as unknown as Partial<PartnerPermissions>)
+        : pu.permissions
+
+    const effectivePermissions = mergePermissionsWithRole(template, roleRow?.permissions, rawUserStorePerms)
+
     return {
-        role: effectiveRole,
-        permissions: effectivePermissions,
+        role: effectiveRoleUpper,
+        permissions: effectivePermissions as unknown as PartnerPermissions,
     }
 }
 
