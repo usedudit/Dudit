@@ -1408,6 +1408,15 @@ export async function getMarketplaceCustomerStoreCreditAction(partnerId: string)
 
   const admin = getAdminClient()
 
+  const { data: partner } = await admin
+    .from("partners")
+    .select("id")
+    .eq("id", partnerId)
+    .eq("is_active", true)
+    .neq("erp_disabled", true)
+    .maybeSingle()
+  if (!partner?.id) return { success: false, availableCredit: 0 }
+
   // Buscar cliente por marketplace_user_id ou email para este parceiro
   const { data: customer } = await admin
     .from("customers")

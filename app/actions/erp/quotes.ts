@@ -421,6 +421,17 @@ export async function createQuoteAction(data: {
             }
 
             const supabase = await getSupabaseServerClient()
+            let customerId = data.customerId || null
+            if (customerId) {
+                const { data: customer } = await getAdminClient()
+                    .from("customers")
+                    .select("id")
+                    .eq("id", customerId)
+                    .eq("partner_id", data.partnerId)
+                    .maybeSingle()
+                if (!customer?.id) return errorResponse("Cliente invÃ¡lido para este parceiro.")
+                customerId = customer.id
+            }
             const payloadValidationError = validateQuotePayload(
                 data.items || [],
                 data.shippingCost || 0,
@@ -449,7 +460,7 @@ export async function createQuoteAction(data: {
             const { data: quoteResult, error: rpcError } = await supabase.rpc('create_quote_with_items', {
                 p_partner_id: data.partnerId,
                 p_user_id: data.userId || user.id,
-                p_customer_id: data.customerId || null,
+                p_customer_id: customerId,
                 p_status: "draft",
                 p_issue_date: data.issueDate || new Date().toISOString().split("T")[0],
                 p_expiration_date: data.expirationDate || null,
@@ -563,6 +574,17 @@ export async function updateQuoteAction(data: {
             }
 
             const supabase = await getSupabaseServerClient()
+            let customerId = data.customerId || null
+            if (data.customerId !== undefined && customerId) {
+                const { data: customer } = await getAdminClient()
+                    .from("customers")
+                    .select("id")
+                    .eq("id", customerId)
+                    .eq("partner_id", data.partnerId)
+                    .maybeSingle()
+                if (!customer?.id) return errorResponse("Cliente invÃ¡lido para este parceiro.")
+                customerId = customer.id
+            }
             const existingItemsResult = await getQuoteItemsForValidation(data.quoteId, data.partnerId, supabase)
             if (existingItemsResult.error || !existingItemsResult.items) {
                 return errorResponse(existingItemsResult.error || "Não foi possí­vel validar o orçamento")
@@ -599,7 +621,7 @@ export async function updateQuoteAction(data: {
             }
 
             const updatePayload: Record<string, unknown> = {}
-            if (data.customerId !== undefined) updatePayload.customer_id = data.customerId || null
+            if (data.customerId !== undefined) updatePayload.customer_id = customerId
             if (data.issueDate) updatePayload.issue_date = data.issueDate
             if (data.expirationDate !== undefined) updatePayload.expiration_date = data.expirationDate || null
             if (data.notes !== undefined) updatePayload.notes = sanitizeNotes(data.notes)

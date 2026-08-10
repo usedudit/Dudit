@@ -194,6 +194,26 @@ function normalizePaymentMethodLabel(value?: string | null) {
     return formatPaymentMethodLabel(value, null)
 }
 
+async function resolvePartnerCustomerId(
+    supabase: any,
+    partnerId: string,
+    requestedCustomerId?: string | null,
+): Promise<string | null> {
+    const customerId = requestedCustomerId || null
+    if (!customerId) return null
+
+    const { data: customer, error } = await supabase
+        .from("customers")
+        .select("id")
+        .eq("id", customerId)
+        .eq("partner_id", partnerId)
+        .maybeSingle()
+
+    if (error) throw new Error("NÃ£o foi possÃ­vel validar o cliente da venda.")
+    if (!customer?.id) throw new Error("Cliente invÃ¡lido para este parceiro.")
+    return customer.id
+}
+
 export async function applyStoreCreditDeduction(
     supabase: any,
     params: {
@@ -211,6 +231,7 @@ export async function applyStoreCreditDeduction(
             .from("customers")
             .select("store_credit")
             .eq("id", params.customerId)
+            .eq("partner_id", params.partnerId)
             .maybeSingle()
 
         if (customer) {
@@ -220,6 +241,7 @@ export async function applyStoreCreditDeduction(
                 .from("customers")
                 .update({ store_credit: newBalance })
                 .eq("id", params.customerId)
+                .eq("partner_id", params.partnerId)
         }
 
         const { data: credits } = await supabase
@@ -270,6 +292,7 @@ export async function restoreStoreCreditDeduction(
             .from("customers")
             .select("store_credit")
             .eq("id", params.customerId)
+            .eq("partner_id", params.partnerId)
             .maybeSingle()
 
         if (customer) {
@@ -279,6 +302,7 @@ export async function restoreStoreCreditDeduction(
                 .from("customers")
                 .update({ store_credit: newBalance })
                 .eq("id", params.customerId)
+                .eq("partner_id", params.partnerId)
         }
     } catch (err) {
         console.error("[restoreStoreCreditDeduction] Error restoring store credit:", err)
@@ -1581,6 +1605,12 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     if (!limitCheck.allowed) return { error: limitCheck.message || "Limite mensal atingido." }
 
     const supabase = createAdminClient()
+    let customerId: string | null
+    try {
+        customerId = await resolvePartnerCustomerId(supabase, partnerId, data.customerId)
+    } catch (error: any) {
+        return { error: error?.message || "Cliente invÃ¡lido para este parceiro." }
+    }
     const sanitizedItemsResult = sanitizeERPItems(data.items)
     if ("error" in sanitizedItemsResult) return { error: sanitizedItemsResult.error }
     const sanitizedItems = sanitizedItemsResult.items
@@ -1613,7 +1643,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         const couponValidation = await validateCoupon({
             partnerId,
             code: data.couponCode,
-            customerId: data.customerId || null,
+            customerId,
             subtotal: Number(data.subtotal || 0),
             shippingCost: Number(data.shippingCost || 0),
             items: sanitizedItems.map((item) => ({ productId: item.productId || null })),
@@ -1626,7 +1656,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         // Re-validate existing coupon by ID
         const couponValidation = await validateCouponById(couponIdToSave, {
             partnerId,
-            customerId: data.customerId || null,
+            customerId,
             subtotal: Number(data.subtotal || 0),
             shippingCost: Number(data.shippingCost || 0),
             items: sanitizedItems.map((item) => ({ productId: item.productId || null })),
@@ -1643,7 +1673,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
 
     // ── Server-side pricing recalculation ────────────────────────────────
     const { listActivePromotionsForMarketplaceAction, filterRawPromotionsByGiftStock, buildGiftOrderItems } = await import("@/app/actions/shared/promotions")
-    const rawPromotions = await listActivePromotionsForMarketplaceAction(partnerId, data.customerId || null)
+    const rawPromotions = await listActivePromotionsForMarketplaceAction(partnerId, customerId)
     const filteredPromotions = await filterRawPromotionsByGiftStock(rawPromotions, supabase)
 
     const pricingResult = calculateOrderPricing({
@@ -1770,8 +1800,8 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     const orderInsertPayload: Record<string, unknown> = {
         ...(data.id ? { id: data.id } : {}),
         partner_id: partnerId,
-        customer_id: data.customerId || null,
-        buyer_id: data.customerId || null,
+        customer_id: customerId,
+        buyer_id: customerId,
         customer_name: data.customerName || null,
         source_quote_id: data.sourceQuoteId || null,
         order_source: buildOrderSource(data.salesChannel, data.deliveryMethod),
@@ -1833,10 +1863,10 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     const orderError = orderInsertResult.error
     if (orderError) return { error: orderError.message }
 
-    if (paymentMethodStoreCreditAmount > 0 && data.customerId) {
+    if (paymentMethodStoreCreditAmount > 0 && customerId) {
         await applyStoreCreditDeduction(supabase, {
             partnerId,
-            customerId: data.customerId,
+            customerId,
             amount: paymentMethodStoreCreditAmount,
         })
     }
@@ -2009,7 +2039,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         await adminClient.from("coupon_usages").upsert(
             {
                 coupon_id: couponIdToSave,
-                customer_id: data.customerId || null,
+                customer_id: customerId,
                 order_id: order.id,
             },
             { onConflict: "coupon_id,order_id", ignoreDuplicates: true }
@@ -2174,6 +2204,7 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
                                 .from("customers")
                                 .update({ user_id: data.buyer_id })
                                 .eq("id", matched.id)
+                                .eq("partner_id", partnerId)
                             return {
                                 ...matched,
                                 user_id: data.buyer_id,
@@ -2280,6 +2311,7 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
                 .from("customers")
                 .select("id, name, email, phone, image_url, addresses(*)")
                 .eq("id", sale.customer_id)
+                .eq("partner_id", partnerId)
                 .single()
                 .then((res: any) => res.data)
             : Promise.resolve(null),
@@ -2406,6 +2438,12 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     if (!csrfValidation.valid) return { error: csrfValidation.error || "Token CSRF inválido" }
 
     const supabase = createAdminClient()
+    let customerId: string | null
+    try {
+        customerId = await resolvePartnerCustomerId(supabase, data.partnerId, data.customerId)
+    } catch (error: any) {
+        return { error: error?.message || "Cliente invÃ¡lido para este parceiro." }
+    }
     const sanitizedItemsResult = sanitizeERPItems(data.items)
     if ("error" in sanitizedItemsResult) return { error: sanitizedItemsResult.error }
     const sanitizedItems = sanitizedItemsResult.items
@@ -2513,7 +2551,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         const couponValidation = await validateCoupon({
             partnerId: data.partnerId,
             code: data.couponCode,
-            customerId: data.customerId || null,
+            customerId,
             subtotal: Number(data.subtotal || 0),
             shippingCost: Number(data.shippingCost || 0),
             items: sanitizedItems.map((item) => ({ productId: item.productId || null })),
@@ -2529,7 +2567,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     } else if (couponIdToSave) {
         const couponValidation = await validateCouponById(couponIdToSave, {
             partnerId: data.partnerId,
-            customerId: data.customerId || null,
+            customerId,
             subtotal: Number(data.subtotal || 0),
             shippingCost: Number(data.shippingCost || 0),
             items: sanitizedItems.map((item) => ({ productId: item.productId || null })),
@@ -2544,7 +2582,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     }
 
     const { listActivePromotionsForMarketplaceAction, filterRawPromotionsByGiftStock, buildGiftOrderItems } = await import("@/app/actions/shared/promotions")
-    const rawPromotions = await listActivePromotionsForMarketplaceAction(data.partnerId, data.customerId || null)
+    const rawPromotions = await listActivePromotionsForMarketplaceAction(data.partnerId, customerId)
     const filteredPromotions = await filterRawPromotionsByGiftStock(rawPromotions, supabase)
 
     const updatePricingResult = calculateOrderPricing({
@@ -2689,8 +2727,8 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     const updateEffectiveDeliveryPayer = (data.deliveryBreakdown?.deliveryPayer as "seller" | "customer") || ((currentOrder as any).delivery_payer || "customer")
 
     const orderUpdatePayload: Record<string, unknown> = {
-        customer_id: data.customerId || null,
-        buyer_id: data.customerId || null,
+        customer_id: customerId,
+        buyer_id: customerId,
         customer_name: data.customerName || null,
         order_source: buildOrderSource(data.salesChannel, data.deliveryMethod),
         delivery_type: data.deliveryMethod,
@@ -2761,7 +2799,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             totalAmount: Number(updateServerTotal || 0),
             newBreakdown: finalBreakdown,
             oldBreakdown: currentOrder.payment_breakdown || [],
-            customerId: data.customerId || null,
+            customerId,
             customerName: data.customerName || null,
             financeAccountId: data.financeAccountId,
             orderSource: currentOrder.order_source || "manual",
@@ -2778,7 +2816,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         paid_amount: Number(paymentState.paidAmount || 0),
         situation: paymentState.situation,
         payment_method: paymentMethodSummary || data.paymentMethod || currentOrder.payment_method,
-        customer_id: data.customerId || currentOrder.buyer_id || null,
+        customer_id: customerId || currentOrder.buyer_id || null,
         customer_name: data.customerName || currentOrder.customer_name,
         finance_account_id: data.financeAccountId || currentOrder.finance_account_id,
         order_source: currentOrder.order_source || "manual",

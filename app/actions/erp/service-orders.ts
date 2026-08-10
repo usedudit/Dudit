@@ -221,6 +221,18 @@ export async function createServiceOrderAction(
     const user = await requireUser()
     const admin = getAdminClient()
 
+    let customerId = input.customer_id || null
+    if (customerId) {
+      const { data: customer } = await admin
+        .from("customers")
+        .select("id")
+        .eq("id", customerId)
+        .eq("partner_id", partnerId)
+        .maybeSingle()
+      if (!customer?.id) return { success: false, error: "Cliente invÃ¡lido para este parceiro." }
+      customerId = customer.id
+    }
+
     const storeId = input.store_id
     if (!storeId) {
       return { success: false, error: "store_id é obrigatório. Selecione uma loja antes de criar a OS." }
@@ -247,8 +259,8 @@ export async function createServiceOrderAction(
         description: input.description || null,
         diagnosis: input.diagnosis || null,
         internal_notes: sanitizeNotes(input.internal_notes),
-        customer_id: input.customer_id || null,
-        customer_snapshot: input.customer_id ? await getCustomerSnapshot(admin, input.customer_id) : null,
+        customer_id: customerId,
+        customer_snapshot: customerId ? await getCustomerSnapshot(admin, customerId) : null,
         expected_completion_date: input.expected_completion_date || null,
         assigned_user_id: input.assigned_user_id || null,
         status,
@@ -313,7 +325,7 @@ export async function createServiceOrderAction(
       .insert({
         partner_id: partnerId,
         store_id: storeId,
-        buyer_id: input.customer_id || null,
+        buyer_id: customerId,
         customer_name: (data.customer_snapshot as any)?.name || null,
         total_amount: 0,
         subtotal_value: 0,
@@ -1244,8 +1256,18 @@ export async function updateServiceOrderAction(
     if (input.diagnosis !== undefined && !isPaid) updateData.diagnosis = input.diagnosis
     if (input.internal_notes !== undefined) updateData.internal_notes = sanitizeNotes(input.internal_notes)
     if (input.customer_id !== undefined && !isPaid) {
-      updateData.customer_id = input.customer_id
-      updateData.customer_snapshot = input.customer_id ? await getCustomerSnapshot(admin, input.customer_id) : null
+      const customerId = input.customer_id || null
+      if (customerId) {
+        const { data: customer } = await admin
+          .from("customers")
+          .select("id")
+          .eq("id", customerId)
+          .eq("partner_id", partnerId)
+          .maybeSingle()
+        if (!customer?.id) return { success: false, error: "Cliente invÃ¡lido para este parceiro." }
+      }
+      updateData.customer_id = customerId
+      updateData.customer_snapshot = customerId ? await getCustomerSnapshot(admin, customerId) : null
     }
     if (input.expected_completion_date !== undefined) updateData.expected_completion_date = input.expected_completion_date
     if (input.assigned_user_id !== undefined && !isPaid) updateData.assigned_user_id = input.assigned_user_id

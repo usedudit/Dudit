@@ -366,15 +366,13 @@ export function ERPSidebar() {
                 // Direct link item (no submenu) - check access
                 if (newItem.href && !newItem.submenu) {
                     if (newItem.href === "/erp/inicio") return newItem
-                    const directMinimumPlan = newItem.href ? PLAN_GATED_MINIMUM[newItem.href] : undefined
-                    const planGateKept = Boolean(directMinimumPlan) && !hasMinimumPlan(planSlug, directMinimumPlan!)
-                    if (canAccess(newItem.href) || planGateKept) return newItem
+                    if (canAccess(newItem.href)) return newItem
                     return null
                 }
 
                 // Submenu item - filter sub-items and hide if none remain
                 if (newItem.submenu) {
-                    const filteredSub = newItem.submenu.filter((sub) => sub.comingSoon || canAccess(sub.href) || Boolean(PLAN_GATED_MINIMUM[sub.href]))
+                    const filteredSub = newItem.submenu.filter((sub) => sub.comingSoon || canAccess(sub.href))
                     const directMinimumPlan = newItem.href ? PLAN_GATED_MINIMUM[newItem.href] : undefined
                     if (filteredSub.length === 0) return null
                     return {

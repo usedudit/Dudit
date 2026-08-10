@@ -191,7 +191,10 @@ export async function cancelBuyerOrderAction(orderId: string) {
   }
 
   // Call helper to sync appointments and transactions
-  await syncCancelledOrderAppointmentsAndTransactions(supabase, orderId)
+  // The buyer has no partner_users membership, so the cancellation side
+  // effects must run with admin only after this action has verified order
+  // ownership and the order's canonical partner_id above.
+  await syncCancelledOrderAppointmentsAndTransactions(getAdminClient(), orderId)
 
   // Log audit event for the cancelled order
   await logAuditEvent({

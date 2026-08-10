@@ -409,6 +409,7 @@ export async function getReturnRequestDetailsAction(partnerId: string, requestId
                 .from("customers")
                 .select("email, phone")
                 .eq("id", data.orders.buyer_id)
+                .eq("partner_id", partnerId)
                 .maybeSingle()
             buyerDetails = customerData
 
@@ -859,7 +860,19 @@ export async function processReturnRequestAction(input: unknown) {
 
         // Map buyer user UUID to ERP customers table ID to avoid foreign key violations on transactions
         const buyerId = (request as any).orders?.buyer_id || (request as any).customer_id
-        let erpCustomerId: string | null = data.customerId || null
+        let erpCustomerId: string | null = null
+        if (data.customerId) {
+            const { data: requestedCustomer } = await supabase
+                .from("customers")
+                .select("id")
+                .eq("id", data.customerId)
+                .eq("partner_id", request.partner_id)
+                .maybeSingle()
+            if (!requestedCustomer?.id) {
+                throw new Error("Cliente invÃ¡lido para este parceiro.")
+            }
+            erpCustomerId = requestedCustomer.id
+        }
         if (!erpCustomerId) {
             if (buyerId) {
                 const { data: existingCustomer } = await supabase
@@ -1497,6 +1510,7 @@ export async function fetchReturnOrderBucketAction(partnerId: string) {
         shipping_total,
         amount_paid,
         buyer_id,
+        customer_id,
         customer_name,
         delivery_address,
         created_at,
@@ -1567,7 +1581,7 @@ export async function fetchReturnOrderBucketAction(partnerId: string) {
             }
         }
 
-        const buyerIds = Array.from(new Set((orders || []).map((o: any) => o.buyer_id).filter(Boolean)))
+        const buyerIds = Array.from(new Set((orders || []).map((o: any) => o.customer_id || o.buyer_id).filter(Boolean)))
         const customersMap = new Map<string, any>()
         if (buyerIds.length > 0) {
             try {
@@ -1575,6 +1589,7 @@ export async function fetchReturnOrderBucketAction(partnerId: string) {
                     .from("customers")
                     .select("id, name, email, phone, image_url, addresses(*)")
                     .in("id", buyerIds)
+                    .eq("partner_id", partnerId)
                     ; (customersData || []).forEach((c: any) => customersMap.set(c.id, c))
             } catch (_) {
                 // customers join is optional - snapshot fields cover the essential data
@@ -1582,7 +1597,7 @@ export async function fetchReturnOrderBucketAction(partnerId: string) {
         }
 
         return (orders || []).map((order: any) => {
-            const customer = order.buyer_id ? customersMap.get(order.buyer_id) : null
+            const customer = (order.customer_id || order.buyer_id) ? customersMap.get(order.customer_id || order.buyer_id) : null
             const orderItems = order.order_items || []
             const amountPaid = getOrderAmountPaid(order)
             const subtotalOriginal = getOrderSubtotalOriginal(order, orderItems)

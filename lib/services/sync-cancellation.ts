@@ -12,29 +12,54 @@ export async function syncCancelledOrderAppointmentsAndTransactions(
   orderId: string,
   options?: { refundMode?: 'store_credit' | 'financial' | 'none' }
 ): Promise<void> {
+  let orderPartnerId: string | null = null
+
   // Refund subscription credits or exchange credits if any were consumed
   try {
-    const { data: order } = await supabase
+    const { data: order, error: orderError } = await supabase
       .from("orders")
-      .select("id, partner_id, buyer_id, store_id, paid_amount, exchange_return_request_id, payment_breakdown")
+      .select("id, partner_id, buyer_id, customer_id, store_id, paid_amount, exchange_return_request_id, payment_breakdown")
       .eq("id", orderId)
       .single()
 
-    if (order?.partner_id && order?.buyer_id) {
-      const { refundSubscriptionCredits } = await import("@/lib/services/credit.service")
-      await refundSubscriptionCredits(supabase, {
-        partnerId: order.partner_id,
-        customerId: order.buyer_id,
-        orderId,
-      })
+    if (orderError || !order?.partner_id) {
+      console.error("[syncCancelledOrder] Order not found or missing partner scope:", orderId)
+      return
+    }
 
-      if (order.exchange_return_request_id && options?.refundMode === "store_credit") {
+    orderPartnerId = order.partner_id
+
+    if (order.buyer_id) {
+      // Marketplace buyers do not have partner_users membership. Resolve the
+      // canonical ERP customer only inside the already-authorized order scope.
+      // Never use buyer_id directly as a customers.id without this mapping.
+      let customerId: string | null = order.customer_id || null
+      if (!customerId) {
+        const { data: marketplaceCustomer } = await supabase
+          .from("customers")
+          .select("id")
+          .eq("partner_id", order.partner_id)
+          .eq("marketplace_user_id", order.buyer_id)
+          .maybeSingle()
+        customerId = marketplaceCustomer?.id || null
+      }
+
+      if (customerId) {
+        const { refundSubscriptionCredits } = await import("@/lib/services/credit.service")
+        await refundSubscriptionCredits(supabase, {
+          partnerId: order.partner_id,
+          customerId,
+          orderId,
+        })
+      }
+
+      if (order.exchange_return_request_id && options?.refundMode === "store_credit" && customerId) {
         const exchangeCreditAmount = Number(order.paid_amount || 0)
         if (exchangeCreditAmount > 0) {
           await supabase.from("store_credits").insert({
             partner_id: order.partner_id,
             store_id: order.store_id || null,
-            customer_id: order.buyer_id,
+            customer_id: customerId,
             return_request_id: order.exchange_return_request_id,
             amount: exchangeCreditAmount,
             remaining_amount: exchangeCreditAmount,
@@ -44,7 +69,8 @@ export async function syncCancelledOrderAppointmentsAndTransactions(
           const { data: customer } = await supabase
             .from("customers")
             .select("store_credit")
-            .eq("id", order.buyer_id)
+            .eq("id", customerId)
+            .eq("partner_id", order.partner_id)
             .single()
 
           await supabase
@@ -53,7 +79,8 @@ export async function syncCancelledOrderAppointmentsAndTransactions(
               store_credit: (Number(customer?.store_credit || 0) + exchangeCreditAmount),
               updated_at: new Date().toISOString(),
             })
-            .eq("id", order.buyer_id)
+            .eq("id", customerId)
+            .eq("partner_id", order.partner_id)
         }
       }
     }
@@ -66,6 +93,7 @@ export async function syncCancelledOrderAppointmentsAndTransactions(
     .from("appointments")
     .select("id, status, receivable_transaction_id, payment_transaction_id")
     .eq("marketplace_order_id", orderId)
+    .eq("partner_id", orderPartnerId)
 
   if (fetchApptsError) {
     console.error("[syncCancelledOrder] Error fetching appointments:", fetchApptsError)
@@ -109,6 +137,7 @@ export async function syncCancelledOrderAppointmentsAndTransactions(
       .from("transactions")
       .select("id, status")
       .in("id", Array.from(txIds))
+      .eq("partner_id", orderPartnerId)
 
     if (fetchTxsError) {
       console.error("[syncCancelledOrder] Error fetching transactions:", fetchTxsError)
