@@ -262,12 +262,18 @@ export const AddServicePage: FC<AddServicePageProps> = ({
             })
 
             notifySuccess("Sucesso", "Campos preenchidos com IA!")
-        } catch {
-            notifyError("Erro", "Falha ao conectar com o servidor.")
+        } catch (e: any) {
+            const msg = e?.error || e?.message || "Falha ao conectar com o servidor."
+            if (e?.code === "plan_blocked") {
+                notifyError("Plano atual não inclui geração por IA", msg)
+                openPlanUpgrade("crescer")
+            } else {
+                notifyError("Erro", msg)
+            }
         } finally {
             setIsGeneratingDetails(false)
         }
-    }, [serviceData.name, partnerId, notifyError, notifySuccess])
+    }, [serviceData.name, partnerId, notifyError, notifySuccess, openPlanUpgrade])
 
     const [fieldErrors, setFieldErrors] = useState<Set<string>>(new Set())
 

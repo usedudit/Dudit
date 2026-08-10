@@ -220,6 +220,11 @@ export const IntegrationsSubPage = ({
     }
 
     const handleStartOAuth = async () => {
+        if (!hasMinimumPlan(planSlug, "crescer")) {
+            setActiveModal(null)
+            openPlanUpgrade("crescer")
+            return
+        }
         setIsLoading(true)
         try {
             window.location.href = "/api/mercadopago/oauth/start"
@@ -545,8 +550,8 @@ export const IntegrationsSubPage = ({
                                 </div>
                             </div>
 
-                            <div className="w-20 h-20 bg-[#25D366] rounded-2xl flex items-center justify-center text-white font-bold text-3xl transform transition-transform group-hover:rotate-3">
-                                WA
+                            <div className="w-20 h-20 bg-white dark:bg-dark-surface rounded-2xl p-4 flex items-center justify-center transform transition-transform group-hover:rotate-3">
+                                <img src="https://img.dudit.com.br/static/icons/WhatsApp.png" alt="WhatsApp" className="w-full h-full object-contain" />
                             </div>
                         </div>
 
@@ -573,6 +578,8 @@ export const IntegrationsSubPage = ({
                                 </Button>
                                 <WhatsappConnectButton
                                     className="flex-1 h-[46px]"
+                                    planSlug={planSlug}
+                                    requiredPlan="escalar"
                                     onSuccess={async () => {
                                         setWaActiveModal(null)
                                         await fetchWaStatus()
@@ -675,7 +682,14 @@ export const IntegrationsSubPage = ({
                                 {waKnowMoreStep === 2 ? (
                                     <Button
                                         className="flex-1 h-[46px]"
-                                        onClick={() => setWaActiveModal("info")}
+                                        onClick={() => {
+                                            if (!hasMinimumPlan(planSlug, "escalar")) {
+                                                setWaActiveModal(null)
+                                                openPlanUpgrade("escalar")
+                                                return
+                                            }
+                                            setWaActiveModal("info")
+                                        }}
                                     >
                                         Entendido
                                     </Button>
@@ -738,7 +752,17 @@ export const IntegrationsSubPage = ({
                                 <Button variant="outline" className="flex-1 h-[46px]" onClick={() => setActiveModal(null)}>
                                     Cancelar
                                 </Button>
-                                <Button className="flex-1 h-[46px]" onClick={() => setActiveModal("permissions")}>
+                                <Button
+                                    className="flex-1 h-[46px]"
+                                    onClick={() => {
+                                        if (!hasMinimumPlan(planSlug, "crescer")) {
+                                            setActiveModal(null)
+                                            openPlanUpgrade("crescer")
+                                            return
+                                        }
+                                        setActiveModal("permissions")
+                                    }}
+                                >
                                     Conectar agora
                                 </Button>
                             </div>
@@ -820,7 +844,14 @@ export const IntegrationsSubPage = ({
                                 {knowMoreStep === KNOW_MORE_STEPS.length - 1 ? (
                                     <Button
                                         className="flex-1 h-[46px]"
-                                        onClick={() => setActiveModal("info")}
+                                        onClick={() => {
+                                            if (!hasMinimumPlan(planSlug, "crescer")) {
+                                                setActiveModal(null)
+                                                openPlanUpgrade("crescer")
+                                                return
+                                            }
+                                            setActiveModal("info")
+                                        }}
                                     >
                                         Entendido
                                     </Button>

@@ -498,8 +498,14 @@ export async function safeFetch(
     // ── Step 4: Fetch with redirect: "manual" ──
     // WHY: Default "follow" mode would silently follow redirects to internal IPs.
     // Manual mode lets us validate each redirect target.
+    const reqHeaders = new Headers(fetchOptions.headers)
+    if (!reqHeaders.has("user-agent") && !reqHeaders.has("User-Agent")) {
+      reqHeaders.set("User-Agent", "Dudit-App/1.0")
+    }
+
     let response = await fetch(rawUrl, {
       ...fetchOptions,
+      headers: reqHeaders,
       redirect: "manual",
       signal: controller.signal,
     })
@@ -545,6 +551,7 @@ export async function safeFetch(
       // Follow the redirect
       response = await fetch(redirectUrl, {
         ...fetchOptions,
+        headers: reqHeaders,
         redirect: "manual",
         signal: controller.signal,
       })
@@ -569,7 +576,10 @@ export async function safeFetch(
     // Re-throw SSRFError as-is
     if (err instanceof SSRFError) throw err
     // Wrap unknown errors
-    throw new SSRFError(`Fetch failed: ${(err as Error).message}`)
+    const cause = (err as any)?.cause
+    const causeMsg = cause?.message || (typeof cause === "string" ? cause : undefined)
+    const detail = causeMsg ? `${(err as Error).message} (${causeMsg})` : (err as Error).message
+    throw new SSRFError(`Fetch failed: ${detail}`)
   } finally {
     clearTimeout(timeoutId)
   }

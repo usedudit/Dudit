@@ -1415,7 +1415,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                         </div>
                                     ))}
                                     {!groupedItems.length && (
-                                        <IconPlaceholder placeholderType="image" imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png" imageAlt="Sem itens" title="Nenhum item encontrado" subtitle="Tente buscar por outro termo." />
+                                        <IconPlaceholder placeholderType="image" imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png" imageAlt="Sem itens" title="Nenhum item por aqui!" subtitle="Este vendedor ainda não adicionou nenhum item." />
                                     )}
                                 </>
                             )}

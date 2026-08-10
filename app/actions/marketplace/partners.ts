@@ -778,6 +778,9 @@ export async function registerPartner(data: any) {
         is_headquarters: true,
         is_active: true,
         is_showcase_active: true,
+        category_id: data.categoryId || null,
+        subcategory_id: data.subcategoryId || null,
+        business_info: normalizeBusinessInfo(data.businessInfo),
       })
       .select("id")
       .single()
@@ -791,10 +794,11 @@ export async function registerPartner(data: any) {
       const addressData = {
         partner_id: newPartner.id,
         store_id: newStore?.id || null,
+        user_id: userId,
         zip_code: data.zipCode,
         street: data.street,
         number: data.number || "S/N",
-        complement: data.complement,
+        complement: data.complement || null,
         neighborhood: data.neighborhood,
         city: data.city,
         state: data.state,

@@ -3,7 +3,7 @@ import { type NextRequest, NextResponse } from "next/server"
 export const dynamic = "force-dynamic"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { getCurrentUser } from "@/lib/auth/authorization"
+import { getCurrentUser, requireMinimumPlan } from "@/lib/auth/authorization"
 import { encrypt } from "@/lib/cryptoService"
 import { validateOAuthState } from "@/lib/security/oauth-state"
 
@@ -76,6 +76,14 @@ export async function GET(request: NextRequest) {
     if (!partner) {
       return NextResponse.redirect(
         `${appUrl}/erp/settings?mp_error=unauthorized`
+      )
+    }
+
+    try {
+      await requireMinimumPlan(partner.id, "crescer")
+    } catch {
+      return NextResponse.redirect(
+        `${appUrl}/erp/settings?tab=integracoes&mp_error=plano_insuficiente`
       )
     }
 

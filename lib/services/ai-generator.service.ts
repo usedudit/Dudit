@@ -174,9 +174,13 @@ export class AiGeneratorService {
 
         Regras Cruciais:
         1. DESCRIÇÃO:
-           - Máximo de 2 parágrafos.
-           - Máximo de aproximadamente 400 caracteres.
-           - Tom estritamente neutro. Não utilize linguagem de marketing exagerada, propaganda, ou emojis.
+           - Escreva uma descrição de venda atraente e bem redigida, em português natural, com tom profissional e convidativo.
+           - Estruture em 2 a 3 parágrafos curtos:
+             a) Abertura: apresente o item de forma convidativa, destacando seu principal benefício ou uso.
+             b) Meio: detalhe características relevantes (qualidade, material, funcionalidade, diferenciais, compatibilidade) de forma natural e específica.
+             c) Encerramento: indique para quem é ideal ou qual problema ele resolve.
+           - Máximo de aproximadamente 700 caracteres no total.
+           - Proibido: emojis, exageros ("melhor do mercado", "perfeito", "revolucionário"), promessas falsas, links, jargão técnico excessivo e menção a preço.
         2. MARCA:
            - Identifique a marca presente no título. Se nenhuma marca estiver clara, retorne string vazia "".
         3. TAGS:
@@ -208,12 +212,10 @@ export class AiGeneratorService {
 
       // 5. Abstração de Provedor e Cadeia de Fallback de Modelos
       const provider = getAiProvider()
-      
-      const models = [
-        process.env.AI_PRODUCT_MODEL || "nvidia/llama-3.3-nemotron-super-49b-v1",
-        "qwen/qwen-2.5-72b-instruct",
-        "deepseek/deepseek-chat"
-      ]
+
+      // Modelo padrão do provedor + fallbacks do próprio provedor.
+      // Se AI_PRODUCT_MODEL for definido, ele é usado como modelo padrão.
+      const models = Array.from(new Set([provider.defaultModel, ...provider.fallbackModels]))
 
       let apiResponseText = ""
       let modelUsed = ""
@@ -247,7 +249,7 @@ export class AiGeneratorService {
       const cleanedJson = cleanJsonResponse(apiResponseText)
       const aiResponseObj = JSON.parse(cleanedJson)
 
-      const description = (aiResponseObj.description || "").trim().slice(0, 500)
+      const description = (aiResponseObj.description || "").trim().slice(0, 800)
       const brand = (aiResponseObj.brand || "").trim()
 
       let rawTags = Array.isArray(aiResponseObj.tags) ? aiResponseObj.tags : []

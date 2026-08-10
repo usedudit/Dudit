@@ -99,6 +99,7 @@ export async function fetchJSONWithCSRF<T = any>(
 
   if (!response.ok) {
     let errorMessage = `HTTP ${response.status}`
+    let errorCode: string | undefined
     try {
       const error = await response.json()
       // Tentar diferentes caminhos de erro
@@ -109,12 +110,14 @@ export async function fetchJSONWithCSRF<T = any>(
       } else if (error.errors?.[0]?.message) {
         errorMessage = error.errors[0].message
       }
+      errorCode = error.code
     } catch (parseErr) {
       // Se não conseguir fazer parse, usar a mensagem padrão
       console.error("[CSRF] Erro ao fazer parse da resposta de erro:", parseErr)
     }
-    const err = new Error(errorMessage)
-      ; (err as any).error = errorMessage
+    const err = new Error(errorMessage) as Error & { error?: string; code?: string }
+    err.error = errorMessage
+    err.code = errorCode
     throw err
   }
 

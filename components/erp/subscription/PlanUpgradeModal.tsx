@@ -4,7 +4,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
-import { Button, ThreeDotsLoader } from "@/components/reusable"
+import { Button, EmailInput, ThreeDotsLoader } from "@/components/reusable"
 import { XIcon } from "@/lib/icons"
 import { toast } from "@/hooks/use-notification"
 import { formatCurrency } from "@/lib/utils"
@@ -165,29 +165,23 @@ function PlanUpgradeModalInner({
         {loading ? (
           <div className="flex items-center gap-2 text-brand-inactive-text py-4">
             <ThreeDotsLoader />
-            <span className="text-xs">Carregando detalhes do faturamento…</span>
           </div>
         ) : (
           <>
-            <FormInput
-              label="Email de faturamento"
-              type="email"
+            <EmailInput
+              label="Email"
               value={billingEmail}
               onChange={(e) => setBillingEmail(e.target.value)}
-              placeholder="voce@empresa.com.br"
               className="w-full"
             />
-            {emailError ? <p className="text-xs text-red-600">{emailError}</p> : null}
-            <p className="text-xs text-brand-inactive-text">
-              Mesmo fluxo da página Minha Assinatura: você será redirecionado ao Mercado Pago quando necessário.
-            </p>
+            {emailError ? <p className="text-xs text-brand-red">{emailError}</p> : null}
           </>
         )}
         <div className="flex flex-col-reverse sm:flex-row gap-3 pt-2">
           <Button variant="outline" className="flex-1 rounded-full" onClick={onClose} disabled={actionLoading}>
             Agora não
           </Button>
-          <Button className="flex-1 rounded-full bg-brand-primary hover:bg-brand-primary/90 text-white" onClick={handleSubscribe} disabled={actionLoading || loading}>
+          <Button className="flex-1" onClick={handleSubscribe} disabled={actionLoading || loading}>
             {actionLoading ? "Processando…" : "Assinar plano"}
           </Button>
         </div>
@@ -196,7 +190,7 @@ function PlanUpgradeModalInner({
   )
 
   const rightPanel = (
-    <div className="relative flex flex-col items-center justify-between bg-brand-gray dark:bg-dark-border/50 text-white p-8 min-h-[280px] md:min-h-0 md:w-[46%] shrink-0">
+    <div className="relative flex flex-col items-center justify-between bg-brand-dark text-white p-8 min-h-[280px] md:min-h-0 md:w-[46%] shrink-0">
       <button
         type="button"
         onClick={onClose}

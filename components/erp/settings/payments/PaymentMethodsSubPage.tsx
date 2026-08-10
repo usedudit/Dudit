@@ -526,7 +526,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, handleBack, onE
     if (planGate && !embedded) {
         return (
             <FadeIn>
-                <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
+                <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
                     <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
 
                         {/* Sticky Header */}
@@ -547,7 +547,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, handleBack, onE
                                             <span className="truncate">Formas de Pagamento</span>
                                         </h1>
 
-                                        <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
+                                        <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100 mt-1"}`}>
                                             Gerencie os métodos de pagamento aceitos em seu negócio.
                                         </div>
                                     </div>
@@ -576,117 +576,117 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, handleBack, onE
     return (
         <>
             {embedded ? (
-                    <>
-                            <PaymentMethodPageControls
-                                search={search}
-                                onSearchChange={setSearch}
-                                onOpenFilter={() => setModals({ filter: true })}
-                                filters={filters}
-                                setFilters={setFilters}
-                                viewMode={viewMode}
-                                onViewModeChange={setViewMode}
-                                hasActiveFilters={hasActiveFilters}
-                            />
+                <>
+                    <PaymentMethodPageControls
+                        search={search}
+                        onSearchChange={setSearch}
+                        onOpenFilter={() => setModals({ filter: true })}
+                        filters={filters}
+                        setFilters={setFilters}
+                        viewMode={viewMode}
+                        onViewModeChange={setViewMode}
+                        hasActiveFilters={hasActiveFilters}
+                    />
 
-                        <div className="mt-4">
-                            <AnimatePresence mode="wait">
-                                <FadeIn
-                                    key={`${viewMode}-${debouncedSearch}-${filters.type.join(",")}-${filters.status.join(",")}-${page}`}
-                                    className="w-full"
-                                >
-                                    {renderListContent()}
+                    <div className="mt-4">
+                        <AnimatePresence mode="wait">
+                            <FadeIn
+                                key={`${viewMode}-${debouncedSearch}-${filters.type.join(",")}-${filters.status.join(",")}-${page}`}
+                                className="w-full"
+                            >
+                                {renderListContent()}
 
-                                    {totalPages > 1 ? (
-                                        <div className="mt-6">
-                                            <Pagination
-                                                currentPage={page}
-                                                totalPages={totalPages}
-                                                onPageChange={setPage}
-                                            />
-                                        </div>
-                                    ) : null}
-                                </FadeIn>
-                            </AnimatePresence>
-                        </div>
-                    </>
-                ) : (
-                    <FadeIn>
-                        <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
-                            <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
+                                {totalPages > 1 ? (
+                                    <div className="mt-6">
+                                        <Pagination
+                                            currentPage={page}
+                                            totalPages={totalPages}
+                                            onPageChange={setPage}
+                                        />
+                                    </div>
+                                ) : null}
+                            </FadeIn>
+                        </AnimatePresence>
+                    </div>
+                </>
+            ) : (
+                <FadeIn>
+                    <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
+                        <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
 
-                                {/* Sticky Header */}
-                                <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out">
-                                    <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
+                            {/* Sticky Header */}
+                            <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out">
+                                <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
 
-                                        {/* Back button - desktop only */}
-                                        <div className={`absolute -left-12 top-3 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
-                                            <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
-                                                <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                            </Button>
-                                        </div>
-
-                                        {/* Title row */}
-                                        <div className="hidden md:flex items-start justify-between">
-                                            <div className="flex flex-col gap-1 overflow-hidden min-w-0">
-                                                <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
-                                                    <span className="truncate">Formas de Pagamento</span>
-                                                </h1>
-
-                                                <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
-                                                    Gerencie os métodos de pagamento aceitos em seu negócio.
-                                                </div>
-                                            </div>
-
-                                            {/* Desktop action buttons */}
-                                            <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                                <Button
-                                                    onClick={() => onCreate?.()}
-                                                    leftIcon={<PlusIcon size={18} />}
-                                                >
-                                                    Novo método
-                                                </Button>
-                                            </div>
-                                        </div>
+                                    {/* Back button - desktop only */}
+                                    <div className={`absolute -left-12 top-3 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                                        <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
+                                            <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                        </Button>
                                     </div>
 
-                                    <div className="px-3 md:px-0 py-2 max-w-[1300px] mx-auto mt-8 w-full">
-                                        <PaymentMethodPageControls
-                                            search={search}
-                                            onSearchChange={setSearch}
-                                            onOpenFilter={() => setModals({ filter: true })}
-                                            filters={filters}
-                                            setFilters={setFilters}
-                                            viewMode={viewMode}
-                                            onViewModeChange={setViewMode}
-                                            hasActiveFilters={hasActiveFilters}
-                                        />
+                                    {/* Title row */}
+                                    <div className="hidden md:flex items-start justify-between">
+                                        <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                                            <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                                                <span className="truncate">Formas de Pagamento</span>
+                                            </h1>
 
-                                        <div className="mt-4">
-                                            <AnimatePresence mode="wait">
-                                                <FadeIn
-                                                    key={`${viewMode}-${debouncedSearch}-${filters.type.join(",")}-${filters.status.join(",")}-${page}`}
-                                                    className="w-full"
-                                                >
-                                                    {renderListContent()}
-
-                                                    {totalPages > 1 ? (
-                                                        <div className="mt-6">
-                                                            <Pagination
-                                                                currentPage={page}
-                                                                totalPages={totalPages}
-                                                                onPageChange={setPage}
-                                                            />
-                                                        </div>
-                                                    ) : null}
-                                                </FadeIn>
-                                            </AnimatePresence>
+                                            <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
+                                                Gerencie os métodos de pagamento aceitos em seu negócio.
+                                            </div>
                                         </div>
+
+                                        {/* Desktop action buttons */}
+                                        <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
+                                            <Button
+                                                onClick={() => onCreate?.()}
+                                                leftIcon={<PlusIcon size={18} />}
+                                            >
+                                                Novo método
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="px-3 md:px-0 py-2 max-w-[1300px] mx-auto mt-8 w-full">
+                                    <PaymentMethodPageControls
+                                        search={search}
+                                        onSearchChange={setSearch}
+                                        onOpenFilter={() => setModals({ filter: true })}
+                                        filters={filters}
+                                        setFilters={setFilters}
+                                        viewMode={viewMode}
+                                        onViewModeChange={setViewMode}
+                                        hasActiveFilters={hasActiveFilters}
+                                    />
+
+                                    <div className="mt-4">
+                                        <AnimatePresence mode="wait">
+                                            <FadeIn
+                                                key={`${viewMode}-${debouncedSearch}-${filters.type.join(",")}-${filters.status.join(",")}-${page}`}
+                                                className="w-full"
+                                            >
+                                                {renderListContent()}
+
+                                                {totalPages > 1 ? (
+                                                    <div className="mt-6">
+                                                        <Pagination
+                                                            currentPage={page}
+                                                            totalPages={totalPages}
+                                                            onPageChange={setPage}
+                                                        />
+                                                    </div>
+                                                ) : null}
+                                            </FadeIn>
+                                        </AnimatePresence>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </FadeIn>
-                )
+                    </div>
+                </FadeIn>
+            )
             }
 
             <FilterSheet

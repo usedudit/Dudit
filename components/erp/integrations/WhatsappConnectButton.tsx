@@ -10,6 +10,10 @@ import {
   getWhatsappEmbeddedSignupClientConfigAction,
 } from "@/app/actions/whatsapp"
 
+import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
+import { hasMinimumPlan, type PlanTierSlug } from "@/lib/subscription/plan-tier"
+import { getSubscriptionStatusAction } from "@/app/actions/erp/subscriptions"
+
 type EmbeddedSignupSession = {
   wabaId: string
   phoneNumberId: string
@@ -64,17 +68,22 @@ export function WhatsappConnectButton({
   disabled,
   className,
   children,
+  planSlug,
+  requiredPlan = "escalar",
 }: {
   onSuccess?: () => void
   disabled?: boolean
   className?: string
   children?: React.ReactNode
+  planSlug?: string
+  requiredPlan?: PlanTierSlug
 }) {
   const [metaConfig, setMetaConfig] = useState<EmbeddedSignupClientConfig | null>(null)
   const [configLoading, setConfigLoading] = useState(true)
   const [sdkReady, setSdkReady] = useState(false)
   const [isConnecting, setIsConnecting] = useState(false)
   const signupSessionRef = useRef<EmbeddedSignupSession | null>(null)
+  const { openPlanUpgrade } = usePlanUpgrade()
 
   useEffect(() => {
     let cancelled = false
@@ -140,6 +149,23 @@ export function WhatsappConnectButton({
   }, [])
 
   const handleConnect = async () => {
+    // 1. Checa plano de assinatura
+    let currentPlan = planSlug
+    if (!currentPlan) {
+      try {
+        const subRes = await getSubscriptionStatusAction()
+        if (subRes.success && subRes.data) {
+          currentPlan = subRes.data.plan.slug
+        }
+      } catch (err) {
+        console.error("[WhatsApp] Erro ao verificar plano:", err)
+      }
+    }
+
+    if (!hasMinimumPlan(currentPlan || "free", requiredPlan)) {
+      openPlanUpgrade(requiredPlan)
+      return
+    }
     if (configLoading) {
       toast.error("Carregando configuração da Meta…")
       return

@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { getCurrentUser } from "@/lib/auth/authorization"
+import { getCurrentUser, requireMinimumPlan } from "@/lib/auth/authorization"
 import { generateOAuthState } from "@/lib/security/oauth-state"
 
 export const dynamic = "force-dynamic"
@@ -44,6 +44,14 @@ export async function GET(request: NextRequest) {
     if (!partner) {
       return NextResponse.redirect(
         `${appUrl}/erp/settings?mp_error=partner_not_found`
+      )
+    }
+
+    try {
+      await requireMinimumPlan(partner.id, "crescer")
+    } catch {
+      return NextResponse.redirect(
+        `${appUrl}/erp/settings?tab=integracoes&mp_error=plano_insuficiente`
       )
     }
 

@@ -313,7 +313,8 @@ export async function prepareWhatsappEmbeddedSignupAction(): Promise<ActionRespo
     try {
         const context = await getCurrentPartnerContext()
         if (!context) return { success: false, error: "Contexto ERP não encontrado" }
-        await requireIntegrationsAccess(context.partnerId)
+        await requirePartnerRouteAccess(context.partnerId, "settings_integrations")
+        await requireMinimumPlan(context.partnerId, "escalar")
         const user = await requireUser()
         await generateWhatsappOAuthState(context.partnerId, user.id)
         return { success: true, data: undefined }
@@ -334,7 +335,8 @@ export async function completeWhatsappEmbeddedSignupAction(input: {
         await requireRateLimit(RateLimitCategory.ERP_GENERAL)
         const context = await getCurrentPartnerContext()
         if (!context) return { success: false, error: "Contexto ERP não encontrado" }
-        await requireIntegrationsAccess(context.partnerId)
+        await requirePartnerRouteAccess(context.partnerId, "settings_integrations")
+        await requireMinimumPlan(context.partnerId, "escalar")
 
         const user = await requireUser()
         const stateValidation = await validateWhatsappOAuthState(user.id)
@@ -629,7 +631,8 @@ export async function connectEvolutionAction(storeId?: string | null): Promise<
         await requireRateLimit(RateLimitCategory.ERP_GENERAL)
         const context = await getCurrentPartnerContext()
         if (!context) return { success: false, error: "Contexto ERP não encontrado" }
-        await requireIntegrationsAccess(context.partnerId)
+        await requirePartnerRouteAccess(context.partnerId, "settings_integrations")
+        await requireMinimumPlan(context.partnerId, "escalar")
 
         // 1. Read server config from env vars
         const serverConfig = getEvolutionServerConfig()

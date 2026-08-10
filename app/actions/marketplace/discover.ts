@@ -1613,7 +1613,7 @@ async function fetchAllProducts(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<
 
     const displayScope = determineDisplayScope(tagged, ctx)
     const isCountry = displayScope === "country"
-    const title = isCountry ? "📦 Produtos na Dudit" : "📦 Produtos disponíveis"
+    const title = isCountry ? "Produtos na Dudit" : "Produtos disponíveis"
     const subtitle = isCountry ? "Variedade para você" : "Variedade para você"
 
     const scoped = filterByScope(tagged, displayScope)

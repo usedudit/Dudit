@@ -213,9 +213,17 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                     </Accordion>
                 </div>
 
-                <FormSection title="Vídeos" hasSeparator>
-                    <ProductVideoSection itemType="product" itemId={itemId} video={video} onChange={onVideoChange} isEditing={isEditing} videoPlanBlocked={videoPlanBlocked} />
-                </FormSection>
+                <div className="mt-8 mb-8">
+                    <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
+                    <Accordion title={
+                        <span className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mb-6">
+                            Vídeo
+                        </span>} defaultOpen={false} triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading text-left">
+                        <div className="pt-2">
+                            <ProductVideoSection itemType="product" itemId={itemId} video={video} onChange={onVideoChange} isEditing={isEditing} videoPlanBlocked={videoPlanBlocked} />
+                        </div>
+                    </Accordion>
+                </div>
             </div>
 
             {/* --- COLUNA DIREITA (SIDEBAR) --- */}

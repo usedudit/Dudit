@@ -605,11 +605,6 @@ function PlanUpgradeCard({ planSlug, onUpgrade }: { planSlug: string; onUpgrade:
         escalar: "Tenha itens e pedidos ilimitados, financeiro avançado com fluxo de caixa e DRE simplificado.",
     };
 
-    const badges: Record<string, string> = {
-        crescer: "RECURSO PREMIUM",
-        escalar: "GESTÃO COMPLETA",
-    };
-
     useEffect(() => {
         if (planFeatures.length <= 1) return;
         const interval = setInterval(() => {
@@ -621,9 +616,6 @@ function PlanUpgradeCard({ planSlug, onUpgrade }: { planSlug: string; onUpgrade:
     return (
         <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 h-[280px] flex flex-row items-center gap-6">
             <div className="flex-1 min-w-0">
-                <Badge variant="green" className="bg-brand-green border-none text-white px-3 py-1 mb-2 inline-block">
-                    {badges[nextSlug]}
-                </Badge>
                 <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-1">
                     Plano {planName}
                 </h3>

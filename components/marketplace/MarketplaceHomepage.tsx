@@ -174,7 +174,7 @@ export default function MarketplaceHome({
         const parts = slug.split("-")
         const state = parts.pop()?.toUpperCase() || ""
         const cityKey = parts.join("-")
-        
+
         let city = COMMON_CITY_ACCENTS[cityKey]
         if (!city) {
             city = parts
@@ -625,7 +625,7 @@ export default function MarketplaceHome({
                             imageSrc="https://img.dudit.com.br/static/mascots/EstamosChegando.png"
                             imageAlt="Estamos Chegando!"
                             title="Estamos Chegando!"
-                            subtitle={`Ainda não temos vendedores ou produtos cadastrados em <strong class='text-brand-dark'>${selectedCityName}</strong>. Que tal ser o pioneiro e começar a vender na sua cidade de graça, sem comissão nenhuma?`}
+                            subtitle={`Ainda não temos vendedores ou produtos cadastrados em ${selectedCityName}. Que tal ser o pioneiro e começar a vender na sua cidade de graça, sem comissão nenhuma?`}
                             itemButton={{
                                 text: "Começar a vender na Dudit",
                                 action: () => {

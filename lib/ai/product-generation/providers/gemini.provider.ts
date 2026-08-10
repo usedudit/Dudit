@@ -1,12 +1,16 @@
 import { AiProvider } from "./index"
 
 export class GeminiProvider implements AiProvider {
+  readonly defaultModel: string
+  readonly fallbackModels: string[] = [
+    "gemini-2.5-flash",
+    "gemini-1.5-flash",
+  ]
   private apiKey: string
-  private defaultModel: string
 
   constructor() {
     this.apiKey = process.env.GOOGLE_GEMINI_API_KEY || ""
-    this.defaultModel = process.env.AI_PRODUCT_MODEL || "gemini-1.5-flash"
+    this.defaultModel = process.env.AI_PRODUCT_MODEL || "gemini-3.6-flash"
   }
 
   async generate(
@@ -34,7 +38,6 @@ export class GeminiProvider implements AiProvider {
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
-            temperature: 0.05,
             responseMimeType: "application/json"
           },
         }),

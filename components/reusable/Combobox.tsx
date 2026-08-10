@@ -211,7 +211,7 @@ export function Combobox({
 
             <div className="max-h-[240px] overflow-y-auto p-1 custom-scrollbar bg-white dark:bg-dark-surface">
                 {filteredOptions.length === 0 ? (
-                    <div className="px-3 py-6 text-center text-sm text-gray-500 dark:text-gray-400">{emptyMessage}</div>
+                    <div className="px-3 py-6 text-center text-sm text-brand-inactive-text dark:text-dark-body">{emptyMessage}</div>
                 ) : (
                     filteredOptions.map((option) => {
                         const isSelected = option.value === value

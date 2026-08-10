@@ -180,9 +180,32 @@ export default function PartnerCategoryModal({
                                 initial={{ opacity: 0, x: 10 }}
                                 animate={{ opacity: 1, x: 0 }}
                                 exit={{ opacity: 0, x: -10 }}
-                                transition={{ duration: 0.15 }}
                                 className="space-y-2"
                             >
+                                {currentParent && !search && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            onSelect({
+                                                categoryId: currentParent.id,
+                                                subcategoryId: null,
+                                                name: currentParent.name,
+                                                path: currentParent.name
+                                            })
+                                            onClose()
+                                        }}
+                                        className="w-full flex items-center justify-between p-3 bg-brand-green/5 hover:bg-brand-green/10 rounded-lg border border-brand-green/20 transition-all text-left font-medium text-brand-green mb-2"
+                                    >
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <div className="w-10 h-10 rounded-lg bg-brand-green/10 flex items-center justify-center shrink-0">
+                                                <Tag className="w-5 h-5 text-brand-green" />
+                                            </div>
+                                            <span className="text-sm font-semibold truncate">
+                                                Selecionar toda a categoria "{currentParent.name}"
+                                            </span>
+                                        </div>
+                                    </button>
+                                )}
                                 {displayCategories.map((cat) => {
                                     const hasSubs = allCategories.some(c => c.parent_id === cat.id)
                                     const parentCat = cat.parent_id ? allCategories.find(p => p.id === cat.parent_id) : null

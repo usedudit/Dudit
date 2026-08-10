@@ -1,12 +1,16 @@
 import { AiProvider } from "./index"
 
 export class OpenRouterProvider implements AiProvider {
+  readonly defaultModel: string
+  readonly fallbackModels: string[] = [
+    "qwen/qwen-2.5-72b-instruct",
+    "deepseek/deepseek-chat",
+  ]
   private apiKey: string
-  private defaultModel: string
 
   constructor() {
     this.apiKey = process.env.OPENROUTER_API_KEY || ""
-    this.defaultModel = process.env.AI_PRODUCT_MODEL || "nemotron-3-ultra-550b-a55b:free"
+    this.defaultModel = process.env.AI_PRODUCT_MODEL || "nvidia/llama-3.3-nemotron-super-49b-v1"
   }
 
   async generate(

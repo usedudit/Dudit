@@ -418,12 +418,18 @@ const AddProductPage: FC<AddProductPageProps> = ({
             })
 
             notifySuccess("Sucesso", "Campos preenchidos com IA!")
-        } catch {
-            notifyError("Erro", "Falha ao conectar com o servidor.")
+        } catch (e: any) {
+            const msg = e?.error || e?.message || "Falha ao conectar com o servidor."
+            if (e?.code === "plan_blocked") {
+                notifyError("Plano atual não inclui geração por IA", msg)
+                openPlanUpgrade("crescer")
+            } else {
+                notifyError("Erro", msg)
+            }
         } finally {
             setIsGeneratingDetails(false)
         }
-    }, [productData.name, partnerId, brandOptions, notifyError, notifySuccess, notifyWarning])
+    }, [productData.name, partnerId, brandOptions, notifyError, notifySuccess, notifyWarning, openPlanUpgrade])
 
     const fileInputRef = useRef<HTMLInputElement>(null)
     const [showImageCropper, setShowImageCropper] = useState(false)

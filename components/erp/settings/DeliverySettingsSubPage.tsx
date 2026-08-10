@@ -323,7 +323,7 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
                                     <div className="border-t border-brand-border dark:border-dark-border w-full"></div>
                                     <Accordion
                                         title={
-                                            <span className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading">
+                                            <span className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading inline-flex items-center gap-2">
                                                 Regras por Horário
                                                 {!advancedEnabled && (
                                                     <img src={planStarIconForTarget("escalar")!} alt="" className="w-4 h-4 object-contain" />
