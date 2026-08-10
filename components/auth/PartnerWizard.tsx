@@ -2,7 +2,7 @@
 
 import React, { useState, useRef } from "react"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
-import { Upload, Briefcase, Home, CheckCircle, ShoppingBag, Store } from "lucide-react"
+import { Upload, Briefcase, Home, CheckCircle, ShoppingBag, Store, Tag, ChevronRight } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "@/hooks/use-notification"
@@ -13,13 +13,18 @@ import NumberInputWithCheckbox from "@/components/ui/number-input-with-checkbox"
 import { Checkbox } from "@/components/reusable/Checkbox"
 import { Button, PhoneInput, EmailInput, Spinner, InfoCard, ListItem, RadioButton } from "@/components/reusable"
 import ImageCropperModal from "@/components/ImageCropperModal"
+import PartnerCategoryModal from "@/components/erp/settings/PartnerCategoryModal"
 import { CepInput, PasswordInput, StateComboBox, PasswordStrengthMeter } from "@/components/reusable"
 import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { useSupabase } from "@/providers/supabase-provider"
 import type { BusinessMode } from "@/lib/business-info"
+import { getDefaultResourcesForCategory } from "@/lib/system-resources"
 
 const initialPartnerData = {
-    businessInfo: { sells: [] as string[], mode: "" as BusinessMode | "" },
+    categoryId: "",
+    subcategoryId: "",
+    categoryName: "",
+    businessInfo: { mode: "" as BusinessMode | "", activeResources: [] as string[] },
     storeName: "",
     phone: "",
     address: {
@@ -29,21 +34,6 @@ const initialPartnerData = {
     description: "",
     storeImageUrl: "",
 }
-
-const SELLS_OPTIONS = [
-    {
-        value: "products",
-        icon: ShoppingBag,
-        title: "Produtos",
-        description: "Venda roupas, eletrônicos, comida ou alugue equipamentos e trajes."
-    },
-    {
-        value: "services",
-        icon: Briefcase,
-        title: "Serviços",
-        description: "Para quem trabalha com agendamentos, orçamentos ou consultorias."
-    },
-]
 
 const MODE_OPTIONS: Array<{
     value: BusinessMode
@@ -99,6 +89,7 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
     const [partnerData, setPartnerData] = useState(initialPartnerData)
     const [imagePreview, setImagePreview] = useState<string | null>(null)
     const [cropModalOpen, setCropModalOpen] = useState(false)
+    const [categoryModalOpen, setCategoryModalOpen] = useState(false)
     const [tempImageFile, setTempImageFile] = useState<File | null>(null)
     const [isLoading, setIsLoading] = useState(false)
     const [isSubmitting, setIsSubmitting] = useState(false)
@@ -106,18 +97,6 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
 
     const actualStep = isUserLoggedIn ? step - 1 : step
     const totalSteps = isUserLoggedIn ? 3 : 4
-
-    const toggleArrayItem = (key: "sells", value: string) =>
-        setPartnerData(prev => {
-            const arr = prev.businessInfo[key]
-            return {
-                ...prev,
-                businessInfo: {
-                    ...prev.businessInfo,
-                    [key]: arr.includes(value) ? arr.filter(i => i !== value) : [...arr, value],
-                },
-            }
-        })
 
     const setMode = (mode: BusinessMode) =>
         setPartnerData(prev => ({
@@ -127,6 +106,20 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                 mode,
             },
         }))
+
+    const handleCategorySelect = (selected: { categoryId: string; subcategoryId: string | null; name: string; path: string }) => {
+        const defaultResources = getDefaultResourcesForCategory(selected.path)
+        setPartnerData(prev => ({
+            ...prev,
+            categoryId: selected.categoryId,
+            subcategoryId: selected.subcategoryId || "",
+            categoryName: selected.path,
+            businessInfo: {
+                ...prev.businessInfo,
+                activeResources: defaultResources,
+            },
+        }))
+    }
 
     const patchAddress = (patch: Partial<typeof partnerData.address>) =>
         setPartnerData(prev => ({ ...prev, address: { ...prev.address, ...patch } }))
@@ -203,8 +196,8 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
             if (calculatePasswordScore(password) < 2) return "A senha deve ser média ou forte."
         }
         if (step === 2 && (!partnerData.storeName || !partnerData.phone)) return "Preencha os dados do negócio"
-        if (step === 3 && (!partnerData.businessInfo.sells.length || !partnerData.businessInfo.mode))
-            return "Selecione pelo menos uma opção e como quer usar a Dudit."
+        if (step === 3 && (!partnerData.categoryId || !partnerData.businessInfo.mode))
+            return "Selecione a categoria do negócio e como quer usar a Dudit."
         if (step === 4) {
             if (imageUploading) return "Aguarde o upload da imagem"
             const { cep, street, number, noNumber, neighborhood, city, state } = partnerData.address
@@ -243,6 +236,8 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                 email: isUserLoggedIn ? "" : email,
                 fullName: isUserLoggedIn ? "" : generateNameFromEmail(email),
                 ...partnerData,
+                categoryId: partnerData.categoryId,
+                subcategoryId: partnerData.subcategoryId || null,
                 businessInfo: partnerData.businessInfo,
                 cnpj: null, cpf: null, personType: "pf",
                 zipCode: partnerData.address.cep,
@@ -298,12 +293,12 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                                 <div className="pt-1">
                                     <div className="pt-1 flex items-center gap-2">
                                         <Checkbox id="termsAgreement" checked={acceptedTerms} onChange={setAcceptedTerms} />
-                                        <label htmlFor="termsAgreement" className="text-sm text-gray-600 cursor-pointer">
-                                            Aceito os <Link href="/institucional/termos" prefetch={false} className="underline font-medium text-gray-800">Termos</Link>
+                                        <label htmlFor="termsAgreement" className="text-sm text-brand-inactive-text cursor-pointer">
+                                            Aceito os <Link href="/institucional/termos" prefetch={false} className="underline text-brand-dark">Termos de uso</Link>
                                         </label>
                                     </div>
                                 </div>
-                                <div className="pt-2">
+                                <div className="pt-2 border-t">
                                     <Button variant="outline" onClick={handleGoogleAuth} disabled={isLoading} className="w-full gap-3 pl-4 bg-transparent">
                                         <svg width="20" height="20" viewBox="0 0 18 18" fill="none" className="shrink-0">
                                             <path d="M17.64 9.20443C17.64 8.56625 17.5827 7.95262 17.4764 7.36353H9V10.8449H13.8436C13.635 11.9699 13.0009 12.9231 12.0477 13.5613V15.8194H14.9564C16.6582 14.2526 17.64 11.9453 17.64 9.20443Z" fill="#4285F4" />
@@ -340,24 +335,27 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                         {step === 3 && (
                             <div className="space-y-6">
                                 <div>
-                                    <h3 className="text-sm font-semibold text-brand-dark mb-3">O que você oferece?</h3>
-                                    <div className="grid gap-3">
-                                        {SELLS_OPTIONS.map(opt => (
-                                            <ListItem
-                                                key={opt.value}
-                                                icon={opt.icon}
-                                                title={opt.title}
-                                                description={opt.description}
-                                                onClick={() => toggleArrayItem("sells", opt.value)}
-                                                left={
-                                                    <Checkbox
-                                                        checked={partnerData.businessInfo.sells.includes(opt.value)}
-                                                        onChange={() => toggleArrayItem("sells", opt.value)}
-                                                    />
-                                                }
-                                            />
-                                        ))}
-                                    </div>
+                                    <h3 className="text-sm font-semibold text-brand-dark mb-3">Qual a categoria do seu negócio?</h3>
+                                    <button
+                                        type="button"
+                                        onClick={() => setCategoryModalOpen(true)}
+                                        className="w-full flex items-center justify-between p-3.5 border border-brand-border rounded-xl hover:border-brand-green bg-white dark:bg-dark-background text-left transition-colors"
+                                    >
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <div className="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center text-brand-green shrink-0">
+                                                <Tag className="w-5 h-5" />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading truncate">
+                                                    {partnerData.categoryName || "Selecionar categoria do negócio"}
+                                                </p>
+                                                <p className="text-xs text-brand-inactive-text truncate">
+                                                    {partnerData.categoryName ? "Clique para alterar" : "Escolha a categoria principal e subcategoria"}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <ChevronRight className="w-5 h-5 text-brand-inactive-text shrink-0" />
+                                    </button>
                                 </div>
                                 <div>
                                     <h3 className="text-sm font-semibold text-brand-dark mb-3">Como você quer usar a Dudit?</h3>
@@ -368,6 +366,7 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                                                 icon={opt.icon}
                                                 title={opt.title}
                                                 description={opt.description}
+                                                className="px-4 py-3 gap-4"
                                                 onClick={() => setMode(opt.value)}
                                                 left={
                                                     <RadioButton
@@ -438,6 +437,12 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                 onClose={() => { setCropModalOpen(false); setTempImageFile(null) }}
                 onConfirm={handleCropComplete}
                 imageFile={tempImageFile}
+            />
+
+            <PartnerCategoryModal
+                isOpen={categoryModalOpen}
+                onClose={() => setCategoryModalOpen(false)}
+                onSelect={handleCategorySelect}
             />
         </div>
     )

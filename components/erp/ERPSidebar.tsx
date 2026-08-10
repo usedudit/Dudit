@@ -244,8 +244,8 @@ export function ERPSidebar() {
 
     const businessInfo = useMemo(() => normalizeBusinessInfo(contextBusinessInfo), [contextBusinessInfo])
 
-    const sellsProducts = businessInfo.sells?.includes("products") ?? true
-    const sellsServices = businessInfo.sells?.includes("services") ?? false
+    const sellsProducts = isSystemResourceActive(businessInfo, "products")
+    const sellsServices = isSystemResourceActive(businessInfo, "services")
     const isQuick = businessInfo.mode === "quick"
     const ordersResourceActive = isSystemResourceActive(businessInfo, "orders")
     const productsResourceActive = isSystemResourceActive(businessInfo, "products")
@@ -342,7 +342,16 @@ export function ERPSidebar() {
                             if (sub.href === "/erp/stock-movements") return stockMovementsResourceActive
                             if (sub.href === "/erp/products/cadastros") return productCadastrosResourceActive
                             if (sub.href === "/erp/suppliers") return productsResourceActive
+                            if (sub.href === "/erp/xml-import") return productsResourceActive
                             return productsResourceActive
+                        }
+                        if (item.label === "Financeiro") {
+                            if (sub.href === "/erp/transactions") return financialResourceActive
+                            if (sub.href === "/erp/contas-a-pagar") return financialResourceActive
+                            if (sub.href === "/erp/contas-a-receber") return financialResourceActive
+                            if (sub.href === "/erp/cash-register") return financialResourceActive
+                            if (sub.href === "/erp/transactions/cadastros-financeiro") return financialResourceActive
+                            return financialResourceActive
                         }
                         if (item.href === "/erp/servicos") {
                             if (sub.href === "/erp/agendamentos") return appointmentsResourceActive

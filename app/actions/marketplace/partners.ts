@@ -242,7 +242,11 @@ async function _getPartnerReviews(partnerId: string) {
   }
 
   return reviewsData.map((r: any) => ({
-    ...r,
+    rating: r.rating,
+    comment: r.comment,
+    created_at: r.created_at,
+    products: r.products || null,
+    services: r.services || null,
     profiles: profilesMap.get(r.user_id) || { full_name: "Usuário", profile_image_url: null }
   }))
 }
@@ -517,7 +521,11 @@ export const getCachedPartnerReviews = async (partnerId: string) => {
       }
 
       return reviewsData.map((r: any) => ({
-        ...r,
+        rating: r.rating,
+        comment: r.comment,
+        created_at: r.created_at,
+        products: r.products || null,
+        services: r.services || null,
         profiles: profilesMap.get(r.user_id) || { full_name: "Usuário", profile_image_url: null }
       }))
     },

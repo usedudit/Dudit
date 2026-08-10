@@ -1,0 +1,26 @@
+{
+  "captured_at": "2026-08-10T01:38:47.655Z",
+  "table_security": [
+    { "relrowsecurity": true, "relforcerowsecurity": true }
+  ],
+  "policies": [
+    { "policyname": "Partner owners can view customers", "roles": "{public}", "cmd": "SELECT", "qual": "partner owner only" },
+    { "policyname": "customers_delete_own", "roles": "{public}", "cmd": "DELETE", "qual": "partner owner only" },
+    { "policyname": "customers_delete_policy", "roles": "{public}", "cmd": "DELETE", "qual": "partner owner or partner_users owner/admin" },
+    { "policyname": "customers_insert_own", "roles": "{public}", "cmd": "INSERT", "with_check": "partner owner only" },
+    { "policyname": "customers_insert_policy", "roles": "{public}", "cmd": "INSERT", "with_check": "partner owner or partner_users owner/admin/manager" },
+    { "policyname": "customers_select_own", "roles": "{public}", "cmd": "SELECT", "qual": "partner owner only" },
+    { "policyname": "customers_select_policy", "roles": "{public}", "cmd": "SELECT", "qual": "partner owner or any partner_users membership" },
+    { "policyname": "customers_update_own", "roles": "{public}", "cmd": "UPDATE", "qual": "partner owner only" }
+  ],
+  "grants": {
+    "anon": ["DELETE", "INSERT", "REFERENCES", "SELECT", "TRIGGER", "TRUNCATE", "UPDATE"],
+    "authenticated": ["DELETE", "INSERT", "REFERENCES", "SELECT", "TRIGGER", "TRUNCATE", "UPDATE"],
+    "service_role": ["DELETE", "INSERT", "REFERENCES", "SELECT", "TRIGGER", "TRUNCATE", "UPDATE"]
+  },
+  "triggers": [
+    { "tgname": "trg_soft_delete_user", "definition": "BEFORE UPDATE ON public.customers FOR EACH ROW EXECUTE FUNCTION handle_soft_delete_by_user()", "enabled": true },
+    { "tgname": "update_customers_updated_at", "definition": "BEFORE UPDATE ON public.customers FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()", "enabled": true }
+  ],
+  "functions": []
+}

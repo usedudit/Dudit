@@ -459,7 +459,9 @@ export async function createQuoteAction(data: {
             // Execute Native DB Transaction
             const { data: quoteResult, error: rpcError } = await supabase.rpc('create_quote_with_items', {
                 p_partner_id: data.partnerId,
-                p_user_id: data.userId || user.id,
+                // The RPC context is always the authenticated actor. A client
+                // supplied userId is not an authorization input.
+                p_user_id: user.id,
                 p_customer_id: customerId,
                 p_status: "draft",
                 p_issue_date: data.issueDate || new Date().toISOString().split("T")[0],
@@ -923,7 +925,7 @@ export async function updateQuoteStatusAction(data: {
             // Fetch fully updated quote for notifications and RLS / details
             const { data: updatedQuote } = await getAdminClient()
                 .from("quotes")
-                .select("*, customers(*)")
+                .select("*, customers(id, name, email)")
                 .eq("id", data.quoteId)
                 .eq("partner_id", data.partnerId)
                 .single()
@@ -2510,7 +2512,7 @@ export async function approvePublicQuoteAction(
             // 4. Fetch updated quote with customer info to notify
             const { data: updatedQuote } = await supabase
                 .from("quotes")
-                .select("*, customers(*)")
+                .select("*, customers(id, name, email)")
                 .eq("id", quote.id)
                 .single()
 
@@ -2607,7 +2609,7 @@ export async function rejectPublicQuoteAction(
             // 4. Fetch updated quote with customer info to notify
             const { data: updatedQuote } = await supabase
                 .from("quotes")
-                .select("*, customers(*)")
+                .select("*, customers(id, name, email)")
                 .eq("id", quote.id)
                 .single()
 

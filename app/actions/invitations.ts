@@ -2,6 +2,7 @@
 
 import crypto from "crypto"
 import { createAdminClient } from "@/lib/supabase/server"
+import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { requirePartnerAccess, requireMinimumPlan, requireUser, getCurrentUser } from "@/lib/auth/authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
@@ -291,7 +292,10 @@ export async function acceptInvitation(
         }
 
         // 7. RACE CONDITION FIX & ATOMIC CONSUMPTION: Call RPC Transaction
-        const { data: rpcResult, error: rpcError } = await admin.rpc(
+        // The database function enforces p_user_id = auth.uid(). Keep this
+        // call session-bound; service_role must not stand in for identity.
+        const sessionSupabase = await getSupabaseServerClient()
+        const { data: rpcResult, error: rpcError } = await sessionSupabase.rpc(
             "accept_partner_invitation",
             {
                 p_invitation_id: invitation.id,

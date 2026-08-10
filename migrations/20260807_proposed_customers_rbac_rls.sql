@@ -1,14 +1,14 @@
 -- ============================================================================
--- PROPOSTA — RLS/RBAC de customers
+-- APLICADA — RLS/RBAC de customers (2026-08-10)
 --
--- NÃO APLICAR AINDA.
+-- Aplicação controlada concluída após o cutover dos consumidores.
 --
 -- Pré-requisito obrigatório:
 --   Migrar os consumidores diretos de customers usados por operator/delivery
 --   para customers_operator_safe/customers_delivery_safe ou para ações/RPCs
 --   com autorização server-side. RLS é row-level e não protege colunas PII.
 --
--- Este arquivo é o desenho da migration para revisão. Ele consolida as
+-- Esta migration consolida as
 -- policies, alinha mutações ao role_id canônico, exige membership ativa e
 -- parceiro habilitado, e impede troca de partner_id por trigger.
 -- ============================================================================

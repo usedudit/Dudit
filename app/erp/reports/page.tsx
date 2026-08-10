@@ -48,7 +48,7 @@ export default async function ERPReportsPage(props: {
     const allAccess = await getAllUserPartnerAccess()
     const activeStore = allAccess.find((s: (typeof allAccess)[number]) => s.partnerId === partnerId)
     const businessInfo = normalizeBusinessInfo(context.businessInfo)
-    const sells = businessInfo.sells || ["products"]
+    const activeResources = businessInfo.activeResources
 
     const searchParams = await props.searchParams
     const period = (searchParams?.period as Period) || "monthly"
@@ -99,7 +99,7 @@ export default async function ERPReportsPage(props: {
 
                         <Suspense fallback={<ReportsSkeleton />}>
                             <ReportsPage
-                                sells={sells}
+                                activeResources={activeResources}
                                 period={period}
                                 productsData={productsData}
                                 servicesData={servicesData}

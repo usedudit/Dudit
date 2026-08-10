@@ -305,7 +305,7 @@ const PaymentModal = ({
             if (active && res?.success && res?.data) {
                 setFetchedCustomerCredit(Number(res.data.store_credit || 0));
             }
-        }).catch(() => {});
+        }).catch(() => { });
         return () => { active = false; };
     }, [isOpen, customer?.id, partnerId]);
 
@@ -1247,7 +1247,9 @@ const PaymentModal = ({
         : isAllocationUnderpaid;
 
     const isOverpaid = !isAllocationUnderpaid && paymentBaseAmount > finalTotalWithMethodPricing + 0.005;
-    const changeAmount = isOverpaid ? paymentBaseAmount - finalTotalWithMethodPricing : 0;
+    const changeAmount = view === 'money' && wantsChange
+        ? Math.max(0, payWithAmount - paymentBaseAmount)
+        : (isOverpaid ? paymentBaseAmount - finalTotalWithMethodPricing : 0);
 
     /** Valor efetivo pago / a registrar (líquido do método quando houver cálculo). */
     const totalPaidCalculated = useMemo(() => {
@@ -1697,19 +1699,25 @@ const PaymentModal = ({
 
             const methodLeg = {
                 method: (() => {
-                    if (isMarketplaceOrder && originalPaymentMethod) {
-                        return formatPaymentMethodToFullLabel(originalPaymentMethod);
+                    let baseLabel = (() => {
+                        if (isMarketplaceOrder && originalPaymentMethod) {
+                            return formatPaymentMethodToFullLabel(originalPaymentMethod);
+                        }
+                        const selectedMethodObj = selectedMethodId ? activeMethods.find((method: any) => method.id === selectedMethodId) : null;
+                        if (selectedMethodObj) {
+                            return getFormattedMethodLabel(selectedMethodObj.name, selectedMethodObj.type);
+                        }
+                        if (isUnpaid && !selectedMethodId) {
+                            return 'Pendente';
+                        }
+                        const fallbackName = view === 'money' ? 'Dinheiro' : (view === 'pix' ? 'Pix' : 'Cartão');
+                        const fallbackType = view === 'money' ? 'cash' : (view === 'pix' ? 'pix' : 'card');
+                        return getFormattedMethodLabel(fallbackName, fallbackType);
+                    })();
+                    if (view === 'money' && wantsChange && payWithAmount > 0 && !baseLabel.toLowerCase().includes("troco para")) {
+                        return `${baseLabel} (Troco para R$ ${payWithAmount.toFixed(2).replace('.', ',')})`;
                     }
-                    const selectedMethodObj = selectedMethodId ? activeMethods.find((method: any) => method.id === selectedMethodId) : null;
-                    if (selectedMethodObj) {
-                        return getFormattedMethodLabel(selectedMethodObj.name, selectedMethodObj.type);
-                    }
-                    if (isUnpaid && !selectedMethodId) {
-                        return 'Pendente';
-                    }
-                    const fallbackName = view === 'money' ? 'Dinheiro' : (view === 'pix' ? 'Pix' : 'Cartão');
-                    const fallbackType = view === 'money' ? 'cash' : (view === 'pix' ? 'pix' : 'card');
-                    return getFormattedMethodLabel(fallbackName, fallbackType);
+                    return baseLabel;
                 })(),
                 amount: (isUnpaid && !selectedMethodId) ? 0 : methodLegAmount,
                 amountReceived: actualReceived,
@@ -1826,10 +1834,10 @@ const PaymentModal = ({
     };
 
     const handleStartProcessing = async (forcedPayload?: any, isUnpaidRegister?: boolean) => {
-        if (view === 'money' && wantsChange && payWithAmount < totalPaidCalculated && !isUnpaidRegister) {
+        if (view === 'money' && wantsChange && payWithAmount <= paymentBaseAmount + 0.005 && !isUnpaidRegister) {
             toast({
                 title: "Valor de troco inválido",
-                description: `O valor pago (R$ ${payWithAmount.toFixed(2)}) deve ser maior ou igual ao valor a receber (R$ ${totalPaidCalculated.toFixed(2)}).`,
+                description: `O valor pago em dinheiro (R$ ${payWithAmount.toFixed(2)}) deve ser estritamente maior que o valor da venda (R$ ${paymentBaseAmount.toFixed(2)}) quando a opção "Precisa de troco" está marcada.`,
                 variant: "destructive",
             });
             return;
@@ -1872,10 +1880,10 @@ const PaymentModal = ({
         }
 
         const isPendingPayment = isUnpaidRegister || paymentPendingType !== 'none';
-        const snapshotTotalPaid = isPendingPayment ? existingPaidAmount : totalPaidCalculated;
+        const snapshotTotalPaid = isPendingPayment ? existingPaidAmount : (view === 'money' && wantsChange ? Math.max(payWithAmount, totalPaidCalculated) : totalPaidCalculated);
         const snapshotIsUnderpaid = isPendingPayment ? (displayTransactionTotal > existingPaidAmount + 0.005) : isUnderpaid;
         const snapshotRemainingPartial = isPendingPayment ? Math.max(0, displayTransactionTotal - existingPaidAmount) : remainingPartial;
-        const snapshotChange = isPendingPayment ? 0 : changeAmount;
+        const snapshotChange = isPendingPayment ? 0 : (view === 'money' && wantsChange ? Math.max(0, payWithAmount - paymentBaseAmount) : changeAmount);
 
         setSuccessSnapshot({
             subTotal,
@@ -2148,57 +2156,57 @@ const PaymentModal = ({
                                                         </div>
                                                     )}
                                                     {customerCredit > 0.009 && (
-                                                         <div className="p-4 rounded-2xl border border-green-300 dark:border-green-800/50 bg-green-50/80 dark:bg-green-950/20 shadow-sm transition-all">
-                                                             <div className="flex items-center justify-between gap-3">
-                                                                 <div className="flex items-center gap-3 min-w-0 flex-1">
-                                                                     <Checkbox
-                                                                         id="use-store-credit-checkbox"
-                                                                         checked={useStoreCredit}
-                                                                         onChange={(checked: any) => {
-                                                                             setUseStoreCredit(Boolean(checked));
-                                                                         }}
-                                                                     />
-                                                                     <div className="min-w-0 flex-1">
-                                                                         <span className="font-bold text-sm text-brand-dark dark:text-dark-heading block truncate">
-                                                                             Usar crédito do cliente
-                                                                         </span>
-                                                                         <span className="text-xs text-brand-green font-semibold block mt-0.5">
-                                                                             Saldo disponível: {formatCurrency(customerCredit)}
-                                                                         </span>
-                                                                     </div>
-                                                                 </div>
-                                                                 {useStoreCredit && (
-                                                                     <div className="w-32 shrink-0">
-                                                                         <MoneyInput
-                                                                             value={storeCreditToUse}
-                                                                             onChange={(val: any) => {
-                                                                                 const num = Math.min(customerCredit, Math.min(chargeTarget, Math.max(0, Number(val || 0))));
-                                                                                 setStoreCreditToUse(num);
-                                                                             }}
-                                                                             className="text-right font-bold text-sm h-9"
-                                                                         />
-                                                                     </div>
-                                                                 )}
-                                                             </div>
-                                                             {useStoreCredit && (
-                                                                 <div className="mt-3 pt-2.5 border-t border-green-200 dark:border-green-800/40 flex justify-between items-center text-xs font-semibold text-brand-dark dark:text-dark-heading">
-                                                                     <span>Abatido no crédito: <strong className="text-brand-green">{formatCurrency(effectiveCreditApplied)}</strong></span>
-                                                                     <span>Restante a pagar: <strong className="text-brand-primary">{formatCurrency(netChargeTarget)}</strong></span>
-                                                                 </div>
-                                                             )}
-                                                             {useStoreCredit && netChargeTarget <= 0.009 && (
-                                                                 <div className="mt-3">
-                                                                     <Button
-                                                                         variant="filled"
-                                                                         className="w-full h-11 text-sm font-bold bg-brand-green text-white hover:bg-brand-green/90"
-                                                                         onClick={() => handleStartProcessing()}
-                                                                     >
-                                                                         Confirmar Pagamento com Crédito ({formatCurrency(effectiveCreditApplied)})
-                                                                     </Button>
-                                                                 </div>
-                                                             )}
-                                                         </div>
-                                                     )}
+                                                        <div className="p-4 rounded-2xl border border-green-300 dark:border-green-800/50 bg-green-50/80 dark:bg-green-950/20 shadow-sm transition-all">
+                                                            <div className="flex items-center justify-between gap-3">
+                                                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                                                    <Checkbox
+                                                                        id="use-store-credit-checkbox"
+                                                                        checked={useStoreCredit}
+                                                                        onChange={(checked: any) => {
+                                                                            setUseStoreCredit(Boolean(checked));
+                                                                        }}
+                                                                    />
+                                                                    <div className="min-w-0 flex-1">
+                                                                        <span className="font-bold text-sm text-brand-dark dark:text-dark-heading block truncate">
+                                                                            Usar crédito do cliente
+                                                                        </span>
+                                                                        <span className="text-xs text-brand-green font-semibold block mt-0.5">
+                                                                            Saldo disponível: {formatCurrency(customerCredit)}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                                {useStoreCredit && (
+                                                                    <div className="w-32 shrink-0">
+                                                                        <MoneyInput
+                                                                            value={storeCreditToUse}
+                                                                            onChange={(val: any) => {
+                                                                                const num = Math.min(customerCredit, Math.min(chargeTarget, Math.max(0, Number(val || 0))));
+                                                                                setStoreCreditToUse(num);
+                                                                            }}
+                                                                            className="text-right font-bold text-sm h-9"
+                                                                        />
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            {useStoreCredit && (
+                                                                <div className="mt-3 pt-2.5 border-t border-green-200 dark:border-green-800/40 flex justify-between items-center text-xs font-semibold text-brand-dark dark:text-dark-heading">
+                                                                    <span>Abatido no crédito: <strong className="text-brand-green">{formatCurrency(effectiveCreditApplied)}</strong></span>
+                                                                    <span>Restante a pagar: <strong className="text-brand-primary">{formatCurrency(netChargeTarget)}</strong></span>
+                                                                </div>
+                                                            )}
+                                                            {useStoreCredit && netChargeTarget <= 0.009 && (
+                                                                <div className="mt-3">
+                                                                    <Button
+                                                                        variant="filled"
+                                                                        className="w-full h-11 text-sm font-bold bg-brand-green text-white hover:bg-brand-green/90"
+                                                                        onClick={() => handleStartProcessing()}
+                                                                    >
+                                                                        Confirmar Pagamento com Crédito ({formatCurrency(effectiveCreditApplied)})
+                                                                    </Button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                     <div className="grid grid-cols-2 gap-4">
                                                         {availableMethodTypes.has("cash") && (
                                                             <PaymentMethodCard
@@ -2313,7 +2321,7 @@ const PaymentModal = ({
                                                             const isChecked = typeof val === "boolean" ? val : Boolean(val?.target?.checked);
                                                             setWantsChange(isChecked);
                                                             if (isChecked && payWithAmount <= paymentBaseAmount) {
-                                                                setPayWithAmount(paymentBaseAmount);
+                                                                setPayWithAmount(0);
                                                             }
                                                         }} />
                                                 </div>
@@ -2325,13 +2333,12 @@ const PaymentModal = ({
                                                             onChange={(val: any) => setPayWithAmount(Number(val || 0))}
                                                             className="font-bold"
                                                         />
-                                                        {payWithAmount > paymentBaseAmount && (
-                                                            <div className="p-3 bg-blue-50 dark:bg-dark-border/20 border border-blue-200 dark:border-blue-900/30 rounded-xl text-sm flex justify-between items-center font-medium">
-                                                                <span className="text-brand-dark dark:text-dark-heading">Levar troco:</span>
-                                                                <span className="font-bold text-brand-primary">
-                                                                    {formatCurrency(payWithAmount - paymentBaseAmount)}
-                                                                </span>
-                                                            </div>
+                                                        {payWithAmount > paymentBaseAmount ? (
+                                                            <InfoCard color="blue" title="Troco" message={formatCurrency(payWithAmount - paymentBaseAmount)} />
+                                                        ) : (
+                                                            <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">
+                                                                O valor pago deve ser maior que {formatCurrency(paymentBaseAmount)} para haver troco.
+                                                            </p>
                                                         )}
                                                     </div>
                                                 )}
@@ -3111,12 +3118,12 @@ const PaymentModal = ({
                                         </div>
                                         <div>
                                             <span className="block text-md font-medium text-brand-inactive-text dark:text-dark-body mb-1">Total recebido</span>
-                                            <div className="text-3xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(successSnapshot ? successSnapshot.totalPaid : totalPaidCalculated)}</div>
+                                            <div className="text-3xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(successSnapshot ? successSnapshot.totalPaid : (view === 'money' && wantsChange ? payWithAmount : totalPaidCalculated))}</div>
                                         </div>
                                         {(successSnapshot ? successSnapshot.change : changeAmount) > 0 && (
                                             <div>
                                                 <span className="block text-md font-medium text-brand-inactive-text dark:text-dark-body mb-1">Troco</span>
-                                                <div className="text-3xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(successSnapshot ? successSnapshot.change : changeAmount)}</div>
+                                                <div className="text-3xl font-bold text-green-600 dark:text-green-400">{formatCurrency(successSnapshot ? successSnapshot.change : changeAmount)}</div>
                                             </div>
                                         )}
                                     </div>

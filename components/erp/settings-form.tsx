@@ -43,7 +43,6 @@ export function SettingsForm({ partner, paymentMethods: initialPaymentMethods }:
     openingHours: partner.opening_hours ? JSON.stringify(partner.opening_hours) : "",
     storeImageUrl: partner.store?.logo_url || partner.store_image_url || "",
     businessInfo: {
-      sells: Array.isArray(businessInfo.sells) ? businessInfo.sells : ["products"],
       mode: (businessInfo.mode || "erp") as BusinessMode,
     },
     paymentMethods: initialPaymentMethods || [],
@@ -58,7 +57,6 @@ export function SettingsForm({ partner, paymentMethods: initialPaymentMethods }:
     openingHours: partner.opening_hours ? JSON.stringify(partner.opening_hours) : "",
     storeImageUrl: partner.store?.logo_url || partner.store_image_url || "",
     businessInfo: {
-      sells: Array.isArray(businessInfo.sells) ? businessInfo.sells : ["products"],
       mode: (businessInfo.mode || "erp") as BusinessMode,
     },
     paymentMethods: initialPaymentMethods || [],
@@ -74,8 +72,8 @@ export function SettingsForm({ partner, paymentMethods: initialPaymentMethods }:
     setError(null)
 
     try {
-      if (formData.businessInfo.sells.length === 0 || !formData.businessInfo.mode) {
-        setError("Selecione pelo menos um tipo de oferta e como quer usar a Dudit.")
+      if (!formData.businessInfo.mode) {
+        setError("Selecione como quer usar a Dudit.")
         setIsLoading(false)
         return
       }
@@ -111,23 +109,6 @@ export function SettingsForm({ partner, paymentMethods: initialPaymentMethods }:
         ? prev.paymentMethods.filter((m) => m !== method)
         : [...prev.paymentMethods, method],
     }))
-  }
-
-  const toggleBusinessInfo = (type: "sells", value: string) => {
-    setFormData((prev) => {
-      const current = prev.businessInfo[type]
-      const updated = current.includes(value)
-        ? current.filter((item: string) => item !== value)
-        : [...current, value]
-
-      return {
-        ...prev,
-        businessInfo: {
-          ...prev.businessInfo,
-          [type]: updated
-        }
-      }
-    })
   }
 
   const setMode = (mode: BusinessMode) => {
@@ -307,32 +288,7 @@ export function SettingsForm({ partner, paymentMethods: initialPaymentMethods }:
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>O que você oferece?</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="sellsProducts"
-                name="sellsProducts"
-                checked={formData.businessInfo.sells.includes("products")}
-                onChange={() => toggleBusinessInfo("sells", "products")}
-              />
-              <Label htmlFor="sellsProducts">Vende produtos físicos</Label>
-            </div>
 
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="providesServices"
-                name="providesServices"
-                checked={formData.businessInfo.sells.includes("services")}
-                onChange={() => toggleBusinessInfo("sells", "services")}
-              />
-              <Label htmlFor="providesServices">Presta serviços</Label>
-            </div>
-          </CardContent>
-        </Card>
 
         <Card>
           <CardHeader>

@@ -4,19 +4,37 @@ import type { Service, ResolvedService } from "@/lib/types/service"
 
 type RawService = Record<string, unknown>
 
+// Public marketplace projection. Keep operational, moderation, cost and
+// staff-assignment fields out of serialized responses even though these
+// helpers execute with the server client.
+const PUBLIC_SERVICE_SELECT = `
+    id, partner_id, store_id, name, description, price, duration_minutes,
+    images, is_active, status, rating, category_id, subcategory_id, sku, unit,
+    show_in_marketplace, tags, price_type, billing_unit, video_url, video_type,
+    video_thumbnail, video_duration, video_provider_id, service_type,
+    warranty, buffer_minutes, marketplace_category_id, fulfillment_modes,
+    payment_requirement, show_price_in_store, promotional_price,
+    created_at,
+    category:service_categories!category_id(name),
+    subcategory:service_categories!subcategory_id(name)
+`
+
+const ERP_SERVICE_SELECT = `
+    *,
+    category:service_categories!category_id(name),
+    subcategory:service_categories!subcategory_id(name)
+`
+
 export async function resolveService(
     serviceId: string,
-    storeId: string
+    storeId: string,
+    publicOnly = false
 ): Promise<ResolvedService | null> {
     const supabase = createAdminClient()
 
     const { data: service, error } = await supabase
         .from("services")
-        .select(`
-            *,
-            category:service_categories!category_id(name),
-            subcategory:service_categories!subcategory_id(name)
-        `)
+        .select(publicOnly ? PUBLIC_SERVICE_SELECT : ERP_SERVICE_SELECT)
         .eq("id", serviceId)
         .eq("store_id", storeId)
         .maybeSingle()
@@ -51,6 +69,7 @@ export async function listStoreServices(
         categoryId?: string
         limit?: number
         offset?: number
+        publicOnly?: boolean
     }
 ): Promise<ResolvedService[]> {
     const supabase = createAdminClient()
@@ -60,11 +79,7 @@ export async function listStoreServices(
 
     let query = supabase
         .from("services")
-        .select(`
-            *,
-            category:service_categories!category_id(name),
-            subcategory:service_categories!subcategory_id(name)
-        `)
+        .select(options?.publicOnly ? PUBLIC_SERVICE_SELECT : ERP_SERVICE_SELECT)
         .eq("partner_id", partnerId)
         .order("created_at", { ascending: false })
         .range(offset, offset + limit - 1)

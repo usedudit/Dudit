@@ -153,8 +153,9 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
   const businessInfo = normalizeBusinessInfo(partner.business_info);
 
   // 2. Determina variáveis auxiliares de Onboarding
-  const sellsProducts = businessInfo.sells.includes("products");
-  const sellsServices = businessInfo.sells.includes("services");
+  const { isSystemResourceActive } = await import("@/lib/system-resources");
+  const sellsProducts = isSystemResourceActive(businessInfo, "products");
+  const sellsServices = isSystemResourceActive(businessInfo, "services");
 
   const hasPhone = !!store?.phone;
   const hasCategory = !!partner.category_id;

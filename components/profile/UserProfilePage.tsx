@@ -10,7 +10,7 @@ import { formatE164ToDisplay } from "@/lib/utils/phone-utils"
 import { MarketplaceHeader } from "../marketplace/MarketplaceHeader"
 import { MarketplaceFooter } from "../marketplace/MarketplaceFooter"
 import { createClient } from "@/lib/supabase/client"
-import { DefaultModal, RadioButton, Button, FormTextarea } from "@/components/reusable"
+import { DefaultModal, RadioButton, Button, FormTextarea, InfoCard, Input } from "@/components/reusable"
 import { Calendar, Users as UsersIcon, FileText, AlertOctagon, CheckCircle } from "lucide-react"
 
 import { View, EditField } from "./profile-shared"
@@ -493,6 +493,26 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                     }
                 }}
                 title={deleteStep === "confirm" ? "Confirmar encerramento da conta" : "O que fez você decidir encerrar sua conta?"}
+                footer={
+                    <>
+                        <Button
+                            variant="outline"
+                            onClick={() => setDeleteStep("none")}
+                            disabled={isDeleting}
+                            className="flex-1 h-12"
+                        >
+                            Continuar com minha conta
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={handleDeleteAccount}
+                            disabled={isDeleting || confirmText !== "EXCLUIR"}
+                            className="flex-1 h-12 bg-red-600"
+                        >
+                            {isDeleting ? "Excluindo..." : "Confirmar exclusão da conta"}
+                        </Button>
+                    </>
+                }
             >
                 {deleteStep === "reason" && (
                     <div className="space-y-6 pt-2 pb-4">
@@ -535,18 +555,12 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
 
                 {deleteStep === "confirm" && (
                     <div className="space-y-6 pt-2 pb-4 max-h-[65vh] overflow-y-auto pr-2 custom-scrollbar">
-                        <div className="flex items-start gap-3 p-4 rounded-xl bg-red-50 dark:bg-red-950/20 border border-red-200/50 dark:border-red-900/50">
-                            <AlertTriangleIcon className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
-                            <div className="text-sm text-red-700 dark:text-red-300 space-y-1">
-                                <strong>Essa decisão é sua.</strong>
-                                <p>Ao confirmar, sua assinatura será cancelada e iniciaremos o encerramento da sua conta. Você terá 48 horas para desistir a qualquer momento.</p>
-                            </div>
-                        </div>
+                        <InfoCard title="Essa decisão é sua." message="Ao confirmar, sua assinatura será cancelada e iniciaremos o encerramento da sua conta." color="red" />
 
                         {/* SUA CONTA HOJE */}
                         {dryRunReport && (
                             <div className="space-y-3">
-                                <h4 className="text-xs font-bold text-brand-inactive-text uppercase tracking-wider">
+                                <h4 className="text-xs font-bold text-brand-inactive-text">
                                     Sua conta hoje
                                 </h4>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -610,16 +624,7 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                                             </span>
                                         </div>
                                     )}
-                                    {dryRunReport.filesCount > 0 && (
-                                        <div className="p-3 rounded-2xl border border-brand-border dark:border-dark-border bg-brand-gray/20 dark:bg-dark-surface/50 text-center">
-                                            <span className="block text-lg font-extrabold text-brand-dark dark:text-dark-heading">
-                                                {dryRunReport.filesCount}
-                                            </span>
-                                            <span className="text-[11px] text-brand-inactive-text font-medium">
-                                                Arquivos enviados
-                                            </span>
-                                        </div>
-                                    )}
+
                                     {dryRunReport.whatsappCount > 0 && (
                                         <div className="p-3 rounded-2xl border border-brand-border dark:border-dark-border bg-brand-gray/20 dark:bg-dark-surface/50 text-center">
                                             <span className="block text-lg font-extrabold text-brand-dark dark:text-dark-heading">
@@ -686,15 +691,7 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                                             </div>
                                         </li>
                                     )}
-                                    {dryRunReport.filesCount > 0 && (
-                                        <li className="flex items-start gap-2">
-                                            <span className="text-red-500 mt-0.5">•</span>
-                                            <div>
-                                                <strong className="text-brand-dark dark:text-dark-heading">Arquivos enviados</strong>
-                                                <span className="block text-xs text-brand-inactive-text">(imagens e mídias no R2)</span>
-                                            </div>
-                                        </li>
-                                    )}
+
                                     <li className="flex items-start gap-2">
                                         <span className="text-red-500 mt-0.5">•</span>
                                         <div>
@@ -703,9 +700,6 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                                         </div>
                                     </li>
                                 </ul>
-                                <p className="text-xs text-brand-inactive-text">
-                                    Tudo isso será removido definitivamente após o período de carência.
-                                </p>
                             </div>
                         )}
 
@@ -730,98 +724,19 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                             </ul>
                         </div>
 
-                        {/* O QUE ACONTECERÁ AGORA (TIMELINE) */}
-                        <div className="space-y-3 pt-2">
-                            <h4 className="text-xs font-bold text-brand-inactive-text uppercase tracking-wider">
-                                O que acontecerá agora
-                            </h4>
-                            <div className="relative pl-6 space-y-4 border-l border-brand-border dark:border-dark-border ml-2 py-1">
-                                <div className="relative">
-                                    <div className="absolute -left-[31px] top-1 w-4 h-4 rounded-full bg-brand-green border-4 border-white dark:border-dark-surface" />
-                                    <div>
-                                        <strong className="text-xs text-brand-dark dark:text-dark-heading block">Agora</strong>
-                                        <span className="text-xs text-brand-inactive-text">Sua assinatura é cancelada e nenhuma nova cobrança será criada.</span>
-                                    </div>
-                                </div>
-                                <div className="relative">
-                                    <div className="absolute -left-[31px] top-1 w-4 h-4 rounded-full bg-brand-green border-4 border-white dark:border-dark-surface" />
-                                    <div>
-                                        <strong className="text-xs text-brand-dark dark:text-dark-heading block">Imediatamente</strong>
-                                        <span className="text-xs text-brand-inactive-text">Sua sessão será encerrada e o login será bloqueado.</span>
-                                    </div>
-                                </div>
-                                <div className="relative">
-                                    <div className="absolute -left-[31px] top-1 w-4 h-4 rounded-full bg-red-50 border-4 border-white dark:border-dark-surface" />
-                                    <div>
-                                        <strong className="text-xs text-brand-dark dark:text-dark-heading block">Processamento assíncrono</strong>
-                                        <span className="text-xs text-brand-inactive-text">Nossos servidores iniciarão a limpeza imediata de arquivos e serviços vinculados.</span>
-                                    </div>
-                                </div>
-                                <div className="relative">
-                                    <div className="absolute -left-[31px] top-1 w-4 h-4 rounded-full bg-gray-400 border-4 border-white dark:border-dark-surface" />
-                                    <div>
-                                        <strong className="text-xs text-brand-dark dark:text-dark-heading block">Após a conclusão</strong>
-                                        <span className="text-xs text-brand-inactive-text">O processo de exclusão é finalizado sem possibilidade de recuperação de dados.</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
                         {/* CONFIRMAÇÃO POR ESCRITO */}
                         <div className="py-4 border-t border-brand-border dark:border-dark-border text-center space-y-3">
-                            <p className="text-xs font-bold text-red-600 dark:text-red-400">
+                            <p className="text-xs font-bold text-brand-red">
                                 Atenção: Esta ação é definitiva e removerá todos os seus dados.
                             </p>
                             <p className="text-xs text-brand-inactive-text">
                                 Digite <strong className="text-brand-dark dark:text-dark-heading">EXCLUIR</strong> abaixo para confirmar.
                             </p>
-                            <input
-                                type="text"
+                            <Input
                                 value={confirmText}
                                 onChange={(e) => setConfirmText(e.target.value)}
                                 placeholder="EXCLUIR"
-                                className="w-full max-w-[200px] mx-auto text-center uppercase tracking-wider font-bold h-10 border border-brand-border dark:border-dark-border rounded-xl bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading text-sm focus:outline-none focus:ring-1 focus:ring-red-500"
                             />
-                        </div>
-
-                        {/* ALTERNATIVAS DISCRETAS */}
-                        <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 py-4 border-t border-brand-border dark:border-dark-border text-xs text-brand-inactive-text">
-                            <a href="/erp/clientes" className="hover:text-brand-dark dark:hover:text-dark-heading transition-colors font-medium">
-                                Exportar meus dados
-                            </a>
-                            <a href="https://wa.me/5551999999999" target="_blank" rel="noopener noreferrer" className="hover:text-brand-dark dark:hover:text-dark-heading transition-colors font-medium">
-                                Falar com o suporte
-                            </a>
-                            <a href="/erp/settings/subscription" className="hover:text-brand-dark dark:hover:text-dark-heading transition-colors font-medium">
-                                Cancelar apenas a assinatura
-                            </a>
-                            <button
-                                type="button"
-                                onClick={() => setDeleteStep("none")}
-                                className="hover:text-brand-dark dark:hover:text-dark-heading transition-colors font-medium"
-                            >
-                                Voltar
-                            </button>
-                        </div>
-
-                        {/* FOOTER ACTIONS */}
-                        <div className="flex flex-col sm:flex-row gap-3 mt-4 pt-4 border-t border-brand-border dark:border-dark-border">
-                            <Button
-                                variant="outline"
-                                onClick={() => setDeleteStep("none")}
-                                disabled={isDeleting}
-                                className="flex-1 h-12 font-bold"
-                            >
-                                Continuar com minha conta
-                            </Button>
-                            <Button
-                                variant="default"
-                                onClick={handleDeleteAccount}
-                                disabled={isDeleting || confirmText !== "EXCLUIR"}
-                                className="flex-1 h-12 bg-red-600 hover:bg-red-700 text-white font-bold disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {isDeleting ? "Excluindo..." : "Confirmar exclusão da conta"}
-                            </Button>
                         </div>
                     </div>
                 )}

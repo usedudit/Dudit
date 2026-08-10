@@ -190,6 +190,7 @@ export type RouteKey =
     | "products"
     | "stock_movements"
     | "import_notes"
+    | "xml_import"
     | "suppliers"
     | "cadastros_produtos"
     // Serviços
@@ -201,6 +202,8 @@ export type RouteKey =
     | "customers"
     // Financeiro
     | "financial_transactions"
+    | "contas_a_pagar"
+    | "contas_a_receber"
     | "cash_register"
     | "financial_dre"
     | "cadastros_financeiro"

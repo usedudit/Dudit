@@ -700,8 +700,8 @@ async function getCachedGeneralMetrics(partnerId: string, storeId = "", period: 
   return cachedFn()
 }
 
-async function getCachedGeneralAlerts(partnerId: string, storeId = "", sells: string[]): Promise<{ alerts: AlertItem[] }> {
-  const mapKey = `${partnerId}:${sells.sort().join(",")}`
+async function getCachedGeneralAlerts(partnerId: string, storeId = "", activeResources: string[] = ["products", "services"]): Promise<{ alerts: AlertItem[] }> {
+  const mapKey = `${partnerId}:${activeResources.sort().join(",")}`
   let cachedFn = generalAlertsCacheMap.get(mapKey)
   if (!cachedFn) {
     cachedFn = unstable_cache(
@@ -729,14 +729,14 @@ async function getCachedGeneralAlerts(partnerId: string, storeId = "", sells: st
           alerts.push({ id: "pending-orders", message: `${pendingOrders.length} pedido${pendingOrders.length > 1 ? "s" : ""} aguardando pagamento`, count: pendingOrders.length, tone: "blue", icon: "cart" })
         }
 
-        if (sells.includes("products")) {
+        if (activeResources.includes("products")) {
           const lowStock = allProducts.filter((p: any) => p.stock_quantity != null && Number(p.stock_quantity) <= 5).slice(0, 50)
           if (lowStock.length > 0) {
             alerts.push({ id: "low-stock", message: `${lowStock.length} produto${lowStock.length > 1 ? "s" : ""} com estoque baixo`, count: lowStock.length, tone: "red", icon: "package" })
           }
         }
 
-        if (sells.includes("services")) {
+        if (activeResources.includes("services")) {
           const pendingApts = allAppointments.filter((a: any) => String(a.start_date).slice(0, 10) === today && a.source !== "unavailable" && String(a.status || "").toLowerCase().includes("aguard")).slice(0, 50)
           if (pendingApts.length > 0) {
             alerts.push({ id: "pending-appointments", message: `${pendingApts.length} agendamento${pendingApts.length > 1 ? "s" : ""} pendente${pendingApts.length > 1 ? "s" : ""}`, count: pendingApts.length, tone: "orange", icon: "calendar" })
@@ -750,7 +750,7 @@ async function getCachedGeneralAlerts(partnerId: string, storeId = "", sells: st
 
         return { alerts }
       },
-      ["dashboard-alerts", partnerId, storeId, sells.sort().join(",")],
+      ["dashboard-alerts", partnerId, storeId, activeResources.sort().join(",")],
       { tags: [DASHBOARD_TAGS.alerts(partnerId), DASHBOARD_TAGS.general(partnerId)], revalidate: 60 },
     )
     generalAlertsCacheMap.set(mapKey, cachedFn)
@@ -954,8 +954,8 @@ async function getCachedGeneralActivity(partnerId: string, storeId = ""): Promis
   return cachedFn()
 }
 
-async function getCachedGeneralTopCategories(partnerId: string, storeId = "", sells: string[], period: Period = "monthly"): Promise<{ categories: ChartPoint[] }> {
-  const mapKey = `${partnerId}:${sells.sort().join(",")}:${period}`
+async function getCachedGeneralTopCategories(partnerId: string, storeId = "", activeResources: string[] = ["products", "services"], period: Period = "monthly"): Promise<{ categories: ChartPoint[] }> {
+  const mapKey = `${partnerId}:${activeResources.sort().join(",")}:${period}`
   let cachedFn = generalTopCategoriesCacheMap.get(mapKey)
   if (!cachedFn) {
     cachedFn = unstable_cache(
@@ -964,7 +964,7 @@ async function getCachedGeneralTopCategories(partnerId: string, storeId = "", se
         const { today, from } = getDateRangeForPeriod(period)
         const categoryMap = new Map<string, number>()
 
-        if (sells.includes("products")) {
+        if (activeResources.includes("products")) {
           const { data } = await supabase.from("order_items").select("product_name, quantity, created_at, orders!inner(partner_id)").eq("orders.partner_id", partnerId).gte("created_at", `${from}T00:00:00`).limit(300)
           // Get product categories
           const productNames = [...new Set((data || []).map((i: any) => i.product_name).filter(Boolean))]
@@ -979,7 +979,7 @@ async function getCachedGeneralTopCategories(partnerId: string, storeId = "", se
           }
         }
 
-        if (sells.includes("services")) {
+        if (activeResources.includes("services")) {
           const allAppointments = await loadRawAppointmentsPast(partnerId, from, today)
           const rows = allAppointments.filter((a: any) => a.start_date >= from && a.source !== "unavailable" && isPaid(a.status)).slice(0, 200)
           // Get service categories
@@ -997,7 +997,7 @@ async function getCachedGeneralTopCategories(partnerId: string, storeId = "", se
 
         return { categories: topFromMap(categoryMap) }
       },
-      ["dashboard-categories", partnerId, storeId, sells.sort().join(","), period],
+      ["dashboard-categories", partnerId, storeId, activeResources.sort().join(","), period],
       { tags: [DASHBOARD_TAGS.categories(partnerId, period), DASHBOARD_TAGS.general(partnerId, period)], revalidate: 120 },
     )
     generalTopCategoriesCacheMap.set(mapKey, cachedFn)
@@ -1014,9 +1014,9 @@ export async function getGeneralMetrics(partnerId: string, period: Period = "mon
   return getCachedGeneralMetrics(partnerId, storeId, period, todayOverride)
 }
 
-export async function getGeneralAlerts(partnerId: string, sells: string[], storeId = "") {
+export async function getGeneralAlerts(partnerId: string, activeResources: string[] = ["products", "services"], storeId = "") {
   await requirePermission(partnerId, "dashboard", "view")
-  return getCachedGeneralAlerts(partnerId, storeId, sells)
+  return getCachedGeneralAlerts(partnerId, storeId, activeResources)
 }
 
 export async function getGeneralRevenueChart(partnerId: string, period: Period = "monthly", todayOverride?: string, storeId = "") {
@@ -1034,7 +1034,7 @@ export async function getGeneralActivity(partnerId: string, storeId = "") {
   return getCachedGeneralActivity(partnerId, storeId)
 }
 
-export async function getGeneralTopCategories(partnerId: string, sells: string[], period: Period = "monthly", storeId = "") {
+export async function getGeneralTopCategories(partnerId: string, activeResources: string[] = ["products", "services"], period: Period = "monthly", storeId = "") {
   await requirePermission(partnerId, "dashboard", "view")
-  return getCachedGeneralTopCategories(partnerId, storeId, sells, period)
+  return getCachedGeneralTopCategories(partnerId, storeId, activeResources, period)
 }

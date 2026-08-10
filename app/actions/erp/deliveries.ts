@@ -1209,7 +1209,7 @@ export async function getERPDeliveriesPageAction(
   | { success: false; error: string }
 > {
   try {
-    await requireUser()
+    const user = await requireUser()
     const actor = await getDeliveryActorScope(partnerId)
     const planCheck = await enforceDeliveryPlanAccess(partnerId, 1)
     if (!planCheck.allowed) {
@@ -1256,8 +1256,13 @@ export async function getERPDeliveriesPageAction(
       .eq("partner_id", partnerId)
 
     if (actor.roleId === "delivery") {
-      if (!actor.partnerUserId) return { success: true, items: [], nextCursor: null, hasMore: false }
-      q = q.eq("delivery_person_id", actor.partnerUserId)
+      const pUserId = actor.partnerUserId
+      const uId = user.id
+      const filters: string[] = []
+      if (pUserId) filters.push(`delivery_person_id.eq.${pUserId}`)
+      if (uId) filters.push(`delivery_person_id.eq.${uId}`)
+      filters.push("delivery_person_id.is.null")
+      q = q.or(filters.join(","))
     }
 
     if (cursor) q = q.or(buildKeysetFilter(cursor))

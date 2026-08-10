@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { requireUser } from "@/lib/auth/authorization"
+import { getCurrentUser } from "@/lib/auth/authorization"
 import { validateFile, validateMagicBytes } from "@/lib/security/file-validator"
 import { checkRateLimitForAPI } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
@@ -51,9 +51,19 @@ async function handleUpload(request: NextRequest) {
     }
 
     // =============================
-    // Auth - STRICT (throws on failure)
+    // Auth - Permite partner-logo durante cadastro mesmo sem sessão logada
     // =============================
-    const user = await requireUser()
+    const uploadType = request.nextUrl.searchParams.get("uploadType") || "products"
+    const user = await getCurrentUser()
+
+    if (!user && uploadType !== "partner-logo") {
+      return NextResponse.json(
+        { error: "Não autenticado." },
+        { status: 401 }
+      )
+    }
+
+    const userId = user ? user.id : "unauthenticated"
 
     // =============================
     // Parse request - suporta FormData ou JSON
@@ -163,7 +173,7 @@ async function handleUpload(request: NextRequest) {
 
     const magicBytesValidation = validateMagicBytes(buffer, mimeType)
     if (!magicBytesValidation.valid) {
-      console.warn(`[SECURITY] MIME spoofing attempt detected for user ${user.id}: ${magicBytesValidation.error}`)
+      console.warn(`[SECURITY] MIME spoofing attempt detected for user ${userId}: ${magicBytesValidation.error}`)
       return NextResponse.json(
         { error: magicBytesValidation.error },
         { status: 400 }
@@ -194,8 +204,6 @@ async function handleUpload(request: NextRequest) {
     // =============================
     // Determinar prefixo da pasta
     // =============================
-    const uploadType = request.nextUrl.searchParams.get("uploadType") || "products"
-
     const prefixMap: Record<string, string> = {
       "partner-logo": "partner-logos/",
       "partner-banner": "partner-banners/",
@@ -211,7 +219,7 @@ async function handleUpload(request: NextRequest) {
       signedUrl = await generateSignedUploadUrl({
         fileName: filename,
         fileType: mimeType,
-        userId: user.id,
+        userId: userId,
         prefix: prefix,
         expiresIn: 120, // 2 minutes - enough for server-side upload
       })

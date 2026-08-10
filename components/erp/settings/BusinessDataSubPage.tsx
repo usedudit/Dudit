@@ -12,7 +12,6 @@ import {
     StateComboBox,
     PhoneInput,
     ListItem,
-    Spinner,
     Tabs,
     TabsList,
     TabsTrigger,
@@ -39,21 +38,6 @@ import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
 import type { BusinessMode } from "@/lib/business-info"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import { consultarCNPJ } from "@/lib/fiscal"
-
-const SELLS_OPTIONS = [
-    {
-        value: "products",
-        icon: ShoppingBagIcon,
-        title: "Produtos",
-        description: "Venda roupas, eletrônicos, comida ou alugue equipamentos e trajes."
-    },
-    {
-        value: "services",
-        icon: WrenchIcon,
-        title: "Serviços",
-        description: "Para quem trabalha com agendamentos, orçamentos ou consultorias."
-    },
-]
 
 const MODE_OPTIONS: Array<{
     value: BusinessMode
@@ -112,7 +96,6 @@ export const BusinessDataSubPage = ({
         cnpj: store?.cpf || store?.cnpj || "",
         razaoSocial: store?.razao_social || "",
         nomeFantasia: store?.nome_fantasia || "",
-        sells: store?.business_info?.sells || partnerBusinessInfo?.sells || ["products"],
         mode: ((store?.business_info?.mode || partnerBusinessInfo?.mode || "erp")) as BusinessMode,
         phone: store?.phone ? formatE164ToDisplay(store.phone) : (partner.phone ? formatE164ToDisplay(partner.phone) : ""),
         category: partner.category || "",
@@ -259,15 +242,6 @@ export const BusinessDataSubPage = ({
         }
     }, [generalInfo.cnpj, notifySuccess, notifyError])
 
-    const toggleArrayItem = (key: "sells", value: string) =>
-        setGeneralInfo((prev: any) => {
-            const arr = prev[key]
-            return {
-                ...prev,
-                [key]: arr.includes(value) ? arr.filter((i: string) => i !== value) : [...arr, value],
-            }
-        })
-
     const setMode = (mode: BusinessMode) =>
         setGeneralInfo((prev: any) => ({ ...prev, mode }))
 
@@ -310,7 +284,6 @@ export const BusinessDataSubPage = ({
         startTransition(async () => {
             try {
                 const businessInfoData = {
-                    sells: generalInfo.sells,
                     mode: generalInfo.mode,
                 }
 
@@ -630,27 +603,6 @@ export const BusinessDataSubPage = ({
                                                             </div>
                                                         </motion.div>
                                                     )}
-                                                </div>
-                                            </FormSection>
-
-                                            <FormSection hasSeparator title="O que você oferece?">
-                                                <div className="grid gap-3">
-                                                    {SELLS_OPTIONS.map(opt => (
-                                                        <ListItem
-                                                            key={opt.value}
-                                                            icon={opt.icon}
-                                                            title={opt.title}
-                                                            description={opt.description}
-                                                            onClick={() => toggleArrayItem("sells", opt.value)}
-                                                            right={
-                                                                <Checkbox
-                                                                    checked={generalInfo.sells.includes(opt.value)}
-                                                                    onChange={() => toggleArrayItem("sells", opt.value)}
-                                                                />
-                                                            }
-                                                            className="py-4 px-6 gap-4"
-                                                        />
-                                                    ))}
                                                 </div>
                                             </FormSection>
                                         </div>

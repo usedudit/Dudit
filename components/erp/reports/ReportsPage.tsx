@@ -56,7 +56,8 @@ const REPORT_TABS: TabDefinition[] = [
 ]
 
 interface ReportsPageProps {
-    sells: string[]
+    sells?: string[]
+    activeResources?: string[]
     period: Period
     productsData: ProductsDashboardData | null
     servicesData: ServicesDashboardData | null
@@ -74,9 +75,10 @@ interface ReportsPageProps {
 }
 
 function useAvailableTabs(props: ReportsPageProps): TabDefinition[] {
-    const { sells, productsData, servicesData, financialData, deliveryData } = props
-    const sellsProducts = sells.includes("products")
-    const sellsServices = sells.includes("services")
+    const { sells, activeResources, productsData, servicesData, financialData, deliveryData } = props
+    const resourcesList = activeResources || sells || ["products", "services"]
+    const sellsProducts = resourcesList.includes("products")
+    const sellsServices = resourcesList.includes("services")
     return useMemo(() => REPORT_TABS.filter(tab => {
         switch (tab.id) {
             case "produtos": case "vendas": case "marketing": return sellsProducts && productsData !== null

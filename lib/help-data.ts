@@ -5817,6 +5817,1179 @@ Sim, para planilha, respeitando a visão e os filtros atuais.
 `
             }
         ]
+    },
+    {
+        id: "marketing",
+        title: "Marketing",
+        icon: "📣",
+        articles: [
+            {
+                id: "visao-geral-cupons",
+                title: "Visão geral de cupons",
+                description: "Entenda os cupons de desconto: tipos, status, escopos e como eles funcionam nas vendas e na vitrine.",
+                slug: "visao-geral-cupons",
+                category: "marketing",
+                content: `
+## Visão geral
+
+Os **cupons de desconto** são códigos que seu cliente usa para ganhar um benefício na compra — percentual, valor fixo ou frete grátis. Você cria o cupom no ERP, define as regras, e ele pode ser usado no balcão (PDV), nas vendas e também na sua vitrine online.
+
+![Tela principal de Cupons](https://img.dudit.com.br/static/screens/Cupons_VisaoGeral.png)
+Legenda: Lista de cupons com abas de status, busca, filtros e ações rápidas.
+
+## O que você encontra no módulo
+
+**Lista de cupons** — cada linha mostra o código, o tipo de desconto, o escopo (onde vale), o uso (quantas vezes foi usado), a validade e o status.
+
+**Abas de status** — quatro abas organizam os cupons:
+
+| Aba | O que mostra |
+|-----|--------------|
+| **Todos** | Todos os cupons cadastrados |
+| **Ativos** | Cupons disponíveis para uso |
+| **Inativos** | Cupons pausados |
+| **Automáticos** | Cupons aplicados sozinhos pelo sistema, sem o cliente digitar |
+
+**Busca e filtros** — encontre cupons por código e refine por tipo de desconto, escopo do catálogo, clientes ou automação.
+
+**Tipos de desconto** — três formatos:
+
+- **Percentual** — desconto em % (ex: 10% OFF)
+- **Valor fixo** — desconto em reais (ex: R$ 20 OFF)
+- **Entrega grátis** — isenta o frete do pedido
+
+**Status** — **Ativo** (pode ser usado) ou **Inativo** (pausado). Cupons automáticos aparecem com uma marcação própria.
+
+## Quando utilizar
+
+- Para atrair novos clientes (cupom de primeira compra)
+- Para fidelizar (cupom de aniversário)
+- Para escoar estoque (desconto em categoria ou produto)
+- Para impulsionar vendas na vitrine online
+- Para bonificar um cliente específico (escopo por cliente)
+
+## Como funciona na prática
+
+1. Você cria o cupom com código, tipo e regras.
+2. O cupom fica **Ativo** e passa a ser aceito.
+3. O cliente usa o código no PDV, na venda ou na vitrine.
+4. O sistema valida as regras (validade, limite, mínimo da sacola) e aplica o desconto.
+5. O uso fica registrado e aparece no relatório de Marketing.
+
+## Dicas importantes
+
+- **Crie códigos fáceis de lembrar** — ex: ANIVERSARIO10, BEMVINDO15.
+- **Defina limites de uso** para não estourar sua margem.
+- **Cupons automáticos** são ótimos para campanhas gerais: o desconto entra sozinho, sem o cliente digitar nada.
+- **Use o link de compartilhamento** para divulgar o cupom no WhatsApp e redes sociais.
+
+## Perguntas frequentes
+
+**O cliente precisa digitar o código?**
+Para cupons normais, sim. Para **cupons automáticos**, não — o sistema aplica o maior desconto automaticamente.
+
+**Cupom funciona na vitrine online?**
+Sim. Cupons ativos aparecem na página do seu negócio e podem ser usados no checkout.
+
+**Posso desativar um cupom depois de criá-lo?**
+Sim. Basta alternar o status para **Inativo** na lista. Cupons usados antes continuam válidos; novos usos param.
+`
+            },
+            {
+                id: "como-criar-configurar-cupom",
+                title: "Como criar e configurar um cupom",
+                description: "Passo a passo completo do formulário: código, tipo de desconto, valor, opções e escopo.",
+                slug: "como-criar-configurar-cupom",
+                category: "marketing",
+                content: `
+## Visão geral
+
+Criar um cupom é rápido. Você informa o **código**, escolhe o **tipo de desconto**, define o **valor**, ajusta **opções** (combinação e automação) e salva. Em seguida pode configurar o **escopo** e os **limites**.
+
+## Quando utilizar
+
+- Para criar um cupom de primeira compra
+- Para lançar uma campanha de desconto
+- Para criar um cupom de aniversário (com código pré-definido e cliente vinculado)
+- Para dar um benefício específico a um cliente
+
+## Como fazer
+
+### 1. Abrir o cadastro
+
+No menu **Marketing > Cupons de Desconto**, clique em **Novo cupom**.
+
+### 2. Dados gerais
+
+- **Código do cupom** — o código que o cliente vai digitar (ex: BEMVINDO15). Sem acentos, letras maiúsculas, máximo 20 caracteres.
+- **Status** — Ativo ou Inativo.
+- **Tipo de desconto** — Percentual, Valor fixo ou Entrega grátis.
+- **Valor do desconto** — informe o percentual ou o valor em reais (para Entrega grátis esse campo é desativado).
+
+### 3. Regras opcionais
+
+- **Valor mínimo da sacola** — o desconto só vale se o pedido atingir esse valor.
+- **Desconto máximo** — limita o valor máximo do desconto em reais (ex: cupom de 20%, mas no máximo R$ 50).
+
+### 4. Opções
+
+- **Permitir combinação** — se ativado, o cupom pode ser usado junto com promoções de campanha. Se desativado, o sistema escolhe o melhor benefício entre cupom e promoção.
+- **Cupom automático** — se ativado, o sistema aplica esse cupom sozinho nas vendas, sem o cliente digitar.
+
+### 5. Escopo
+
+Na aba **Escopo**, defina onde o cupom vale:
+
+- **Aplicar a** — todas as categorias, ou categorias/produtos/serviços específicos.
+- **Escopo de clientes** — todos os clientes ou clientes específicos.
+
+### 6. Limites e validade
+
+No painel lateral:
+
+- **Limitar uso total** — quantas vezes o cupom pode ser usado no total.
+- **Limitar por cliente** — quantas vezes cada cliente pode usar.
+- **Apenas primeira compra** — o cupom vale só para o primeiro pedido do cliente.
+- **Validade** — sem limite de data ou com data de início e fim.
+
+### 7. Salvar
+
+Clique em **Salvar**. O cupom aparece na lista e já pode ser usado.
+
+## Dicas importantes
+
+- **Código sem espaços e sem acentos** — evita erro na hora de digitar.
+- **"Apenas primeira compra" e "Limitar por cliente" são exclusivos** — ativar um desativa o outro.
+- **Teste o cupom** — faça uma venda de teste para conferir se o desconto aplica como esperado.
+- **Use o compartilhamento** — após salvar, use o botão de compartilhar para divulgar o link do cupom.
+
+## Problemas comuns
+
+| Problema | Causa | Solução |
+|----------|-------|---------|
+| Código não aceito | Espaços ou acentos | Recrie sem espaços e sem acentos |
+| Desconto não aplica | Valor mínimo da sacola não atingido | Ajuste o valor mínimo ou o pedido |
+| Cupom aparece no seletor desabilitado | Escopo não inclui os itens do pedido | Amplie o escopo ou escolha itens elegíveis |
+| Cupom não aparece no PDV | Cupom inativo | Ative o cupom na lista |
+
+## Perguntas frequentes
+
+**Posso editar um cupom depois de criar?**
+Sim. Na lista, abra o cupom e use **Editar**. Dados como valor, escopo, limites e validade podem ser alterados.
+
+**O que significa "Entrega grátis"?**
+O cupom zera o valor do frete do pedido. Não precisa informar valor de desconto.
+
+**Cupom de aniversário é criado aqui?**
+O cupom em si é criado aqui com o código que preferir. No módulo **Clientes**, o recurso de aniversário cria o cupom automaticamente com o código **ANIVERSARIO10** e vincula o cliente.
+`
+            },
+            {
+                id: "regras-limites-validade-escopo-cupons",
+                title: "Regras, limites, validade e escopo dos cupons",
+                description: "Entenda como configurar onde o cupom vale, limites de uso, validade e condições da sacola.",
+                slug: "regras-limites-validade-escopo-cupons",
+                category: "marketing",
+                content: `
+## Visão geral
+
+Além do tipo de desconto, um cupom tem **regras** que controlam onde ele vale, quem pode usar, quantas vezes e até quando. Configurar bem essas regras evita abusos e protege sua margem.
+
+## Quando utilizar
+
+- Para limitar um cupom a determinados produtos, serviços ou categorias
+- Para restringir o cupom a clientes específicos
+- Para evitar que o mesmo cliente use o cupom várias vezes
+- Para criar cupons de primeira compra
+- Para definir valor mínimo de compra
+
+## Como funciona
+
+### Escopo de aplicação (onde vale)
+
+| Escopo | Descrição |
+|--------|-----------|
+| **Todas as categorias** | Vale para qualquer item da loja |
+| **Categorias específicas** | Vale para itens de categorias selecionadas |
+| **Produtos específicos** | Vale só para produtos escolhidos |
+| **Serviços específicos** | Vale só para serviços escolhidos |
+
+Ao escolher um escopo específico, você seleciona os itens em uma lista com busca. Itens inativos aparecem desabilitados.
+
+### Escopo de clientes (quem pode usar)
+
+- **Todos os clientes** — qualquer pessoa pode usar.
+- **Clientes específicos** — somente clientes selecionados podem usar.
+
+### Limites de uso
+
+- **Limite total** — o cupom vale no máximo N usos. Depois disso, o sistema rejeita novos usos com a mensagem "Limite de uso do cupom atingido."
+- **Limite por cliente** — cada cliente pode usar no máximo N vezes.
+- **Apenas primeira compra** — vale somente para o primeiro pedido do cliente. (Exclusivo com limite por cliente: ativar um desativa o outro.)
+
+### Validade
+
+- **Sem limite de data** — vale indefinidamente.
+- **Com datas** — informa **início** e **fim**. Antes do início: "Cupom ainda não está disponível." Depois do fim: "Cupom expirado."
+
+### Condições da sacola
+
+- **Valor mínimo da sacola** — o desconto só vale se o total do pedido atingir o mínimo informado.
+- **Desconto máximo** — limita o valor do desconto em reais, mesmo que o percentual calcule mais.
+
+## Dicas importantes
+
+- **Combine valor mínimo com desconto máximo** — exemplo real: cupom de 20% com mínimo de R$ 100 e desconto máximo de R$ 50.
+- **Cupom de primeira compra** — ideal para atrair novos clientes sem que os antigos repitam o benefício.
+- **Escopo por cliente** — ótimo para bonificar clientes VIP ou reter quem está sumindo.
+- **Reveja a validade** — cupons sem data ficam ativos para sempre; defina datas para campanhas temporárias.
+
+## Problemas comuns
+
+| Problema | Causa | Solução |
+|----------|-------|---------|
+| "Cupom expirado" | Data de fim já passou | Renove a validade ou crie novo cupom |
+| "Limite de uso atingido" | Uso total chegou ao limite | Aumente o limite ou crie novo cupom |
+| "Este cliente já atingiu o limite" | Cliente já usou o máximo permitido | Ajuste o limite por cliente |
+| "Nenhum item da sacola é elegível" | Itens não estão no escopo | Amplie o escopo do cupom |
+
+## Perguntas frequentes
+
+**Um cupom sem escopo definido vale para tudo?**
+Sim. Se o escopo é **Todas as categorias** e não há produtos/serviços vinculados, vale para toda a loja.
+
+**Posso ter limite de uso total e por cliente ao mesmo tempo?**
+Sim, os dois podem estar ativos juntos.
+
+**"Apenas primeira compra" pode ser usado com "limite por cliente"?**
+Não. São exclusivos — ativar um desativa o outro.
+
+**O desconto máximo vale para cupom de valor fixo?**
+Se o desconto fixo for menor que o teto, o teto não muda nada. O teto protege principalmente cupons percentuais em pedidos grandes.
+`
+            },
+            {
+                id: "cupons-automaticos-e-aplicacao-nas-vendas",
+                title: "Cupons automáticos e aplicação nas vendas",
+                description: "Como o cupom é aplicado no PDV, nas vendas e no checkout online, e o que são cupons automáticos.",
+                slug: "cupons-automaticos-e-aplicacao-nas-vendas",
+                category: "marketing",
+                content: `
+## Visão geral
+
+O cupom pode ser usado de três formas: o **cliente digita o código** (PDV, venda ou vitrine), você **seleciona o cupom** no PDV, ou o sistema aplica **automaticamente** um cupom configurado como automático. Entender esses caminhos evita dúvidas na hora de vender.
+
+## Quando utilizar
+
+- Para aplicar desconto no balcão sem o cliente ter o código
+- Para campanhas em que todo cliente ganha o desconto (cupom automático)
+- Para garantir que o desconto seja validado corretamente nas vendas
+
+## Como funciona
+
+### No PDV (balcão)
+
+Na tela do PDV, você pode:
+
+- **Digitar o código** — o sistema valida e aplica o desconto.
+- **Selecionar o cupom** — abre uma lista de cupons ativos com o formato do benefício (ex: "10% off", "R$ 20 off", "Entrega grátis"). Cupons com restrições aparecem com aviso "Possui restrições".
+- **Aplicar automático** — se houver cupom automático válido, o PDV aplica o maior desconto sozinho.
+
+### Nas Vendas (pedidos)
+
+Ao criar ou editar um pedido no módulo Vendas, existe a opção **"Utiliza um cupom de desconto pré-cadastrado"**. Informe o código e o sistema valida e recalcula o total.
+
+### Na vitrine online
+
+O cliente escolhe o cupom na tela de **Cupom de Desconto** do checkout ou digita o código. O sistema mostra:
+
+- O desconto aplicado no resumo ("Desconto do cupom").
+- Aviso **"Desconto aplicado a X de Y itens"** quando o cupom vale só para parte da sacola.
+
+### Cupons automáticos
+
+São cupons marcados com a opção **Cupom automático**. O sistema busca os cupons automáticos ativos e **aplica o de maior desconto**, sem o cliente digitar nada. Eles aparecem marcados como **Automático** na lista.
+
+### Combinação com promoções
+
+- Se o cupom tem **Permitir combinação** ativado, ele soma com as promoções de campanha.
+- Se **não** tem, o sistema compara os cenários e usa o que der o **menor total para o cliente** (cupom ou promoção, não os dois).
+
+## Dicas importantes
+
+- **Configure apenas cupons automáticos que você quer que valham sempre** — eles aplicam sozinhos em todas as vendas elegíveis.
+- **Verifique a validação** — o sistema recalcula o preço com o cupom no momento do pedido, então o total é sempre o correto.
+- **No PDV, desconfie de "Possui restrições"** — confira o motivo antes de aplicar.
+
+## Problemas comuns
+
+| Problema | Causa | Solução |
+|----------|-------|---------|
+| Cupom não aplica no PDV | Cupom com escopo/condição não atendida | Veja o motivo na lista de cupons do PDV |
+| Desconto menor que o esperado | Cupom não é combinável com promoção | Ajuste "Permitir combinação" no cupom |
+| Dois descontos parecem somados | Cupom combinável + promoção ativa | Confirme a opção de combinação |
+
+## Perguntas frequentes
+
+**O cupom automático exige código?**
+Não. O sistema aplica automaticamente o maior desconto entre os cupons automáticos válidos.
+
+**Cupom e promoção podem ser usados juntos?**
+Depende da configuração. Se o cupom permite **combinação** e a promoção também, sim. Caso contrário, vale o melhor benefício.
+
+**Onde vejo se o cupom foi aplicado?**
+No resumo do pedido aparece a linha de desconto. No PDV, o cupom aplicado fica indicado na tela com opção de remover.
+`
+            },
+            {
+                id: "compartilhamento-e-uso-dos-cupons",
+                title: "Compartilhamento e uso dos cupons",
+                description: "Divulgue cupons por link, veja-os na vitrine e use o cupom de aniversário com clientes.",
+                slug: "compartilhamento-e-uso-dos-cupons",
+                category: "marketing",
+                content: `
+## Visão geral
+
+Cupom não serve só no balcão. Você pode **compartilhar um link** do cupom, o cliente vê os cupons na página do seu negócio, e o módulo de Clientes gera **cupom de aniversário** automaticamente.
+
+## Quando utilizar
+
+- Para divulgar uma promoção no WhatsApp e redes sociais
+- Para deixar cupons visíveis na vitrine online
+- Para bonificar clientes no aniversário deles
+
+## Como funciona
+
+### Compartilhar por link
+
+Na lista de cupons, use a ação **Compartilhar**. O sistema gera um link público que já traz o cupom preenchido para o cliente. Você cola esse link no WhatsApp, e-mail ou rede social.
+
+### Cupons na vitrine
+
+Cupons ativos aparecem na seção **"Cupons do vendedor"** da página do seu negócio na vitrine. O cliente vê o código e o benefício (ex: "BEMVINDO15 - 15% OFF") e pode usá-lo no checkout. Cupons com restrições mostram o pedido mínimo, o desconto máximo ou a primeira compra.
+
+### Cupom de aniversário
+
+No módulo **Clientes**, quando um cliente tem data de nascimento cadastrada e você está no plano Crescer, aparece um card de aniversário com ações:
+
+- **Criar cupom** — abre a tela de cupons já preenchida com código **ANIVERSARIO10** e o cliente vinculado.
+- **Enviar WhatsApp** — abre uma conversa com o cupom no texto.
+- **Enviar notificação** — envia uma notificação (uma vez por ano).
+
+### Uso registrado
+
+Cada uso do cupom fica registrado. Você acompanha no **detalhe do cupom** (usos realizados) e no **Relatório de Marketing** (cupons mais usados e taxa de uso).
+
+## Dicas importantes
+
+- **Divulgue com link, não só com código** — o link já leva o cliente direto ao cupom.
+- **Use o aniversário para reativar clientes** — uma cortesia no aniversário aumenta as chances de recompra.
+- **Confira o uso no relatório** — veja quais cupons performaram e invista nos que trazem resultado.
+
+## Perguntas frequentes
+
+**O link do cupom funciona sem o cliente estar cadastrado?**
+Sim, o link leva à vitrine com o cupom indicado. Para cupons de primeira compra, o sistema valida no momento do pedido.
+
+**Todo cupom ativo aparece na vitrine?**
+Cupons ativos e com escopo aplicável aparecem na seção de cupons da sua página. Alguns podem aparecer como disponíveis no checkout conforme os itens do pedido.
+
+**O cupom de aniversário tem desconto fixo?**
+O padrão é **ANIVERSARIO10** (10%). Você pode editar o cupom depois para ajustar valor, regras e validade.
+
+**Posso ver quantas vezes um cupom foi usado?**
+Sim. No detalhe do cupom há o contador de usos realizados, e no Relatório de Marketing o ranking de cupons mais usados.
+`
+            },
+            {
+                id: "visao-geral-campanhas-promocoes",
+                title: "Visão geral de Campanhas e Promoções",
+                description: "Entenda como funcionam campanhas e promoções: desconto automático, brinde e Leve X Pague Y.",
+                slug: "visao-geral-campanhas-promocoes",
+                category: "marketing",
+                content: `
+## Visão geral
+
+**Campanhas e Promoções** aplicam descontos e benefícios de forma **automática** nas suas vendas — sem depender de código digitado. Você cria uma **campanha** (o período e o público) e adiciona **promoções** (as regras de desconto, brinde ou Leve X Pague Y) a ela.
+
+![Tela principal de Campanhas e Promoções](https://img.dudit.com.br/static/screens/Campanhas_VisaoGeral.png)
+Legenda: Lista de campanhas com status, vigência e a primeira regra de cada uma.
+
+## Estrutura: campanha + promoção
+
+- **Campanha** — é o guarda-chuva: nome, período de vigência, público (todos os clientes ou segmentado) e loja.
+- **Promoção (regra)** — é o benefício em si: desconto, brinde ou Leve X Pague Y, com escopo, condições e limites. Uma campanha pode ter mais de uma promoção.
+
+## Tipos de promoção
+
+| Tipo | O que faz | Exemplo |
+|------|-----------|---------|
+| **Desconto percentual** | Aplica um % de desconto | 10% OFF em uma categoria |
+| **Desconto fixo (R$)** | Aplica um valor em reais | R$ 20 OFF acima de R$ 100 |
+| **Brinde** | Dá um produto ou serviço grátis | Ganhe um brinde na compra |
+| **Leve X Pague Y** | Reduz o preço de unidades | Leve 3, Pague 2 |
+
+## Onde a promoção aparece
+
+- **PDV** — o desconto aplica sozinho na pré-venda; o cliente vê o preço promocional.
+- **Vendas/Ordens** — vale na criação e edição de pedidos.
+- **Vitrine online** — mostra o preço "de/por", o nome da promoção e o bloco "Brinde Incluso".
+- **Checkout** — brindes aparecem como itens grátis ("Você ganhou este brinde").
+
+## Quando utilizar
+
+- Para campanhas sazonais (Black Friday, Dia das Mães, queima de estoque)
+- Para incentivar compras acima de um valor
+- Para presentear o cliente com um brinde
+- Para escoar estoque com Leve X Pague Y
+
+## Dicas importantes
+
+- **Aplicação automática** — o desconto entra sozinho, sem código. Isso reduz atrito na compra.
+- **Confira a vigência** — a promoção só vale dentro do período da campanha.
+- **Atenção ao escopo** — defina se vale para toda a sacola, produtos, categorias ou serviços.
+
+## Perguntas frequentes
+
+**Qual a diferença entre campanha e promoção?**
+A campanha organiza (período, público, nome). A promoção é a regra de desconto/brinde dentro dela.
+
+**Promoção precisa de cupom?**
+Não. Promoção é automática. Se quiser um benefício por código, use **Cupons** (módulo ao lado).
+
+**Uma campanha pode ter várias promoções?**
+Sim. Uma campanha pode conter várias regras, e cada uma pode ter escopo e condições próprias.
+
+**Em que plano estão disponíveis?**
+Campanhas e Promoções exigem o plano **Escalar** ou superior.
+`
+            },
+            {
+                id: "como-criar-campanha",
+                title: "Como criar uma campanha e suas promoções",
+                description: "Passo a passo para criar uma campanha e adicionar as promoções de desconto, brinde ou Leve X Pague Y.",
+                slug: "como-criar-campanha",
+                category: "marketing",
+                content: `
+## Visão geral
+
+Criar uma promoção acontece em duas etapas: você informa os dados da **campanha** (nome, período e público) e depois configura a **regra** (o desconto ou brinde). O formulário guia os dois passos.
+
+## Quando utilizar
+
+- Ao lançar uma nova campanha de vendas
+- Para aplicar um desconto automático em produtos ou categorias
+- Para oferecer brinde ou Leve X Pague Y
+
+## Como fazer
+
+### 1. Abrir o cadastro
+
+No menu **Marketing > Campanhas e Promoções**, clique em **Nova campanha** (ou **Adicionar**).
+
+### 2. Dados da campanha
+
+- **Nome** — ex: "Queima de estoque de inverno".
+- **Descrição** (opcional) — contexto interno.
+- **Vigência** — data de início e fim da campanha.
+- **Público** — **Todos os clientes** ou **Segmentado** (selecione clientes específicos).
+- **Loja** — em multi-loja, escolha a loja ou deixe para toda a rede.
+
+### 3. Configurar a promoção (regra)
+
+- **Tipo** — Desconto, Brinde ou Leve X Pague Y.
+- **Valores** — percentual ou valor em reais (e teto, se quiser).
+- **Condições** — valor mínimo de compra, prioridade de execução, limites de uso.
+- **Escopo** — Toda a sacola, Produtos específicos, Categorias específicas ou Serviços específicos.
+- **Combinação** — "Permitir uso combinado com cupons de desconto" (opcional).
+
+### 4. Ativar e salvar
+
+A campanha nasce com a opção **"Campanha ativa e disponível"**. Salve para publicar. Enquanto estiver dentro da vigência, a promoção aplica automaticamente.
+
+## Exemplo prático: campanha de 10% em uma categoria
+
+1. Nome: "Promoção de outono".
+2. Vigência: mês atual.
+3. Tipo: **Desconto percentual**, valor **10%**.
+4. Escopo: **Categorias específicas** → selecione a categoria "Blusas".
+5. Salve. Toda venda de blusas na vigência aplica 10% automaticamente.
+
+## Dicas importantes
+
+- **Use nomes claros** — facilita identificar a campanha na lista e nos relatórios.
+- **Defina a vigência** — sem datas, a campanha fica ativa indefinidamente.
+- **Duplique campanhas** — o formulário tem opção de duplicar, ótima para repetir promoções que deram certo.
+
+## Problemas comuns
+
+| Problema | Causa | Solução |
+|----------|-------|---------|
+| Promoção não aplica | Fora da vigência ou campanha inativa | Confira as datas e o status |
+| Desconto fixo não aparece | Faltou valor mínimo de compra | Informe o mínimo na regra |
+| Itens não elegíveis | Escopo não inclui os itens | Amplie o escopo |
+
+## Perguntas frequentes
+
+**Posso adicionar mais de uma promoção à mesma campanha?**
+Sim. Você pode criar várias regras na mesma campanha, cada uma com seu escopo e condições.
+
+**Como editar uma campanha existente?**
+Abra a campanha na lista e use **Editar**. Dados da campanha e das regras podem ser ajustados.
+
+**O que é duplicar campanha?**
+Cria uma cópia da campanha com as regras, para você ajustar datas e valores rapidamente.
+`
+            },
+            {
+                id: "tipos-de-promocao",
+                title: "Tipos de promoção",
+                description: "Conheça os quatro tipos: desconto percentual, desconto fixo, brinde e Leve X Pague Y, com exemplos.",
+                slug: "tipos-de-promocao",
+                category: "marketing",
+                content: `
+## Visão geral
+
+As promoções automáticas têm **quatro tipos**. Cada um atende um objetivo de venda diferente. Entender as regras de cada tipo ajuda a montar campanhas eficientes.
+
+## 1. Desconto percentual
+
+Aplica um percentual de desconto no escopo definido.
+
+- **Quando usar**: campanhas de % off em produtos ou categorias.
+- **Configuração**: tipo **Percentual**, valor (ex: 10) e teto opcional (desconto máximo em reais).
+- **Exemplo**: 10% OFF em toda a categoria "Acessórios". Comprou R$ 200 em acessórios → desconto de R$ 20 (ou o teto, se configurado).
+
+## 2. Desconto fixo (R$)
+
+Aplica um valor em reais de desconto.
+
+- **Quando usar**: campanhas de valor fixo com mínimo de compra.
+- **Configuração**: tipo **Fixo**, valor (ex: 20) e **valor mínimo de compra obrigatório** (ex: mínimo R$ 100).
+- **Exemplo**: R$ 20 OFF em compras acima de R$ 100.
+
+## 3. Brinde
+
+Oferece um produto ou serviço grátis na compra.
+
+- **Quando usar**: para presentear o cliente e incentivar a compra.
+- **Configuração**: selecione o **brinde** (produto OU serviço).
+- **Como funciona**: o brinde entra como item no pedido, marcado como "BRINDE", com valor zero. Se o brinde não tiver estoque, o sistema registra o "brinde pulado" e não o adiciona.
+- **Exemplo**: "Na compra de qualquer tênis, ganhe uma meia". O item "BRINDE - Meia" entra grátis no carrinho.
+
+## 4. Leve X Pague Y
+
+Reduz o preço das unidades quando o cliente leva uma quantidade.
+
+- **Quando usar**: para escoar estoque e incentivar compras em volume.
+- **Configuração**: **Leve** (quantidade de compra) e **Pague** (quantidade paga). A compra deve ser maior que a paga (ex: Leve 3, Pague 2).
+- **Como funciona**: as unidades mais baratas do item ficam grátis.
+- **Exemplo**: "Leve 3, Pague 2" em sucos. Comprou 3 → 1 sai grátis (a mais barata).
+
+## Resumo
+
+| Tipo | Benefício | Pré-requisito |
+|------|-----------|---------------|
+| Percentual | % OFF | — |
+| Fixo | R$ OFF | Valor mínimo de compra |
+| Brinde | Item grátis | Selecionar brinde (produto/serviço) |
+| Leve X Pague Y | Unidades grátis | Leve > Pague |
+
+## Dicas importantes
+
+- **Brinde depende de estoque** — se o brinde está sem estoque ou inativo, ele é pulado automaticamente.
+- **Leve X Pague Y exige compra maior que pagamento** — o formulário bloqueia configurações inválidas.
+- **Combine tipos numa mesma campanha** — por exemplo, desconto de 10% + brinde para um determinado público.
+
+## Perguntas frequentes
+
+**Posso ter desconto percentual e brinde na mesma compra?**
+Sim, se forem promoções diferentes da mesma campanha (ou de campanhas combináveis), os benefícios podem se somar conforme as regras.
+
+**Brinde entra como item pago?**
+Não. Entra como item grátis, marcado como "BRINDE", com valor zero no pedido.
+
+**No Leve X Pague Y, qual unidade fica grátis?**
+As mais baratas. O sistema deixa grátis as unidades de menor preço para o cliente aproveitar o melhor benefício.
+`
+            },
+            {
+                id: "condicoes-prioridade-e-limites-promocoes",
+                title: "Condições, prioridade e limites das promoções",
+                description: "Escopo, valor mínimo, prioridade de execução, limites de uso e sobreposição entre promoções.",
+                slug: "condicoes-prioridade-e-limites-promocoes",
+                category: "marketing",
+                content: `
+## Visão geral
+
+Além do tipo de benefício, cada promoção tem **condições** que controlam quando ela vale: escopo, valor mínimo, prioridade, limites e a regra contra sobreposição.
+
+## Escopo de aplicação
+
+| Escopo | O que significa |
+|--------|-----------------|
+| **Toda a sacola** | Aplica em qualquer item do pedido |
+| **Produtos específicos** | Só nos produtos selecionados |
+| **Categorias específicas** | Só em itens das categorias escolhidas |
+| **Serviços específicos** | Só nos serviços escolhidos |
+
+## Condições
+
+- **Valor mínimo de compra (R$)** — a promoção só vale se o total do pedido atingir o mínimo. Obrigatório para desconto fixo.
+- **Prioridade de execução** — quando várias promoções são elegíveis, o sistema aplica a de **maior prioridade**; em empate, a de maior desconto.
+
+## Limites de uso
+
+- **Limite global de usos** — quantas vezes a promoção pode ser usada no total.
+- **Limite de usos por cliente** — quantas vezes cada cliente pode aproveitar.
+
+Quando o limite global é atingido, a promoção deixa de ser oferecida.
+
+## Regra de sobreposição
+
+O sistema **impede** que duas promoções ativas cubram o mesmo item/escopo no mesmo período. Ao ativar ou editar uma promoção, ele verifica se já existe outra promoção ativa do mesmo tipo no mesmo intervalo:
+
+- **Toda a sacola** sempre conflita com qualquer escopo.
+- **Categoria × categoria** conflita quando os itens se sobrepõem.
+- **Produto × produto** conflita quando há produto em comum.
+- Um produto dentro de uma categoria com promoção também é considerado conflito.
+
+Se houver conflito, você recebe o aviso: *"O item/escopo selecionado já possui uma promoção de {desconto|brinde|Leve X Pague Y} ativa no mesmo período"*.
+
+## Quando utilizar
+
+- Para limitar a promoção a um público ou a itens específicos
+- Para definir qual desconto prevalece quando houver mais de uma regra
+- Para controlar o custo da campanha com limites de uso
+
+## Dicas importantes
+
+- **Use prioridade para organizar regras** — se duas regras podem valer, a de maior prioridade vence.
+- **Defina limites de uso** para evitar custo fora de controle.
+- **Respeite a sobreposição** — em vez de criar regras que se sobrepõem, amplie o escopo de uma única regra.
+
+## Perguntas frequentes
+
+**Posso ter duas promoções na mesma campanha cobrindo o mesmo produto?**
+Não. O sistema impede sobreposição no mesmo período. Use prioridade e escopos distintos.
+
+**O que acontece se eu aumentar a prioridade de uma promoção?**
+Ela passa a vencer quando há mais de uma regra elegível no mesmo item.
+
+**Promoção com limite de uso esgotado continua ativa?**
+A regra deixa de ser aplicada até você aumentar o limite ou reabrir a campanha.
+`
+            },
+            {
+                id: "combinacao-promocoes-e-cupons",
+                title: "Combinação de promoções e cupons",
+                description: "Como o sistema decide entre promoção e cupom: pilha de descontos, prioridade e a regra de combinação.",
+                slug: "combinacao-promocoes-e-cupons",
+                category: "marketing",
+                content: `
+## Visão geral
+
+Promoções (automáticas) e cupons (por código) podem coexistir. A forma como eles se combinam depende da configuração de **combinação** da promoção e do cupom. Entender essa lógica evita surpresas no total do pedido.
+
+## Quando utilizar
+
+- Para permitir que cupom e promoção sejam usados juntos (pilha de descontos)
+- Para impedir descontos acumulados que estouram sua margem
+- Para criar campanhas em que o melhor benefício é escolhido automaticamente
+
+## Como funciona
+
+### Combinação permitida
+
+Quando a promoção tem **"Permitir uso combinado com cupons de desconto"** ativado **e** o cupom também permite combinação, os dois benefícios se somam.
+
+**Exemplo**: promoção de 10% na categoria + cupom de 10% → o cliente acumula até 20% (limitado por tetos e condições).
+
+### Combinação não permitida
+
+Quando a combinação não é permitida, o sistema calcula **dois cenários**:
+
+- **Cenário A** — mantém a promoção e aplica o cupom.
+- **Cenário B** — descarta a promoção nos itens elegíveis e aplica o cupom sobre o preço original.
+
+O sistema escolhe o cenário que der o **menor total para o cliente** — na prática, o maior desconto.
+
+### Prioridade entre promoções
+
+Quando várias promoções são elegíveis para o mesmo item, vence a de **maior prioridade** (empate → maior desconto). A promoção vencida não é aplicada naquele item.
+
+## Dicas importantes
+
+- **Combinação = margem em risco** — use com critério e defina tetos de desconto.
+- **Para descontos altos em datas especiais** — desative a combinação para garantir que o cliente escolha entre cupom e promoção, não os dois.
+- **Confira no PDV** — o resumo mostra o desconto aplicado e de qual origem (promoção, cupom ou manual).
+
+## Problemas comuns
+
+| Problema | Causa | Solução |
+|----------|-------|---------|
+| Desconto acumulado menor que o esperado | Combinação desativada | Compare no detalhe o desconto aplicado |
+| Cupom "anula" a promoção | Cenário B venceu (maior desconto) | Comportamento correto: melhor benefício |
+| Dois descontos somados | Combinação ativa nos dois | Confira as configurações |
+
+## Perguntas frequentes
+
+**Como sei se promoção e cupom vão somar?**
+Se ambos permitem **combinação**, somam. Se a promoção não permite, o sistema usa o melhor benefício entre os dois.
+
+**O desconto manual do ERP também soma?**
+Sim. O desconto manual aplicado pelo vendedor é calculado em etapa própria e soma ao total de descontos.
+
+**Posso configurar um cupom para nunca combinar com promoção?**
+Sim. Deixe a promoção sem "Permitir uso combinado" e/ou o cupom sem "Permitir combinação".
+`
+            },
+            {
+                id: "promocoes-na-vitrine-e-pdv",
+                title: "Promoções na vitrine e no PDV",
+                description: "Como o cliente enxerga a promoção na loja online e como ela aparece no balcão.",
+                slug: "promocoes-na-vitrine-e-pdv",
+                category: "marketing",
+                content: `
+## Visão geral
+
+Quando uma promoção está ativa, ela aparece de formas diferentes para o cliente online e para você no balcão. Saber o que cada lado enxerga ajuda a comunicar a campanha com clareza.
+
+## Na vitrine online (loja online)
+
+- **Preço "de/por"** — o item mostra o preço original riscado e o preço promocional, com o percentual de desconto.
+- **Badge da promoção** — aparece o nome da promoção no item.
+- **Brinde Incluso** — se a promoção é de brinde, aparece o bloco "Brinde Incluso" na página do produto/serviço.
+- **No checkout** — os brindes entram como itens grátis com a marcação "Você ganhou este brinde".
+- **Página do produto** — mostra o desconto aplicado e de onde veio (promoção da campanha).
+
+## No PDV (balcão)
+
+- O desconto aplica **automaticamente** na pré-venda, conforme as regras.
+- O item exibe o **preço promocional** no carrinho.
+- Itens de brinde aparecem com a tag "BRINDE".
+- O resumo do pedido mostra um badge **"Pedido com brinde"** quando há brinde no carrinho.
+- Você pode conferir o cálculo total do pedido com as promoções aplicadas.
+
+## Nas Vendas (ordens)
+
+A mesma lógica vale na criação e edição de pedidos do módulo Vendas: promoções ativas entram no cálculo e brindes são adicionados automaticamente.
+
+## Quando utilizar
+
+- Para conferir se a campanha está aparecendo corretamente online
+- Para explicar ao cliente o preço "de/por" e o brinde no balcão
+- Para validar o total do pedido com as promoções aplicadas
+
+## Dicas importantes
+
+- **Comunique o preço "de/por"** — clientes respondem bem a descontos visíveis.
+- **Confira o brinde no checkout** — o item grátis deve aparecer no carrinho e na nota.
+- **Aviso de brinde sem estoque** — se o brinde esgotou, ele é pulado automaticamente e o pedido segue sem o brinde.
+
+## Perguntas frequentes
+
+**O cliente vê o nome da minha promoção online?**
+Sim, quando a promoção está ativa, o nome dela aparece como badge no item.
+
+**O brinde aparece na nota do pedido?**
+Sim. Entra como item "BRINDE" com valor zero.
+
+**Se o brinde esgotar, o cliente é bloqueado de comprar?**
+Não. O brinde é pulado (registrado como "brinde pulado") e o pedido continua normal, sem o item grátis.
+`
+            },
+            {
+                id: "edicao-em-massa-de-promocoes",
+                title: "Edição em massa de promoções",
+                description: "Ative, desative, ajuste vigência, público, limites e prioridade de várias campanhas de uma vez.",
+                slug: "edicao-em-massa-de-promocoes",
+                category: "marketing",
+                content: `
+## Visão geral
+
+A **edição em massa** permite atualizar várias campanhas ao mesmo tempo — mudar o período de validade, o público, os limites de uso ou a prioridade sem abrir uma por uma.
+
+## Quando utilizar
+
+- Para estender ou encurtar a vigência de várias campanhas
+- Para mudar o público de várias campanhas de uma vez
+- Para padronizar limites de uso e prioridade
+
+## Como fazer
+
+1. Na lista de **Campanhas e Promoções**, selecione as campanhas desejadas (checkboxes).
+2. Use a ação de **editar em massa**.
+3. Escolha o que alterar:
+
+| Opção | O que ajusta |
+|-------|--------------|
+| **Validade** | Data de início e/ou fim |
+| **Público** | Todos os clientes ou segmentado (selecionar clientes) |
+| **Limites** | Prioridade, valor mínimo, limite global e limite por cliente |
+4. Salve. As alterações se aplicam a todas as campanhas selecionadas.
+
+## Ativar/desativar em massa
+
+Você também pode **ativar** ou **desativar** várias campanhas de uma vez. Ao ativar, o sistema revalida se não há sobreposição com outras campanhas ativas.
+
+## Excluir em massa
+
+Selecione as campanhas e exclua todas juntas. A exclusão é permanente.
+
+## Dicas importantes
+
+- **Confira a seleção** antes de aplicar — a edição em massa afeta todas as campanhas marcadas.
+- **Ao ativar em massa** — atenção ao aviso de sobreposição; campanhas conflitantes não são ativadas.
+- **Limites em massa** — útil para padronizar o custo de várias campanhas no mesmo valor.
+
+## Perguntas frequentes
+
+**A edição em massa altera as regras de desconto?**
+Depende. Ela altera vigência, público, prioridade e limites. Para mudar o tipo de desconto ou escopo, edite a promoção individualmente.
+
+**Posso desfazer uma edição em massa?**
+Não há desfazer automático. Revise antes de salvar.
+
+**O que acontece se uma campanha selecionada conflitar com outra ao ativar?**
+Ela não é ativada e o sistema mostra o motivo.
+`
+            },
+            {
+                id: "visao-geral-videos-comunidade",
+                title: "Visão geral de Vídeos da Comunidade",
+                description: "Vídeos curtos vinculados a produtos, serviços ou coleções, exibidos na página Explorar da vitrine.",
+                slug: "visao-geral-videos-comunidade",
+                category: "marketing",
+                content: `
+## Visão geral
+
+**Vídeos da Comunidade** são vídeos curtos (de 10 a 60 segundos) que você publica vinculados a um **produto, serviço ou coleção**. Eles aparecem em um carrossel na página **Explorar** da vitrine, e quem assiste pode tocar no item para ver a página dele.
+
+![Tela de Vídeos da Comunidade](https://img.dudit.com.br/static/screens/Videos_VisaoGeral.png)
+Legenda: Lista de vídeos com status, visualizações, cliques e data de publicação.
+
+## O que você encontra no módulo
+
+**Lista de vídeos** — cada linha mostra o vídeo, o status, as visualizações, os cliques e a data.
+
+**Abas de status** — quatro abas:
+
+| Aba | O que mostra |
+|-----|--------------|
+| **Todos** | Todos os vídeos |
+| **Pendentes** | Aguardando aprovação |
+| **Aprovados** | Publicados na vitrine |
+| **Rejeitados** | Recusados na moderação (inclui sinalizados) |
+
+**Busca** — por título ou descrição.
+
+**Visualização** — lista (tabela) ou grade de cards, com miniatura e duração.
+
+## Quando utilizar
+
+- Para mostrar o produto em uso (vídeo demonstrando o item)
+- Para apresentar o serviço (antes e depois, ambiente)
+- Para destacar uma coleção inteira
+- Para gerar engajamento na vitrine e aumentar cliques para produtos
+
+## Limites por plano
+
+| Plano | Limite |
+|-------|--------|
+| Crescer | **1 vídeo por mês** |
+| Escalar | **1 vídeo por semana** |
+
+O plano Free não tem acesso ao módulo.
+
+## Como funciona
+
+1. Você cadastra o vídeo com título, descrição e o arquivo (ou link do YouTube/Vimeo).
+2. Opcionalmente vincula um produto, serviço ou coleção.
+3. O vídeo entra em **Pendente** (moderação automática).
+4. Após aprovação, fica **Aprovado** e aparece no carrossel da vitrine.
+5. A cada reprodução e clique, o sistema registra as métricas.
+
+## Dicas importantes
+
+- **Vídeos entre 10 e 60 segundos** — mais curtos engajam melhor e respeitam o limite.
+- **Sempre vincule um item** — o vídeo sem vínculo não direciona o cliente para a compra.
+- **Capriche na capa** — a miniatura é gerada automaticamente a partir do vídeo.
+
+## Perguntas frequentes
+
+**Onde o cliente vê meus vídeos?**
+Na página **Explorar** da vitrine, no carrossel "Vídeos da comunidade".
+
+**Posso postar mais de um vídeo por mês?**
+No plano Crescer, o limite é 1 por mês. No Escalar, 1 por semana.
+
+**Meu vídeo aparece imediatamente?**
+Não. Ele passa pela moderação e aparece na vitrine apenas quando **aprovado**.
+`
+            },
+            {
+                id: "como-cadastrar-video",
+                title: "Como cadastrar um vídeo",
+                description: "Upload de vídeo (MP4, WebM, MOV), link do YouTube/Vimeo e vínculo com produto, serviço ou coleção.",
+                slug: "como-cadastrar-video",
+                category: "marketing",
+                content: `
+## Visão geral
+
+Cadastrar um vídeo da comunidade é rápido: você informa o título, adiciona o vídeo (upload ou link) e, se quiser, vincula a um produto, serviço ou coleção.
+
+## Quando utilizar
+
+- Para publicar o primeiro vídeo da sua loja
+- Para trocar o vídeo vinculado a um item
+- Para editar título ou descrição de um vídeo existente
+
+## Como fazer
+
+### 1. Abrir o cadastro
+
+No menu **Marketing > Vídeos da Comunidade**, clique em **Novo vídeo**.
+
+### 2. Preencher os dados
+
+- **Título** (obrigatório) — até 200 caracteres.
+- **Descrição** (opcional) — até 1.000 caracteres.
+- **Vídeo** — escolha a fonte:
+
+### 3. Escolher a fonte do vídeo
+
+| Fonte | Como funciona |
+|-------|---------------|
+| **Upload** | Envie um arquivo MP4, WebM ou MOV, de **10 a 60 segundos**. A miniatura é gerada automaticamente. |
+| **YouTube** | Cole o link do vídeo. O sistema busca duração e miniatura. |
+| **Vimeo** | Cole o link do vídeo. O sistema busca duração e miniatura. |
+
+### 4. Vincular um item (opcional, recomendado)
+
+- **Produto vinculado** — selecione um produto da sua loja.
+- **Serviço vinculado** — selecione um serviço.
+- **Link da coleção** — informe o endereço da coleção.
+
+O item vinculado aparece no player para o cliente ir direto à página da compra.
+
+### 5. Salvar
+
+Clique em **Criar vídeo**. Ele entra em **Pendente** para moderação.
+
+## Editar um vídeo
+
+Para vídeos existentes, você pode alterar **apenas o título e a descrição**. O arquivo e o vínculo não são editáveis.
+
+## Dicas importantes
+
+- **Formatos aceitos**: MP4, WebM e MOV.
+- **Duração ideal**: entre 10 e 60 segundos — acima disso o cadastro é bloqueado.
+- **Vincule sempre um produto/serviço** — aumenta as chances de clique e venda.
+- **Arquivos grandes são comprimidos** automaticamente para caber nos limites.
+
+## Problemas comuns
+
+| Problema | Causa | Solução |
+|----------|-------|---------|
+| Upload recusado | Formato ou duração fora do limite | Use MP4/WebM/MOV de 10 a 60s |
+| Miniatura não gerada | Falha na captura do frame | Tente novamente ou use um trecho com imagem estável |
+| Link do YouTube não carrega | URL inválida | Confira se é um link de vídeo válido |
+
+## Perguntas frequentes
+
+**O título pode ser alterado depois?**
+Sim. Título e descrição são editáveis. O vídeo em si não.
+
+**Preciso vincular um produto?**
+Não é obrigatório, mas é recomendado. Sem vínculo, o cliente só assiste ao vídeo.
+
+**Posso usar um vídeo do YouTube já publicado?**
+Sim, basta colar o link. O sistema valida duração e miniatura.
+`
+            },
+            {
+                id: "status-e-moderecao-de-videos",
+                title: "Status e moderação dos vídeos",
+                description: "Entenda os status (pendente, aprovado, rejeitado, sinalizado) e o fluxo de moderação dos vídeos.",
+                slug: "status-e-moderecao-de-videos",
+                category: "marketing",
+                content: `
+## Visão geral
+
+Todo vídeo da comunidade passa por **moderação** antes de aparecer na vitrine. Isso garante que o conteúdo publicado siga as regras da plataforma. Entender os status evita dúvidas sobre por que um vídeo ainda não apareceu.
+
+## Status dos vídeos
+
+| Status | O que significa |
+|--------|-----------------|
+| **Pendente** | Vídeo enviado, aguardando análise |
+| **Aprovado** | Publicado e visível na vitrine |
+| **Rejeitado** | Não aprovado, com motivo informado |
+| **Sinalizado** | Marcado por violar as regras; tratado como rejeitado na lista |
+
+## Fluxo de moderação
+
+1. **Você cadastra** o vídeo com título e descrição.
+2. O sistema faz uma **moderação automática** do texto e envia o vídeo para **Pendente**.
+3. A equipe de moderação da plataforma **aprova** ou **rejeita** o vídeo.
+4. **Aprovado** → o vídeo ganha data de publicação e aparece na página Explorar.
+5. **Rejeitado** → o vídeo não aparece e o motivo fica registrado.
+
+## Quando utilizar
+
+- Para acompanhar por que um vídeo não apareceu na vitrine
+- Para entender os motivos de rejeição e corrigir no próximo vídeo
+- Para saber quantos vídeos ativos você tem publicados
+
+## Como funciona na prática
+
+- A aba **Pendentes** mostra o que ainda aguarda análise.
+- A aba **Rejeitados** mostra os vídeos recusados (incluindo os sinalizados).
+- Você pode **excluir** um vídeo a qualquer momento, mesmo pendente.
+
+## Dicas importantes
+
+- **Revise o conteúdo antes de enviar** — título, descrição e material dentro das regras passam mais rápido.
+- **Rejeitado não é o fim** — corrija o que foi apontado e cadastre um novo vídeo dentro do seu limite mensal.
+- **Vídeos sinalizados** contam como rejeitados e não aparecem na vitrine.
+
+## Perguntas frequentes
+
+**Quanto tempo leva a moderação?**
+Varia conforme a fila de análise. Enquanto isso, o vídeo fica em **Pendente**.
+
+**Posso excluir um vídeo pendente?**
+Sim. Excluir é permitido em qualquer status.
+
+**Um vídeo rejeitado pode ser reenviado?**
+O vídeo em si não é editável. Você cadastra um novo vídeo, já ajustado, respeitando o limite do plano.
+
+**Por que meu vídeo ficou sinalizado?**
+A sinalização indica que o conteúdo chamou atenção por potencial violação das regras. A lista o trata junto com os rejeitados.
+`
+            },
+            {
+                id: "metricas-e-visibilidade-videos",
+                title: "Métricas e visibilidade dos vídeos",
+                description: "Visualizações, cliques e onde os vídeos aparecem na vitrine para o cliente final.",
+                slug: "metricas-e-visibilidade-videos",
+                category: "marketing",
+                content: `
+## Visão geral
+
+Os vídeos da comunidade geram duas métricas principais: **visualizações** (quando alguém reproduz o vídeo) e **cliques** (quando alguém toca no produto/serviço vinculado). Elas aparecem na lista de vídeos e ajudam a medir o interesse.
+
+## Quando utilizar
+
+- Para saber quais vídeos geram mais engajamento
+- Para comparar o desempenho entre vídeos
+- Para decidir em qual produto investir em vídeo
+
+## Como funciona
+
+### Visualizações
+
+Cada vez que um cliente abre e reproduz o vídeo na vitrine, o contador de **visualizações** aumenta. A coluna na lista mostra esse número.
+
+### Cliques
+
+Quando o cliente toca no **item vinculado** (produto, serviço ou coleção) dentro do player, o contador de **cliques** aumenta. Isso indica o quanto o vídeo está levando as pessoas para a página do item.
+
+### Visibilidade na vitrine
+
+- Os vídeos **aprovados** aparecem no carrossel **"Vídeos da comunidade"** da página Explorar.
+- O card mostra a miniatura, a duração, o título e o nome da loja.
+- Ao tocar, abre o **player** com o vídeo, a descrição e o **card do item vinculado** (imagem, nome, preço e botão para ver o produto/serviço).
+
+## Dicas importantes
+
+- **Vídeo com vínculo rende cliques** — sem item vinculado, o cliente só assiste e não tem para onde ir.
+- **Monitore os cliques** — alto clique indica que o vídeo vende; alto clique baixo, que o item não está atrativo.
+- **Compare vídeos** — repita o formato dos vídeos com melhor desempenho.
+
+## Perguntas frequentes
+
+**O que conta como visualização?**
+A reprodução do vídeo pelo cliente na vitrine.
+
+**O que conta como clique?**
+O toque no item vinculado (produto/serviço/coleção) dentro do player do vídeo.
+
+**Os vídeos aparecem em todas as páginas da vitrine?**
+Eles aparecem no carrossel da página **Explorar**. É lá que o cliente navega pelos vídeos da comunidade.
+
+**O vídeo precisa estar aprovado para aparecer?**
+Sim. Somente vídeos **aprovados** são exibidos na vitrine.
+`
+            },
+            {
+                id: "relatorio-marketing",
+                title: "Relatório de Marketing",
+                description: "Faturamento por canal, cupons mais usados, taxa de uso e campanhas ativas em um só painel.",
+                slug: "relatorio-marketing",
+                category: "marketing",
+                content: `
+## Visão geral
+
+O **Relatório de Marketing** resume o desempenho das suas ações de divulgação: quanto você faturou, de qual canal vieram as vendas, quais cupons foram mais usados e quantas campanhas estão ativas.
+
+![Relatório de Marketing](https://img.dudit.com.br/static/screens/Relatorio_Marketing.png)
+Legenda: Painel com indicadores de faturamento, canal de origem, cupons e campanhas.
+
+## Indicadores
+
+| Indicador | O que mostra |
+|-----------|--------------|
+| **Faturamento** | Total vendido no período |
+| **Top Canal** | Canal que mais vendeu e o % do total |
+| **Cupons** | Quantidade de cupons ativos |
+| **Uso de Cupons** | Taxa de uso dos cupons (%) |
+| **Campanhas** | Quantas campanhas estão ativas (de um total) |
+
+## O que você encontra
+
+- **Gráfico "Faturamento por Canal"** — pizza com a participação de cada canal de origem (ex: PDV/Presencial, Vitrine Online, Outros).
+- **Evolução** — linha do faturamento dividido em **online**, **presencial** e **outros** ao longo do período.
+- **Cupons mais usados** — ranking com a quantidade de usos e o tipo de desconto.
+- **Campanhas** — cards com o nome e o status (ativa/inativa).
+- **Exportação** — botão para baixar o relatório em planilha (CSV ou Excel).
+
+## Como acessar
+
+1. No menu lateral, acesse **Relatórios**.
+2. Selecione a aba **Marketing**.
+3. Ajuste o período desejado.
+4. Use a exportação para compartilhar com sua equipe ou contador.
+
+## Quando utilizar
+
+- No fim do mês, para avaliar o resultado das campanhas
+- Para saber qual canal traz mais resultado e investir nele
+- Para medir se os cupons estão sendo usados (e se a margem aguenta)
+
+## Dicas importantes
+
+- **Compare períodos** — veja o efeito de uma campanha comparando antes/durante/depois.
+- **Alta taxa de uso de cupons pode apertar a margem** — o sistema sugere atenção quando mais de 30% dos pedidos usam cupom.
+- **Canal dominante** — se um canal representa muito do faturamento, diversifique para reduzir o risco.
+
+## Perguntas frequentes
+
+**Preciso do módulo de vendas ativo para ver o relatório?**
+Sim. A aba Marketing exige o módulo de vendas/produtos ativo.
+
+**O relatório considera transferências e ajustes financeiros?**
+Não. Ele usa as vendas registradas, classificadas pelo canal de origem.
+
+**Posso exportar o relatório?**
+Sim. Use a exportação para baixar os indicadores em planilha.
+
+**Em que plano o relatório está disponível?**
+Relatórios exigem o plano **Crescer** ou superior.
+`
+            }
+        ]
     }
 ]
 

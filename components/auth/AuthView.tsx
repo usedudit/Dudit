@@ -428,7 +428,7 @@ export default function AuthView({
                                         {mode === "signup" && (
                                             <div className="flex items-center gap-2 pt-1">
                                                 <Checkbox id="terms" checked={acceptedTerms} onChange={(checked) => setAcceptedTerms(checked as boolean)} />
-                                                <label htmlFor="terms" className="text-sm text-gray-600 cursor-pointer">Aceito os <Link href="institucional/termos" prefetch={false} className="underline text-slate-800">Termos</Link></label>
+                                                <label htmlFor="terms" className="text-sm text-brand-inactive-text cursor-pointer">Aceito os <Link href="institucional/termos" prefetch={false} className="underline text-brand-dark">Termos de uso</Link></label>
                                             </div>
                                         )}
 

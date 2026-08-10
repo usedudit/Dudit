@@ -28,15 +28,23 @@ async function _getMarketplaceService(serviceId: string, storeId?: string | null
   let query = supabase
     .from("services")
     .select(`
-      *,
+      id, partner_id, store_id, name, description, price, duration_minutes,
+      images, is_active, status, rating, category_id, subcategory_id, sku, unit,
+      show_in_marketplace, tags, price_type, billing_unit, video_url, video_type,
+      video_thumbnail, video_duration, video_provider_id, service_type,
+      warranty, buffer_minutes, marketplace_category_id, fulfillment_modes,
+      payment_requirement, show_price_in_store, promotional_price,
+      created_at,
       partners!partner_id (
         id,
         user_id,
+        is_active,
+        erp_disabled,
         mp_user_id,
         mp_public_key,
         created_at,
         addresses (id, street, number, neighborhood, city, state, zip_code),
-        payment_methods (*)
+        payment_methods (id, type, payment_type, name, is_active, is_default)
       ),
       service_categories:service_categories!category_id (name),
       marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
@@ -63,7 +71,7 @@ async function _getMarketplaceService(serviceId: string, storeId?: string | null
 
   // Validate store visibility if store context is available
   if (storeId && data) {
-    const resolvedService = await resolveService(serviceId, storeId)
+    const resolvedService = await resolveService(serviceId, storeId, true)
     if (!resolvedService) {
       console.warn(`[Service] ${serviceId} rejeitado pelo resolver (store:${storeId})`)
       return null
@@ -107,13 +115,26 @@ async function _getMarketplaceService(serviceId: string, storeId?: string | null
       .select("id")
       .eq("partner_id", partnerId)
       .eq("user_id", user.id)
+      .eq("is_active", true)
       .maybeSingle()
     isTeamMember = !!membership
   }
 
-  const isPubliclyVisible = data.is_active && data.show_in_marketplace !== false
+  const isPubliclyVisible =
+    data.is_active &&
+    data.show_in_marketplace !== false &&
+    rawPartner?.is_active !== false &&
+    rawPartner?.erp_disabled !== true
   if (!isPubliclyVisible && !isOwner && !isTeamMember) {
     return null
+  }
+
+  // user_id is used only for the ownership decision above and must never be
+  // serialized to a marketplace client.
+  if (rawPartner && "user_id" in rawPartner) {
+    delete rawPartner.user_id
+    delete rawPartner.is_active
+    delete rawPartner.erp_disabled
   }
 
   return data
@@ -128,7 +149,11 @@ export async function getServiceReviews(serviceId: string, storeId?: string | nu
   const supabase = getAdminClient()
   let query = supabase
     .from("reviews")
-    .select("*")
+    .select(`
+      id, rating, comment, created_at, product_id, service_id, store_id,
+      products:product_id(name, images, slug, unit),
+      services:service_id(name, images, slug, unit)
+    `)
     .eq("service_id", serviceId)
 
   if (storeId) {

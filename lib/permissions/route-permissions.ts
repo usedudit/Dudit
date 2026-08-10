@@ -68,6 +68,10 @@ export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
         key: "import_notes", path: "/erp/import-notes", label: "Notas de entrada", category: "Produtos", legacyCategory: "products",
         specificPermissions: ["can_import_products"],
     },
+    xml_import: {
+        key: "xml_import", path: "/erp/xml-import", label: "Importar XML (NF-e)", category: "Produtos", legacyCategory: "products",
+        specificPermissions: ["can_import_products"],
+    },
     suppliers: { key: "suppliers", path: "/erp/suppliers", label: "Fornecedores", category: "Produtos", legacyCategory: "suppliers" },
     cadastros_produtos: { key: "cadastros_produtos", path: "/erp/products/cadastros", label: "Cadastros", category: "Produtos", legacyCategory: "products" },
 
@@ -92,7 +96,7 @@ export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
             "can_generate_invoice",
         ],
     },
-    cadastros_services: { key: "cadastros_services", path: "/erp/cadastros-services", label: "Cadastros", category: "Serviços", legacyCategory: "services" },
+    cadastros_services: { key: "cadastros_services", path: "/erp/servicos/cadastros", label: "Cadastros", category: "Serviços", legacyCategory: "services" },
 
     // ── Clientes
     customers: { key: "customers", path: "/erp/customers", label: "Clientes", category: "Clientes", legacyCategory: "customers" },
@@ -101,6 +105,14 @@ export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
     financial_transactions: {
         key: "financial_transactions", path: "/erp/transactions", label: "Transações (Pagar/Receber)", category: "Financeiro", legacyCategory: "financial",
         specificPermissions: ["can_approve_payment", "can_view_reports"],
+    },
+    contas_a_pagar: {
+        key: "contas_a_pagar", path: "/erp/contas-a-pagar", label: "Contas a Pagar", category: "Financeiro", legacyCategory: "financial",
+        specificPermissions: ["can_approve_payment"],
+    },
+    contas_a_receber: {
+        key: "contas_a_receber", path: "/erp/contas-a-receber", label: "Contas a Receber", category: "Financeiro", legacyCategory: "financial",
+        specificPermissions: ["can_approve_payment"],
     },
     cash_register: {
         key: "cash_register", path: "/erp/cash-register", label: "Caixa (PDV)", category: "Financeiro", legacyCategory: "financial",
@@ -239,6 +251,7 @@ const OWNER_PERMISSIONS: PartnerRoutePermissions = {
     products: withSpecific(full, { can_adjust_stock: true, can_import_products: true }),
     stock_movements: full,
     import_notes: withSpecific(full, { can_import_products: true }),
+    xml_import: withSpecific(full, { can_import_products: true }),
     suppliers: full,
     cadastros_produtos: full,
     // Serviços
@@ -256,6 +269,8 @@ const OWNER_PERMISSIONS: PartnerRoutePermissions = {
     customers: full,
     // Financeiro
     financial_transactions: withSpecific(full, { can_approve_payment: true, can_view_reports: true }),
+    contas_a_pagar: withSpecific(full, { can_approve_payment: true }),
+    contas_a_receber: withSpecific(full, { can_approve_payment: true }),
     cash_register: withSpecific(full, { can_open_cash: true, can_close_cash: true, can_manage_cash: true }),
     financial_dre: withSpecific(full, { can_view_dre: true }),
     cadastros_financeiro: full,
@@ -321,6 +336,7 @@ const MANAGER_PERMISSIONS: PartnerRoutePermissions = {
     products: withSpecific(full, { can_adjust_stock: true, can_import_products: true }),
     stock_movements: full,
     import_notes: withSpecific(full, { can_import_products: true }),
+    xml_import: withSpecific(full, { can_import_products: true }),
     suppliers: full,
     cadastros_produtos: full,
     // Serviços - full
@@ -338,6 +354,8 @@ const MANAGER_PERMISSIONS: PartnerRoutePermissions = {
     customers: full,
     // Financeiro - pode visualizar e gerenciar pagamentos
     financial_transactions: withSpecific(full, { can_approve_payment: true, can_view_reports: true }),
+    contas_a_pagar: withSpecific(full, { can_approve_payment: true }),
+    contas_a_receber: withSpecific(full, { can_approve_payment: true }),
     cash_register: withSpecific(full, { can_open_cash: true, can_close_cash: true, can_manage_cash: true }),
     financial_dre: withSpecific(viewOnly, { can_view_dre: true }),
     cadastros_financeiro: full,
@@ -388,6 +406,7 @@ const OPERATOR_PERMISSIONS: PartnerRoutePermissions = {
     products: withSpecific(viewOnly, { can_adjust_stock: false, can_import_products: false }),
     stock_movements: viewOnly,
     import_notes: noAccess,
+    xml_import: withSpecific(viewOnly, { can_import_products: false }),
     suppliers: crud,
     cadastros_produtos: viewOnly,
     // Serviços - view only (cannot create/edit services)
@@ -404,12 +423,14 @@ const OPERATOR_PERMISSIONS: PartnerRoutePermissions = {
     cadastros_services: viewOnly,
     // Clientes - CRUD sem exclusão
     customers: crud,
-    // Financeiro - full access
-    financial_transactions: withSpecific(full, { can_approve_payment: true, can_view_reports: true }),
+    // Financeiro - no financial access for operator
+    financial_transactions: noAccess,
+    contas_a_pagar: noAccess,
+    contas_a_receber: noAccess,
     cash_register: withSpecific(full, { can_open_cash: true, can_close_cash: true, can_manage_cash: true }),
-    financial_dre: viewOnly,
-    cadastros_financeiro: full,
-    reports: full,
+    financial_dre: noAccess,
+    cadastros_financeiro: noAccess,
+    reports: noAccess,
     // Vitrine - no access
     store_customize: noAccess,
     store_reviews: noAccess,
@@ -459,6 +480,7 @@ const DELIVERY_PERMISSIONS: PartnerRoutePermissions = {
     products: noAccess,
     stock_movements: noAccess,
     import_notes: noAccess,
+    xml_import: noAccess,
     suppliers: noAccess,
     cadastros_produtos: noAccess,
     // Serviços - no access
@@ -470,6 +492,8 @@ const DELIVERY_PERMISSIONS: PartnerRoutePermissions = {
     customers: noAccess,
     // Financeiro - no access
     financial_transactions: noAccess,
+    contas_a_pagar: noAccess,
+    contas_a_receber: noAccess,
     cash_register: noAccess,
     financial_dre: noAccess,
     cadastros_financeiro: noAccess,
@@ -732,7 +756,7 @@ export function legacyToRoutePermissions(legacy: PartnerPermissions, role: Partn
 
     if (legacy.products) {
         const mapped = mapLegacy(legacy.products)
-            ;["products", "stock_movements", "import_notes", "cadastros_produtos", "suppliers"].forEach((routeKey) =>
+            ;["products", "stock_movements", "import_notes", "xml_import", "cadastros_produtos", "suppliers"].forEach((routeKey) =>
                 apply(routeKey as RouteKey, mapped)
             )
     }
@@ -848,7 +872,7 @@ export function legacyToRoutePermissions(legacy: PartnerPermissions, role: Partn
             delete: false,
             specific: { can_cancel: legacy.financial.cancel ?? false },
         }
-            ;["financial_transactions", "cadastros_financeiro"].forEach((routeKey) => apply(routeKey as RouteKey, mapped))
+            ;["financial_transactions", "contas_a_pagar", "contas_a_receber", "cadastros_financeiro"].forEach((routeKey) => apply(routeKey as RouteKey, mapped))
     }
 
     if (legacy.cash_register) {

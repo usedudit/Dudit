@@ -226,10 +226,13 @@ export function normalizeActiveResources(value: unknown): SystemResourceId[] {
   return Array.from(new Set(normalized))
 }
 
-export function defaultActiveResourcesForBusinessInfo(businessInfo: { sells?: string[] }): SystemResourceId[] {
-  const sells = businessInfo.sells || []
-  const defaults: SystemResourceId[] = [
+export function getDefaultResourcesForCategory(categorySlugOrName?: string): SystemResourceId[] {
+  const slug = (categorySlugOrName || "").toLowerCase().trim()
+
+  const allDefaults: SystemResourceId[] = [
     "orders",
+    "products",
+    "services",
     "quotes",
     "goals",
     "returns",
@@ -251,17 +254,51 @@ export function defaultActiveResourcesForBusinessInfo(businessInfo: { sells?: st
     "productivity",
     "communityVideos",
   ]
-  if (sells.includes("products")) {
-    defaults.push("products")
+
+  // Alimentação & Varejo: esconde serviços e agendamentos por padrão
+  if (
+    slug.includes("alimentacao") ||
+    slug.includes("alimentação") ||
+    slug.includes("varejo") ||
+    slug.includes("mercado")
+  ) {
+    return allDefaults.filter(
+      r => r !== "services" && r !== "appointments" && r !== "serviceOrders" && r !== "serviceCadastros"
+    )
   }
-  if (sells.includes("services")) {
-    defaults.push("services")
+
+  // Serviços, Profissional / Consultoria & Educação: esconde entregas por padrão
+  if (
+    slug.includes("servicos") ||
+    slug.includes("serviços") ||
+    slug.includes("profissional") ||
+    slug.includes("consultoria") ||
+    slug.includes("educacao") ||
+    slug.includes("educação")
+  ) {
+    return allDefaults.filter(r => r !== "deliveries")
   }
-  return defaults
+
+  // Beleza e Estética & Saúde: esconde entregas por padrão
+  if (
+    slug.includes("beleza") ||
+    slug.includes("estetica") ||
+    slug.includes("estética") ||
+    slug.includes("saude") ||
+    slug.includes("saúde")
+  ) {
+    return allDefaults.filter(r => r !== "deliveries")
+  }
+
+  return allDefaults
 }
 
-export function resolveActiveResources(businessInfo: { sells?: string[]; activeResources?: unknown; resourcesVersion?: number }): SystemResourceId[] {
-  if (Array.isArray(businessInfo.activeResources)) {
+export function defaultActiveResourcesForBusinessInfo(businessInfo?: { activeResources?: unknown }): SystemResourceId[] {
+  return getDefaultResourcesForCategory()
+}
+
+export function resolveActiveResources(businessInfo: { activeResources?: unknown; resourcesVersion?: number }): SystemResourceId[] {
+  if (Array.isArray(businessInfo?.activeResources)) {
     const current = normalizeActiveResources(businessInfo.activeResources)
 
     const version = (businessInfo as any).resourcesVersion || 0
@@ -319,7 +356,7 @@ export function resolveActiveResources(businessInfo: { sells?: string[]; activeR
 }
 
 export function isSystemResourceActive(
-  businessInfo: { sells?: string[]; activeResources?: unknown },
+  businessInfo: { activeResources?: unknown },
   resourceId: SystemResourceId,
 ): boolean {
   return resolveActiveResources(businessInfo).includes(resourceId)

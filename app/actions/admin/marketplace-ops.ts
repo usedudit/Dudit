@@ -120,8 +120,7 @@ export async function getAdminReturnRequests(
             stores!left(id, name, person_type),
             orders!order_id(id, order_number, situation, delivery_status, total_amount, amount_paid, payment_method, payment_provider, store_id),
             return_items!return_items_return_request_id_fkey(id, product_name_snapshot, quantity, net_item_value_snapshot, reason, condition),
-            return_evidence(id, file_url, file_type, file_name, created_at),
-            return_events(id, event_type, from_status, to_status, message, metadata, created_at)
+            return_evidence(id, file_url, file_type, file_name, created_at)
         `)
         .is("deleted_at", null)
 

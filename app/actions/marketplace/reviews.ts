@@ -1,6 +1,7 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
+import { createAdminClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 
 import { requireUser } from "@/lib/auth/authorization"
@@ -79,7 +80,7 @@ async function checkFraudulentReview(
 
   // 3. Verificar se já avaliou este produto antes
   if (productId) {
-    const { data: existingReview } = await supabase
+    const { data: existingReview } = await adminSupabase
       .from("reviews")
       .select("id")
       .eq("user_id", userId)
@@ -90,7 +91,7 @@ async function checkFraudulentReview(
       return { isSuspicious: true, reason: "Você já avaliou este produto" }
     }
   } else if (serviceId) {
-    const { data: existingReview } = await supabase
+    const { data: existingReview } = await adminSupabase
       .from("reviews")
       .select("id")
       .eq("user_id", userId)
@@ -103,7 +104,7 @@ async function checkFraudulentReview(
   }
 
   // 4. Verificar padrão suspeito: muitas avaliações positivas do mesmo usuário para o mesmo parceiro
-  const { data: userReviews } = await supabase
+  const { data: userReviews } = await adminSupabase
     .from("reviews")
     .select("rating")
     .eq("user_id", userId)
@@ -452,6 +453,7 @@ export async function deleteReviewAction(reviewId: string, csrf_token?: string) 
 // SECURITY FIX (MED-04): userId derived from session, not client parameter
 export async function canUserReviewProduct(productId: string): Promise<boolean> {
   const supabase = await getSupabaseServerClient()
+  const adminSupabase = createAdminClient()
   const user = await requireUser()
   if (!user) return false
   const userId = user.id
@@ -472,7 +474,7 @@ export async function canUserReviewProduct(productId: string): Promise<boolean> 
   }
 
   // Check if user already reviewed this product
-  const { data: existingReview } = await supabase
+  const { data: existingReview } = await adminSupabase
     .from("reviews")
     .select("id")
     .eq("user_id", userId)
@@ -484,8 +486,9 @@ export async function canUserReviewProduct(productId: string): Promise<boolean> 
 
 export async function getProductReviews(productId: string) {
   const supabase = await getSupabaseServerClient()
+  const adminSupabase = createAdminClient()
 
-  const { data: reviewsData, error } = await supabase
+  const { data: reviewsData, error } = await adminSupabase
     .from("reviews")
     .select("*")
     .eq("product_id", productId)
@@ -523,8 +526,9 @@ export async function getProductReviews(productId: string) {
 
 export async function getPartnerReviews(partnerId: string, storeId?: string | null) {
   const supabase = await getSupabaseServerClient()
+  const adminSupabase = createAdminClient()
 
-  let query = supabase
+  let query = adminSupabase
     .from("reviews")
     .select(`
       *,
@@ -607,9 +611,10 @@ export async function getPartnerReviews(partnerId: string, storeId?: string | nu
 
 export async function getBuyerReviewsAction() {
   const supabase = await getSupabaseServerClient()
+  const adminSupabase = createAdminClient()
   const user = await requireUser()
 
-  const { data: reviewsData, error } = await supabase
+  const { data: reviewsData, error } = await adminSupabase
     .from("reviews")
     .select(`
       *,

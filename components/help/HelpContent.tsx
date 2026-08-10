@@ -197,7 +197,8 @@ export default function HelpContent({ article }: { article: HelpArticle }) {
                             article.category === "financeiro" ? "💰" :
                             article.category === "produtos-estoque" ? "📦" :
                             article.category === "servicos" ? "🛠️" :
-                            article.category === "clientes" ? "👥" : "📁"
+                            article.category === "clientes" ? "👥" :
+                            article.category === "marketing" ? "📣" : "📁"
                         );
                         return (
                             <Badge variant="green" icon={null} className="px-3">

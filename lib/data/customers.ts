@@ -3,6 +3,8 @@ import { getAdminClient } from "@/lib/supabase/admin"
 import { unstable_cache } from "next/cache"
 import { TAGS } from "@/lib/utils/revalidation-tags"
 
+const CUSTOMER_CACHE_SELECT = "id, partner_id, name, email, phone, notes, created_at, updated_at, person_type, cpf, contribuinte, cnpj, nome_fantasia, inscricao_estadual, store_credit, status, phone_fixed, website, birth_date, mother_name, father_name, user_id, marketplace_user_id, image_url, ie_isento, inscricao_municipal, razao_social, crt, is_active, deleted_at, deleted_by, deleted_reason"
+
 /**
  * Fetches all customers for a partner.
  * Uses unstable_cache for cross-request caching + React cache() for per-request deduplication.
@@ -17,7 +19,7 @@ export const getPartnerCustomersCached = cache(async (partnerId: string, storeId
                 const supabase = getAdminClient()
                 const { data, error } = await supabase
                     .from("customers")
-                    .select("*")
+                    .select(CUSTOMER_CACHE_SELECT)
                     .eq("partner_id", partnerId)
                     .order("created_at", { ascending: false })
 

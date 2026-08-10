@@ -972,7 +972,7 @@ export async function processReturnRequestAction(input: unknown) {
             p_refund_payment_method: data.refundPaymentMethod || null,
             p_return_to_inventory: pReturnToInventoryForRpc,
             p_store_credit_amount: data.storeCreditAmount,
-            p_exchange_items: data.exchangeItems,
+            p_exchange_items: data.exchangeItems || [],
             p_exchange_balance_resolution: data.exchangeBalanceResolution || null,
             p_notes: sanitizeNotes(data.notes),
             p_idempotency_key: data.idempotencyKey || crypto.randomUUID(),
@@ -1704,13 +1704,18 @@ export async function retryMercadoPagoRefundAction(partnerId: string, refundId: 
             throw new Error(res.error || "Erro ao processar reembolso no Mercado Pago.")
         }
 
-        await supabase.from("return_events").insert({
-            return_request_id: requestId,
-            previous_status: null,
-            new_status: null,
+        await supabase.from("audit_logs").insert({
+            table_name: "return_requests",
+            action: "REFUND_RETRIED",
+            partner_id: partnerId,
+            user_id: user.id,
             actor_user_id: user.id,
-            notes: `Processamento manual de reembolso no Mercado Pago aprovado (ID MP: ${res.mpRefundId}).`,
-            metadata: { refundId, mpRefundId: res.mpRefundId }
+            entity_type: "return_request",
+            entity_id: requestId,
+            action_type: "refund_retried",
+            change_lines: [`Processamento manual de reembolso no Mercado Pago aprovado (ID MP: ${res.mpRefundId}).`],
+            metadata: { refundId, mpRefundId: res.mpRefundId },
+            source: "erp"
         })
 
         await revalidateReturns(partnerId, order.id, requestId)
@@ -1847,12 +1852,16 @@ export async function saveReturnEvidenceAction(
 
         if (error) throw error
 
-        await admin.from("return_events").insert({
-            return_request_id: returnRequestId,
+        await admin.from("audit_logs").insert({
+            table_name: "return_requests",
+            action: "EVIDENCE_UPLOADED",
             partner_id: partnerId,
+            user_id: user.id,
             actor_user_id: user.id,
-            event_type: "evidence_uploaded",
-            message: `Evidência adicionada: ${fileName}`,
+            entity_type: "return_request",
+            entity_id: returnRequestId,
+            action_type: "evidence_uploaded",
+            change_lines: [`Evidência adicionada: ${fileName}`],
             metadata: { file_name: fileName, file_size: fileSize, file_key: fileKey },
             source: "user"
         })
@@ -1892,12 +1901,16 @@ export async function deleteReturnEvidenceAction(
 
         await admin.from("return_evidence").delete().eq("id", evidenceId)
 
-        await admin.from("return_events").insert({
-            return_request_id: returnRequestId,
+        await admin.from("audit_logs").insert({
+            table_name: "return_requests",
+            action: "EVIDENCE_DELETED",
             partner_id: partnerId,
+            user_id: user.id,
             actor_user_id: user.id,
-            event_type: "evidence_deleted",
-            message: `Evidência removida: ${evidence.file_name || "Documento"}`,
+            entity_type: "return_request",
+            entity_id: returnRequestId,
+            action_type: "evidence_deleted",
+            change_lines: [`Evidência removida: ${evidence.file_name || "Documento"}`],
             metadata: { file_name: evidence.file_name, file_key: evidence.file_key },
             source: "user"
         })

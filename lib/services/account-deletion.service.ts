@@ -16,7 +16,6 @@ export interface PreDeleteReport {
   customersCount: number
   suppliersCount: number
   quotesCount: number
-  filesCount: number
   whatsappCount: number
   serviceOrdersCount: number
   appointmentsCount: number
@@ -228,7 +227,6 @@ export class AccountDeletionService {
     let appointmentsCount = 0
     let returnRequestsCount = 0
     let whatsappCount = 0
-    let filesCount = 0
 
     let storesCount = 0
     let storeNames: string[] = []
@@ -278,29 +276,8 @@ export class AccountDeletionService {
       membersCount = members || 0
     }
 
-    // Estimate file count from Cloudflare R2
-    try {
-      const config = getR2ServerConfig()
-      if (config.accessKeyId && config.secretAccessKey) {
-        const s3 = new S3Client({
-          region: "auto",
-          credentials: { accessKeyId: config.accessKeyId, secretAccessKey: config.secretAccessKey },
-          endpoint: `https://${config.accountId}.r2.cloudflarestorage.com`
-        })
-
-        const res = await s3.send(new ListObjectsV2Command({
-          Bucket: config.bucketName,
-          Prefix: `users/${userId}/`
-        }))
-
-        filesCount = res.Contents?.length || 0
-      }
-    } catch (err) {
-      SecureLogger.error("Failed to count R2 files in pre-delete report", { userId, error: err })
-    }
-
     const redisKeysCount = partnerId ? (1 + productsCount + servicesCount + 4) : 3
-    const estimatedTimeMs = (whatsappCount * 2000) + (filesCount * 50) + 10000
+    const estimatedTimeMs = (whatsappCount * 2000) + 10000
 
     return {
       productsCount,
@@ -314,7 +291,6 @@ export class AccountDeletionService {
       returnRequestsCount,
       redisKeysCount,
       estimatedTimeMs,
-      filesCount,
       whatsappCount,
       storesCount,
       storeNames,

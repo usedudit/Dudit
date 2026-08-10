@@ -21,8 +21,6 @@ const PUBLIC_PATHS = [
 // Rotas que são puramente estáticas e não precisam de contexto de usuário no RootLayout.
 // Note: /institucional and /ajuda are now excluded from the middleware matcher entirely,
 // but we keep the header for any edge cases where dynamic routing might reach here.
-const STATIC_INSTITUTIONAL_PATHS = ["/institucional", "/ajuda"]
-
 // Rotas da API que possuem seu próprio rate limit interno e devem ser isentas do rate limit global no middleware
 const RATE_LIMIT_EXEMPT_PATHS = [
   "/api/upload-image",
@@ -330,14 +328,15 @@ export async function middleware(request: NextRequest) {
 
   // Prepara os headers iniciais
   const requestHeaders = new Headers(request.headers)
+  // Identity headers are never trusted by server-side authorization. Remove
+  // client-supplied copies before forwarding the request internally.
+  requestHeaders.delete("x-user-id")
+  requestHeaders.delete("x-user-email")
+  requestHeaders.delete("x-skip-auth-fallback")
   requestHeaders.set('Content-Security-Policy', contentSecurityPolicyHeaderValue)
 
   // Otimização para páginas institucionais: pula a busca de usuário no RootLayout (server-side)
   // pois essas páginas são estáticas e não usam o contexto de usuário.
-  if (STATIC_INSTITUTIONAL_PATHS.some(p => pathname.startsWith(p))) {
-    requestHeaders.set('x-skip-auth-fallback', 'true')
-  }
-
   // 3. INICIA A RESPOSTA
   let response = NextResponse.next({
     request: { headers: requestHeaders }
@@ -428,10 +427,6 @@ export async function middleware(request: NextRequest) {
         const { data: { user } } = await supabase.auth.getUser()
 
         if (user) {
-          console.log(`[MIDDLEWARE] Injected x-user-id for ${pathname}`)
-          requestHeaders.set("x-user-id", user.id)
-          requestHeaders.set("x-user-email", user.email || "")
-
           // ================================================================
           // PARALLEL: Ban check + Partner status check
           // These are independent queries - run them concurrently to save ~30-50ms

@@ -75,7 +75,7 @@ export default function PartnerCategoryModal({
     const handleCategoryClick = (category: Category) => {
         // Check if this category has subcategories
         const subcategories = allCategories.filter(c => c.parent_id === category.id)
-        
+
         if (subcategories.length > 0) {
             // It has subcategories, drill down
             setCurrentParentId(category.id)
@@ -157,7 +157,7 @@ export default function PartnerCategoryModal({
                         placeholder="Buscar categoria ou subcategoria (ex: oficina, lanchonete...)"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        className="bg-brand-gray border-gray-200"
+                        variant="full-rounded"
                         prefix={
                             <SearchIcon
                                 size={18}

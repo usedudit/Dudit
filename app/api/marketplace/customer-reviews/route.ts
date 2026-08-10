@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/server"
 import { requireUser } from "@/lib/auth/authorization"
 
 export async function GET(request: NextRequest) {
-  await requireUser()
+  const user = await requireUser()
 
   const customerId = request.nextUrl.searchParams.get("customerId")
   if (!customerId) {
@@ -12,36 +12,22 @@ export async function GET(request: NextRequest) {
 
   const supabase = createAdminClient()
 
-  // 1. Fetch customer details including email and phone for auto-linking if needed
+  // Resolve the customer only through an existing link to the authenticated
+  // marketplace account. Do not auto-link by email: a client-provided UUID
+  // must never become an ownership bypass for an adminClient read.
   const { data: customer } = await supabase
     .from("customers")
-    .select("id, partner_id, user_id, marketplace_user_id, email, phone")
+    .select("id, partner_id, user_id, marketplace_user_id")
     .eq("id", customerId)
+    .or(`user_id.eq.${user.id},marketplace_user_id.eq.${user.id}`)
     .maybeSingle()
 
   if (!customer) {
     return NextResponse.json({ reviews: [] })
   }
 
-  let marketplaceUserId = customer.marketplace_user_id
-  let userId = customer.user_id
-
-  // 2. If marketplace_user_id / user_id is missing, attempt auto-linking via email
-  if (!marketplaceUserId && !userId && customer.email) {
-    try {
-      const { data: authUserRes } = await supabase.auth.admin.getUserByEmail(customer.email)
-      if (authUserRes?.user?.id) {
-        const foundId = authUserRes.user.id
-        marketplaceUserId = foundId
-        await supabase
-          .from("customers")
-          .update({ marketplace_user_id: foundId })
-          .eq("id", customer.id)
-      }
-    } catch (e) {
-      console.error("[customer-reviews] Auto-link error:", e)
-    }
-  }
+  const marketplaceUserId = customer.marketplace_user_id
+  const userId = customer.user_id
 
   // 3. Find any orders for this customer under the current store (partner_id)
   const allCustomerIds = Array.from(
@@ -144,7 +130,6 @@ export async function GET(request: NextRequest) {
       created_at: review.created_at,
       product_name: product?.name || null,
       service_name: service?.name || null,
-      partner_id: review.partner_id,
       quantity: orderItem?.quantity || null,
       variant_name: orderItem?.variant_name || null,
       variant_options: orderItem?.variant_options || null,

@@ -11,7 +11,7 @@ export class OrderService {
       .select(`
         *,
         items:order_items(*),
-        customer:customers(*)
+        customer:customers(id, name, email, phone)
       `)
       .eq("id", orderId)
       .single()

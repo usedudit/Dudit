@@ -46,7 +46,7 @@ export default async function StoreMenuPage({ params }: Props) {
 
     const [products, services] = await Promise.all([
         listStoreProducts(store.partner_id, store.id, { isActive: true, includeVariants: true }),
-        listStoreServices(store.partner_id, store.id, { isActive: true }),
+        listStoreServices(store.partner_id, store.id, { isActive: true, publicOnly: true }),
     ])
 
     const filteredProducts = (products || []).filter((p: any) => p.store_is_active !== false)

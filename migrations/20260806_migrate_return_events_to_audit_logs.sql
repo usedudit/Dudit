@@ -113,6 +113,11 @@ BEGIN
 END $$;
 
 -- 3. Update create_return_request procedure to insert into audit_logs instead of return_events
+DROP FUNCTION IF EXISTS public.create_return_request(UUID, UUID, UUID, TEXT, TEXT, TEXT, TEXT, JSONB, JSONB, TEXT, TIMESTAMPTZ, TEXT, UUID, TEXT, UUID, UUID);
+DROP FUNCTION IF EXISTS public.create_return_request(UUID, UUID, UUID, TEXT, TEXT, TEXT, TEXT, JSONB, JSONB, TEXT, TIMESTAMPTZ, TEXT, UUID, TEXT, UUID);
+DROP FUNCTION IF EXISTS public.create_return_request(UUID, UUID, UUID, JSONB, VARCHAR, VARCHAR, JSONB, TEXT, VARCHAR, VARCHAR, TEXT);
+DROP FUNCTION IF EXISTS public.process_return_request(UUID, UUID, VARCHAR, TEXT, NUMERIC, VARCHAR, VARCHAR, NUMERIC, BOOLEAN, JSONB, VARCHAR, TEXT);
+
 CREATE OR REPLACE FUNCTION public.create_return_request(
   p_partner_id UUID,
   p_order_id UUID,

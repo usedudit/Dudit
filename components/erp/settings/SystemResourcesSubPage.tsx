@@ -20,7 +20,6 @@ import {
 
 interface SystemResourcesSubPageProps {
     businessInfo: {
-        sells?: string[]
         activeResources?: string[]
     }
     planSlug: string
@@ -47,9 +46,6 @@ export function SystemResourcesSubPage({ businessInfo, planSlug, onBack }: Syste
 
     const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(hasChanges)
 
-    const sellsProducts = businessInfo.sells?.includes("products") ?? false
-    const sellsServices = businessInfo.sells?.includes("services") ?? false
-
     const groupedResources = React.useMemo(() => {
         return SYSTEM_RESOURCES
             .filter((r) => r.id !== "team")
@@ -60,9 +56,7 @@ export function SystemResourcesSubPage({ businessInfo, planSlug, onBack }: Syste
             }, {} as Record<SystemResourceModule, typeof SYSTEM_RESOURCES>)
     }, [])
 
-    const isResourceLocked = (resourceId: SystemResourceId): boolean => {
-        if (resourceId === "products" && sellsProducts) return true
-        if (resourceId === "services" && sellsServices) return true
+    const isResourceLocked = (_resourceId: SystemResourceId): boolean => {
         return false
     }
 

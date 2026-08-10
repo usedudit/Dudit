@@ -11,6 +11,7 @@ import {
     ServiceIcon,
     BriefcaseIcon,
     MoneyIcon,
+    MegaphoneIcon,
     FileTextIcon,
     HelpCircleIcon,
     KeyIcon,
@@ -136,6 +137,7 @@ export default function HelpHome() {
                     <ModuleCard icon={<ServiceIcon size={24} />} title="Serviços" link="/ajuda/servicos/visao-geral-servicos" color="green" />
                     <ModuleCard icon={<UserIcon size={24} />} title="Clientes" link="/ajuda/clientes/visao-geral-clientes" color="green" />
                     <ModuleCard icon={<MoneyIcon size={24} />} title="Financeiro" link="/ajuda/financeiro/visao-geral-financeiro" color="green" />
+                    <ModuleCard icon={<MegaphoneIcon size={24} />} title="Marketing" link="/ajuda/marketing/visao-geral-cupons" color="green" />
                     <ModuleCard icon={<HelpCircleIcon size={24} />} title="Primeiros Passos" link="/ajuda/login-registro/acessando-conta" color="blue" />
                 </div>
             </section>

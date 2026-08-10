@@ -554,12 +554,9 @@ export const hasBusinessCapability = cache(async (
     }
   }
 
-  const sells = normalizeBusinessInfo(info).sells || []
-
-  if (capability === "products" && !sells.includes("products")) return false
-  if (capability === "services" && !sells.includes("services")) return false
-
-  return true
+  const { isSystemResourceActive } = await import("@/lib/system-resources")
+  const businessInfo = normalizeBusinessInfo(info)
+  return isSystemResourceActive(businessInfo, capability)
 })
 
 /**

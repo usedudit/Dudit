@@ -33,7 +33,7 @@ export default async function ERPDashboardPage(props: { searchParams?: Promise<{
     if (!allowed) return <AccessDenied />
 
     const businessInfo = normalizeBusinessInfo(context.businessInfo)
-    const sells = businessInfo.sells || ["products"]
+    const activeResources = businessInfo.activeResources
 
     const allAccess = await getAllUserPartnerAccess()
     const activeStore = allAccess.find((s: (typeof allAccess)[number]) => s.partnerId === partnerId)
@@ -64,7 +64,7 @@ export default async function ERPDashboardPage(props: { searchParams?: Promise<{
                             </Suspense>
                         </header>
                         <Suspense fallback={<DashboardSkeleton />}>
-                            <GeneralTab partnerId={partnerId} sells={sells} period={period} compare={compare} compareFrom={compareFrom} compareTo={compareTo} />
+                            <GeneralTab partnerId={partnerId} sells={activeResources} period={period} compare={compare} compareFrom={compareFrom} compareTo={compareTo} />
                         </Suspense>
                     </div>
                 </DashboardProvider>

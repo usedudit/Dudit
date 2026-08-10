@@ -26,6 +26,7 @@ const client = new Client({
 
 const failures = []
 const results = []
+let initialProposedViewCount = 0
 
 function check(name, actual, expected) {
   const pass = actual === expected
@@ -64,6 +65,13 @@ async function dml(sql, params = []) {
 
 async function main() {
   await client.connect()
+  const initialViews = await client.query(
+    `SELECT count(*)::int AS view_count
+       FROM information_schema.views
+      WHERE table_schema = 'public'
+        AND table_name IN ('customers_operator_safe', 'customers_delivery_safe')`,
+  )
+  initialProposedViewCount = initialViews.rows[0].view_count
   await client.query("BEGIN")
   await client.query("SET LOCAL statement_timeout = '45s'")
 
@@ -140,6 +148,19 @@ async function main() {
       [partnerC.id, disabledUser, partnerA.user_id],
     )
     await client.query(`UPDATE public.partners SET is_active = false WHERE id = $1`, [partnerC.id])
+
+    // The live database may already contain the proposed migration. Remove
+    // only its objects inside this transaction so the same rollback harness
+    // can validate both pre-apply and post-apply states. The final ROLLBACK
+    // restores the live schema unchanged.
+    await client.query(`
+      DROP POLICY IF EXISTS customers_select_privileged ON public.customers;
+      DROP POLICY IF EXISTS customers_insert_rbac ON public.customers;
+      DROP POLICY IF EXISTS customers_update_rbac ON public.customers;
+      DROP POLICY IF EXISTS customers_delete_rbac ON public.customers;
+      DROP VIEW IF EXISTS public.customers_operator_safe;
+      DROP VIEW IF EXISTS public.customers_delivery_safe;
+    `)
 
     let migration = await fs.readFile("migrations/20260807_proposed_customers_rbac_rls.sql", "utf8")
     migration = migration.replace(/^\s*BEGIN;\s*/i, "").replace(/\s*COMMIT;\s*$/i, "")
@@ -241,8 +262,8 @@ main()
         WHERE table_schema = 'public'
           AND table_name IN ('customers_operator_safe', 'customers_delivery_safe')`,
     )
-    results.push({ name: "rollback removed proposed views", pass: verification.rows[0].view_count === 0, actual: verification.rows[0].view_count, expected: 0 })
-    if (verification.rows[0].view_count !== 0) failures.push("rollback did not remove proposed views")
+    results.push({ name: "rollback restored proposed views state", pass: verification.rows[0].view_count === initialProposedViewCount, actual: verification.rows[0].view_count, expected: initialProposedViewCount })
+    if (verification.rows[0].view_count !== initialProposedViewCount) failures.push("rollback did not restore proposed views state")
   })
   .then(() => {
     console.log(JSON.stringify({ failures, results }, null, 2))

@@ -242,9 +242,6 @@ export const accountDeletionTask = task({
 
       // Compare reports and check for discrepancies
       const discrepancies: string[] = []
-      if (filesDeleted !== plannedReport.filesCount) {
-        discrepancies.push(`File count mismatch: Planned ${plannedReport.filesCount}, deleted ${filesDeleted}`)
-      }
 
       const discrepancyReport = discrepancies.length > 0 ? discrepancies : null
 

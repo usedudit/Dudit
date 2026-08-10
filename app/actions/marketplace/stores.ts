@@ -114,7 +114,7 @@ export const getCachedStoreServices = async (storeId: string, partnerId: string)
     let fn = storeServicesCacheMap.get(mapKey)
     if (!fn) {
         fn = unstable_cache(
-            async () => listStoreServices(partnerId, storeId, { isActive: true }),
+            async () => listStoreServices(partnerId, storeId, { isActive: true, publicOnly: true }),
             [`store-services-${storeId}`],
             { tags: ["store-services", `store-${storeId}`], revalidate: 30 }
         )
@@ -132,9 +132,9 @@ export const getCachedStoreReviews = async (storeId: string) => {
                 const { data: reviewsData } = await supabase
                     .from("reviews")
                     .select(`
-                        *,
-                        products:product_id(name),
-                        services:service_id(name)
+                        id, rating, comment, created_at, product_id, service_id, store_id,
+                        products:product_id(name, images, slug, unit),
+                        services:service_id(name, images, slug, unit)
                     `)
                     .eq("store_id", storeId)
                     .order("created_at", { ascending: false })
