@@ -17,7 +17,7 @@ import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { ReportModal } from "./ReportModal"
 import { ReviewsSection } from "./ReviewsSection"
 import { addToCartAction } from "@/app/actions/marketplace/cart"
-import { prepareProductBuyNowCheckoutAction, getGiftItemDetailsAction } from "@/app/actions/marketplace/cart-extensions"
+import { prepareProductBuyNowCheckoutAction, getGiftItemDetailsAction, checkCanUserBuyFromStoreAction } from "@/app/actions/marketplace/cart-extensions"
 import { InfoCard } from "@/components/reusable/InfoCard"
 import { useNotification } from "@/hooks/use-notification"
 import { invalidateCartCache } from "@/hooks/use-cart"
@@ -234,12 +234,34 @@ export function ProductDetailsPageClient({
         }
     }, [product])
 
+    const [canBuyState, setCanBuyState] = useState<{ canBuy: boolean; isOwner: boolean; isTeamMember: boolean; reason?: string }>(() => {
+        const isOwner = !!(userId && partner?.user_id && userId === partner.user_id)
+        return {
+            canBuy: !isOwner,
+            isOwner,
+            isTeamMember: false,
+            reason: isOwner ? "Você não pode comprar seus próprios produtos." : undefined,
+        }
+    })
+
+    useEffect(() => {
+        if (!partner?.partner_id && !partner?.id) return
+        const targetPartnerId = partner.partner_id || partner.id
+        const targetStoreId = product?.store_id || partner.store_id || partner.id
+        checkCanUserBuyFromStoreAction(targetPartnerId, targetStoreId).then(res => {
+            setCanBuyState(res)
+        })
+    }, [userId, partner?.partner_id, partner?.id, partner?.store_id, product?.store_id])
+
+    const isProductOwner = !canBuyState.canBuy
+    const isTeamMember = canBuyState.isTeamMember
+
     const [activePromotions, setActivePromotions] = useState<any[]>([])
 
     // Combined effect: promotions + view counter + delivery config
     // Grouped into a single timer to reduce Server Action POST count on mount
     useEffect(() => {
-        if (!partner?.id || !product?.id) return
+        if (!partner?.id || !product?.id || isProductOwner) return
         const timer = setTimeout(() => {
             // Fire all deferred actions in parallel
             listActivePromotionsForMarketplaceAction(partner.id)
@@ -259,7 +281,7 @@ export function ProductDetailsPageClient({
             })
         }, 600)
         return () => clearTimeout(timer)
-    }, [partner?.id, product?.id])
+    }, [partner?.id, product?.id, isProductOwner])
 
     const activePromo = useMemo(() => {
         return activePromotions.find((promo) => {
@@ -693,27 +715,8 @@ export function ProductDetailsPageClient({
     const MAX_STOCK = selectedVariant ? (selectedVariant.stock_available ?? selectedVariant.stock_quantity ?? 0) : (product.stock_available ?? product.stock_quantity ?? 0)
     const isOutOfStock = MAX_STOCK === 0
 
-    // Check if user is owner OR team member of this store
-    const [isTeamMember, setIsTeamMember] = useState(false)
-    useEffect(() => {
-        if (userId && userId !== partner.user_id && partner.id) {
-            supabase
-                .from("partner_users")
-                .select("id")
-                .eq("partner_id", partner.id)
-                .eq("user_id", userId)
-                .maybeSingle()
-                .then(({ data }: any) => {
-                    if (data) setIsTeamMember(true)
-                })
-                .catch(() => { })
-        }
-    }, [userId, partner.id, partner.user_id, supabase])
-
     const partnerProfileImageUrl = getR2ImageUrl(partner.store_avatar)
     // NOTE: delivery config fetch is now merged into the combined useEffect above (line ~239)
-
-
 
     const preparationEstimate = useMemo(() => computeOrderPreparationEstimate({
         products: [{
@@ -724,8 +727,6 @@ export function ProductDetailsPageClient({
         pickupWindowMinutes: 30,
         deliveryTimeEstimateMinutes: 0,
     }), [product, partner.openingHours])
-
-    const isProductOwner = !!(userId && (userId === partner.user_id || isTeamMember))
 
     useEffect(() => {
         if (processedVariants.length > 0 && !selectedVariant) {

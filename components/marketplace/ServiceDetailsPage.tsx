@@ -28,6 +28,8 @@ import { MarketplaceHeader } from "./MarketplaceHeader"
 import { useFavorites } from "@/providers/favorites-provider"
 import { fetchCSRFTokenSingleton } from "@/hooks/use-csrf-token"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { checkCanUserBuyFromStoreAction } from "@/app/actions/marketplace/cart-extensions"
+import { InfoCard } from "@/components/reusable/InfoCard"
 import { Button, Input, FormSection, IconPlaceholder, DefaultModal, CepInput, Spinner, StateComboBox, RadioButton, NumberInputWithCheckbox, Badge } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils"
 import { getBillingUnitSuffix } from "@/lib/utils/formatters"
@@ -203,7 +205,6 @@ export function ServiceDetailsPageClient({
     const [calculatedAddress, setCalculatedAddress] = useState<string | null>(null)
     const [expandedAccordion, setExpandedAccordion] = useState<string | null>(null)
     const [deliveryConfig, setDeliveryConfig] = useState<any>(null)
-    const [isTeamMember, setIsTeamMember] = useState(false)
     const { isFavorited: isFav, toggleFavorite: toggleFav } = useFavorites()
 
     // Address flow states (checkout-like)
@@ -321,43 +322,49 @@ export function ServiceDetailsPageClient({
         setCep(raw.length > 5 ? `${raw.slice(0, 5)}-${raw.slice(5)}` : raw)
     }, [])
 
-    // Check if user is team member of the partner
-    useEffect(() => {
-        if (userId && userId !== partner.user_id && partner.id) {
-            supabase
-                .from("partner_users")
-                .select("id")
-                .eq("partner_id", partner.id)
-                .eq("user_id", userId)
-                .maybeSingle()
-                .then(({ data }: any) => {
-                    if (data) setIsTeamMember(true)
-                })
-                .catch(() => { })
+    const [canBuyState, setCanBuyState] = useState<{ canBuy: boolean; isOwner: boolean; isTeamMember: boolean; reason?: string }>(() => {
+        const isOwner = !!(userId && partner?.user_id && userId === partner.user_id)
+        return {
+            canBuy: !isOwner,
+            isOwner,
+            isTeamMember: false,
+            reason: isOwner ? "Você não pode agendar ou comprar seus próprios serviços." : undefined,
         }
-    }, [userId, partner.id, partner.user_id, supabase])
+    })
+
+    useEffect(() => {
+        if (!partner?.partner_id && !partner?.id && !service?.partner_id) return
+        const targetPartnerId = service?.partner_id || partner.partner_id || partner.id
+        const targetStoreId = service?.store_id || partner.store_id || partner.id
+        checkCanUserBuyFromStoreAction(targetPartnerId, targetStoreId).then(res => {
+            setCanBuyState(res)
+        })
+    }, [userId, partner?.partner_id, partner?.id, partner?.store_id, service?.partner_id, service?.store_id])
+
+    const isProductOwner = !canBuyState.canBuy
+    const isTeamMember = canBuyState.isTeamMember
 
     // Load partner delivery configuration
     useEffect(() => {
-        if (!partner.id) return
+        if (!partner.id || isProductOwner) return
         const timer = setTimeout(() => {
             getPartnerDeliveryConfigAction(partner.id).then((res: any) => {
                 if (res.success) setDeliveryConfig(res)
             })
         }, 500)
         return () => clearTimeout(timer)
-    }, [partner.id])
+    }, [partner.id, isProductOwner])
 
     // Load user addresses if logged in
     useEffect(() => {
-        if (userId) {
+        if (userId && !isProductOwner) {
             const timer = setTimeout(() => loadUserAddresses(), 1000)
             return () => clearTimeout(timer)
         } else {
             setUserAddresses([])
             setSelectedAddressId("")
         }
-    }, [userId])
+    }, [userId, isProductOwner])
 
     const loadUserAddresses = async () => {
         if (!userId) return
@@ -661,8 +668,6 @@ export function ServiceDetailsPageClient({
         pickupWindowMinutes: 30,
         deliveryTimeEstimateMinutes: 0,
     }), [service, partner.opening_hours])
-
-    const isProductOwner = !!(userId && (userId === partner.user_id || isTeamMember))
 
     const avgRating = useMemo(() =>
         reviews.length > 0 ? reviews.reduce((s: number, r: any) => s + r.rating, 0) / reviews.length : 0,
@@ -1304,7 +1309,15 @@ export function ServiceDetailsPageClient({
             )}
 
             {/* ── CTA Buttons ── */}
-            {!showPrice ? (
+            {isProductOwner ? (
+                <InfoCard
+                    message={canBuyState.reason || (canBuyState.isOwner
+                        ? "Você não pode agendar ou comprar seus próprios serviços."
+                        : "Você não pode agendar serviços de um negócio do qual faz parte da equipe.")}
+                    color="orange"
+                    className="mb-8"
+                />
+            ) : !showPrice ? (
                 <div className="hidden lg:block mb-4">
                     {(() => {
                         const cleanPhone = partner.phone ? partner.phone.replace(/\D/g, "") : ""

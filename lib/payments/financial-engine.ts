@@ -29,6 +29,8 @@ export type PaymentLineDetails = {
   interestAmount: number
   feeAmount: number
   fixedFeeAmount: number
+  /** Custo de parcelamento (juros das parcelas), segue installmentFeeBearer */
+  installmentCostAmount: number
 }
 
 export type PaymentBreakdownLine = {
@@ -48,6 +50,7 @@ export type PaymentBreakdownLine = {
   interestAmount?: number
   feeAmount?: number
   fixedFeeAmount?: number
+  installmentCostAmount?: number
 }
 
 export type PaymentBreakdownEntry = {
@@ -67,6 +70,7 @@ export type PaymentBreakdownEntry = {
   interestAmount?: number
   feeAmount?: number
   fixedFeeAmount?: number
+  installmentCostAmount?: number
   /** Mercado Pago specific fields */
   provider?: string
   paymentTypeId?: string | null
@@ -120,6 +124,7 @@ export function computePaymentLine(input: PaymentLineInput): PaymentLineDetails 
   const feePercent = Math.max(0, Number(pm.feePercent || 0))
   const feeFixed = Math.max(0, Number(pm.feeFixed || 0))
   const feeBearer = (pm.feeBearer || "merchant") as "merchant" | "customer"
+  const installmentFeeBearer = (pm.installmentFeeBearer || "merchant") as "merchant" | "customer"
 
   const clampedInstallments = Math.min(Math.max(1, input.installmentNumber || 1), Math.max(1, pm.maxInstallments || 24))
   const installmentFeePercent = (pm.installmentFees || []).find(
@@ -136,10 +141,17 @@ export function computePaymentLine(input: PaymentLineInput): PaymentLineDetails 
   const paymentMethodDiscountAmount = round2(baseAmount * (discountPercent / 100))
   let current = round2(baseAmount - paymentMethodDiscountAmount)
 
-  // Step 2: Interest on discounted amount
-  const interestAmount = round2(current * (interestPercent / 100))
+  // Step 2: Interest on discounted amount.
+  // Juros fixos (fixedInterestPercent) seguem feeBearer; o custo de parcelamento
+  // (installmentFeePercent) segue installmentFeeBearer (config independente).
+  const fixedInterestAmount = round2(current * (fixedInterestPercent / 100))
+  const installmentCostAmount = round2(current * (installmentFeePercent / 100))
+  const interestAmount = round2(fixedInterestAmount + installmentCostAmount)
   if (hasInterest && feeBearer === "customer") {
-    current = round2(current + interestAmount)
+    current = round2(current + fixedInterestAmount)
+  }
+  if (hasInterest && installmentFeeBearer === "customer") {
+    current = round2(current + installmentCostAmount)
   }
 
   // Step 3: Fee on amount after interest
@@ -150,9 +162,14 @@ export function computePaymentLine(input: PaymentLineInput): PaymentLineDetails 
   }
 
   const effectiveAmount = round2(current)
-  const netAmount = feeBearer === "merchant"
-    ? round2(baseAmount - paymentMethodDiscountAmount - interestAmount - feeAmount - fixedFeeAmount)
-    : effectiveAmount
+  // Lucro líquido = valor cobrado (effectiveAmount) menos custos absorvidos:
+  // - taxas/juros fixos seguem feeBearer; o custo de parcelamento segue
+  //   installmentFeeBearer (independente).
+  const netAmount = round2(
+    effectiveAmount
+      - (feeBearer === "merchant" ? fixedInterestAmount + feeAmount + fixedFeeAmount : 0)
+      - (installmentFeeBearer === "merchant" ? installmentCostAmount : 0)
+  )
 
   // Primary adjustment type for backward compatibility
   let adjustmentType: AdjustmentType = "none"
@@ -183,6 +200,7 @@ export function computePaymentLine(input: PaymentLineInput): PaymentLineDetails 
     interestAmount,
     feeAmount,
     fixedFeeAmount,
+    installmentCostAmount,
   }
 }
 
@@ -213,6 +231,7 @@ export function computePaymentBreakdown(input: {
       interestAmount: details.interestAmount,
       feeAmount: details.feeAmount,
       fixedFeeAmount: details.fixedFeeAmount,
+      installmentCostAmount: details.installmentCostAmount,
     }
   })
 

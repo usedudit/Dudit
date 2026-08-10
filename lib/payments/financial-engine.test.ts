@@ -159,6 +159,69 @@ describe("computePaymentLine - single payment", () => {
   })
 })
 
+// --------------- installment cost bearer (independent config) ---------------
+
+describe("computePaymentLine - custo de parcelamento (installmentFeeBearer)", () => {
+  const instConfig = (feeBearer: "merchant" | "customer", installmentFeeBearer?: "merchant" | "customer"): PaymentMethodFeeConfig => ({
+    feePercent: 0,
+    feeFixed: 0,
+    feeBearer,
+    installmentFeeBearer,
+    discountPercent: 0,
+    maxInstallments: 12,
+    installmentFees: [{ installmentNumber: 2, feePercent: 3 }],
+  })
+
+  it("default merchant: feeBearer=customer mas custo de parcelamento absorvido (effective 100, net 97)", () => {
+    const r = computePaymentLine({ amountReceived: 100, paymentMethod: instConfig("customer"), installmentNumber: 2 })
+    expect(r.interestAmount).toBe(3)
+    expect(r.installmentCostAmount).toBe(3)
+    expect(r.effectiveAmount).toBe(100)
+    expect(r.netAmount).toBe(97)
+  })
+
+  it("feeBearer=merchant + installmentFeeBearer=merchant: cliente não paga juros, empresa absorve (net 97)", () => {
+    const r = computePaymentLine({ amountReceived: 100, paymentMethod: instConfig("merchant", "merchant"), installmentNumber: 2 })
+    expect(r.effectiveAmount).toBe(100)
+    expect(r.netAmount).toBe(97)
+    expect(r.installmentCostAmount).toBe(3)
+  })
+
+  it("feeBearer=merchant + installmentFeeBearer=customer: juros repassado ao cliente, lucro não desconta (net 103)", () => {
+    const r = computePaymentLine({ amountReceived: 100, paymentMethod: instConfig("merchant", "customer"), installmentNumber: 2 })
+    expect(r.effectiveAmount).toBe(103)
+    expect(r.netAmount).toBe(103)
+    expect(r.installmentCostAmount).toBe(3)
+  })
+
+  it("feeBearer=customer + installmentFeeBearer=customer: tudo pago pelo cliente (net 103)", () => {
+    const r = computePaymentLine({ amountReceived: 100, paymentMethod: instConfig("customer", "customer"), installmentNumber: 2 })
+    expect(r.effectiveAmount).toBe(103)
+    expect(r.netAmount).toBe(103)
+  })
+
+  it("juro fixo segue feeBearer; custo de parcelamento segue installmentFeeBearer", () => {
+    const r = computePaymentLine({
+      amountReceived: 100,
+      paymentMethod: {
+        feePercent: 0,
+        feeFixed: 0,
+        feeBearer: "merchant",
+        installmentFeeBearer: "customer",
+        discountPercent: 0,
+        maxInstallments: 12,
+        fixedInterestPercent: 2,
+        installmentFees: [{ installmentNumber: 2, feePercent: 3 }],
+      },
+      installmentNumber: 2,
+    })
+    expect(r.interestAmount).toBe(5)
+    expect(r.installmentCostAmount).toBe(3)
+    expect(r.effectiveAmount).toBe(103) // só o custo de parcelamento é cobrado
+    expect(r.netAmount).toBe(101)       // empresa absorve o juro fixo (2)
+  })
+})
+
 // --------------- computePaymentBreakdown ---------------
 
 describe("computePaymentBreakdown - split payments", () => {

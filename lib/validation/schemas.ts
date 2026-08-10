@@ -112,6 +112,7 @@ export const PaymentMethodSchema = z.object({
   feeFixed: z.number().min(0).optional().nullable(),
   receivingDays: z.number().int().min(0).max(365).optional().nullable(),
   feeBearer: z.enum(["merchant", "customer"]).optional(),
+  installmentFeeBearer: z.enum(["merchant", "customer"]).optional().nullable(),
   supportsInstallments: z.boolean().optional(),
   maxInstallments: z.number().int().min(1).max(24).optional().nullable(),
   discountPercent: z.number().min(0).max(100).optional().nullable(),

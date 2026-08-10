@@ -892,6 +892,7 @@ export async function checkoutCartAction(
       feePercent: Number(bestMethod.fee_percent || bestMethod.percentage_rate || 0),
       feeFixed: Number(bestMethod.fee_fixed || bestMethod.fixed_amount || 0),
       feeBearer: (bestMethod.fee_bearer || "merchant") as "merchant" | "customer",
+      installmentFeeBearer: (bestMethod.installment_fee_bearer || "merchant") as "merchant" | "customer",
       maxInstallments: Number(bestMethod.max_installments || 1),
       installmentNumber: Math.max(1, Number(installments || 1)),
       installmentFees: (fees || []).map((row: any) => ({

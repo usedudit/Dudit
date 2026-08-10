@@ -70,6 +70,22 @@ export async function assertCanBuyFromStore(
   return { error: "Você não pode comprar de uma loja da qual faz parte da equipe." }
 }
 
+export async function checkCanUserBuyFromStoreAction(partnerId: string, storeId?: string | null) {
+  try {
+    const { getCurrentUser } = await import("@/lib/auth/authorization")
+    const user = await getCurrentUser()
+    if (!user) return { canBuy: true, isOwner: false, isTeamMember: false }
+    const guard = await assertCanBuyFromStore(user.id, partnerId, storeId)
+    if (guard.error) {
+      const isOwner = guard.error.includes("sua própria loja")
+      return { canBuy: false, isOwner, isTeamMember: !isOwner, reason: guard.error }
+    }
+    return { canBuy: true, isOwner: false, isTeamMember: false }
+  } catch {
+    return { canBuy: true, isOwner: false, isTeamMember: false }
+  }
+}
+
 export async function addServiceBookingToCartAction(
   input: {
     serviceId: string

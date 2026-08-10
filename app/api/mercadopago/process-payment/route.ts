@@ -306,6 +306,7 @@ async function handler(request: NextRequest) {
             feePercent: Number(pmtMethod.fee_percent || pmtMethod.percentage_rate || 0),
             feeFixed: Number(pmtMethod.fee_fixed || pmtMethod.fixed_amount || 0),
             feeBearer: (pmtMethod.fee_bearer || "merchant") as "merchant" | "customer",
+            installmentFeeBearer: (pmtMethod.installment_fee_bearer || "merchant") as "merchant" | "customer",
             maxInstallments: Number(pmtMethod.max_installments || 1),
             installmentNumber: Math.max(1, Number(paymentFormData?.installments || 1)),
             installmentFees: (fees || []).map((row: any) => ({
@@ -564,6 +565,7 @@ async function handler(request: NextRequest) {
             feePercent: Number(pmtMethod.fee_percent || pmtMethod.percentage_rate || 0),
             feeFixed: Number(pmtMethod.fee_fixed || pmtMethod.fixed_amount || 0),
             feeBearer: (pmtMethod.fee_bearer || "merchant") as "merchant" | "customer",
+            installmentFeeBearer: (pmtMethod.installment_fee_bearer || "merchant") as "merchant" | "customer",
             maxInstallments: Number(pmtMethod.max_installments || 1),
             installmentNumber: Math.max(1, Number(paymentFormData?.installments || 1)),
             installmentFees: (fees || []).map((row: any) => ({

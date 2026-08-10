@@ -6,6 +6,11 @@ export type PaymentMethodFeeConfig = {
   fixedInterestPercent?: number
   maxInstallments?: number
   installmentFees?: Array<{ installmentNumber: number; feePercent: number }>
+  /**
+   * Quem paga o custo de parcelamento (juros das parcelas do cartão de crédito).
+   * Independente de feeBearer. Default: merchant (empresa absorve).
+   */
+  installmentFeeBearer?: "merchant" | "customer"
 }
 
 export type PaymentCalculationInput = {
@@ -27,6 +32,8 @@ export type PaymentCalculationResult = {
   appliedDiscountPercent: number
   appliedFeePercent: number
   appliedInterestPercent: number
+  /** Juros do parcelamento (parcela do interestAmount atribuída ao custo de parcelamento) */
+  installmentCostAmount: number
   /** @deprecated Use amountReceived from financial-engine */
   amountReceived?: number
   /** @deprecated Use effectiveAmount from financial-engine */
@@ -81,10 +88,19 @@ export function calculatePaymentAmounts(input: PaymentCalculationInput): Payment
   const amountBeforeInterest = currentTotal
 
   // Step 2: installment interest over the discounted running total
+  // Juros fixos (fixedInterestPercent) seguem feeBearer; o custo de parcelamento
+  // (installmentFeePercent) segue installmentFeeBearer, config independente.
   const totalInterestPercent = Math.max(0, fixedInterestPercent + Number(installmentFeePercent || 0))
   const interestAmount = round2(currentTotal * (totalInterestPercent / 100))
-  if (input.paymentMethod.feeBearer === "customer") {
-    currentTotal = toSafeMoney(currentTotal + interestAmount)
+  const feeBearer = input.paymentMethod.feeBearer
+  const installmentFeeBearer = input.paymentMethod.installmentFeeBearer || "merchant"
+  const fixedInterestAmount = round2(currentTotal * (fixedInterestPercent / 100))
+  const installmentCostAmount = round2(currentTotal * (installmentFeePercent / 100))
+  if (feeBearer === "customer") {
+    currentTotal = toSafeMoney(currentTotal + fixedInterestAmount)
+  }
+  if (installmentFeeBearer === "customer") {
+    currentTotal = toSafeMoney(currentTotal + installmentCostAmount)
   }
   const amountBeforeFee = currentTotal
 
@@ -110,5 +126,6 @@ export function calculatePaymentAmounts(input: PaymentCalculationInput): Payment
     appliedDiscountPercent: paymentMethodDiscountPercent,
     appliedFeePercent: feePercent,
     appliedInterestPercent: totalInterestPercent,
+    installmentCostAmount,
   }
 }

@@ -121,7 +121,7 @@ async function resolvePosFinalTotalWithPaymentMethod(params: {
 
     const [{ data: methods }, { data: fees }] = await Promise.all([
         methodIds.length > 0
-            ? resolvePaymentMethodsForStore(params.supabase, { partnerId: params.partnerId, storeId: params.storeId }, { select: "id, fee_percent, fee_fixed, fee_bearer, discount_percent, max_installments" }).in("id", methodIds)
+            ? resolvePaymentMethodsForStore(params.supabase, { partnerId: params.partnerId, storeId: params.storeId }, { select: "id, fee_percent, fee_fixed, fee_bearer, installment_fee_bearer, discount_percent, max_installments" }).in("id", methodIds)
             : Promise.resolve({ data: [] as any[] }),
         methodIds.length > 0
             ? params.supabase

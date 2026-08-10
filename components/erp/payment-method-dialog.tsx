@@ -34,6 +34,7 @@ interface PaymentMethod {
     fee_percent?: number | null
     fee_fixed?: number | null
     fee_bearer?: "merchant" | "customer"
+    installment_fee_bearer?: "merchant" | "customer"
     supports_installments?: boolean
     max_installments?: number
     receiving_days?: number
@@ -107,6 +108,7 @@ export function PaymentMethodDialog({ open, onClose, partnerId, storeId: propSto
         fee_percent: 0,
         fee_fixed: 0,
         fee_bearer: "merchant" as "merchant" | "customer",
+        installment_fee_bearer: "merchant" as "merchant" | "customer",
         receiving_days: 0,
         discount_percent: 0,
         pix_key_type: "email" as "cpf" | "cnpj" | "email" | "phone" | "random",
@@ -144,6 +146,7 @@ export function PaymentMethodDialog({ open, onClose, partnerId, storeId: propSto
                 fee_percent: 0,
                 fee_fixed: 0,
                 fee_bearer: "merchant" as const,
+                installment_fee_bearer: "merchant" as const,
                 receiving_days: 0,
                 discount_percent: 0,
                 pix_key_type: "email" as const,
@@ -175,6 +178,7 @@ export function PaymentMethodDialog({ open, onClose, partnerId, storeId: propSto
                     fee_percent: Number(full.fee_percent || 0),
                     fee_fixed: Number(full.fee_fixed || 0),
                     fee_bearer: (full.fee_bearer || "merchant") as "merchant" | "customer",
+                    installment_fee_bearer: (full.installment_fee_bearer || "merchant") as "merchant" | "customer",
                     receiving_days: Number(full.receiving_days || 0),
                     discount_percent: Number(full.discount_percent || 0),
                     pix_key_type: (full.pix_key_type || "email") as "cpf" | "cnpj" | "email" | "phone" | "random",
@@ -346,6 +350,7 @@ export function PaymentMethodDialog({ open, onClose, partnerId, storeId: propSto
                 receivingDays: formData.receiving_days,
                 discountPercent: formData.discount_percent,
                 feeBearer: formData.fee_bearer,
+                installmentFeeBearer: formData.installment_fee_bearer,
                 supportsInstallments: isCreditCard && formData.has_fees ? formData.supports_installments : false,
                 maxInstallments: isCreditCard && formData.has_fees && formData.supports_installments ? formData.max_installments : 1,
                 installmentFees: isCreditCard && formData.has_fees && formData.supports_installments
@@ -541,6 +546,15 @@ export function PaymentMethodDialog({ open, onClose, partnerId, storeId: propSto
                                     </div>
                                     {formData.supports_installments && (
                                         <div className="space-y-4 pt-2">
+                                            <FormDropdown
+                                                label="Quem paga o custo de parcelamento?"
+                                                value={formData.installment_fee_bearer}
+                                                setValue={(value: any) => setFormData({ ...formData, installment_fee_bearer: value })}
+                                                options={[
+                                                    { value: "merchant", label: "Empresa (absorve)" },
+                                                    { value: "customer", label: "Cliente (acrescenta no valor)" },
+                                                ]}
+                                            />
                                             <div className="space-y-1.5">
                                                 <div className="flex items-center justify-between gap-2">
                                                     <label className="block text-sm font-medium text-brand-dark dark:text-dark-heading truncate">Máximo de parcelas</label>

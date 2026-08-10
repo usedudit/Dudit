@@ -16,7 +16,7 @@ import { ShareModal } from "./ShareModal"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { useNotification } from "@/hooks/use-notification"
 import { getAddressesAction, createAddressAction } from "@/app/actions/shared/addresses"
-import { addSubscriptionToCartAction } from "@/app/actions/marketplace/cart-extensions"
+import { addSubscriptionToCartAction, checkCanUserBuyFromStoreAction } from "@/app/actions/marketplace/cart-extensions"
 import { invalidateCartCache } from "@/hooks/use-cart"
 import { getStoreUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
 import { fetchCSRFTokenSingleton } from "@/hooks/use-csrf-token"
@@ -121,24 +121,27 @@ export function PlanDetailsPageClient({
         return planImages.map((src: string) => ({ type: "image" as const, src }))
     }, [planImages])
 
-    // Check if user is owner OR team member of this store
-    const [isTeamMember, setIsTeamMember] = useState(false)
-    useEffect(() => {
-        if (userId && userId !== partner.user_id && partner.id) {
-            supabase
-                .from("partner_users")
-                .select("id")
-                .eq("partner_id", partner.id)
-                .eq("user_id", userId)
-                .maybeSingle()
-                .then(({ data }: any) => {
-                    if (data) setIsTeamMember(true)
-                })
-                .catch(() => { })
+    const [canBuyState, setCanBuyState] = useState<{ canBuy: boolean; isOwner: boolean; isTeamMember: boolean; reason?: string }>(() => {
+        const isOwner = !!(userId && partner?.user_id && userId === partner.user_id)
+        return {
+            canBuy: !isOwner,
+            isOwner,
+            isTeamMember: false,
+            reason: isOwner ? "Você não pode assinar seus próprios planos." : undefined,
         }
-    }, [userId, partner.id, partner.user_id, supabase])
+    })
 
-    const isPlanOwner = !!(userId && (userId === partner.user_id || isTeamMember))
+    useEffect(() => {
+        if (!partner?.partner_id && !partner?.id && !plan?.partner_id) return
+        const targetPartnerId = plan?.partner_id || partner.partner_id || partner.id
+        const targetStoreId = plan?.store_id || partner.store_id || partner.id
+        checkCanUserBuyFromStoreAction(targetPartnerId, targetStoreId).then(res => {
+            setCanBuyState(res)
+        })
+    }, [userId, partner?.partner_id, partner?.id, partner?.store_id, plan?.partner_id, plan?.store_id])
+
+    const isPlanOwner = !canBuyState.canBuy
+    const isTeamMember = canBuyState.isTeamMember
 
     useEffect(() => {
         setIsMounted(true)
@@ -412,9 +415,9 @@ export function PlanDetailsPageClient({
 
             {isPlanOwner ? (
                 <InfoCard
-                    message={isTeamMember
+                    message={canBuyState.reason || (isTeamMember
                         ? "Você não pode assinar planos de um negócio do qual faz parte da equipe."
-                        : "Você não pode assinar seus próprios planos."}
+                        : "Você não pode assinar seus próprios planos.")}
                     color="orange"
                     className="mb-8"
                 />

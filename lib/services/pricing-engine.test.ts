@@ -393,6 +393,7 @@ describe("calculateOrderPricing", () => {
         feePercent: 0,
         feeFixed: 0,
         feeBearer: "customer",
+        installmentFeeBearer: "customer",
         interestType: "fixed",
         interestValue: 3,
         installmentNumber: 2,
@@ -404,6 +405,51 @@ describe("calculateOrderPricing", () => {
     // finalAmountWithPayment = 105
     expect(r.finalAmountWithPayment).toBe(105)
     expect(r.paymentMethodInterestAmount).toBe(5)
+    expect(r.paymentMethodInstallmentCostAmount).toBe(2)
+  })
+
+  it("charges only the installment cost when feeBearer=merchant and installmentFeeBearer=customer", () => {
+    const r = calculateOrderPricing({
+      items: [{ unitPrice: 100, quantity: 1 }],
+      shippingCost: 0,
+      paymentMethod: {
+        discountPercent: 0,
+        feePercent: 0,
+        feeFixed: 0,
+        feeBearer: "merchant",
+        installmentFeeBearer: "customer",
+        interestType: "fixed",
+        interestValue: 3,
+        installmentNumber: 2,
+        installmentFees: [{ installmentNumber: 2, feePercent: 2 }],
+      },
+    })
+    // fixed interest (3%) absorbed by merchant; installment cost (2%) charged to customer
+    expect(r.finalAmountWithPayment).toBe(102)
+    expect(r.paymentMethodInterestAmount).toBe(5)
+    expect(r.paymentMethodInstallmentCostAmount).toBe(2)
+  })
+
+  it("charges only the fixed interest when feeBearer=customer and installmentFeeBearer=merchant", () => {
+    const r = calculateOrderPricing({
+      items: [{ unitPrice: 100, quantity: 1 }],
+      shippingCost: 0,
+      paymentMethod: {
+        discountPercent: 0,
+        feePercent: 0,
+        feeFixed: 0,
+        feeBearer: "customer",
+        installmentFeeBearer: "merchant",
+        interestType: "fixed",
+        interestValue: 3,
+        installmentNumber: 2,
+        installmentFees: [{ installmentNumber: 2, feePercent: 2 }],
+      },
+    })
+    // fixed interest (3%) charged to customer; installment cost (2%) absorbed by merchant
+    expect(r.finalAmountWithPayment).toBe(103)
+    expect(r.paymentMethodInterestAmount).toBe(5)
+    expect(r.paymentMethodInstallmentCostAmount).toBe(2)
   })
 
   it("calculates merchant-borne payment method interest without charging the customer", () => {

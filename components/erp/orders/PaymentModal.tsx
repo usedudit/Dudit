@@ -1690,6 +1690,11 @@ const PaymentModal = ({
                 });
         } else {
             const isUnpaid = isUnpaidRegister || (netChargeTarget > 0 && paymentBaseAmount === 0);
+            const methodLegAmount = Number(paymentCalculation?.finalAmount ?? finalTotalWithMethodPricing ?? netChargeTarget);
+            const actualReceived = isUnpaid ? 0 : (view === 'money'
+                ? (wantsChange ? Math.max(payWithAmount, paymentBaseAmount) : Math.max(paymentBaseAmount, paymentBaseAmount))
+                : Number(paymentCalculation?.amountReceived ?? paymentBaseAmount ?? 0));
+
             const methodLeg = {
                 method: (() => {
                     if (isMarketplaceOrder && originalPaymentMethod) {
@@ -1699,31 +1704,29 @@ const PaymentModal = ({
                     if (selectedMethodObj) {
                         return getFormattedMethodLabel(selectedMethodObj.name, selectedMethodObj.type);
                     }
-                    if (isUnpaid) {
+                    if (isUnpaid && !selectedMethodId) {
                         return 'Pendente';
                     }
                     const fallbackName = view === 'money' ? 'Dinheiro' : (view === 'pix' ? 'Pix' : 'Cartão');
                     const fallbackType = view === 'money' ? 'cash' : (view === 'pix' ? 'pix' : 'card');
                     return getFormattedMethodLabel(fallbackName, fallbackType);
                 })(),
-                amount: isUnpaid ? 0 : Number(totalPaidCalculated || 0),
-                amountReceived: isUnpaid ? 0 : (view === 'money'
-                    ? (wantsChange ? Math.max(payWithAmount, totalPaidCalculated) : Math.max(paymentBaseAmount, totalPaidCalculated))
-                    : Number(paymentCalculation?.amountReceived ?? totalPaidCalculated ?? 0)),
+                amount: (isUnpaid && !selectedMethodId) ? 0 : methodLegAmount,
+                amountReceived: actualReceived,
                 wantsChange: view === 'money' ? wantsChange : undefined,
                 payWithAmount: view === 'money' && wantsChange ? payWithAmount : undefined,
-                changeAmount: isUnpaid ? 0 : (view === 'money'
+                changeAmount: (isUnpaid || actualReceived <= 0.009) ? 0 : (view === 'money'
                     ? (wantsChange
-                        ? Number((payWithAmount - totalPaidCalculated).toFixed(2))
-                        : (paymentBaseAmount > totalPaidCalculated
-                            ? Number((paymentBaseAmount - totalPaidCalculated).toFixed(2))
+                        ? Number((payWithAmount - methodLegAmount).toFixed(2))
+                        : (paymentBaseAmount > methodLegAmount
+                            ? Number((paymentBaseAmount - methodLegAmount).toFixed(2))
                             : 0))
                     : 0),
                 adjustmentType: paymentCalculation?.adjustmentType || 'none',
                 adjustmentPercent: Number(paymentCalculation?.adjustmentPercent || 0),
                 adjustmentAmount: Number(paymentCalculation?.adjustmentAmount || 0),
-                effectiveAmount: isUnpaid ? 0 : Number(paymentCalculation?.effectiveAmount ?? totalPaidCalculated ?? 0),
-                netAmount: isUnpaid ? 0 : Number(paymentCalculation?.netAmount ?? totalPaidCalculated ?? 0),
+                effectiveAmount: (isUnpaid && !selectedMethodId) ? 0 : Number(paymentCalculation?.effectiveAmount ?? methodLegAmount),
+                netAmount: (isUnpaid && !selectedMethodId) ? 0 : Number(paymentCalculation?.netAmount ?? methodLegAmount),
                 feeBearer: paymentCalculation?.feeBearer || null,
                 paymentMethodDiscountAmount: Number(paymentCalculation?.paymentMethodDiscountAmount || 0),
                 interestAmount: Number(paymentCalculation?.interestAmount || 0),
@@ -1733,7 +1736,7 @@ const PaymentModal = ({
                 installmentNumber: Math.max(1, Number(installments || 1)),
             };
 
-            selectedLegs = [methodLeg].filter((l) => l.amount > 0.009 || isUnpaidRegister);
+            selectedLegs = [methodLeg].filter((l) => l.amount > 0.009 || isUnpaidRegister || selectedMethodId !== null);
         }
 
         const rawPaymentBreakdown = [...storeCreditLeg, ...selectedLegs];
@@ -1742,7 +1745,7 @@ const PaymentModal = ({
         const validExistingBreakdown = existingPaidAmount > 0.009 ? (existingPaymentBreakdown || []) : [];
 
         const mergedPaymentBreakdown = [...validExistingBreakdown, ...newPaymentBreakdown]
-            .filter((entry: any) => entry?.method && (Number(entry?.amount || 0) > 0.009 || isUnpaidRegister));
+            .filter((entry: any) => entry?.method && (Number(entry?.amount || 0) > 0.009 || isUnpaidRegister || entry?.paymentMethodId));
 
         const paymentMethod = Array.from(new Set(mergedPaymentBreakdown.map((entry: any) => formatPaymentMethodToFullLabel(entry.method)))).join(', ') || 'Método não definido';
 
@@ -1752,7 +1755,7 @@ const PaymentModal = ({
                 : null;
 
         const singleRegisterAmount =
-            view !== 'split' ? (isUnpaidRegister ? 0 : (effectiveCreditApplied + (isCreditOnlyConfirm ? 0 : totalPaidCalculated))) : (effectiveCreditApplied + (splitFinalCharged || 0));
+            view !== 'split' ? (isUnpaidRegister ? 0 : (effectiveCreditApplied + (isCreditOnlyConfirm ? 0 : (view === 'money' && wantsChange ? Math.max(payWithAmount, paymentBaseAmount) : paymentBaseAmount)))) : (effectiveCreditApplied + (splitFinalCharged || 0));
 
         const paidToRegister =
             existingPaidAmount + singleRegisterAmount;
@@ -1763,7 +1766,7 @@ const PaymentModal = ({
             paymentMethod: paymentMethod || 'Método não definido',
             paymentBreakdown: mergedPaymentBreakdown,
             splitPayments: view === 'split' ? payments : [],
-            paymentStatus: isUnpaidRegister ? 'unpaid' : (isUnderpaid ? 'partially_paid' : 'paid'),
+            paymentStatus: isUnpaidRegister ? 'unpaid' : (isUnderpaid ? (paidToRegister <= 0.005 ? 'unpaid' : 'partially_paid') : 'paid'),
             isPendingDelivery,
             paidAmount: paidToRegister
         };
@@ -3184,16 +3187,22 @@ const PaymentModal = ({
                                     confirmText={
                                         editingPaymentIndex !== null
                                             ? "Salvar"
-                                            : (isUnderpaid ? "Salvar Parcialmente" : "Registrar Venda")
+                                            : (paymentBaseAmount <= 0.009
+                                                ? "Registrar venda (sem pagamento)"
+                                                : (isUnderpaid ? "Salvar Parcialmente" : "Registrar Venda"))
                                     }
                                     disabledText={isSinglePricingBusy ? "Calculando valores..." : "Verifique os valores"}
                                     buttonVariant={
                                         editingPaymentIndex !== null
                                             ? "filled"
-                                            : (isUnderpaid ? "outline" : "default")
+                                            : (paymentBaseAmount <= 0.009 || isUnderpaid ? "outline" : "default")
                                     }
                                     disabled={isSinglePricingBusy}
-                                    onCustomConfirm={editingPaymentIndex !== null ? () => handleSplitPaymentUpdate(Number(paymentBaseAmount || 0)) : undefined}
+                                    onCustomConfirm={
+                                        editingPaymentIndex !== null
+                                            ? () => handleSplitPaymentUpdate(Number(paymentBaseAmount || 0))
+                                            : (paymentBaseAmount <= 0.009 ? () => handleStartProcessing(undefined, true) : undefined)
+                                    }
                                 />
                             )}
 

@@ -345,7 +345,7 @@ async function applyPaymentMethodPricingToTotal(
         methodIds.length > 0
             ? supabase
                 .from("payment_methods")
-                .select("id, fee_percent, fee_fixed, fee_bearer, discount_percent, max_installments")
+                .select("id, fee_percent, fee_fixed, fee_bearer, installment_fee_bearer, discount_percent, max_installments")
                 .eq("partner_id", partnerId)
                 .eq("is_active", true)
                 .in("id", methodIds)
@@ -1666,7 +1666,10 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     couponDiscountAmount = pricingResult.couponDiscountAmount
     const serverComputedTotal = pricingResult.finalTotal
     const serverShippingCost = pricingResult.shipping
-    const breakdownTotal = sanitizedPaymentBreakdown.reduce((s, e) => s + e.amount, 0)
+    const breakdownTotalReceived = sanitizedPaymentBreakdown.reduce(
+        (s, e) => s + Number(e.amountReceived ?? (data.paymentStatus === "paid" ? e.amount : 0)),
+        0
+    )
     const hasBreakdown = sanitizedPaymentBreakdown.length > 0
 
     // Extract individual adjustment totals from payment breakdown for separate columns
@@ -1703,10 +1706,14 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     const serverTotalAmount = Math.max(0, serverComputedTotal - paymentMethodDiscountAmount + paymentMethodExtraAmount)
     const adjustedPaymentBreakdown = sanitizedPaymentBreakdown
     const paymentMethodSummary = buildPaymentMethodSummary(adjustedPaymentBreakdown, data.paymentMethod)
+    const effectivePaidAmount = data.paymentStatus === "unpaid"
+        ? 0
+        : (hasBreakdown && breakdownTotalReceived > 0 ? breakdownTotalReceived : Number(data.paidAmount || 0))
+
     const paymentState = resolvePaymentState({
         requestedStatus: data.paymentStatus,
         totalAmount: serverTotalAmount,
-        paidAmount: hasBreakdown && breakdownTotal > 0 ? breakdownTotal : data.paidAmount,
+        paidAmount: effectivePaidAmount,
         fallbackPaidAmount:
             data.paymentStatus === "paid"
                 ? serverTotalAmount
@@ -2644,18 +2651,13 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         }
     }
 
-    const updateBreakdownTotal = adjustedPaymentBreakdown.reduce((s, e) => s + e.amount, 0)
     const hasUpdateBreakdown = adjustedPaymentBreakdown.length > 0
-    const updateFinalTotal = isUnpaidOrder
-        ? updateServerTotal
-        : (hasUpdateBreakdown ? updateBreakdownTotal : (Number(data.totalAmount) || updateServerTotal))
-    const updatePricingBase = hasUpdateBreakdown ? updateServerTotal : Math.max(updateServerTotal, updateFinalTotal)
-    const updatePaymentMethodExtraAmount = Math.max(0, updateFinalTotal - updatePricingBase)
-    // Extract individual adjustment totals from payment breakdown for separate columns
     let updatePaymentMethodInterestAmount = 0
     let updatePaymentMethodFeeAmount = 0
     let updatePaymentMethodFixedFeeAmount = 0
     let updateBreakdownPaymentMethodDiscountAmount = 0
+    let updateCustomerExtraFees = 0
+
     for (const entry of adjustedPaymentBreakdown) {
         const bearer = String(entry.feeBearer || "merchant").toLowerCase().trim()
         const isCustomerBearer = bearer === "customer" || bearer === "buyer"
@@ -2665,15 +2667,17 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             updatePaymentMethodInterestAmount = Math.max(0, updatePaymentMethodInterestAmount + Number(entry.interestAmount || 0))
             updatePaymentMethodFeeAmount = Math.max(0, updatePaymentMethodFeeAmount + Number(entry.feeAmount || 0))
             updatePaymentMethodFixedFeeAmount = Math.max(0, updatePaymentMethodFixedFeeAmount + Number(entry.fixedFeeAmount || 0))
-            if (adjType === "discount" || adjType === "" || adjType === "none") {
+            if (adjType === "discount") {
                 updateBreakdownPaymentMethodDiscountAmount = Math.max(0, updateBreakdownPaymentMethodDiscountAmount + Number(entry.paymentMethodDiscountAmount || 0))
             }
+        } else {
+            updateCustomerExtraFees = Math.max(0, updateCustomerExtraFees + Number(entry.interestAmount || 0) + Number(entry.feeAmount || 0) + Number(entry.fixedFeeAmount || 0))
         }
     }
-    const updatePaymentMethodDiscountAmount = updateBreakdownPaymentMethodDiscountAmount > 0
-        ? updateBreakdownPaymentMethodDiscountAmount
-        : (isUnpaidOrder ? 0 : Math.max(0, updatePricingBase - updateFinalTotal))
-    updateServerTotal = updateFinalTotal
+
+    const updatePaymentMethodDiscountAmount = updateBreakdownPaymentMethodDiscountAmount
+    const updatePaymentMethodExtraAmount = updateCustomerExtraFees
+    updateServerTotal = Math.max(0, updateServerTotal - updatePaymentMethodDiscountAmount + updatePaymentMethodExtraAmount)
     const paymentMethodSummary = buildPaymentMethodSummary(adjustedPaymentBreakdown, data.paymentMethod)
     const paymentState = resolvePaymentState({
         requestedStatus: data.paymentStatus,
@@ -3585,9 +3589,23 @@ export async function updateOrdersStatusInBatchAction(payload: {
                             : 0,
             })
 
-            const nextPaymentMethod = payload.paymentBreakdown
-                ? Array.from(new Set(payload.paymentBreakdown.map((entry: any) => normalizePaymentMethodLabel(entry.method)).filter(Boolean))).join(', ') || 'Método não definido'
-                : undefined
+            const validMethodLabels = payload.paymentBreakdown
+                ? Array.from(
+                    new Set(
+                        payload.paymentBreakdown
+                            .map((entry: any) => normalizePaymentMethodLabel(entry.method))
+                            .filter((label?: string): label is string => {
+                                if (!label) return false;
+                                const norm = label.toLowerCase();
+                                return !norm.includes('não definido') && !norm.includes('metodo nao definido') && !norm.includes('pendente') && !norm.includes('não informado') && !norm.includes('nao informado');
+                            })
+                    )
+                )
+                : []
+
+            const nextPaymentMethod = validMethodLabels.length > 0
+                ? validMethodLabels.join(', ')
+                : (payload.paymentBreakdown ? undefined : undefined)
 
             const updateFields: Record<string, unknown> = {
                 situation: paymentState.situation,

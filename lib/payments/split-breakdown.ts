@@ -30,6 +30,7 @@ export type MethodRow = {
     fee_bearer: string
     discount_percent: number
     max_installments: number
+    installment_fee_bearer?: string | null
 }
 
 export type InstallmentFee = { installmentNumber: number; feePercent: number }
@@ -58,6 +59,7 @@ function toFeeConfig(
         feePercent: Number(method.fee_percent || 0),
         feeFixed: Math.max(0, Number(method.fee_fixed || 0)),
         feeBearer: (method.fee_bearer || "merchant") as "merchant" | "customer",
+        installmentFeeBearer: (method.installment_fee_bearer || "merchant") as "merchant" | "customer",
         discountPercent: Number(method.discount_percent || 0),
         maxInstallments: Math.max(1, Number(method.max_installments || 1)),
         installmentFees: (feesByMethod.get(String(method.id)) || []).map((f) => ({
@@ -81,6 +83,7 @@ export type RecalculatedSplitRow = SplitInputRow & {
     adjustmentAmount?: number
     effectiveAmount?: number
     netAmount?: number
+    installmentCostAmount?: number
 }
 
 /**
@@ -165,6 +168,7 @@ export function recalculateSplitPaymentFromBaseAmounts(
                         adjustmentAmount: 0,
                         effectiveAmount: amountReceived,
                         netAmount: amountReceived,
+                        installmentCostAmount: 0,
                     },
                 ],
             }
@@ -199,6 +203,7 @@ export function recalculateSplitPaymentFromBaseAmounts(
                     adjustmentAmount: engine.adjustmentAmount,
                     effectiveAmount: engine.effectiveAmount,
                     netAmount: engine.netAmount,
+                    installmentCostAmount: engine.installmentCostAmount,
                     feeBearer: engine.feeBearer,
                 },
             ],
@@ -238,6 +243,7 @@ export function recalculateSplitPaymentFromBaseAmounts(
                 adjustmentAmount: 0,
                 effectiveAmount: amountReceived,
                 netAmount: amountReceived,
+                installmentCostAmount: 0,
             })
             finalTotal = round2(finalTotal + amountReceived)
             continue
@@ -269,6 +275,7 @@ export function recalculateSplitPaymentFromBaseAmounts(
             adjustmentAmount: engine.adjustmentAmount,
             effectiveAmount: engine.effectiveAmount,
             netAmount: engine.netAmount,
+            installmentCostAmount: engine.installmentCostAmount,
             feeBearer: engine.feeBearer,
         })
         finalTotal = round2(finalTotal + finalAmt)
@@ -305,6 +312,7 @@ export function toStoredBreakdownAmounts(rows: RecalculatedSplitRow[]): PaymentB
         fixedFeeAmount: r.fixedFeeAmount ?? 0,
         effectiveAmount: r.effectiveAmount ?? r.finalAmount,
         netAmount: r.netAmount ?? r.finalAmount,
+        installmentCostAmount: r.installmentCostAmount ?? 0,
         paymentMethodId: r.paymentMethodId,
         installmentNumber: r.installmentNumber,
     }))

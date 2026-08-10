@@ -26,6 +26,7 @@ type UpsertPaymentMethodInput = {
     receivingDays?: number | null
     discountPercent?: number | null
     feeBearer?: "merchant" | "customer"
+    installmentFeeBearer?: "merchant" | "customer" | null
     supportsInstallments?: boolean
     maxInstallments?: number | null
     installmentFees?: InstallmentFeeInput[]
@@ -156,6 +157,7 @@ const getCachedPaymentMethods = (partnerId: string) => unstable_cache(
                 "fee_percent, fee_fixed, fee_bearer, discount_percent, " +
                 "max_installments, card_brand, priority, " +
                 "percentage_rate, fixed_amount, created_at, " +
+                "installment_fee_bearer, " +
                 "default_finance_account_id, store_id, " +
                 "finance_accounts!default_finance_account_id(name)"
             )
@@ -174,6 +176,7 @@ const getCachedPaymentMethods = (partnerId: string) => unstable_cache(
             fee_percent: method.fee_percent ?? method.percentage_rate ?? null,
             fee_fixed: method.fee_fixed ?? method.fixed_amount ?? null,
             fee_bearer: method.fee_bearer || "merchant",
+            installment_fee_bearer: method.installment_fee_bearer || "merchant",
             finance_account_name: method.finance_accounts?.name || null,
         }))
     },
@@ -236,6 +239,7 @@ export async function calculatePaymentMethodAmountsAction(input: {
     paymentMethodId: string
     installmentNumber?: number
     feeBearer?: "merchant" | "customer"
+    installmentFeeBearer?: "merchant" | "customer" | null
     includeInstallmentOptions?: boolean
 }) {
     await requireUser()
@@ -243,7 +247,7 @@ export async function calculatePaymentMethodAmountsAction(input: {
 
     const { data: method } = await supabase
         .from("payment_methods")
-        .select("id, partner_id, fee_percent, fee_fixed, fee_bearer, discount_percent, max_installments, type, payment_type")
+        .select("id, partner_id, fee_percent, fee_fixed, fee_bearer, installment_fee_bearer, discount_percent, max_installments, type, payment_type")
         .eq("id", input.paymentMethodId)
         .single()
 
@@ -259,6 +263,7 @@ export async function calculatePaymentMethodAmountsAction(input: {
         feePercent: Number(method.fee_percent || 0),
         feeFixed: Number(method.fee_fixed || 0),
         feeBearer: (input.feeBearer || method.fee_bearer || "merchant") as "merchant" | "customer",
+        installmentFeeBearer: (input.installmentFeeBearer || method.installment_fee_bearer || "merchant") as "merchant" | "customer",
         discountPercent: Number(method.discount_percent || 0),
         maxInstallments: Number(method.max_installments || 1),
         installmentFees: (fees || []).map((row: any) => ({
@@ -283,11 +288,12 @@ export async function calculatePaymentMethodAmountsAction(input: {
             installmentOptions.push({
                 installments: i,
                 installmentValue: calc.installmentAmounts[0] || round2(calc.finalAmount / i),
-                hasInterest: calc.interestAmount > 0.009 && pmConfig.feeBearer === "customer",
+                hasInterest: calc.interestAmount > 0.009 && (pmConfig.feeBearer === "customer" || pmConfig.installmentFeeBearer === "customer"),
                 totalInterest: calc.interestAmount,
                 totalFee: calc.feeAmount,
                 fixedFee: calc.fixedFeeAmount,
                 feeBearer: pmConfig.feeBearer,
+                installmentFeeBearer: pmConfig.installmentFeeBearer,
                 finalAmount: calc.finalAmount
             })
         }
@@ -305,9 +311,16 @@ export async function calculatePaymentMethodAmountsAction(input: {
     const adjustmentPercent = adjustmentType === "discount"
         ? calc.appliedDiscountPercent
         : (adjustmentType === "interest" ? calc.appliedInterestPercent : calc.appliedFeePercent)
-    const absorbedAmount = pmConfig.feeBearer === "merchant"
-        ? round2(Number(calc.interestAmount || 0) + Number(calc.feeAmount || 0) + Number(calc.fixedFeeAmount || 0))
-        : 0
+    const installmentCostAmount = round2(Number(calc.installmentCostAmount || 0))
+    const fixedInterestAmount = round2(Number(calc.interestAmount || 0) - installmentCostAmount)
+    // Custos absorvidos pelo vendedor: taxas/juros fixos seguem feeBearer;
+    // o custo de parcelamento segue installmentFeeBearer (independente).
+    const absorbedAmount = round2(
+        (pmConfig.feeBearer === "merchant"
+            ? fixedInterestAmount + Number(calc.feeAmount || 0) + Number(calc.fixedFeeAmount || 0)
+            : 0)
+        + (pmConfig.installmentFeeBearer === "merchant" ? installmentCostAmount : 0)
+    )
 
     return {
         success: true,
@@ -317,6 +330,7 @@ export async function calculatePaymentMethodAmountsAction(input: {
         feeAmount: calc.feeAmount,
         fixedFeeAmount: calc.fixedFeeAmount,
         interestAmount: calc.interestAmount,
+        installmentCostAmount,
         amountBeforeInterest: calc.amountBeforeInterest,
         amountBeforeFee: calc.amountBeforeFee,
         installmentNumber: calc.installmentNumber,
@@ -331,6 +345,7 @@ export async function calculatePaymentMethodAmountsAction(input: {
         effectiveAmount: calc.finalAmount,
         netAmount: round2(calc.finalAmount - absorbedAmount),
         feeBearer: pmConfig.feeBearer,
+        installmentFeeBearer: pmConfig.installmentFeeBearer,
     }
 }
 
@@ -364,7 +379,7 @@ export async function previewSplitPaymentBreakdownAction(input: {
         methodIds.length > 0
             ? supabase
                 .from("payment_methods")
-                .select("id, fee_percent, fee_fixed, fee_bearer, discount_percent, max_installments")
+                .select("id, fee_percent, fee_fixed, fee_bearer, installment_fee_bearer, discount_percent, max_installments")
                 .eq("partner_id", input.partnerId)
                 .eq("is_active", true)
                 .in("id", methodIds)
@@ -443,6 +458,7 @@ export async function createPaymentMethodAction(data: UpsertPaymentMethodInput) 
         feeFixed: data.feeFixed ?? 0,
         receivingDays: data.receivingDays ?? 0,
         feeBearer: data.feeBearer || "merchant",
+        installmentFeeBearer: data.installmentFeeBearer || "merchant",
         supportsInstallments,
         maxInstallments,
         discountPercent: data.discountPercent,
@@ -500,6 +516,7 @@ export async function createPaymentMethodAction(data: UpsertPaymentMethodInput) 
             receiving_days: data.receivingDays ?? 0,
             discount_percent: data.discountPercent ?? 0,
             fee_bearer: data.feeBearer || "merchant",
+            installment_fee_bearer: data.installmentFeeBearer || "merchant",
             supports_installments: supportsInstallments,
             card_brand: data.cardBrand,
             pix_key_type: isPix ? (data.pixKeyType || null) : null,
@@ -542,6 +559,7 @@ export async function updatePaymentMethodAction(
         receivingDays?: number
         discountPercent?: number
         feeBearer?: "merchant" | "customer"
+        installmentFeeBearer?: "merchant" | "customer" | null
         supportsInstallments?: boolean
         installmentFees?: InstallmentFeeInput[]
         pixKeyType?: "cpf" | "cnpj" | "email" | "phone" | "random" | null
@@ -608,6 +626,7 @@ export async function updatePaymentMethodAction(
     if (data.receivingDays !== undefined) updateData.receiving_days = data.receivingDays
     if (data.discountPercent !== undefined) updateData.discount_percent = data.discountPercent
     if (data.feeBearer !== undefined) updateData.fee_bearer = data.feeBearer
+    if (data.installmentFeeBearer !== undefined) updateData.installment_fee_bearer = data.installmentFeeBearer || "merchant"
     if (data.supportsInstallments !== undefined) updateData.supports_installments = data.supportsInstallments
     if (data.pixKeyType !== undefined) updateData.pix_key_type = data.pixKeyType
     if (data.usePartnerPixData !== undefined) updateData.use_partner_pix_data = data.usePartnerPixData

@@ -181,6 +181,7 @@ export type PricingInput = {
     feePercent?: number
     feeFixed?: number
     feeBearer?: "merchant" | "customer"
+    installmentFeeBearer?: "merchant" | "customer"
     installmentFees?: Array<{ installmentNumber: number; feePercent: number }>
     installmentNumber?: number
     maxInstallments?: number
@@ -240,6 +241,8 @@ export type PricingResult = {
   paymentMethodDiscountAmount: number
   /** Payment method interest amount */
   paymentMethodInterestAmount: number
+  /** Custo de parcelamento (juros das parcelas) do método de pagamento */
+  paymentMethodInstallmentCostAmount: number
   /** Payment method fee amount */
   paymentMethodFeeAmount: number
   /** Payment method fixed fee amount */
@@ -925,6 +928,7 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
   let paymentMethodInterestAmount = 0
   let paymentMethodFeeAmount = 0
   let paymentMethodFixedFeeAmount = 0
+  let paymentMethodInstallmentCostAmount = 0
   let appliedPaymentDiscountPercent = 0
   let finalAmountWithPayment = currentTotal
 
@@ -937,6 +941,7 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
         feePercent: pmt.feePercent ?? 0,
         feeFixed: pmt.feeFixed ?? 0,
         feeBearer: pmt.feeBearer ?? "merchant",
+        installmentFeeBearer: pmt.installmentFeeBearer ?? "merchant",
         discountPercent: pmt.discountPercent ?? 0,
         maxInstallments: pmt.maxInstallments ?? 24,
         installmentFees: pmt.installmentFees ?? [],
@@ -946,6 +951,7 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
 
     paymentMethodDiscountAmount = round2(clampMin0(paymentCalc.paymentMethodDiscountAmount))
     paymentMethodInterestAmount = round2(clampMin0(paymentCalc.interestAmount))
+    paymentMethodInstallmentCostAmount = round2(clampMin0(paymentCalc.installmentCostAmount))
     paymentMethodFeeAmount = round2(clampMin0(paymentCalc.feeAmount))
     paymentMethodFixedFeeAmount = round2(clampMin0(paymentCalc.fixedFeeAmount))
     appliedPaymentDiscountPercent = paymentCalc.appliedDiscountPercent
@@ -983,6 +989,7 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
     couponReplacedCampaign,
     paymentMethodDiscountAmount,
     paymentMethodInterestAmount,
+    paymentMethodInstallmentCostAmount,
     paymentMethodFeeAmount,
     paymentMethodFixedFeeAmount,
     appliedPaymentDiscountPercent,

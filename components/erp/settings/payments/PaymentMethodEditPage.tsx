@@ -69,6 +69,7 @@ interface PaymentMethod {
     fee_fixed?: number | null
     discount_percent?: number | null
     fee_bearer?: "merchant" | "customer"
+    installment_fee_bearer?: "merchant" | "customer"
     card_brand?: string | null
     max_installments?: number | null
     pix_key_type?: "cpf" | "cnpj" | "email" | "phone" | "random" | null
@@ -111,6 +112,7 @@ export function PaymentMethodEditPage({ partnerId, storeId: propStoreId, editing
         fee_percent: 0,
         fee_fixed: 0,
         fee_bearer: "merchant" as "merchant" | "customer",
+        installment_fee_bearer: "merchant" as "merchant" | "customer",
         discount_percent: 0,
         card_brand: null as string | null,
         max_installments: 1,
@@ -143,6 +145,7 @@ export function PaymentMethodEditPage({ partnerId, storeId: propStoreId, editing
                     fee_percent: 0,
                     fee_fixed: 0,
                     fee_bearer: "merchant" as const,
+                    installment_fee_bearer: "merchant" as const,
                     discount_percent: 0,
                     card_brand: null,
                     max_installments: 1,
@@ -176,6 +179,7 @@ export function PaymentMethodEditPage({ partnerId, storeId: propStoreId, editing
                         fee_percent: Number(m.fee_percent || 0),
                         fee_fixed: Number(m.fee_fixed || 0),
                         fee_bearer: (m.fee_bearer || "merchant") as "merchant" | "customer",
+                        installment_fee_bearer: (m.installment_fee_bearer || "merchant") as "merchant" | "customer",
                         discount_percent: Number(m.discount_percent || 0),
                         card_brand: m.card_brand || null,
                         max_installments: Number(m.max_installments || 1),
@@ -243,6 +247,7 @@ export function PaymentMethodEditPage({ partnerId, storeId: propStoreId, editing
                 feePercent: Number(formData.fee_percent || 0),
                 feeFixed: Number(formData.fee_fixed || 0),
                 feeBearer: formData.fee_bearer || "merchant",
+                installmentFeeBearer: formData.installment_fee_bearer || "merchant",
                 discountPercent: Number(formData.discount_percent || 0),
                 maxInstallments: isCredit ? Number(formData.max_installments || 1) : 1,
                 supportsInstallments: isCredit && formData.supports_installments,
@@ -819,6 +824,15 @@ export function PaymentMethodEditPage({ partnerId, storeId: propStoreId, editing
 
                                                         {formData.supports_installments && (
                                                             <div className="space-y-4">
+                                                                <FormDropdown
+                                                                    label="Quem paga o custo de parcelamento?"
+                                                                    value={formData.installment_fee_bearer}
+                                                                    setValue={(val: any) => setFormData({ ...formData, installment_fee_bearer: val })}
+                                                                    options={[
+                                                                        { value: "merchant", label: "Empresa (absorve)" },
+                                                                        { value: "customer", label: "Cliente (acrescenta no valor)" },
+                                                                    ]}
+                                                                />
                                                                 <div className="flex items-center justify-between">
                                                                     <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading">Custo de Parcelamento</label>
                                                                     {formData.installment_fees.length > 0 && formData.installment_fees.some(f => f.feePercent > 0) && (

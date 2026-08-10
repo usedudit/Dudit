@@ -368,9 +368,21 @@ export default function PaymentStatusModal({
                 }
             }
 
+            const hasRealLeg = updatedBreakdown.some((leg: any) => {
+                const norm = String(leg.method || '').toLowerCase();
+                return !norm.includes('não definido') && !norm.includes('metodo nao definido') && !norm.includes('pendente');
+            });
+
+            const finalBreakdown = hasRealLeg
+                ? updatedBreakdown.filter((leg: any) => {
+                    const norm = String(leg.method || '').toLowerCase();
+                    return !norm.includes('não definido') && !norm.includes('metodo nao definido') && !norm.includes('pendente');
+                })
+                : updatedBreakdown;
+
             let totalLegDiscount = 0;
             let totalLegExtra = 0;
-            for (const leg of updatedBreakdown) {
+            for (const leg of finalBreakdown) {
                 if (leg.adjustmentType === 'discount' && Number(leg.adjustmentAmount || 0) > 0) {
                     totalLegDiscount += Number(leg.adjustmentAmount);
                 } else if (leg.adjustmentType === 'surcharge' && Number(leg.adjustmentAmount || 0) > 0) {
@@ -395,7 +407,7 @@ export default function PaymentStatusModal({
                 actionType: "payment_status",
                 statusValue: nextSituation,
                 paidAmount: nextPaidAmount,
-                paymentBreakdown: updatedBreakdown,
+                paymentBreakdown: finalBreakdown,
             });
 
             if (res.success) {
@@ -406,7 +418,7 @@ export default function PaymentStatusModal({
                     paid_amount: nextPaidAmount,
                     paidAmount: nextPaidAmount,
                     situation: nextSituation,
-                    payment_breakdown: updatedBreakdown,
+                    payment_breakdown: finalBreakdown,
                     payment_method_discount_amount: totalLegDiscount,
                     payment_method_extra_amount: totalLegExtra,
                 };

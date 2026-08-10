@@ -29,6 +29,7 @@ function distributeInstallments(total: number, installments: number): number[] {
 type MarketplacePreviewResult = {
   finalAmount: number
   interestAmount: number
+  installmentCostAmount: number
   feeAmount: number
   fixedFeeAmount: number
   paymentMethodDiscountAmount: number
@@ -79,10 +80,17 @@ function marketplaceCalculateAmounts(input: {
   const amountBeforeInterest = currentTotal
 
   // Step 2: installment interest (marketplace-specific chaining)
+  // Juros fixos seguem feeBearer; o custo de parcelamento segue installmentFeeBearer.
   const totalInterestPercent = Math.max(0, fixedInterestPercent + Number(installmentFeePercent || 0))
   const interestAmount = round2(currentTotal * (totalInterestPercent / 100))
+  const installmentFeeBearer = (pm.installmentFeeBearer || "merchant") as "merchant" | "customer"
+  const fixedInterestAmount = round2(currentTotal * (fixedInterestPercent / 100))
+  const installmentCostAmount = round2(currentTotal * (installmentFeePercent / 100))
   if (pm.feeBearer === "customer") {
-    currentTotal = toSafeMoney(currentTotal + interestAmount)
+    currentTotal = toSafeMoney(currentTotal + fixedInterestAmount)
+  }
+  if (installmentFeeBearer === "customer") {
+    currentTotal = toSafeMoney(currentTotal + installmentCostAmount)
   }
   const amountBeforeFee = currentTotal
 
@@ -97,6 +105,7 @@ function marketplaceCalculateAmounts(input: {
   return {
     finalAmount,
     interestAmount,
+    installmentCostAmount,
     feeAmount: percentageFeeAmount,
     fixedFeeAmount,
     paymentMethodDiscountAmount,
@@ -127,7 +136,7 @@ export async function previewMarketplacePaymentAction(input: {
   if (isUuid) {
     const { data, error } = await adminSupabase
       .from("payment_methods")
-      .select("id, partner_id, type, payment_type, is_active, discount_percent, fee_percent, fee_fixed, priority, is_default, name, default_finance_account_id, max_installments, fee_bearer")
+      .select("id, partner_id, type, payment_type, is_active, discount_percent, fee_percent, fee_fixed, priority, is_default, name, default_finance_account_id, max_installments, fee_bearer, installment_fee_bearer")
       .eq("id", input.paymentMethodId)
       .eq("partner_id", input.partnerId)
       .eq("is_active", true)
@@ -157,6 +166,7 @@ export async function previewMarketplacePaymentAction(input: {
     feePercent: Number(method.fee_percent || 0),
     feeFixed: Number(method.fee_fixed || 0),
     feeBearer: (method.fee_bearer || "merchant") as "merchant" | "customer",
+    installmentFeeBearer: (method.installment_fee_bearer || "merchant") as "merchant" | "customer",
     discountPercent: Number(method.discount_percent || 0),
     maxInstallments: Number(method.max_installments || 1),
     installmentFees: (fees || []).map((row: any) => ({
@@ -184,11 +194,12 @@ export async function previewMarketplacePaymentAction(input: {
       installmentOptions.push({
         installments: i,
         installmentValue: calc.installmentAmounts[0] || 0,
-        hasInterest: calc.interestAmount > 0 && feeConfig.feeBearer === "customer",
+        hasInterest: calc.interestAmount > 0 && (feeConfig.feeBearer === "customer" || feeConfig.installmentFeeBearer === "customer"),
         totalInterest: calc.interestAmount,
         totalFee: calc.feeAmount,
         fixedFee: calc.fixedFeeAmount,
         feeBearer: feeConfig.feeBearer,
+        installmentFeeBearer: feeConfig.installmentFeeBearer,
         finalAmount: calc.finalAmount,
       })
     }
@@ -201,6 +212,7 @@ export async function previewMarketplacePaymentAction(input: {
     methodType: chosenType,
     maxInstallments: Math.max(1, Number(method.max_installments || 1)),
     feeBearer: feeConfig.feeBearer,
+    installmentFeeBearer: feeConfig.installmentFeeBearer,
     installmentOptions,
     ...result,
   }

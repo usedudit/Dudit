@@ -27,7 +27,7 @@ export async function pickBestPaymentMethod(
 
     const { data: allMethods } = await supabase
         .from("payment_methods")
-        .select("id, partner_id, type, payment_type, is_active, discount_percent, fee_percent, fee_fixed, priority, is_default, name, default_finance_account_id, max_installments, fee_bearer, store_id, store_ids")
+        .select("id, partner_id, type, payment_type, is_active, discount_percent, fee_percent, fee_fixed, priority, is_default, name, default_finance_account_id, max_installments, fee_bearer, installment_fee_bearer, store_id, store_ids")
         .eq("partner_id", partnerId)
         .eq("is_active", true)
 

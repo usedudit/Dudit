@@ -5,7 +5,7 @@ export function resolvePaymentMethodsForStore(
   params: { partnerId: string; storeId?: string | null },
   options?: { select?: string; activeOnly?: boolean }
 ) {
-  const select = options?.select || "id, fee_percent, fee_fixed, fee_bearer, discount_percent, max_installments"
+  const select = options?.select || "id, fee_percent, fee_fixed, fee_bearer, installment_fee_bearer, discount_percent, max_installments"
   const activeOnly = options?.activeOnly !== false
 
   let query = supabase
