@@ -36,3 +36,27 @@ export function normalizePermissions(template: PermissionTemplate, raw: unknown)
   return out as RbacPermissions
 }
 
+/**
+ * Merges base role permissions (from DB roles table) with user-level overrides,
+ * then normalizes against the base permission template.
+ * If userPerms is empty/null/{}, rolePerms is used directly as the source of truth.
+ */
+export function mergePermissionsWithRole(
+  template: PermissionTemplate,
+  rolePerms: unknown,
+  userPerms: unknown
+): RbacPermissions {
+  const baseRole = isPlainObject(rolePerms) ? rolePerms : {}
+  const userPatch = isPlainObject(userPerms) ? userPerms : {}
+
+  const merged: any = {}
+  for (const moduleKey of Object.keys(template)) {
+    const roleMod = isPlainObject((baseRole as any)[moduleKey]) ? (baseRole as any)[moduleKey] : {}
+    const userMod = isPlainObject((userPatch as any)[moduleKey]) ? (userPatch as any)[moduleKey] : {}
+    merged[moduleKey] = { ...roleMod, ...userMod }
+  }
+
+  return normalizePermissions(template, merged)
+}
+
+

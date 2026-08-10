@@ -335,17 +335,29 @@ export async function updateTeamMemberRole(
             return { success: false, error: "O proprietário da loja não pode ser alterado." }
         }
 
-        // Update
+        const newRoleIdLower = String(newRole || "").toLowerCase()
+        const newRoleUpper = String(newRole || "").toUpperCase()
+
+        // Update partner_users
         const { error } = await admin
             .from("partner_users")
             .update({
-                role_id: String(newRole || "").toLowerCase()
+                role_id: newRoleIdLower,
+                role: newRoleUpper,
             })
             .eq("id", targetRecord.id)
 
         if (error) {
             return { success: false, error: "Erro ao atualizar o membro." }
         }
+
+        // Update store_members for this partner_user as well
+        await admin
+            .from("store_members")
+            .update({
+                role: newRoleUpper,
+            })
+            .eq("partner_user_id", targetRecord.id)
 
         await import("@/lib/security/audit-logger").then(m => m.auditLog({
             action: "member.updated" as any,

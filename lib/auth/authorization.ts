@@ -8,7 +8,7 @@ import type { PartnerPermissions } from "@/lib/permissions/types"
 import type { RoleId } from "@/lib/permissions/rbac-types"
 import { can } from "@/lib/permissions/can"
 import { getPermissionTemplate } from "@/lib/permissions/rbac-template-loader"
-import { normalizePermissions } from "@/lib/permissions/rbac-normalize"
+import { normalizePermissions, mergePermissionsWithRole } from "@/lib/permissions/rbac-normalize"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 
 // ─── Auth Errors ────────────────────────────────────────────────────────────
@@ -175,12 +175,8 @@ const checkPartnerAccess = async (
   // Explicitly validate returned truthy data
   if (invitedAccessRes.data && invitedAccessRes.data.role_id) {
     const roleId = String(invitedAccessRes.data.role_id || "delivery").toLowerCase() as RoleId
-    let rawPerms = invitedAccessRes.data.permissions
-    if (!rawPerms) {
-      const { data: roleRow } = await admin.from("roles").select("permissions").eq("id", roleId).maybeSingle()
-      rawPerms = roleRow?.permissions
-    }
-    const permissions = normalizePermissions(template, rawPerms)
+    const { data: roleRow } = await admin.from("roles").select("permissions").eq("id", roleId).maybeSingle()
+    const permissions = mergePermissionsWithRole(template, roleRow?.permissions, invitedAccessRes.data.permissions)
     return { roleId, permissions }
   }
 

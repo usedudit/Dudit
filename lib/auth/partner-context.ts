@@ -160,7 +160,7 @@ export async function getActiveStoreId(): Promise<string | null> {
 // ─── Partner Context Resolution ─────────────────────────────────────────────
 
 import { getPermissionTemplate } from "@/lib/permissions/rbac-template-loader"
-import { normalizePermissions } from "@/lib/permissions/rbac-normalize"
+import { normalizePermissions, mergePermissionsWithRole } from "@/lib/permissions/rbac-normalize"
 
 // ─── Extracted Cache Factory for stability and strict keying ────────────────
 //
@@ -252,7 +252,7 @@ const fetchUserAccessStatic = (userId: string) => unstable_cache(
 
                 if (!accessRecords[record.partner_id]) {
                     const roleId = (String(record.role_id || "delivery").toLowerCase() as RoleId)
-                    const dbPerms = record.permissions || rolePermsMap.get(roleId) || undefined
+                    const rolePerms = rolePermsMap.get(roleId)
                     const storeName = storeNameMap.get(record.partner_id) || "Loja sem nome"
                     const ownerName = partner.user_id ? (ownerNameMap.get(partner.user_id) || "Desconhecido") : "Desconhecido"
 
@@ -261,7 +261,7 @@ const fetchUserAccessStatic = (userId: string) => unstable_cache(
                         userId: record.user_id,
                         role: String(roleId).toUpperCase() as PartnerRole,
                         roleId,
-                        permissions: normalizePermissions(template, dbPerms),
+                        permissions: mergePermissionsWithRole(template, rolePerms, record.permissions),
                         storeName,
                         ownerName,
                         businessInfo: normalizeBusinessInfo(partner.business_info),
