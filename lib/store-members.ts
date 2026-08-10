@@ -57,15 +57,17 @@ export async function resolveEffectivePermissions(
     // 1. Buscar partner_user
     const { data: pu } = await supabase
         .from("partner_users")
-        .select("id, role, permissions")
+        .select("id, role, role_id, permissions")
         .eq("partner_id", partnerId)
         .eq("user_id", user.id)
         .maybeSingle()
 
     if (!pu) return null
 
+    const puRoleLower = String(pu.role_id || pu.role || "").toLowerCase()
+
     // 2. OWNER bypass
-    if (pu.role === "OWNER") {
+    if (puRoleLower === "owner" || pu.role === "OWNER") {
         const template = await getPermissionTemplate()
         return {
             role: "OWNER",
@@ -76,7 +78,7 @@ export async function resolveEffectivePermissions(
     // 3. Contexto global (sem store específica)
     if (!storeId) {
         return {
-            role: pu.role as PartnerRole,
+            role: (pu.role || pu.role_id || "delivery").toUpperCase() as PartnerRole,
             permissions: pu.permissions as unknown as PartnerPermissions,
         }
     }
@@ -93,7 +95,7 @@ export async function resolveEffectivePermissions(
     if (!sm) return null
 
     // 4c. Com store_member → aplicar fallback
-    const effectiveRole = (sm.role || pu.role) as PartnerRole
+    const effectiveRole = (sm.role || pu.role || pu.role_id || "delivery").toUpperCase() as PartnerRole
     const basePermissions = pu.permissions as unknown as PartnerPermissions
 
     let effectivePermissions: PartnerPermissions

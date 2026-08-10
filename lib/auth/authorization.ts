@@ -520,7 +520,7 @@ export async function requirePartnerAccessWithPermission(
   // Canonical RBAC enforcement: resource.action => permissions[resource][action] === true
   if (resource && action) {
     const permissionKey = `${String(resource)}.${String(action)}`
-    if (!can({ role_id: roleId, permissions }, permissionKey)) {
+    if (!can({ role_id: roleId, role: roleId, permissions }, permissionKey)) {
       throw new ForbiddenError("Sem permissão para esta ação")
     }
   }
@@ -694,7 +694,7 @@ export async function requireStorePermission(
   if (!effective) {
     throw new ForbiddenError("Acesso negado a esta loja")
   }
-  const rbacUser = { role_id: effective.role.toLowerCase() as RoleId, permissions: effective.permissions }
+  const rbacUser = { role_id: effective.role.toLowerCase() as RoleId, role: effective.role, permissions: effective.permissions }
   if (!can(rbacUser, `${module}.${action}`)) {
     throw new ForbiddenError("Permissão negada para esta ação na loja")
   }

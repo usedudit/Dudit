@@ -66,8 +66,9 @@ export type PermissionTemplate = {
 export type RbacPermissions = PermissionTemplate
 
 export type RbacUserLike = {
-  role_id?: RoleId | null
-  roleId?: RoleId | null
+  role_id?: RoleId | string | null
+  roleId?: RoleId | string | null
+  role?: RoleId | string | null
   permissions?: unknown
 }
 

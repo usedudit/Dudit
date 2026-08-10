@@ -39,7 +39,7 @@ const navItems: NavItem[] = [
     {
         icon: GridIcon,
         label: "Dashboard",
-        href: "/erp/dashboard", // gráficos, métricas, relatórios rápidos
+        href: "/erp/dashboard",
     },
     {
         icon: ShoppingCartIcon,

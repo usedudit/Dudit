@@ -49,6 +49,7 @@ export async function checkPermission<R extends PermissionResource>(
         if (!effective) return { allowed: false }
         const rbacUser: RbacUserLike = {
             role_id: effective.role.toLowerCase() as any,
+            role: effective.role,
             permissions: effective.permissions,
         }
         return { allowed: can(rbacUser, `${String(resource)}.${String(action)}`) }

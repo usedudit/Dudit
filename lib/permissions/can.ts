@@ -1,7 +1,7 @@
 import type { RbacUserLike } from "@/lib/permissions/rbac-types"
 
 function getRoleId(user: RbacUserLike | null | undefined): string {
-  return String((user as any)?.role_id ?? (user as any)?.roleId ?? "").toLowerCase()
+  return String((user as any)?.role_id ?? (user as any)?.roleId ?? (user as any)?.role ?? "").trim().toLowerCase()
 }
 
 /**
