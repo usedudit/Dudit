@@ -6,6 +6,7 @@ import { normalizeToRoutePermissions } from "@/lib/permissions/route-permissions
 import { canAccessRoute } from "@/lib/permissions/route-permissions"
 import type { PartnerRole } from "@/lib/permissions/types"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
+import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import GoalsPage from "@/components/erp/goals/GoalsPage"
 import { getSalesGoalsModuleAction, getSalesGoalsRankingAction, getSalesGoalsSummaryAction } from "@/app/actions/erp/goals"
 
@@ -27,7 +28,7 @@ export default async function ProdutividadeMetasPage() {
   ])
 
   const isFreePlan = plan.slug.toLowerCase() === "free"
-  const planGate = isFreePlan ? { requiredPlanSlug: "crescer" as const } : undefined
+  const planGate = !hasMinimumPlan(plan.slug, "escalar") ? { requiredPlanSlug: "escalar" as const } : undefined
 
   const safeGoals = goalsRes.success ? goalsRes.goals : []
   const safeSellers = goalsRes.success ? goalsRes.sellers : []

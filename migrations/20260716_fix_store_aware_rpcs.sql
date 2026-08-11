@@ -15,7 +15,7 @@
 BEGIN;
 
 -- ============================================================
--- 1. Fix create_batch_stock_movement — Branch 1 & 3 fallback
+-- 1. Fix create_batch_stock_movement - Branch 1 & 3 fallback
 -- ============================================================
 CREATE OR REPLACE FUNCTION public.create_batch_stock_movement(
     p_partner_id UUID,
@@ -203,7 +203,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ============================================================
--- 2. Fix finalize_pos_sale — merge store-aware (f101) + fee/interest (20260715)
+-- 2. Fix finalize_pos_sale - merge store-aware (f101) + fee/interest (20260715)
 -- ============================================================
 CREATE OR REPLACE FUNCTION public.finalize_pos_sale(
   p_partner_id UUID,

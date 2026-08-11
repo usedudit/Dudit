@@ -3,6 +3,7 @@ import { ERPPageHeader } from "@/components/erp/page-header-state"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
+import { requireMinimumPlan } from "@/lib/auth/authorization"
 import { normalizeToRoutePermissions } from "@/lib/permissions/route-permissions"
 import { canAccessRoute } from "@/lib/permissions/route-permissions"
 import type { PartnerRole } from "@/lib/permissions/types"
@@ -27,6 +28,12 @@ export default async function ProdutividadePage(props: {
   const role = (context.role || "DELIVERY") as PartnerRole
   const routePermissions = normalizeToRoutePermissions(role, context.roleId === "owner" ? null : context.permissions)
   if (!canAccessRoute(routePermissions, "productivity_overview")) return <AccessDenied />
+
+  try {
+    await requireMinimumPlan(partnerId, "escalar")
+  } catch {
+    return <AccessDenied />
+  }
 
   const searchParams = await props.searchParams
   const period = (searchParams?.period as Period) || "monthly"

@@ -14,6 +14,7 @@ import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { sanitizeNotes } from "@/lib/input-validator"
 import { createAddressAction } from "@/app/actions/shared/addresses"
+import { enrichAddressData } from "@/lib/services/location.service"
 import { validateCPF, validateCNPJ, validateEmail, validatePhoneBR, validateURL, validateCEP } from "@/lib/input-validator"
 import { buildSoftDeletePayload, buildRestorePayload, buildArchivePayload, scopeActiveOnly, scopeArchivedOnly, scopeWithArchived } from "@/lib/supabase/query-helpers"
 import { checkLimit } from "@/lib/services/subscription.service"
@@ -264,7 +265,7 @@ export async function createComprehensiveCustomerAction(data: {
   }
 
   revalidateCustomers(partnerId)
-  revalidatePath("/erp/customers")
+  revalidatePath("/erp/clientes")
   return { success: true }
 }
 
@@ -297,7 +298,7 @@ export async function deleteCustomerAction(customerId: string, csrf_token?: stri
   }
 
   revalidateCustomers(partnerId)
-  revalidatePath("/erp/customers")
+  revalidatePath("/erp/clientes")
 
   return { success: true }
 }
@@ -442,7 +443,7 @@ export async function updateComprehensiveCustomerAction(data: {
     return { error: error.message }
   }
 
-  // Sincronizar endereÃ§o na tabela addresses
+  // Sincronizar endereço na tabela addresses
   if (data.street || data.city) {
     const { data: existingAddresses } = await supabase
       .from("addresses")
@@ -452,7 +453,7 @@ export async function updateComprehensiveCustomerAction(data: {
       .limit(1)
 
     if (existingAddresses && existingAddresses.length > 0) {
-      const { error: addressUpdateError } = await supabase.from("addresses").update({
+      const enrichedCustAddr = await enrichAddressData({
         zip_code: data.zipCode,
         street: data.street,
         number: data.number,
@@ -462,10 +463,10 @@ export async function updateComprehensiveCustomerAction(data: {
         state: data.state,
         country: data.country || "BR",
         municipio_codigo_ibge: data.municipioCodigoIbge || null,
-      }).eq("id", existingAddresses[0].id)
-      
+      })
+      const { error: addressUpdateError } = await supabase.from("addresses").update(enrichedCustAddr).eq("id", existingAddresses[0].id)
       if (addressUpdateError) {
-        console.error("[updateComprehensiveCustomerAction] Erro ao atualizar endereÃ§o principal:", addressUpdateError.message)
+        console.error("[updateComprehensiveCustomerAction] Erro ao atualizar endereço principal:", addressUpdateError.message)
       }
     } else {
       const addressResult = await createAddressAction({
@@ -486,12 +487,11 @@ export async function updateComprehensiveCustomerAction(data: {
       })
       
       if (addressResult && addressResult.error) {
-        console.error("[updateComprehensiveCustomerAction] Erro ao criar novo endereÃ§o principal:", addressResult.error)
+        console.error("[updateComprehensiveCustomerAction] Erro ao criar novo endereço principal:", addressResult.error)
       }
     }
   }
 
-  // Sincronizar endereÃ§o de cobranÃ§a
   if (data.hasDifferentBillingAddress && (data.billingStreet || data.billingCity)) {
     const { data: existingBilling } = await supabase
       .from("addresses")
@@ -546,7 +546,7 @@ export async function updateComprehensiveCustomerAction(data: {
   }
 
   revalidateCustomers(partnerId)
-  revalidatePath("/erp/customers")
+  revalidatePath("/erp/clientes")
   return { success: true }
 }
 
@@ -921,7 +921,7 @@ export async function deleteCustomersInBatchAction(customerIds: string[]) {
   }
 
   revalidateCustomers(partnerId)
-  revalidatePath("/erp/customers")
+  revalidatePath("/erp/clientes")
   return { success: true }
 }
 
@@ -941,7 +941,7 @@ export async function archiveCustomerAction(customerId: string) {
   if (error) return { error: error.message }
 
   revalidateCustomers(customer.partner_id)
-  revalidatePath("/erp/customers")
+  revalidatePath("/erp/clientes")
   return { success: true }
 }
 
@@ -966,7 +966,7 @@ export async function unarchiveCustomerAction(customerId: string) {
   if (error) return { error: error.message }
 
   revalidateCustomers(customer.partner_id)
-  revalidatePath("/erp/customers")
+  revalidatePath("/erp/clientes")
   return { success: true }
 }
 
@@ -1006,7 +1006,7 @@ export async function toggleCustomersStatusAction(customerIds: string[], isActiv
   }
 
   revalidateCustomers(partnerId)
-  revalidatePath("/erp/customers")
+  revalidatePath("/erp/clientes")
   return { success: true }
 }
 

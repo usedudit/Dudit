@@ -17,7 +17,7 @@ export function DashboardTabs({ active }: { active: DashboardTab }) {
         {tabs.map((tab) => (
           <Link
             key={tab.value}
-            href={`/erp/dashboard?tab=${tab.value}`}
+            href={`/erp/painel?tab=${tab.value}`}
             prefetch={false}
             className={cn(
               "h-9 rounded-lg px-4 text-[13px] font-bold transition-all",

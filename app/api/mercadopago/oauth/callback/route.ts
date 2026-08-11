@@ -29,13 +29,13 @@ export async function GET(request: NextRequest) {
       : error
 
     return NextResponse.redirect(
-      `${appUrl}/erp/settings?mp_error=${encodeURIComponent(mpError)}`
+      `${appUrl}/erp/configuracoes?mp_error=${encodeURIComponent(mpError)}`
     )
   }
 
   if (!code || !state) {
     return NextResponse.redirect(
-      `${appUrl}/erp/settings?mp_error=missing_code`
+      `${appUrl}/erp/configuracoes?mp_error=missing_code`
     )
   }
 
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
       })
 
       return NextResponse.redirect(
-        `${appUrl}/erp/settings?mp_error=invalid_state`
+        `${appUrl}/erp/configuracoes?mp_error=invalid_state`
       )
     }
 
@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
 
     if (!partner) {
       return NextResponse.redirect(
-        `${appUrl}/erp/settings?mp_error=unauthorized`
+        `${appUrl}/erp/configuracoes?mp_error=unauthorized`
       )
     }
 
@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
       await requireMinimumPlan(partner.id, "crescer")
     } catch {
       return NextResponse.redirect(
-        `${appUrl}/erp/settings?tab=integracoes&mp_error=plano_insuficiente`
+        `${appUrl}/erp/configuracoes?tab=integracoes&mp_error=plano_insuficiente`
       )
     }
 
@@ -139,7 +139,7 @@ export async function GET(request: NextRequest) {
       })
 
       return NextResponse.redirect(
-        `${appUrl}/erp/settings?mp_error=token_exchange_failed`
+        `${appUrl}/erp/configuracoes?mp_error=token_exchange_failed`
       )
     }
 
@@ -157,7 +157,7 @@ export async function GET(request: NextRequest) {
       })
 
       return NextResponse.redirect(
-        `${appUrl}/erp/settings?mp_error=${encodeURIComponent(detailedError)}`
+        `${appUrl}/erp/configuracoes?mp_error=${encodeURIComponent(detailedError)}`
       )
     }
 
@@ -171,7 +171,7 @@ export async function GET(request: NextRequest) {
       })
 
       return NextResponse.redirect(
-        `${appUrl}/erp/settings?mp_error=invalid_token_response`
+        `${appUrl}/erp/configuracoes?mp_error=invalid_token_response`
       )
     }
 
@@ -203,7 +203,7 @@ export async function GET(request: NextRequest) {
       console.error("Error saving MP tokens:", updateError)
 
       return NextResponse.redirect(
-        `${appUrl}/erp/settings?mp_error=save_failed`
+        `${appUrl}/erp/configuracoes?mp_error=save_failed`
       )
     }
 
@@ -266,13 +266,13 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.redirect(
-      `${appUrl}/erp/settings?mp_connected=true`
+      `${appUrl}/erp/configuracoes?mp_connected=true`
     )
   } catch (error: any) {
     console.error("MP OAuth callback error:", error)
 
     return NextResponse.redirect(
-      `${appUrl}/erp/settings?mp_error=${encodeURIComponent(
+      `${appUrl}/erp/configuracoes?mp_error=${encodeURIComponent(
         error.message
       )}`
     )

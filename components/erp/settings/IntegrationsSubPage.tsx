@@ -505,7 +505,7 @@ export const IntegrationsSubPage = ({
                                             >
                                                 Saber mais
                                             </Button>
-                                            <Link href="/erp/integrations/whatsapp">
+                                            <Link href="/erp/integracoes/whatsapp">
                                                 <Button variant="link">
                                                     Configurar
                                                 </Button>

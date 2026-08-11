@@ -1,4 +1,4 @@
-# Fase 4.1 — cutover de consumidores limitados
+# Fase 4.1 - cutover de consumidores limitados
 
 Data: 2026-08-09. A migration de RLS de `customers` continua sem aplicação.
 

@@ -591,7 +591,7 @@ export default function OrdersPage({
         if (isMarketplace || hasMethod) {
             openPaymentStatusModal(order)
         } else {
-            router.push(`/erp/orders?edit=${order.originalId}&payment=1`)
+            router.push(`/erp/pedidos?edit=${order.originalId}&payment=1`)
         }
     }, [router, openPaymentStatusModal])
 
@@ -852,7 +852,7 @@ export default function OrdersPage({
                                         payment_breakdown: order.payment_breakdown || [],
                                     })
                                 } else {
-                                    router.push(`/erp/orders?edit=${order.id}&payment=1`)
+                                    router.push(`/erp/pedidos?edit=${order.id}&payment=1`)
                                 }
                             }}
                             onCancelOrder={(order: any) => openCancelModal(order.id)}

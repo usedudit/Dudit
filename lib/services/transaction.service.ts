@@ -538,9 +538,9 @@ export async function createTransactionFromOrder(
                 continue
             }
 
-            // 1) Reconhecimento — DRE bruto, não move saldo.
+            // 1) Reconhecimento - DRE bruto, não move saldo.
             // Venda parcelada (2+ parcelas): NÃO cria movimentação com o valor
-            // total — o valor ainda não foi recebido; só os settlements (contas
+            // total - o valor ainda não foi recebido; só os settlements (contas
             // a receber) representam o que virá, e cada parcela paga gera o
             // registro de recebimento.
             if (installments <= 1) {
@@ -578,7 +578,7 @@ export async function createTransactionFromOrder(
                 }
             }
 
-            // 2) Taxa do gateway — despesa DRE, não move saldo
+            // 2) Taxa do gateway - despesa DRE, não move saldo
             if (entry.cost > 0.009) {
                 const { error: feeError } = await supabase.from("transactions").insert({
                     partner_id: orderData.partner_id,
@@ -613,7 +613,7 @@ export async function createTransactionFromOrder(
                 }
             }
 
-            // 3) Liquidação — único evento que move caixa (valor líquido)
+            // 3) Liquidação - único evento que move caixa (valor líquido)
             if (installments > 1) {
                 const groupId = await createInstallmentGroupForSale(
                     supabase,
@@ -806,7 +806,7 @@ export async function syncReceivableForOrder(
 // ─── Reconciliação do ledger Fase 2 em refunds/devoluções ───────────────────
 // NÃO cria novas transações e NÃO altera recognition/fee/refund existentes:
 // apenas cancela ou reduz settlements (kind='settlement') PENDENTES da venda,
-// que nunca moveram saldo — por isso não há ajuste de caixa aqui.
+// que nunca moveram saldo - por isso não há ajuste de caixa aqui.
 // Idempotente por reconcileKey: linhas já reconciliadas (marcadas nas notes)
 // são puladas em execuções repetidas.
 
@@ -874,7 +874,7 @@ async function auditLedgerReconciliation(params: {
 
 /**
  * Cancela todos os settlements PENDENTES da venda (refund integral, troca ou
- * cancelamento de pedido). Parcelas já quitadas NÃO são tocadas — o valor já
+ * cancelamento de pedido). Parcelas já quitadas NÃO são tocadas - o valor já
  * recebido é coberto pelo evento de refund gerado pelo fluxo existente.
  */
 export async function cancelPendingSettlementsForOrder(params: {

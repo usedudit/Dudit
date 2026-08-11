@@ -62,7 +62,7 @@ export async function addStoreMemberAction(
             targetUserId: partnerUserId,
         })
 
-        revalidatePath("/erp/stores/members")
+        revalidatePath("/erp/lojas/membros")
         return { success: true, data: undefined }
     } catch (error) {
         return { success: false, error: error instanceof Error ? error.message : "Erro ao adicionar membro" }
@@ -99,7 +99,7 @@ export async function updateStoreMemberAction(
             newRole: role,
         })
 
-        revalidatePath("/erp/stores/members")
+        revalidatePath("/erp/lojas/membros")
         return { success: true, data: undefined }
     } catch (error) {
         return { success: false, error: error instanceof Error ? error.message : "Erro ao atualizar membro" }
@@ -129,7 +129,7 @@ export async function removeStoreMemberAction(
             memberId,
         })
 
-        revalidatePath("/erp/stores/members")
+        revalidatePath("/erp/lojas/membros")
         return { success: true, data: undefined }
     } catch (error) {
         return { success: false, error: error instanceof Error ? error.message : "Erro ao remover membro" }
@@ -210,7 +210,7 @@ export async function saveMemberStoreAccessAction(params: {
             storeCount: storeAccesses.length,
         })
 
-        revalidatePath("/erp/settings")
+        revalidatePath("/erp/configuracoes")
         return { success: true, data: undefined }
     } catch (error) {
         return { success: false, error: error instanceof Error ? error.message : "Erro ao salvar acessos às lojas" }

@@ -367,7 +367,7 @@ BEGIN
 END;
 $$;
 
--- ─── Constraint fix (kept — additive, safe) ─────────────────────────────
+-- ─── Constraint fix (kept - additive, safe) ─────────────────────────────
 -- 'confirmed' is left in the constraint to keep the RPC working.
 -- To fully revert to original, run manually:
 --   ALTER TABLE xml_import_items DROP CONSTRAINT xml_import_items_match_status_check,

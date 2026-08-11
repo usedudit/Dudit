@@ -5,6 +5,7 @@ import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { normalizeToRoutePermissions } from "@/lib/permissions/route-permissions"
 import { canAccessRoute } from "@/lib/permissions/route-permissions"
 import type { PartnerRole } from "@/lib/permissions/types"
+import { requireMinimumPlan } from "@/lib/auth/authorization"
 import CommissionPage from "@/components/erp/produtividade/CommissionPage"
 import { getSellersCommissionOverviewAction } from "@/app/actions/erp/produtividade"
 
@@ -17,6 +18,12 @@ export default async function ProdutividadeComissoesPage() {
   const role = (context.role || "DELIVERY") as PartnerRole
   const routePermissions = normalizeToRoutePermissions(role, context.roleId === "owner" ? null : context.permissions)
   if (!canAccessRoute(routePermissions, "productivity_commissions")) return <AccessDenied />
+
+  try {
+    await requireMinimumPlan(partnerId, "crescer")
+  } catch {
+    return <AccessDenied />
+  }
 
   const overviewRes = await getSellersCommissionOverviewAction(partnerId)
   const overview = overviewRes.success && overviewRes.overview

@@ -12,6 +12,7 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { decryptCPF } from "@/lib/crypto"
 import { validateCPF, validateCNPJ } from "@/lib/input-validator"
 import { logAuditEvent } from "@/lib/services/timeline.service"
+import { enrichAddressData } from "@/lib/services/location.service"
 
 interface ImportPreview {
   xml_import_id: string
@@ -134,7 +135,7 @@ async function matchProduct(
 
   const cleanGtin = product.gtin?.replace(/\D/g, "") || null
 
-  // Produtos arquivados/excluídos nunca são usados como match — sempre criar novo
+  // Produtos arquivados/excluídos nunca são usados como match - sempre criar novo
   const EXCLUDED_STATUSES = "(archived,arquivado,deleted,excluido)"
 
   for (const method of order) {
@@ -675,8 +676,9 @@ export async function uploadXMLAction(
       // Criar endereço do fornecedor a partir do XML
       if (metadata.emitente.endereco) {
         const addr = metadata.emitente.endereco
-        await supabase.from("addresses").insert({
+        const enrichedXmlAddr = await enrichAddressData({
           supplier_id: newSupplier.id,
+          user_id: user.id,
           zip_code: addr.cep || null,
           street: addr.logradouro || null,
           number: addr.numero || null,
@@ -686,7 +688,9 @@ export async function uploadXMLAction(
           country: addr.pais || "BR",
           municipio_codigo_ibge: addr.codigo_municipio || null,
           is_default: true,
-        }).maybeSingle()
+          address_type: "primary",
+        })
+        await supabase.from("addresses").insert(enrichedXmlAddr)
       }
     }
 

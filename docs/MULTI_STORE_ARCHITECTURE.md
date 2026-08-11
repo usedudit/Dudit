@@ -1,7 +1,7 @@
 # Multi-Store Architecture
 
 > Arquitetura oficial multi-store do DUDIT.
-> Baseline: Fase 4.5 — bridge performance optimization.
+> Baseline: Fase 4.5 - bridge performance optimization.
 > Data: 2026-07-18
 
 ---
@@ -10,7 +10,7 @@
 
 Toda tabela no banco segue UMA das seguintes classificações:
 
-### 🟦 GLOBAL — sem store_id, dados do parceiro
+### 🟦 GLOBAL - sem store_id, dados do parceiro
 
 | Tabela | Observação |
 |--------|-----------|
@@ -31,7 +31,7 @@ Toda tabela no banco segue UMA das seguintes classificações:
 | `product_fiscal_profiles` | Dados fiscais do produto |
 | `product_logistics` | Dados logísticos do produto |
 
-### 🟧 STORE — store_id NOT NULL, pertencem a uma loja
+### 🟧 STORE - store_id NOT NULL, pertencem a uma loja
 
 | Tabela | RLS |
 |--------|-----|
@@ -49,7 +49,7 @@ Toda tabela no banco segue UMA das seguintes classificações:
 | `delivery_settings` | `user_has_store_access(store_id)` |
 | `store_credits` | `user_has_store_access(store_id)` |
 
-### 🟩 HYBRID nullable — store_id NULL = global, preenchido = store-level
+### 🟩 HYBRID nullable - store_id NULL = global, preenchido = store-level
 
 | Tabela | RLS |
 |--------|-----|
@@ -65,7 +65,7 @@ Toda tabela no banco segue UMA das seguintes classificações:
 | `whatsapp_messages` | idem |
 | `reviews` | Leitura global, filtro opcional por store_id |
 
-### 🟪 BRIDGE — tabelas que conectam GLOBAL → STORE
+### 🟪 BRIDGE - tabelas que conectam GLOBAL → STORE
 
 | Bridge | Tabela Base | Unique Key | Override Fields |
 |--------|------------|------------|-----------------|
@@ -223,7 +223,7 @@ AND (
 
 ### 7.1 Criação de Produto (ERP)
 
-**Server action:** `app/actions/erp/products.ts` — `createProductAction`
+**Server action:** `app/actions/erp/products.ts` - `createProductAction`
 
 1. Valida permissão do usuário
 2. INSERT em `products` (sem `store_id`)
@@ -236,7 +236,7 @@ AND (
 
 ### 7.2 Criação de Serviço (ERP)
 
-**Server action:** `app/actions/erp/servicos.ts` — `createServiceAction`
+**Server action:** `app/actions/erp/servicos.ts` - `createServiceAction`
 
 1. INSERT em `services` (sem `store_id`)
 2. Chama `linkServiceToStore(service.id, storeId)` → INSERT em `store_services`
@@ -310,7 +310,7 @@ Quando uma nova loja é criada, ela herda **automaticamente** sem criar dados:
 
 | Problema | Solução | Arquivo |
 |----------|---------|---------|
-| N+1 em variantes por produto | `listStoreProductVariantsBatch()` — única query com `IN (...)` | `lib/store-variants.ts` |
+| N+1 em variantes por produto | `listStoreProductVariantsBatch()` - única query com `IN (...)` | `lib/store-variants.ts` |
 | N+1 em visibility_scope check | Query única com `IN (productIds)` + Map em memória | `lib/store-products.ts:156-179` |
 
 ### 9.2 LEFT JOIN vs Subqueries

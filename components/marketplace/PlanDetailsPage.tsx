@@ -305,7 +305,7 @@ export function PlanDetailsPageClient({
     const frequencyLabel = useMemo(() => {
         const interval = plan.frequency_interval || 1
         const type = plan.frequency_type || "monthly"
-        
+
         if (type === "daily") return interval === 1 ? "diário" : `a cada ${interval} dias`
         if (type === "weekly") return interval === 1 ? "semanal" : `a cada ${interval} semanas`
         if (type === "monthly") return interval === 1 ? "mensal" : `a cada ${interval} meses`
@@ -724,7 +724,7 @@ export function PlanDetailsPageClient({
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 xl:gap-12">
                         {/* Left Column: Details */}
                         <div className="lg:col-span-8">
-                            
+
                             {/* Gallery */}
                             <div className="flex gap-3 mb-6">
                                 {/* Desktop thumbnails */}
@@ -877,8 +877,8 @@ export function PlanDetailsPageClient({
                                             {/* Banner Link to Partner Profile */}
                                             <Link href={getStoreUrl(partner)} className="block group">
                                                 <div className="h-24 w-full relative bg-gray-100 overflow-hidden select-none">
-                                                    <img src={sellerBannerImage} alt="" className="w-full h-full object-cover" />
-                                                    <div className="absolute inset-0 bg-black/10" />
+                                                    <img src={sellerBannerImage} alt={`Banner de ${partner.store_name}`} className="w-full h-full object-cover" />
+                                                    <div className="absolute inset-0" />
                                                 </div>
 
                                                 <div className="px-5 pt-0 relative flex flex-col">

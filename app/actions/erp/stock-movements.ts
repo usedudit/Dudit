@@ -116,8 +116,8 @@ export async function createStockMovementAction(data: {
         }
 
         revalidateStockMovements(partnerId)
-        revalidatePath('/erp/stock-movements')
-        revalidatePath('/erp/products')
+        revalidatePath('/erp/movimentacao-estoque')
+        revalidatePath('/erp/produtos')
         await invalidateProductCache(data.productId, partnerId, 'update', { silent: true })
 
         return successResponse(movementRecord)
@@ -214,8 +214,8 @@ export async function createBatchStockMovementAction(data: {
         }
 
         revalidateStockMovements(partnerId)
-        revalidatePath('/erp/stock-movements')
-        revalidatePath('/erp/products')
+        revalidatePath('/erp/movimentacao-estoque')
+        revalidatePath('/erp/produtos')
 
         // Invalidate cache for all products
         for (const item of data.items) {
@@ -383,8 +383,8 @@ export async function deleteStockMovementAction(id: string) {
         }
 
         revalidateStockMovements(ctx.partnerId)
-        revalidatePath('/erp/stock-movements')
-        revalidatePath('/erp/products')
+        revalidatePath('/erp/movimentacao-estoque')
+        revalidatePath('/erp/produtos')
 
         return successResponse({ id })
     } catch (err: any) {
@@ -455,8 +455,8 @@ export async function undoStockMovementAction(id: string, customReason?: string)
         }
 
         revalidateStockMovements(partnerId)
-        revalidatePath('/erp/stock-movements')
-        revalidatePath('/erp/products')
+        revalidatePath('/erp/movimentacao-estoque')
+        revalidatePath('/erp/produtos')
 
         for (const item of childItems) {
             await invalidateProductCache(item.product_id, partnerId, 'update', { silent: true })

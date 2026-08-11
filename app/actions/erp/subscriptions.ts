@@ -5,6 +5,7 @@ import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { errorResponse, successResponse } from "@/lib/utils/action-helpers"
 import type { ActionResponse } from "@/lib/types/action-response"
+import { getAdminClient } from "@/lib/supabase/admin"
 import {
   getAllPlans,
   getPartnerPlan,
@@ -17,6 +18,7 @@ import {
   updateMpSubscription,
   getMpSubscriptionStatus,
 } from "@/lib/services/mercadopago/subscriptions"
+import { computeSubscriptionPeriods } from "@/lib/billing/subscription-period"
 import { SUBSCRIPTION_MESSAGES } from "@/lib/constants/messages"
 
 // ============================================================================
@@ -81,6 +83,51 @@ export async function getSubscriptionStatusAction(): Promise<ActionResponse<any>
       }
     }
 
+    // Always provide a correct upcoming charge date (never in the past).
+    if (subscriptionPayload && subscription) {
+      if (!subscriptionPayload.next_payment_date) {
+        const periods = computeSubscriptionPeriods(subscription)
+        subscriptionPayload.next_payment_date = periods.nextStart.toISOString()
+      }
+    }
+
+    // ── Fetch the NEXT cycle purchase (the "Próxima Fatura") from billing ──
+    let nextInvoice: any = null
+    if (
+      subscriptionPayload &&
+      subscription &&
+      ["active", "trialing"].includes(subscription.status)
+    ) {
+      try {
+        const admin = getAdminClient()
+        const { data: nextPurchase } = await admin
+          .from("billing_purchases")
+          .select("*, billing_invoices(*)")
+          .eq("subscription_id", subscription.id)
+          .eq("status", "pending")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        if (nextPurchase) {
+          const invoice = (nextPurchase as any).billing_invoices?.[0] || null
+          nextInvoice = {
+            purchase_id: nextPurchase.id,
+            invoice_id: invoice?.id || nextPurchase.invoice_id || null,
+            invoice_number: invoice?.invoice_number || null,
+            due_date: nextPurchase.billing_period_start
+              || (nextPurchase.metadata?.due_date || null),
+            period_start: nextPurchase.billing_period_start || null,
+            period_end: nextPurchase.billing_period_end || null,
+            amount: Number(nextPurchase.total_amount),
+            status: nextPurchase.status,
+          }
+        }
+      } catch (err: any) {
+        console.error("[Subscriptions] Error fetching next invoice:", err?.message)
+      }
+    }
+
     return successResponse({
       plan: {
         id: plan.id,
@@ -91,6 +138,7 @@ export async function getSubscriptionStatusAction(): Promise<ActionResponse<any>
         features: plan.features_json,
       },
       subscription: subscriptionPayload,
+      next_invoice: nextInvoice,
       usage: counters || {
         products_count: 0,
         users_count: 0,

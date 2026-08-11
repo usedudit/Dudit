@@ -16,7 +16,7 @@ export async function getUserProfileAction() {
 
     const sessionData = await getUserSessionData(user.id)
 
-    return { 
+    return {
       full_name: sessionData.profile?.full_name || null,
       address: sessionData.profile && sessionData.profile.city ? `${sessionData.profile.city} - ${sessionData.profile.state}` : null
     }
@@ -158,11 +158,11 @@ export async function updateProfileAction(data: {
             return { error: "Esse CPF não pôde ser usado. Verifique se está correto ou tente outro." }
           }
         } else {
-          // Column doesn't exist yet — fall back to old method
+          // Column doesn't exist yet - fall back to old method
           console.warn("[SECURITY] cpf_hash column not found. Run DB migration to add it. Falling back to decrypt-all method.")
         }
       } catch {
-        // Column doesn't exist — fall back
+        // Column doesn't exist - fall back
       }
 
       // Fallback: decrypt-all method (only if hash check wasn't possible)
@@ -193,7 +193,7 @@ export async function updateProfileAction(data: {
 
       try {
         updateData.cpf = await encryptCPF(cleanCpf)
-        // Always store the hash for future O(1) lookups (safe even if column doesn't exist yet — Supabase ignores unknown fields)
+        // Always store the hash for future O(1) lookups (safe even if column doesn't exist yet - Supabase ignores unknown fields)
         updateData.cpf_hash = cpfHash
       } catch (err) {
         console.error("Error encrypting CPF:", err)

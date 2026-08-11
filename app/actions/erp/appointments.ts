@@ -940,7 +940,7 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
     safeRevalidateTag(DASHBOARD_TAGS.services(partnerId))
     safeRevalidateTag(DASHBOARD_TAGS.financial(partnerId))
     safeRevalidateTag(DASHBOARD_TAGS.operations(partnerId))
-    revalidatePath("/erp/dashboard")
+    revalidatePath("/erp/painel")
     revalidatePath("/erp/servicos")
 
     // Only send notifications for marketplace/online appointments, not manual ones
@@ -1197,7 +1197,7 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
     safeRevalidateTag(DASHBOARD_TAGS.financial(partnerId))
     safeRevalidateTag(DASHBOARD_TAGS.operations(partnerId))
     safeRevalidateTag(`partner-stats-${partnerId}`)
-    revalidatePath("/erp/dashboard")
+    revalidatePath("/erp/painel")
     revalidatePath("/erp/servicos")
 
     const finalRow = syncedAppointment || updated
@@ -1316,7 +1316,7 @@ export async function deleteAppointmentAction(appointmentId: string, notifyClien
     safeRevalidateTag(DASHBOARD_TAGS.general(partnerId))
     safeRevalidateTag(DASHBOARD_TAGS.services(partnerId))
     safeRevalidateTag(DASHBOARD_TAGS.operations(partnerId))
-    revalidatePath("/erp/dashboard")
+    revalidatePath("/erp/painel")
     return { success: true }
   } catch (error: any) {
     return { success: false, error: error?.message || "Erro ao excluir agendamento" }
@@ -1351,7 +1351,7 @@ export async function deleteUnavailableSeriesAction(partnerId: string, serviceNa
     safeRevalidateTag(DASHBOARD_TAGS.general(partnerId))
     safeRevalidateTag(DASHBOARD_TAGS.services(partnerId))
     safeRevalidateTag(DASHBOARD_TAGS.operations(partnerId))
-    revalidatePath("/erp/dashboard")
+    revalidatePath("/erp/painel")
     return { success: true }
   } catch (error: any) {
     return { success: false, error: error?.message || "Erro ao excluir série" }

@@ -116,9 +116,9 @@ export async function examplePartnerNotification(
       <h3>Novo pedido recebido</h3>
       <p>Você recebeu um pedido de <strong>${buyerName}</strong></p>
       <p><strong>Produto:</strong> ${productName}</p>
-      <p>Acesse sua loja para mais detalhes: https://example.com/erp/orders</p>
+      <p>Acesse sua loja para mais detalhes: https://example.com/erp/pedidos</p>
     `,
-    text: `Novo pedido recebido!\n\nComprador: ${buyerName}\nProduto: ${productName}\n\nAcesse: https://example.com/erp/orders`,
+    text: `Novo pedido recebido!\n\nComprador: ${buyerName}\nProduto: ${productName}\n\nAcesse: https://example.com/erp/pedidos`,
     partnerId,
   })
 

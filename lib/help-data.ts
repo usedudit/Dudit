@@ -3120,11 +3120,11 @@ O módulo **Serviços** reúne tudo o que você precisa para gerenciar atendimen
 ![Tela principal de Serviços](https://img.dudit.com.br/static/screens/Servicos_VisaoGeral.png)
 Legenda: Menu de serviços com acesso rápido a Agendamentos e Ordens de Serviço.
 
-**Agendamentos** — Calendário visual (dia, semana, mês) para marcar horários, escolher cliente, serviço e profissional. Permite recorrência, bloqueio de indisponibilidades e checkout integrado.
+**Agendamentos** - Calendário visual (dia, semana, mês) para marcar horários, escolher cliente, serviço e profissional. Permite recorrência, bloqueio de indisponibilidades e checkout integrado.
 
-**Ordens de Serviço (OS)** — Acompanhamento completo da execução: etapas, responsável, previsão, serviços e produtos utilizados, especificações, anexos e assinatura online.
+**Ordens de Serviço (OS)** - Acompanhamento completo da execução: etapas, responsável, previsão, serviços e produtos utilizados, especificações, anexos e assinatura online.
 
-**Catálogo de Serviços** — Cadastro dos seus serviços com preço, duração, categoria e recursos de estoque. Esses serviços aparecem tanto nos agendamentos quanto nas ordens de serviço.
+**Catálogo de Serviços** - Cadastro dos seus serviços com preço, duração, categoria e recursos de estoque. Esses serviços aparecem tanto nos agendamentos quanto nas ordens de serviço.
 
 ## Conceitos importantes
 
@@ -3161,11 +3161,11 @@ Legenda: Acesso ao módulo de Serviços pelo menu principal.
 
 ## Dicas importantes
 
-- Cadastre seus serviços **antes** de começar a agendar — isso agiliza muito o dia a dia.
+- Cadastre seus serviços **antes** de começar a agendar - isso agiliza muito o dia a dia.
 - Configure **categorias de serviço** (ex: "Corte", "Manutenção", "Instalação") para organizar a seleção.
 - Defina **duração realista** nos serviços; o calendário usa isso para mostrar horários disponíveis.
 - Use **indisponibilidades** (férias, manutenção, feriado) para bloquear horários dos profissionais.
-- Na OS, preencha **diagnóstico** e **observações internas** — ajuda na comunicação com a equipe e no histórico.
+- Na OS, preencha **diagnóstico** e **observações internas** - ajuda na comunicação com a equipe e no histórico.
 
 ## Perguntas frequentes
 
@@ -3211,12 +3211,12 @@ Legenda: Formulário de cadastro rápido de serviço.
 
 Você pode cadastrar serviços de duas formas:
 
-**Opção A — No Agendamento (rápido):**
+**Opção A - No Agendamento (rápido):**
 1. Em **Agendamentos**, clique em **Novo agendamento**.
 2. Na etapa "Selecionar Serviços", clique no botão **"+"** ao lado da busca.
 3. Preencha o nome, preço e duração. O serviço é salvo no catálogo e já adicionado ao agendamento.
 
-**Opção B — No cadastro completo (recomendado para organizar):**
+**Opção B - No cadastro completo (recomendado para organizar):**
 1. Em **Agendamentos**, clique no menu **Ações** > **Cadastrar serviço** (ou acesse via OS ao adicionar serviço).
 2. Preencha todas as informações.
 
@@ -3229,9 +3229,9 @@ Você pode cadastrar serviços de duas formas:
 **Duração (minutos)**: tempo que o serviço leva. O calendário usa isso para calcular horários disponíveis.
 
 **Unidade de cobrança**:
-- **Por Serviço** — preço fixo (padrão)
-- **Por Hora** — preço × horas gastas
-- **Por Dia** — preço × dias de execução
+- **Por Serviço** - preço fixo (padrão)
+- **Por Hora** - preço × horas gastas
+- **Por Dia** - preço × dias de execução
 
 **Categoria**: agrupe por tipo (ex: "Corte", "Barba", "Hidratação", "Manutenção", "Instalação"). Se não existir, crie na hora.
 
@@ -3266,7 +3266,7 @@ As categorias aparecem como grupos na seleção de serviços:
 - **Duração realista**: evite colocar 30 min se o serviço leva 1 hora. Isso bagunça a agenda.
 - **Buffer**: use para tempos de preparação/limpeza entre clientes.
 - **Recursos de estoque**: cadastre para serviços que sempre usam os mesmos materiais. Agiliza e evita esquecer itens.
-- **Preço por hora/dia**: útil para serviços variáveis (ex: "Consultoria técnica — Por Hora").
+- **Preço por hora/dia**: útil para serviços variáveis (ex: "Consultoria técnica - Por Hora").
 
 ## Perguntas frequentes
 
@@ -3360,10 +3360,10 @@ O sistema avisa se você tenta marcar sobre outro agendamento do mesmo profissio
 
 ## Dicas importantes
 
-- **Configure horário de funcionamento** em Configurações > Horários — o calendário respeita isso.
-- **Use cores dos profissionais** — cada membro da equipe tem cor, facilita visualizar a agenda.
-- **Recorrência para clientes fixos** — cliente que vem toda semana? Crie recorrente semanal.
-- **Indisponibilidade de almoço** — crie recorrente diária "Almoço" para bloquear 12h–13h automaticamente.
+- **Configure horário de funcionamento** em Configurações > Horários - o calendário respeita isso.
+- **Use cores dos profissionais** - cada membro da equipe tem cor, facilita visualizar a agenda.
+- **Recorrência para clientes fixos** - cliente que vem toda semana? Crie recorrente semanal.
+- **Indisponibilidade de almoço** - crie recorrente diária "Almoço" para bloquear 12h–13h automaticamente.
 
 ## Perguntas frequentes
 
@@ -3433,7 +3433,7 @@ O sistema valida conflitos de horário e avisa se o novo horário não está dis
 3. Confirme.
 
 > [!TIP]
-> Se o cliente só vai trocar de horário, prefira **reagendar** (editar data/hora) em vez de cancelar — mantém o histórico.
+> Se o cliente só vai trocar de horário, prefira **reagendar** (editar data/hora) em vez de cancelar - mantém o histórico.
 
 ### 4. Registrar não comparecimento
 
@@ -3451,10 +3451,10 @@ Na tela de detalhes, a aba **Histórico** mostra tudo que aconteceu com o agenda
 
 ## Dicas importantes
 
-- **Reagende em vez de cancelar** sempre que possível — preserva o histórico e evita refazer o agendamento do zero.
+- **Reagende em vez de cancelar** sempre que possível - preserva o histórico e evita refazer o agendamento do zero.
 - **Use tipos de indisponibilidade** para saber o motivo do bloqueio no calendário (almoço, férias, feriado).
 - **Notifique o cliente** ao cancelar para evitar falta sem aviso e cliente chateado.
-- **Confira o histórico** antes de duplicar um agendamento — evita erros repetidos.
+- **Confira o histórico** antes de duplicar um agendamento - evita erros repetidos.
 
 ## Perguntas frequentes
 
@@ -3560,16 +3560,16 @@ Anexe arquivos e imagens (fotos do antes/depois, laudos, orçamentos):
 
 ## Dicas importantes
 
-- **Preencha o diagnóstico no início** e a descrição da solução no fim — deixa o histórico completo.
-- **Use especificações** para modelos, números de série, garantias — facilita a consulta depois.
-- **Anexe fotos do equipamento** antes de mexer — protege contra reclamações.
+- **Preencha o diagnóstico no início** e a descrição da solução no fim - deixa o histórico completo.
+- **Use especificações** para modelos, números de série, garantias - facilita a consulta depois.
+- **Anexe fotos do equipamento** antes de mexer - protege contra reclamações.
 - **Serviços avulsos**: use com moderação. Se repete sempre, cadastre no catálogo.
 - **Campos congelados após pagamento**: depois que a OS é paga, os campos principais ficam bloqueados (só status, prioridade e previsão continuam editáveis).
 
 ## Perguntas frequentes
 
 **Posso criar OS sem serviço cadastrado?**
-Sim. Use **serviço avulso** — preencha nome e preço na hora.
+Sim. Use **serviço avulso** - preencha nome e preço na hora.
 
 **O que significa "Serviço avulso"?**
 É um serviço que não está no catálogo. Você digita o nome e o valor manualmente. Útil para itens pontuais.
@@ -3670,9 +3670,9 @@ A aba **Histórico** mostra a linha do tempo completa:
 
 ## Dicas importantes
 
-- **Atualize o status em cada etapa** — a timeline e os relatórios dependem disso.
+- **Atualize o status em cada etapa** - a timeline e os relatórios dependem disso.
 - **Use "Aguardando peça"** para pausas por falta de material em vez de deixar parado em "Em andamento".
-- **Compartilhe a OS** assim que aprovar — o cliente acompanha o andamento e assina online.
+- **Compartilhe a OS** assim que aprovar - o cliente acompanha o andamento e assina online.
 - **Só marque como Entregue** quando o cliente realmente retirou/recebeu.
 
 ## Perguntas frequentes
@@ -3804,21 +3804,21 @@ Tudo que você faz aqui reflete nos outros módulos:
 
 ## O que você encontra no módulo
 
-**Lista de clientes** — visualização em grade (cards) ou tabela, com rolagem infinita. Mostra nome, avatar, total de pedidos, valor gasto, crédito disponível, último pedido e status.
+**Lista de clientes** - visualização em grade (cards) ou tabela, com rolagem infinita. Mostra nome, avatar, total de pedidos, valor gasto, crédito disponível, último pedido e status.
 
-**Abas de status** — Todos · Ativo · Inativo · Bloqueado · Arquivado (cada uma com contador).
+**Abas de status** - Todos · Ativo · Inativo · Bloqueado · Arquivado (cada uma com contador).
 
-**Busca unificada** — encontra por nome, e-mail ou telefone digitando qualquer parte.
+**Busca unificada** - encontra por nome, e-mail ou telefone digitando qualquer parte.
 
-**Filtros laterais** — refina por status (checkbox).
+**Filtros laterais** - refina por status (checkbox).
 
-**Ordenação** — clique no cabeçalho da coluna: Nome, Pedidos, Total Gasto, Crédito, Status, Último Pedido.
+**Ordenação** - clique no cabeçalho da coluna: Nome, Pedidos, Total Gasto, Crédito, Status, Último Pedido.
 
-**Ações por cliente** — Ver detalhes · Editar · Arquivar/Desarquivar · Excluir.
+**Ações por cliente** - Ver detalhes · Editar · Arquivar/Desarquivar · Excluir.
 
-**Seleção múltipla** — marque vários para ativar/desativar em massa, excluir ou exportar.
+**Seleção múltipla** - marque vários para ativar/desativar em massa, excluir ou exportar.
 
-**Importar/Exportar** — planilha .xlsx/.csv com mapeamento inteligente.
+**Importar/Exportar** - planilha .xlsx/.csv com mapeamento inteligente.
 
 ## Detalhes do cliente
 
@@ -3827,16 +3827,16 @@ Ao clicar em um cliente, abre a tela de detalhes com três abas:
 | Aba | O que mostra |
 |-----|--------------|
 | **Dados Gerais** | KPIs (pedidos, total gasto, ticket médio, última compra), dados cadastrais completos, endereços, documentos, observações internas, vales-compra |
-| **Pedidos** | Histórico de compras com ID, total, status, canal, data — clique para abrir o pedido |
+| **Pedidos** | Histórico de compras com ID, total, status, canal, data - clique para abrir o pedido |
 | **Avaliações** | Reviews recebidos no marketplace (se houver) |
 
 ## Status dos clientes
 
-- **Ativo** — aparece nas buscas e seleções normais
-- **Inativo** — oculto da seleção padrão, mas mantido no histórico
-- **Bloqueado** — impedido de novas compras/agendamentos
-- **Arquivado** — removido da lista principal, recuperável quando precisar
-- **Excluído** — soft delete (mantém histórico, não aparece mais)
+- **Ativo** - aparece nas buscas e seleções normais
+- **Inativo** - oculto da seleção padrão, mas mantido no histórico
+- **Bloqueado** - impedido de novas compras/agendamentos
+- **Arquivado** - removido da lista principal, recuperável quando precisar
+- **Excluído** - soft delete (mantém histórico, não aparece mais)
 
 > [!TIP]
 > Use **Arquivado** para clientes antigos que não compram mais, mas cujo histórico você quer preservar. Use **Inativo** para pausa temporária. **Bloqueado** é para casos de inadimplência ou restrição.
@@ -3850,11 +3850,11 @@ Ao clicar em um cliente, abre a tela de detalhes com três abas:
 
 ## Dicas importantes
 
-- **Cadastre antes de vender** — ter o cliente no sistema agiliza PDV, orçamentos e agendamentos.
-- **Preencha CPF/CNPJ** — evita duplicatas e permite emissão de nota fiscal.
-- **Use observações internas** — anote preferências, restrições, histórico de conversas; só sua equipe vê.
-- **Mantenha endereços atualizados** — essenciais para entregas e notas fiscais.
-- **Aproveite a importação** — se tem base antiga em planilha, importe de uma vez (até 2.000 linhas).
+- **Cadastre antes de vender** - ter o cliente no sistema agiliza PDV, orçamentos e agendamentos.
+- **Preencha CPF/CNPJ** - evita duplicatas e permite emissão de nota fiscal.
+- **Use observações internas** - anote preferências, restrições, histórico de conversas; só sua equipe vê.
+- **Mantenha endereços atualizados** - essenciais para entregas e notas fiscais.
+- **Aproveite a importação** - se tem base antiga em planilha, importe de uma vez (até 2.000 linhas).
 
 ## Perguntas frequentes
 
@@ -3900,11 +3900,11 @@ Legenda: Aba Dados Gerais com identificação, dados tributários e contatos.
 
 ### 1. Abrir o cadastro
 
-**Opção A — Lista de Clientes (completo):**
+**Opção A - Lista de Clientes (completo):**
 1. Em **Clientes**, clique em **Novo cliente**.
 2. Preencha as 3 abas e salve.
 
-**Opção B — Durante Venda/PDV/Agendamento (rápido):**
+**Opção B - Durante Venda/PDV/Agendamento (rápido):**
 1. No seletor de cliente, clique no botão **"+"** ou **"Novo cliente"**.
 2. Preencha apenas nome, e-mail e telefone.
 3. O cliente é salvo e já selecionado no fluxo atual.
@@ -3915,11 +3915,11 @@ Legenda: Aba Dados Gerais com identificação, dados tributários e contatos.
 ### 2. Aba "Dados Gerais"
 
 #### Identificação
-- **Nome ou Razão Social** (obrigatório) — nome que aparecerá em documentos e buscas.
-- **Status** — Ativo / Inativo / Bloqueado. Padrão: Ativo.
+- **Nome ou Razão Social** (obrigatório) - nome que aparecerá em documentos e buscas.
+- **Status** - Ativo / Inativo / Bloqueado. Padrão: Ativo.
 
 #### Dados Tributários
-**Tipo de pessoa** — escolha no início, muda os campos abaixo:
+**Tipo de pessoa** - escolha no início, muda os campos abaixo:
 
 | Pessoa Física | Pessoa Jurídica |
 |---------------|-----------------|
@@ -3930,13 +3930,13 @@ Legenda: Aba Dados Gerais com identificação, dados tributários e contatos.
 | Nome do pai | CRT: 1-Simples / 3-Normal / 4-MEI |
 | | Contribuinte: 1-ICMS / 2-Isento / 9-Não contribuinte |
 
-**Consulta CNPJ automática** — ao sair do campo CNPJ (14 dígitos), o sistema busca na Receita Federal e preenche: razão social, nome fantasia, endereço, telefone, e-mail, regime tributário (CRT). Funciona só para PJ.
+**Consulta CNPJ automática** - ao sair do campo CNPJ (14 dígitos), o sistema busca na Receita Federal e preenche: razão social, nome fantasia, endereço, telefone, e-mail, regime tributário (CRT). Funciona só para PJ.
 
 #### Contatos
-- **E-mail** — validado; usado para notas fiscais, comunicações, login no marketplace.
-- **Celular (WhatsApp)** — principal; usado para notificações, WhatsApp de aniversário, agendamentos.
-- **Telefone Fixo** — opcional.
-- **Site** — opcional; validado como URL.
+- **E-mail** - validado; usado para notas fiscais, comunicações, login no marketplace.
+- **Celular (WhatsApp)** - principal; usado para notificações, WhatsApp de aniversário, agendamentos.
+- **Telefone Fixo** - opcional.
+- **Site** - opcional; validado como URL.
 
 #### Imagem do cliente
 - Clique na área da foto para enviar imagem (PNG, JPG, WEBP até 5 MB).
@@ -3946,7 +3946,7 @@ Legenda: Aba Dados Gerais com identificação, dados tributários e contatos.
 ### 3. Aba "Endereço"
 
 #### Endereço Principal
-1. **CEP** — digite e o sistema preenche rua, bairro, cidade, UF (busca automática).
+1. **CEP** - digite e o sistema preenche rua, bairro, cidade, UF (busca automática).
 2. Complete: **Número** (ou marque "S/N"), **Complemento**, **Tipo** (Casa, Apartamento, Comercial, Outro).
 3. Este endereço é usado como padrão em entregas e notas fiscais.
 
@@ -3962,7 +3962,7 @@ Legenda: Aba Dados Gerais com identificação, dados tributários e contatos.
 
 - Campo livre para **anotações internas**.
 - Exemplos: "Prefere atendimento pela manhã", "Alergia a látex", "Cliente VIP - dar prioridade", "Não ligar após 18h".
-- **Só sua equipe vê** — não aparece para o cliente em nenhum canal.
+- **Só sua equipe vê** - não aparece para o cliente em nenhum canal.
 
 ### 5. Salvar
 
@@ -3974,13 +3974,13 @@ Legenda: Aba Dados Gerais com identificação, dados tributários e contatos.
 
 1. Na lista, clique em **Editar** (ícone de lápis) no card/linha do cliente.
 2. Ou no detalhe, clique em **Editar cliente**.
-3. Altere o que precisar — os mesmos campos e validações do cadastro.
+3. Altere o que precisar - os mesmos campos e validações do cadastro.
 4. Salve.
 
 > [!TIP]
 > Ao editar, o sistema mostra o indicador de alterações não salvas. Se sair sem salvar, pergunta se deseja descartar.
 
-## Pessoa Física vs Pessoa Jurídica — resumo prático
+## Pessoa Física vs Pessoa Jurídica - resumo prático
 
 | Situação | Use |
 |----------|-----|
@@ -3990,11 +3990,11 @@ Legenda: Aba Dados Gerais com identificação, dados tributários e contatos.
 
 ## Dicas importantes
 
-- **CPF/CNPJ único** — não cadastra duplicado. Se avisar "já existe", busque o cliente existente e edite.
-- **Consulta CNPJ** — funciona só para PJ com CNPJ válido de 14 dígitos. Se não encontrar, preencha manualmente.
-- **Data de nascimento** — habilita automações de aniversário (cupom, WhatsApp, notificação) no plano Crescer.
-- **E-mail** — se o cliente for comprar no marketplace, use o mesmo e-mail da conta dele.
-- **Observações** — use para contextualizar a equipe; evite dados sensíveis (LGPD).
+- **CPF/CNPJ único** - não cadastra duplicado. Se avisar "já existe", busque o cliente existente e edite.
+- **Consulta CNPJ** - funciona só para PJ com CNPJ válido de 14 dígitos. Se não encontrar, preencha manualmente.
+- **Data de nascimento** - habilita automações de aniversário (cupom, WhatsApp, notificação) no plano Crescer.
+- **E-mail** - se o cliente for comprar no marketplace, use o mesmo e-mail da conta dele.
+- **Observações** - use para contextualizar a equipe; evite dados sensíveis (LGPD).
 
 ## Problemas comuns
 
@@ -4036,7 +4036,7 @@ Sim, no seletor de cliente do PDV e na tela de venda.
                 content: `
 ## Visão geral
 
-A lista de Clientes foi feita para você encontrar, filtrar e agir sobre sua base rapidamente — seja para localizar um contato, fazer uma ação em lote ou exportar dados.
+A lista de Clientes foi feita para você encontrar, filtrar e agir sobre sua base rapidamente - seja para localizar um contato, fazer uma ação em lote ou exportar dados.
 
 ![Lista de Clientes com abas e filtros](https://img.dudit.com.br/static/screens/Clientes_Lista_Filtros.png)
 Legenda: Abas de status (Todos, Ativo, Inativo, Bloqueado, Arquivado), busca, filtro lateral e ordenação.
@@ -4101,31 +4101,31 @@ Clique novamente na mesma coluna para inverter (asc/desc). Uma seta indica a dir
 
 ### 5. Alternar visualização
 
-- **Lista (tabela)** — padrão no desktop; mais colunas, ordenação, seleção em massa.
-- **Grade (cards)** — padrão no mobile/tablet; mostra avatar, nome, pedidos, total gasto, status.
+- **Lista (tabela)** - padrão no desktop; mais colunas, ordenação, seleção em massa.
+- **Grade (cards)** - padrão no mobile/tablet; mostra avatar, nome, pedidos, total gasto, status.
 - Botão no canto superior direito alterna entre as duas.
 
 ### 6. Ações em um cliente (individual)
 
 Passe o mouse sobre a linha (tabela) ou use o menu ⋮ no card (grade):
 
-- **Ver detalhes** — abre tela completa com histórico, pedidos, vales, endereços.
-- **Editar** — abre formulário de cadastro preenchido.
-- **Arquivar** — move para aba "Arquivado" (sai das listas normais).
-- **Desarquivar** — volta para "Ativo" (disponível só na aba Arquivado).
-- **Excluir** — soft delete; mantém histórico, remove da base. Confirmação obrigatória.
+- **Ver detalhes** - abre tela completa com histórico, pedidos, vales, endereços.
+- **Editar** - abre formulário de cadastro preenchido.
+- **Arquivar** - move para aba "Arquivado" (sai das listas normais).
+- **Desarquivar** - volta para "Ativo" (disponível só na aba Arquivado).
+- **Excluir** - soft delete; mantém histórico, remove da base. Confirmação obrigatória.
 
 ### 7. Ações em massa (vários clientes)
 
 1. Marque a **checkbox** na primeira coluna (tabela) ou segure/ative seleção múltipla (grade).
-2. Selecione quantos quiser — contador na barra flutuante inferior.
+2. Selecione quantos quiser - contador na barra flutuante inferior.
 3. Escolha a ação na **Barra Flutuante**:
-   - **Ativar / Desativar** — alterna status entre Ativo ↔ Inativo para todos selecionados.
-   - **Excluir** — soft delete em lote (confirmação com contador).
+   - **Ativar / Desativar** - alterna status entre Ativo ↔ Inativo para todos selecionados.
+   - **Excluir** - soft delete em lote (confirmação com contador).
 4. Ou use **Exportar** → "Selecionados" para baixar só os marcados.
 
 > [!IMPORTANT]
-> **Arquivar** não está na ação em massa — faça individualmente para confirmar cada um.
+> **Arquivar** não está na ação em massa - faça individualmente para confirmar cada um.
 
 ### 8. Exportar clientes
 
@@ -4146,10 +4146,10 @@ Dois caminhos:
 
 ### 9. Importar clientes (planilha)
 
-1. No cabeçalho, clique **Importar** (ou acesse \`/erp/customers/import\`).
-2. **Passo 1 — Upload:** arraste .xlsx, .xls ou .csv (até 10 MB, 2.000 linhas).
-3. **Passo 2 — Mapeamento:** o sistema sugere mapear colunas da planilha para campos do cadastro (nome, e-mail, CPF, etc.). Cada coluna tem **confiança** (Exato/Alto/Médio/Baixo). Ajuste o que precisar.
-4. **Passo 3 — Preview:** veja os primeiros clientes como ficarão. Confira.
+1. No cabeçalho, clique **Importar** (ou acesse \`/erp/clientes/importar\`).
+2. **Passo 1 - Upload:** arraste .xlsx, .xls ou .csv (até 10 MB, 2.000 linhas).
+3. **Passo 2 - Mapeamento:** o sistema sugere mapear colunas da planilha para campos do cadastro (nome, e-mail, CPF, etc.). Cada coluna tem **confiança** (Exato/Alto/Médio/Baixo). Ajuste o que precisar.
+4. **Passo 3 - Preview:** veja os primeiros clientes como ficarão. Confira.
 5. **Importar:** opções "Pular duplicatas" (por CPF/CNPJ/e-mail) e "Pular erros". Clique **Importar**.
 
 ![Importação - etapa de mapeamento](https://img.dudit.com.br/static/screens/Clientes_Importacao_Mapeamento.png)
@@ -4157,19 +4157,19 @@ Legenda: Mapeamento de colunas com indicador de confiança.
 
 ## Dicas importantes
 
-- **Mantenha a aba "Ativo" como padrão** — é a que o PDV e agendamentos usam para busca rápida.
-- **Arquive, não exclua** — cliente arquivado some da lista mas volta com 1 clique. Excluído some de vez.
-- **Use ordenação "Total Gasto" desc** — identifica seus melhores clientes (top 20% = 80% da receita).
-- **Combine busca + aba** — ex: aba "Inativo" + busca "joão" = acha "João" inativo rápido.
-- **Exporte antes de importar em massa** — faz backup da base atual.
-- **Limpe duplicatas antes de importar** — a opção "Pular duplicatas" usa CPF/CNPJ/e-mail como chave.
+- **Mantenha a aba "Ativo" como padrão** - é a que o PDV e agendamentos usam para busca rápida.
+- **Arquive, não exclua** - cliente arquivado some da lista mas volta com 1 clique. Excluído some de vez.
+- **Use ordenação "Total Gasto" desc** - identifica seus melhores clientes (top 20% = 80% da receita).
+- **Combine busca + aba** - ex: aba "Inativo" + busca "joão" = acha "João" inativo rápido.
+- **Exporte antes de importar em massa** - faz backup da base atual.
+- **Limpe duplicatas antes de importar** - a opção "Pular duplicatas" usa CPF/CNPJ/e-mail como chave.
 
 ## Problemas comuns
 
 | Problema | Causa | Solução |
 |----------|-------|---------|
 | Cliente não aparece na busca | Está arquivado ou inativo | Mude para aba "Todos" ou "Arquivado"/"Inativo" |
-| Ordenação não funciona | Visualização em grade (cards) | Mude para **Lista (tabela)** — ordenação só funciona lá |
+| Ordenação não funciona | Visualização em grade (cards) | Mude para **Lista (tabela)** - ordenação só funciona lá |
 | Exportação vem vazia | Filtro muito restritivo | Limpe filtros/aba/busca antes de exportar |
 | Importação falha em algumas linhas | CPF/CNPJ inválido ou duplicado | Ative "Pular erros" e "Pular duplicatas"; revise planilha |
 | Não consegue desarquivar | Limite do plano atingido | Upgrade do plano ou exclua/arquive outros para abrir vaga |
@@ -4229,7 +4229,7 @@ Legenda: Aba Dados Gerais com KPIs, informações cadastrais, endereços e vales
 - Em Vendas/PDV/Orçamentos: clique no nome do cliente já selecionado
 - Em Serviços/Agendamentos/OS: clique no cliente no detalhe do agendamento/OS
 
-### 2. Aba "Dados Gerais" — Visão 360°
+### 2. Aba "Dados Gerais" - Visão 360°
 
 #### KPIs do cliente (topo)
 | Indicador | O que mostra |
@@ -4247,15 +4247,15 @@ Legenda: Aba Dados Gerais com KPIs, informações cadastrais, endereços e vales
 - CPF ou CNPJ (formatado)
 - Data de nascimento (se preenchida)
 - E-mail, celular, telefone fixo, site
-- **Cliente desde** — data do primeiro cadastro
+- **Cliente desde** - data do primeiro cadastro
 
 #### Endereços
-- **Endereço principal** — usado em entregas e notas fiscais
-- **Endereço de cobrança** — se diferente do principal (aparece separado)
+- **Endereço principal** - usado em entregas e notas fiscais
+- **Endereço de cobrança** - se diferente do principal (aparece separado)
 
 #### Observações internas
 - Caixa laranja com anotações da equipe (ex: "Prefere WhatsApp", "Alérgico a látex")
-- Só sua equipe vê — não vai para o cliente
+- Só sua equipe vê - não vai para o cliente
 
 #### Vales-compra (Crédito da loja)
 Lista de vales gerados para este cliente:
@@ -4267,13 +4267,13 @@ Lista de vales gerados para este cliente:
 ![Vales-compra no detalhe](https://img.dudit.com.br/static/screens/Cliente_ValesCompra.png)
 Legenda: Lista de vales-compra com saldo restante e status.
 
-### 3. Aba "Pedidos" — Histórico de compras
+### 3. Aba "Pedidos" - Histórico de compras
 
 Tabela com todos os pedidos do cliente (não cancelados), ordenados do mais recente para o mais antigo:
 
 | Coluna | Descrição |
 |--------|-----------|
-| **Pedido** | ID curto (#ABC12) — clique para abrir o pedido |
+| **Pedido** | ID curto (#ABC12) - clique para abrir o pedido |
 | **Total** | Valor do pedido |
 | **Status** | Pago, Pendente, Enviado, Entregue, Cancelado, etc. |
 | **Canal** | Manual, PDV, Marketplace, Loja Virtual, etc. |
@@ -4287,7 +4287,7 @@ Tabela com todos os pedidos do cliente (não cancelados), ordenados do mais rece
 > [!IMPORTANT]
 > A aba **Pedidos** agrega pedidos feitos pelo \`customer_id\` do ERP **OU** pelo \`user_id\`/\`marketplace_user_id\` vinculados (conta do cliente no marketplace). Por isso, compras feitas pelo cliente logado no site também aparecem aqui.
 
-### 4. Aba "Avaliações" — Reviews do Marketplace
+### 4. Aba "Avaliações" - Reviews do Marketplace
 
 Se o cliente avaliou produtos/loja no marketplace, aparecem aqui:
 - Estrelas (1 a 5)
@@ -4306,11 +4306,11 @@ Se o cliente tem **data de nascimento** cadastrada e o aniversário é **hoje** 
 
 ## Dicas importantes
 
-- **KPIs ajudam na abordagem** — cliente com "Total Gasto alto + Última compra antiga" = reativação
-- **Vales-compra** — antes de fechar venda, confira se o cliente tem saldo disponível
-- **Observações** — leia antes de ligar/visitar; evita repetir informações
-- **Endereço de cobrança** — confira se nota fiscal deve ir para endereço diferente
-- **Pedidos do marketplace** — aparecem junto dos manuais; filtre pelo canal se precisar separar
+- **KPIs ajudam na abordagem** - cliente com "Total Gasto alto + Última compra antiga" = reativação
+- **Vales-compra** - antes de fechar venda, confira se o cliente tem saldo disponível
+- **Observações** - leia antes de ligar/visitar; evita repetir informações
+- **Endereço de cobrança** - confira se nota fiscal deve ir para endereço diferente
+- **Pedidos do marketplace** - aparecem junto dos manuais; filtre pelo canal se precisar separar
 
 ## Problemas comuns
 
@@ -4339,16 +4339,16 @@ Sim, botão **Editar cliente** no cabeçalho (desktop) ou no menu de ações (mo
 Não. Observações são só para sua equipe.
 `
             },
-    {
-        id: "importar-exportar-clientes",
-        title: "Importar e exportar clientes",
-        description: "Migre sua base por planilha (upload, mapeamento, preview) e exporte para backup ou análise.",
-        slug: "importar-exportar-clientes",
-        category: "clientes",
-        content: `
+            {
+                id: "importar-exportar-clientes",
+                title: "Importar e exportar clientes",
+                description: "Migre sua base por planilha (upload, mapeamento, preview) e exporte para backup ou análise.",
+                slug: "importar-exportar-clientes",
+                category: "clientes",
+                content: `
 ## Visão geral
 
-A **importação** traz clientes de planilhas (.xlsx, .xls, .csv) em lote — ideal para migração de sistema antigo ou cadastro inicial. A **exportação** baixa a base atual para Excel — útil para backup, análise ou envio ao contador.
+A **importação** traz clientes de planilhas (.xlsx, .xls, .csv) em lote - ideal para migração de sistema antigo ou cadastro inicial. A **exportação** baixa a base atual para Excel - útil para backup, análise ou envio ao contador.
 
 ![Importação - tela de upload](https://img.dudit.com.br/static/screens/Clientes_Importacao_Upload.png)
 Legenda: Arraste a planilha ou clique para selecionar (até 10 MB, 2.000 linhas).
@@ -4408,13 +4408,13 @@ Legenda: Arraste a planilha ou clique para selecionar (até 10 MB, 2.000 linhas)
 
 1. Em **Clientes**, clique em **Importar** (botão no cabeçalho).
 2. Arraste o arquivo ou clique em **Selecionar Planilha**.
-3. Aguarde a leitura — mostra total de linhas e colunas detectadas.
+3. Aguarde a leitura - mostra total de linhas e colunas detectadas.
 
 ### 3. Revisar o mapeamento
 
 O sistema sugere mapear cada coluna da planilha para um campo do cadastro:
 
-- **Confiança** — badge colorido: **Exato** (verde) · **Alto** (azul) · **Médio** (laranja) · **Baixo** (vermelho)
+- **Confiança** - badge colorido: **Exato** (verde) · **Alto** (azul) · **Médio** (laranja) · **Baixo** (vermelho)
 - Ajuste manualmente se o sistema errou
 - Colunas sem mapeamento = **Ignorada** (não importa)
 
@@ -4428,8 +4428,8 @@ Legenda: Cada linha = coluna da planilha. Escolha o campo do sistema no dropdown
 1. Clique **Continuar** → abre **Preview** com os primeiros clientes como ficarão.
 2. Confira: nomes, documentos, e-mails, endereços.
 3. Opções antes de importar:
-   - **Pular duplicatas** (recomendado ON) — ignora linhas com CPF/CNPJ/e-mail já cadastrados
-   - **Pular erros** (recomendado ON) — importa o que der certo, pula linhas com erro de validação
+   - **Pular duplicatas** (recomendado ON) - ignora linhas com CPF/CNPJ/e-mail já cadastrados
+   - **Pular erros** (recomendado ON) - importa o que der certo, pula linhas com erro de validação
 4. Clique **Importar X cliente(s)**.
 
 ### 5. Resultado
@@ -4458,12 +4458,12 @@ Tela de sucesso mostra: **X de Y clientes importados**.
 
 ## Dicas importantes
 
-- **Exporte antes de importar em massa** — backup da base atual.
-- **Limpe a planilha antes** — remova linhas vazias, corrija CPF/CNPJ inválidos, padronize telefone (DDD + número).
-- **Use "Pular duplicatas"** — evita erro se rodar a importação duas vezes.
-- **CPF/CNPJ são chaves únicas** — o sistema usa eles (e e-mail) para detectar duplicatas.
-- **Importação só CRIA** — não atualiza clientes existentes. Para atualizar em massa, edite individualmente ou use API.
-- **Endereços** — a importação cria endereço principal; endereço de cobrança diferente não é suportado na importação (cadastre depois manualmente).
+- **Exporte antes de importar em massa** - backup da base atual.
+- **Limpe a planilha antes** - remova linhas vazias, corrija CPF/CNPJ inválidos, padronize telefone (DDD + número).
+- **Use "Pular duplicatas"** - evita erro se rodar a importação duas vezes.
+- **CPF/CNPJ são chaves únicas** - o sistema usa eles (e e-mail) para detectar duplicatas.
+- **Importação só CRIA** - não atualiza clientes existentes. Para atualizar em massa, edite individualmente ou use API.
+- **Endereços** - a importação cria endereço principal; endereço de cobrança diferente não é suportado na importação (cadastre depois manualmente).
 
 ## Problemas comuns
 
@@ -4480,17 +4480,17 @@ Tela de sucesso mostra: **X de Y clientes importados**.
 **Posso importar clientes com endereço de cobrança diferente?**
 Não na importação padrão. Importe o endereço principal; depois edite cada cliente e marque "Endereço de cobrança diferente".
 `
-},
-{
-    id: "clientes-em-outros-modulos",
-        title: "Clientes em Vendas, Serviços e outros módulos",
-            description: "Como selecionar, criar e usar clientes no PDV, Vendas, Orçamentos, Serviços, Agendamentos e OS.",
+            },
+            {
+                id: "clientes-em-outros-modulos",
+                title: "Clientes em Vendas, Serviços e outros módulos",
+                description: "Como selecionar, criar e usar clientes no PDV, Vendas, Orçamentos, Serviços, Agendamentos e OS.",
                 slug: "clientes-em-outros-modulos",
-                    category: "clientes",
-                        content: `
+                category: "clientes",
+                content: `
 ## Visão geral
 
-O cadastro de clientes não fica isolado — ele alimenta **Vendas, PDV, Orçamentos, Serviços, Agendamentos, Ordens de Serviço e Entregas**. Entender como o cliente é selecionado e criado nesses fluxos agiliza o dia a dia.
+O cadastro de clientes não fica isolado - ele alimenta **Vendas, PDV, Orçamentos, Serviços, Agendamentos, Ordens de Serviço e Entregas**. Entender como o cliente é selecionado e criado nesses fluxos agiliza o dia a dia.
 
 ![Seletor de cliente no PDV](https://img.dudit.com.br/static/screens/Cliente_Seletor_PDV.png)
 Legenda: Seletor de cliente com busca, fixados e botão de novo cliente rápido.
@@ -4508,11 +4508,11 @@ Legenda: Seletor de cliente com busca, fixados e botão de novo cliente rápido.
 
 Na maioria dos módulos (Vendas, PDV, Orçamentos, Serviços, Agendamentos, OS), ao iniciar um novo atendimento, abre o **Seletor de Cliente** com:
 
-1. **Busca** — digite nome, e-mail ou telefone; filtra em tempo real
-2. **Fixados / Recentes** — clientes marcados como favoritos ou usados recentemente aparecem no topo
-3. **Lista completa** — todos os clientes ativos (rolagem infinita)
-4. **Botão "Novo cliente" (+)** — cria cliente rápido (nome, e-mail, telefone)
-5. **Botão "Remover"** — limpa seleção (venda para consumidor final)
+1. **Busca** - digite nome, e-mail ou telefone; filtra em tempo real
+2. **Fixados / Recentes** - clientes marcados como favoritos ou usados recentemente aparecem no topo
+3. **Lista completa** - todos os clientes ativos (rolagem infinita)
+4. **Botão "Novo cliente" (+)** - cria cliente rápido (nome, e-mail, telefone)
+5. **Botão "Remover"** - limpa seleção (venda para consumidor final)
 
 > [!TIP]
 > O seletor **só mostra clientes com status "Ativo"**. Inativos, bloqueados e arquivados não aparecem. Para usar um inativo, reative antes na lista de Clientes.
@@ -4538,7 +4538,7 @@ Na maioria dos módulos (Vendas, PDV, Orçamentos, Serviços, Agendamentos, OS),
 
 ### Consumidor final (sem cliente)
 - Clique **Remover** (X) no cliente selecionado.
-- Venda fica como "Consumidor final" — não vincula a ninguém, não exige CPF na nota (exceto se valor > limite legal).
+- Venda fica como "Consumidor final" - não vincula a ninguém, não exige CPF na nota (exceto se valor > limite legal).
 
 ### Endereço de entrega
 - Se o cliente tem **endereço principal** cadastrado, ele pré-preenche o endereço de entrega da venda.
@@ -4550,7 +4550,7 @@ Na maioria dos módulos (Vendas, PDV, Orçamentos, Serviços, Agendamentos, OS),
 
 ### Agendar com cliente
 1. Em **Agendamentos > Novo agendamento**.
-2. Etapa **Cliente** — abra seletor, escolha ou crie rápido.
+2. Etapa **Cliente** - abra seletor, escolha ou crie rápido.
 3. Cliente selecionado → aparece no card do agendamento no calendário.
 4. No dia do atendimento, clique no agendamento > **Ver detalhes do cliente** abre a ficha completa.
 
@@ -4564,7 +4564,7 @@ Na maioria dos módulos (Vendas, PDV, Orçamentos, Serviços, Agendamentos, OS),
 
 ### Criar OS para cliente
 1. Em **Ordens de Serviço > Nova OS**.
-2. Campo **Cliente** — seletor padrão (busca, fixados, novo rápido).
+2. Campo **Cliente** - seletor padrão (busca, fixados, novo rápido).
 3. Cliente vinculado → aparece no cabeçalho da OS.
 4. **Endereço principal** do cliente pré-preenche o endereço da OS (se for visita técnica).
 
@@ -4598,11 +4598,11 @@ Na maioria dos módulos (Vendas, PDV, Orçamentos, Serviços, Agendamentos, OS),
 
 ## Dicas importantes
 
-- **Sempre selecione o cliente** antes de fechar venda/OS — garante histórico, nota fiscal correta, endereço de entrega e vales-compra.
-- **Cliente rápido = complete depois** — nome+e-mail+telefone resolve na hora; volte em Clientes para por CPF, endereço, dados fiscais.
-- **Fixados** — marque clientes frequentes como fixados (estrela no seletor) para aparecerem no topo.
-- **Consumidor final** — use só para vendas rápidas de balcão sem nota fiscal nominal.
-- **Endereço de entrega** — alterar na venda **não altera** o cadastro do cliente. Para mudar definitivo, edite em Clientes.
+- **Sempre selecione o cliente** antes de fechar venda/OS - garante histórico, nota fiscal correta, endereço de entrega e vales-compra.
+- **Cliente rápido = complete depois** - nome+e-mail+telefone resolve na hora; volte em Clientes para por CPF, endereço, dados fiscais.
+- **Fixados** - marque clientes frequentes como fixados (estrela no seletor) para aparecerem no topo.
+- **Consumidor final** - use só para vendas rápidas de balcão sem nota fiscal nominal.
+- **Endereço de entrega** - alterar na venda **não altera** o cadastro do cliente. Para mudar definitivo, edite em Clientes.
 
 ## Problemas comuns
 
@@ -4631,14 +4631,14 @@ Automático: se e-mail do pedido logado = e-mail do cliente no ERP, o sistema vi
 **Posso ter preços diferentes por cliente?**
 Não há tabela de preços por cliente nativa. Use **cupons personalizados** ou **observação interna** com "Preço especial: X%".
 `
-},
-{
-    id: "perguntas-frequentes-clientes",
-        title: "Perguntas frequentes sobre Clientes",
-            description: "Respostas rápidas sobre cadastro, organização, histórico, importação, recursos e integração.",
+            },
+            {
+                id: "perguntas-frequentes-clientes",
+                title: "Perguntas frequentes sobre Clientes",
+                description: "Respostas rápidas sobre cadastro, organização, histórico, importação, recursos e integração.",
                 slug: "perguntas-frequentes-clientes",
-                    category: "clientes",
-                        content: `
+                category: "clientes",
+                content: `
 ## Cadastro e edição
 
 **Posso cadastrar cliente sem CPF/CNPJ?**
@@ -4672,7 +4672,7 @@ Não. Pedidos, orçamentos, agendamentos e OSs antigos continuam vinculados e vi
 Vá na aba **Arquivado**, clique em **Desarquivar** no menu do cliente. Volta para "Ativo".
 
 **Posso excluir um cliente permanentemente?**
-Excluir faz **soft delete** — some das listas e buscas, mas histórico permanece. Para restaurar, contate o suporte.
+Excluir faz **soft delete** - some das listas e buscas, mas histórico permanece. Para restaurar, contate o suporte.
 
 **Quantos clientes posso cadastrar?**
 Depende do seu plano. Clientes arquivados **não contam** para o limite. O sistema avisa ao atingir.
@@ -4705,10 +4705,10 @@ Não. Só pedidos com situação diferente de "cancelado".
 
 **Pedidos feitos no site (marketplace) aparecem no histórico?**
 Sim, se o cliente fez login e o e-mail bate com o cadastro do ERP. O sistema vincula automaticamente via \`marketplace_user_id\`.
-- **Cliente rápido = complete depois** — nome+e-mail+telefone resolve na hora; volte em Clientes para por CPF, endereço, dados fiscais.
-- **Fixados** — marque clientes frequentes como fixados (estrela no seletor) para aparecerem no topo.
-- **Consumidor final** — use só para vendas rápidas de balcão sem nota fiscal nominal.
-- **Endereço de entrega** — alterar na venda **não altera** o cadastro do cliente. Para mudar definitivo, edite em Clientes.
+- **Cliente rápido = complete depois** - nome+e-mail+telefone resolve na hora; volte em Clientes para por CPF, endereço, dados fiscais.
+- **Fixados** - marque clientes frequentes como fixados (estrela no seletor) para aparecerem no topo.
+- **Consumidor final** - use só para vendas rápidas de balcão sem nota fiscal nominal.
+- **Endereço de entrega** - alterar na venda **não altera** o cadastro do cliente. Para mudar definitivo, edite em Clientes.
 
 ## Problemas comuns
 
@@ -4737,7 +4737,7 @@ Automático: se e-mail do pedido logado = e-mail do cliente no ERP, o sistema vi
 **Posso ter preços diferentes por cliente?**
 Não há tabela de preços por cliente nativa. Use **cupons personalizados** ou **observação interna** com "Preço especial: X%".
 `
-},
+            },
         ]
     },
     {
@@ -4769,9 +4769,9 @@ Tudo que acontece nos outros módulos reflete aqui automaticamente:
 
 ## O que você encontra no módulo
 
-**Lista de transações** — cada linha é um lançamento com descrição, categoria, contato, data de vencimento, forma de pagamento, status e valor. Clique em qualquer uma para ver os detalhes.
+**Lista de transações** - cada linha é um lançamento com descrição, categoria, contato, data de vencimento, forma de pagamento, status e valor. Clique em qualquer uma para ver os detalhes.
 
-**Abas de situação** — cinco abas organizam os lançamentos:
+**Abas de situação** - cinco abas organizam os lançamentos:
 
 | Aba | O que mostra |
 |-----|--------------|
@@ -4781,11 +4781,11 @@ Tudo que acontece nos outros módulos reflete aqui automaticamente:
 | **Vencidos** | Lançamentos com data de vencimento passada e sem baixa |
 | **Cancelados** | Lançamentos que foram cancelados |
 
-**Resumo por aba** — cada aba mostra o total pendente, vencido e concluído, facilitando saber quanto está em aberto.
+**Resumo por aba** - cada aba mostra o total pendente, vencido e concluído, facilitando saber quanto está em aberto.
 
-**Busca e filtros** — encontre lançamentos por descrição, categoria, contato, forma de pagamento, data e valor.
+**Busca e filtros** - encontre lançamentos por descrição, categoria, contato, forma de pagamento, data e valor.
 
-**Tipos de lançamento** — ao criar, você escolhe um dos cinco tipos: **Entrada**, **Saída**, **Transferência**, **Ajuste** ou **Reembolso**.
+**Tipos de lançamento** - ao criar, você escolhe um dos cinco tipos: **Entrada**, **Saída**, **Transferência**, **Ajuste** ou **Reembolso**.
 
 ## Como acessar
 
@@ -4796,10 +4796,10 @@ Tudo que acontece nos outros módulos reflete aqui automaticamente:
 
 ## Dicas importantes
 
-- **Cadastre suas contas e categorias antes de lançar** — facilita a organização e os relatórios.
+- **Cadastre suas contas e categorias antes de lançar** - facilita a organização e os relatórios.
 - **Use as abas A pagar e A receber** para saber exatamente o que vence no mês.
 - **Confira a aba Vencidos** com frequência para evitar juros e cobranças atrasadas.
-- **Aproveite as transações automáticas** — vendas, comissões e assinaturas já entram sozinhas no financeiro.
+- **Aproveite as transações automáticas** - vendas, comissões e assinaturas já entram sozinhas no financeiro.
 
 ## Perguntas frequentes
 
@@ -4813,7 +4813,7 @@ Sim, automaticamente. Cada venda gera um recebimento vinculado à forma de pagam
 Sim. Abra o lançamento e use a opção de cancelar. Ele passa para a aba **Cancelados** e não conta mais nos totais.
 
 **O módulo Financeiro substitui meu controle em planilha?**
-Sim. Com contas, categorias, parcelamentos e relatórios, ele centraliza tudo que você controlava em planilhas — com menos retrabalho.
+Sim. Com contas, categorias, parcelamentos e relatórios, ele centraliza tudo que você controlava em planilhas - com menos retrabalho.
 `
             },
             {
@@ -4862,9 +4862,9 @@ Depois dos lançamentos, acesse os relatórios para ver seu resultado do mês, d
 
 ## Dicas importantes
 
-- **Comece pelo que é essencial** — contas e categorias principais já resolvem a maioria dos casos.
-- **Use categorias consistentes** — evite criar nomes diferentes para a mesma coisa (ex: "Energia" e "Conta de luz").
-- **Lançamentos antigos** — se precisar de histórico completo, inclua meses anteriores; se quiser começar do zero, lance apenas o saldo atual.
+- **Comece pelo que é essencial** - contas e categorias principais já resolvem a maioria dos casos.
+- **Use categorias consistentes** - evite criar nomes diferentes para a mesma coisa (ex: "Energia" e "Conta de luz").
+- **Lançamentos antigos** - se precisar de histórico completo, inclua meses anteriores; se quiser começar do zero, lance apenas o saldo atual.
 
 ## Perguntas frequentes
 
@@ -4893,8 +4893,8 @@ Categorias organizam suas transações por tipo. Elas aparecem nos lançamentos,
 
 Cada categoria é de um tipo:
 
-- **Categoria de entrada (receita)** — para lançamentos que trazem dinheiro: vendas, serviços, outras receitas.
-- **Categoria de saída (despesa)** — para lançamentos que tiram dinheiro: fornecedores, aluguel, impostos, salários.
+- **Categoria de entrada (receita)** - para lançamentos que trazem dinheiro: vendas, serviços, outras receitas.
+- **Categoria de saída (despesa)** - para lançamentos que tiram dinheiro: fornecedores, aluguel, impostos, salários.
 
 ## Subcategorias
 
@@ -4922,9 +4922,9 @@ Você pode criar subcategorias dentro de uma categoria para detalhar ainda mais.
 
 ## Dicas importantes
 
-- **Padronize os nomes** — categorias bem nomeadas geram relatórios limpos.
-- **Crie subcategorias com parcimônia** — subcategorias demais dificultam a leitura.
-- **Use o tipo correto** — uma categoria de entrada não aparece para saídas e vice-versa.
+- **Padronize os nomes** - categorias bem nomeadas geram relatórios limpos.
+- **Crie subcategorias com parcimônia** - subcategorias demais dificultam a leitura.
+- **Use o tipo correto** - uma categoria de entrada não aparece para saídas e vice-versa.
 
 ## Perguntas frequentes
 
@@ -4935,7 +4935,7 @@ Não após criar. Crie uma nova categoria com o tipo correto e use-a nos lançam
 Eles passam a exibir o novo nome, já que apontam para a mesma categoria.
 
 **Preciso de categoria para transferência entre contas?**
-Não. Transferências não usam categoria de entrada ou saída — o sistema as trata de forma específica.
+Não. Transferências não usam categoria de entrada ou saída - o sistema as trata de forma específica.
 `
             },
             {
@@ -4951,16 +4951,16 @@ Não. Transferências não usam categoria de entrada ou saída — o sistema as 
 
 ## Tipos de conta
 
-- **Caixa** — dinheiro em espécie (gaveta, retiradas do dia).
-- **Conta bancária** — conta corrente ou poupança (cheque, transferência, Pix).
-- **Cartão de crédito** — para lançar gastos no cartão e acompanhar a fatura.
+- **Caixa** - dinheiro em espécie (gaveta, retiradas do dia).
+- **Conta bancária** - conta corrente ou poupança (cheque, transferência, Pix).
+- **Cartão de crédito** - para lançar gastos no cartão e acompanhar a fatura.
 
 ## Como criar uma conta
 
 1. No módulo **Financeiro**, acesse **Cadastros > Contas**.
 2. Clique em **Nova conta**.
 3. Informe o **nome** (ex: "Caixa da loja", "Banco X - corrente") e o **tipo**.
-4. Defina o **saldo inicial** — o valor que a conta tem hoje.
+4. Defina o **saldo inicial** - o valor que a conta tem hoje.
 5. Salve. A conta aparece na seleção dos lançamentos.
 
 ## Como funciona o saldo
@@ -4978,9 +4978,9 @@ Não. Transferências não usam categoria de entrada ou saída — o sistema as 
 
 ## Dicas importantes
 
-- **Mantenha o saldo inicial real** — ele é a base para tudo que virá depois.
-- **Lançamento na conta certa** — um gasto pago pelo cartão deve ser lançado no cartão, não no caixa.
-- **Revise saldos periodicamente** — compare com seu banco e use **Ajuste** para corrigir diferenças.
+- **Mantenha o saldo inicial real** - ele é a base para tudo que virá depois.
+- **Lançamento na conta certa** - um gasto pago pelo cartão deve ser lançado no cartão, não no caixa.
+- **Revise saldos periodicamente** - compare com seu banco e use **Ajuste** para corrigir diferenças.
 
 ## Perguntas frequentes
 
@@ -5007,10 +5007,10 @@ Use o tipo de lançamento **Ajuste** para corrigir o saldo da conta para o valor
 
 ## Tipos de contato
 
-- **Fornecedor** — quem te vende produtos, matéria-prima ou serviços (despesas).
-- **Funcionário** — pagamentos de salários, comissões e adiantamentos.
-- **Cliente** — quem compra de você (receitas).
-- **Outro** — demais pessoas ou empresas (ex: sócio, prestador eventual).
+- **Fornecedor** - quem te vende produtos, matéria-prima ou serviços (despesas).
+- **Funcionário** - pagamentos de salários, comissões e adiantamentos.
+- **Cliente** - quem compra de você (receitas).
+- **Outro** - demais pessoas ou empresas (ex: sócio, prestador eventual).
 
 ## Como criar um contato
 
@@ -5028,9 +5028,9 @@ Use o tipo de lançamento **Ajuste** para corrigir o saldo da conta para o valor
 
 ## Dicas importantes
 
-- **Reutilize contatos** — o mesmo fornecedor deve ser usado em todos os lançamentos, assim o relatório fica agrupado.
-- **Vincule sempre que possível** — lançamentos sem contato aparecem como "Sem contato" nos relatórios.
-- **Clientes já cadastrados** — clientes do módulo de Clientes podem aparecer automaticamente aqui nas receitas.
+- **Reutilize contatos** - o mesmo fornecedor deve ser usado em todos os lançamentos, assim o relatório fica agrupado.
+- **Vincule sempre que possível** - lançamentos sem contato aparecem como "Sem contato" nos relatórios.
+- **Clientes já cadastrados** - clientes do módulo de Clientes podem aparecer automaticamente aqui nas receitas.
 
 ## Perguntas frequentes
 
@@ -5073,19 +5073,19 @@ Selecione **Entrada** para receita ou **Saída** para despesa.
 
 ### 3. Preencher os dados
 
-- **Descrição** — o que é (ex: "Venda balcão", "Compra de matéria-prima").
-- **Valor** — o total do lançamento.
-- **Categoria** — escolha a categoria (e subcategoria, se houver).
-- **Conta** — onde o dinheiro entra ou sai.
-- **Contato** — para quem paga ou de quem recebe (opcional).
-- **Data de vencimento** — quando vence ou foi pago.
-- **Forma de pagamento** — Pix, dinheiro, cartão, etc.
-- **Observações** — anotações internas (opcional).
+- **Descrição** - o que é (ex: "Venda balcão", "Compra de matéria-prima").
+- **Valor** - o total do lançamento.
+- **Categoria** - escolha a categoria (e subcategoria, se houver).
+- **Conta** - onde o dinheiro entra ou sai.
+- **Contato** - para quem paga ou de quem recebe (opcional).
+- **Data de vencimento** - quando vence ou foi pago.
+- **Forma de pagamento** - Pix, dinheiro, cartão, etc.
+- **Observações** - anotações internas (opcional).
 
 ### 4. Opcionais
 
-- **Parcelado** — divida o valor em parcelas (veja o artigo sobre lançamentos parcelados).
-- **Recorrente** — repita automaticamente todos os meses (veja o artigo sobre transações recorrentes).
+- **Parcelado** - divida o valor em parcelas (veja o artigo sobre lançamentos parcelados).
+- **Recorrente** - repita automaticamente todos os meses (veja o artigo sobre transações recorrentes).
 
 ### 5. Salvar
 
@@ -5093,9 +5093,9 @@ Clique em **Salvar**. O lançamento aparece na aba correspondente e atualiza o s
 
 ## Dicas importantes
 
-- **Escolha a categoria certa** — entradas usam categorias de entrada e saídas, de saída.
-- **Confira a conta** — o saldo da conta indicada será alterado.
-- **Use a data de vencimento** — lançamentos em aberto aparecem em A pagar/A receber até serem baixados.
+- **Escolha a categoria certa** - entradas usam categorias de entrada e saídas, de saída.
+- **Confira a conta** - o saldo da conta indicada será alterado.
+- **Use a data de vencimento** - lançamentos em aberto aparecem em A pagar/A receber até serem baixados.
 
 ## Perguntas frequentes
 
@@ -5118,7 +5118,7 @@ Cada lançamento é individual. Para movimentações entre contas, use **Transfe
                 content: `
 ## Visão geral
 
-A **transferência** move dinheiro de uma conta para outra — por exemplo, do **caixa** para a **conta bancária**, ou do **banco** para o **cartão** para pagar a fatura. Ela não gera receita nem despesa: apenas muda onde o dinheiro está.
+A **transferência** move dinheiro de uma conta para outra - por exemplo, do **caixa** para a **conta bancária**, ou do **banco** para o **cartão** para pagar a fatura. Ela não gera receita nem despesa: apenas muda onde o dinheiro está.
 
 ## Quando utilizar
 
@@ -5141,9 +5141,9 @@ A transferência **não altera** seu resultado do mês, porque uma conta reduz e
 
 ## Dicas importantes
 
-- **Origem e destino diferentes** — se informar a mesma conta, o sistema não permite ou não faz sentido; confira antes de salvar.
-- **Use descrições claras** — facilita entender o histórico depois.
-- **Não confunda com Ajuste** — transferência move entre contas; ajuste corrige saldo.
+- **Origem e destino diferentes** - se informar a mesma conta, o sistema não permite ou não faz sentido; confira antes de salvar.
+- **Use descrições claras** - facilita entender o histórico depois.
+- **Não confunda com Ajuste** - transferência move entre contas; ajuste corrige saldo.
 
 ## Perguntas frequentes
 
@@ -5166,7 +5166,7 @@ Não nos totais de receitas/despesas, mas aparece no detalhamento de cada conta.
                 content: `
 ## Visão geral
 
-O **Ajuste** é o lançamento usado para corrigir o saldo de uma conta quando ele não bate com a realidade — por exemplo, após uma **conciliação bancária** ou quando o saldo do caixa físico está diferente do registrado.
+O **Ajuste** é o lançamento usado para corrigir o saldo de uma conta quando ele não bate com a realidade - por exemplo, após uma **conciliação bancária** ou quando o saldo do caixa físico está diferente do registrado.
 
 ## Quando utilizar
 
@@ -5185,9 +5185,9 @@ O **Ajuste** é o lançamento usado para corrigir o saldo de uma conta quando el
 
 ## Dicas importantes
 
-- **Ajuste não é despesa nem receita** — ele só corrige o saldo da conta.
-- **Documente o motivo** — a descrição do ajuste é essencial para auditoria depois.
-- **Prefira lançar o correto** — se a diferença tem causa conhecida (ex: uma saída esquecida), lance a saída em vez do ajuste.
+- **Ajuste não é despesa nem receita** - ele só corrige o saldo da conta.
+- **Documente o motivo** - a descrição do ajuste é essencial para auditoria depois.
+- **Prefira lançar o correto** - se a diferença tem causa conhecida (ex: uma saída esquecida), lance a saída em vez do ajuste.
 
 ## Perguntas frequentes
 
@@ -5212,8 +5212,8 @@ Sim. Informe o valor do ajuste conforme a correção necessária.
 
 O **Reembolso** registra quando o dinheiro volta ou sai por uma devolução. Existem dois tipos:
 
-- **Reembolso de despesa** — quando uma despesa paga volta (ex: fornecedor devolve o valor de uma compra).
-- **Reembolso de receita / estorno** — quando você devolve o dinheiro de uma venda (ex: devolução de produto ou cancelamento).
+- **Reembolso de despesa** - quando uma despesa paga volta (ex: fornecedor devolve o valor de uma compra).
+- **Reembolso de receita / estorno** - quando você devolve o dinheiro de uma venda (ex: devolução de produto ou cancelamento).
 
 ## Quando utilizar
 
@@ -5227,16 +5227,16 @@ O **Reembolso** registra quando o dinheiro volta ou sai por uma devolução. Exi
 1. No módulo **Financeiro**, clique em **Nova transação**.
 2. Escolha o tipo **Reembolso**.
 3. Selecione o **tipo de reembolso**:
-   - **Reembolso de despesa** — o dinheiro volta para você.
-   - **Reembolso de receita** — você devolve dinheiro ao cliente.
+   - **Reembolso de despesa** - o dinheiro volta para você.
+   - **Reembolso de receita** - você devolve dinheiro ao cliente.
 4. Preencha descrição, valor, conta, contato e data.
 5. Salve. O lançamento fica marcado como reembolso no histórico.
 
 ## Dicas importantes
 
-- **Use a categoria Reembolsos** — o sistema registra nessa categoria para facilitar a identificação.
-- **Vincule o cliente** — ao reembolsar uma receita, vincule o cliente para controle.
-- **Confira o saldo da conta** — o reembolso mexe no saldo da conta escolhida.
+- **Use a categoria Reembolsos** - o sistema registra nessa categoria para facilitar a identificação.
+- **Vincule o cliente** - ao reembolsar uma receita, vincule o cliente para controle.
+- **Confira o saldo da conta** - o reembolso mexe no saldo da conta escolhida.
 
 ## Perguntas frequentes
 
@@ -5266,9 +5266,9 @@ Legenda: Despesas em aberto com total pendente, vencido e concluído.
 
 ## O que você vê
 
-- **Total pendente** — quanto ainda falta pagar
-- **Total vencido** — o que já passou do vencimento
-- **Total concluído** — o que já foi pago no período
+- **Total pendente** - quanto ainda falta pagar
+- **Total vencido** - o que já passou do vencimento
+- **Total concluído** - o que já foi pago no período
 
 A lista é ordenada por **data de vencimento**, então o que vence primeiro aparece primeiro.
 
@@ -5288,9 +5288,9 @@ A lista é ordenada por **data de vencimento**, então o que vence primeiro apar
 
 ## Dicas importantes
 
-- **Pague com folga** — acompanhe o que vence nos próximos dias, não só o que já venceu.
-- **Use os vencidos** — a aba **Vencidos** concentra tudo que está atrasado para você priorizar.
-- **Parcelas e recorrências** — parcelas em aberto e ocorrências recorrentes futuras aparecem aqui automaticamente.
+- **Pague com folga** - acompanhe o que vence nos próximos dias, não só o que já venceu.
+- **Use os vencidos** - a aba **Vencidos** concentra tudo que está atrasado para você priorizar.
+- **Parcelas e recorrências** - parcelas em aberto e ocorrências recorrentes futuras aparecem aqui automaticamente.
 
 ## Perguntas frequentes
 
@@ -5317,9 +5317,9 @@ A aba **A receber** reúne todas as **entradas em aberto**: vendas a prazo, parc
 
 ## O que você vê
 
-- **Total pendente** — quanto ainda falta receber
-- **Total vencido** — o que já passou do vencimento sem receber
-- **Total concluído** — o que já foi recebido no período
+- **Total pendente** - quanto ainda falta receber
+- **Total vencido** - o que já passou do vencimento sem receber
+- **Total concluído** - o que já foi recebido no período
 
 A lista é ordenada por **data de vencimento**, mostrando primeiro o que deve entrar antes.
 
@@ -5339,9 +5339,9 @@ A lista é ordenada por **data de vencimento**, mostrando primeiro o que deve en
 
 ## Dicas importantes
 
-- **Acompanhe os vencidos** — vendas a prazo não pagas aparecem em **Vencidos** para você cobrar.
-- **Vendas a prazo já entram automaticamente** — a parcela da venda aparece como a receber.
-- **Serviços e agendamentos** — recebimentos de serviços podem ser lançados como a receber.
+- **Acompanhe os vencidos** - vendas a prazo não pagas aparecem em **Vencidos** para você cobrar.
+- **Vendas a prazo já entram automaticamente** - a parcela da venda aparece como a receber.
+- **Serviços e agendamentos** - recebimentos de serviços podem ser lançados como a receber.
 
 ## Perguntas frequentes
 
@@ -5352,7 +5352,7 @@ Vendas a prazo geram recebimentos com datas de vencimento. Enquanto não recebid
 Abra o lançamento e use **Marcar como recebido**. O saldo da conta indicada aumenta.
 
 **O que é o total vencido em A receber?**
-São recebimentos que passaram do vencimento e ainda não entraram — sinal de que vale cobrar.
+São recebimentos que passaram do vencimento e ainda não entraram - sinal de que vale cobrar.
 `
             },
             {
@@ -5391,9 +5391,9 @@ São recebimentos que passaram do vencimento e ainda não entraram — sinal de 
 
 ## Dicas importantes
 
-- **Confira a primeira data** — ela define o vencimento de todas as parcelas seguintes.
-- **Baixe parcela a parcela** — o saldo da conta é atualizado a cada baixa.
-- **Parcelas atrasadas** — aparecem na aba **Vencidos** para você não esquecer.
+- **Confira a primeira data** - ela define o vencimento de todas as parcelas seguintes.
+- **Baixe parcela a parcela** - o saldo da conta é atualizado a cada baixa.
+- **Parcelas atrasadas** - aparecem na aba **Vencidos** para você não esquecer.
 
 ## Perguntas frequentes
 
@@ -5441,9 +5441,9 @@ Não diretamente. Você pode cancelar o grupo e refazer o lançamento com as nov
 
 ## Dicas importantes
 
-- **Baixe a ocorrência do mês** — pagar a ocorrência não altera o modelo; cada mês é uma nova baixa.
-- **Revise o dia de vencimento** — o dia escolhido na criação vale para todas as ocorrências.
-- **Recorrência não é parcela** — parcela tem fim definido; recorrência continua até você cancelar.
+- **Baixe a ocorrência do mês** - pagar a ocorrência não altera o modelo; cada mês é uma nova baixa.
+- **Revise o dia de vencimento** - o dia escolhido na criação vale para todas as ocorrências.
+- **Recorrência não é parcela** - parcela tem fim definido; recorrência continua até você cancelar.
 
 ## Perguntas frequentes
 
@@ -5466,7 +5466,7 @@ Ela gera as ocorrências previstas. O pagamento/recebimento de cada uma é feito
                 content: `
 ## Visão geral
 
-O sistema gera **transações automáticas** a partir de movimentações em outros módulos. Você não precisa lançar manualmente — elas entram no Financeiro sozinhas, com origem identificada.
+O sistema gera **transações automáticas** a partir de movimentações em outros módulos. Você não precisa lançar manualmente - elas entram no Financeiro sozinhas, com origem identificada.
 
 ## Origens das transações automáticas
 
@@ -5486,14 +5486,14 @@ Transações automáticas aparecem na lista com sua **origem** indicada (ex: ven
 
 ## Quando utilizar
 
-- Não é necessário fazer nada — a integração é automática
+- Não é necessário fazer nada - a integração é automática
 - Use para conferir se tudo que foi vendido entrou no financeiro
 
 ## Dicas importantes
 
-- **Confira periodicamente** — compare as vendas do dia com os recebimentos no Financeiro.
-- **Não duplique** — não relance manualmente o que o sistema já gerou, ou o valor contará duas vezes.
-- **Estornos** — cancelamentos e devoluções também geram lançamentos automáticos de estorno/reembolso.
+- **Confira periodicamente** - compare as vendas do dia com os recebimentos no Financeiro.
+- **Não duplique** - não relance manualmente o que o sistema já gerou, ou o valor contará duas vezes.
+- **Estornos** - cancelamentos e devoluções também geram lançamentos automáticos de estorno/reembolso.
 
 ## Perguntas frequentes
 
@@ -5523,15 +5523,15 @@ Legenda: Detalhes do lançamento com dados gerais, forma de pagamento e históri
 
 ## O que você encontra
 
-**Informações principais** — descrição, valor, categoria, subcategoria, conta, contato, data de vencimento, forma de pagamento e status (pago/recebido ou em aberto).
+**Informações principais** - descrição, valor, categoria, subcategoria, conta, contato, data de vencimento, forma de pagamento e status (pago/recebido ou em aberto).
 
-**Origem** — se a transação é manual ou veio de outro módulo (venda, serviço, comissão, assinatura, recorrência).
+**Origem** - se a transação é manual ou veio de outro módulo (venda, serviço, comissão, assinatura, recorrência).
 
-**Parcelas** — se o lançamento é parcelado, mostra o grupo com número da parcela e total.
+**Parcelas** - se o lançamento é parcelado, mostra o grupo com número da parcela e total.
 
-**Valores auxiliares** — juros, descontos e valor já pago (pagamentos parciais), quando aplicáveis.
+**Valores auxiliares** - juros, descontos e valor já pago (pagamentos parciais), quando aplicáveis.
 
-**Histórico** — linha do tempo com o que aconteceu com a transação: criação, alterações, baixas de pagamento e cancelamentos.
+**Histórico** - linha do tempo com o que aconteceu com a transação: criação, alterações, baixas de pagamento e cancelamentos.
 
 ## Como abrir
 
@@ -5548,9 +5548,9 @@ Legenda: Detalhes do lançamento com dados gerais, forma de pagamento e históri
 
 ## Dicas importantes
 
-- **Use o histórico para auditoria** — ele mostra alterações e baixas, útil para conciliação.
-- **Confira a origem** — em transações automáticas, abra a venda/serviço original se precisar corrigir.
-- **Observações** — o campo de observações internas aparece aqui e ajuda a lembrar o contexto do lançamento.
+- **Use o histórico para auditoria** - ele mostra alterações e baixas, útil para conciliação.
+- **Confira a origem** - em transações automáticas, abra a venda/serviço original se precisar corrigir.
+- **Observações** - o campo de observações internas aparece aqui e ajuda a lembrar o contexto do lançamento.
 
 ## Perguntas frequentes
 
@@ -5584,7 +5584,7 @@ O **caixa do PDV** controla o dinheiro em espécie do balcão ao longo do dia. V
 
 ## Sangria
 
-**Sangria** é a retirada de dinheiro do caixa durante o dia — por exemplo, para pagar uma despesa ou depositar no banco.
+**Sangria** é a retirada de dinheiro do caixa durante o dia - por exemplo, para pagar uma despesa ou depositar no banco.
 
 1. Com o caixa aberto, use a opção **Sangria**.
 2. Informe o **valor** e o **motivo**.
@@ -5592,7 +5592,7 @@ O **caixa do PDV** controla o dinheiro em espécie do balcão ao longo do dia. V
 
 ## Reforço
 
-**Reforço** é a entrada de dinheiro no caixa durante o dia — por exemplo, quando você repõe troco.
+**Reforço** é a entrada de dinheiro no caixa durante o dia - por exemplo, quando você repõe troco.
 
 1. Com o caixa aberto, use a opção **Reforço**.
 2. Informe o **valor** e o **motivo**.
@@ -5615,9 +5615,9 @@ No fim do dia:
 
 ## Dicas importantes
 
-- **Registre toda retirada como sangria** — evita diferença no fechamento.
-- **Confira o caixa antes de fechar** — conte o dinheiro físico e compare com o esperado.
-- **Vendas em dinheiro entram no caixa automaticamente** — você só registra o que sai ou entra por fora das vendas.
+- **Registre toda retirada como sangria** - evita diferença no fechamento.
+- **Confira o caixa antes de fechar** - conte o dinheiro físico e compare com o esperado.
+- **Vendas em dinheiro entram no caixa automaticamente** - você só registra o que sai ou entra por fora das vendas.
 
 ## Perguntas frequentes
 
@@ -5647,15 +5647,15 @@ Os **relatórios financeiros** mostram o panorama do seu dinheiro: quanto entrou
 
 ## Relatórios disponíveis
 
-**Resultado (receitas x despesas)** — total de entradas, total de saídas e o resultado do período (positivo ou negativo).
+**Resultado (receitas x despesas)** - total de entradas, total de saídas e o resultado do período (positivo ou negativo).
 
-**Por categoria** — quanto foi movimentado em cada categoria de entrada e de saída, para identificar onde o dinheiro vai.
+**Por categoria** - quanto foi movimentado em cada categoria de entrada e de saída, para identificar onde o dinheiro vai.
 
-**Por conta** — saldo e movimentação de cada conta (caixa, banco, cartão).
+**Por conta** - saldo e movimentação de cada conta (caixa, banco, cartão).
 
-**Por contato** — total pago a cada fornecedor e recebido de cada cliente.
+**Por contato** - total pago a cada fornecedor e recebido de cada cliente.
 
-**Vencidos** — o que está atrasado, tanto a pagar quanto a receber.
+**Vencidos** - o que está atrasado, tanto a pagar quanto a receber.
 
 ## Como acessar
 
@@ -5673,9 +5673,9 @@ Os **relatórios financeiros** mostram o panorama do seu dinheiro: quanto entrou
 
 ## Dicas importantes
 
-- **Use períodos comparáveis** — compare o mesmo intervalo entre meses diferentes.
-- **Confira as categorias** — relatórios dependem de lançamentos bem categorizados.
-- **Exporte para compartilhar** — os relatórios podem ser exportados para planilha.
+- **Use períodos comparáveis** - compare o mesmo intervalo entre meses diferentes.
+- **Confira as categorias** - relatórios dependem de lançamentos bem categorizados.
+- **Exporte para compartilhar** - os relatórios podem ser exportados para planilha.
 
 ## Perguntas frequentes
 
@@ -5720,9 +5720,9 @@ Cada linha é uma transação com informações como descrição, categoria, con
 
 ## Dicas importantes
 
-- **Filtre antes de exportar** — a exportação respeita a visão/filtro atual.
-- **Confira o período** — exporte apenas o intervalo que precisa.
-- **Não altere no sistema** — o arquivo é um retrato dos dados no momento da exportação.
+- **Filtre antes de exportar** - a exportação respeita a visão/filtro atual.
+- **Confira o período** - exporte apenas o intervalo que precisa.
+- **Não altere no sistema** - o arquivo é um retrato dos dados no momento da exportação.
 
 ## Perguntas frequentes
 
@@ -5786,10 +5786,10 @@ Em **A pagar** ou **A receber**, conforme a data de vencimento de cada ocorrênc
 ## Reembolsos e estornos
 
 **O que é reembolso de despesa?**
-Quando uma despesa paga volta — por exemplo, o fornecedor devolve o valor de uma compra.
+Quando uma despesa paga volta - por exemplo, o fornecedor devolve o valor de uma compra.
 
 **O que é reembolso de receita (estorno)?**
-Quando você devolve o dinheiro de uma venda — por exemplo, em uma devolução ou cancelamento.
+Quando você devolve o dinheiro de uma venda - por exemplo, em uma devolução ou cancelamento.
 
 ## Integrações automáticas
 
@@ -5832,16 +5832,16 @@ Sim, para planilha, respeitando a visão e os filtros atuais.
                 content: `
 ## Visão geral
 
-Os **cupons de desconto** são códigos que seu cliente usa para ganhar um benefício na compra — percentual, valor fixo ou frete grátis. Você cria o cupom no ERP, define as regras, e ele pode ser usado no balcão (PDV), nas vendas e também na sua vitrine online.
+Os **cupons de desconto** são códigos que seu cliente usa para ganhar um benefício na compra - percentual, valor fixo ou frete grátis. Você cria o cupom no ERP, define as regras, e ele pode ser usado no balcão (PDV), nas vendas e também na sua vitrine online.
 
 ![Tela principal de Cupons](https://img.dudit.com.br/static/screens/Cupons_VisaoGeral.png)
 Legenda: Lista de cupons com abas de status, busca, filtros e ações rápidas.
 
 ## O que você encontra no módulo
 
-**Lista de cupons** — cada linha mostra o código, o tipo de desconto, o escopo (onde vale), o uso (quantas vezes foi usado), a validade e o status.
+**Lista de cupons** - cada linha mostra o código, o tipo de desconto, o escopo (onde vale), o uso (quantas vezes foi usado), a validade e o status.
 
-**Abas de status** — quatro abas organizam os cupons:
+**Abas de status** - quatro abas organizam os cupons:
 
 | Aba | O que mostra |
 |-----|--------------|
@@ -5850,15 +5850,15 @@ Legenda: Lista de cupons com abas de status, busca, filtros e ações rápidas.
 | **Inativos** | Cupons pausados |
 | **Automáticos** | Cupons aplicados sozinhos pelo sistema, sem o cliente digitar |
 
-**Busca e filtros** — encontre cupons por código e refine por tipo de desconto, escopo do catálogo, clientes ou automação.
+**Busca e filtros** - encontre cupons por código e refine por tipo de desconto, escopo do catálogo, clientes ou automação.
 
-**Tipos de desconto** — três formatos:
+**Tipos de desconto** - três formatos:
 
-- **Percentual** — desconto em % (ex: 10% OFF)
-- **Valor fixo** — desconto em reais (ex: R$ 20 OFF)
-- **Entrega grátis** — isenta o frete do pedido
+- **Percentual** - desconto em % (ex: 10% OFF)
+- **Valor fixo** - desconto em reais (ex: R$ 20 OFF)
+- **Entrega grátis** - isenta o frete do pedido
 
-**Status** — **Ativo** (pode ser usado) ou **Inativo** (pausado). Cupons automáticos aparecem com uma marcação própria.
+**Status** - **Ativo** (pode ser usado) ou **Inativo** (pausado). Cupons automáticos aparecem com uma marcação própria.
 
 ## Quando utilizar
 
@@ -5878,7 +5878,7 @@ Legenda: Lista de cupons com abas de status, busca, filtros e ações rápidas.
 
 ## Dicas importantes
 
-- **Crie códigos fáceis de lembrar** — ex: ANIVERSARIO10, BEMVINDO15.
+- **Crie códigos fáceis de lembrar** - ex: ANIVERSARIO10, BEMVINDO15.
 - **Defina limites de uso** para não estourar sua margem.
 - **Cupons automáticos** são ótimos para campanhas gerais: o desconto entra sozinho, sem o cliente digitar nada.
 - **Use o link de compartilhamento** para divulgar o cupom no WhatsApp e redes sociais.
@@ -5886,7 +5886,7 @@ Legenda: Lista de cupons com abas de status, busca, filtros e ações rápidas.
 ## Perguntas frequentes
 
 **O cliente precisa digitar o código?**
-Para cupons normais, sim. Para **cupons automáticos**, não — o sistema aplica o maior desconto automaticamente.
+Para cupons normais, sim. Para **cupons automáticos**, não - o sistema aplica o maior desconto automaticamente.
 
 **Cupom funciona na vitrine online?**
 Sim. Cupons ativos aparecem na página do seu negócio e podem ser usados no checkout.
@@ -5921,36 +5921,36 @@ No menu **Marketing > Cupons de Desconto**, clique em **Novo cupom**.
 
 ### 2. Dados gerais
 
-- **Código do cupom** — o código que o cliente vai digitar (ex: BEMVINDO15). Sem acentos, letras maiúsculas, máximo 20 caracteres.
-- **Status** — Ativo ou Inativo.
-- **Tipo de desconto** — Percentual, Valor fixo ou Entrega grátis.
-- **Valor do desconto** — informe o percentual ou o valor em reais (para Entrega grátis esse campo é desativado).
+- **Código do cupom** - o código que o cliente vai digitar (ex: BEMVINDO15). Sem acentos, letras maiúsculas, máximo 20 caracteres.
+- **Status** - Ativo ou Inativo.
+- **Tipo de desconto** - Percentual, Valor fixo ou Entrega grátis.
+- **Valor do desconto** - informe o percentual ou o valor em reais (para Entrega grátis esse campo é desativado).
 
 ### 3. Regras opcionais
 
-- **Valor mínimo da sacola** — o desconto só vale se o pedido atingir esse valor.
-- **Desconto máximo** — limita o valor máximo do desconto em reais (ex: cupom de 20%, mas no máximo R$ 50).
+- **Valor mínimo da sacola** - o desconto só vale se o pedido atingir esse valor.
+- **Desconto máximo** - limita o valor máximo do desconto em reais (ex: cupom de 20%, mas no máximo R$ 50).
 
 ### 4. Opções
 
-- **Permitir combinação** — se ativado, o cupom pode ser usado junto com promoções de campanha. Se desativado, o sistema escolhe o melhor benefício entre cupom e promoção.
-- **Cupom automático** — se ativado, o sistema aplica esse cupom sozinho nas vendas, sem o cliente digitar.
+- **Permitir combinação** - se ativado, o cupom pode ser usado junto com promoções de campanha. Se desativado, o sistema escolhe o melhor benefício entre cupom e promoção.
+- **Cupom automático** - se ativado, o sistema aplica esse cupom sozinho nas vendas, sem o cliente digitar.
 
 ### 5. Escopo
 
 Na aba **Escopo**, defina onde o cupom vale:
 
-- **Aplicar a** — todas as categorias, ou categorias/produtos/serviços específicos.
-- **Escopo de clientes** — todos os clientes ou clientes específicos.
+- **Aplicar a** - todas as categorias, ou categorias/produtos/serviços específicos.
+- **Escopo de clientes** - todos os clientes ou clientes específicos.
 
 ### 6. Limites e validade
 
 No painel lateral:
 
-- **Limitar uso total** — quantas vezes o cupom pode ser usado no total.
-- **Limitar por cliente** — quantas vezes cada cliente pode usar.
-- **Apenas primeira compra** — o cupom vale só para o primeiro pedido do cliente.
-- **Validade** — sem limite de data ou com data de início e fim.
+- **Limitar uso total** - quantas vezes o cupom pode ser usado no total.
+- **Limitar por cliente** - quantas vezes cada cliente pode usar.
+- **Apenas primeira compra** - o cupom vale só para o primeiro pedido do cliente.
+- **Validade** - sem limite de data ou com data de início e fim.
 
 ### 7. Salvar
 
@@ -5958,10 +5958,10 @@ Clique em **Salvar**. O cupom aparece na lista e já pode ser usado.
 
 ## Dicas importantes
 
-- **Código sem espaços e sem acentos** — evita erro na hora de digitar.
-- **"Apenas primeira compra" e "Limitar por cliente" são exclusivos** — ativar um desativa o outro.
-- **Teste o cupom** — faça uma venda de teste para conferir se o desconto aplica como esperado.
-- **Use o compartilhamento** — após salvar, use o botão de compartilhar para divulgar o link do cupom.
+- **Código sem espaços e sem acentos** - evita erro na hora de digitar.
+- **"Apenas primeira compra" e "Limitar por cliente" são exclusivos** - ativar um desativa o outro.
+- **Teste o cupom** - faça uma venda de teste para conferir se o desconto aplica como esperado.
+- **Use o compartilhamento** - após salvar, use o botão de compartilhar para divulgar o link do cupom.
 
 ## Problemas comuns
 
@@ -6018,31 +6018,31 @@ Ao escolher um escopo específico, você seleciona os itens em uma lista com bus
 
 ### Escopo de clientes (quem pode usar)
 
-- **Todos os clientes** — qualquer pessoa pode usar.
-- **Clientes específicos** — somente clientes selecionados podem usar.
+- **Todos os clientes** - qualquer pessoa pode usar.
+- **Clientes específicos** - somente clientes selecionados podem usar.
 
 ### Limites de uso
 
-- **Limite total** — o cupom vale no máximo N usos. Depois disso, o sistema rejeita novos usos com a mensagem "Limite de uso do cupom atingido."
-- **Limite por cliente** — cada cliente pode usar no máximo N vezes.
-- **Apenas primeira compra** — vale somente para o primeiro pedido do cliente. (Exclusivo com limite por cliente: ativar um desativa o outro.)
+- **Limite total** - o cupom vale no máximo N usos. Depois disso, o sistema rejeita novos usos com a mensagem "Limite de uso do cupom atingido."
+- **Limite por cliente** - cada cliente pode usar no máximo N vezes.
+- **Apenas primeira compra** - vale somente para o primeiro pedido do cliente. (Exclusivo com limite por cliente: ativar um desativa o outro.)
 
 ### Validade
 
-- **Sem limite de data** — vale indefinidamente.
-- **Com datas** — informa **início** e **fim**. Antes do início: "Cupom ainda não está disponível." Depois do fim: "Cupom expirado."
+- **Sem limite de data** - vale indefinidamente.
+- **Com datas** - informa **início** e **fim**. Antes do início: "Cupom ainda não está disponível." Depois do fim: "Cupom expirado."
 
 ### Condições da sacola
 
-- **Valor mínimo da sacola** — o desconto só vale se o total do pedido atingir o mínimo informado.
-- **Desconto máximo** — limita o valor do desconto em reais, mesmo que o percentual calcule mais.
+- **Valor mínimo da sacola** - o desconto só vale se o total do pedido atingir o mínimo informado.
+- **Desconto máximo** - limita o valor do desconto em reais, mesmo que o percentual calcule mais.
 
 ## Dicas importantes
 
-- **Combine valor mínimo com desconto máximo** — exemplo real: cupom de 20% com mínimo de R$ 100 e desconto máximo de R$ 50.
-- **Cupom de primeira compra** — ideal para atrair novos clientes sem que os antigos repitam o benefício.
-- **Escopo por cliente** — ótimo para bonificar clientes VIP ou reter quem está sumindo.
-- **Reveja a validade** — cupons sem data ficam ativos para sempre; defina datas para campanhas temporárias.
+- **Combine valor mínimo com desconto máximo** - exemplo real: cupom de 20% com mínimo de R$ 100 e desconto máximo de R$ 50.
+- **Cupom de primeira compra** - ideal para atrair novos clientes sem que os antigos repitam o benefício.
+- **Escopo por cliente** - ótimo para bonificar clientes VIP ou reter quem está sumindo.
+- **Reveja a validade** - cupons sem data ficam ativos para sempre; defina datas para campanhas temporárias.
 
 ## Problemas comuns
 
@@ -6062,7 +6062,7 @@ Sim. Se o escopo é **Todas as categorias** e não há produtos/serviços vincul
 Sim, os dois podem estar ativos juntos.
 
 **"Apenas primeira compra" pode ser usado com "limite por cliente"?**
-Não. São exclusivos — ativar um desativa o outro.
+Não. São exclusivos - ativar um desativa o outro.
 
 **O desconto máximo vale para cupom de valor fixo?**
 Se o desconto fixo for menor que o teto, o teto não muda nada. O teto protege principalmente cupons percentuais em pedidos grandes.
@@ -6091,9 +6091,9 @@ O cupom pode ser usado de três formas: o **cliente digita o código** (PDV, ven
 
 Na tela do PDV, você pode:
 
-- **Digitar o código** — o sistema valida e aplica o desconto.
-- **Selecionar o cupom** — abre uma lista de cupons ativos com o formato do benefício (ex: "10% off", "R$ 20 off", "Entrega grátis"). Cupons com restrições aparecem com aviso "Possui restrições".
-- **Aplicar automático** — se houver cupom automático válido, o PDV aplica o maior desconto sozinho.
+- **Digitar o código** - o sistema valida e aplica o desconto.
+- **Selecionar o cupom** - abre uma lista de cupons ativos com o formato do benefício (ex: "10% off", "R$ 20 off", "Entrega grátis"). Cupons com restrições aparecem com aviso "Possui restrições".
+- **Aplicar automático** - se houver cupom automático válido, o PDV aplica o maior desconto sozinho.
 
 ### Nas Vendas (pedidos)
 
@@ -6117,9 +6117,9 @@ São cupons marcados com a opção **Cupom automático**. O sistema busca os cup
 
 ## Dicas importantes
 
-- **Configure apenas cupons automáticos que você quer que valham sempre** — eles aplicam sozinhos em todas as vendas elegíveis.
-- **Verifique a validação** — o sistema recalcula o preço com o cupom no momento do pedido, então o total é sempre o correto.
-- **No PDV, desconfie de "Possui restrições"** — confira o motivo antes de aplicar.
+- **Configure apenas cupons automáticos que você quer que valham sempre** - eles aplicam sozinhos em todas as vendas elegíveis.
+- **Verifique a validação** - o sistema recalcula o preço com o cupom no momento do pedido, então o total é sempre o correto.
+- **No PDV, desconfie de "Possui restrições"** - confira o motivo antes de aplicar.
 
 ## Problemas comuns
 
@@ -6172,9 +6172,9 @@ Cupons ativos aparecem na seção **"Cupons do vendedor"** da página do seu neg
 
 No módulo **Clientes**, quando um cliente tem data de nascimento cadastrada e você está no plano Crescer, aparece um card de aniversário com ações:
 
-- **Criar cupom** — abre a tela de cupons já preenchida com código **ANIVERSARIO10** e o cliente vinculado.
-- **Enviar WhatsApp** — abre uma conversa com o cupom no texto.
-- **Enviar notificação** — envia uma notificação (uma vez por ano).
+- **Criar cupom** - abre a tela de cupons já preenchida com código **ANIVERSARIO10** e o cliente vinculado.
+- **Enviar WhatsApp** - abre uma conversa com o cupom no texto.
+- **Enviar notificação** - envia uma notificação (uma vez por ano).
 
 ### Uso registrado
 
@@ -6182,9 +6182,9 @@ Cada uso do cupom fica registrado. Você acompanha no **detalhe do cupom** (usos
 
 ## Dicas importantes
 
-- **Divulgue com link, não só com código** — o link já leva o cliente direto ao cupom.
-- **Use o aniversário para reativar clientes** — uma cortesia no aniversário aumenta as chances de recompra.
-- **Confira o uso no relatório** — veja quais cupons performaram e invista nos que trazem resultado.
+- **Divulgue com link, não só com código** - o link já leva o cliente direto ao cupom.
+- **Use o aniversário para reativar clientes** - uma cortesia no aniversário aumenta as chances de recompra.
+- **Confira o uso no relatório** - veja quais cupons performaram e invista nos que trazem resultado.
 
 ## Perguntas frequentes
 
@@ -6210,15 +6210,15 @@ Sim. No detalhe do cupom há o contador de usos realizados, e no Relatório de M
                 content: `
 ## Visão geral
 
-**Campanhas e Promoções** aplicam descontos e benefícios de forma **automática** nas suas vendas — sem depender de código digitado. Você cria uma **campanha** (o período e o público) e adiciona **promoções** (as regras de desconto, brinde ou Leve X Pague Y) a ela.
+**Campanhas e Promoções** aplicam descontos e benefícios de forma **automática** nas suas vendas - sem depender de código digitado. Você cria uma **campanha** (o período e o público) e adiciona **promoções** (as regras de desconto, brinde ou Leve X Pague Y) a ela.
 
 ![Tela principal de Campanhas e Promoções](https://img.dudit.com.br/static/screens/Campanhas_VisaoGeral.png)
 Legenda: Lista de campanhas com status, vigência e a primeira regra de cada uma.
 
 ## Estrutura: campanha + promoção
 
-- **Campanha** — é o guarda-chuva: nome, período de vigência, público (todos os clientes ou segmentado) e loja.
-- **Promoção (regra)** — é o benefício em si: desconto, brinde ou Leve X Pague Y, com escopo, condições e limites. Uma campanha pode ter mais de uma promoção.
+- **Campanha** - é o guarda-chuva: nome, período de vigência, público (todos os clientes ou segmentado) e loja.
+- **Promoção (regra)** - é o benefício em si: desconto, brinde ou Leve X Pague Y, com escopo, condições e limites. Uma campanha pode ter mais de uma promoção.
 
 ## Tipos de promoção
 
@@ -6231,10 +6231,10 @@ Legenda: Lista de campanhas com status, vigência e a primeira regra de cada uma
 
 ## Onde a promoção aparece
 
-- **PDV** — o desconto aplica sozinho na pré-venda; o cliente vê o preço promocional.
-- **Vendas/Ordens** — vale na criação e edição de pedidos.
-- **Vitrine online** — mostra o preço "de/por", o nome da promoção e o bloco "Brinde Incluso".
-- **Checkout** — brindes aparecem como itens grátis ("Você ganhou este brinde").
+- **PDV** - o desconto aplica sozinho na pré-venda; o cliente vê o preço promocional.
+- **Vendas/Ordens** - vale na criação e edição de pedidos.
+- **Vitrine online** - mostra o preço "de/por", o nome da promoção e o bloco "Brinde Incluso".
+- **Checkout** - brindes aparecem como itens grátis ("Você ganhou este brinde").
 
 ## Quando utilizar
 
@@ -6245,9 +6245,9 @@ Legenda: Lista de campanhas com status, vigência e a primeira regra de cada uma
 
 ## Dicas importantes
 
-- **Aplicação automática** — o desconto entra sozinho, sem código. Isso reduz atrito na compra.
-- **Confira a vigência** — a promoção só vale dentro do período da campanha.
-- **Atenção ao escopo** — defina se vale para toda a sacola, produtos, categorias ou serviços.
+- **Aplicação automática** - o desconto entra sozinho, sem código. Isso reduz atrito na compra.
+- **Confira a vigência** - a promoção só vale dentro do período da campanha.
+- **Atenção ao escopo** - defina se vale para toda a sacola, produtos, categorias ou serviços.
 
 ## Perguntas frequentes
 
@@ -6289,19 +6289,19 @@ No menu **Marketing > Campanhas e Promoções**, clique em **Nova campanha** (ou
 
 ### 2. Dados da campanha
 
-- **Nome** — ex: "Queima de estoque de inverno".
-- **Descrição** (opcional) — contexto interno.
-- **Vigência** — data de início e fim da campanha.
-- **Público** — **Todos os clientes** ou **Segmentado** (selecione clientes específicos).
-- **Loja** — em multi-loja, escolha a loja ou deixe para toda a rede.
+- **Nome** - ex: "Queima de estoque de inverno".
+- **Descrição** (opcional) - contexto interno.
+- **Vigência** - data de início e fim da campanha.
+- **Público** - **Todos os clientes** ou **Segmentado** (selecione clientes específicos).
+- **Loja** - em multi-loja, escolha a loja ou deixe para toda a rede.
 
 ### 3. Configurar a promoção (regra)
 
-- **Tipo** — Desconto, Brinde ou Leve X Pague Y.
-- **Valores** — percentual ou valor em reais (e teto, se quiser).
-- **Condições** — valor mínimo de compra, prioridade de execução, limites de uso.
-- **Escopo** — Toda a sacola, Produtos específicos, Categorias específicas ou Serviços específicos.
-- **Combinação** — "Permitir uso combinado com cupons de desconto" (opcional).
+- **Tipo** - Desconto, Brinde ou Leve X Pague Y.
+- **Valores** - percentual ou valor em reais (e teto, se quiser).
+- **Condições** - valor mínimo de compra, prioridade de execução, limites de uso.
+- **Escopo** - Toda a sacola, Produtos específicos, Categorias específicas ou Serviços específicos.
+- **Combinação** - "Permitir uso combinado com cupons de desconto" (opcional).
 
 ### 4. Ativar e salvar
 
@@ -6317,9 +6317,9 @@ A campanha nasce com a opção **"Campanha ativa e disponível"**. Salve para pu
 
 ## Dicas importantes
 
-- **Use nomes claros** — facilita identificar a campanha na lista e nos relatórios.
-- **Defina a vigência** — sem datas, a campanha fica ativa indefinidamente.
-- **Duplique campanhas** — o formulário tem opção de duplicar, ótima para repetir promoções que deram certo.
+- **Use nomes claros** - facilita identificar a campanha na lista e nos relatórios.
+- **Defina a vigência** - sem datas, a campanha fica ativa indefinidamente.
+- **Duplique campanhas** - o formulário tem opção de duplicar, ótima para repetir promoções que deram certo.
 
 ## Problemas comuns
 
@@ -6390,16 +6390,16 @@ Reduz o preço das unidades quando o cliente leva uma quantidade.
 
 | Tipo | Benefício | Pré-requisito |
 |------|-----------|---------------|
-| Percentual | % OFF | — |
+| Percentual | % OFF | - |
 | Fixo | R$ OFF | Valor mínimo de compra |
 | Brinde | Item grátis | Selecionar brinde (produto/serviço) |
 | Leve X Pague Y | Unidades grátis | Leve > Pague |
 
 ## Dicas importantes
 
-- **Brinde depende de estoque** — se o brinde está sem estoque ou inativo, ele é pulado automaticamente.
-- **Leve X Pague Y exige compra maior que pagamento** — o formulário bloqueia configurações inválidas.
-- **Combine tipos numa mesma campanha** — por exemplo, desconto de 10% + brinde para um determinado público.
+- **Brinde depende de estoque** - se o brinde está sem estoque ou inativo, ele é pulado automaticamente.
+- **Leve X Pague Y exige compra maior que pagamento** - o formulário bloqueia configurações inválidas.
+- **Combine tipos numa mesma campanha** - por exemplo, desconto de 10% + brinde para um determinado público.
 
 ## Perguntas frequentes
 
@@ -6435,13 +6435,13 @@ Além do tipo de benefício, cada promoção tem **condições** que controlam q
 
 ## Condições
 
-- **Valor mínimo de compra (R$)** — a promoção só vale se o total do pedido atingir o mínimo. Obrigatório para desconto fixo.
-- **Prioridade de execução** — quando várias promoções são elegíveis, o sistema aplica a de **maior prioridade**; em empate, a de maior desconto.
+- **Valor mínimo de compra (R$)** - a promoção só vale se o total do pedido atingir o mínimo. Obrigatório para desconto fixo.
+- **Prioridade de execução** - quando várias promoções são elegíveis, o sistema aplica a de **maior prioridade**; em empate, a de maior desconto.
 
 ## Limites de uso
 
-- **Limite global de usos** — quantas vezes a promoção pode ser usada no total.
-- **Limite de usos por cliente** — quantas vezes cada cliente pode aproveitar.
+- **Limite global de usos** - quantas vezes a promoção pode ser usada no total.
+- **Limite de usos por cliente** - quantas vezes cada cliente pode aproveitar.
 
 Quando o limite global é atingido, a promoção deixa de ser oferecida.
 
@@ -6464,9 +6464,9 @@ Se houver conflito, você recebe o aviso: *"O item/escopo selecionado já possui
 
 ## Dicas importantes
 
-- **Use prioridade para organizar regras** — se duas regras podem valer, a de maior prioridade vence.
+- **Use prioridade para organizar regras** - se duas regras podem valer, a de maior prioridade vence.
 - **Defina limites de uso** para evitar custo fora de controle.
-- **Respeite a sobreposição** — em vez de criar regras que se sobrepõem, amplie o escopo de uma única regra.
+- **Respeite a sobreposição** - em vez de criar regras que se sobrepõem, amplie o escopo de uma única regra.
 
 ## Perguntas frequentes
 
@@ -6509,10 +6509,10 @@ Quando a promoção tem **"Permitir uso combinado com cupons de desconto"** ativ
 
 Quando a combinação não é permitida, o sistema calcula **dois cenários**:
 
-- **Cenário A** — mantém a promoção e aplica o cupom.
-- **Cenário B** — descarta a promoção nos itens elegíveis e aplica o cupom sobre o preço original.
+- **Cenário A** - mantém a promoção e aplica o cupom.
+- **Cenário B** - descarta a promoção nos itens elegíveis e aplica o cupom sobre o preço original.
 
-O sistema escolhe o cenário que der o **menor total para o cliente** — na prática, o maior desconto.
+O sistema escolhe o cenário que der o **menor total para o cliente** - na prática, o maior desconto.
 
 ### Prioridade entre promoções
 
@@ -6520,9 +6520,9 @@ Quando várias promoções são elegíveis para o mesmo item, vence a de **maior
 
 ## Dicas importantes
 
-- **Combinação = margem em risco** — use com critério e defina tetos de desconto.
-- **Para descontos altos em datas especiais** — desative a combinação para garantir que o cliente escolha entre cupom e promoção, não os dois.
-- **Confira no PDV** — o resumo mostra o desconto aplicado e de qual origem (promoção, cupom ou manual).
+- **Combinação = margem em risco** - use com critério e defina tetos de desconto.
+- **Para descontos altos em datas especiais** - desative a combinação para garantir que o cliente escolha entre cupom e promoção, não os dois.
+- **Confira no PDV** - o resumo mostra o desconto aplicado e de qual origem (promoção, cupom ou manual).
 
 ## Problemas comuns
 
@@ -6557,11 +6557,11 @@ Quando uma promoção está ativa, ela aparece de formas diferentes para o clien
 
 ## Na vitrine online (loja online)
 
-- **Preço "de/por"** — o item mostra o preço original riscado e o preço promocional, com o percentual de desconto.
-- **Badge da promoção** — aparece o nome da promoção no item.
-- **Brinde Incluso** — se a promoção é de brinde, aparece o bloco "Brinde Incluso" na página do produto/serviço.
-- **No checkout** — os brindes entram como itens grátis com a marcação "Você ganhou este brinde".
-- **Página do produto** — mostra o desconto aplicado e de onde veio (promoção da campanha).
+- **Preço "de/por"** - o item mostra o preço original riscado e o preço promocional, com o percentual de desconto.
+- **Badge da promoção** - aparece o nome da promoção no item.
+- **Brinde Incluso** - se a promoção é de brinde, aparece o bloco "Brinde Incluso" na página do produto/serviço.
+- **No checkout** - os brindes entram como itens grátis com a marcação "Você ganhou este brinde".
+- **Página do produto** - mostra o desconto aplicado e de onde veio (promoção da campanha).
 
 ## No PDV (balcão)
 
@@ -6583,9 +6583,9 @@ A mesma lógica vale na criação e edição de pedidos do módulo Vendas: promo
 
 ## Dicas importantes
 
-- **Comunique o preço "de/por"** — clientes respondem bem a descontos visíveis.
-- **Confira o brinde no checkout** — o item grátis deve aparecer no carrinho e na nota.
-- **Aviso de brinde sem estoque** — se o brinde esgotou, ele é pulado automaticamente e o pedido segue sem o brinde.
+- **Comunique o preço "de/por"** - clientes respondem bem a descontos visíveis.
+- **Confira o brinde no checkout** - o item grátis deve aparecer no carrinho e na nota.
+- **Aviso de brinde sem estoque** - se o brinde esgotou, ele é pulado automaticamente e o pedido segue sem o brinde.
 
 ## Perguntas frequentes
 
@@ -6608,7 +6608,7 @@ Não. O brinde é pulado (registrado como "brinde pulado") e o pedido continua n
                 content: `
 ## Visão geral
 
-A **edição em massa** permite atualizar várias campanhas ao mesmo tempo — mudar o período de validade, o público, os limites de uso ou a prioridade sem abrir uma por uma.
+A **edição em massa** permite atualizar várias campanhas ao mesmo tempo - mudar o período de validade, o público, os limites de uso ou a prioridade sem abrir uma por uma.
 
 ## Quando utilizar
 
@@ -6639,9 +6639,9 @@ Selecione as campanhas e exclua todas juntas. A exclusão é permanente.
 
 ## Dicas importantes
 
-- **Confira a seleção** antes de aplicar — a edição em massa afeta todas as campanhas marcadas.
-- **Ao ativar em massa** — atenção ao aviso de sobreposição; campanhas conflitantes não são ativadas.
-- **Limites em massa** — útil para padronizar o custo de várias campanhas no mesmo valor.
+- **Confira a seleção** antes de aplicar - a edição em massa afeta todas as campanhas marcadas.
+- **Ao ativar em massa** - atenção ao aviso de sobreposição; campanhas conflitantes não são ativadas.
+- **Limites em massa** - útil para padronizar o custo de várias campanhas no mesmo valor.
 
 ## Perguntas frequentes
 
@@ -6671,9 +6671,9 @@ Legenda: Lista de vídeos com status, visualizações, cliques e data de publica
 
 ## O que você encontra no módulo
 
-**Lista de vídeos** — cada linha mostra o vídeo, o status, as visualizações, os cliques e a data.
+**Lista de vídeos** - cada linha mostra o vídeo, o status, as visualizações, os cliques e a data.
 
-**Abas de status** — quatro abas:
+**Abas de status** - quatro abas:
 
 | Aba | O que mostra |
 |-----|--------------|
@@ -6682,9 +6682,9 @@ Legenda: Lista de vídeos com status, visualizações, cliques e data de publica
 | **Aprovados** | Publicados na vitrine |
 | **Rejeitados** | Recusados na moderação (inclui sinalizados) |
 
-**Busca** — por título ou descrição.
+**Busca** - por título ou descrição.
 
-**Visualização** — lista (tabela) ou grade de cards, com miniatura e duração.
+**Visualização** - lista (tabela) ou grade de cards, com miniatura e duração.
 
 ## Quando utilizar
 
@@ -6712,9 +6712,9 @@ O plano Free não tem acesso ao módulo.
 
 ## Dicas importantes
 
-- **Vídeos entre 10 e 60 segundos** — mais curtos engajam melhor e respeitam o limite.
-- **Sempre vincule um item** — o vídeo sem vínculo não direciona o cliente para a compra.
-- **Capriche na capa** — a miniatura é gerada automaticamente a partir do vídeo.
+- **Vídeos entre 10 e 60 segundos** - mais curtos engajam melhor e respeitam o limite.
+- **Sempre vincule um item** - o vídeo sem vínculo não direciona o cliente para a compra.
+- **Capriche na capa** - a miniatura é gerada automaticamente a partir do vídeo.
 
 ## Perguntas frequentes
 
@@ -6753,9 +6753,9 @@ No menu **Marketing > Vídeos da Comunidade**, clique em **Novo vídeo**.
 
 ### 2. Preencher os dados
 
-- **Título** (obrigatório) — até 200 caracteres.
-- **Descrição** (opcional) — até 1.000 caracteres.
-- **Vídeo** — escolha a fonte:
+- **Título** (obrigatório) - até 200 caracteres.
+- **Descrição** (opcional) - até 1.000 caracteres.
+- **Vídeo** - escolha a fonte:
 
 ### 3. Escolher a fonte do vídeo
 
@@ -6767,9 +6767,9 @@ No menu **Marketing > Vídeos da Comunidade**, clique em **Novo vídeo**.
 
 ### 4. Vincular um item (opcional, recomendado)
 
-- **Produto vinculado** — selecione um produto da sua loja.
-- **Serviço vinculado** — selecione um serviço.
-- **Link da coleção** — informe o endereço da coleção.
+- **Produto vinculado** - selecione um produto da sua loja.
+- **Serviço vinculado** - selecione um serviço.
+- **Link da coleção** - informe o endereço da coleção.
 
 O item vinculado aparece no player para o cliente ir direto à página da compra.
 
@@ -6784,8 +6784,8 @@ Para vídeos existentes, você pode alterar **apenas o título e a descrição**
 ## Dicas importantes
 
 - **Formatos aceitos**: MP4, WebM e MOV.
-- **Duração ideal**: entre 10 e 60 segundos — acima disso o cadastro é bloqueado.
-- **Vincule sempre um produto/serviço** — aumenta as chances de clique e venda.
+- **Duração ideal**: entre 10 e 60 segundos - acima disso o cadastro é bloqueado.
+- **Vincule sempre um produto/serviço** - aumenta as chances de clique e venda.
 - **Arquivos grandes são comprimidos** automaticamente para caber nos limites.
 
 ## Problemas comuns
@@ -6850,8 +6850,8 @@ Todo vídeo da comunidade passa por **moderação** antes de aparecer na vitrine
 
 ## Dicas importantes
 
-- **Revise o conteúdo antes de enviar** — título, descrição e material dentro das regras passam mais rápido.
-- **Rejeitado não é o fim** — corrija o que foi apontado e cadastre um novo vídeo dentro do seu limite mensal.
+- **Revise o conteúdo antes de enviar** - título, descrição e material dentro das regras passam mais rápido.
+- **Rejeitado não é o fim** - corrija o que foi apontado e cadastre um novo vídeo dentro do seu limite mensal.
 - **Vídeos sinalizados** contam como rejeitados e não aparecem na vitrine.
 
 ## Perguntas frequentes
@@ -6904,9 +6904,9 @@ Quando o cliente toca no **item vinculado** (produto, serviço ou coleção) den
 
 ## Dicas importantes
 
-- **Vídeo com vínculo rende cliques** — sem item vinculado, o cliente só assiste e não tem para onde ir.
-- **Monitore os cliques** — alto clique indica que o vídeo vende; alto clique baixo, que o item não está atrativo.
-- **Compare vídeos** — repita o formato dos vídeos com melhor desempenho.
+- **Vídeo com vínculo rende cliques** - sem item vinculado, o cliente só assiste e não tem para onde ir.
+- **Monitore os cliques** - alto clique indica que o vídeo vende; alto clique baixo, que o item não está atrativo.
+- **Compare vídeos** - repita o formato dos vídeos com melhor desempenho.
 
 ## Perguntas frequentes
 
@@ -6949,11 +6949,11 @@ Legenda: Painel com indicadores de faturamento, canal de origem, cupons e campan
 
 ## O que você encontra
 
-- **Gráfico "Faturamento por Canal"** — pizza com a participação de cada canal de origem (ex: PDV/Presencial, Vitrine Online, Outros).
-- **Evolução** — linha do faturamento dividido em **online**, **presencial** e **outros** ao longo do período.
-- **Cupons mais usados** — ranking com a quantidade de usos e o tipo de desconto.
-- **Campanhas** — cards com o nome e o status (ativa/inativa).
-- **Exportação** — botão para baixar o relatório em planilha (CSV ou Excel).
+- **Gráfico "Faturamento por Canal"** - pizza com a participação de cada canal de origem (ex: PDV/Presencial, Vitrine Online, Outros).
+- **Evolução** - linha do faturamento dividido em **online**, **presencial** e **outros** ao longo do período.
+- **Cupons mais usados** - ranking com a quantidade de usos e o tipo de desconto.
+- **Campanhas** - cards com o nome e o status (ativa/inativa).
+- **Exportação** - botão para baixar o relatório em planilha (CSV ou Excel).
 
 ## Como acessar
 
@@ -6970,9 +6970,9 @@ Legenda: Painel com indicadores de faturamento, canal de origem, cupons e campan
 
 ## Dicas importantes
 
-- **Compare períodos** — veja o efeito de uma campanha comparando antes/durante/depois.
-- **Alta taxa de uso de cupons pode apertar a margem** — o sistema sugere atenção quando mais de 30% dos pedidos usam cupom.
-- **Canal dominante** — se um canal representa muito do faturamento, diversifique para reduzir o risco.
+- **Compare períodos** - veja o efeito de uma campanha comparando antes/durante/depois.
+- **Alta taxa de uso de cupons pode apertar a margem** - o sistema sugere atenção quando mais de 30% dos pedidos usam cupom.
+- **Canal dominante** - se um canal representa muito do faturamento, diversifique para reduzir o risco.
 
 ## Perguntas frequentes
 

@@ -1,5 +1,5 @@
 -- ============================================================================
--- Fase 10.6 — Add financial breakdown columns to public.sales
+-- Fase 10.6 - Add financial breakdown columns to public.sales
 -- ============================================================================
 -- As colunas payment_method_interest_amount, payment_method_fee_amount e
 -- payment_method_fixed_fee_amount já existem em public.orders mas NÃO em

@@ -1,8 +1,8 @@
-# Multi-Store — Final Architecture State
+# Multi-Store - Final Architecture State
 
 > Snapshot arquitetural após conclusão da Fase 4.
 > Data: 2026-07-18
-> Status: ✅ Finalizado — sem legado de `store_id` nas tabelas base.
+> Status: ✅ Finalizado - sem legado de `store_id` nas tabelas base.
 
 ---
 
@@ -10,7 +10,7 @@
 
 ### 1.1 Classificação das Tabelas
 
-#### 🟦 GLOBAL (sem store_id — dados do parceiro)
+#### 🟦 GLOBAL (sem store_id - dados do parceiro)
 
 | Tabela | Observação |
 |--------|-----------|
@@ -31,7 +31,7 @@
 | `product_fiscal_profiles` | Dados fiscais do produto (atributo do produto, não da loja) |
 | `product_logistics` | Dados logísticos do produto |
 
-#### 🟧 STORE (store_id NOT NULL — pertencem a uma loja)
+#### 🟧 STORE (store_id NOT NULL - pertencem a uma loja)
 
 | Tabela | store_id |
 |--------|----------|
@@ -156,10 +156,10 @@ resolveProduct(productId, storeId?) → ResolvedProduct
 ```
 
 **Helpers implementados:**
-- `buildResolvedProduct()` — `lib/store-products.ts`
-- `buildResolvedService()` — `lib/store-services.ts`
-- `resolveKitsForStore()` — `lib/resolve-marketplace-visibility.ts`
-- `resolveSuppliersForStore()` — `lib/resolve-marketplace-visibility.ts`
+- `buildResolvedProduct()` - `lib/store-products.ts`
+- `buildResolvedService()` - `lib/store-services.ts`
+- `resolveKitsForStore()` - `lib/resolve-marketplace-visibility.ts`
+- `resolveSuppliersForStore()` - `lib/resolve-marketplace-visibility.ts`
 
 ---
 
@@ -167,7 +167,7 @@ resolveProduct(productId, storeId?) → ResolvedProduct
 
 ### 3.1 Criação de Produto (ERP)
 
-**Server action:** `app/actions/erp/products.ts` — `createProductAction`
+**Server action:** `app/actions/erp/products.ts` - `createProductAction`
 1. Valida permissão do usuário
 2. INSERT em `products` (sem `store_id`)
 3. Se `storeId` fornecido: chama `linkProductToStore(product.id, storeId)` → insere em `store_products`
@@ -178,7 +178,7 @@ resolveProduct(productId, storeId?) → ResolvedProduct
 
 ### 3.2 Criação de Serviço (ERP)
 
-**Server action:** `app/actions/erp/servicos.ts` — `createServiceAction`
+**Server action:** `app/actions/erp/servicos.ts` - `createServiceAction`
 1. INSERT em `services` (sem `store_id`)
 2. Chama `linkServiceToStore(service.id, storeId)`
 
@@ -337,7 +337,7 @@ resolveProduct(productId, storeId?) → ResolvedProduct
 
 | Item | Prioridade | Descrição |
 |------|-----------|-----------|
-| Fase 5 — STORE órfãs | 🔴 Alta | Revisar `deliveries`, `returns`, `service_orders` que ainda podem ter inconsistências de store_id |
-| Fase 1b — Fiscal store_id nullable | 🟢 Baixa | Adicionar `store_id` nullable em `product_fiscal_profiles` se necessário |
+| Fase 5 - STORE órfãs | 🔴 Alta | Revisar `deliveries`, `returns`, `service_orders` que ainda podem ter inconsistências de store_id |
+| Fase 1b - Fiscal store_id nullable | 🟢 Baixa | Adicionar `store_id` nullable em `product_fiscal_profiles` se necessário |
 | Marketplace discover/search para kits+suppliers | 🟢 Baixa | Implementar filtros de marketplace para kits e fornecedores |
 | `created_store_id` em products | 🟢 Baixa | Campo opcional para rastrear loja de origem do produto |

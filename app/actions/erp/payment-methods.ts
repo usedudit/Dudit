@@ -542,7 +542,7 @@ export async function createPaymentMethodAction(data: UpsertPaymentMethodInput) 
     }
 
     revalidateTag(`payment-methods-${data.partnerId}`, "max")
-    revalidatePath("/erp/settings")
+    revalidatePath("/erp/configuracoes")
 
     return { success: true, method }
 }
@@ -703,7 +703,7 @@ export async function updatePaymentMethodAction(
     }
 
     revalidateTag(`payment-methods-${method.partner_id}`, "max")
-    revalidatePath("/erp/settings")
+    revalidatePath("/erp/configuracoes")
 
     return { success: true }
 }
@@ -740,7 +740,7 @@ export async function deletePaymentMethodAction(methodId: string) {
     }
 
     revalidateTag(`payment-methods-${method.partner_id}`, "max")
-    revalidatePath("/erp/settings")
+    revalidatePath("/erp/configuracoes")
 
     return { success: true }
 }

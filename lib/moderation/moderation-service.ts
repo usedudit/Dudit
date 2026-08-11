@@ -80,7 +80,7 @@ export async function checkTextSafety(texts: string[], userId?: string): Promise
   const cached = await redis.get<ModerationResponse>(cacheKey)
   if (cached) return cached
 
-  // 2. Rate limit (10/min) — se estourar, deixa passar sem moderar
+  // 2. Rate limit (10/min) - se estourar, deixa passar sem moderar
   if (userId) {
     const rl = await ratelimiter.limit(`moderation:text:${userId}`)
     if (!rl.success) {

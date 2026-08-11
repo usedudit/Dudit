@@ -1,5 +1,5 @@
 -- ============================================================================
--- FASE 2 — LEDGER ÚNICO: transactions.kind + vínculo payments/orders
+-- FASE 2 - LEDGER ÚNICO: transactions.kind + vínculo payments/orders
 -- Data: 2026-08-05 | Projeto: Dudit
 -- ----------------------------------------------------------------------------
 -- Aditivo e idempotente. NÃO toca dados existentes (zero backfill, zero UPDATE
@@ -117,7 +117,7 @@ DECLARE
     v_total_interest   NUMERIC;
 BEGIN
     -- STEP 1: Lock and fetch pending settlement rows for this group
-    -- Guard: apenas kind='settlement' ou legado (NULL) — linhas recognition/fee
+    -- Guard: apenas kind='settlement' ou legado (NULL) - linhas recognition/fee
     -- jamais são liquidadas aqui (invariante do ledger único).
     FOR v_row IN
         SELECT

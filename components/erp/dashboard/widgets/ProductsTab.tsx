@@ -210,7 +210,7 @@ export function ProductsTab({ data }: { data: ProductsDashboardData }) {
                               variant="outline"
                               size="sm"
                               className="text-[12px] font-bold py-1 px-4 whitespace-nowrap h-auto"
-                              onClick={() => router.push("/erp/products")}
+                              onClick={() => router.push("/erp/produtos")}
                             >
                               Ver Produto
                             </Button>

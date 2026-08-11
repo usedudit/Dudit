@@ -10,7 +10,7 @@
  *         type KeyVersion = "v1" | "v2"     →  adicione a nova versão se necessário
  *   4. Rode o script:
  *         npx jiti scripts/rotate-encryption-keys.ts
- *   5. Verifique os logs — nenhum erro = migração concluída
+ *   5. Verifique os logs - nenhum erro = migração concluída
  *   6. Após confirmar que tudo está em v2, pode remover MASTER_KEY_V1 do .env
  *
  * SEGURANÇA:
@@ -279,7 +279,7 @@ async function migrateColumn(migration: ColumnMigration, activeVersion: KeyVersi
     const { data: records, error } = await query
 
     if (error) {
-      // Tabela pode não existir — não é erro fatal
+      // Tabela pode não existir - não é erro fatal
       if (error.code === "PGRST116" || error.message?.includes("Could not find the table")) {
         console.log(`tabela não encontrada, pulando ✔`)
         return stats
@@ -345,7 +345,7 @@ async function migrateColumn(migration: ColumnMigration, activeVersion: KeyVersi
       process.stdout.write(`\r  ↳ ${progress}/${stats.total} processados (${stats.errors} erros)`)
     }
 
-    console.log(`\r  ↳ ${stats.total}/${stats.total} — ✅ ${stats.migrated} migrados, ${stats.skipped} ignorados, ${stats.errors} erros`)
+    console.log(`\r  ↳ ${stats.total}/${stats.total} - ✅ ${stats.migrated} migrados, ${stats.skipped} ignorados, ${stats.errors} erros`)
   } catch (err) {
     console.error(`\n❌ Erro fatal em ${label}: ${err}`)
     stats.errors++

@@ -9,7 +9,7 @@ const productFields: FieldDef[] = [
   { name: "stock_quantity", label: "Estoque", type: "number", synonyms: ["qtd", "quantidade", "estoque", "saldo", "quantidade estoque", "stock", "quantity", "qtde", "qty", "estoque atual", "saldo estoque", "quant"] },
   { name: "min_stock", label: "Estoque Mínimo", type: "number", synonyms: ["estoque mínimo", "estoque minimo", "min stock", "est min", "qtd min", "quantidade mínima", "quantidade minima", "min estoque"] },
   { name: "status", label: "Status", type: "string", synonyms: ["status", "situação", "situacao", "estado", "ativo/inativo", "ativo", "inativo"] },
-  { name: "visibility", label: "Visibilidade", type: "string", synonyms: ["visibilidade", "visibility", "exibir", "publicado", "exibir na loja", "mostrar", "marketplace", "loja"] },
+  { name: "show_in_marketplace", label: "Visibilidade", type: "string", synonyms: ["visibilidade", "visibility", "exibir", "publicado", "exibir na loja", "mostrar", "marketplace", "loja"] },
   { name: "description", label: "Descrição", type: "string", synonyms: ["descrição", "descricao", "description", "detalhes", "desc completa", "desc detalhada", "descricao completa"] },
   { name: "unit", label: "Unidade", type: "string", synonyms: ["unidade", "un", "unit", "und", "medida", "unid"] },
   { name: "category", label: "Categoria", type: "string", synonyms: ["categoria", "cat", "category", "categoria produto", "categoria do produto", "departamento", "depto"] },

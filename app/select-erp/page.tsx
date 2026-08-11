@@ -107,7 +107,7 @@ export default async function SelectErpPage() {
                                             }
                                             description={
                                                 isOwn
-                                                    ? `${access.partnerName} — você pode alternar entre matriz e filiais depois de entrar`
+                                                    ? `${access.partnerName} - você pode alternar entre matriz e filiais depois de entrar`
                                                     : access.ownerName
                                                         ? `${access.partnerName} · Proprietário: ${access.ownerName}`
                                                         : access.partnerName

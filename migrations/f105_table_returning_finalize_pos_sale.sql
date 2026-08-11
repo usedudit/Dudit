@@ -1,9 +1,9 @@
 -- ============================================================================
--- Fase 10.5 — finalize_pos_sale com RETURNS TABLE + INSERT correto
+-- Fase 10.5 - finalize_pos_sale com RETURNS TABLE + INSERT correto
 -- ============================================================================
 -- CORREÇÕES:
---   1. RETURNS TABLE(sale_id UUID) — PostgREST gera wrapper sem COALESCE
---   2. v_sale_number TEXT + generate_sale_number() — sale_number é TEXT
+--   1. RETURNS TABLE(sale_id UUID) - PostgREST gera wrapper sem COALESCE
+--   2. v_sale_number TEXT + generate_sale_number() - sale_number é TEXT
 --   3. INSERT nas colunas REAIS da tabela sales
 --      (partner_id, store_id, customer_id, pre_sale_id, total_amount,
 --       discount_amount, final_amount, paid_amount, payment_status,

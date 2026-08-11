@@ -1,5 +1,5 @@
 -- ============================================================================
--- Fase 10.9 — Fix create_batch_stock_movement: re-add stock_movement_items
+-- Fase 10.9 - Fix create_batch_stock_movement: re-add stock_movement_items
 -- insert + set order_id / reference_name in finalize_order_inventory
 -- ============================================================================
 -- REGRESSÃO: A migration 20260722 removeu o INSERT INTO stock_movement_items
@@ -13,7 +13,7 @@
 BEGIN;
 
 -- ============================================================
--- 1. Fix create_batch_stock_movement — re-add stock_movement_items insert
+-- 1. Fix create_batch_stock_movement - re-add stock_movement_items insert
 -- ============================================================
 CREATE OR REPLACE FUNCTION public.create_batch_stock_movement(
     p_partner_id UUID,
@@ -120,7 +120,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = 'public';
 
 -- ============================================================
--- 2. Fix finalize_order_inventory — set order_id + reference_name
+-- 2. Fix finalize_order_inventory - set order_id + reference_name
 -- ============================================================
 CREATE OR REPLACE FUNCTION public.finalize_order_inventory(
     p_partner_id UUID,
@@ -232,7 +232,7 @@ END;
 $$;
 
 -- ============================================================
--- 3. Fix createOrderStockMovement in app code — use order_number
+-- 3. Fix createOrderStockMovement in app code - use order_number
 --    (This is fixed in the TypeScript code separately)
 -- ============================================================
 

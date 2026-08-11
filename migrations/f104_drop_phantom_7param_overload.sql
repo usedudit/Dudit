@@ -1,9 +1,9 @@
 -- ============================================================================
--- Fase 10.4 — Drop overload fantasma 7-param de finalize_pos_sale
+-- Fase 10.4 - Drop overload fantasma 7-param de finalize_pos_sale
 -- ============================================================================
 -- Foi descoberto um overload de finalize_pos_sale com 7 parâmetros
 -- (p_order_id, p_created_by, p_reason, p_notes, p_items) que NUNCA foi
--- criado por nenhuma migration — provavelmente criado manualmente no SQL
+-- criado por nenhuma migration - provavelmente criado manualmente no SQL
 -- Editor. Ele chama finalize_order_inventory com argumentos na ordem errada
 -- (positional pass) causando type mismatch.
 --
@@ -53,7 +53,7 @@ DROP FUNCTION IF EXISTS public.finalize_pos_sale(
 );
 
 -- ============================================================
--- 2. Recreate finalize_pos_sale — 9-param, SEM validação estoque
+-- 2. Recreate finalize_pos_sale - 9-param, SEM validação estoque
 -- ============================================================
 CREATE OR REPLACE FUNCTION public.finalize_pos_sale(
   p_partner_id UUID,

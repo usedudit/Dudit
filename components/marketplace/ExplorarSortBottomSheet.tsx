@@ -1,9 +1,7 @@
 "use client"
 
-import BottomSheet from "@/components/BottomSheet"
-import { Button } from "@/components/reusable"
+import DefaultModal from "@/components/reusable/DefaultModal"
 import { Check } from "lucide-react"
-import { Separator } from "@/components/reusable/Separator"
 
 type SortOption = "relevancia" | "preco_menor" | "preco_maior" | "recentes"
 
@@ -23,38 +21,27 @@ export function ExplorarSortBottomSheet({
     sortOptions,
 }: ExplorarSortBottomSheetProps) {
     return (
-        <BottomSheet isOpen={isOpen} onClose={onClose} title="Ordenar">
-            <div className="space-y-0 py-4 px-4">
-                <h3 className="mb-4 text-base font-bold text-brand-dark px-0">Ordenar por</h3>
-
-                <div className="space-y-2">
-                    {sortOptions.map((option) => (
-                        <button
-                            key={option.value}
-                            onClick={() => {
-                                onSortChange(option.value)
-                                onClose()
-                            }}
-                            className={`flex w-full items-center justify-between rounded-lg px-3 py-3 text-sm font-semibold transition-colors ${sortBy === option.value
-                                    ? "bg-[#ecfdf5] text-brand-green"
-                                    : "text-brand-dark hover:bg-gray-50"
-                                }`}
-                        >
-                            <span>{option.label}</span>
-                            {sortBy === option.value && (
-                                <Check className="h-4 w-4" />
-                            )}
-                        </button>
-                    ))}
-                </div>
-
-                {/* Action Button */}
-                <div className="pt-4 mt-4 border-t border-gray-100">
-                    <Button onClick={onClose} className="w-full">
-                        Aplicar
-                    </Button>
-                </div>
+        <DefaultModal isOpen={isOpen} onClose={onClose} title="Ordenar" maxWidth="sm">
+            <div className="space-y-2">
+                {sortOptions.map((option) => (
+                    <button
+                        key={option.value}
+                        onClick={() => {
+                            onSortChange(option.value)
+                            onClose()
+                        }}
+                        className={`flex w-full items-center justify-between rounded-lg px-3 py-3 text-sm font-semibold transition-colors ${sortBy === option.value
+                            ? "bg-[#ecfdf5] text-brand-green"
+                            : "text-brand-dark hover:bg-gray-50"
+                            }`}
+                    >
+                        <span>{option.label}</span>
+                        {sortBy === option.value && (
+                            <Check className="h-4 w-4" />
+                        )}
+                    </button>
+                ))}
             </div>
-        </BottomSheet>
+        </DefaultModal>
     )
 }

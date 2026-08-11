@@ -50,7 +50,7 @@ describe("Dashboard Engine - Rules Evaluation Tests", () => {
       const checklist = getChecklistItems(ctx);
       const itemsStep = checklist.find((item) => item.id === "items");
       expect(itemsStep?.completed).toBe(false);
-      expect(itemsStep?.href).toBe("/erp/products?create=true");
+      expect(itemsStep?.href).toBe("/erp/produtos?create=true");
     });
 
     it("should point to services create path if only selling services and catalogue is empty", () => {

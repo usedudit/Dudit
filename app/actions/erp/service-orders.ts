@@ -353,7 +353,7 @@ export async function createServiceOrderAction(
     await admin.from("service_orders").update({ order_id: linkedOrder.id }).eq("id", data.id)
 
     await recalcTotals(admin, data.id)
-    revalidatePath("/erp/service-orders")
+    revalidatePath("/erp/ordens-de-servico")
     return { success: true, data, orderNumber }
   } catch (err: any) {
     return { success: false, error: err.message || "Erro ao criar ordem de serviço" }
@@ -467,7 +467,7 @@ export async function addServicesToOrderAction(
       changeLines: [`${items.length} serviço(s) adicionado(s)`],
     })
 
-    revalidatePath("/erp/service-orders")
+    revalidatePath("/erp/ordens-de-servico")
     return { success: true, data }
   } catch (err: any) {
     return { success: false, error: err.message || "Erro ao adicionar serviços" }
@@ -534,7 +534,7 @@ export async function addProductsToOrderAction(
       changeLines: [`${items.length} produto(s) adicionado(s)`],
     })
 
-    revalidatePath("/erp/service-orders")
+    revalidatePath("/erp/ordens-de-servico")
     return { success: true, data }
   } catch (err: any) {
     return { success: false, error: err.message || "Erro ao adicionar produtos" }
@@ -581,7 +581,7 @@ export async function updateServiceOrderStatusAction(
       changeLines: [`Status alterado: ${current.status} → ${status}`],
     })
 
-    revalidatePath("/erp/service-orders")
+    revalidatePath("/erp/ordens-de-servico")
     return { success: true, data }
   } catch (err: any) {
     return { success: false, error: err.message || "Erro ao atualizar status" }
@@ -630,7 +630,7 @@ export async function assignServiceOrderAction(
       } catch { }
     }
 
-    revalidatePath("/erp/service-orders")
+    revalidatePath("/erp/ordens-de-servico")
     return { success: true, data }
   } catch (err: any) {
     return { success: false, error: err.message || "Erro ao atribuir OS" }
@@ -667,7 +667,7 @@ export async function saveSignatureAction(
       changeLines: ["OS assinada pelo cliente"],
     })
 
-    revalidatePath("/erp/service-orders")
+    revalidatePath("/erp/ordens-de-servico")
     return { success: true, data }
   } catch (err: any) {
     return { success: false, error: err.message || "Erro ao salvar assinatura" }
@@ -826,7 +826,7 @@ export async function saveAttachmentAction(
       changeLines: [`Anexo adicionado: ${fileName}`],
     })
 
-    revalidatePath("/erp/service-orders")
+    revalidatePath("/erp/ordens-de-servico")
     return { success: true, data }
   } catch (err: any) {
     return { success: false, error: err.message || "Erro ao salvar anexo" }
@@ -878,7 +878,7 @@ export async function deleteAttachmentAction(
       changeLines: [`Anexo removido: ${attachment?.file_name || "Documento"}`],
     })
 
-    revalidatePath("/erp/service-orders")
+    revalidatePath("/erp/ordens-de-servico")
     return { success: true }
   } catch (err: any) {
     return { success: false, error: err.message || "Erro ao remover anexo" }
@@ -904,7 +904,7 @@ export async function deleteServiceOrderAction(
       changeLines: ["OS deletada"],
     })
 
-    revalidatePath("/erp/service-orders")
+    revalidatePath("/erp/ordens-de-servico")
     return { success: true }
   } catch (err: any) {
     return { success: false, error: err.message || "Erro ao deletar OS" }
@@ -1317,7 +1317,7 @@ export async function updateServiceOrderAction(
     })
 
     await recalcTotals(admin, serviceOrderId)
-    revalidatePath("/erp/service-orders")
+    revalidatePath("/erp/ordens-de-servico")
     return { success: true, data }
   } catch (err: any) {
     return { success: false, error: err.message || "Erro ao atualizar ordem de serviço" }
@@ -1384,7 +1384,7 @@ export async function syncServiceOrderServicesAction(
     }
 
     await recalcTotals(admin, serviceOrderId)
-    revalidatePath("/erp/service-orders")
+    revalidatePath("/erp/ordens-de-servico")
     return { success: true }
   } catch (err: any) {
     return { success: false, error: err.message || "Erro ao sincronizar serviços" }
@@ -1452,7 +1452,7 @@ export async function syncServiceOrderProductsAction(
     }
 
     await recalcTotals(admin, serviceOrderId)
-    revalidatePath("/erp/service-orders")
+    revalidatePath("/erp/ordens-de-servico")
     return { success: true }
   } catch (err: any) {
     return { success: false, error: err.message || "Erro ao sincronizar produtos" }
@@ -1884,7 +1884,7 @@ export async function confirmServiceOrderPaymentAction(payload: {
       },
     })
 
-    revalidatePath("/erp/service-orders")
+    revalidatePath("/erp/ordens-de-servico")
     return { success: true, orderId: order.id, orderNumber: order.order_number }
   } catch (err: any) {
     return { success: false, error: err.message || "Erro ao processar pagamento da ordem de serviço" }
@@ -1911,7 +1911,7 @@ export async function saveServiceOrderSpecificationsAction(
 
     if (error) throw error
 
-    revalidatePath("/erp/service-orders")
+    revalidatePath("/erp/ordens-de-servico")
     return { success: true }
   } catch (err: any) {
     return { success: false, error: err.message || "Erro ao salvar especificações" }
@@ -1983,7 +1983,7 @@ export async function regenerateServiceOrderApprovalCodeAction(
       return { success: false, error: "Erro ao salvar novo código." }
     }
 
-    revalidatePath("/erp/service-orders")
+    revalidatePath("/erp/ordens-de-servico")
     return { success: true, code: plainCode }
   } catch (err: any) {
     return { success: false, error: err.message || "Erro ao gerar novo código" }
@@ -2144,7 +2144,7 @@ export async function signPublicServiceOrderAction(
       }
     }
 
-    revalidatePath("/erp/service-orders")
+    revalidatePath("/erp/ordens-de-servico")
     return { success: true }
   } catch (err: any) {
     console.error("[signPublicServiceOrderAction] Error:", err)

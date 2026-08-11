@@ -9,7 +9,7 @@ import { getAdminClient } from "@/lib/supabase/admin"
 import { UnosendService } from "@/lib/services/unosend.service"
 import { syncToExploreRedis, syncPartnerItemsToExploreRedis } from "@/lib/redis-sync"
 import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
-import { geocodeAddress } from "@/lib/services/location.service"
+import { geocodeAddress, enrichAddressData } from "@/lib/services/location.service"
 import { getRandomDefaultBanner } from "@/lib/utils/banner"
 
 // --- Interfaces Atualizadas ---
@@ -156,23 +156,27 @@ export async function createPartnerAction(data: CreatePartnerData) {
 
     // Inserir endereço na tabela addresses e linkar com a loja
     if (data.city || data.street || data.zipCode) {
+      const enriched = await enrichAddressData({
+        partner_id: partner.id,
+        store_id: store?.id || null,
+        user_id: currentUser.id,
+        zip_code: data.zipCode || null,
+        street: data.street || null,
+        number: data.number || null,
+        complement: data.complement || null,
+        neighborhood: data.neighborhood || null,
+        city: data.city || null,
+        state: data.state || null,
+        country: "BR",
+        is_default: true,
+        address_type: "primary",
+        latitude: coords?.lat || null,
+        longitude: coords?.lng || null,
+      })
+
       const { data: addressData, error: addressError } = await supabaseAdmin
         .from("addresses")
-        .insert({
-          partner_id: partner.id,
-          store_id: store?.id || null,
-          zip_code: data.zipCode || null,
-          street: data.street || null,
-          number: data.number || null,
-          complement: data.complement || null,
-          neighborhood: data.neighborhood || null,
-          city: data.city || null,
-          state: data.state || null,
-          country: "BR",
-          is_default: true,
-          latitude: coords?.lat || null,
-          longitude: coords?.lng || null,
-        })
+        .insert(enriched)
         .select("id")
         .single()
 
@@ -341,7 +345,7 @@ export async function updatePartnerAction(
     updateData.last_seo_update_at = new Date().toISOString()
   }
 
-  // Handle store updates (headquarters store) — all fiscal fields moved per-store
+  // Handle store updates (headquarters store) - all fiscal fields moved per-store
   const storeUpdateData: Record<string, any> = {}
   if (data.storeName) storeUpdateData.name = data.storeName
   if (data.storeDescription !== undefined) storeUpdateData.description = data.storeDescription
@@ -449,34 +453,44 @@ export async function updatePartnerAction(
 
     const existingAddress = await supabase
       .from("addresses")
-      .select("id")
+      .select("*")
       .or(storeId ? `store_id.eq.${storeId},partner_id.eq.${partnerId}` : `partner_id.eq.${partnerId}`)
       .limit(1)
       .maybeSingle()
 
-    const addressWithCoords = {
-      ...addressData,
+    const combinedPayload = {
+      ...(existingAddress?.data || {}),
+      partner_id: partnerId,
       store_id: storeId || null,
-      latitude: geocodedCoords?.lat || null,
-      longitude: geocodedCoords?.lng || null,
+      user_id: currentUser.id,
+      zip_code: data.zipCode ?? existingAddress?.data?.zip_code,
+      street: data.street ?? existingAddress?.data?.street,
+      number: data.number ?? existingAddress?.data?.number,
+      complement: data.complement !== undefined ? (data.complement || null) : existingAddress?.data?.complement,
+      neighborhood: data.neighborhood ?? existingAddress?.data?.neighborhood,
+      city: data.city ?? existingAddress?.data?.city,
+      state: data.state ?? existingAddress?.data?.state,
+      country: "BR",
+      municipio_codigo_ibge: (data as any).municipioCodigoIbge ?? (data as any).ibge ?? existingAddress?.data?.municipio_codigo_ibge,
+      latitude: geocodedCoords?.lat ?? existingAddress?.data?.latitude ?? null,
+      longitude: geocodedCoords?.lng ?? existingAddress?.data?.longitude ?? null,
+      address_type: "primary",
+      is_default: true,
     }
+
+    const enriched = await enrichAddressData(combinedPayload)
 
     if (existingAddress?.data?.id) {
       await supabase
         .from("addresses")
-        .update(addressWithCoords)
+        .update(enriched)
         .eq("id", existingAddress.data.id)
     } else {
-      await supabase.from("addresses").insert({
-        partner_id: partnerId,
-        ...addressWithCoords,
-        country: "BR",
-        is_default: true,
-      })
+      await supabase.from("addresses").insert(enriched)
     }
   }
 
-  revalidatePath("/erp/settings")
+  revalidatePath("/erp/configuracoes")
 
   // Redis Sync for Marketplace Vitrines
   await syncToExploreRedis({ id: partnerId, type: "loja", data: {} })

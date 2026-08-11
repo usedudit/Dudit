@@ -1,6 +1,6 @@
 -- ============================================================================
--- Fase 10.10 — Corrige NULLIF nas colunas NOT NULL de sales (finalize_pos_sale)
---              Apenas isso — lógica de estoque vai no TypeScript (orders.ts).
+-- Fase 10.10 - Corrige NULLIF nas colunas NOT NULL de sales (finalize_pos_sale)
+--              Apenas isso - lógica de estoque vai no TypeScript (orders.ts).
 -- ============================================================================
 -- Problema: finalize_pos_sale usa NULLIF(v_fee_total, 0) no INSERT INTO sales,
 -- mas as colunas payment_method_fee_amount/interest_amount/fixed_fee_amount
@@ -173,7 +173,7 @@ BEGIN
         v_subtotal, v_discount, v_final_amount_adjusted, v_clamped_paid,
         v_payment_status, v_payment_status,
         p_finance_account_id, p_cash_session_id, COALESCE(v_draft.notes, ''), p_user_id,
-        -- FIX: COALESCE(NULLIF(v, 0), 0) — NULLIF retorna NULL quando = 0, mas
+        -- FIX: COALESCE(NULLIF(v, 0), 0) - NULLIF retorna NULL quando = 0, mas
         -- a coluna é NOT NULL (f106). COALESCE converte de volta pra 0.
         COALESCE(NULLIF(v_interest_total, 0), 0),
         COALESCE(NULLIF(v_fee_total, 0), 0),

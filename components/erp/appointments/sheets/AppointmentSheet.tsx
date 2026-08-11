@@ -208,7 +208,7 @@ export const AppointmentSheet = ({
     const handleViewSale = () => {
         const saleId = linkedOrderId || appointment?.marketplaceOrderId || appointment?.saleId || (appointment as any)?.sale_id;
         if (saleId) {
-            router.push(`/erp/orders?view=${saleId}`);
+            router.push(`/erp/pedidos?view=${saleId}`);
             onClose();
         } else {
             toast.warning("Venda não encontrada", "Não foi possível encontrar a venda associada a este agendamento.");
@@ -367,7 +367,7 @@ export const AppointmentSheet = ({
     const handleCheckoutNavigation = useCallback(() => {
         const linkedOrderId = appointment?.marketplaceOrderId || appointment?.saleId;
         if (linkedOrderId) {
-            router.push(`/erp/orders?edit=${linkedOrderId}&payment=1`);
+            router.push(`/erp/pedidos?edit=${linkedOrderId}&payment=1`);
         }
     }, [appointment?.marketplaceOrderId, appointment?.saleId, router]);
 

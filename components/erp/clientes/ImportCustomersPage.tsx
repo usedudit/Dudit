@@ -282,7 +282,7 @@ export function ImportCustomersPage({ partnerId }: ImportCustomersPageProps) {
         const title = step === "upload" ? "Importar Clientes" : step === "mapping" ? "Revisar Mapeamento" : fileName
         setHeaderOverride({
             title,
-            onBack: () => step === "upload" ? router.push("/erp/products") : setStep("upload"),
+            onBack: () => step === "upload" ? router.push("/erp/produtos") : setStep("upload"),
             isSubPage: true
         })
         return () => setHeaderOverride(null)
@@ -428,7 +428,7 @@ export function ImportCustomersPage({ partnerId }: ImportCustomersPageProps) {
                             title="Importação concluída!"
                             subtitle={`${importCount} de ${totalRows} clientes importados com sucesso.`}
                             buttons={[
-                                { text: "Ver Clientes", action: () => router.push("/erp/customers"), variant: "outline" },
+                                { text: "Ver Clientes", action: () => router.push("/erp/clientes"), variant: "outline" },
                                 { text: "Nova Importação", action: () => { setStep("upload"); setImportDone(false); setParsedCustomers([]); setMapping([]) } }
                             ]}
                         />
@@ -449,7 +449,7 @@ export function ImportCustomersPage({ partnerId }: ImportCustomersPageProps) {
 
                             {/* Back button - desktop only */}
                             <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
-                                <Button variant="filled" onClick={() => step === "upload" ? router.push("/erp/products") : setStep("upload")} className="w-10 h-10 p-0 flex items-center justify-center">
+                                <Button variant="filled" onClick={() => step === "upload" ? router.push("/erp/produtos") : setStep("upload")} className="w-10 h-10 p-0 flex items-center justify-center">
                                     <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                 </Button>
                             </div>

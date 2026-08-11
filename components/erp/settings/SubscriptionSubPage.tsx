@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { Button, DefaultModal, AlertModal, InfoCard } from "@/components/reusable"
+import { Button, Badge, DefaultModal, AlertModal, InfoCard } from "@/components/reusable"
 import { Input as FormInput } from "@/components/reusable/Input"
 import Portal from "@/components/Portal"
 import {
@@ -90,7 +90,7 @@ const PlanCard: React.FC<PlanCardProps> = ({
                 }`}
         >
             {popular && (
-                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-brand-green text-white text-xs font-bold py-1.5 px-4 rounded-full flex items-center gap-1.5 whitespace-nowrap shadow-sm">
+                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-brand-green text-white text-xs font-bold py-1.5 px-4 rounded-full flex items-center gap-1.5 whitespace-nowrap">
                     Mais popular
                 </div>
             )}
@@ -186,12 +186,12 @@ const PlanCardSkeleton = () => (
 
 const BillingToggle = ({ value, onChange }: { value: "monthly" | "annually", onChange: (v: "monthly" | "annually") => void }) => (
     <div className="flex justify-center mb-8">
-        <div className="bg-brand-gray dark:bg-dark-surface p-1 rounded-2xl border border-brand-border dark:border-dark-border flex items-center shadow-sm">
+        <div className="bg-brand-gray dark:bg-dark-surface p-1 rounded-2xl border border-brand-border dark:border-dark-border flex items-center">
             <button
                 type="button"
                 onClick={() => onChange("monthly")}
                 className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 ${value === "monthly"
-                    ? "bg-white dark:bg-zinc-800 text-brand-dark dark:text-dark-heading shadow-md"
+                    ? "bg-white dark:bg-zinc-800 text-brand-dark dark:text-dark-heading"
                     : "text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading"
                     }`}
             >
@@ -201,7 +201,7 @@ const BillingToggle = ({ value, onChange }: { value: "monthly" | "annually", onC
                 type="button"
                 onClick={() => onChange("annually")}
                 className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 flex items-center gap-2 ${value === "annually"
-                    ? "bg-white dark:bg-zinc-800 text-brand-dark dark:text-dark-heading shadow-md"
+                    ? "bg-white dark:bg-zinc-800 text-brand-dark dark:text-dark-heading"
                     : "text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading"
                     }`}
             >
@@ -236,6 +236,16 @@ interface SubscriptionData {
         trial_end: string | null
         payment_provider: string
         next_payment_date?: string | null
+    } | null
+    next_invoice?: {
+        purchase_id: string | null
+        invoice_id: string | null
+        invoice_number: string | null
+        due_date: string | null
+        period_start: string | null
+        period_end: string | null
+        amount: number
+        status: string | null
     } | null
     usage: Record<string, number>
 }
@@ -454,9 +464,27 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
         ["active", "trialing", "past_due"].includes(subData.subscription.status) &&
         currentPlanSlug !== "free"
 
-    const nextInvoiceDate = subData?.subscription?.next_payment_date
+    const nextInvoice = subData?.next_invoice ?? null
+    const nextInvoiceDate = nextInvoice?.due_date
+        ?? subData?.subscription?.next_payment_date
         ?? subData?.subscription?.current_period_end
         ?? (subData?.subscription?.status === "trialing" ? subData.subscription.trial_end : null)
+
+    const nextInvoiceStatusVariant = (status: string | null | undefined): "green" | "orange" | "red" | "gray" => {
+        if (status === "completed" || status === "approved") return "green"
+        if (status === "pending" || status === "processing") return "orange"
+        if (status === "failed" || status === "rejected" || status === "cancelled") return "red"
+        return "gray"
+    }
+
+    const nextInvoiceStatusLabel = (status: string | null | undefined) => {
+        if (status === "completed") return "Paga"
+        if (status === "pending") return "Pendente"
+        if (status === "processing") return "Processando"
+        if (status === "failed") return "Falhou"
+        if (status === "cancelled") return "Cancelada"
+        return null
+    }
 
     return (
         <FadeIn>
@@ -496,11 +524,11 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10 items-stretch">
 
                             {/* Card 1: Current Plan */}
-                            <div className="rounded-3xl p-6 md:p-8 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border flex flex-col justify-between shadow-sm relative">
+                            <div className="rounded-3xl p-6 md:p-8 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border flex flex-col justify-between relative">
                                 <div>
                                     <div className="flex items-center justify-between mb-4">
-                                        <span className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body">
-                                            Plano Atual
+                                        <span className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body">
+                                            Plano atual
                                         </span>
                                         {subData?.subscription?.status === "active" && (
                                             <span className="bg-brand-green/10 text-brand-green text-xs font-bold px-3 py-1 rounded-full">
@@ -548,34 +576,57 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
                                         </Button>
                                     </div>
                                 </div>
+
+                                {nextInvoiceDate && hasActivePaidSub && (
+                                    <div className="mt-5 pt-4 border-t border-brand-border dark:border-dark-border flex items-center justify-between text-xs md:text-sm">
+                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">
+                                            {subData?.subscription?.cancel_at_period_end ? "Acesso até" : "Renova em"}
+                                        </span>
+                                        <span className={`font-bold ${subData?.subscription?.cancel_at_period_end ? "text-red-500" : "text-brand-dark dark:text-dark-heading"}`}>
+                                            {formatDate(nextInvoiceDate)}
+                                        </span>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Card 2: Próxima Fatura */}
-                            <div className="rounded-3xl p-6 md:p-8 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border flex flex-col justify-between shadow-sm relative">
+                            <div className="rounded-3xl p-6 md:p-8 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border flex flex-col justify-between relative">
                                 <div>
                                     <div className="flex items-center justify-between mb-4">
-                                        <span className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body">
-                                            Próxima Fatura
+                                        <span className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body">
+                                            Próxima fatura
                                         </span>
+                                        {nextInvoiceStatusLabel(nextInvoice?.status) && (
+                                            <Badge variant={nextInvoiceStatusVariant(nextInvoice?.status)}>
+                                                {nextInvoiceStatusLabel(nextInvoice?.status)}
+                                            </Badge>
+                                        )}
                                     </div>
 
                                     <h2 className="text-3xl md:text-4xl font-extrabold text-brand-dark dark:text-dark-heading mb-6">
-                                        {subData ? (currentPlanPrice > 0 ? formatCurrency(currentPlanPrice) : "R$ 0,00") : "..."}
+                                        {subData ? (currentPlanPrice > 0 ? formatCurrency(nextInvoice?.amount ?? currentPlanPrice) : "R$ 0,00") : "..."}
                                     </h2>
                                 </div>
 
                                 <div className="space-y-3 pt-6 border-t border-brand-border dark:border-dark-border mt-auto">
                                     <div className="flex items-center justify-between text-xs md:text-sm">
+                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">Fatura</span>
+                                        <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                            {nextInvoice?.invoice_number || "A gerar"}
+                                        </span>
+                                    </div>
+
+                                    <div className="flex items-center justify-between text-xs md:text-sm">
                                         <span className="text-brand-inactive-text dark:text-dark-body font-medium">Plano</span>
                                         <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                            {subData ? `Plano ${getHardcodedPlan(subData.plan.slug).name}` : "—"}
+                                            {subData ? `Plano ${getHardcodedPlan(subData.plan.slug).name}` : "-"}
                                         </span>
                                     </div>
 
                                     <div className="flex items-center justify-between text-xs md:text-sm">
                                         <span className="text-brand-inactive-text dark:text-dark-body font-medium">Vencimento</span>
                                         <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                            {nextInvoiceDate ? formatDate(nextInvoiceDate) : "—"}
+                                            {nextInvoiceDate ? formatDate(nextInvoiceDate) : "-"}
                                         </span>
                                     </div>
 

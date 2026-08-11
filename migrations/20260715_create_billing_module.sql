@@ -1,5 +1,5 @@
 -- ============================================================================
--- BILLING MODULE — Generic purchase/payment/invoice system
+-- BILLING MODULE - Generic purchase/payment/invoice system
 -- ============================================================================
 -- This module is the CENTRAL purchase entity for EVERY financial transaction
 -- within Dudit. It is NOT subscription-specific. Any current or future

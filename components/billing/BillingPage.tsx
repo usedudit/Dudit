@@ -65,7 +65,7 @@ function getGatewayLabel(gateway: string | null): string {
         pagseguro: "PagSeguro",
         manual: "Manual",
     }
-    return labels[gateway || ""] || gateway || "—"
+    return labels[gateway || ""] || gateway || "-"
 }
 
 function getTypeLabel(type: string): string {

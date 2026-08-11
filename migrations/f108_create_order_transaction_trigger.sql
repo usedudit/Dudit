@@ -1,5 +1,5 @@
 -- Creates transactions + transaction_payments for orders marked as paid
--- (marketplace, MP webhook, admin, etc.) — fills the gap where only
+-- (marketplace, MP webhook, admin, etc.) - fills the gap where only
 -- `finalize_pos_sale` (PDV) used to create them.
 
 CREATE OR REPLACE FUNCTION public.create_order_transaction_on_paid()

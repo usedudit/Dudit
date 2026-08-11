@@ -1,5 +1,5 @@
 -- ============================================================================
--- Fase 10.1 — Rollback: Store-Aware Product Variants
+-- Fase 10.1 - Rollback: Store-Aware Product Variants
 -- ============================================================================
 BEGIN;
 
@@ -924,7 +924,7 @@ BEGIN
     END;
   END LOOP;
 
-  -- Create stock movement — pass p_store_id so create_batch_stock_movement
+  -- Create stock movement - pass p_store_id so create_batch_stock_movement
   -- updates store_products.override_stock_quantity instead of products.stock_quantity
   IF jsonb_array_length(v_stock_items) > 0 THEN
     v_stock_movement_result := public.create_batch_stock_movement(

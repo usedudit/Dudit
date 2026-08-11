@@ -1,5 +1,5 @@
 -- ============================================================================
--- Fase 10.2 — PDV: mesmo fluxo de estoque que venda manual + Branch 3 fix
+-- Fase 10.2 - PDV: mesmo fluxo de estoque que venda manual + Branch 3 fix
 -- ============================================================================
 -- 1. Remove TODO inline stock validation de finalize_pos_sale
 -- 2. Stock deduction só via create_batch_stock_movement (igual venda manual)
@@ -24,7 +24,7 @@ DROP FUNCTION IF EXISTS public.create_batch_stock_movement(
 );
 
 -- ============================================================
--- 2. Recreate create_batch_stock_movement — 4 branches + fix
+-- 2. Recreate create_batch_stock_movement - 4 branches + fix
 -- ============================================================
 CREATE OR REPLACE FUNCTION public.create_batch_stock_movement(
     p_partner_id UUID,
@@ -257,7 +257,7 @@ DROP FUNCTION IF EXISTS public.finalize_pos_sale(
 );
 
 -- ============================================================
--- 4. Recreate finalize_pos_sale — SEM validação inline de estoque
+-- 4. Recreate finalize_pos_sale - SEM validação inline de estoque
 -- ============================================================
 CREATE OR REPLACE FUNCTION public.finalize_pos_sale(
   p_partner_id UUID,

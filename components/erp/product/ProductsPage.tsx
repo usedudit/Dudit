@@ -972,7 +972,7 @@ export default function ProductsPage({
                                         showChevron={false}
                                         fullWidth={false}
                                     >
-                                        <DropdownItem onClick={() => router.push("/erp/products/import")}>
+                                        <DropdownItem onClick={() => router.push("/erp/produtos/importar")}>
                                             <UploadSheetIcon size={18} /> Importar Planilha
                                         </DropdownItem>
                                         <DropdownItem onClick={handleExport} disabled={isExporting}>
@@ -1006,7 +1006,7 @@ export default function ProductsPage({
                                     search={search}
                                     onSearchChange={setSearch}
                                     onOpenFilter={() => setModals((p) => ({ ...p, filter: true }))}
-                                    onOpenImport={() => router.push("/erp/xml-import")}
+                                    onOpenImport={() => router.push("/erp/importacao-xml")}
                                     onOpenExport={handleExport}
                                     onAddProduct={handleAddFirstProduct}
                                     filters={filters}

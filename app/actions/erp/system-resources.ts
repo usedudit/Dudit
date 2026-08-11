@@ -47,7 +47,7 @@ export async function updateSystemResourcesAction(activeResources: string[]) {
 
   revalidateTag(TAGS.userAccess(user.id), "max")
   revalidatePath("/erp")
-  revalidatePath("/erp/settings")
+  revalidatePath("/erp/configuracoes")
 
   return { success: true }
 }

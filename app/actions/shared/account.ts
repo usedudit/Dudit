@@ -67,7 +67,7 @@ export async function deleteAccountAction(
       path: "/",
     })
 
-    revalidatePath("/erp/settings/subscription")
+    revalidatePath("/erp/configuracoes/assinatura")
     return { success: true }
   } catch (error: any) {
     console.error("General error in deleteAccountAction:", error)

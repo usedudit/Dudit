@@ -1,5 +1,5 @@
 -- ============================================================================
--- Rollback: Fase 10.6 — Remove financial breakdown columns from public.sales
+-- Rollback: Fase 10.6 - Remove financial breakdown columns from public.sales
 -- ============================================================================
 
 BEGIN;

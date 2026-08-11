@@ -1,7 +1,8 @@
 import { getAdminClient } from "@/lib/supabase/admin"
-import type { BillingPurchase, BillingPayment, BillingInvoice } from "./types"
-import { generateInvoiceData } from "./invoice-generator"
+import type { BillingPurchase } from "./types"
 import { logBillingAudit } from "./audit"
+import { generateInvoiceForPurchase } from "./invoice-generation"
+import { computeSubscriptionPeriods, periodKey } from "./subscription-period"
 
 type SyncContext = "webhook" | "manual" | "migration"
 
@@ -14,28 +15,29 @@ const SUBSCRIPTION_PURCHASE_MAP: Record<string, string> = {
     paused: "pending",
 }
 
-function findPaymentMethod(mpData: any): string | null {
-    if (!mpData) return null
-    const payer = mpData.payer
-    if (payer?.payment_method?.id) return payer.payment_method.id
-    if (payer?.payment_method_id) return payer.payment_method_id
-    return null
+function samePeriod(iso: string | null | undefined, target: Date): boolean {
+    if (!iso) return false
+    const d = new Date(iso)
+    if (isNaN(d.getTime())) return false
+    return periodKey(d) === periodKey(target)
 }
 
 /**
  * Sync a subscription's billing state into billing_purchases.
  *
  * FULLY IDEMPOTENT:
- * - Looks up billing_purchase by subscription_id – updates if exists, creates if not.
- * - Looks up billing_payment by gateway_payment_id – updates if exists, creates if not.
- * - Invoice is generated only once (check by purchase.invoice_id).
+ * - The CURRENT cycle purchase is upserted (by subscription_id / period).
+ * - The NEXT cycle purchase (upcoming payment) is upserted with status "pending"
+ *   and its own invoice, so the "Próxima Fatura" is always generated on the
+ *   plan's due date.
+ * - Invoices are generated server-side (no auth) and only once per purchase.
  *
  * Safe to call multiple times with the same subscription.
  */
 export async function syncSubscriptionToBilling(
     subscriptionId: string,
     context: SyncContext = "webhook",
-): Promise<{ purchaseId: string | null; created: boolean }> {
+): Promise<{ purchaseId: string | null; created: boolean; nextPurchaseId?: string | null }> {
     const supabase = getAdminClient()
 
     // ── 1. Load subscription with plan and partner ──
@@ -57,70 +59,93 @@ export async function syncSubscriptionToBilling(
 
     const plan = sub.plan
     const partner = sub.partner
-    const planPrice = plan?.price || 0
+    const planPrice = Number(plan?.price || 0)
     const purchaseStatus = SUBSCRIPTION_PURCHASE_MAP[sub.status] || "pending"
     const isActiveOrTrialing = ["active", "trialing"].includes(sub.status)
 
     console.log(`[BillingSync] Syncing sub ${subscriptionId} (status=${sub.status}, purchase=${purchaseStatus})`)
 
-    // ── 2. Idempotent upsert billing_purchase ──
-    const { data: existingPurchase } = await supabase
+    // ── 2. Compute billing periods (never in the past) ──
+    const periods = computeSubscriptionPeriods(sub)
+
+    const { data: purchases } = await supabase
         .from("billing_purchases")
         .select("*")
         .eq("subscription_id", subscriptionId)
         .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle()
 
-    let purchase: BillingPurchase | null = existingPurchase
-    let purchaseCreated = false
+    const allPurchases = (purchases || []) as any[]
+
+    // Current cycle purchase: matches the current period, else latest completed, else latest.
+    let currentPurchase =
+        allPurchases.find((p) => samePeriod(p.billing_period_start, periods.periodStart))
+        ?? allPurchases.find((p) => p.status === "completed")
+        ?? allPurchases[0]
+        ?? null
+
+    // Next cycle purchase: pending purchase for the upcoming period, else any pending.
+    let nextPurchase =
+        allPurchases.find((p) => p.status === "pending" && samePeriod(p.billing_period_start, periods.nextStart))
+        ?? allPurchases.find((p) => p.status === "pending")
+        ?? null
+
+    if (nextPurchase && currentPurchase && nextPurchase.id === currentPurchase.id) {
+        nextPurchase = null
+    }
 
     const now = new Date().toISOString()
+    const description = plan?.name ? `Plano ${plan.name}` : "Assinatura"
+    let created = false
 
-    if (purchase) {
-        // Update existing purchase
+    // ── 3. Upsert CURRENT cycle purchase ──
+    if (currentPurchase) {
         const updateData: Record<string, any> = {
             status: purchaseStatus,
             total_amount: planPrice,
             amount: planPrice,
-            description: plan?.name ? `Plano ${plan.name}` : "Assinatura",
+            description,
             updated_at: now,
         }
+        if (!currentPurchase.billing_period_start) updateData.billing_period_start = periods.periodStart.toISOString()
+        if (!currentPurchase.billing_period_end) updateData.billing_period_end = periods.periodEnd.toISOString()
 
         if (sub.mercado_pago_subscription_id) {
             updateData.gateway_payment_id = sub.mercado_pago_subscription_id
             updateData.gateway_status = sub.status
         }
 
-        if (purchase.status !== purchaseStatus) {
-            const { error: updateErr } = await supabase
-                .from("billing_purchases")
-                .update(updateData)
-                .eq("id", purchase.id)
+        const { error: updateErr } = await supabase
+            .from("billing_purchases")
+            .update(updateData)
+            .eq("id", currentPurchase.id)
 
-            if (updateErr) {
-                console.error(`[BillingSync] Failed to update purchase ${purchase.id}:`, updateErr.message)
-                return { purchaseId: purchase.id, created: false }
-            }
-
-            await logBillingAudit(purchaseStatus === "completed" ? "billing.purchase.completed"
-                : purchaseStatus === "failed" ? "billing.purchase.failed"
-                    : purchaseStatus === "cancelled" ? "billing.purchase.cancelled"
-                        : purchaseStatus === "refunded" ? "billing.purchase.refunded"
-                            : "billing.purchase.completed", sub.partner_id, {
-                purchase_id: purchase.id,
-                subscription_id: subscriptionId,
-                previous_status: purchase.status,
-                new_status: purchaseStatus,
-                via: context,
-            }, partner?.user_id || undefined)
-
-            console.log(`[BillingSync] Updated purchase ${purchase.id}: ${purchase.status} → ${purchaseStatus}`)
+        if (updateErr) {
+            console.error(`[BillingSync] Failed to update purchase ${currentPurchase.id}:`, updateErr.message)
+            return { purchaseId: currentPurchase.id, created: false }
         }
 
-        purchase = { ...purchase, ...updateData } as BillingPurchase
+        if (currentPurchase.status !== purchaseStatus) {
+            await logBillingAudit(
+                purchaseStatus === "completed" ? "billing.purchase.completed"
+                    : purchaseStatus === "failed" ? "billing.purchase.failed"
+                        : purchaseStatus === "cancelled" ? "billing.purchase.cancelled"
+                            : purchaseStatus === "refunded" ? "billing.purchase.refunded"
+                                : "billing.purchase.completed",
+                sub.partner_id,
+                {
+                    purchase_id: currentPurchase.id,
+                    subscription_id: subscriptionId,
+                    previous_status: currentPurchase.status,
+                    new_status: purchaseStatus,
+                    via: context,
+                },
+                partner?.user_id || undefined,
+            )
+        }
+
+        currentPurchase = { ...currentPurchase, ...updateData } as BillingPurchase
+        console.log(`[BillingSync] Updated purchase ${currentPurchase.id}: ${currentPurchase.status} → ${purchaseStatus}`)
     } else {
-        // Create new purchase
         const { data: newPurchase, error: createErr } = await supabase
             .from("billing_purchases")
             .insert({
@@ -138,10 +163,13 @@ export async function syncSubscriptionToBilling(
                 gateway_payment_id: sub.mercado_pago_subscription_id || null,
                 gateway_status: sub.status,
                 subscription_id: subscriptionId,
-                description: plan?.name ? `Plano ${plan.name}` : "Assinatura",
+                description,
+                billing_period_start: periods.periodStart.toISOString(),
+                billing_period_end: periods.periodEnd.toISOString(),
                 metadata: {
                     plan_name: plan?.name || null,
                     plan_slug: plan?.slug || null,
+                    billing_cycle: "current",
                     synced_via: context,
                     synced_at: now,
                 },
@@ -154,28 +182,27 @@ export async function syncSubscriptionToBilling(
             return { purchaseId: null, created: false }
         }
 
-        purchase = newPurchase as unknown as BillingPurchase
-        purchaseCreated = true
+        currentPurchase = newPurchase as unknown as BillingPurchase
+        created = true
 
         await logBillingAudit("billing.purchase.created", sub.partner_id, {
-            purchase_id: purchase.id,
+            purchase_id: currentPurchase.id,
             subscription_id: subscriptionId,
             plan_name: plan?.name,
             status: purchaseStatus,
             via: context,
         }, partner?.user_id || undefined)
 
-        console.log(`[BillingSync] Created purchase ${purchase.id} for sub ${subscriptionId}`)
+        console.log(`[BillingSync] Created purchase ${currentPurchase.id} for sub ${subscriptionId}`)
     }
 
-    // ── 3. Idempotent upsert billing_payment (only for active/trialing) ──
+    // ── 4. Payment record (only for active/trialing with MP preapproval) ──
     const mpSubId = sub.mercado_pago_subscription_id
-
     if (mpSubId && isActiveOrTrialing) {
         const { data: existingPayment } = await supabase
             .from("billing_payments")
             .select("*")
-            .eq("purchase_id", purchase.id)
+            .eq("purchase_id", currentPurchase.id)
             .eq("gateway_payment_id", mpSubId)
             .maybeSingle()
 
@@ -183,7 +210,7 @@ export async function syncSubscriptionToBilling(
             const { error: payErr } = await supabase
                 .from("billing_payments")
                 .insert({
-                    purchase_id: purchase.id,
+                    purchase_id: currentPurchase.id,
                     amount: planPrice,
                     currency: "BRL",
                     fee_amount: 0,
@@ -197,30 +224,104 @@ export async function syncSubscriptionToBilling(
                 })
 
             if (payErr) {
-                console.error(`[BillingSync] Failed to create payment for purchase ${purchase.id}:`, payErr.message)
+                console.error(`[BillingSync] Failed to create payment for purchase ${currentPurchase.id}:`, payErr.message)
             } else {
-                console.log(`[BillingSync] Created payment for purchase ${purchase.id}`)
+                console.log(`[BillingSync] Created payment for purchase ${currentPurchase.id}`)
             }
         }
     }
 
-    // ── 4. Idempotent invoice generation ──
-    if (purchaseStatus === "completed" && !purchase.invoice_id) {
-        try {
-            const { generateInvoiceAction } = await import("@/app/actions/billing/invoices")
-            const result = await generateInvoiceAction(purchase.id)
-
-            if (result.success && result.data) {
-                console.log(`[BillingSync] Generated invoice ${result.data.invoice_number} for purchase ${purchase.id}`)
-            } else {
-                console.warn(`[BillingSync] Invoice generation skipped for purchase ${purchase.id}:`, result.error || "already exists")
-            }
-        } catch (err: any) {
-            console.error(`[BillingSync] Invoice generation error for purchase ${purchase.id}:`, err.message)
+    // ── 5. Invoice for the CURRENT cycle ──
+    if (["completed", "pending"].includes(purchaseStatus)) {
+        const invResult = await generateInvoiceForPurchase(currentPurchase.id, partner?.user_id || undefined)
+        if (invResult.success && invResult.data) {
+            console.log(`[BillingSync] Invoice ${invResult.data.invoice_number} ensured for purchase ${currentPurchase.id}`)
+        } else {
+            console.warn(`[BillingSync] Invoice generation skipped for purchase ${currentPurchase.id}:`, invResult.error || "already exists")
         }
     }
 
-    // ── 5. Invalidate plan cache ──
+    // ── 6. NEXT cycle purchase (upcoming invoice to pay) ──
+    let nextPurchaseId: string | null = null
+    if (isActiveOrTrialing && planPrice > 0) {
+        if (nextPurchase) {
+            const { error: nextErr } = await supabase
+                .from("billing_purchases")
+                .update({
+                    status: "pending",
+                    amount: planPrice,
+                    total_amount: planPrice,
+                    description,
+                    billing_period_start: periods.nextStart.toISOString(),
+                    billing_period_end: periods.nextEnd.toISOString(),
+                    updated_at: now,
+                })
+                .eq("id", nextPurchase.id)
+
+            if (!nextErr) {
+                nextPurchaseId = nextPurchase.id
+                console.log(`[BillingSync] Updated next-cycle purchase ${nextPurchase.id} for sub ${subscriptionId}`)
+            }
+        } else {
+            const { data: newNext, error: nextErr } = await supabase
+                .from("billing_purchases")
+                .insert({
+                    partner_id: sub.partner_id,
+                    user_id: partner?.user_id || null,
+                    purchase_type: "subscription",
+                    purchaseable_type: "plan",
+                    purchaseable_id: plan?.id || null,
+                    amount: planPrice,
+                    total_amount: planPrice,
+                    discount_amount: 0,
+                    currency: "BRL",
+                    status: "pending",
+                    gateway: "mercado_pago",
+                    gateway_payment_id: mpSubId || null,
+                    gateway_status: sub.status,
+                    subscription_id: subscriptionId,
+                    description,
+                    billing_period_start: periods.nextStart.toISOString(),
+                    billing_period_end: periods.nextEnd.toISOString(),
+                    metadata: {
+                        plan_name: plan?.name || null,
+                        plan_slug: plan?.slug || null,
+                        billing_cycle: "next",
+                        due_date: periods.nextStart.toISOString(),
+                        synced_via: context,
+                        synced_at: now,
+                    },
+                })
+                .select("id")
+                .single()
+
+            if (newNext && !nextErr) {
+                nextPurchaseId = newNext.id
+                console.log(`[BillingSync] Created next-cycle purchase ${newNext.id} for sub ${subscriptionId}`)
+            } else {
+                console.error(`[BillingSync] Failed to create next-cycle purchase for sub ${subscriptionId}:`, nextErr?.message)
+            }
+        }
+
+        // ── 7. Invoice for the NEXT cycle (the "Próxima Fatura") ──
+        if (nextPurchaseId) {
+            const nextInv = await generateInvoiceForPurchase(nextPurchaseId, partner?.user_id || undefined)
+            if (nextInv.success && nextInv.data) {
+                console.log(`[BillingSync] Next-cycle invoice ${nextInv.data.invoice_number} ensured for purchase ${nextPurchaseId}`)
+            } else {
+                console.warn(`[BillingSync] Next-cycle invoice skipped for purchase ${nextPurchaseId}:`, nextInv.error || "already exists")
+            }
+        }
+    } else {
+        // Subscription no longer bills → cancel any stale pending "next" purchase.
+        for (const p of allPurchases) {
+            if (p.status === "pending" && p.id !== currentPurchase.id) {
+                await supabase.from("billing_purchases").update({ status: "cancelled", updated_at: now }).eq("id", p.id)
+            }
+        }
+    }
+
+    // ── 8. Invalidate plan cache ──
     try {
         const { invalidatePartnerPlanCache } = await import("@/lib/services/subscription.service")
         invalidatePartnerPlanCache(sub.partner_id)
@@ -228,5 +329,5 @@ export async function syncSubscriptionToBilling(
         // non-critical
     }
 
-    return { purchaseId: purchase.id, created: purchaseCreated }
+    return { purchaseId: currentPurchase.id, created, nextPurchaseId }
 }

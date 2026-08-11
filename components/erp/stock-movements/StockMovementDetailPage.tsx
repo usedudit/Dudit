@@ -444,7 +444,7 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
                                                 <div className="space-y-4">
                                                     <ListItem
                                                         title="Motivo"
-                                                        description={reason || "—"}
+                                                        description={reason || "-"}
                                                         className="border-0 bg-transparent px-0 hover:bg-transparent"
                                                     />
                                                     {data.referenceName && (

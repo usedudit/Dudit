@@ -1,5 +1,5 @@
 -- ============================================================================
--- Rollback: Fase 10.7 — Restore f105 version of finalize_pos_sale
+-- Rollback: Fase 10.7 - Restore f105 version of finalize_pos_sale
 -- ============================================================================
 -- ATENÇÃO: Este rollback restaura a versão REGRESSIVA que NÃO cria
 -- transactions nem transaction_payments. Use apenas em caso de emergência.

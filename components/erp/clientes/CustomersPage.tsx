@@ -537,7 +537,7 @@ export default function CustomersPage({
                                         {isExporting ? "Exportando..." : "Exportar"}
                                     </Button>
 
-                                    <Button variant="outline" onClick={() => router.push("/erp/customers/import")} leftIcon={<UploadIcon size={18} />}>
+                                    <Button variant="outline" onClick={() => router.push("/erp/clientes/importar")} leftIcon={<UploadIcon size={18} />}>
                                         Importar
                                     </Button>
 

@@ -511,7 +511,34 @@ export async function openCashSessionAction(input: {
   if (!Number.isFinite(raw)) return { success: false as const, error: "Valor inicial inválido." }
   const initialAmount = money(Math.max(0, raw))
 
-  const existing = await getActiveSessionForPartner(supabase, input.partnerId, input.storeId)
+  // Resolve a valid store for the partner. If the incoming storeId is missing or
+  // does not belong to the partner (e.g. stale cookie after a store was deleted),
+  // fall back to the partner's default store to avoid FK violations.
+  let storeId = input.storeId || null
+  if (storeId) {
+    const { data: validStore } = await supabase
+      .from("stores")
+      .select("id")
+      .eq("id", storeId)
+      .eq("partner_id", input.partnerId)
+      .maybeSingle()
+    if (!validStore) {
+      storeId = null
+    }
+  }
+  if (!storeId) {
+    const { data: defaultStore } = await supabase
+      .from("stores")
+      .select("id")
+      .eq("partner_id", input.partnerId)
+      .order("is_headquarters", { ascending: false })
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle()
+    storeId = defaultStore?.id ?? null
+  }
+
+  const existing = await getActiveSessionForPartner(supabase, input.partnerId, storeId)
   if (existing?.id) {
     return { success: false as const, error: "Já existe um caixa aberto para esta loja. Utilize o caixa atual ou feche-o primeiro." }
   }
@@ -520,7 +547,7 @@ export async function openCashSessionAction(input: {
     .from("cash_sessions")
     .insert({
       partner_id: input.partnerId,
-      store_id: input.storeId || null,
+      store_id: storeId,
       opened_by_user_id: user.id,
       initial_amount: initialAmount,
       status: "open",
@@ -546,7 +573,7 @@ export async function openCashSessionAction(input: {
     source: "manual",
   })
   await revalidateEntityTimeline("cash_session", data.id)
-  revalidatePath("/erp/cash-register")
+  revalidatePath("/erp/caixa")
   revalidatePath("/erp/pdv")
 
   return { success: true as const, data }
@@ -641,8 +668,8 @@ export async function createCashMovementAction(input: {
       source: "manual",
     })
     await revalidateEntityTimeline("cash_session", sessionId)
-    revalidatePath("/erp/cash-register")
-    revalidatePath("/erp/transactions")
+    revalidatePath("/erp/caixa")
+    revalidatePath("/erp/transacoes")
 
     console.log("[cash-register] createCashMovementAction OK (fallback path)", {
       partnerId: input.partnerId,
@@ -667,8 +694,8 @@ export async function createCashMovementAction(input: {
     source: "manual",
   })
   await revalidateEntityTimeline("cash_session", sessionId)
-  revalidatePath("/erp/cash-register")
-  revalidatePath("/erp/transactions")
+  revalidatePath("/erp/caixa")
+  revalidatePath("/erp/transacoes")
 
   const { data: movement } = await supabase
     .from("cash_movements")
@@ -747,8 +774,8 @@ export async function reverseCashMovementAction(input: {
       await revalidateEntityTimeline("cash_session", fallbackMovement.cash_session_id)
     }
 
-    revalidatePath("/erp/cash-register")
-    revalidatePath("/erp/transactions")
+    revalidatePath("/erp/caixa")
+    revalidatePath("/erp/transacoes")
 
     return fallbackResult
   }
@@ -774,8 +801,8 @@ export async function reverseCashMovementAction(input: {
     await revalidateEntityTimeline("cash_session", movement.cash_session_id)
   }
 
-  revalidatePath("/erp/cash-register")
-  revalidatePath("/erp/transactions")
+  revalidatePath("/erp/caixa")
+  revalidatePath("/erp/transacoes")
 
   return { success: true as const, data: rpcData }
 }
@@ -929,7 +956,7 @@ export async function closeCashSessionAction(input: {
     source: "manual",
   })
   await revalidateEntityTimeline("cash_session", input.cashSessionId)
-  revalidatePath("/erp/cash-register")
+  revalidatePath("/erp/caixa")
   revalidatePath("/erp/pdv")
 
   // Build operator-grouped summary for the close response

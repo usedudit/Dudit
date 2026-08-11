@@ -16,7 +16,7 @@ export function getNotificationHref(params: {
 
   if (entityType === "order" && entityId) {
     if (audience === "seller" || audience === "admin") {
-      return `/erp/orders?view=${encodeURIComponent(entityId)}`
+      return `/erp/pedidos?view=${encodeURIComponent(entityId)}`
     }
     const orderNumber = data?.orderNumber as string | undefined ?? data?.order_number as string | undefined
     if (typeof orderNumber === "string" && orderNumber.length > 0) {
@@ -34,18 +34,18 @@ export function getNotificationHref(params: {
 
   if (entityType === "subscription" && entityId) {
     if (audience === "seller" || audience === "admin") {
-      return `/erp/recurring/subscriptions`
+      return `/erp/recorrentes/assinaturas`
     }
     return "/assinaturas"
   }
 
   if (entityType === "message" && entityId) {
-    return `/erp/integrations/whatsapp`
+    return `/erp/integracoes/whatsapp`
   }
 
   if (entityType === "product") {
-    if (entityId) return `/erp/products?product=${encodeURIComponent(entityId)}`
-    return "/erp/products"
+    if (entityId) return `/erp/produtos?product=${encodeURIComponent(entityId)}`
+    return "/erp/produtos"
   }
 
   return "/"

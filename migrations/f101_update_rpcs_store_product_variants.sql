@@ -1,5 +1,5 @@
 -- ============================================================================
--- Fase 10.1 — Update RPCs for Store-Aware Variants
+-- Fase 10.1 - Update RPCs for Store-Aware Variants
 -- ============================================================================
 -- Atualiza todos os RPCs de estoque para usar store_product_variants quando
 -- variant_id + store_id estão ambos presentes.
@@ -10,14 +10,14 @@
 --   3. release_order_inventory
 --   4. finalize_order_inventory
 --   5. finalize_pos_sale
---   6. get_store_product_stock — add variant support
---   7. handle_order_payment_stock — fix: passa variant_id real
+--   6. get_store_product_stock - add variant support
+--   7. handle_order_payment_stock - fix: passa variant_id real
 -- ============================================================================
 
 BEGIN;
 
 -- ============================================================
--- 1. create_batch_stock_movement — 4 branches
+-- 1. create_batch_stock_movement - 4 branches
 --    Branch 1: variant_id + store_id → store_product_variants
 --    Branch 2: variant_id only          → product_variants
 --    Branch 3: store_id only            → store_products
@@ -207,7 +207,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ============================================================
--- 2. reserve_order_inventory — 4 branches
+-- 2. reserve_order_inventory - 4 branches
 -- ============================================================
 CREATE OR REPLACE FUNCTION public.reserve_order_inventory(
   p_partner_id UUID,
@@ -348,7 +348,7 @@ END;
 $$;
 
 -- ============================================================
--- 3. release_order_inventory — 4 branches
+-- 3. release_order_inventory - 4 branches
 -- ============================================================
 CREATE OR REPLACE FUNCTION public.release_order_inventory(
   p_partner_id UUID,
@@ -484,7 +484,7 @@ END;
 $$;
 
 -- ============================================================
--- 4. finalize_order_inventory — 4 branches
+-- 4. finalize_order_inventory - 4 branches
 -- ============================================================
 CREATE OR REPLACE FUNCTION public.finalize_order_inventory(
   p_partner_id UUID,
@@ -697,7 +697,7 @@ END;
 $$;
 
 -- ============================================================
--- 5. get_store_product_stock — add variant support
+-- 5. get_store_product_stock - add variant support
 -- ============================================================
 CREATE OR REPLACE FUNCTION public.get_store_product_stock(
   p_product_id UUID DEFAULT NULL,
@@ -792,7 +792,7 @@ END;
 $$;
 
 -- ============================================================
--- 6. finalize_pos_sale — variant stock validation store-aware
+-- 6. finalize_pos_sale - variant stock validation store-aware
 -- ============================================================
 CREATE OR REPLACE FUNCTION public.finalize_pos_sale(
   p_partner_id UUID,

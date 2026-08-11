@@ -1536,36 +1536,38 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
             <ExplorarFiltersBottomSheet
                 isOpen={isCategoryFiltersOpen}
                 onClose={() => setIsCategoryFiltersOpen(false)}
-                selectedCitySlug={null}
-                formatCitySlug={(s) => s}
-                onCitySelect={() => { }}
-                currentType={activeContext === "Produtos" ? "produtos" : activeContext === "Servicos" ? "servicos" : "planos"}
-                typeOptions={[]}
-                onTypeChange={() => { }}
-                activeCategoriesList={[]}
-                selectedCategories={[]}
-                onToggleCategory={() => { }}
-                minPrice={categoryMinPrice}
-                onMinPriceChange={setCategoryMinPrice}
-                maxPrice={categoryMaxPrice}
-                onMaxPriceChange={setCategoryMaxPrice}
-                sortBy={categorySortBy}
-                sortOptions={[
-                    { value: "relevancia", label: "Relevância" },
-                    { value: "preco_menor", label: "Menor Preço" },
-                    { value: "preco_maior", label: "Maior Preço" },
-                    { value: "recentes", label: "Mais Recentes" },
-                ]}
-                onSortChange={(val) => setCategorySortBy(val as any)}
-                promoOn={categoryPromoOn}
-                onPromoToggle={() => setCategoryPromoOn(!categoryPromoOn)}
-                activeFiltersCount={categoryActiveFiltersCount}
-                onClearFilters={() => {
+                onApply={(filters) => {
+                    setCategoryMinPrice(String(filters.minPrice || ""))
+                    setCategoryMaxPrice(String(filters.maxPrice || ""))
+                    setCategoryPromoOn(filters.promoOn)
+                }}
+                onClear={() => {
                     setCategorySortBy("relevancia")
                     setCategoryMinPrice("")
                     setCategoryMaxPrice("")
                     setCategoryPromoOn(false)
                     setCategorySelectedBrands([])
+                }}
+                selectedCitySlug={null}
+                formatCitySlug={(s) => s}
+                onCitySelect={() => { }}
+                currentType={activeContext === "Produtos" ? "produtos" : activeContext === "Servicos" ? "servicos" : "planos"}
+                selectedCategories={[]}
+                selectedRadius={null}
+                minPrice={categoryMinPrice}
+                maxPrice={categoryMaxPrice}
+                promoOn={categoryPromoOn}
+                typeOptions={[]}
+                productCategories={[]}
+                serviceCategories={[]}
+                partnerCategories={[]}
+                filterConfig={{
+                    showType: false,
+                    showCategory: false,
+                    showPrice: true,
+                    showSort: false,
+                    showPromo: true,
+                    showRadius: false,
                 }}
             />
 

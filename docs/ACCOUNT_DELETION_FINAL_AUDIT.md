@@ -1,4 +1,4 @@
-# Relatório de Auditoria Final — Account Deletion
+# Relatório de Auditoria Final - Account Deletion
 
 Este documento apresenta a análise de conformidade, segurança e resiliência do fluxo de exclusão de conta assíncrona imediata após a conclusão dos testes e revisões de edge cases.
 

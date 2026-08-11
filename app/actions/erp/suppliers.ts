@@ -12,6 +12,7 @@ import { sanitizeNotes } from "@/lib/input-validator"
 import { generateUniqueSupplierCode } from "@/lib/utils/code-generators"
 import { canUseFeature } from "@/lib/services/subscription.service"
 import { revalidateSuppliers } from "@/lib/utils/revalidation"
+import { enrichAddressData } from "@/lib/services/location.service"
 
 export async function createComprehensiveSupplierAction(data: {
   partnerId: string
@@ -95,8 +96,9 @@ export async function createComprehensiveSupplierAction(data: {
 
   // Criar endereço na tabela addresses se dados foram fornecidos
   if (data.street || data.city) {
-    const addrData: any = {
+    const addrData = await enrichAddressData({
       supplier_id: newSupplier.id,
+      user_id: user.id,
       zip_code: data.zipCode || null,
       street: data.street || null,
       number: data.number || null,
@@ -108,12 +110,12 @@ export async function createComprehensiveSupplierAction(data: {
       municipio_codigo_ibge: data.municipioCodigoIbge || null,
       is_default: true,
       address_type: "primary",
-    }
+    })
     await supabase.from("addresses").insert(addrData)
   }
 
-  revalidatePath("/erp/suppliers")
-  redirect("/erp/suppliers")
+  revalidatePath("/erp/fornecedores")
+  redirect("/erp/fornecedores")
 }
 
 export async function createSupplierAction(data: {
@@ -161,9 +163,9 @@ export async function createSupplierAction(data: {
     return { error: error.message }
   }
 
-  revalidatePath("/erp/suppliers")
+  revalidatePath("/erp/fornecedores")
 
-  redirect("/erp/suppliers")
+  redirect("/erp/fornecedores")
 }
 
 export async function updateSupplierAction(
@@ -207,9 +209,9 @@ export async function updateSupplierAction(
     return { error: error.message }
   }
 
-  revalidatePath("/erp/suppliers")
+  revalidatePath("/erp/fornecedores")
 
-  redirect("/erp/suppliers")
+  redirect("/erp/fornecedores")
 }
 
 export async function deleteSupplierAction(supplierId: string, csrf_token?: string) {
@@ -233,9 +235,9 @@ export async function deleteSupplierAction(supplierId: string, csrf_token?: stri
     return { error: error.message }
   }
 
-  revalidatePath("/erp/suppliers")
+  revalidatePath("/erp/fornecedores")
 
-  redirect("/erp/suppliers")
+  redirect("/erp/fornecedores")
 }
 
 export async function updateComprehensiveSupplierAction(data: {
@@ -343,7 +345,7 @@ export async function updateComprehensiveSupplierAction(data: {
     }
   }
 
-  revalidatePath("/erp/suppliers")
+  revalidatePath("/erp/fornecedores")
   return { success: true }
 }
 
@@ -406,7 +408,7 @@ export async function duplicateSupplierAction(supplierId: string) {
     return { error: createError.message }
   }
 
-  revalidatePath("/erp/suppliers")
+  revalidatePath("/erp/fornecedores")
   return { success: true }
 }
 
@@ -581,7 +583,7 @@ export async function deleteSuppliersInBatchAction(supplierIds: string[]) {
   if (error) return { error: error.message }
 
   revalidateSuppliers(partnerId)
-  revalidatePath("/erp/suppliers")
+  revalidatePath("/erp/fornecedores")
   return { success: true }
 }
 
@@ -617,7 +619,7 @@ export async function toggleSuppliersStatusAction(supplierIds: string[], isActiv
   if (error) return { error: error.message }
 
   revalidateSuppliers(partnerId)
-  revalidatePath("/erp/suppliers")
+  revalidatePath("/erp/fornecedores")
   return { success: true }
 }
 

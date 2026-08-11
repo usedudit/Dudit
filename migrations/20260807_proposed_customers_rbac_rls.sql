@@ -1,5 +1,5 @@
 -- ============================================================================
--- APLICADA — RLS/RBAC de customers (2026-08-10)
+-- APLICADA - RLS/RBAC de customers (2026-08-10)
 --
 -- Aplicação controlada concluída após o cutover dos consumidores.
 --

@@ -1,5 +1,5 @@
 -- ============================================================================
--- F4.1d — Backfill bridges faltantes (segurança)
+-- F4.1d - Backfill bridges faltantes (segurança)
 -- ============================================================================
 -- Garante que TODO produto/serviço/fornecedor/kit com store_id legacy tenha
 -- sua contraparte na bridge table. Idempotente.

@@ -117,7 +117,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
         if (onBack) {
             onBack()
         } else {
-            window.location.href = "/erp/service-orders"
+            window.location.href = "/erp/ordens-de-servico"
         }
     }, [onBack])
 
@@ -186,7 +186,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
         if (onEdit) {
             onEdit(order.id)
         } else {
-            window.location.href = `/erp/service-orders?edit=${order.id}`
+            window.location.href = `/erp/ordens-de-servico?edit=${order.id}`
         }
     }
 
@@ -554,7 +554,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
 
                                                         {order.payment_status !== "paid" && order.order_id && (
                                                             <div className="pt-4 flex justify-end">
-                                                                <Button onClick={() => router.push(`/erp/orders?edit=${order.order_id}&payment=1`)} className="w-full md:w-auto">
+                                                                <Button onClick={() => router.push(`/erp/pedidos?edit=${order.order_id}&payment=1`)} className="w-full md:w-auto">
                                                                     Registrar Pagamento
                                                                 </Button>
                                                             </div>

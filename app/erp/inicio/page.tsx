@@ -5,15 +5,11 @@ import { getUnifiedDashboardAction } from "@/app/actions/erp/quick-mode"
 import QuickModeHome from "@/components/erp/quick-mode/QuickModeHome"
 import { IconPlaceholder, SkeletonLoader } from "@/components/reusable"
 
-export const metadata = {
-    title: "Início - Dudit Marketplace",
-}
-
 export default async function InicioPage() {
     const context = await getCurrentPartnerContext()
 
     if (!context) {
-        redirect("/erp/switch")
+        redirect("/erp/trocar-erp")
     }
 
     const { partnerId } = context

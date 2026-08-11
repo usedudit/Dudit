@@ -39,41 +39,42 @@ const navItems: NavItem[] = [
     {
         icon: GridIcon,
         label: "Dashboard",
-        href: "/erp/dashboard",
+        href: "/erp/painel",
     },
     {
         icon: ShoppingCartIcon,
         label: "Vendas",
-        href: "/erp/orders",
+        href: "/erp/pedidos",
         submenu: [
-            { label: "Pedidos e Vendas", href: "/erp/orders" },
-            { label: "Orçamentos", href: "/erp/quotes" },
+            { label: "Pedidos e Vendas", href: "/erp/pedidos" },
+            { label: "Orçamentos", href: "/erp/orcamentos" },
             { label: "PDV (Frente de Caixa)", href: "/erp/pdv" },
-            { label: "Devoluções", href: "/erp/returns" },
-            { label: "Expedição e Entregas", href: "/erp/logistics" },
+            { label: "Devoluções", href: "/erp/devolucoes" },
+            { label: "Expedição e Entregas", href: "/erp/logistica" },
         ],
     },
     {
         icon: ChartIcon,
-        label: "Produtividade",
+        label: "Desempenho",
         href: "/erp/produtividade",
         submenu: [
             { label: "Visão Geral", href: "/erp/produtividade" },
             { label: "Metas", href: "/erp/produtividade/metas" },
             { label: "Comissões", href: "/erp/produtividade/comissoes" },
+            { label: "Estatísticas", href: "/erp/relatorios" },
         ],
     },
     {
         icon: Package,
         label: "Produtos",
-        href: "/erp/products",
+        href: "/erp/produtos",
         submenu: [
-            { label: "Catálogo de Produtos", href: "/erp/products" },
-            { label: "Movimentação de Estoque", href: "/erp/stock-movements" },
-            { label: "Importar XML (NF-e)", href: "/erp/xml-import" },
+            { label: "Catálogo de Produtos", href: "/erp/produtos" },
+            { label: "Movimentação de Estoque", href: "/erp/movimentacao-estoque" },
+            { label: "Importar XML (NF-e)", href: "/erp/importacao-xml" },
             { label: "Notas de Entrada", href: "/" },
-            { label: "Fornecedores", href: "/erp/suppliers" },
-            { label: "Cadastros de Produtos", href: "/erp/products/cadastros" },
+            { label: "Fornecedores", href: "/erp/fornecedores" },
+            { label: "Cadastros de Produtos", href: "/erp/produtos/cadastros" },
         ],
     },
     {
@@ -83,40 +84,33 @@ const navItems: NavItem[] = [
         submenu: [
             { label: "Catálogo de Serviços", href: "/erp/servicos" },
             { label: "Agendamentos", href: "/erp/agendamentos" },
-            { label: "Ordens de Serviço", href: "/erp/service-orders" },
+            { label: "Ordens de Serviço", href: "/erp/ordens-de-servico" },
             { label: "Cadastros de Serviços", href: "/erp/servicos/cadastros" },
         ],
     },
     {
         icon: Users,
         label: "Clientes",
-        href: "/erp/customers",
+        href: "/erp/clientes",
     },
     {
         icon: MoneyIcon,
         label: "Financeiro",
-        href: "/erp/transactions",
+        href: "/erp/transacoes",
         submenu: [
-            { label: "Movimentações", href: "/erp/transactions" },
+            { label: "Movimentações", href: "/erp/transacoes" },
             { label: "Contas a Pagar", href: "/erp/contas-a-pagar" },
             { label: "Contas a Receber", href: "/erp/contas-a-receber" },
-            { label: "Caixa (PDV)", href: "/erp/cash-register" },
-            { label: "Cadastros financeiros", href: "/erp/transactions/cadastros-financeiro" },
+            { label: "Caixa (PDV)", href: "/erp/caixa" },
+            { label: "Cadastros financeiros", href: "/erp/transacoes/cadastros-financeiro" },
         ],
-    },
-    {
-        icon: ChartIcon,
-        label: "Relatórios",
-        href: "/erp/reports",
     },
     {
         icon: MegaphoneIcon,
         label: "Marketing",
         submenu: [
-            { label: "Cupons de Desconto", href: "/erp/coupons" },
-            { label: "Campanhas e Promoções", href: "/erp/promotions" },
-            { label: "Planos Recorrentes", href: "/erp/recurring/plans" },
-            { label: "Assinaturas", href: "/erp/recurring/subscriptions" },
+            { label: "Cupons de Desconto", href: "/erp/cupons" },
+            { label: "Campanhas e Promoções", href: "/erp/promocoes" },
             { label: "Vídeos da Comunidade", href: "/erp/marketing/videos" },
         ],
     },
@@ -132,31 +126,33 @@ const navItems: NavItem[] = [
     {
         icon: SettingsIcon,
         label: "Configurações",
-        href: "/erp/settings",
+        href: "/erp/configuracoes",
     },
 ]
 
 const PLAN_GATED_MINIMUM: Record<string, "crescer" | "escalar"> = {
-    "/erp/stores": "escalar",
-    "/erp/logistics": "crescer",
-    "/erp/transactions": "crescer",
+    "/erp/lojas": "escalar",
+    "/erp/logistica": "crescer",
+    "/erp/transacoes": "crescer",
     "/erp/contas-a-pagar": "crescer",
     "/erp/contas-a-receber": "crescer",
-    "/erp/cash-register": "crescer",
-    "/erp/products/cadastros": "crescer",
+    "/erp/caixa": "crescer",
+    "/erp/produtos/cadastros": "crescer",
     "/erp/servicos/cadastros": "crescer",
-    "/erp/transactions/cadastros-financeiro": "crescer",
-    "/erp/reports": "crescer",
-    "/erp/coupons": "crescer",
-    "/erp/promotions": "escalar",
+    "/erp/transacoes/cadastros-financeiro": "crescer",
+    "/erp/relatorios": "crescer",
+    "/erp/cupons": "crescer",
+    "/erp/promocoes": "escalar",
     "/erp/produtividade": "escalar",
     "/erp/produtividade/metas": "escalar",
-    "/erp/produtividade/comissoes": "escalar",
-    "/erp/goals": "crescer",
-    "/erp/service-orders": "crescer",
-    "/erp/returns": "crescer",
-    "/erp/suppliers": "crescer",
-    "/erp/xml-import": "crescer",
+    "/erp/produtividade/comissoes": "crescer",
+    "/erp/metas": "crescer",
+    "/erp/ordens-de-servico": "crescer",
+    "/erp/devolucoes": "crescer",
+    "/erp/fornecedores": "crescer",
+    "/erp/importacao-xml": "crescer",
+    "/erp/movimentacao-estoque": "crescer",
+    "/erp/marketing/videos": "crescer",
 }
 
 function ErpPlanGatedNavItem({
@@ -287,7 +283,7 @@ export function ERPSidebar() {
         if (pathname === href) return true;
 
         // Exception for the Submenu of Products: "Catálogo de Produtos" should not be marked active if currently in "Cadastros de Produtos"
-        if (href === "/erp/products" && pathname.startsWith("/erp/products/cadastros")) {
+        if (href === "/erp/produtos" && pathname.startsWith("/erp/produtos/cadastros")) {
             return false;
         }
 
@@ -299,18 +295,17 @@ export function ERPSidebar() {
         return navItems
             .map((item) => {
                 // Business Rules Filtering
-                if (item.href === "/erp/orders" && !salesGroupActive) return null;
-                if (item.href === "/erp/products" && !productsResourceActive) return null;
+                if (item.href === "/erp/pedidos" && !salesGroupActive) return null;
+                if (item.href === "/erp/produtos" && !productsResourceActive) return null;
                 if (item.href === "/erp/servicos" && !servicesGroupActive) return null;
                 if (item.label === "Financeiro" && !financialResourceActive) return null;
-                if (item.href === "/erp/customers" && !customersResourceActive) return null;
-                if (item.href === "/erp/reports" && !reportsResourceActive) return null;
+                if (item.href === "/erp/clientes" && !customersResourceActive) return null;
                 if (item.label === "Marketing" && !marketingResourceActive) return null;
                 if (item.label === "Minha Vitrine" && !showcaseResourceActive) return null;
                 if (item.label === "Produtos" && !sellsProducts && !sellsServices) return null; // Only show if they sell anything at all (but usually products. The label is Produtos for the catalogue.)
                 if (item.label === "Produtos" && !sellsProducts && sellsServices) return null; // Don't show products if they only sell services
                 if (item.label === "Serviços" && !sellsServices) return null;
-                if (item.label === "Produtividade" && !productivityResourceActive) return null;
+                if (item.label === "Desempenho" && !productivityResourceActive && !reportsResourceActive) return null;
                 if (isQuick) {
                     // Quick mode navigation: simplified, no advanced modules
                     const allowed = new Set(["Início", "Vendas", "Produtos", "Serviços", "Configurações"])
@@ -320,7 +315,7 @@ export function ERPSidebar() {
                         return {
                             ...item,
                             submenu: undefined,
-                            href: item.href || (item.label === "Vendas" ? "/erp/orders" : item.href),
+                            href: item.href || (item.label === "Vendas" ? "/erp/pedidos" : item.href),
                             directAccess: true,
                         }
                     }
@@ -330,42 +325,43 @@ export function ERPSidebar() {
                 const newItem = { ...item };
                 if (newItem.submenu) {
                     newItem.submenu = newItem.submenu.filter((sub) => {
-                        if (item.href === "/erp/orders") {
-                            if (sub.href === "/erp/orders") return ordersResourceActive
-                            if (sub.href === "/erp/returns") return returnsResourceActive
-                            if (sub.href === "/erp/quotes") return quotesResourceActive
+                        if (item.href === "/erp/pedidos") {
+                            if (sub.href === "/erp/pedidos") return ordersResourceActive
+                            if (sub.href === "/erp/devolucoes") return returnsResourceActive
+                            if (sub.href === "/erp/orcamentos") return quotesResourceActive
                             if (sub.href === "/erp/pdv") return posResourceActive
-                            if (sub.href.startsWith("/erp/logistics")) return deliveriesResourceActive
+                            if (sub.href.startsWith("/erp/logistica")) return deliveriesResourceActive
                         }
-                        if (item.href === "/erp/products") {
-                            if (sub.href === "/erp/products") return productsResourceActive
-                            if (sub.href === "/erp/stock-movements") return stockMovementsResourceActive
-                            if (sub.href === "/erp/products/cadastros") return productCadastrosResourceActive
-                            if (sub.href === "/erp/suppliers") return productsResourceActive
-                            if (sub.href === "/erp/xml-import") return productsResourceActive
+                        if (item.href === "/erp/produtos") {
+                            if (sub.href === "/erp/produtos") return productsResourceActive
+                            if (sub.href === "/erp/movimentacao-estoque") return stockMovementsResourceActive
+                            if (sub.href === "/erp/produtos/cadastros") return productCadastrosResourceActive
+                            if (sub.href === "/erp/fornecedores") return productsResourceActive
+                            if (sub.href === "/erp/importacao-xml") return productsResourceActive
                             return productsResourceActive
                         }
                         if (item.label === "Financeiro") {
-                            if (sub.href === "/erp/transactions") return financialResourceActive
+                            if (sub.href === "/erp/transacoes") return financialResourceActive
                             if (sub.href === "/erp/contas-a-pagar") return financialResourceActive
                             if (sub.href === "/erp/contas-a-receber") return financialResourceActive
-                            if (sub.href === "/erp/cash-register") return financialResourceActive
-                            if (sub.href === "/erp/transactions/cadastros-financeiro") return financialResourceActive
+                            if (sub.href === "/erp/caixa") return financialResourceActive
+                            if (sub.href === "/erp/transacoes/cadastros-financeiro") return financialResourceActive
                             return financialResourceActive
                         }
                         if (item.href === "/erp/servicos") {
                             if (sub.href === "/erp/agendamentos") return appointmentsResourceActive
-                            if (sub.href === "/erp/service-orders") return serviceOrdersResourceActive
+                            if (sub.href === "/erp/ordens-de-servico") return serviceOrdersResourceActive
                             if (sub.href === "/erp/servicos/cadastros") return serviceCadastrosResourceActive
                             return servicesResourceActive
                         }
                         if (item.label === "Marketing") {
-                            if (sub.href === "/erp/coupons") return couponsResourceActive
-                            if (sub.href === "/erp/promotions") return campaignsResourceActive
+                            if (sub.href === "/erp/cupons") return couponsResourceActive
+                            if (sub.href === "/erp/promocoes") return campaignsResourceActive
                             if (sub.href === "/erp/marketing/videos") return communityVideosResourceActive
                             return marketingResourceActive
                         }
-                        if (item.label === "Produtividade") {
+                        if (item.label === "Desempenho") {
+                            if (sub.href === "/erp/relatorios") return reportsResourceActive
                             return productivityResourceActive
                         }
                         return true

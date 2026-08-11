@@ -3,11 +3,11 @@ import { createClient } from "@supabase/supabase-js"
 
 /**
  * Singleton admin (service role) Supabase client.
- * Bypasses ALL Row Level Security — use ONLY for server-side admin operations
+ * Bypasses ALL Row Level Security - use ONLY for server-side admin operations
  * that genuinely need to cross user/partner boundaries.
  *
  * DESIGN DECISION (LOW-06): This is an intentional module-level singleton.
- * The Supabase JS client is stateless for queries — it holds no per-request auth
+ * The Supabase JS client is stateless for queries - it holds no per-request auth
  * state and does not cache query results. It is therefore safe to share across
  * requests in the same Node.js process (serverless function instance).
  *

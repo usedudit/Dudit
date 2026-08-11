@@ -32,48 +32,48 @@ export interface RouteInfo {
 
 export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
     // ── Início
-    dashboard: { key: "dashboard", path: "/erp/dashboard", label: "Início", category: "Início" },
+    dashboard: { key: "dashboard", path: "/erp/painel", label: "Início", category: "Início" },
 
     // ── Vendas
     orders: {
-        key: "orders", path: "/erp/orders", label: "Pedidos e Vendas", category: "Vendas", legacyCategory: "orders",
+        key: "orders", path: "/erp/pedidos", label: "Pedidos e Vendas", category: "Vendas", legacyCategory: "orders",
         specificPermissions: [
             "can_cancel_order", "can_refund", "can_update_status",
             "can_assign_delivery", "can_view_values", "can_apply_discount",
         ],
     },
-    returns: { key: "returns", path: "/erp/returns", label: "Devoluções", category: "Vendas", legacyCategory: "orders" },
+    returns: { key: "returns", path: "/erp/devolucoes", label: "Devoluções", category: "Vendas", legacyCategory: "orders" },
     logistics: {
-        key: "logistics", path: "/erp/logistics", label: "Expedição e Entregas", category: "Vendas", legacyCategory: "orders",
+        key: "logistics", path: "/erp/logistica", label: "Expedição e Entregas", category: "Vendas", legacyCategory: "orders",
         specificPermissions: [
             "can_update_delivery_status", "can_assign_driver",
             "can_print_label", "can_generate_tracking", "can_view_delivery_details",
         ],
     },
-    invoices: { key: "invoices", path: "/erp/invoices", label: "Notas Fiscais", category: "Vendas", legacyCategory: "orders" },
+    invoices: { key: "invoices", path: "/erp/notas-fiscais", label: "Notas Fiscais", category: "Vendas", legacyCategory: "orders" },
     pos: {
         key: "pos", path: "/erp/pdv", label: "PDV (Frente de Caixa)", category: "Vendas", legacyCategory: "orders",
         specificPermissions: ["can_sell", "can_discount", "can_cancel_sale", "can_add_delivery"],
     },
-    quotes: { key: "quotes", path: "/erp/quotes", label: "Orçamentos", category: "Vendas", legacyCategory: "quotes", specificPermissions: ["can_apply_discount"] },
-    goals: { key: "goals", path: "/erp/goals", label: "Metas", category: "Vendas", legacyCategory: "orders" },
+    quotes: { key: "quotes", path: "/erp/orcamentos", label: "Orçamentos", category: "Vendas", legacyCategory: "quotes", specificPermissions: ["can_apply_discount"] },
+    goals: { key: "goals", path: "/erp/metas", label: "Metas", category: "Vendas", legacyCategory: "orders" },
 
     // ── Produtos
     products: {
-        key: "products", path: "/erp/products", label: "Catálogo de Produtos", category: "Produtos", legacyCategory: "products",
+        key: "products", path: "/erp/produtos", label: "Catálogo de Produtos", category: "Produtos", legacyCategory: "products",
         specificPermissions: ["can_adjust_stock", "can_import_products"],
     },
-    stock_movements: { key: "stock_movements", path: "/erp/stock-movements", label: "Movimentação de estoque", category: "Produtos", legacyCategory: "products" },
+    stock_movements: { key: "stock_movements", path: "/erp/movimentacao-estoque", label: "Movimentação de estoque", category: "Produtos", legacyCategory: "products" },
     import_notes: {
-        key: "import_notes", path: "/erp/import-notes", label: "Notas de entrada", category: "Produtos", legacyCategory: "products",
+        key: "import_notes", path: "/erp/notas-entrada", label: "Notas de entrada", category: "Produtos", legacyCategory: "products",
         specificPermissions: ["can_import_products"],
     },
     xml_import: {
-        key: "xml_import", path: "/erp/xml-import", label: "Importar XML (NF-e)", category: "Produtos", legacyCategory: "products",
+        key: "xml_import", path: "/erp/importacao-xml", label: "Importar XML (NF-e)", category: "Produtos", legacyCategory: "products",
         specificPermissions: ["can_import_products"],
     },
-    suppliers: { key: "suppliers", path: "/erp/suppliers", label: "Fornecedores", category: "Produtos", legacyCategory: "suppliers" },
-    cadastros_produtos: { key: "cadastros_produtos", path: "/erp/products/cadastros", label: "Cadastros", category: "Produtos", legacyCategory: "products" },
+    suppliers: { key: "suppliers", path: "/erp/fornecedores", label: "Fornecedores", category: "Produtos", legacyCategory: "suppliers" },
+    cadastros_produtos: { key: "cadastros_produtos", path: "/erp/produtos/cadastros", label: "Cadastros", category: "Produtos", legacyCategory: "products" },
 
     // ── Serviços
     appointments: {
@@ -88,7 +88,7 @@ export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
         specificPermissions: ["can_change_service_price"],
     },
     service_orders: {
-        key: "service_orders", path: "/erp/service-orders", label: "Ordens de Serviço", category: "Serviços", legacyCategory: "services",
+        key: "service_orders", path: "/erp/ordens-de-servico", label: "Ordens de Serviço", category: "Serviços", legacyCategory: "services",
         specificPermissions: [
             "can_assign_technician",
             "can_change_status",
@@ -99,11 +99,11 @@ export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
     cadastros_services: { key: "cadastros_services", path: "/erp/servicos/cadastros", label: "Cadastros", category: "Serviços", legacyCategory: "services" },
 
     // ── Clientes
-    customers: { key: "customers", path: "/erp/customers", label: "Clientes", category: "Clientes", legacyCategory: "customers" },
+    customers: { key: "customers", path: "/erp/clientes", label: "Clientes", category: "Clientes", legacyCategory: "customers" },
 
     // ── Financeiro
     financial_transactions: {
-        key: "financial_transactions", path: "/erp/transactions", label: "Transações (Pagar/Receber)", category: "Financeiro", legacyCategory: "financial",
+        key: "financial_transactions", path: "/erp/transacoes", label: "Transações (Pagar/Receber)", category: "Financeiro", legacyCategory: "financial",
         specificPermissions: ["can_approve_payment", "can_view_reports"],
     },
     contas_a_pagar: {
@@ -115,63 +115,63 @@ export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
         specificPermissions: ["can_approve_payment"],
     },
     cash_register: {
-        key: "cash_register", path: "/erp/cash-register", label: "Caixa (PDV)", category: "Financeiro", legacyCategory: "financial",
+        key: "cash_register", path: "/erp/caixa", label: "Caixa (PDV)", category: "Financeiro", legacyCategory: "financial",
         specificPermissions: ["can_open_cash", "can_close_cash", "can_manage_cash"],
     },
     financial_dre: {
-        key: "financial_dre", path: "/erp/financial/dre", label: "DRE Gerencial", category: "Financeiro", legacyCategory: "financial",
+        key: "financial_dre", path: "/erp/financeiro/dre", label: "DRE Gerencial", category: "Financeiro", legacyCategory: "financial",
         specificPermissions: ["can_view_dre"],
     },
-    cadastros_financeiro: { key: "cadastros_financeiro", path: "/erp/transactions/cadastros-financeiro", label: "Cadastros financeiros", category: "Financeiro", legacyCategory: "financial" },
-    reports: { key: "reports", path: "/erp/reports", label: "Relatórios", category: "Relatórios" },
+    cadastros_financeiro: { key: "cadastros_financeiro", path: "/erp/transacoes/cadastros-financeiro", label: "Cadastros financeiros", category: "Financeiro", legacyCategory: "financial" },
+    reports: { key: "reports", path: "/erp/relatorios", label: "Estatísticas", category: "Desempenho" },
 
     // ── Minha Vitrine
     store_customize: {
-        key: "store_customize", path: "/erp/store-profile/customize", label: "Personalizar Perfil", category: "Minha Vitrine",
+        key: "store_customize", path: "/erp/perfil-loja/personalizar", label: "Personalizar Perfil", category: "Minha Vitrine",
         specificPermissions: ["can_customize_store"],
     },
     store_reviews: {
-        key: "store_reviews", path: "/erp/store-profile/reviews", label: "Avaliações e Reputação", category: "Minha Vitrine",
+        key: "store_reviews", path: "/erp/perfil-loja/avaliacoes", label: "Avaliações e Reputação", category: "Minha Vitrine",
         specificPermissions: ["can_respond_reviews"],
     },
 
     // ── Marketing
-    marketing_coupons: { key: "marketing_coupons", path: "/erp/coupons", label: "Cupons de Desconto", category: "Marketing" },
-    marketing_promotions: { key: "marketing_promotions", path: "/erp/promotions", label: "Campanhas e Promoções", category: "Marketing" },
+    marketing_coupons: { key: "marketing_coupons", path: "/erp/cupons", label: "Cupons de Desconto", category: "Marketing" },
+    marketing_promotions: { key: "marketing_promotions", path: "/erp/promocoes", label: "Campanhas e Promoções", category: "Marketing" },
     cadastros_marketing: { key: "cadastros_marketing", path: "/erp/cadastros-marketing", label: "Cadastros", category: "Marketing" },
-    recurring_plans: { key: "recurring_plans", path: "/erp/recurring/plans", label: "Planos Recorrentes", category: "Marketing" },
-    recurring_subscriptions: { key: "recurring_subscriptions", path: "/erp/recurring/subscriptions", label: "Assinaturas", category: "Marketing" },
+    recurring_plans: { key: "recurring_plans", path: "/erp/recorrentes/planos", label: "Planos Recorrentes", category: "Marketing" },
+    recurring_subscriptions: { key: "recurring_subscriptions", path: "/erp/recorrentes/assinaturas", label: "Assinaturas", category: "Marketing" },
     community_videos: { key: "community_videos", path: "/erp/marketing/videos", label: "Vídeos da Comunidade", category: "Marketing" },
     colecoes: { key: "colecoes", path: "/erp/marketing/colecoes", label: "Coleções", category: "Marketing" },
 
     // ── Lojas e Filiais
     stores: {
-        key: "stores", path: "/erp/stores", label: "Lojas e Filiais", category: "Configurações",
+        key: "stores", path: "/erp/lojas", label: "Lojas e Filiais", category: "Configurações",
         specificPermissions: ["manage_members"],
     },
     stores_members: {
-        key: "stores_members", path: "/erp/stores/members", label: "Membros por Loja", category: "Configurações",
+        key: "stores_members", path: "/erp/lojas/membros", label: "Membros por Loja", category: "Configurações",
     },
     stores_settings: {
-        key: "stores_settings", path: "/erp/stores/settings", label: "Configurações da Loja", category: "Configurações",
+        key: "stores_settings", path: "/erp/lojas/configuracoes", label: "Configurações da Loja", category: "Configurações",
     },
 
     // ── Configurações
-    settings: { key: "settings", path: "/erp/settings", label: "Configurações", category: "Configurações" },
+    settings: { key: "settings", path: "/erp/configuracoes", label: "Configurações", category: "Configurações" },
     settings_business: {
-        key: "settings_business", path: "/erp/settings/business", label: "Dados do Negócio", category: "Configurações",
+        key: "settings_business", path: "/erp/configuracoes/dados-negocio", label: "Dados do Negócio", category: "Configurações",
         specificPermissions: ["can_edit_business_data"],
     },
     settings_integrations: {
-        key: "settings_integrations", path: "/erp/settings/integrations", label: "Integrações", category: "Configurações",
+        key: "settings_integrations", path: "/erp/configuracoes/integracoes", label: "Integrações", category: "Configurações",
         specificPermissions: ["can_manage_integrations"],
     },
     settings_team: {
-        key: "settings_team", path: "/erp/settings/team", label: "Equipe e Acessos", category: "Configurações",
+        key: "settings_team", path: "/erp/configuracoes/equipe", label: "Equipe e Acessos", category: "Configurações",
         specificPermissions: ["can_invite", "can_remove_member", "can_manage_team", "can_revoke_invite"],
     },
     settings_subscription: {
-        key: "settings_subscription", path: "/erp/settings/subscription", label: "Minha Assinatura", category: "Configurações",
+        key: "settings_subscription", path: "/erp/configuracoes/assinatura", label: "Minha Assinatura", category: "Configurações",
         specificPermissions: ["can_change_subscription"],
     },
 
@@ -192,8 +192,8 @@ for (const [key, info] of Object.entries(ROUTE_MAP)) {
 }
 
 /**
- * Resolve a pathname (e.g. "/erp/products" or "/erp/products/new") to a RouteKey.
- * Supports exact match and prefix match (for subpages like /erp/products/[id]).
+ * Resolve a pathname (e.g. "/erp/produtos" or "/erp/produtos/novo") to a RouteKey.
+ * Supports exact match and prefix match (for subpages like /erp/produtos/[id]).
  */
 export function resolveRouteKey(pathname: string): RouteKey | null {
     // Exact match first

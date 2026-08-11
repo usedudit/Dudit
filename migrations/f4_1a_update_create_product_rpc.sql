@@ -1,12 +1,12 @@
 -- ============================================================================
--- F4.1a — Atualizar RPC create_product_transaction
+-- F4.1a - Atualizar RPC create_product_transaction
 -- Remove write to products.store_id (legacy), cria store_products via bridge.
 -- ============================================================================
 -- Contexto:
 --   products.store_id é coluna legada (Fase 4). Novos produtos devem criar
 --   relação via store_products em vez de escrever store_id diretamente.
 --   O RPC ainda aceita store_id no JSONB para compatibilidade, mas não o
---   persiste em products — em vez disso, insere em store_products.
+--   persiste em products - em vez disso, insere em store_products.
 -- ============================================================================
 
 BEGIN;

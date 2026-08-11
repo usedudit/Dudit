@@ -280,7 +280,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
             );
             lastLoadedHistoryQuoteId.current = null;
             debouncedRefresh();
-            router.push(`/erp/orders/${d.orderId}`);
+            router.push(`/erp/pedidos/${d.orderId}`);
         } catch {
             notifyError("Erro", "Falha de conexão ao converter o orçamento.");
         } finally {
@@ -570,7 +570,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                                                 <Button
                                                                     variant="outline"
                                                                     className="mt-3 h-[36px] text-xs"
-                                                                    onClick={() => router.push(`/erp/orders/${quote.converted_order_id}`)}
+                                                                    onClick={() => router.push(`/erp/pedidos/${quote.converted_order_id}`)}
                                                                 >
                                                                     Abrir pedido <ArrowRightIcon size={14} className="ml-1" />
                                                                 </Button>

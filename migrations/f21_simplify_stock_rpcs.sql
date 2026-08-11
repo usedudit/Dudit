@@ -1,5 +1,5 @@
 -- ============================================================================
--- F21: Simplify stock RPCs — remove Branch 1/3 (store_product_variants /
+-- F21: Simplify stock RPCs - remove Branch 1/3 (store_product_variants /
 -- store_products).  Com store_id direto nas tabelas base, o estoque vive
 -- exclusivamente em products.stock_quantity / product_variants.stock_quantity.
 -- ============================================================================

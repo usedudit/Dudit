@@ -300,7 +300,7 @@ function normalizeReturnRow(row: any): ReturnRequestListItem & { returnEvents?: 
 }
 
 async function revalidateReturns(partnerId: string, orderId?: string, requestId?: string) {
-    revalidatePath("/erp/returns")
+    revalidatePath("/erp/devolucoes")
     revalidatePath("/pedidos")
     await revalidateOrders(partnerId)
     if (orderId) await revalidateOrderHistory(orderId)
@@ -1095,7 +1095,7 @@ export async function processReturnRequestAction(input: unknown) {
                 : 0
 
         // Ledger Fase 2: reconcilia settlements da venda original quando a
-        // solicitação é aprovada/resolvida. Não cria transações novas — só
+        // solicitação é aprovada/resolvida. Não cria transações novas - só
         // cancela/reduz settlements pending (parcelas já quitadas são cobertas
         // pelo refund existente). Idempotente por reconcileKey.
         if (data.nextStatus === "APPROVED" || data.nextStatus === "RESOLVED") {

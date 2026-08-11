@@ -23,11 +23,11 @@ export async function selectErpAction(formData: FormData): Promise<void> {
     const hasAccess = allAccess.some((a) => a.partnerId === partnerId)
 
     if (!hasAccess) {
-        throw new Error("Você não tem acesso a este ERP.")
+        throw new Error("Você não tem acesso a este negócio.")
     }
 
     await setActivePartner(partnerId)
-    
+
     if (storeId && typeof storeId === "string") {
         // Verify the store belongs to the partner and user has access
         const storeAccess = allAccess.find(a => a.storeId === storeId && a.partnerId === partnerId)
@@ -35,6 +35,6 @@ export async function selectErpAction(formData: FormData): Promise<void> {
             await setActiveStore(storeId)
         }
     }
-    
+
     redirect("/erp/inicio")
 }

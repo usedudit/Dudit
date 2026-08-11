@@ -737,7 +737,7 @@ export default function ServicesPage({
                                 <div className="flex items-center gap-3">
                                     <Button
                                         variant="outline"
-                                        onClick={() => router.push("/erp/servicos/import")}
+                                        onClick={() => router.push("/erp/servicos/importar")}
                                         leftIcon={<UploadIcon size={16} />}
                                     >
                                         Importar

@@ -211,7 +211,7 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId }: Replenishment
                                     className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-orange/40 hover:shadow-sm transition-all cursor-pointer"
                                     onClick={() => {
                                         onClose()
-                                        router.push(`/erp/products?view=${s.id}`)
+                                        router.push(`/erp/produtos?view=${s.id}`)
                                     }}
                                 >
                                     <div className="flex items-start gap-3">

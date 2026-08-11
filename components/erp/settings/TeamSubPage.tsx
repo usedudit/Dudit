@@ -990,7 +990,7 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
                     <DefaultModal
                         isOpen={!!selectedStoreMember}
                         onClose={() => setSelectedStoreMember(null)}
-                        title={`Gerenciar Lojas — ${selectedStoreMember?.fullName || selectedStoreMember?.email || "Membro"}`}
+                        title={`Gerenciar Lojas - ${selectedStoreMember?.fullName || selectedStoreMember?.email || "Membro"}`}
                     >
                         {isLoadingUserStores ? (
                             <div className="flex justify-center py-12">
@@ -1124,7 +1124,7 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
                                 <IconPlaceholder
                                     icon={CheckCircleIcon}
                                     title="Convite Ativo!"
-                                    subtitle="Envie o link abaixo para o membro que deseja convidar. O link continua válido — nada foi invalidado."
+                                    subtitle="Envie o link abaixo para o membro que deseja convidar. O link continua válido - nada foi invalidado."
                                 />
 
                                 {/* Copy Field */}

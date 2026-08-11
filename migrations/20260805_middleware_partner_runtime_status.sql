@@ -3,7 +3,7 @@
 -- ============================================================================
 -- O middleware valida o active_partner_id consultando partner_users com um
 -- join `partners!inner(is_active, erp_disabled)`. Porém a RLS de partners
--- (partners_select_own) só expõe a linha do partner ao DONO — para membros
+-- (partners_select_own) só expõe a linha do partner ao DONO - para membros
 -- convidados o inner join descarta a linha e o middleware conclui
 -- "has no access to partner", limpando o cookie e impedindo o acesso ao ERP.
 --

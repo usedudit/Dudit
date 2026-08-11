@@ -1,5 +1,5 @@
 -- ============================================================================
--- Fase 10.11 — Corrige NULLIF → COALESCE na função finalize_pos_sale (9 params)
+-- Fase 10.11 - Corrige NULLIF → COALESCE na função finalize_pos_sale (9 params)
 --              + Restaura criação de cash_movements, transactions e status
 -- ============================================================================
 

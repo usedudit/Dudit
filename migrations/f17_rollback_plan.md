@@ -7,7 +7,7 @@ Sempre testar rollback em staging antes de produção.
 
 ---
 
-## Fase 1 — Schema Foundation
+## Fase 1 - Schema Foundation
 
 ### M1: `visibility_scope` + `marketplace_visible` em store_products
 
@@ -132,13 +132,13 @@ ALTER TABLE campaigns DROP COLUMN IF EXISTS store_id;
 
 ---
 
-## Fase 2 — RLS + Runtime (preview, implementar depois)
+## Fase 2 - RLS + Runtime (preview, implementar depois)
 
 Cada policy nova será criada com DROP POLICY IF EXISTS antes, permitindo rollback simples: dropar a nova e recriar a antiga se necessário.
 
 ---
 
-## Fase 3 — Bridges (preview)
+## Fase 3 - Bridges (preview)
 
 ### store_kits
 
@@ -152,7 +152,7 @@ Cada policy nova será criada com DROP POLICY IF EXISTS antes, permitindo rollba
 
 ---
 
-## Fase 4 — Remoção de Legado (preview)
+## Fase 4 - Remoção de Legado (preview)
 
 ⚠️ **Rollback destas migrations requer restaurar colunas com dados.**
 Estratégia: antes de dropar coluna, criar backup table:
@@ -176,7 +176,7 @@ Esta estratégia se aplica a: products, services, customers, product_kits, suppl
 
 ---
 
-## Fase 5 — STORE órfãs (preview)
+## Fase 5 - STORE órfãs (preview)
 
 ⚠️ **Maior risco.** Para cada tabela, a estratégia é:
 

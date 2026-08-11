@@ -103,7 +103,7 @@ export async function disconnectMercadoPagoAction() {
     .eq("integration_source", "mercadopago")
 
   revalidateTag(`mp-status-${partner.id}`, "max")
-  revalidatePath("/erp/settings")
+  revalidatePath("/erp/configuracoes")
   return { success: true }
 }
 
@@ -212,7 +212,7 @@ export async function refreshMercadoPagoTokenAction() {
     }
 
     revalidateTag(`mp-status-${partner.id}`, "max")
-    revalidatePath("/erp/settings")
+    revalidatePath("/erp/configuracoes")
     return { success: true }
   } catch (error: any) {
     return { error: error.message }
@@ -249,7 +249,7 @@ export async function updateMpAcceptedPaymentMethodsAction(methods: MpAcceptedPa
   }
 
   revalidateTag(`mp-status-${ctx.partnerId}`, "max")
-  revalidatePath("/erp/settings")
+  revalidatePath("/erp/configuracoes")
   return { success: true }
 }
 

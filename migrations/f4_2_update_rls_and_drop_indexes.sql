@@ -1,14 +1,14 @@
 -- ============================================================================
--- F4.2 — Remover dependência de store_id legacy em RLS policies + índices
+-- F4.2 - Remover dependência de store_id legacy em RLS policies + índices
 -- ============================================================================
 -- Contexto:
 --   products, services, customers, suppliers, product_kits são tabelas GLOBAL
 --   cujo store_id está sendo removido (F4.3). As RLS policies não devem mais
---   referenciar store_id dessas tabelas — o isolamento por loja é feito via
+--   referenciar store_id dessas tabelas - o isolamento por loja é feito via
 --   bridge tables (store_products, store_services, etc.) no resolver layer.
 --
 --   Tabelas STORE/HYBRID (orders, stock_movements, payment_methods, etc.)
---   NÃO são alteradas — store_id é legítimo nelas.
+--   NÃO são alteradas - store_id é legítimo nelas.
 --
 -- Rollback:
 --   Re-aplicar f3_rls_store_aware.sql + recriar índices.
@@ -17,7 +17,7 @@
 BEGIN;
 
 -- ============================================================
--- 1. RLS Policies — remover gating store_id legacy
+-- 1. RLS Policies - remover gating store_id legacy
 -- ============================================================
 
 -- ─── Products ───────────────────────────────────────────────────────────────
@@ -92,7 +92,7 @@ DROP INDEX IF EXISTS idx_suppliers_store_id;
 DROP INDEX IF EXISTS idx_product_kits_store_id;
 
 -- Nota: Outros índices idx_*_store_id (stock_movements, orders, cart_items,
--- payment_methods, reviews) NÃO são dropados — store_id é legítimo nessas
+-- payment_methods, reviews) NÃO são dropados - store_id é legítimo nessas
 -- tabelas STORE/HYBRID.
 
 -- ============================================================

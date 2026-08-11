@@ -292,8 +292,16 @@ async function processSubscriptionWebhook(
       return
     }
 
-    // Idempotent: skip if already in this status
-    if (sub.status === newStatus) {
+    // Keep the period end in sync with MP's real next charge date.
+    // MP returns next_payment_date for authorized preapprovals.
+    const mpNextPayment = mpData?.next_payment_date
+      ? new Date(mpData.next_payment_date)
+      : null
+    const periodEndMs = sub.current_period_end ? new Date(sub.current_period_end).getTime() : null
+    const periodEndChanged = mpNextPayment && periodEndMs !== mpNextPayment.getTime()
+
+    // Idempotent: skip only if status is unchanged AND the period end matches MP.
+    if (sub.status === newStatus && !periodEndChanged) {
       console.log(`[SUB_WEBHOOK] Subscription ${sub.id} already in status "${newStatus}", skipping`)
       return
     }
@@ -305,18 +313,24 @@ async function processSubscriptionWebhook(
     }
 
     // ── Build update payload ──
-    const updatePayload: any = {
-      status: newStatus,
+    const updatePayload: any = {}
+    if (sub.status !== newStatus) {
+      updatePayload.status = newStatus
     }
 
-    if (newStatus === "active") {
-      // Set period dates when subscription becomes active
+    if (newStatus === "active" || (sub.status === "active" && periodEndChanged)) {
       const now = new Date()
-      updatePayload.current_period_start = now.toISOString()
-      updatePayload.current_period_end = new Date(
-        now.getTime() + 30 * 24 * 60 * 60 * 1000,
-      ).toISOString()
-      // Clear past_due_at when reactivated
+      const nextPeriodEnd = mpNextPayment ?? new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+
+      // On renewal (already active), roll the period start forward to the old end.
+      const prevEnd = sub.current_period_end ? new Date(sub.current_period_end) : null
+      updatePayload.current_period_start = sub.current_period_start
+        && (!prevEnd || prevEnd.getTime() > now.getTime())
+        ? sub.current_period_start
+        : (prevEnd && sub.status === "active" ? prevEnd : now).toISOString()
+
+      updatePayload.current_period_end = nextPeriodEnd.toISOString()
+      // Clear past_due_at when active
       updatePayload.past_due_at = null
     }
 

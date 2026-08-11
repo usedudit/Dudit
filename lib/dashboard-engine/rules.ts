@@ -37,7 +37,7 @@ export function getChecklistItems(ctx: DashboardContext): DashboardChecklistItem
       ? "Adicione serviços: cadastre manualmente ou importe via planilha."
       : "Adicione produtos: cadastre manualmente, importe via planilha ou XML (NF-e).";
 
-  const itemHref = ctx.sellsProducts ? "/erp/products?create=true" : "/erp/servicos?create=true";
+  const itemHref = ctx.sellsProducts ? "/erp/produtos?create=true" : "/erp/servicos?create=true";
 
   items.push({
     id: "items",
@@ -102,7 +102,7 @@ export function getCards(ctx: DashboardContext): DashboardCard[] {
       value: ctx.stats.activeProductsCount + ctx.stats.activeServicesCount,
       subtitle: "Produtos e serviços publicados",
       icon: "Package",
-      href: "/erp/products"
+      href: "/erp/produtos"
     });
   } else if (ctx.sellsServices) {
     cards.push({
@@ -120,7 +120,7 @@ export function getCards(ctx: DashboardContext): DashboardCard[] {
       value: ctx.stats.activeProductsCount,
       subtitle: "Produtos publicados",
       icon: "Package",
-      href: "/erp/products"
+      href: "/erp/produtos"
     });
   }
 
@@ -131,7 +131,7 @@ export function getCards(ctx: DashboardContext): DashboardCard[] {
     value: ctx.stats.receivedOrdersCount,
     subtitle: "Total de vendas realizadas",
     icon: "ShoppingCartIcon",
-    href: "/erp/orders"
+    href: "/erp/pedidos"
   });
 
   return cards;
@@ -149,7 +149,7 @@ export function getShortcuts(ctx: DashboardContext): DashboardShortcut[] {
       label: "Anunciar Produto",
       description: "Crie um novo anúncio no marketplace",
       icon: "PlusIcon",
-      href: "/erp/products?create=true"
+      href: "/erp/produtos?create=true"
     });
   }
 
@@ -180,7 +180,7 @@ export function getAlerts(ctx: DashboardContext): DashboardAlert[] {
       description: "Você atingiu o limite de 15 produtos do plano grátis. Faça upgrade para continuar cadastrando.",
       type: "danger",
       actionLabel: "Fazer Upgrade",
-      actionHref: "/erp/settings" // Direciona para a aba de planos
+      actionHref: "/erp/configuracoes" // Direciona para a aba de planos
     });
   }
 
@@ -192,7 +192,7 @@ export function getAlerts(ctx: DashboardContext): DashboardAlert[] {
       description: "Você atingiu o limite de 25 pedidos mensais do plano grátis. Faça upgrade para continuar vendendo.",
       type: "danger",
       actionLabel: "Fazer Upgrade",
-      actionHref: "/erp/settings"
+      actionHref: "/erp/configuracoes"
     });
   }
 
@@ -204,7 +204,7 @@ export function getAlerts(ctx: DashboardContext): DashboardAlert[] {
       description: "Você está em um plano pago, mas ainda não conectou o Mercado Pago para receber pagamentos de forma integrada.",
       type: "warning",
       actionLabel: "Conectar Mercado Pago",
-      actionHref: "/erp/settings?tab=formas-de-pagamento"
+      actionHref: "/erp/configuracoes?tab=formas-de-pagamento"
     });
   }
 
@@ -221,14 +221,14 @@ export function getIntegrations(ctx: DashboardContext): DashboardIntegration[] {
       name: "WhatsApp",
       description: "Receba pedidos e envie atualizações automáticas via WhatsApp.",
       status: ctx.isWhatsAppConnected ? "connected" : "disconnected",
-      actionHref: "/erp/integrations/whatsapp"
+      actionHref: "/erp/integracoes/whatsapp"
     },
     {
       id: "mercadopago",
       name: "Mercado Pago",
       description: "Habilite pagamentos online via Pix, boleto e cartão no checkout da sua vitrine.",
       status: ctx.isMercadoPagoConnected ? "connected" : "disconnected",
-      actionHref: "/erp/settings?tab=formas-de-pagamento"
+      actionHref: "/erp/configuracoes?tab=formas-de-pagamento"
     }
   ];
 }
@@ -247,7 +247,7 @@ export function getRecommendations(ctx: DashboardContext): DashboardRecommendati
       description: "Aumente seu limite de catálogo para 100 itens, receba pagamentos via Mercado Pago e ative cupons promocionais para vender mais.",
       badge: "RECURSO PREMIUM",
       actionLabel: "Ver Planos",
-      actionHref: "/erp/settings",
+      actionHref: "/erp/configuracoes",
       variant: "upgrade"
     });
   }
@@ -260,7 +260,7 @@ export function getRecommendations(ctx: DashboardContext): DashboardRecommendati
       description: "Tenha itens e pedidos ilimitados, financeiro avançado com fluxo de caixa, DRE simplificado e gestão completa de devoluções.",
       badge: "GESTÃO COMPLETA",
       actionLabel: "Ver Planos",
-      actionHref: "/erp/settings",
+      actionHref: "/erp/configuracoes",
       variant: "upgrade"
     });
   }
@@ -272,7 +272,7 @@ export function getRecommendations(ctx: DashboardContext): DashboardRecommendati
       title: "Venda mais com o WhatsApp",
       description: "Conecte seu número de WhatsApp corporativo para receber pedidos e agendamentos diretos de forma totalmente integrada.",
       actionLabel: "Conectar Agora",
-      actionHref: "/erp/integrations/whatsapp",
+      actionHref: "/erp/integracoes/whatsapp",
       variant: "tip"
     });
   }

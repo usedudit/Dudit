@@ -201,7 +201,7 @@ export async function getOnboardingStatusAction(partnerId: string) {
                 completed: hasItems,
                 title: "Cadastrar Produto ou Serviço",
                 description: "Adicione pelo menos um item ativo ao seu catálogo.",
-                path: hasItems ? "" : "/erp/products?create=true"
+                path: hasItems ? "" : "/erp/produtos?create=true"
             },
             showcase: {
                 completed: hasShowcase,

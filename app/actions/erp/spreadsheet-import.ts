@@ -342,7 +342,7 @@ function rowToPreviewEntity(
   const price = rawPrice ? parseFloat(rawPrice.replace(",", ".").replace(/[^0-9.\-]/g, "")) || 0 : 0
   const rawStock = get("stock_quantity")
   const stock = rawStock ? parseInt(rawStock.replace(/\D/g, "")) || 0 : 0
-  const rawVis = get("visibility")?.toLowerCase()
+  const rawVis = get("show_in_marketplace")?.toLowerCase()
   const show_in_marketplace = !(rawVis && ["oculto", "privado", "unpublished", "inativo", "0", "false", "nao", "não"].includes(rawVis))
 
   return {
@@ -361,7 +361,6 @@ function rowToPreviewEntity(
     cest: get("cest"),
     status,
     show_in_marketplace,
-    visibility: show_in_marketplace ? "Published" : "Unpublished",
     is_active: status === "ativo",
     condition: get("condition") || "Novo",
     product_type: get("product_type") || "Físico",

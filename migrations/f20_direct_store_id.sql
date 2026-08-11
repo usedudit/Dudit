@@ -4,7 +4,7 @@
 -- Adiciona store_id diretamente em products, services, product_kits, suppliers
 -- com backfill a partir das bridges existentes.
 -- 
--- NÃO dropa as bridges ainda — primeiro validamos os dados.
+-- NÃO dropa as bridges ainda - primeiro validamos os dados.
 -- ============================================================================
 
 BEGIN;

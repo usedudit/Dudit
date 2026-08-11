@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
 
     if (!clientId) {
       return NextResponse.redirect(
-        `${appUrl}/erp/settings?mp_error=missing_client_id`
+        `${appUrl}/erp/configuracoes?mp_error=missing_client_id`
       )
     }
 
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
 
     if (!partner) {
       return NextResponse.redirect(
-        `${appUrl}/erp/settings?mp_error=partner_not_found`
+        `${appUrl}/erp/configuracoes?mp_error=partner_not_found`
       )
     }
 
@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
       await requireMinimumPlan(partner.id, "crescer")
     } catch {
       return NextResponse.redirect(
-        `${appUrl}/erp/settings?tab=integracoes&mp_error=plano_insuficiente`
+        `${appUrl}/erp/configuracoes?tab=integracoes&mp_error=plano_insuficiente`
       )
     }
 
@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
     console.error("Mercado Pago OAuth start error:", error)
 
     return NextResponse.redirect(
-      `${appUrl}/erp/settings?mp_error=oauth_start_failed`
+      `${appUrl}/erp/configuracoes?mp_error=oauth_start_failed`
     )
   }
 }

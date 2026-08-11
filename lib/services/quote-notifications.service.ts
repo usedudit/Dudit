@@ -154,7 +154,7 @@ export async function notifyQuoteEvent(input: QuoteNotificationInput): Promise<v
                         <p><strong>Total:</strong> R$ ${quote.total}</p>
                         <p>O orçamento está pronto para ser convertido em pedido no ERP.</p>
                         <div style="margin: 24px 0;">
-                            <a href="${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/erp/quotes" 
+                            <a href="${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/erp/orcamentos" 
                                style="background-color: #113833; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
                                 Abrir no ERP
                             </a>
@@ -181,7 +181,7 @@ export async function notifyQuoteEvent(input: QuoteNotificationInput): Promise<v
                         </blockquote>
                         <p>Você pode acessar a timeline de negociações no ERP para revisar as mensagens.</p>
                         <div style="margin: 24px 0;">
-                            <a href="${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/erp/quotes" 
+                            <a href="${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/erp/orcamentos" 
                                style="background-color: #113833; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
                                 Ver no ERP
                             </a>

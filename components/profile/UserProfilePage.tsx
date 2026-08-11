@@ -772,7 +772,7 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                             variant="default"
                             onClick={() => {
                                 setActiveSubModalOpen(false)
-                                window.location.href = "/erp/settings/subscription"
+                                window.location.href = "/erp/configuracoes/assinatura"
                             }}
                             className="flex-1 h-12 font-bold bg-amber-600 text-white hover:bg-amber-700"
                         >

@@ -59,6 +59,8 @@ const AppointmentsPageControls: React.FC<AppointmentsPageControlsProps> = ({
     setFilters,
     teamOptions,
     hasActiveFilters,
+    viewMode,
+    onViewModeChange,
     calendarView,
     onCalendarViewChange,
     onOpenCreate,
@@ -177,6 +179,24 @@ const AppointmentsPageControls: React.FC<AppointmentsPageControlsProps> = ({
                         fullWidth={false}
                     >
                         <div className="w-56 p-1.5 space-y-1">
+                            <div className="text-[10px] font-bold text-brand-inactive-text px-3 py-1 uppercase tracking-wider">
+                                Modo
+                            </div>
+                            <button
+                                onClick={() => onViewModeChange("calendar")}
+                                className={`flex items-center justify-between w-full text-left px-3 py-2 text-sm font-semibold rounded-md transition-colors ${viewMode === "calendar" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-500 hover:bg-gray-50 dark:hover:bg-zinc-800"}`}
+                            >
+                                <span>Calendário</span>
+                                {viewMode === "calendar" && <span className="text-brand-green">✓</span>}
+                            </button>
+                            <button
+                                onClick={() => onViewModeChange("list")}
+                                className={`flex items-center justify-between w-full text-left px-3 py-2 text-sm font-semibold rounded-md transition-colors ${viewMode === "list" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-500 hover:bg-gray-50 dark:hover:bg-zinc-800"}`}
+                            >
+                                <span>Lista</span>
+                                {viewMode === "list" && <span className="text-brand-green">✓</span>}
+                            </button>
+                            <div className="border-t border-brand-border dark:border-dark-border my-1.5"></div>
                             <div className="text-[10px] font-bold text-brand-inactive-text px-3 py-1 uppercase tracking-wider">
                                 Visualização
                             </div>

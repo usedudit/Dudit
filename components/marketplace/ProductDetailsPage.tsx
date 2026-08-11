@@ -1500,8 +1500,8 @@ export function ProductDetailsPageClient({
                             <Link href={getStoreUrl(partner)} prefetch={false} className="block group">
                                 {/* Banner */}
                                 <div className="h-20 w-full relative bg-gray-100 overflow-hidden select-none">
-                                    <img src={sellerBannerImage} alt="" className="w-full h-full object-cover" />
-                                    <div className="absolute inset-0 bg-black/10" />
+                                    <img src={sellerBannerImage} alt={`Banner de ${partner.store_name}`} className="w-full h-full object-cover" />
+                                    <div className="absolute inset-0" />
                                 </div>
 
                                 {/* Profile Header */}

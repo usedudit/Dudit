@@ -1,5 +1,5 @@
 -- ============================================================================
--- Fase 10.7 — Fix finalize_pos_sale: restore transactions + transaction_payments
+-- Fase 10.7 - Fix finalize_pos_sale: restore transactions + transaction_payments
 -- ============================================================================
 -- REGRESSÃO: As migrations f103/f104/f105 removeram a criação de lançamentos
 -- financeiros (transactions + transaction_payments) da função finalize_pos_sale.
@@ -57,7 +57,7 @@ DROP FUNCTION IF EXISTS public.finalize_pos_sale(
 );
 
 -- ============================================================
--- 2. CREATE finalize_pos_sale — 9-param com RETURNS TABLE
+-- 2. CREATE finalize_pos_sale - 9-param com RETURNS TABLE
 -- ============================================================
 CREATE OR REPLACE FUNCTION public.finalize_pos_sale(
   p_partner_id UUID,

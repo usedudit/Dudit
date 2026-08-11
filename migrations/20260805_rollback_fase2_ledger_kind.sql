@@ -1,5 +1,5 @@
 -- ==============================================================================
--- ROLLBACK — FASE 2 (LEDGER ÚNICO)
+-- ROLLBACK - FASE 2 (LEDGER ÚNICO)
 -- Data: 2026-08-05 | Projeto: Dudit
 -- Descrição: Reverte exatamente o que 20260805_fase2_ledger_kind.sql adicionou:
 --   1. Restaura settle_installment_group para a versão original (sem guard de kind)
@@ -11,7 +11,7 @@
 
 BEGIN;
 
--- 1. Restaura o RPC ORIGINAL (20260425154000) — sem o guard de kind
+-- 1. Restaura o RPC ORIGINAL (20260425154000) - sem o guard de kind
 CREATE OR REPLACE FUNCTION settle_installment_group(
     p_partner_id           UUID,
     p_installment_group_id UUID,

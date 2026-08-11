@@ -51,7 +51,7 @@ export default function LabelsPageClient({ isFree }: LabelsPageClientProps) {
 
         <div className="grid gap-4 md:grid-cols-2">
           <div className="p-6 border rounded-lg hover:bg-accent cursor-pointer">
-            <Link href="/erp/labels/generate" prefetch={false} className="space-y-2 block h-full">
+            <Link href="/erp/etiquetas/gerar" prefetch={false} className="space-y-2 block h-full">
               <h3 className="font-semibold text-lg">Gerar Etiquetas</h3>
               <p className="text-sm text-muted-foreground">
                 Selecione produtos e gere etiquetas com código de barras para impressão

@@ -10,7 +10,7 @@ import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 
 import { getAdminClient } from "@/lib/supabase/admin"
-import { geocodeAddress } from "@/lib/services/location.service"
+import { geocodeAddress, enrichAddressData } from "@/lib/services/location.service"
 
 // Tipos para endereços consolidados
 type AddressType = "user" | "partner" | "supplier" | "customer" | "store"
@@ -132,7 +132,8 @@ export async function createAddressAction(data: {
   const supabase = await getSupabaseServerClient()
 
   // Build insert object based on entity type
-  const insertData: any = {
+  // 1. Enrich address data (geocoding + IBGE lookup)
+  const baseData = {
     zip_code: data.zipCode,
     street: data.street,
     number: data.number,
@@ -143,27 +144,12 @@ export async function createAddressAction(data: {
     country: data.country || "BR",
     address_type: data.addressType || "primary",
     is_default: data.isDefault || false,
+    municipio_codigo_ibge: data.municipioCodigoIbge || (data as any).ibge || null,
+    latitude: (data as any).latitude ?? null,
+    longitude: (data as any).longitude ?? null,
   }
 
-  // 1.5 Geocode the address before saving
-  const fullAddressString = [
-    data.street,
-    data.number,
-    data.neighborhood,
-    data.city,
-    data.state,
-    data.country || "BR"
-  ].filter(Boolean).join(", ")
-
-  try {
-    const coords = await geocodeAddress(fullAddressString)
-    if (coords) {
-      insertData.latitude = coords.lat
-      insertData.longitude = coords.lng
-    }
-  } catch (e) {
-    console.error("Geocoding failed for address:", fullAddressString, e)
-  }
+  const insertData: any = await enrichAddressData(baseData)
 
   // Add entity reference
   if (data.entityType === "user") {
@@ -172,10 +158,8 @@ export async function createAddressAction(data: {
     insertData.partner_id = data.entityId
   } else if (data.entityType === "supplier") {
     insertData.supplier_id = data.entityId
-    insertData.municipio_codigo_ibge = data.municipioCodigoIbge || null
   } else if (data.entityType === "customer") {
     insertData.customer_id = data.entityId
-    insertData.municipio_codigo_ibge = data.municipioCodigoIbge || null
   } else if (data.entityType === "store") {
     insertData.store_id = data.entityId
   }
@@ -263,39 +247,41 @@ export async function updateAddressAction(data: {
 
   const supabase = await getSupabaseServerClient()
 
+  // Fetch existing address to fill missing fields if needed
+  const { data: existingAddress } = await supabase.from("addresses").select("*").eq("id", data.addressId).single()
+
+  const combinedPayload = {
+    ...existingAddress,
+    zip_code: data.zipCode ?? existingAddress?.zip_code,
+    street: data.street ?? existingAddress?.street,
+    number: data.number ?? existingAddress?.number,
+    complement: data.complement !== undefined ? (data.complement || null) : existingAddress?.complement,
+    neighborhood: data.neighborhood ?? existingAddress?.neighborhood,
+    city: data.city ?? existingAddress?.city,
+    state: data.state ?? existingAddress?.state,
+    country: data.country ?? existingAddress?.country ?? "BR",
+    municipio_codigo_ibge: (data as any).municipioCodigoIbge ?? (data as any).ibge ?? existingAddress?.municipio_codigo_ibge,
+    latitude: (data as any).latitude ?? existingAddress?.latitude,
+  }
+
+  const enriched = await enrichAddressData(combinedPayload)
+
   const updateData: any = {
     updated_at: new Date().toISOString(),
   }
 
-  if (data.zipCode !== undefined) updateData.zip_code = data.zipCode
-  if (data.street !== undefined) updateData.street = data.street
-  if (data.number !== undefined) updateData.number = data.number
-  if (data.complement !== undefined) updateData.complement = data.complement || null
-  if (data.neighborhood !== undefined) updateData.neighborhood = data.neighborhood
-  if (data.city !== undefined) updateData.city = data.city
-  if (data.state !== undefined) updateData.state = data.state
-  if (data.country !== undefined) updateData.country = data.country
+  updateData.zip_code = enriched.zip_code
+  updateData.street = enriched.street
+  updateData.number = enriched.number
+  updateData.complement = enriched.complement
+  updateData.neighborhood = enriched.neighborhood
+  updateData.city = enriched.city
+  updateData.state = enriched.state
+  updateData.country = enriched.country
+  updateData.municipio_codigo_ibge = enriched.municipio_codigo_ibge
+  updateData.latitude = enriched.latitude
+  updateData.longitude = enriched.longitude
   if (data.addressType !== undefined) updateData.address_type = data.addressType
-
-  // Geocode the updated address
-  const street = data.street ?? ""
-  const city = data.city ?? ""
-  if (street || city) {
-    const fullAddressString = [
-      data.street, data.number, data.neighborhood,
-      data.city, data.state, data.country || "BR"
-    ].filter(Boolean).join(", ")
-
-    try {
-      const coords = await geocodeAddress(fullAddressString)
-      if (coords) {
-        updateData.latitude = coords.lat
-        updateData.longitude = coords.lng
-      }
-    } catch (e) {
-      console.error("Geocoding failed for address update:", fullAddressString, e)
-    }
-  }
 
   // Handle is_default change
   if (data.isDefault) {

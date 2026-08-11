@@ -44,7 +44,7 @@ export default function ERPErrorBoundary({
                         : "Ocorreu um erro inesperado ao carregar esta página. Tente recarregá-la."}`}
                     itemButton={{
                         text: "Voltar para o Início",
-                        action: "/erp/dashboard"
+                        action: "/erp/painel"
                     }}
                 />
             </div>

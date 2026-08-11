@@ -47,7 +47,7 @@ export function LatestOrdersCard({ items }: CardProps) {
               return (
                 <div 
                   key={item.id} 
-                  onClick={() => router.push(`/erp/orders`)}
+                  onClick={() => router.push(`/erp/pedidos`)}
                   className="py-3 flex items-center justify-between cursor-pointer hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 rounded-lg px-2 -mx-2 transition-colors"
                 >
                   <div className="flex flex-col min-w-0 pr-2">
@@ -73,7 +73,7 @@ export function LatestOrdersCard({ items }: CardProps) {
               variant="outline"
               size="sm"
               className="w-full text-[12px] font-bold py-2"
-              onClick={() => router.push("/erp/orders")}
+              onClick={() => router.push("/erp/pedidos")}
             >
               Ver Todos os Pedidos
             </Button>
@@ -111,7 +111,7 @@ export function CriticalStockCard({ items }: CardProps) {
               return (
                 <div 
                   key={item.id} 
-                  onClick={() => router.push(`/erp/products`)}
+                  onClick={() => router.push(`/erp/produtos`)}
                   className="py-3 flex items-center justify-between cursor-pointer hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 rounded-lg px-2 -mx-2 transition-colors"
                 >
                   <div className="flex flex-col min-w-0 pr-2">
@@ -137,7 +137,7 @@ export function CriticalStockCard({ items }: CardProps) {
               variant="outline"
               size="sm"
               className="w-full text-[12px] font-bold py-2"
-              onClick={() => router.push("/erp/products")}
+              onClick={() => router.push("/erp/produtos")}
             >
               Gerenciar Estoque
             </Button>

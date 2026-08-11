@@ -1,5 +1,5 @@
 -- =============================================================================
--- ROLLBACK — STORE_ID NO FINANCEIRO
+-- ROLLBACK - STORE_ID NO FINANCEIRO
 -- Data: 2026-08-05 | Projeto: Dudit
 -- Descrição: Reverte exatamente o que 20260805_financial_store_id.sql adicionou:
 --   1. Restaura generate_recurring_occurrences_bulk (versão sem store_id)

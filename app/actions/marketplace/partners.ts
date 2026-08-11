@@ -14,7 +14,7 @@ import { normalizePhoneToE164 } from "@/lib/utils/phone-utils"
 import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { decryptCPF } from "@/lib/crypto"
 import { normalizeBusinessInfo } from "@/lib/business-info"
-import { geocodeAddress } from "@/lib/services/location.service"
+import { geocodeAddress, enrichAddressData } from "@/lib/services/location.service"
 import { syncPartnerItemsToExploreRedis, syncToExploreRedis } from "@/lib/redis-sync"
 import { getRandomDefaultBanner } from "@/lib/utils/banner"
 
@@ -661,7 +661,7 @@ export async function updatePartnerAction(partnerId: string, data: any) {
   await revalidatePartnerProfile(partnerId)
   await syncToExploreRedis({ id: partnerId, type: "loja", data: {}, silent: true })
   await syncPartnerItemsToExploreRedis(partnerId)
-  revalidatePath("/erp/settings")
+  revalidatePath("/erp/configuracoes")
 
   return { success: true }
 }
@@ -789,41 +789,44 @@ export async function registerPartner(data: any) {
     }
 
     // 3. Inserir o Endereço na tabela ADDRESSES (Usando o ID do novo parceiro)
-    // Os dados vêm do frontend como data.zipCode, data.street, etc (conforme seu PartnerWizard)
-    if (data.zipCode || data.street || data.city) {
-      const addressData = {
+    const rawZip = data.zipCode || data.address?.cep || data.address?.zipCode || ""
+    const rawStreet = data.street || data.address?.street || ""
+    const rawCity = data.city || data.address?.city || ""
+    const rawNumber = data.number || data.address?.number || "S/N"
+    const rawComplement = data.complement || data.address?.complement || null
+    const rawNeighborhood = data.neighborhood || data.address?.neighborhood || ""
+    const rawState = data.state || data.address?.state || ""
+    const rawIbge = data.municipioCodigoIbge || data.ibge || data.address?.ibge || data.address?.municipioCodigoIbge || null
+
+    if (rawZip || rawStreet || rawCity) {
+      const enrichedAddress = await enrichAddressData({
         partner_id: newPartner.id,
         store_id: newStore?.id || null,
         user_id: userId,
-        zip_code: data.zipCode,
-        street: data.street,
-        number: data.number || "S/N",
-        complement: data.complement || null,
-        neighborhood: data.neighborhood,
-        city: data.city,
-        state: data.state,
+        zip_code: rawZip,
+        street: rawStreet,
+        number: rawNumber,
+        complement: rawComplement,
+        neighborhood: rawNeighborhood,
+        city: rawCity,
+        state: rawState,
         country: "BR",
         is_default: true,
-        municipio_codigo_ibge: data.municipioCodigoIbge || null,
-      }
+        address_type: "primary",
+        municipio_codigo_ibge: rawIbge,
+      })
 
       const { error: addressError } = await supabaseAdmin
         .from("addresses")
-        .insert(addressData)
+        .insert(enrichedAddress)
 
       if (addressError) {
-        console.error("Error inserting address:", addressError)
-      }
-      
-      // GEOCODING AUTOMATICO PARA NOVOS REGISTROS
-      if (data.street && data.city && newStore?.id) {
-        const addressString = `${data.street}, ${data.number || ''}, ${data.city} - ${data.state || ''}, Brazil, ${data.zipCode || ''}`
-        try {
-          const coords = await geocodeAddress(addressString)
-          if (coords) {
-            await supabaseAdmin.from("addresses").update({ latitude: coords.lat, longitude: coords.lng }).eq("store_id", newStore.id)
-          }
-        } catch(e) { console.error("Geocoding failed on register", e) }
+        console.error("[registerPartner] Error inserting address:", addressError)
+      } else if (newStore?.id && enrichedAddress.latitude != null && enrichedAddress.longitude != null) {
+        await supabaseAdmin
+          .from("stores")
+          .update({ latitude: enrichedAddress.latitude, longitude: enrichedAddress.longitude })
+          .eq("id", newStore.id)
       }
     }
 

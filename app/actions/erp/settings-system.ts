@@ -30,7 +30,7 @@ export async function updatePartnerTimezoneAction(partnerId: string, timezone: s
       .update({ timezone })
       .eq("partner_id", partnerId)
     if (error) return { success: false as const, error: error.message }
-    revalidatePath("/erp/settings")
+    revalidatePath("/erp/configuracoes")
     return { success: true as const }
   } catch (e: any) {
     return { success: false as const, error: e.message }

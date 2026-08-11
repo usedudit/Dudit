@@ -1,4 +1,4 @@
-# Proposta — RLS de `customers` alinhada ao RBAC
+# Proposta - RLS de `customers` alinhada ao RBAC
 
 Status: proposta preparada para revisão. Nenhum SQL foi aplicado no Supabase.
 

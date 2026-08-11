@@ -71,7 +71,7 @@ CREATE POLICY "recurring_transactions_delete_own" ON public.recurring_transactio
     AND (store_id IS NULL OR public.user_has_store_access(store_id))
   );
 
--- ── accounts_payable (condicional — tabela pode não existir) ────────────
+-- ── accounts_payable (condicional - tabela pode não existir) ────────────
 DO $$
 BEGIN
   IF EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'accounts_payable') THEN
@@ -110,7 +110,7 @@ BEGIN
   END IF;
 END $$;
 
--- ── accounts_receivable (condicional — tabela pode não existir) ──────────
+-- ── accounts_receivable (condicional - tabela pode não existir) ──────────
 DO $$
 BEGIN
   IF EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'accounts_receivable') THEN

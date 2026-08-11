@@ -54,6 +54,6 @@ export async function updatePickupPaymentPolicyAction(
     return { error: error.message }
   }
 
-  revalidatePath("/erp/settings")
+  revalidatePath("/erp/configuracoes")
   return { success: true }
 }

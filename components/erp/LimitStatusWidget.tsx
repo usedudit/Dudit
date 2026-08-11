@@ -10,8 +10,6 @@ import { getLimitStatusAction } from "@/app/actions/erp/limits-status"
 import type { LimitStatusData } from "@/app/actions/erp/limits-status"
 import { getHardcodedPlan } from "@/lib/subscription/feature-labels"
 
-const COOKIE_NAME = "dudit_limit_widget_dismissed"
-
 interface PageLimitConfig {
   key: string
   label: string
@@ -20,27 +18,11 @@ interface PageLimitConfig {
 }
 
 const PAGE_LIMIT_MAP: Record<string, PageLimitConfig> = {
-  "/erp/products": { key: "items", label: "Produtos", limitName: "items", isMonthly: false },
-  "/erp/orders": { key: "monthly_orders", label: "Pedidos/mês", limitName: "monthly_orders", isMonthly: true },
+  "/erp/produtos": { key: "items", label: "Produtos", limitName: "items", isMonthly: false },
+  "/erp/pedidos": { key: "monthly_orders", label: "Pedidos/mês", limitName: "monthly_orders", isMonthly: true },
   "/erp/agendamentos": { key: "monthly_appointments", label: "Agendamentos/mês", limitName: "monthly_appointments", isMonthly: true },
-  "/erp/quotes": { key: "monthly_quotes", label: "Orçamentos/mês", limitName: "monthly_quotes", isMonthly: true },
-  "/erp/service-orders": { key: "monthly_service_orders", label: "Ordens de serviço/mês", limitName: "monthly_service_orders", isMonthly: true },
-}
-
-function getDismissedCookie(): number | null {
-  try {
-    const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${COOKIE_NAME}=([^;]*)`))
-    if (match) {
-      const val = parseInt(match[1], 10)
-      return isNaN(val) ? null : val
-    }
-  } catch {}
-  return null
-}
-
-function setDismissedCookie() {
-  const expires = new Date(Date.now() + 24 * 60 * 60 * 1000)
-  document.cookie = `${COOKIE_NAME}=${Date.now()}; path=/; expires=${expires.toUTCString()}; SameSite=Lax`
+  "/erp/orcamentos": { key: "monthly_quotes", label: "Orçamentos/mês", limitName: "monthly_quotes", isMonthly: true },
+  "/erp/ordens-de-servico": { key: "monthly_service_orders", label: "Ordens de serviço/mês", limitName: "monthly_service_orders", isMonthly: true },
 }
 
 export function LimitStatusWidget() {
@@ -59,12 +41,6 @@ export function LimitStatusWidget() {
 
   useEffect(() => {
     if (!pageConfig) {
-      setLoading(false)
-      return
-    }
-    const dismissedAt = getDismissedCookie()
-    if (dismissedAt && Date.now() - dismissedAt < 24 * 60 * 60 * 1000) {
-      setDismissed(true)
       setLoading(false)
       return
     }
@@ -95,7 +71,6 @@ export function LimitStatusWidget() {
   const handleClose = useCallback(() => {
     setIsOpen(false)
     setDismissed(true)
-    setDismissedCookie()
   }, [])
 
   if (!pageConfig || !data) return null

@@ -1,5 +1,5 @@
 -- ==============================================================================
--- ROLLBACK — DROP RECEIVABLES (recria a tabela exatamente como criada na Fase 1)
+-- ROLLBACK - DROP RECEIVABLES (recria a tabela exatamente como criada na Fase 1)
 -- Data: 2026-08-05 | Projeto: Dudit
 -- Descrição: Restaura public.receivables com a mesma DDL da migration
 -- 20260804_create_payments_and_receivables.sql (idempotente). A tabela fica

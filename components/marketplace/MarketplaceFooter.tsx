@@ -66,7 +66,7 @@ const Footer: React.FC<FooterProps> = ({ setView }) => {
                             <h4 className="text-sm font-medium text-white mb-6">Plataforma</h4>
                             <ul className="space-y-4">
                                 <li><Link href="/erp/vender" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Explorar</Link></li>
-                                <li><Link href="/erp/dashboard" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Anunciar na Dudit</Link></li>
+                                <li><Link href="/erp/painel" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Anunciar na Dudit</Link></li>
                             </ul>
                         </div>
 

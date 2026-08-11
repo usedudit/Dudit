@@ -54,11 +54,11 @@ function stateFromCurrentUrl(): EntityState {
  * window.history.replaceState() which is <1ms.
  *
  * URL patterns:
- *   /erp/products              → list (no action)
- *   /erp/products?view=123     → viewing entity 123
- *   /erp/products?edit=123     → editing entity 123
- *   /erp/products?create=true  → creating new entity
- *   /erp/products?duplicate=123 → duplicating entity 123
+ *   /erp/produtos              → list (no action)
+ *   /erp/produtos?view=123     → viewing entity 123
+ *   /erp/produtos?edit=123     → editing entity 123
+ *   /erp/produtos?create=true  → creating new entity
+ *   /erp/produtos?duplicate=123 → duplicating entity 123
  */
 export function useEntityState() {
     const searchParams = useSearchParams()

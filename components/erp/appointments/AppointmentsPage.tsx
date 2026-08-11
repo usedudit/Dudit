@@ -10,7 +10,7 @@ import { usePermissions } from '@/lib/permission-context';
 import { useStore } from "@/lib/store-context";
 import ExportColumnSelectionModal from '@/components/erp/export/ExportColumnSelectionModal';
 import { Button, Checkbox, IconPlaceholder, Pagination, Dropdown, DropdownItem } from '@/components/reusable';
-import { Settings, CalendarOff, RefreshCw, ArrowUpDown } from 'lucide-react';
+import { Settings, CalendarOff, RefreshCw, ArrowUpDown, CalendarX } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import {
@@ -653,6 +653,12 @@ const AppointmentsPage = ({
         return items;
     }, [appointments, appointmentFilters.teamIds, searchTerm]);
 
+    const listTotalPages = Math.max(1, Math.ceil(visibleAppointments.length / itemsPerPage));
+    const paginatedList = useMemo(
+        () => visibleAppointments.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage),
+        [visibleAppointments, currentPage, itemsPerPage]
+    );
+
     useEffect(() => {
         setCurrentPage(1);
         setSelectedIds(new Set());
@@ -856,9 +862,87 @@ const AppointmentsPage = ({
                                         />
                                     </div>
 
-                                    {/* Desktop view switcher (Calendar Only) */}
+                                    {/* Desktop view switcher (Calendar / List) */}
                                     <div className="hidden md:flex flex-1 flex-col overflow-y-auto no-scrollbar">
                                         <div className="flex flex-col h-full">
+                                            {viewMode === 'list' ? (
+                                                <>
+                                                    {visibleAppointments.length === 0 ? (
+                                                        <div className="flex flex-col items-center justify-center py-20 text-center h-full">
+                                                            <div className="w-16 h-16 bg-gray-50 dark:bg-zinc-900 rounded-full flex items-center justify-center mb-4 text-brand-inactive-text"><CalendarX size={24} /></div>
+                                                            <h3 className="text-brand-dark dark:text-dark-heading font-bold mb-1">Sem agendamentos</h3>
+                                                            <p className="text-sm text-brand-inactive-text max-w-[240px]">Não há agendamentos para este período.</p>
+                                                            <Button variant="outline" className="mt-4 rounded-full" onClick={() => handleOpenCreate()}>Adicionar</Button>
+                                                        </div>
+                                                    ) : (
+                                                        <>
+                                                            <div className="w-full overflow-hidden rounded-xl relative">
+                                                                <div className="overflow-x-auto pb-4 custom-scrollbar">
+                                                                    <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
+                                                                        <thead>
+                                                                            <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                                                <th className="py-3 px-2 w-12 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50">
+                                                                                    <div className="flex items-center">
+                                                                                        <Checkbox
+                                                                                            checked={paginatedList.length > 0 && paginatedList.every(a => selectedIds.has(a.id))}
+                                                                                            onChange={(checked) => {
+                                                                                                setSelectedIds(checked ? new Set(paginatedList.map(a => a.id)) : new Set())
+                                                                                            }}
+                                                                                            className="bg-white dark:bg-dark-background"
+                                                                                        />
+                                                                                    </div>
+                                                                                </th>
+                                                                                {APPOINTMENT_COLUMNS.map((col, idx) => (
+                                                                                    <th
+                                                                                        key={col.id}
+                                                                                        className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${idx === APPOINTMENT_COLUMNS.length - 1 ? "rounded-r-lg" : ""}`}
+                                                                                        style={{ width: col.width, minWidth: col.minWidth }}
+                                                                                    >
+                                                                                        <div className={`relative flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
+                                                                                            <span>{col.label}</span>
+                                                                                        </div>
+                                                                                    </th>
+                                                                                ))}
+                                                                            </tr>
+                                                                        </thead>
+                                                                        <tbody>
+                                                                            {paginatedList.map((appointment) => (
+                                                                                <AppointmentListRow
+                                                                                    key={appointment.id}
+                                                                                    appointment={appointment}
+                                                                                    appointments={visibleAppointments}
+                                                                                    openingHours={openingHours}
+                                                                                    columns={APPOINTMENT_COLUMNS}
+                                                                                    selected={selectedIds.has(appointment.id)}
+                                                                                    onSelect={(id) => {
+                                                                                        setSelectedIds(prev => {
+                                                                                            const next = new Set(prev)
+                                                                                            if (next.has(id)) next.delete(id); else next.add(id)
+                                                                                            return next
+                                                                                        })
+                                                                                    }}
+                                                                                    onView={handleOpenView}
+                                                                                />
+                                                                            ))}
+                                                                        </tbody>
+                                                                    </table>
+                                                                </div>
+                                                            </div>
+                                                            {listTotalPages > 1 && (
+                                                                <div className="mt-auto">
+                                                                    <Pagination
+                                                                        currentPage={currentPage}
+                                                                        totalPages={listTotalPages}
+                                                                        onPageChange={setCurrentPage}
+                                                                        inline
+                                                                    />
+                                                                </div>
+                                                            )}
+                                                        </>
+                                                    )}
+                                                </>
+                                            ) : (
+                                                <>
                                             {calendarView === 'month' && (
                                                 <>
                                                     <div className="grid grid-cols-7 border-b border-brand-border dark:border-dark-border bg-gray-50 dark:bg-zinc-900/50 flex-shrink-0">
@@ -921,6 +1005,8 @@ const AppointmentsPage = ({
                                                     handleOpenUnavailable={handleOpenUnavailable}
                                                     openingHours={openingHours}
                                                 />
+                                            )}
+                                                </>
                                             )}
                                         </div>
                                     </div>

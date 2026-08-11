@@ -216,15 +216,19 @@ function PlanUpgradeModalInner({
       <BottomSheet isOpen={anim} onClose={onClose}>
         <div className="flex flex-col gap-4 pt-2 pb-6 max-h-[85vh] overflow-y-auto">
           <div className="rounded-2xl overflow-hidden border border-brand-border dark:border-dark-border">
-            <div className="max-h-[200px] overflow-hidden bg-[#0f172a] flex flex-col items-center px-6 pt-8 pb-4 relative">
-              <button type="button" onClick={onClose} className="absolute top-3 right-3 p-2 rounded-full bg-white/10" aria-label="Fechar">
+            <div className="max-h-[200px] overflow-hidden bg-brand-dark px-6 pt-8 pb-4 relative">
+              <button type="button" onClick={onClose} className="absolute top-3 right-3 z-10 p-2 rounded-full bg-white/10" aria-label="Fechar">
                 <XIcon className="w-4 h-4 text-white" />
               </button>
-              <p className="text-[11px] uppercase tracking-wider text-white/60 mb-1">{hero.kicker}</p>
-              <h3 className="text-lg font-bold text-center text-white">{hero.title}</h3>
-              {isCrescerOrEscalar && (
-                <img src={mascot} alt="" className="w-40 h-auto object-contain mt-3" />
-              )}
+              <div className="flex items-center justify-between gap-4">
+                <div className="text-left">
+                  <p className="text-[11px] uppercase tracking-wider text-white/60 mb-1">{hero.kicker}</p>
+                  <h3 className="text-lg font-bold text-white leading-tight">{hero.title}</h3>
+                </div>
+                {isCrescerOrEscalar && (
+                  <img src={mascot} alt="" className="w-32 h-auto object-contain" />
+                )}
+              </div>
             </div>
           </div>
           {leftPanel}

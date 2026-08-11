@@ -41,7 +41,7 @@ export function EditProductWrapper({ product, suppliers, partnerId, onDuplicate 
     const { success: notifySuccess, error: notifyError } = useNotification()
 
     const handleBack = () => {
-        router.push("/erp/products")
+        router.push("/erp/produtos")
     }
     const handleSaveProduct = async (productData: any) => {
         console.log("Updating product with data:", productData)
@@ -88,7 +88,7 @@ export function EditProductWrapper({ product, suppliers, partnerId, onDuplicate 
             const result = await deleteProductAction(product.id)
             if (result.success) {
                 notifySuccess("Sucesso", "Produto excluído com sucesso!")
-                router.push("/erp/products")
+                router.push("/erp/produtos")
             } else {
                 notifyError("Erro", result.error || "Erro ao excluir produto")
             }
@@ -107,7 +107,7 @@ export function EditProductWrapper({ product, suppliers, partnerId, onDuplicate 
             console.log("Calling onDuplicate callback from edit page")
             onDuplicate(product)
             // Navigate back to products page where duplication will be handled
-            router.push("/erp/products")
+            router.push("/erp/produtos")
         } else {
             console.log("ERROR: No onDuplicate callback provided")
         }

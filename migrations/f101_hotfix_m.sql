@@ -1,5 +1,5 @@
 -- ============================================================================
--- Fase 10.1 Hotfix — Correções Médias Pós-Auditoria
+-- Fase 10.1 Hotfix - Correções Médias Pós-Auditoria
 -- ============================================================================
 -- M1: FOR UPDATE no fallback de decrement_store_product_stock
 -- M2: Lock ordering consistente em transfer_store_stock (prevenir deadlock)

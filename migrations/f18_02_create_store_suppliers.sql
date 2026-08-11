@@ -14,7 +14,7 @@
 -- - visibility_scope: 'all' (padrão), 'selected', 'exclusive'
 -- - marketplace_visible: controla exibição no marketplace (default true)
 -- - Diferente de store_products, não tem override fields (fornecedor
---   não tem preço/estoque — apenas vínculo produto-fornecedor)
+--   não tem preço/estoque - apenas vínculo produto-fornecedor)
 -- ============================================================================
 
 BEGIN;

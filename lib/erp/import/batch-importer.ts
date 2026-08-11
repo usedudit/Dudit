@@ -4,6 +4,7 @@ import { getAdminClient } from "@/lib/supabase/admin"
 import { generateSKUBase, generateSKUWithSuffix } from "@/lib/utils/code-generators"
 import { encryptCPF } from "@/lib/crypto"
 import { createAddressAction } from "@/app/actions/shared/addresses"
+import { enrichAddressData } from "@/lib/services/location.service"
 import type { ColumnMapping, EntityType, ImportResult, ImportSession } from "./types"
 
 const BATCH_SIZE = 500
@@ -262,7 +263,7 @@ async function importProductBatch(
     }
 
     let showInMarketplace = true
-    const rawVis = row["visibility"]?.trim().toLowerCase()
+    const rawVis = row["show_in_marketplace"]?.trim().toLowerCase()
     if (rawVis) {
       if (["oculto", "privado", "unpublished", "inativo", "0", "false", "nao", "não"].includes(rawVis)) {
         showInMarketplace = false
@@ -287,7 +288,7 @@ async function importProductBatch(
       promotional_price: cleanNumber(row["promotional_price"] ?? ""),
       status,
       show_in_marketplace: showInMarketplace,
-      visibility: showInMarketplace ? "Published" : "Unpublished",
+      is_active: status === "ativo",
     }
 
     if (row["category"]) {
@@ -571,7 +572,7 @@ async function importCustomerBatch(
         const addr = addressBatch[i]
         if (addr.street || addr.city) {
           try {
-            await supabase.from("addresses").insert({
+            const enrichedImportedAddr = await enrichAddressData({
               customer_id: inserted[i].id,
               street: addr.street,
               number: addr.number,
@@ -584,6 +585,7 @@ async function importCustomerBatch(
               address_type: "primary",
               is_default: true,
             })
+            await supabase.from("addresses").insert(enrichedImportedAddr)
           } catch {
             // non-critical error for address
           }

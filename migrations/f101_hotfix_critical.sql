@@ -1,5 +1,5 @@
 -- ============================================================================
--- Fase 10.1 Hotfix — Correções Críticas Pós-Auditoria
+-- Fase 10.1 Hotfix - Correções Críticas Pós-Auditoria
 -- ============================================================================
 -- C2: FOR UPDATE em Branch 1 e Branch 3 de create_batch_stock_movement
 -- C3: Remove loop duplicado (double decrement) em finalize_order_inventory

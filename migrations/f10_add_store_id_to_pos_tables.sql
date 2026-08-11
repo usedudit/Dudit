@@ -86,7 +86,7 @@ WHERE cm.cash_session_id = cs.id
   AND cm.store_id IS NULL;
 
 -- ============================================================
--- 6. Update RLS Policies — pre_sales
+-- 6. Update RLS Policies - pre_sales
 -- ============================================================
 DROP POLICY IF EXISTS "pre_sales_select_own" ON public.pre_sales;
 CREATE POLICY "pre_sales_select_own" ON public.pre_sales
@@ -121,7 +121,7 @@ CREATE POLICY "pre_sales_delete_own" ON public.pre_sales
   );
 
 -- ============================================================
--- 7. Update RLS Policies — sales
+-- 7. Update RLS Policies - sales
 -- ============================================================
 DROP POLICY IF EXISTS "sales_select_own" ON public.sales;
 CREATE POLICY "sales_select_own" ON public.sales
@@ -156,7 +156,7 @@ CREATE POLICY "sales_delete_own" ON public.sales
   );
 
 -- ============================================================
--- 8. Update RLS Policies — sale_items
+-- 8. Update RLS Policies - sale_items
 -- ============================================================
 DROP POLICY IF EXISTS "sale_items_select_own" ON public.sale_items;
 CREATE POLICY "sale_items_select_own" ON public.sale_items
@@ -191,7 +191,7 @@ CREATE POLICY "sale_items_delete_own" ON public.sale_items
   );
 
 -- ============================================================
--- 9. Update RLS Policies — cash_sessions
+-- 9. Update RLS Policies - cash_sessions
 -- ============================================================
 DROP POLICY IF EXISTS "cash_sessions_select_own" ON public.cash_sessions;
 CREATE POLICY "cash_sessions_select_own" ON public.cash_sessions
@@ -226,7 +226,7 @@ CREATE POLICY "cash_sessions_delete_own" ON public.cash_sessions
   );
 
 -- ============================================================
--- 10. Update RLS Policies — cash_movements
+-- 10. Update RLS Policies - cash_movements
 -- ============================================================
 DROP POLICY IF EXISTS "cash_movements_select_own" ON public.cash_movements;
 CREATE POLICY "cash_movements_select_own" ON public.cash_movements
@@ -605,7 +605,7 @@ BEGIN
     END;
   END LOOP;
 
-  -- Create stock movement — pass p_store_id so create_batch_stock_movement
+  -- Create stock movement - pass p_store_id so create_batch_stock_movement
   -- updates store_products.override_stock_quantity instead of products.stock_quantity
   IF jsonb_array_length(v_stock_items) > 0 THEN
     v_stock_movement_result := public.create_batch_stock_movement(

@@ -264,7 +264,6 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
                                                     placeholder="R$ 0,00"
                                                 />
                                                 <Input
-                                                    disabled={!advancedEnabled}
                                                     label="KM incluído"
                                                     value={settings.includedKm}
                                                     onChange={(e) => setSettings((s) => ({ ...s, includedKm: e.target.value }))}

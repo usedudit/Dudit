@@ -14,7 +14,7 @@
 --   2. Team member: partner_users.user_id = auth.uid()
 --   3. Store member: must have partner_users record (FK constraint)
 --
--- The user_has_store_access() function is NOT affected — it's SECURITY DEFINER
+-- The user_has_store_access() function is NOT affected - it's SECURITY DEFINER
 -- and bypasses RLS internally (runs as function owner / superuser).
 -- All other stores_* policies already use get_user_partner_ids() safely.
 -- ============================================================================

@@ -25,7 +25,7 @@ Atualizacao desta auditoria: alem da revisao estatica, foram executadas verifica
 
 ## Achados detalhados
 
-### F-00 — RPC de busca marketplace está quebrada no banco atual
+### F-00 - RPC de busca marketplace está quebrada no banco atual
 
 Severity: Critical. Verificação direta em PostgreSQL em 2026-08-05.
 
@@ -33,17 +33,17 @@ Severity: Critical. Verificação direta em PostgreSQL em 2026-08-05.
 
 Isso é uma falha funcional antes de ser um problema de performance: busca, marketplace e qualquer fluxo que use essa RPC podem retornar erro em produção. Corrigir a migração/estado do schema de forma consistente, testar com a assinatura instalada e só depois medir o plano. Não aplicar uma coluna ou migration às cegas: comparar a definição desejada, histórico e deploy efetivo.
 
-### Evidência live — estado atual e uso de índices
+### Evidência live - estado atual e uso de índices
 
 O banco conectado é PostgreSQL 17.6, com pg_stat_statements habilitado. Cardinalidade atual ainda é baixa: audit_logs 1.902, orders 360, order_items 431, transactions 130, notifications 131, products 24 e customers 4 linhas vivas.
 
-Nesta janela, há índices com zero scans em orders, products, customers, transactions, audit_logs e stock_movements. Exemplos: customers `idx_customers_partner`, `idx_customers_partner_created`, `trgm_idx_customers_name`; orders `idx_orders_partner_id_situation`, `idx_orders_pickup_window_start`; products `idx_products_partner_created`, `idx_products_fts`; transactions vários índices de referências/recorrência. Isso não autoriza remoção imediata — as estatísticas podem ter sido resetadas — mas justifica inventário e período de observação antes de criar mais índices.
+Nesta janela, há índices com zero scans em orders, products, customers, transactions, audit_logs e stock_movements. Exemplos: customers `idx_customers_partner`, `idx_customers_partner_created`, `trgm_idx_customers_name`; orders `idx_orders_partner_id_situation`, `idx_orders_pickup_window_start`; products `idx_products_partner_created`, `idx_products_fts`; transactions vários índices de referências/recorrência. Isso não autoriza remoção imediata - as estatísticas podem ter sido resetadas - mas justifica inventário e período de observação antes de criar mais índices.
 
 O top de pg_stat_statements inclui 146.080 chamadas de leitura do WAL/Realtime, totalizando aproximadamente 828s, além de introspecção do Supabase com centenas de chamadas e médias elevadas. Separar carga de plataforma/introspection da carga da aplicação ao avaliar custo e latência.
 
 Os planos medidos confirmam que o índice de orders funciona para a listagem recente (`idx_orders_partner_created_id_desc`) e para count (`Index Only Scan`). A query de customers com `select *` não usou índice na base de apenas quatro linhas; com volume real, deve ser repetida após paginação e seleção explícita. O contador unread usou `idx_notifications_user_unread` corretamente.
 
-### F-01 — Backfill é O(N) round-trips e replay destrutivo
+### F-01 - Backfill é O(N) round-trips e replay destrutivo
 
 Severity: Critical. Location: scripts/backfill-marketplace-metrics.ts:18-80.
 
@@ -62,7 +62,7 @@ Optimized version: RPCs set-based com INSERT ... SELECT e ON CONFLICT, lotes de 
 
 Impacto: 90–99% menos round-trips.
 
-### F-02 — Customers carrega tudo e descriptografa todos os CPFs
+### F-02 - Customers carrega tudo e descriptografa todos os CPFs
 
 Severity: Critical. Location: lib/data/customers.ts:12-51.
 
@@ -77,7 +77,7 @@ Optimized version: seleção explícita, paginação keyset, busca no banco e de
 
 Impacto: payload/CPU proporcional à página; 80–99% menos dados em carteiras grandes.
 
-### F-03 — Dashboard tem consultas redundantes e counts exatos
+### F-03 - Dashboard tem consultas redundantes e counts exatos
 
 Severity: High. Location: lib/dashboard-engine/engine.ts:34-139.
 
@@ -98,7 +98,7 @@ Optimized version: um RPC/view retorna store, flags, contagens e limites; contad
 
 Impacto: 14 → 1–3 round-trips.
 
-### F-04 — Middleware adiciona Auth e consultas a toda rota privada
+### F-04 - Middleware adiciona Auth e consultas a toda rota privada
 
 Severity: High. Location: lib/supabase/middleware.ts:384-494.
 
@@ -114,7 +114,7 @@ Optimized version: middleware limitado a sessão/redirect; RPC único para ban/d
 
 Impacto: menor TTFB e 2–4 operações a menos por request.
 
-### F-05 — Busca marketplace executa fuzzy/ranking por linha
+### F-05 - Busca marketplace executa fuzzy/ranking por linha
 
 Severity: High. Location: migrations/20260610_marketplace_search_v2.sql:479-564.
 
@@ -124,7 +124,7 @@ Optimized version: coluna normalizada e search_document pré-calculados; tabela/
 
 Impacto: CPU e latência muito menores em milhões de itens. Confirmar com EXPLAIN (ANALYZE, BUFFERS).
 
-### F-06 — Importação de clientes faz scan completo de CPFs
+### F-06 - Importação de clientes faz scan completo de CPFs
 
 Severity: High. Location: lib/erp/import/batch-importer.ts:437-474.
 
@@ -139,7 +139,7 @@ Cada lote lê e descriptografa todos os CPFs do parceiro. Com 100k clientes, cus
 
 Optimized version: hash determinístico com salt por tenant, campo cpf_lookup_hash e índice (partner_id, cpf_lookup_hash), ou RPC que receba o lote e faça matching sem retornar a carteira.
 
-### F-07 — Service-role após autorização e overfetch
+### F-07 - Service-role após autorização e overfetch
 
 Severity: High. Location: app/erp/settings/page.tsx:13-40.
 
@@ -154,7 +154,7 @@ O admin ignora RLS e retorna colunas desnecessárias. A segurança depende apena
 
 Optimized version: cliente server-side com sessão/RLS, campos explícitos e join/RPC invoker-safe. Se admin for indispensável, validar tenant dentro da função e limitar colunas.
 
-### F-08 — Cache global sem eviction e chave duplicada
+### F-08 - Cache global sem eviction e chave duplicada
 
 Severity: Medium. Location: lib/data/customers.ts:10-49.
 
@@ -167,7 +167,7 @@ O Map cresce por partner/store em processos long-lived. Como storeId não filtra
 
 Optimized version: remover Map e usar cache com TTL/limite; ou aplicar realmente store_id e manter a chave completa.
 
-### F-09 — Realtime causa duas refetches por evento
+### F-09 - Realtime causa duas refetches por evento
 
 Severity: Medium. Location: providers/notifications-realtime-provider.tsx:12-20.
 
@@ -180,7 +180,7 @@ Rajadas podem recarregar lista inteira e contador repetidamente.
 
 Optimized version: setQueryData para contador/lista, debounce de 100–300 ms e refetch da lista apenas para evento relevante. Confirmar filtro Realtime por user_id.
 
-### F-10 — Índices de várias gerações precisam de inventário
+### F-10 - Índices de várias gerações precisam de inventário
 
 Severity: Medium. Location: migrations 028, 040, 20260801_migration5 e 20260801_migration6.
 
@@ -188,7 +188,7 @@ Há múltiplas definições históricas para orders/products/customers/stock_mov
 
 Optimized version: comparar pg_indexes, medir pg_stat_user_indexes, remover apenas duplicatas confirmadas e validar cada query com EXPLAIN. Para workload multi-tenant, tenant deve aparecer no início quando for predicado dominante.
 
-### F-11 — Policies permissivas e numerosas aumentam custo de RLS; products tem SELECT global
+### F-11 - Policies permissivas e numerosas aumentam custo de RLS; products tem SELECT global
 
 Severity: High. Verificação direta em pg_policies em 2026-08-05.
 
@@ -198,7 +198,7 @@ Optimized version: separar claramente leitura pública de marketplace em view/RP
 
 Impacto: menor avaliação de RLS e menor risco de vazamento/carga por leitura ampla. Validar com testes anon/authenticated e EXPLAIN sob os roles reais antes de alterar.
 
-### F-12 — Divergencia live entre PostgreSQL e Redis no marketplace
+### F-12 - Divergencia live entre PostgreSQL e Redis no marketplace
 
 Severity: Critical. Verificacao direta em PostgreSQL e Upstash Redis em 2026-08-07.
 
@@ -206,7 +206,7 @@ Entre 14 candidatos ativos do marketplace no banco, a comparacao das chaves `dat
 
 Isso confirma que Redis hoje nao pode ser tratado como fonte autoritativa para preco, estoque, visibilidade ou disponibilidade. O banco deve ser a fonte de verdade; Redis pode acelerar descoberta/ranking, mas checkout e reserva devem sempre reler e validar no PostgreSQL.
 
-### F-13 — Sincronizacao Redis nao e atomica e engole falhas
+### F-13 - Sincronizacao Redis nao e atomica e engole falhas
 
 Severity: High. Location: `lib/redis-sync.ts:64-72,233-250` e `app/api/webhooks/supabase/route.ts:37-88`.
 
@@ -214,7 +214,7 @@ Uma sincronizacao grava/remover chave e zsets com `Promise.all`, sem transacao, 
 
 Usar pipeline/transaction atomica para objeto + indices, incluir `source_updated_at`/versao monotonicamente e rejeitar writes atrasados. Falha deve entrar em outbox/retry observavel; o endpoint precisa diferenciar recebido de processado.
 
-### F-14 — Reconciliacao por LIMIT nao garante recuperacao de eventos perdidos
+### F-14 - Reconciliacao por LIMIT nao garante recuperacao de eventos perdidos
 
 Severity: High. Location: `app/api/cron/sync-redis/route.ts:17-68`.
 
@@ -222,7 +222,7 @@ O cron revisa apenas os ultimos 100 produtos, 50 servicos e 50 parceiros, sem wa
 
 Trocar por outbox com `event_id`, `updated_at`/cursor, tentativas e dead-letter; manter um reconciliador paginado como rede de seguranca. Limitar concorrencia para nao transformar uma recuperacao em rajada contra Redis/Postgres.
 
-### F-15 — Caches de busca e variantes podem ficar stale por ate 24h/1h
+### F-15 - Caches de busca e variantes podem ficar stale por ate 24h/1h
 
 Severity: High. Location: `app/actions/marketplace/search.ts:373-425` e `app/actions/marketplace/products.ts:231-256`.
 
@@ -230,7 +230,7 @@ O cache de IDs de consultas tem TTL de 24h e retorna cedo quando os objetos exis
 
 Para campos criticos, invalidar por versao do item/tenant e nao apenas por TTL; aguardar a escrita/invalidation antes de confirmar a mutacao. Para estoque e preco exibidos no checkout, fazer leitura autoritativa no banco.
 
-### F-16 — Disponibilidade de servicos tem custo extra e corrida de reserva
+### F-16 - Disponibilidade de servicos tem custo extra e corrida de reserva
 
 Severity: Critical para consistencia. Location: `app/actions/marketplace/services.ts:231-357,363-510,512-549`.
 
@@ -240,7 +240,7 @@ Mais importante: a criacao consulta disponibilidade e depois insere o appointmen
 
 No frontend, `ServiceDetailsPage` nao cancela/ordena respostas concorrentes ao trocar data/staff, entao uma resposta lenta pode sobrescrever os horarios da selecao atual.
 
-### F-17 — Supabase Realtime nao cobre os dados criticos do marketplace
+### F-17 - Supabase Realtime nao cobre os dados criticos do marketplace
 
 Severity: High. Verificacao direta em `pg_publication_tables` em 2026-08-07.
 
@@ -248,7 +248,7 @@ A publication `supabase_realtime` contem apenas `notifications`, `reports` e `re
 
 Se a UX precisar de atualizacao instantanea, publicar eventos de dominio/outbox para os consumidores. Realtime pode notificar a UI, mas nao deve substituir a leitura/lock transacional do banco para checkout, estoque ou reserva.
 
-### F-18 — Drift entre migrations e funcao instalada de busca
+### F-18 - Drift entre migrations e funcao instalada de busca
 
 Severity: Critical. Verificacao direta no banco.
 
@@ -256,7 +256,7 @@ O arquivo `migrations/20260610_marketplace_search_v2.sql` define uma assinatura 
 
 Gerar um diff do schema instalado contra migrations versionadas, corrigir a funcao em uma migration nova e testar todas as assinaturas chamadas pelo app (`search_marketplace_fts`, browse e search). Nao adicionar colunas ou remover overloads sem confirmar consumidores.
 
-### F-19 — Seed/rebuild do Redis pode expor estado parcial
+### F-19 - Seed/rebuild do Redis pode expor estado parcial
 
 Severity: Medium/High. Location: `scripts/seed-explore-redis.ts:62-110`.
 
@@ -264,7 +264,7 @@ O seed apaga os indices globais e os reconstrui item a item. Durante a janela, a
 
 Usar versionamento de indice (double-buffer), construir a nova versao em background e trocar um ponteiro atomico no final. Compartilhar um serializer unico com `redis-sync.ts`, incluindo versao/updated_at e os campos realmente usados na exibicao.
 
-### F-20 — `products_select_all` expõe a tabela operacional inteira
+### F-20 - `products_select_all` expõe a tabela operacional inteira
 
 Severity: Critical. Auditoria read-only em PostgreSQL e Data API em 2026-08-07.
 
@@ -282,7 +282,7 @@ Apos a migracao `20260807_restrict_products_public_access`, `products_select_all
 
 Os leitores autenticados de ERP/PDV/importacao continuam consultando `products` com as policies de parceiro existentes; nao foram migrados para a projecao publica. O teste de Data API autenticado com JWT de usuario real permanece pendente de uma sessao de teste; o papel PostgreSQL `authenticated` sem claims foi validado diretamente.
 
-## Fase 3 — implementação incremental concluída em 2026-08-07
+## Fase 3 - implementação incremental concluída em 2026-08-07
 
 O checkout Mercado Pago agora deriva o `partner_id` canônico do carrinho/produtos antes de consultar configuração ou token MP; divergências com o `partnerId` informado pelo client são rejeitadas. O fluxo continua autenticado e o `process-payment` já validava o parceiro do carrinho antes de criar o pedido.
 

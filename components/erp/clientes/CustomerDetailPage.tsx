@@ -94,7 +94,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
         }
         try {
             const couponCode = await getBirthdayCouponCodeAction(customer.partner_id || "");
-            router.push(`/erp/coupons?create=true&code=${couponCode}&customerId=${realCustomerId}`);
+            router.push(`/erp/cupons?create=true&code=${couponCode}&customerId=${realCustomerId}`);
         } catch (err) {
             notifyError("Erro ao iniciar criação do cupom.");
         }
@@ -419,7 +419,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
     const paginatedOrders = formattedOrders.slice((page - 1) * itemsPerPage, page * itemsPerPage);
 
     const handleDetailsOrder = (order: any) => {
-        router.push(`/erp/orders?view=${order.originalId}`)
+        router.push(`/erp/pedidos?view=${order.originalId}`)
     }
 
     const handleDelete = async () => {

@@ -1,5 +1,5 @@
 -- ============================================================================
--- F4.1b — Atualizar RPC execute_xml_import
+-- F4.1b - Atualizar RPC execute_xml_import
 -- Remove write to products.store_id (legacy), cria store_products via bridge.
 -- ============================================================================
 
@@ -134,7 +134,7 @@ BEGIN
 
       -- Resolve qual produto usar
       IF v_decision = 'create_product' THEN
-        -- Cria novo produto (sem store_id — F4.1 usa bridge store_products)
+        -- Cria novo produto (sem store_id - F4.1 usa bridge store_products)
         v_created_product_id := gen_random_uuid();
 
         INSERT INTO public.products (

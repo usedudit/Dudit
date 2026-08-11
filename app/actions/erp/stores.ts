@@ -190,7 +190,7 @@ export async function createStoreAction(input: CreateStoreInput): Promise<Action
             storeName: input.name,
         })
 
-        revalidatePath("/erp/stores")
+        revalidatePath("/erp/lojas")
         return { success: true, data: { id: data.id } }
     } catch (error) {
         return { success: false, error: error instanceof Error ? error.message : "Erro ao criar loja" }
@@ -344,7 +344,7 @@ export async function updateStoreAction(input: UpdateStoreInput): Promise<Action
             changes: Object.keys(updateData),
         })
 
-        revalidatePath("/erp/stores")
+        revalidatePath("/erp/lojas")
         return { success: true, data: undefined }
     } catch (error) {
         return { success: false, error: error instanceof Error ? error.message : "Erro ao atualizar loja" }
@@ -370,7 +370,7 @@ export async function deleteStoreAction(storeId: string, partnerId: string): Pro
             storeId,
         })
 
-        revalidatePath("/erp/stores")
+        revalidatePath("/erp/lojas")
         return { success: true, data: undefined }
     } catch (error) {
         return { success: false, error: error instanceof Error ? error.message : "Erro ao excluir loja" }

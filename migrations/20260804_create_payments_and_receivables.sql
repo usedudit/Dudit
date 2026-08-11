@@ -1,5 +1,5 @@
 -- ============================================================================
--- PAYMENTS & RECEIVABLES — Nova camada financeira (Fase 1)
+-- PAYMENTS & RECEIVABLES - Nova camada financeira (Fase 1)
 -- Data: 2026-08-04 | Projeto: Dudit
 -- ----------------------------------------------------------------------------
 -- Aditivo e idempotente. NÃO altera tabelas existentes, NÃO recalcula saldos,

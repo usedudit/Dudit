@@ -324,15 +324,15 @@ export function NeedsAttention({ alerts }: { alerts: any[] }) {
                       className="text-[12px] font-bold py-1 px-4 whitespace-nowrap h-auto"
                       onClick={() => {
                         if (item.id === "due-accounts") {
-                          router.push("/erp/transactions");
+                          router.push("/erp/transacoes");
                         } else if (item.id === "pending-orders") {
-                          router.push("/erp/orders");
+                          router.push("/erp/pedidos");
                         } else if (item.id === "low-stock") {
-                          router.push("/erp/products");
+                          router.push("/erp/produtos");
                         } else if (item.id === "pending-appointments") {
                           router.push("/erp/agendamentos");
                         } else if (item.id === "late-deliveries") {
-                          router.push("/erp/logistics");
+                          router.push("/erp/logistica");
                         }
                       }}
                     >

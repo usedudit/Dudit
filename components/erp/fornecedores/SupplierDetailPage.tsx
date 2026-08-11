@@ -175,7 +175,7 @@ export const SupplierDetailPage = ({ supplier, onBack, onEdit }: Props) => {
     const paginatedImports = formattedImports.slice((page - 1) * itemsPerPage, page * itemsPerPage);
 
     const handleDetailsImport = (imp: any) => {
-        router.push(`/erp/xml-import?view=${imp.id}`)
+        router.push(`/erp/importacao-xml?view=${imp.id}`)
     }
 
     const handleDelete = async () => {

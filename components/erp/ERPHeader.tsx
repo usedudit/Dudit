@@ -53,7 +53,7 @@ interface ERPHeaderProps {
     sidebarOpen?: boolean
     setSidebarOpen?: (arg: boolean) => void
     pageTitle?: string
-    backHref?: string // Link to go back (e.g., /erp/products)
+    backHref?: string // Link to go back (e.g., /erp/produtos)
     onBack?: () => void // Custom back logic (e.g. discard changes)
     isSubPage?: boolean // Force ChevronLeftIcon even without backHref
     userProfile?: {
@@ -348,7 +348,7 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                                         </Link>
                                     </DropdownItem>
                                     <DropdownItem>
-                                        <Link href="/erp/settings?tab=assinatura" prefetch={false} className="flex items-center gap-3 w-full">
+                                        <Link href="/erp/configuracoes?tab=assinatura" prefetch={false} className="flex items-center gap-3 w-full">
                                             <CreditCardIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
                                             <span className="text-sm font-normal text-brand-inactive-text">Meu plano</span>
                                         </Link>

@@ -1,5 +1,5 @@
 -- ============================================================
--- Fase 4.3 — Drop legacy store_id columns
+-- Fase 4.3 - Drop legacy store_id columns
 -- ============================================================
 -- Pré-requisitos (validados):
 --   ✓ Nenhuma view referencia store_id nestas tabelas

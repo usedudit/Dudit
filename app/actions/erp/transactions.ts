@@ -1726,7 +1726,7 @@ export async function recordInstallmentPaymentAction(input: {
         if (!isStatusPending(tx.status)) throw new Error("A parcela já está quitada.")
 
         // Parcelas de venda (ledger de vendas) já nascem com o método de pagamento
-        // fixado pelo gateway (ex: cartão de crédito) — não pode ser alterado.
+        // fixado pelo gateway (ex: cartão de crédito) - não pode ser alterado.
         const lockedPaymentMethodId = tx.payment_method_id || null
         const effectivePaymentMethodId = lockedPaymentMethodId || input.paymentMethodId || null
 

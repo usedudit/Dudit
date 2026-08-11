@@ -44,7 +44,7 @@ export function StoreSwitcher() {
             openPlanUpgrade("escalar")
             return
         }
-        router.push("/erp/stores")
+        router.push("/erp/lojas")
     }
 
     return (

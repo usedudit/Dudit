@@ -105,7 +105,7 @@ async function handler(request: NextRequest) {
       if (product) {
         partnerId = product.partner_id
       } else {
-        // Pode ser uma variante — buscar via product_variants
+        // Pode ser uma variante - buscar via product_variants
         const { data: variant } = await adminClient
           .from("product_variants")
           .select("products(partner_id)")

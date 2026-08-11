@@ -1,14 +1,14 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import BottomSheet from "@/components/BottomSheet"
 import Portal from "@/components/Portal"
-import { Button, Checkbox, Input, FormDropdown } from "@/components/reusable"
+import { Button, Input, FormDropdown } from "@/components/reusable"
 import { Check, MapPin } from "lucide-react"
 import { Separator } from "@/components/reusable/Separator"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { XIcon } from "@/lib/icons"
-import type { FilterConfig, PageMode } from "./contextual-filters"
+import type { FilterConfig } from "./contextual-filters"
 
 const RADIUS_OPTIONS = [
     { value: "", label: "Toda a cidade (sem limite)" },
@@ -19,73 +19,123 @@ const RADIUS_OPTIONS = [
     { value: "100", label: "Até 100 km" },
 ]
 
+export interface AppliedFilters {
+    type: string
+    categories: string[]
+    minPrice: string | number
+    maxPrice: string | number
+    promoOn: boolean
+    radius: number | null
+}
+
 interface ExplorarFiltersBottomSheetProps {
     isOpen: boolean
     onClose: () => void
+    onApply: (filters: AppliedFilters) => void
+    onClear: () => void
+    onCitySelect: () => void
     selectedCitySlug: string | null
     formatCitySlug: (slug: string) => string
-    onCitySelect: () => void
     currentType: string
-    typeOptions: { value: string; label: string }[]
-    onTypeChange: (type: string) => void
-    activeCategoriesList: { name: string; icon_url: string | null }[]
     selectedCategories: string[]
-    onToggleCategory: (cat: string) => void
-    minPrice: string | number
-    onMinPriceChange: (val: string) => void
-    maxPrice: string | number
-    onMaxPriceChange: (val: string) => void
-    sortBy: string
-    sortOptions: { value: string; label: string }[]
-    onSortChange: (val: string) => void
-    promoOn: boolean
-    onPromoToggle: () => void
-    activeFiltersCount: number
-    onClearFilters: () => void
     selectedRadius?: number | null
-    onRadiusChange?: (radius: number | null) => void
+    minPrice: string | number
+    maxPrice: string | number
+    promoOn: boolean
+    typeOptions: { value: string; label: string }[]
+    productCategories: { name: string; icon_url: string | null }[]
+    serviceCategories: { name: string; icon_url: string | null }[]
+    partnerCategories: { name: string; icon_url: string | null }[]
     userProfile?: any
     filterConfig?: FilterConfig
-    pageMode?: PageMode
 }
 
 export function ExplorarFiltersBottomSheet({
     isOpen,
     onClose,
+    onApply,
+    onClear,
+    onCitySelect,
     selectedCitySlug,
     formatCitySlug,
-    onCitySelect,
     currentType,
-    typeOptions,
-    onTypeChange,
-    activeCategoriesList,
     selectedCategories,
-    onToggleCategory,
-    minPrice,
-    onMinPriceChange,
-    maxPrice,
-    onMaxPriceChange,
-    sortBy,
-    sortOptions,
-    onSortChange,
-    promoOn,
-    onPromoToggle,
-    activeFiltersCount,
-    onClearFilters,
     selectedRadius,
-    onRadiusChange,
+    minPrice,
+    maxPrice,
+    promoOn,
+    typeOptions,
+    productCategories,
+    serviceCategories,
+    partnerCategories,
     userProfile,
     filterConfig = { showType: true, showCategory: true, showPrice: true, showSort: true, showPromo: true, showRadius: true },
-    pageMode,
 }: ExplorarFiltersBottomSheetProps) {
     const isMobile = useMediaQuery("(max-width: 1023px)")
+
+    const [draftType, setDraftType] = useState(currentType)
+    const [draftCategories, setDraftCategories] = useState<string[]>(selectedCategories)
+    const [draftMinPrice, setDraftMinPrice] = useState<string | number>(minPrice)
+    const [draftMaxPrice, setDraftMaxPrice] = useState<string | number>(maxPrice)
+    const [draftPromo, setDraftPromo] = useState(promoOn)
+    const [draftRadius, setDraftRadius] = useState<number | null>(selectedRadius ?? null)
+
+    useEffect(() => {
+        if (!isOpen) return
+        setDraftType(currentType)
+        setDraftCategories(selectedCategories)
+        setDraftMinPrice(minPrice)
+        setDraftMaxPrice(maxPrice)
+        setDraftPromo(promoOn)
+        setDraftRadius(selectedRadius ?? null)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOpen])
+
+    const hasDraftFilters = (typeOptions.length > 0 && draftType !== "tudo")
+        || draftCategories.length > 0
+        || !!draftMinPrice
+        || !!draftMaxPrice
+        || draftPromo
+        || !!draftRadius
+
+    const draftCategoryList = useMemo(() => {
+        if (draftType === "servicos") return serviceCategories
+        if (draftType === "vitrines" || draftType === "negocios") return partnerCategories
+        return productCategories
+    }, [draftType, productCategories, serviceCategories, partnerCategories])
+
+    const handleApply = () => {
+        onApply({
+            type: draftType,
+            categories: draftCategories,
+            minPrice: draftMinPrice,
+            maxPrice: draftMaxPrice,
+            promoOn: draftPromo,
+            radius: draftRadius,
+        })
+        onClose()
+    }
+
+    const handleClear = () => {
+        onClear()
+        onClose()
+    }
+
+    const handleTypeSelect = (value: string) => {
+        setDraftType(value)
+        setDraftCategories([])
+    }
+
+    const handleToggleCategory = (cat: string) => {
+        setDraftCategories(prev => prev.includes(cat) ? [] : [cat])
+    }
 
     const headerRow = (
         <div className="flex items-center justify-between">
             <h3 className="text-base font-bold text-brand-dark">Filtros</h3>
-            {activeFiltersCount > 0 && (
+            {hasDraftFilters && (
                 <button
-                    onClick={onClearFilters}
+                    onClick={handleClear}
                     className="text-xs font-bold text-brand-green hover:underline"
                 >
                     Limpar Tudo
@@ -118,12 +168,12 @@ export function ExplorarFiltersBottomSheet({
             )}
 
             {/* Raio de busca */}
-            {filterConfig.showRadius !== false && ((selectedCitySlug && selectedCitySlug !== "brasil" && !selectedCitySlug.startsWith("estado-")) || !!userProfile) && onRadiusChange && (
+            {filterConfig.showRadius !== false && ((selectedCitySlug && selectedCitySlug !== "brasil" && !selectedCitySlug.startsWith("estado-")) || !!userProfile) && (
                 <section>
                     <FormDropdown
                         label="Raio de busca"
-                        value={String(selectedRadius || "")}
-                        setValue={(v) => onRadiusChange(v ? Number(v) : null)}
+                        value={String(draftRadius || "")}
+                        setValue={(v) => setDraftRadius(v ? Number(v) : null)}
                         options={RADIUS_OPTIONS}
                     />
                 </section>
@@ -137,14 +187,14 @@ export function ExplorarFiltersBottomSheet({
                         {typeOptions.map((option) => (
                             <button
                                 key={option.value}
-                                onClick={() => onTypeChange(option.value)}
-                                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${currentType === option.value
+                                onClick={() => handleTypeSelect(option.value)}
+                                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${draftType === option.value
                                     ? "bg-[#ecfdf5] text-brand-green"
                                     : "text-brand-dark hover:bg-gray-50"
                                     }`}
                             >
                                 <span>{option.label}</span>
-                                {currentType === option.value && (
+                                {draftType === option.value && (
                                     <Check className="h-4 w-4" />
                                 )}
                             </button>
@@ -154,18 +204,16 @@ export function ExplorarFiltersBottomSheet({
             )}
 
             {/* Categories Section */}
-            {filterConfig.showCategory !== false && activeCategoriesList.length > 0 && (
+            {filterConfig.showCategory !== false && draftCategoryList.length > 0 && (
                 <section>
-                    <h4 className="mb-3 text-sm font-bold text-brand-dark">
-                        {pageMode === "category" ? "Subcategorias" : "Categorias"}
-                    </h4>
+                    <h4 className="mb-3 text-sm font-bold text-brand-dark">Categorias</h4>
                     <div className="space-y-2">
-                        {activeCategoriesList.map((cat) => {
-                            const isSelected = selectedCategories.includes(cat.name)
+                        {draftCategoryList.map((cat) => {
+                            const isSelected = draftCategories.includes(cat.name)
                             return (
                                 <button
                                     key={cat.name}
-                                    onClick={() => onToggleCategory(cat.name)}
+                                    onClick={() => handleToggleCategory(cat.name)}
                                     className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-semibold transition-colors ${isSelected
                                         ? "bg-[#ecfdf5] text-brand-green"
                                         : "text-brand-dark hover:bg-gray-50"
@@ -204,15 +252,15 @@ export function ExplorarFiltersBottomSheet({
                     <h4 className="mb-3 text-sm font-bold text-brand-dark">Preço</h4>
                     <div className="grid grid-cols-2 gap-2">
                         <Input
-                            value={minPrice}
-                            onChange={(e) => onMinPriceChange(e.target.value)}
+                            value={draftMinPrice}
+                            onChange={(e) => setDraftMinPrice(e.target.value)}
                             inputMode="decimal"
                             placeholder="Min."
                             className="h-10 text-sm"
                         />
                         <Input
-                            value={maxPrice}
-                            onChange={(e) => onMaxPriceChange(e.target.value)}
+                            value={draftMaxPrice}
+                            onChange={(e) => setDraftMaxPrice(e.target.value)}
                             inputMode="decimal"
                             placeholder="Max."
                             className="h-10 text-sm"
@@ -225,19 +273,19 @@ export function ExplorarFiltersBottomSheet({
             {filterConfig.showPromo !== false && (
                 <section>
                     <button
-                        onClick={onPromoToggle}
-                        className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${promoOn
+                        onClick={() => setDraftPromo(!draftPromo)}
+                        className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${draftPromo
                             ? "bg-[#ecfdf5] text-brand-green"
                             : "text-brand-dark hover:bg-gray-50"
                             }`}
                     >
                         <span
-                            className={`flex h-4 w-4 items-center justify-center rounded border shrink-0 ${promoOn
+                            className={`flex h-4 w-4 items-center justify-center rounded border shrink-0 ${draftPromo
                                 ? "border-brand-green bg-brand-green"
                                 : "border-gray-200 bg-white"
                                 }`}
                         >
-                            {promoOn && (
+                            {draftPromo && (
                                 <Check className="h-3.5 w-3.5 text-white" />
                             )}
                         </span>
@@ -250,12 +298,9 @@ export function ExplorarFiltersBottomSheet({
 
     const footerButtons = (
         <>
-            {activeFiltersCount > 0 && (
+            {hasDraftFilters && (
                 <Button
-                    onClick={() => {
-                        onClearFilters()
-                        onClose()
-                    }}
+                    onClick={handleClear}
                     variant="outline"
                     className="flex-1"
                 >
@@ -263,7 +308,7 @@ export function ExplorarFiltersBottomSheet({
                 </Button>
             )}
             <Button
-                onClick={onClose}
+                onClick={handleApply}
                 className="flex-1"
             >
                 Aplicar

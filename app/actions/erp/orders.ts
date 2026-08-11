@@ -1311,9 +1311,9 @@ async function createRefundTransactionForCancelledOrderSafe(params: {
             const share = isLast
                 ? remaining
                 : Math.min(
-                      round2((Math.max(0, Number(entry?.amount || 0)) / breakdownTotal) * refundableAmount),
-                      remaining,
-                  )
+                    round2((Math.max(0, Number(entry?.amount || 0)) / breakdownTotal) * refundableAmount),
+                    remaining,
+                )
             const legAmount = round2(share)
             remaining = round2(remaining - legAmount)
             if (legAmount <= 0.009) continue
@@ -1385,7 +1385,7 @@ async function createRefundTransactionForCancelledOrderSafe(params: {
                 shouldRetry = true
             }
             if (message.includes("payment_method_id")) {
-                ;(fallbackPayload as Record<string, unknown>).payment_method_id = null
+                ; (fallbackPayload as Record<string, unknown>).payment_method_id = null
                 shouldRetry = true
             }
             if (shouldRetry) {
@@ -3339,7 +3339,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                     situation: "cancelled",
                 })
                 // Ledger Fase 2: venda cancelada não tem mais obrigação de
-                // recebimento futuro — cancela settlements pendentes (sempre,
+                // recebimento futuro - cancela settlements pendentes (sempre,
                 // independente do refund automático). Idempotente.
                 await cancelPendingSettlementsForOrder({
                     supabase,
@@ -4641,7 +4641,7 @@ export async function saveOrderAttachmentAction(
         })
 
         const { revalidatePath } = await import("next/cache")
-        revalidatePath("/erp/orders")
+        revalidatePath("/erp/pedidos")
         return { success: true, data }
     } catch (err: any) {
         return { success: false, error: err.message || "Erro ao salvar anexo" }
@@ -4744,7 +4744,7 @@ export async function deleteOrderAttachmentAction(
         })
 
         const { revalidatePath } = await import("next/cache")
-        revalidatePath("/erp/orders")
+        revalidatePath("/erp/pedidos")
         return { success: true }
     } catch (err: any) {
         return { success: false, error: err.message || "Erro ao deletar anexo" }

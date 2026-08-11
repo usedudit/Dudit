@@ -444,7 +444,7 @@ export async function middleware(request: NextRequest) {
           const activePartnerId = request.cookies.get("active_partner_id")?.value
           const needsPartnerCheck = pathname.startsWith("/erp") && !!activePartnerId
 
-          // Only query account_deletions if the flag cookie exists — avoids an unnecessary
+          // Only query account_deletions if the flag cookie exists - avoids an unnecessary
           // DB call on every request for the 99.99% of users who never request deletion.
           const hasDeletionFlag = request.cookies.get("x-account-deleting")?.value === "true"
           const needsUserDeletionCheck = hasDeletionFlag && (isProtected || pathname.startsWith("/cart") || pathname.startsWith("/checkout"))
@@ -467,8 +467,8 @@ export async function middleware(request: NextRequest) {
             // the RLS join while still returning null for cookie tamperers (non-members).
             needsPartnerCheck
               ? Promise.resolve(
-                  supabase.rpc("get_partner_runtime_status", { p_partner_id: activePartnerId! })
-                ).then((rpcResult) => ({ data: rpcResult.error ? null : rpcResult.data }))
+                supabase.rpc("get_partner_runtime_status", { p_partner_id: activePartnerId! })
+              ).then((rpcResult) => ({ data: rpcResult.error ? null : rpcResult.data }))
               : Promise.resolve({ data: null }),
             needsUserDeletionCheck
               ? supabase
@@ -514,7 +514,7 @@ export async function middleware(request: NextRequest) {
             return responseRedirect
           }
 
-          // Deletion completed — query returned nothing, clear the flag
+          // Deletion completed - query returned nothing, clear the flag
           if (hasDeletionFlag) {
             response.cookies.set("x-account-deleting", "", { maxAge: 0, path: "/" })
           }

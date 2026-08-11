@@ -208,7 +208,7 @@ export function ComprehensiveSupplierForm({ partnerId, supplier }: Comprehensive
         setError(result.error)
       } else {
         queryClient.invalidateQueries({ queryKey: ['erp', 'suppliers', partnerId] })
-        router.push("/erp/suppliers")
+        router.push("/erp/fornecedores")
         // No router.refresh() needed - push already navigates
       }
     } catch (err) {

@@ -168,6 +168,7 @@ export function SystemResourcesSubPage({ businessInfo, planSlug, onBack }: Syste
                                                     ) : (
                                                         <Switch
                                                             checked={checked}
+                                                            disabled={isPlanBlocked && checked}
                                                             onCheckedChange={(value: boolean) => toggleResource(resource.id, value)}
                                                         />
                                                     )}

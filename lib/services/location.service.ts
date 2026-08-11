@@ -254,3 +254,107 @@ export function enrichMarketplaceDistance<T extends { partners?: any }>(
         }
     })
 }
+
+export interface RawAddressPayload {
+  zip_code?: string | null
+  zipCode?: string | null
+  cep?: string | null
+  street?: string | null
+  number?: string | null
+  complement?: string | null
+  neighborhood?: string | null
+  bairro?: string | null
+  city?: string | null
+  state?: string | null
+  uf?: string | null
+  country?: string | null
+  municipio_codigo_ibge?: string | null
+  municipioCodigoIbge?: string | null
+  ibge?: string | null
+  latitude?: number | null
+  longitude?: number | null
+  partner_id?: string | null
+  store_id?: string | null
+  user_id?: string | null
+  customer_id?: string | null
+  supplier_id?: string | null
+  address_type?: string | null
+  is_default?: boolean
+}
+
+export async function enrichAddressData<T extends RawAddressPayload>(input: T) {
+  const cleanZip = String(input.zip_code || input.zipCode || input.cep || "").trim()
+  const street = String(input.street || "").trim()
+  const number = String(input.number || "S/N").trim()
+  const complement = input.complement ? String(input.complement).trim() : null
+  const neighborhood = String(input.neighborhood || input.bairro || "").trim()
+  const city = String(input.city || "").trim()
+  const state = String(input.state || input.uf || "").trim().toUpperCase()
+  const country = String(input.country || "BR").trim()
+  let ibge = String(input.municipio_codigo_ibge || input.municipioCodigoIbge || input.ibge || "").trim() || null
+  let lat = typeof input.latitude === "number" && !isNaN(input.latitude) ? input.latitude : null
+  let lng = typeof input.longitude === "number" && !isNaN(input.longitude) ? input.longitude : null
+
+  // 1. Se municipio_codigo_ibge está ausente, mas temos CEP (8 dígitos), busca o código IBGE via ViaCEP
+  const cleanDigitsCep = cleanZip.replace(/\D/g, "")
+  if (!ibge && cleanDigitsCep.length === 8) {
+    try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 4000)
+      const res = await fetch(`https://viacep.com.br/ws/${cleanDigitsCep}/json/`, {
+        signal: controller.signal,
+      })
+      clearTimeout(timeoutId)
+      if (res.ok) {
+        const data = await res.json()
+        if (data && data.ibge) {
+          ibge = String(data.ibge).trim()
+        }
+      }
+    } catch (e) {
+      // Ignora erro de fallback
+    }
+  }
+
+  // 2. Se latitude ou longitude está ausente, geocodifica o endereço para obter lat/lng
+  if ((lat === null || lng === null) && (street || city || cleanZip)) {
+    const fullAddressParts = [
+      street,
+      number !== "S/N" ? number : "",
+      neighborhood,
+      city,
+      state,
+      cleanZip,
+      country === "BR" ? "Brasil" : country
+    ].filter(Boolean)
+
+    if (fullAddressParts.length > 0) {
+      try {
+        const coords = await geocodeAddress(fullAddressParts.join(", "))
+        if (coords) {
+          lat = coords.lat
+          lng = coords.lng
+        }
+      } catch (geocodeErr) {
+        console.warn("[enrichAddressData] Geocoding failed:", geocodeErr)
+      }
+    }
+  }
+
+  return {
+    ...input,
+    zip_code: cleanZip,
+    street,
+    number,
+    complement,
+    neighborhood,
+    city,
+    state,
+    country,
+    municipio_codigo_ibge: ibge,
+    latitude: lat,
+    longitude: lng,
+    address_type: input.address_type || "primary",
+    is_default: input.is_default ?? true,
+  }
+}

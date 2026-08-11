@@ -89,7 +89,7 @@ export function WhatsAppIntegrationPage({
     useEffect(() => {
         setHeaderOverride({
             title: "WhatsApp API",
-            onBack: () => { window.location.href = "/erp/settings?tab=integracoes" },
+            onBack: () => { window.location.href = "/erp/configuracoes?tab=integracoes" },
             isSubPage: true
         })
         return () => setHeaderOverride(null)
@@ -366,7 +366,7 @@ export function WhatsAppIntegrationPage({
 
                                 {/* Back button - desktop only */}
                                 <div className={`absolute -left-12 top-3 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
-                                    <Link href="/erp/settings?tab=integracoes">
+                                    <Link href="/erp/configuracoes?tab=integracoes">
                                         <Button variant="filled" className="w-10 h-10 p-0 flex items-center justify-center">
                                             <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                         </Button>

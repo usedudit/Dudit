@@ -314,7 +314,7 @@ export default function MarketplaceHome({
                         Não somos um marketplace mercenário. Aqui não tem taxa e o cliente é seu do começo ao fim.
                     </p>
                     <button
-                        onClick={() => router.push(user ? "/erp/switch" : "/auth/login?mode=partner")}
+                        onClick={() => router.push(user ? "/erp/trocar-erp" : "/auth/login?mode=partner")}
                         className="bg-brand-green text-white font-bold py-3.5 px-8 rounded-full hover:bg-[#047857] transition-colors"
                     >
                         Criar Conta Grátis e Vender Mais
@@ -629,7 +629,7 @@ export default function MarketplaceHome({
                             itemButton={{
                                 text: "Começar a vender na Dudit",
                                 action: () => {
-                                    router.push(userProfile ? "/erp/switch" : "/auth/login?mode=partner")
+                                    router.push(userProfile ? "/erp/trocar-erp" : "/auth/login?mode=partner")
                                 },
                                 variant: "default"
                             }}

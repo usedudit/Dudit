@@ -196,7 +196,7 @@ export function InvoicePreview({ data, printMode }: InvoicePreviewProps) {
                                             {data.customer.email && <p className="text-xs text-gray-500">{data.customer.email}</p>}
                                         </>
                                     ) : (
-                                        <p className="text-sm text-gray-400">—</p>
+                                        <p className="text-sm text-gray-400">-</p>
                                     )}
                                 </div>
                             </div>
@@ -222,7 +222,7 @@ export function InvoicePreview({ data, printMode }: InvoicePreviewProps) {
                             <tbody>
                                 {page.items.map((item, i) => (
                                     <tr key={i} className="border-b border-gray-100">
-                                        <td className="py-2 text-xs text-gray-500">{item.code || "—"}</td>
+                                        <td className="py-2 text-xs text-gray-500">{item.code || "-"}</td>
                                         <td className="py-2">
                                             <p className="text-sm font-medium text-gray-800 truncate max-w-[250px]">{item.name}</p>
                                             {item.description && (

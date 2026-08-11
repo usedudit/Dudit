@@ -31,6 +31,8 @@ export interface BillingPurchase {
     metadata: Record<string, any>
     description: string | null
     invoice_id: string | null
+    billing_period_start: string | null
+    billing_period_end: string | null
     created_at: string
     updated_at: string
 }

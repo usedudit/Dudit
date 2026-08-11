@@ -630,7 +630,15 @@ export const getCurrentPartnerContext = cache(async (resolvedUser?: any): Promis
     if (allAccess.length === 1 && allAccess[0].roleId === "owner") {
         const match = allAccess[0]
         let activeStoreId = await getActiveStoreId()
-        if (!activeStoreId) {
+        if (activeStoreId) {
+            // Validate against the stores table (same as the multi-partner path above)
+            // so a stale/deleted store in the cookie cannot leak into inserts (e.g. cash_sessions).
+            const admin = createAdminClient()
+            const { data: validStore } = await admin.from("stores").select("id").eq("id", activeStoreId).eq("partner_id", match.partnerId).maybeSingle()
+            if (!validStore) {
+                activeStoreId = await resolveDefaultStoreId(match.partnerId)
+            }
+        } else {
             activeStoreId = await resolveDefaultStoreId(match.partnerId)
         }
         return {

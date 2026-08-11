@@ -3,8 +3,8 @@
 import { getAdminClient } from "@/lib/supabase/admin"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import { requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { generateInvoiceForPurchase } from "@/lib/billing/invoice-generation"
 import { logBillingAudit } from "@/lib/billing/audit"
-import { generateInvoiceData } from "@/lib/billing/invoice-generator"
 import type { BillingPurchase, BillingPayment, BillingInvoice, BillingPageResult, InvoiceData } from "@/lib/billing/types"
 
 export async function generateInvoiceAction(
@@ -16,13 +16,13 @@ export async function generateInvoiceAction(
 
         const admin = getAdminClient()
 
-        const { data: purchase, error: purchaseError } = await admin
+        const { data: purchase } = await admin
             .from("billing_purchases")
-            .select("*, partners:partners!billing_purchases_partner_id_fkey(*)")
+            .select("partner_id")
             .eq("id", purchaseId)
             .maybeSingle()
 
-        if (purchaseError || !purchase) {
+        if (!purchase) {
             return { success: false, error: "Compra não encontrada" }
         }
 
@@ -33,114 +33,7 @@ export async function generateInvoiceAction(
             user,
         )
 
-        const { data: payments } = await admin
-            .from("billing_payments")
-            .select("*")
-            .eq("purchase_id", purchaseId)
-            .order("created_at", { ascending: false })
-
-        const partner = (purchase as any).partners || {}
-        const partnerAddress = partner.address || ""
-
-        // Data comes from stores (fiscal fields, phone, logo)
-        const { data: storeData } = await admin
-            .from("stores")
-            .select("cnpj, cpf, phone, logo_url")
-            .eq("partner_id", purchase.partner_id)
-            .order("is_headquarters", { ascending: false })
-            .limit(1)
-            .maybeSingle()
-        const partnerDoc = storeData?.cnpj || storeData?.cpf || ""
-
-        let customerDetails: { name: string; document: string | null; email: string | null } | null = null
-        if (purchase.user_id) {
-            const { data: profile } = await admin
-                .from("user_profiles")
-                .select("full_name, email")
-                .eq("user_id", purchase.user_id)
-                .maybeSingle()
-
-            if (profile) {
-                customerDetails = {
-                    name: profile.full_name || "Usuário",
-                    document: null,
-                    email: profile.email || null,
-                }
-            }
-        }
-
-        const purchaseableDetails: { name?: string; description?: string } = {}
-        if (purchase.purchaseable_type === "plan" && purchase.purchaseable_id) {
-            const { data: plan } = await admin
-                .from("plans")
-                .select("name, slug")
-                .eq("id", purchase.purchaseable_id)
-                .maybeSingle()
-            if (plan) {
-                purchaseableDetails.name = `Plano ${plan.name}`
-                purchaseableDetails.description = plan.slug
-            }
-        }
-
-        let periodStart: string | null = null
-        let periodEnd: string | null = null
-        if (purchase.subscription_id) {
-            const { data: sub } = await admin
-                .from("subscriptions")
-                .select("current_period_start, current_period_end")
-                .eq("id", purchase.subscription_id)
-                .maybeSingle()
-            if (sub) {
-                periodStart = sub.current_period_start
-                periodEnd = sub.current_period_end
-            }
-        }
-
-        const { invoiceNumber, verificationHash, invoiceData } = await generateInvoiceData(
-            purchase as BillingPurchase,
-            (payments || []) as BillingPayment[],
-            {
-                name: partner.stores?.[0]?.name || partner.name || "Empresa",
-                document: partnerDoc,
-                address: partnerAddress,
-                email: partner.email || null,
-                phone: storeData?.phone || partner.phone || null,
-                image_url: storeData?.logo_url || partner.store_image_url || null,
-            },
-            customerDetails,
-            purchaseableDetails,
-            periodStart,
-            periodEnd,
-        )
-
-        const { data: invoice, error: invoiceError } = await admin
-            .from("billing_invoices")
-            .insert({
-                purchase_id: purchaseId,
-                partner_id: purchase.partner_id,
-                invoice_number: invoiceNumber,
-                verification_hash: verificationHash,
-                invoice_data: invoiceData,
-            })
-            .select()
-            .single()
-
-        if (invoiceError) {
-            return { success: false, error: invoiceError.message }
-        }
-
-        await admin
-            .from("billing_purchases")
-            .update({ invoice_id: invoice.id })
-            .eq("id", purchaseId)
-
-        await logBillingAudit("billing.invoice.generated", purchase.partner_id, {
-            purchase_id: purchaseId,
-            invoice_id: invoice.id,
-            invoice_number: invoiceNumber,
-        }, user.id)
-
-        return { success: true, data: invoice as BillingInvoice }
+        return await generateInvoiceForPurchase(purchaseId, user.id)
     } catch (error: any) {
         return { success: false, error: error.message || "Erro ao gerar fatura" }
     }

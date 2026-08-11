@@ -55,8 +55,8 @@ const PromotionSchema = z.object({
 
 // Helper to revalidate promotions routes
 async function revalidatePromotions(partnerId: string) {
-  revalidatePath("/erp/promotions")
-  revalidatePath(`/erp/promotions/${partnerId}`)
+  revalidatePath("/erp/promocoes")
+  revalidatePath(`/erp/promocoes/${partnerId}`)
 }
 
 async function checkPromotionOverlap(

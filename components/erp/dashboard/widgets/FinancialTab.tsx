@@ -202,7 +202,7 @@ export function FinancialTab({ data }: { data: FinancialDashboardData }) {
                               variant="outline"
                               size="sm"
                               className="text-[12px] font-bold py-1 px-4 whitespace-nowrap h-auto"
-                              onClick={() => router.push("/erp/transactions")}
+                              onClick={() => router.push("/erp/transacoes")}
                             >
                               Ver Detalhes
                             </Button>

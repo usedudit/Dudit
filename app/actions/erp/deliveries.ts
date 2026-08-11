@@ -48,7 +48,7 @@ function revalidateDeliveryDashboard(partnerId: string) {
   revalidateTag(DASHBOARD_TAGS.financial(partnerId), "max")
   // @ts-ignore
   revalidateTag(DASHBOARD_TAGS.operations(partnerId), "max")
-  revalidatePath("/erp/dashboard")
+  revalidatePath("/erp/painel")
   revalidatePath("/erp/inicio")
 }
 

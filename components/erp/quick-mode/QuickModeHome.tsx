@@ -240,14 +240,14 @@ function ShortcutsCard({ shortcuts, sellsProducts, sellsServices }: {
             label: "Ver Pedidos",
             description: "Acesse seus pedidos recebidos",
             icon: "ShoppingCartIcon",
-            href: "/erp/orders"
+            href: "/erp/pedidos"
         },
         {
             id: "products",
             label: "Meu Catálogo",
             description: "Gerencie produtos e serviços",
             icon: "Package",
-            href: "/erp/products"
+            href: "/erp/produtos"
         },
     ];
 
@@ -488,14 +488,14 @@ function ImportOptionsModal({
             label: "Cadastrar manualmente",
             description: "Crie um novo produto preenchendo os dados",
             icon: "PlusIcon",
-            href: "/erp/products?create=true",
+            href: "/erp/produtos?create=true",
             variant: "default",
         },
         {
             label: "Importar via planilha",
             description: "Faça upload de uma planilha Excel/CSV com seus produtos",
             icon: "UploadSheetIcon",
-            href: "/erp/products/import",
+            href: "/erp/produtos/importar",
             variant: "outline",
         },
     ];
@@ -505,7 +505,7 @@ function ImportOptionsModal({
             label: "Importar XML (NF-e)",
             description: "Importe produtos direto da nota fiscal de entrada",
             icon: "DownloadIcon",
-            href: "/erp/xml-import",
+            href: "/erp/importacao-xml",
             variant: "outline",
         });
     }
@@ -522,7 +522,7 @@ function ImportOptionsModal({
             label: "Importar via planilha",
             description: "Faça upload de uma planilha Excel/CSV com seus serviços",
             icon: "UploadSheetIcon",
-            href: "/erp/servicos/import",
+            href: "/erp/servicos/importar",
             variant: "outline",
         },
     ];
@@ -753,7 +753,7 @@ export default function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
         if (item.href) {
             router.push(item.href);
         } else if (item.tabTarget) {
-            router.push(`/erp/settings?tab=${item.tabTarget}`);
+            router.push(`/erp/configuracoes?tab=${item.tabTarget}`);
         }
     };
 
@@ -793,7 +793,7 @@ export default function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
                                 variant="outline"
                                 size="sm"
                                 className="gap-2"
-                                onClick={() => router.push('/erp/settings')}
+                                onClick={() => router.push('/erp/configuracoes')}
                             >
                                 <SettingsIcon className="w-4 h-4" />
                                 Configurações

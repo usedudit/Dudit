@@ -1,5 +1,5 @@
 -- ============================================================================
--- Fase 10.1 — Store-Aware Product Variants
+-- Fase 10.1 - Store-Aware Product Variants
 -- ============================================================================
 -- Cria store_product_variants: vincula uma variante (product_variants) a uma
 -- store específica, permitindo que uma mesma variante tenha estoque diferente

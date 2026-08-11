@@ -73,7 +73,7 @@ export async function revalidateCoupons(partnerId: string) {
         await safeRevalidateTag(partnerId)
     }
     await safeRevalidateTag("coupons")
-    revalidatePath("/erp/coupons")
+    revalidatePath("/erp/cupons")
 }
 
 /**
@@ -101,7 +101,7 @@ export async function revalidateQuotes(partnerId: string, quoteId?: string) {
         await safeRevalidateTag(`quote-${quoteId}`)
     }
     await safeRevalidateTag("quotes")
-    revalidatePath("/erp/quotes")
+    revalidatePath("/erp/orcamentos")
 }
 
 export async function revalidateQuoteHistory(quoteId: string) {
@@ -202,9 +202,9 @@ export async function revalidateTransactions(partnerId: string) {
         await safeRevalidateTag(DASHBOARD_TAGS.activity(partnerId))
     }
     await safeRevalidateTag("transactions")
-    revalidatePath("/erp/dashboard")
+    revalidatePath("/erp/painel")
     revalidatePath("/erp/inicio")
-    revalidatePath("/erp/transactions")
+    revalidatePath("/erp/transacoes")
     revalidatePath("/erp/contas-a-pagar")
     revalidatePath("/erp/contas-a-receber")
 }

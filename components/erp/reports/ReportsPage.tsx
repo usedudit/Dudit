@@ -389,7 +389,7 @@ function ProductsSection({ productsData, stockValue, returnsData }: { productsDa
                         title="Estoque Crítico"
                         columns={[{ key: "title", header: "Produto" }, { key: "subtitle", header: "Categoria" }, { key: "value", header: "Estoque" }]}
                         data={(productsData.criticalStock || []).map((s: any) => ({ id: s.id, title: s.title, subtitle: s.subtitle, value: s.value }))}
-                        onRowClick={() => router.push("/erp/products")}
+                        onRowClick={() => router.push("/erp/produtos")}
                         icon={PackageIcon}
                     />
                 </div>
@@ -671,7 +671,7 @@ function ServiceOrdersSection({ serviceOrdersData }: { serviceOrdersData: Servic
                         title="Últimas OS"
                         columns={[{ key: "orderNumber", header: "Número" }, { key: "title", header: "Título" }, { key: "status", header: "Status" }, { key: "total", header: "Total" }, { key: "date", header: "Data" }]}
                         data={serviceOrdersData.recentOrders}
-                        onRowClick={() => router.push("/erp/service-orders")}
+                        onRowClick={() => router.push("/erp/ordens-de-servico")}
                         icon={ListIcon}
                     />
                 </div>
@@ -773,7 +773,7 @@ function ReturnsSection({ returnsData }: { returnsData: ReturnsReportData | null
                         title="Últimas Devoluções"
                         columns={[{ key: "customer", header: "Cliente" }, { key: "reason", header: "Motivo" }, { key: "amount", header: "Valor" }, { key: "status", header: "Status" }, { key: "date", header: "Data" }]}
                         data={returnsData.recentReturns}
-                        onRowClick={() => router.push("/erp/returns")}
+                        onRowClick={() => router.push("/erp/devolucoes")}
                     />
                 </div>
             </div>

@@ -507,7 +507,7 @@ export async function requirePartnerAccessWithPermission(
 
   const access = await checkPartnerAccess(partnerId, user.id)
   if (!access) {
-    throw new ForbiddenError("Você não tem acesso a este ERP")
+    throw new ForbiddenError("Você não tem acesso a este negócio")
   }
 
   const permissions = access.permissions

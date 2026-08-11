@@ -33,7 +33,7 @@ import { ExplorarViewControls } from "./ExplorarViewControls"
 import { ExplorarFiltersBottomSheet } from "./ExplorarFiltersBottomSheet"
 import { ExplorarSortBottomSheet } from "./ExplorarSortBottomSheet"
 import { ExploreContentSkeleton } from "./explorar-skeleton"
-import { CATEGORY_SLUG_MAP, COMMON_CITY_ACCENTS } from "./explorar-constants"
+import { CATEGORY_SLUG_MAP, COMMON_CITY_ACCENTS, FALLBACK_CATEGORIES } from "./explorar-constants"
 import type { SortOption, ViewMode } from "./explorar-constants"
 import { getFilterConfig, getSortOptionsForMode, type PageMode } from "./contextual-filters"
 
@@ -117,6 +117,18 @@ export function ExplorarPageClient({
         }
         return `${city} - ${state}`
     }, [cidade, resolvedCityName])
+
+    const categoryToSlug = useCallback((name: string) => {
+        return name
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/ & /g, "-e-")
+            .replace(/&/g, "e")
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/(^-|-$)/g, "")
+    }, [])
+
     const pathCategorySlug = slug[1] || ""
     const pathCategory = pathCategorySlug ? (CATEGORY_SLUG_MAP[pathCategorySlug] || pathCategorySlug) : ""
 
@@ -138,18 +150,20 @@ export function ExplorarPageClient({
     const [dbPartnerCategories, setDbPartnerCategories] = useState<{ id?: string; name: string; icon_url: string | null }[]>([])
     const [viewMode, setViewMode] = useState<ViewMode>("grid")
 
-    const categoriesList = useMemo(() => {
-        const newCategories: { name: string; icon_url: string | null }[] = [
-            { name: "Produtos", icon_url: "https://img.dudit.com.br/static/categories/products/Produtos.png" },
-            { name: "Serviços", icon_url: "https://img.dudit.com.br/static/categories/products/Servicos.png" },
-            { name: "Negócios", icon_url: "https://img.dudit.com.br/static/categories/products/Negocios.png" },
-            { name: "Bem avaliados", icon_url: "https://img.dudit.com.br/static/categories/products/Bem-avaliados.png" },
-            { name: "Em oferta", icon_url: "https://img.dudit.com.br/static/categories/products/Em-oferta.png" },
-            { name: "Em alta", icon_url: "https://img.dudit.com.br/static/categories/products/Em-alta.png" },
-            { name: "Novos anunciados", icon_url: "https://img.dudit.com.br/static/categories/products/Novos-anunciados.png" },
-        ]
-        return newCategories
-    }, [])
+    const resolveCategoryName = useCallback((value: string) => {
+        const normalize = (s: string) => s
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/&/g, "e")
+            .replace(/[-_]+/g, " ")
+            .replace(/\s+/g, " ")
+            .trim()
+        const normValue = normalize(value)
+        const all = [...dbCategories, ...dbServiceCategories, ...dbPartnerCategories]
+        const found = all.find(c => normalize(c.name) === normValue)
+        return found?.name || value
+    }, [dbCategories, dbServiceCategories, dbPartnerCategories])
 
     const categoriesLoadedRef = useRef(false)
 
@@ -235,16 +249,15 @@ export function ExplorarPageClient({
         const queryStr = queryParams.toString()
         const queryPart = queryStr ? `?${queryStr}` : ""
 
+        const catSlug = categories.length > 0 ? categoryToSlug(categories[0]) : ""
 
-
-        if (city) {
-            if (categories.length > 0) {
-                const catName = categories[0]
-                const catSlug = Object.keys(CATEGORY_SLUG_MAP).find(key => CATEGORY_SLUG_MAP[key] === catName) || catName
-                router.push(`/explorar/${city}/${catSlug}${queryPart}`)
-            } else {
-                router.push(`/explorar/${city}${queryPart}`)
-            }
+        if (city && catSlug) {
+            router.push(`/explorar/${city}/${catSlug}${queryPart}`)
+        } else if (city) {
+            router.push(`/explorar/${city}${queryPart}`)
+        } else if (catSlug) {
+            queryParams.set("categoria", catSlug)
+            router.push(`/explorar?${queryParams.toString()}`)
         } else {
             router.push(`/explorar${queryPart}`)
         }
@@ -550,8 +563,16 @@ export function ExplorarPageClient({
         if (!itemCategory) return false
         const categoryStr = typeof itemCategory === 'string' ? itemCategory : String(itemCategory || "")
         if (!categoryStr) return false
-        const normItem = categoryStr.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
-        const normTarget = catName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
+        const normalize = (s: string) => s
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/&/g, "e")
+            .replace(/[-_]+/g, " ")
+            .replace(/\s+/g, " ")
+            .trim()
+        const normItem = normalize(categoryStr)
+        const normTarget = normalize(catName)
         if (normItem === normTarget) return true
         // Fallback: check if one contains the other (for subcategory variations)
         // Only if the difference isn't too large (avoid false positives like "casa" matching "casa & utilidades")
@@ -577,12 +598,23 @@ export function ExplorarPageClient({
         return getItemCategoryNames(item).some((name) => matchCategory(name, catName))
     }
 
-    const isStandardCategory = (catName: string) => {
-        return categoriesList.some(cat => matchCategory(catName, cat.name))
-    }
+    const productCategories = useMemo(
+        () => (dbCategories.length > 0 ? dbCategories : FALLBACK_CATEGORIES),
+        [dbCategories]
+    )
+
+    const filterCategoriesList = useMemo(() => {
+        if (currentType === "servicos") return dbServiceCategories
+        if (currentType === "vitrines" || currentType === "negocios") return dbPartnerCategories
+        return productCategories
+    }, [currentType, dbServiceCategories, dbPartnerCategories, productCategories])
+
+    const isStandardCategory = useCallback((catName: string) => {
+        return filterCategoriesList.some(cat => matchCategory(catName, cat.name))
+    }, [filterCategoriesList])
 
     const activeCategoriesList = useMemo(() => {
-        const all = [...categoriesList]
+        const all = [...filterCategoriesList]
         const hasOutros = dataToFilter.some(p => {
             if (p.itemType === 'loja') return false
             const itemCat = p.category
@@ -592,7 +624,7 @@ export function ExplorarPageClient({
             all.push({ name: "Outros", icon_url: null })
         }
         return all
-    }, [categoriesList, dataToFilter])
+    }, [filterCategoriesList, dataToFilter, isStandardCategory])
 
     const outrosItems = useMemo(() => {
         return dataToFilter.filter(p => {
@@ -600,7 +632,7 @@ export function ExplorarPageClient({
             const itemCat = p.category
             return !itemCat || !isStandardCategory(itemCat)
         }).slice(0, 20)
-    }, [dataToFilter, categoriesList])
+    }, [dataToFilter, isStandardCategory])
 
     // In-memory filters for advanced filters
     const filteredResults = useMemo(() => {
@@ -646,7 +678,7 @@ export function ExplorarPageClient({
             )
         }
         return filtered
-    }, [dataToFilter, selectedCategories, minPrice, maxPrice, promoOn, sortBy, selectedSection, categoriesList])
+    }, [dataToFilter, selectedCategories, minPrice, maxPrice, promoOn, sortBy, selectedSection, isStandardCategory])
 
     const activeFiltersCount = useMemo(() => {
         let count = 0
@@ -739,22 +771,6 @@ export function ExplorarPageClient({
             .filter(g => g.list.length > 0)
     }, [filteredResults, selectedCategories])
 
-    const handleTypeChange = (newType: string) => {
-        if (newType === currentType) return
-        setCurrentType(newType as any)
-        setSelectedCategories([])
-        setMinPrice("")
-        setMaxPrice("")
-        setPromoOn(false)
-        updateUrl(selectedCitySlug, [], query, newType)
-    }
-
-    const handleRadiusChange = (radius: number | null) => {
-        setSelectedRadius(radius)
-        updateUrl(selectedCitySlug, selectedCategories, query, currentType, radius)
-    }
-
-
     const toggleCategory = (catName: string) => {
         setSelectedCategories((prev) => {
             const next = prev.includes(catName) ? [] : [catName]
@@ -835,7 +851,7 @@ export function ExplorarPageClient({
             if (selectedSection === "best-rated") return `Melhor avaliados${citySuffix}`
             if (selectedSection === "best-sellers") return `Mais vendidos${citySuffix}`
         }
-        if (selectedCategories.length > 0) return `${selectedCategories[0]}${citySuffix}`
+        if (selectedCategories.length > 0) return `${resolveCategoryName(selectedCategories[0])}${citySuffix}`
         if (currentType === "produtos") return `Produtos${citySuffix}`
         if (currentType === "servicos") return `Serviços${citySuffix}`
         if (currentType === "planos") return `Assinaturas e Planos${citySuffix}`
@@ -846,7 +862,7 @@ export function ExplorarPageClient({
         if (currentType === "em-alta") return `Em alta${citySuffix}`
         if (currentType === "novos-anunciados") return `Novos anunciados${citySuffix}`
         return `Itens${citySuffix}`
-    }, [query, currentType, selectedCategories, selectedCitySlug, selectedSection])
+    }, [query, currentType, selectedCategories, selectedCitySlug, selectedSection, resolveCategoryName])
 
     const emptySubtitle = useMemo(() => {
         const cityNameOnly = selectedCitySlug
@@ -986,15 +1002,29 @@ export function ExplorarPageClient({
         updateUrl(selectedCitySlug, [], query, "tudo", null)
     }
 
+    const applyFilters = (filters: {
+        type: string
+        categories: string[]
+        minPrice: string | number
+        maxPrice: string | number
+        promoOn: boolean
+        radius: number | null
+    }) => {
+        setCurrentType(filters.type as any)
+        setSelectedCategories(filters.categories)
+        setMinPrice(filters.minPrice)
+        setMaxPrice(filters.maxPrice)
+        setPromoOn(filters.promoOn)
+        setSelectedRadius(filters.radius)
+        updateUrl(selectedCitySlug, filters.categories, query, filters.type, filters.radius, selectedSection)
+    }
+
     const typeOptions = [
         { value: "tudo", label: "Tudo" },
         { value: "produtos", label: "Produtos" },
         { value: "servicos", label: "Serviços" },
-        { value: "negocios", label: "Negócios" },
-        { value: "bem-avaliados", label: "Bem avaliados" },
-        { value: "em-oferta", label: "Em oferta" },
-        { value: "em-alta", label: "Em alta" },
-        { value: "novos-anunciados", label: "Novos anunciados" },
+        { value: "vitrines", label: "Lojas" },
+        { value: "planos", label: "Assinaturas" },
     ]
 
     const sortOptions: { value: SortOption; label: string }[] = [
@@ -1010,7 +1040,7 @@ export function ExplorarPageClient({
             chips.push({
                 key: "category",
                 label: "Categoria",
-                value: selectedCategories[0],
+                value: resolveCategoryName(selectedCategories[0]),
                 onRemove: () => toggleCategory(selectedCategories[0]),
             })
         }
@@ -1056,7 +1086,7 @@ export function ExplorarPageClient({
             })
         }
         return chips
-    }, [selectedCategories, minPrice, maxPrice, promoOn, sortBy, currentType, selectedCitySlug, query])
+    }, [selectedCategories, minPrice, maxPrice, promoOn, sortBy, currentType, selectedCitySlug, query, resolveCategoryName])
 
     const getItemUrl = (item: any) => {
         if (item.itemType === "loja") return getStoreUrl(item.partners || item)
@@ -1282,9 +1312,9 @@ export function ExplorarPageClient({
     const showCommunityVideos = communityVideos.length > 0
 
     const goToCategory = (catName: string) => {
-        const catSlug = Object.keys(CATEGORY_SLUG_MAP).find(key => CATEGORY_SLUG_MAP[key] === catName) || catName.toLowerCase().replace(/ & /g, "-e-").replace(/\s+/g, "-")
-        const path = `/explorar/${selectedCitySlug || "brasil"}/${catSlug}`
-        router.push(path)
+        const catSlug = categoryToSlug(catName)
+        const typeParam = currentType && currentType !== "tudo" ? `?type=${currentType}` : ""
+        router.push(`/explorar/${selectedCitySlug || "brasil"}/${catSlug}${typeParam}`)
     }
 
     return (
@@ -1311,37 +1341,34 @@ export function ExplorarPageClient({
 
                 {/* MAIN CONTENT */}
                 <div className="container mx-auto max-w-[1400px] flex-grow pb-24 lg:pb-12 mt-4">
+                    {/* CATEGORIAS EM CÍRCULOS (type-aware) */}
+                    {!query && activeCategoriesList.length > 0 && !isLandingPage && (
+                        <div className="mb-6 lg:mb-8">
+                            <h2 className="text-lg lg:text-2xl font-medium text-brand-dark mb-4">Categorias</h2>
+                            <div className="flex gap-4 overflow-x-auto scrollbar-none snap-x snap-mandatory pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                                {activeCategoriesList.map((cat) => (
+                                    <button
+                                        key={cat.name}
+                                        onClick={() => goToCategory(cat.name)}
+                                        className="snap-start shrink-0 flex flex-col items-center gap-2 group w-[85px]"
+                                    >
+                                        <div className="w-[68px] h-[68px] rounded-full bg-brand-gray border border-gray-100 flex items-center justify-center overflow-hidden group-hover:border-brand-green group-hover:shadow-md transition-all duration-200">
+                                            {cat.icon_url ? (
+                                                <img src={cat.icon_url} alt={cat.name} className="w-9 h-9 object-contain" />
+                                            ) : (
+                                                <span className="text-2xl">📦</span>
+                                            )}
+                                        </div>
+                                        <span className="text-[11px] font-bold text-center leading-tight text-brand-dark line-clamp-2">{cat.name}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     {/* ─── SECTIONS MODE: Discover sections on top ─── */}
                     {showExploreSections && (
                         <div className="mb-6 lg:mb-8 space-y-6 lg:space-y-10">
-                            {/* 1. CATEGORIAS EM CÍRCULOS */}
-                            <div className="w-full">
-                                <h2 className="text-lg lg:text-2xl font-medium text-brand-dark mb-4">Categorias</h2>
-                                <div className="flex gap-4 overflow-x-auto scrollbar-none snap-x snap-mandatory pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                                    {(categoriesList || []).map((cat) => {
-                                        const catSlug = cat.name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")
-                                        return (
-                                            <button
-                                                key={cat.name}
-                                                onClick={() => goToCategory(cat.name)}
-                                                className="snap-start shrink-0 flex flex-col items-center gap-2 group w-[85px]"
-                                            >
-                                                <div className="w-[68px] h-[68px] rounded-full bg-brand-gray border border-gray-100 flex items-center justify-center overflow-hidden group-hover:border-brand-green group-hover:shadow-md transition-all duration-200">
-                                                    {cat.icon_url ? (
-                                                        <img src={cat.icon_url} alt={cat.name} className="w-9 h-9 object-contain" />
-                                                    ) : (
-                                                        <span className="text-2xl">📦</span>
-                                                    )}
-                                                </div>
-                                                <span className="text-[11px] font-bold text-center leading-tight text-brand-dark line-clamp-2">{cat.name}</span>
-                                            </button>
-                                        )
-                                    })}
-                                </div>
-                            </div>
-
-
-
                             {/* 3. VÍDEOS DA COMUNIDADE */}
                             {showCommunityVideos && (
                                 <CommunityVideosCarousel
@@ -1434,7 +1461,7 @@ export function ExplorarPageClient({
                         >
                             {isLoading || (isFetching && !isFetchingNextPage) ? (
                                 <ExploreContentSkeleton type={currentType} hasSection={!!selectedSection} />
-                            ) : !selectedCitySlug ? (
+                            ) : !selectedCitySlug && rawItems.length === 0 ? (
                                 <div className="flex justify-center">
                                     <IconPlaceholder
                                         placeholderType="image"
@@ -1463,7 +1490,7 @@ export function ExplorarPageClient({
                                             {
                                                 text: "Eu vendo algo",
                                                 action: () => {
-                                                    router.push(userProfile ? "/erp/switch" : "/auth/login?mode=partner")
+                                                    router.push(userProfile ? "/erp/trocar-erp" : "/auth/login?mode=partner")
                                                 },
                                                 variant: "default"
                                             },
@@ -1542,7 +1569,7 @@ export function ExplorarPageClient({
                                                     {
                                                         text: "Eu vendo algo",
                                                         action: () => {
-                                                            router.push(userProfile ? "/erp/switch" : "/auth/login?mode=partner")
+                                                            router.push(userProfile ? "/erp/trocar-erp" : "/auth/login?mode=partner")
                                                         },
                                                         variant: "default"
                                                     },
@@ -1622,15 +1649,22 @@ export function ExplorarPageClient({
                 {!hideHeaderAndFooter && <MarketplaceFooter />}
             </div>
 
-            {/* BOTTOM SHEETS (Mobile) */}
+            {/* FILTERS SHEET */}
             <ExplorarFiltersBottomSheet
                 userProfile={userProfile}
                 isOpen={isFiltersBottomSheetOpen}
                 onClose={() => setIsFiltersBottomSheetOpen(false)}
+                onApply={applyFilters}
+                onClear={clearFilters}
                 selectedCitySlug={selectedCitySlug}
                 formatCitySlug={formatCitySlug}
                 onCitySelect={() => setIsCityModalOpen(true)}
                 currentType={currentType}
+                selectedCategories={selectedCategories}
+                selectedRadius={selectedRadius}
+                minPrice={minPrice}
+                maxPrice={maxPrice}
+                promoOn={promoOn}
                 typeOptions={[
                     { value: "tudo", label: "Tudo" },
                     { value: "produtos", label: "Produtos" },
@@ -1638,25 +1672,10 @@ export function ExplorarPageClient({
                     { value: "planos", label: "Assinaturas" },
                     { value: "vitrines", label: "Lojas" },
                 ]}
-                onTypeChange={handleTypeChange}
-                activeCategoriesList={activeCategoriesList}
-                selectedCategories={selectedCategories}
-                onToggleCategory={toggleCategory}
-                selectedRadius={selectedRadius}
-                onRadiusChange={handleRadiusChange}
-                minPrice={minPrice}
-                onMinPriceChange={setMinPrice}
-                maxPrice={maxPrice}
-                onMaxPriceChange={setMaxPrice}
-                sortBy={sortBy}
-                sortOptions={contextualSortOptions}
-                onSortChange={(val) => setSortBy(val as any)}
-                promoOn={promoOn}
-                onPromoToggle={() => setPromoOn(!promoOn)}
-                activeFiltersCount={activeFiltersCount}
-                onClearFilters={clearFilters}
+                productCategories={productCategories}
+                serviceCategories={dbServiceCategories}
+                partnerCategories={dbPartnerCategories}
                 filterConfig={filterConfig}
-                pageMode={pageMode}
             />
 
             <ExplorarSortBottomSheet
@@ -1743,7 +1762,7 @@ export function ExplorarPageClient({
                 maxWidth="md"
             >
                 <div className="flex flex-col gap-2 py-2 max-h-[350px] overflow-y-auto pr-1">
-                    {categoriesList.map((cat) => {
+                    {activeCategoriesList.map((cat) => {
                         const isSelected = selectedCategories.includes(cat.name)
                         return (
                             <button

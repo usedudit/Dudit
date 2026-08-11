@@ -56,7 +56,7 @@ function AuthContent() {
   /**
    * Logged-in + mode=partner: `null` = ainda decidir (mostrar loading);
    * `true` = pode exibir o wizard (sem acesso a ERP ainda);
-   * `false` = não usado (redirect /erp/switch ocorre antes).
+   * `false` = não usado (redirect /erp/trocar-erp ocorre antes).
    */
   const [canShowPartnerWizardWhenLoggedIn, setCanShowPartnerWizardWhenLoggedIn] = useState<null | boolean>(null)
 
@@ -73,13 +73,13 @@ function AuthContent() {
   // Handle direct redirection for verified partners (e-mail de verificação)
   useEffect(() => {
     if (verifiedParam === "true" && rawModeParam === "partner") {
-      router.push("/erp/switch")
+      router.push("/erp/trocar-erp")
     }
   }, [verifiedParam, rawModeParam, router])
 
   const lastCheckedUserId = useRef<string | null>(null)
 
-  // Sessão logada + ?mode=partner: com ERP -> /erp/switch; sem ERP -> fica no wizard
+  // Sessão logada + ?mode=partner: com ERP -> /erp/trocar-erp; sem ERP -> fica no wizard
   useEffect(() => {
     if (!user || !isPartnerMode) {
       setCanShowPartnerWizardWhenLoggedIn(null)
@@ -97,7 +97,7 @@ function AuthContent() {
       .then((has) => {
         if (gone) return
         if (has) {
-          router.replace("/erp/switch")
+          router.replace("/erp/trocar-erp")
           return
         }
         lastCheckedUserId.current = user.id

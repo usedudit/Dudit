@@ -74,7 +74,7 @@ export function SupplierForm({ partnerId, supplier }: SupplierFormProps) {
       toast.error("Erro ao salvar fornecedor", result.error)
       setIsLoading(false)
     } else {
-      router.push("/erp/suppliers")
+      router.push("/erp/fornecedores")
     }
   }
 

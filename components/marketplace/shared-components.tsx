@@ -32,7 +32,7 @@ export const HeroBanner: React.FC<{ height?: number }> = ({ height = 300 }) => {
             <div className={`w-[82vw] md:w-full max-w-[1400px] h-[${height}px] relative rounded-[20px] overflow-hidden cursor-pointer select-none active:scale-[0.99] hover:shadow-lg transition-all duration-300`}>
                 <img
                     src="https://img.dudit.com.br/static/banners/Banner-1.png"
-                    alt="Dudit Marketplace"
+                    alt="Dudit"
                     className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-500"
                     loading="lazy"
                 />

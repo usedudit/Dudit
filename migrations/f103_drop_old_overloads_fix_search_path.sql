@@ -1,5 +1,5 @@
 -- ============================================================================
--- Fase 10.3 — Drop overload antigo (8-param) de finalize_pos_sale + search_path
+-- Fase 10.3 - Drop overload antigo (8-param) de finalize_pos_sale + search_path
 -- ============================================================================
 -- PROBLEMA:
 --   1. Migration 20260715 criou finalize_pos_sale com 8 parâmetros (sem
@@ -18,7 +18,7 @@ BEGIN;
 -- 1. DROP ALL overloads de finalize_pos_sale
 -- ============================================================
 
--- 8-param (old, from 20260715) — NUNCA foi dropado antes
+-- 8-param (old, from 20260715) - NUNCA foi dropado antes
 DROP FUNCTION IF EXISTS public.finalize_pos_sale(
   p_partner_id UUID,
   p_pre_sale_id UUID,
@@ -30,7 +30,7 @@ DROP FUNCTION IF EXISTS public.finalize_pos_sale(
   p_user_id UUID
 );
 
--- 9-param (from f102) — já existe mas vamos recriar
+-- 9-param (from f102) - já existe mas vamos recriar
 DROP FUNCTION IF EXISTS public.finalize_pos_sale(
   p_partner_id UUID,
   p_pre_sale_id UUID,
@@ -44,7 +44,7 @@ DROP FUNCTION IF EXISTS public.finalize_pos_sale(
 );
 
 -- ============================================================
--- 2. Recreate finalize_pos_sale — 9-param, SEM validação estoque
+-- 2. Recreate finalize_pos_sale - 9-param, SEM validação estoque
 -- ============================================================
 CREATE OR REPLACE FUNCTION public.finalize_pos_sale(
   p_partner_id UUID,

@@ -1,5 +1,5 @@
 -- ============================================================================
--- F4.1c — Migrar dados legacy store_id para bridge tables
+-- F4.1c - Migrar dados legacy store_id para bridge tables
 -- ============================================================================
 -- Migra dados existentes de store_id nas tabelas base (suppliers, product_kits)
 -- para as respectivas bridge tables (store_suppliers, store_product_kits).
@@ -45,7 +45,7 @@ WHERE pk.store_id IS NOT NULL
   );
 
 -- ============================================================
--- 3. Relatório de migração (opcional — via RAISE NOTICE)
+-- 3. Relatório de migração (opcional - via RAISE NOTICE)
 -- ============================================================
 DO $$
 DECLARE
