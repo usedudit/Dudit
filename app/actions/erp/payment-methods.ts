@@ -159,6 +159,7 @@ const getCachedPaymentMethods = (partnerId: string) => unstable_cache(
                 "percentage_rate, fixed_amount, created_at, " +
                 "installment_fee_bearer, " +
                 "default_finance_account_id, store_id, " +
+                "payment_method_installment_fees(installment_number, fee_percent), " +
                 "finance_accounts!default_finance_account_id(name)"
             )
             .eq("partner_id", partnerId)
@@ -177,6 +178,10 @@ const getCachedPaymentMethods = (partnerId: string) => unstable_cache(
             fee_fixed: method.fee_fixed ?? method.fixed_amount ?? null,
             fee_bearer: method.fee_bearer || "merchant",
             installment_fee_bearer: method.installment_fee_bearer || "merchant",
+            installment_fees: (method.payment_method_installment_fees || []).map((row: any) => ({
+                installment_number: Number(row.installment_number || 0),
+                fee_percent: Number(row.fee_percent || 0),
+            })),
             finance_account_name: method.finance_accounts?.name || null,
         }))
     },

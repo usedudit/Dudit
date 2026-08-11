@@ -56,7 +56,7 @@ export type ERPOrderPayload = {
     salesChannel?: string
     deliveryMethod: 'delivery' | 'pickup'
     storeId?: string
-    financeAccountId: string
+    financeAccountId?: string | null
     paymentStatus: 'paid' | 'partially_paid' | 'unpaid'
     deliveryStatus: 'not_sent' | 'preparing' | 'sent' | 'delivered' | 'pickup_available' | 'delivery_failed'
     items: ERPItemPayload[]
@@ -1593,6 +1593,9 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     const partnerId = data.partnerId
     await requirePermission(partnerId, "orders", "create")
 
+    // Normalize empty finance account to null (avoids `invalid input syntax for type uuid: ""`)
+    data.financeAccountId = data.financeAccountId?.trim() ? data.financeAccountId.trim() : null
+
     // Validate discount permission if a discount is being applied
     if (data.discountValue > 0 || data.couponCode) {
         await requirePermission(partnerId, "orders", "can_apply_discount")
@@ -2430,6 +2433,9 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     if (!user) return { error: "Não autenticado" }
 
     const { roleId } = await requirePermission(data.partnerId, "orders", "edit")
+
+    // Normalize empty finance account to null (avoids `invalid input syntax for type uuid: ""`)
+    data.financeAccountId = data.financeAccountId?.trim() ? data.financeAccountId.trim() : null
 
     // Validate discount permission if a discount is being applied
     if (data.discountValue > 0 || data.couponCode) {

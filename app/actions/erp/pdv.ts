@@ -1115,7 +1115,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
         paymentStatus: "paid",
         paymentMethod: input.paymentMethod || "PDV",
         paymentBreakdown: breakdownForOrder as any,
-        financeAccountId: input.financeAccountId || "",
+        financeAccountId: input.financeAccountId || null,
         items: erpItems,
         subtotal: safeMoney(Number(preSaleDraft.subtotal || 0)),
         discountValue: safeMoney(Number(preSaleDraft.discount_amount || 0)),

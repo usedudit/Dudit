@@ -34,6 +34,7 @@ import { formatPaymentMethodLabel } from '@/lib/utils/payment-method-label';
 import { usePaymentMethods } from '@/hooks/use-payment-methods';
 import { useStore } from '@/lib/store-context';
 import { getPOSCustomerDetailsAction } from '@/app/actions/erp/pdv';
+import { calculatePaymentAmounts } from '@/lib/payments/calculation';
 
 
 const PAYMENT_METHODS_UPDATED_EVENT = "payment-methods-updated";
@@ -185,7 +186,91 @@ type PartnerPaymentMethod = {
     fee_bearer?: "merchant" | "customer";
     discount_percent?: number | null;
     max_installments?: number | null;
+    installment_fee_bearer?: "merchant" | "customer" | null;
+    installment_fees?: Array<{ installment_number: number; fee_percent: number }>;
 };
+
+function calculatePaymentDetailsLocally(
+    method: PartnerPaymentMethod,
+    originalAmount: number,
+    installmentNumber: number,
+    includeInstallmentOptions: boolean,
+) {
+    const feeBearer = (method.fee_bearer || "merchant") as "merchant" | "customer";
+    const installmentFeeBearer = (method.installment_fee_bearer || "merchant") as "merchant" | "customer";
+    const config = {
+        feePercent: Number(method.fee_percent || 0),
+        feeFixed: Number(method.fee_fixed || 0),
+        feeBearer,
+        installmentFeeBearer,
+        discountPercent: Number(method.discount_percent || 0),
+        maxInstallments: Math.max(1, Number(method.max_installments || 1)),
+        installmentFees: (method.installment_fees || []).map((row) => ({
+            installmentNumber: Number(row.installment_number || 0),
+            feePercent: Number(row.fee_percent || 0),
+        })),
+    };
+    const normalizedAmount = Math.max(0, Number(originalAmount || 0));
+    const options: any[] = [];
+
+    if (includeInstallmentOptions && normalizeMethodType(method.type) === "credit_card" && config.maxInstallments > 1) {
+        for (let i = 1; i <= config.maxInstallments; i += 1) {
+            const row = calculatePaymentAmounts({ originalAmount: normalizedAmount, paymentMethod: config, installmentNumber: i });
+            options.push({
+                installments: i,
+                installmentValue: row.installmentAmounts[0] || row.finalAmount / i,
+                hasInterest: row.interestAmount > 0.009 && (feeBearer === "customer" || installmentFeeBearer === "customer"),
+                totalInterest: row.interestAmount,
+                totalFee: row.feeAmount,
+                fixedFee: row.fixedFeeAmount,
+                feeBearer,
+                installmentFeeBearer,
+                finalAmount: row.finalAmount,
+            });
+        }
+    }
+
+    const row = calculatePaymentAmounts({ originalAmount: normalizedAmount, paymentMethod: config, installmentNumber });
+    const adjustmentAmount = Number((row.paymentMethodDiscountAmount + row.interestAmount + row.feeAmount + row.fixedFeeAmount).toFixed(2));
+    const adjustmentType = row.paymentMethodDiscountAmount > 0.009
+        ? "discount"
+        : (row.interestAmount > 0.009 ? "interest" : (row.feeAmount > 0.009 || row.fixedFeeAmount > 0.009 ? "fee" : "none"));
+    const adjustmentPercent = adjustmentType === "discount"
+        ? row.appliedDiscountPercent
+        : (adjustmentType === "interest" ? row.appliedInterestPercent : row.appliedFeePercent);
+    const installmentCostAmount = Number(row.installmentCostAmount || 0);
+    const fixedInterestAmount = Number(row.interestAmount || 0) - installmentCostAmount;
+    const absorbedAmount = Number((
+        (feeBearer === "merchant" ? fixedInterestAmount + row.feeAmount + row.fixedFeeAmount : 0)
+        + (installmentFeeBearer === "merchant" ? installmentCostAmount : 0)
+    ).toFixed(2));
+
+    return {
+        success: true,
+        installmentOptions: options,
+        finalAmount: row.finalAmount,
+        paymentMethodDiscountAmount: row.paymentMethodDiscountAmount,
+        feeAmount: row.feeAmount,
+        fixedFeeAmount: row.fixedFeeAmount,
+        interestAmount: row.interestAmount,
+        installmentCostAmount,
+        amountBeforeInterest: row.amountBeforeInterest,
+        amountBeforeFee: row.amountBeforeFee,
+        installmentNumber: row.installmentNumber,
+        installmentAmounts: row.installmentAmounts,
+        appliedDiscountPercent: row.appliedDiscountPercent,
+        appliedFeePercent: row.appliedFeePercent,
+        appliedInterestPercent: row.appliedInterestPercent,
+        amountReceived: row.finalAmount,
+        adjustmentType,
+        adjustmentPercent,
+        adjustmentAmount,
+        effectiveAmount: row.finalAmount,
+        netAmount: Number((row.finalAmount - absorbedAmount).toFixed(2)),
+        feeBearer,
+        installmentFeeBearer,
+    };
+}
 
 const normalizeMethodType = (value?: string | null) => {
     const raw = String(value || "").toLowerCase().trim();
@@ -1174,13 +1259,21 @@ const PaymentModal = ({
         }
 
         setIsPaymentCalculationLoading(true);
-        calculatePaymentMethodAmountsAction({
-            originalAmount: base,
-            paymentMethodId: selectedMethodId,
-            installmentNumber,
-            feeBearer,
-            includeInstallmentOptions: shouldComputeOptions,
-        }).then((res: any) => {
+        const calculationPromise = currentMethod
+            ? Promise.resolve(calculatePaymentDetailsLocally(
+                currentMethod as PartnerPaymentMethod,
+                base,
+                installmentNumber,
+                shouldComputeOptions,
+            ))
+            : calculatePaymentMethodAmountsAction({
+                originalAmount: base,
+                paymentMethodId: selectedMethodId,
+                installmentNumber,
+                feeBearer,
+                includeInstallmentOptions: shouldComputeOptions,
+            });
+        calculationPromise.then((res: any) => {
             if (!active) return;
             if (res?.success) {
                 paymentCalculationCacheRef.current.set(calculationCacheKey, res);
