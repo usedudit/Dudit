@@ -102,6 +102,8 @@ export interface InvoiceData {
         name: string
         document: string | null
         email: string | null
+        phone: string | null
+        address: string | null
     } | null
 
     purchase: {

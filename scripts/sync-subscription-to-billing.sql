@@ -51,25 +51,31 @@ DECLARE
     inv_data JSONB;
     store_doc TEXT;
     store_rec RECORD;
+    owner_email TEXT;
 BEGIN
     IF EXISTS (SELECT 1 FROM billing_invoices WHERE purchase_id = p_purchase_id) THEN
         RETURN jsonb_build_object('status', 'exists');
     END IF;
 
-    SELECT bp.*, pn.name AS partner_name, pn.email AS partner_email
+    SELECT bp.*
     INTO p
     FROM billing_purchases bp
-    LEFT JOIN partners pn ON pn.id = bp.partner_id
     WHERE bp.id = p_purchase_id;
 
     IF NOT FOUND THEN
         RETURN jsonb_build_object('error', 'purchase not found');
     END IF;
 
+    -- Dados do emissor vêm da loja matriz do parceiro (partners não tem
+    -- mais name/email/phone/logo_url).
     SELECT * INTO store_rec
     FROM stores WHERE partner_id = p.partner_id AND is_headquarters = true LIMIT 1;
     SELECT COALESCE(cnpj, cpf, '') INTO store_doc
     FROM stores WHERE partner_id = p.partner_id AND is_headquarters = true LIMIT 1;
+
+    -- Email de faturamento da assinatura (quando a purchase é de subscription).
+    SELECT s.billing_email INTO owner_email
+    FROM subscriptions s WHERE s.id = p.subscription_id;
 
     SELECT name INTO plan_name FROM plans WHERE id = p.purchaseable_id;
 
@@ -86,10 +92,10 @@ BEGIN
         'created_at', now(),
         'status', 'issued',
         'partner', jsonb_build_object(
-            'name', COALESCE(store_rec.name, p.partner_name, ''),
+            'name', COALESCE(store_rec.name, ''),
             'document', store_doc,
             'address', '',
-            'email', p.partner_email,
+            'email', COALESCE(owner_email, ''),
             'phone', COALESCE(store_rec.phone, ''),
             'image_url', COALESCE(store_rec.logo_url, '')
         ),

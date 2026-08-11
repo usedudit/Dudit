@@ -2999,13 +2999,14 @@ const PaymentModal = ({
                                                     )}
                                                     {mpBrickError && (
                                                         <div className="flex flex-col items-center justify-center py-16 gap-4 text-center">
-                                                            <div className="w-16 h-16 rounded-full bg-red-50 dark:bg-red-900/20 flex items-center justify-center">
-                                                                <CancelCircleIcon size={32} className="text-brand-red" />
-                                                            </div>
-                                                            <p className="text-sm font-medium text-brand-red max-w-sm">{mpBrickError}</p>
-                                                            <Button variant="outline" onClick={() => { setMpBrickError(null); mpBrickInitializedRef.current = false; setMpBrickReady(false); initializeMpBrick(); }} className="mt-2">
-                                                                Tentar novamente
-                                                            </Button>
+                                                            <IconPlaceholder
+                                                                placeholderType="image"
+                                                                imageSrc="https://img.dudit.com.br/static/mascots/Ops.png"
+                                                                imageAlt="Não foi possível concluir a venda"
+                                                                title="Não foi possível concluir a venda"
+                                                                subtitle={mpBrickError}
+                                                                buttons={[{ text: "Tentar novamente", action: () => { setMpBrickError(null); mpBrickInitializedRef.current = false; setMpBrickReady(false); initializeMpBrick(); }, variant: "outline" }]}
+                                                            />
                                                         </div>
                                                     )}
                                                     {mpIsProcessing && (
@@ -3022,7 +3023,7 @@ const PaymentModal = ({
                                                 <div className="flex flex-col items-center px-2 pt-4">
                                                     <div className="text-center mb-6">
                                                         <div className="w-16 h-16 rounded-full bg-[#00b1ea]/10 flex items-center justify-center mx-auto mb-4">
-                                                            <img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="MP" className="w-8 h-8 object-contain" />
+                                                            <img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-8 h-8 object-contain" />
                                                         </div>
                                                         <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-1">Pix gerado via Mercado Pago</h3>
                                                         <p className="text-sm text-brand-inactive-text">Escaneie o QR Code ou copie o código</p>

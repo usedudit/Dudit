@@ -1,12 +1,15 @@
 "use client"
-import { useState, useEffect, useCallback } from "react"
-import { Button } from "@/components/reusable"
-import { PrinterIcon, DownloadIcon, EyeIcon } from "@/lib/icons"
-import { Loader2 } from "lucide-react"
+
+import { useCallback, useEffect, useState } from "react"
+import Portal from "@/components/Portal"
+import { Button, Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/reusable"
+import { XIcon, PrinterIcon, DownloadIcon } from "@/lib/icons"
+import { useMediaQuery } from "@/components/erp/hooks"
+import { downloadPdf } from "@/lib/pdf/download"
 import { InvoicePreview } from "./InvoicePreview"
 import type { InvoiceData } from "@/lib/billing/types"
 
-interface InvoicePrintModalProps {
+export type InvoicePrintModalProps = {
     isOpen: boolean
     onClose: () => void
     invoiceData: InvoiceData | null
@@ -14,101 +17,137 @@ interface InvoicePrintModalProps {
 }
 
 export function InvoicePrintModal({ isOpen, onClose, invoiceData, invoiceId }: InvoicePrintModalProps) {
-    const [loading, setLoading] = useState(false)
     const isMobile = useMediaQuery("(max-width: 1023px)")
 
-    const handlePrint = useCallback(async () => {
-        if (isMobile) {
-            try {
-                await downloadPdf(`/api/pdf/invoice/${invoiceId}`, `fatura-${invoiceId}.pdf`)
-            } catch {
-                window.open(`/print/invoice/${invoiceId}`, "_blank")
-            }
-        } else {
-            window.open(`/print/invoice/${invoiceId}`, "_blank")
-        }
-    }, [invoiceId, isMobile])
-
-    const handleDownloadPdf = useCallback(async () => {
-        setLoading(true)
-        try {
-            await downloadPdf(`/api/pdf/invoice/${invoiceId}`, `fatura-${invoiceId}.pdf`)
-        } catch (err: any) {
-            console.error("PDF download error:", err)
-        } finally {
-            setLoading(false)
-        }
-    }, [invoiceId])
+    const [isVisible, setIsVisible] = useState(false)
+    const [isAnimating, setIsAnimating] = useState(false)
+    const [activeTab, setActiveTab] = useState("Visualização")
 
     useEffect(() => {
-        if (!isOpen) return
+        if (isOpen) {
+            setIsVisible(true)
+            const id = setTimeout(() => setIsAnimating(true), 50)
+            return () => clearTimeout(id)
+        }
+        setIsAnimating(false)
+        const id = setTimeout(() => setIsVisible(false), 200)
+        return () => clearTimeout(id)
     }, [isOpen])
 
-    if (!isOpen || !invoiceData) return null
+    const handlePrint = useCallback(() => {
+        if (!invoiceId) return
+        if (isMobile) {
+            downloadPdf(`/api/pdf/invoice/${invoiceId}`, `fatura-${invoiceId}.pdf`)
+                .catch(() => window.open(`/print/invoice/${invoiceId}`, "_blank"))
+            onClose()
+            return
+        }
+        window.open(`/print/invoice/${invoiceId}`, "_blank")
+        onClose()
+    }, [invoiceId, onClose, isMobile])
+
+    const handleDownloadPdf = useCallback(() => {
+        if (!invoiceId) return
+        downloadPdf(`/api/pdf/invoice/${invoiceId}`, `fatura-${invoiceId}.pdf`)
+            .catch(() => {
+                window.open(`/print/invoice/${invoiceId}`, "_blank")
+            })
+        onClose()
+    }, [invoiceId, onClose])
+
+    if (!isVisible) return null
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-            <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-            <div className="relative bg-white dark:bg-dark-surface rounded-2xl w-full max-w-[900px] max-h-[90vh] flex flex-col shadow-2xl">
-                <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-dark-border">
-                    <h2 className="text-lg font-bold text-gray-800 dark:text-dark-heading">Fatura {invoiceData.invoice_number}</h2>
-                    <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" leftIcon={<PrinterIcon />} onClick={handlePrint}>
-                            Imprimir
-                        </Button>
+        <Portal>
+            <div className="fixed inset-0 z-[130] flex flex-col bg-black/60">
+                <div
+                    className={`relative flex flex-col w-full h-full bg-white dark:bg-dark-background transition-opacity duration-200 ${isAnimating ? "opacity-100" : "opacity-0"
+                        }`}
+                >
+                    {/* Header */}
+                    <div className="shrink-0 flex items-center justify-between px-4 md:px-6 py-4 border-b border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
+                        <h2 className="text-lg md:text-xl font-bold text-brand-dark dark:text-dark-heading">
+                            {invoiceData ? `Fatura ${invoiceData.invoice_number}` : "Imprimir fatura"}
+                        </h2>
                         <Button
-                            variant="default"
-                            size="sm"
-                            leftIcon={loading ? <Loader2 className="animate-spin" /> : <DownloadIcon />}
-                            onClick={handleDownloadPdf}
-                            disabled={loading}
+                            variant="filled"
+                            onClick={onClose}
+                            className="w-10 h-10 p-0 flex items-center justify-center shrink-0"
                         >
-                            {loading ? "Gerando..." : "Salvar PDF"}
+                            <XIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                         </Button>
-                        <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-dark-border rounded-full">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M18 6L6 18M6 6l12 12" />
-                            </svg>
-                        </button>
                     </div>
-                </div>
-                <div className="flex-1 overflow-y-auto p-4">
-                    <InvoicePreview data={invoiceData} />
+
+                    {!invoiceData ? (
+                        <div className="flex-1 flex items-center justify-center text-brand-red font-bold">
+                            Não foi possível carregar a fatura.
+                        </div>
+                    ) : (
+                        <Tabs
+                            value={activeTab}
+                            onValueChange={setActiveTab}
+                            className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0"
+                        >
+                            {isMobile && (
+                                <div className="shrink-0 px-4 pt-3 border-b border-brand-border dark:border-dark-border lg:hidden">
+                                    <TabsList className="bg-transparent p-0 gap-4 w-full justify-start border-b-0">
+                                        <TabsTrigger value="Visualização">Visualização</TabsTrigger>
+                                    </TabsList>
+                                </div>
+                            )}
+
+                            {/* Left - options */}
+                            <div
+                                className={`w-full lg:w-1/2 flex flex-col border-r border-brand-border dark:border-dark-border overflow-hidden ${activeTab === "Visualização" ? "hidden lg:flex" : "flex"
+                                    }`}
+                            >
+                                <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-6">
+                                    <p className="text-sm text-brand-inactive-text">
+                                        Visualize e imprima a fatura em formato A4.
+                                    </p>
+
+                                    <div className="hidden lg:flex gap-3 pt-2">
+                                        <Button className="flex-1 h-12" onClick={handlePrint} leftIcon={<PrinterIcon size={18} />}>
+                                            Imprimir
+                                        </Button>
+                                        <Button variant="outline" className="flex-1 h-12" onClick={handleDownloadPdf} leftIcon={<DownloadIcon size={18} />}>
+                                            Salvar PDF
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                {/* Mobile footer actions */}
+                                <div className="lg:hidden shrink-0 p-4 border-t border-brand-border dark:border-dark-border flex gap-3">
+                                    <Button className="flex-1 h-12" onClick={handlePrint} leftIcon={<PrinterIcon size={18} />}>
+                                        Imprimir
+                                    </Button>
+                                    <Button variant="outline" className="flex-1 h-12" onClick={handleDownloadPdf} leftIcon={<DownloadIcon size={18} />}>
+                                        PDF
+                                    </Button>
+                                </div>
+                            </div>
+
+                            {/* Right - preview */}
+                            <div
+                                className={`w-full lg:w-1/2 bg-brand-gray dark:bg-dark-border/20 flex flex-col min-h-0 overflow-hidden ${activeTab === "Visualização" ? "flex flex-1" : "hidden lg:flex"
+                                    }`}
+                            >
+                                <TabsContent
+                                    value="Visualização"
+                                    className="m-0 p-0 h-full flex flex-col flex-1 min-h-0 focus-visible:outline-none"
+                                    forceMount
+                                >
+                                    <div className="flex-1 overflow-auto custom-scrollbar p-4 md:p-6 flex justify-center items-start">
+                                        <div className="w-full h-full min-h-[400px]">
+                                            <InvoicePreview data={invoiceData} />
+                                        </div>
+                                    </div>
+                                </TabsContent>
+                            </div>
+                        </Tabs>
+                    )}
                 </div>
             </div>
-        </div>
+        </Portal>
     )
-}
-
-async function downloadPdf(apiPath: string, filename: string): Promise<void> {
-    const response = await fetch(apiPath)
-    if (!response.ok) {
-        let errorMessage = "Erro ao gerar PDF"
-        try {
-            const errorJson = await response.json()
-            errorMessage = errorJson.error || errorJson.details || errorMessage
-        } catch { }
-        throw new Error(errorMessage)
-    }
-    const blob = await response.blob()
-    const url = window.URL.createObjectURL(blob)
-    const link = document.createElement("a")
-    link.href = url
-    link.download = filename
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    window.URL.revokeObjectURL(url)
-}
-
-function useMediaQuery(query: string): boolean {
-    const [matches, setMatches] = useState(false)
-    useEffect(() => {
-        const mql = window.matchMedia(query)
-        setMatches(mql.matches)
-        const handler = (e: MediaQueryListEvent) => setMatches(e.matches)
-        mql.addEventListener("change", handler)
-        return () => mql.removeEventListener("change", handler)
-    }, [query])
-    return matches
 }

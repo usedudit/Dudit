@@ -84,7 +84,6 @@ function getTypeLabel(type: string): string {
 const COLUMNS = [
     { id: "type", label: "Tipo", align: "left" as const, width: "100px" },
     { id: "description", label: "Descrição", align: "left" as const },
-    { id: "partner", label: "Parceiro", align: "left" as const },
     { id: "amount", label: "Valor", align: "right" as const, width: "120px" },
     { id: "status", label: "Status", align: "left" as const, width: "120px" },
     { id: "gateway", label: "Gateway", align: "left" as const, width: "120px" },
@@ -94,11 +93,10 @@ const COLUMNS = [
 
 interface BillingPageProps {
     initialPartnerId?: string
-    hidePartnerColumn?: boolean
     showTitle?: boolean
 }
 
-export function BillingPage({ initialPartnerId, hidePartnerColumn, showTitle }: BillingPageProps) {
+export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
     const isMobile = useMediaQuery("(max-width: 767px)")
     const [data, setData] = useState<PurchaseWithRelations[]>([])
     const [total, setTotal] = useState(0)
@@ -122,7 +120,7 @@ export function BillingPage({ initialPartnerId, hidePartnerColumn, showTitle }: 
     const [cancelOpen, setCancelOpen] = useState(false)
 
     const effectiveViewMode = isMobile ? "grid" : viewMode
-    const filteredColumns = hidePartnerColumn ? COLUMNS.filter((c) => c.id !== "partner") : COLUMNS
+    const filteredColumns = COLUMNS
 
     const billingFilters: BillingFilters = useMemo(() => ({
         partner_id: initialPartnerId,
@@ -281,10 +279,6 @@ export function BillingPage({ initialPartnerId, hidePartnerColumn, showTitle }: 
                         <p className="text-xs text-brand-inactive-text font-medium">Data</p>
                         <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatDate(selectedPurchase.created_at)}</p>
                     </div>
-                    <div>
-                        <p className="text-xs text-brand-inactive-text font-medium">Parceiro</p>
-                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">{selectedPurchase.partner_name || selectedPurchase.partner_id}</p>
-                    </div>
                     {selectedPurchase.description && (
                         <div className="col-span-2">
                             <p className="text-xs text-brand-inactive-text font-medium">Descrição</p>
@@ -410,7 +404,6 @@ export function BillingPage({ initialPartnerId, hidePartnerColumn, showTitle }: 
                                     statusLabel={getStatusLabel(p.status)}
                                     statusVariant={STATUS_VARIANTS[p.status] || "gray"}
                                     gatewayLabel={getGatewayLabel(p.gateway)}
-                                    partnerName={p.partner_name}
                                     createdAt={p.created_at}
                                     onDetails={() => handleViewDetails(p)}
                                     onCancel={p.status === "pending" ? () => { setCancelTarget(p); setCancelOpen(true) } : undefined}
@@ -462,7 +455,6 @@ export function BillingPage({ initialPartnerId, hidePartnerColumn, showTitle }: 
                                             statusLabel={getStatusLabel(p.status)}
                                             statusVariant={STATUS_VARIANTS[p.status] || "gray"}
                                             gatewayLabel={getGatewayLabel(p.gateway)}
-                                            partnerName={p.partner_name}
                                             createdAt={p.created_at}
                                             columns={filteredColumns}
                                             onDetails={() => handleViewDetails(p)}

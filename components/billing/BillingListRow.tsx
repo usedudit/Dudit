@@ -34,7 +34,6 @@ interface BillingListRowProps {
     statusLabel: string
     statusVariant: "green" | "red" | "orange" | "blue" | "cyan" | "purple" | "gray"
     gatewayLabel: string
-    partnerName?: string | null
     createdAt: string
     columns: ColumnDef[]
     onDetails: () => void
@@ -53,7 +52,6 @@ const BillingListRow = React.memo(
         statusLabel,
         statusVariant,
         gatewayLabel,
-        partnerName,
         createdAt,
         columns,
         onDetails,
@@ -87,10 +85,6 @@ const BillingListRow = React.memo(
                                 {description || typeLabel}
                             </span>
                         </div>
-                    )
-                case "partner":
-                    return (
-                        <span className="text-xs font-medium text-brand-dark dark:text-dark-heading">{partnerName}</span>
                     )
                 case "amount":
                     return (
@@ -128,8 +122,7 @@ const BillingListRow = React.memo(
             <motion.tr
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="group hover:[&:not(:has(.action-btn:hover))]:bg-brand-gray dark:hover:[&:not(:has(.action-btn:hover))]:bg-dark-border/20 transition-colors cursor-pointer bg-white dark:bg-dark-background"
-                onClick={onDetails}
+                className="group hover:[&:not(:has(.action-btn:hover))]:bg-brand-gray dark:hover:[&:not(:has(.action-btn:hover))]:bg-dark-border/20 transition-colors bg-white dark:bg-dark-background"
             >
                 {columns.map((col) => (
                     <td

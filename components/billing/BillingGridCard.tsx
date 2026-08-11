@@ -27,7 +27,6 @@ interface BillingGridCardProps {
     statusLabel: string
     statusVariant: "green" | "red" | "orange" | "blue" | "cyan" | "purple" | "gray"
     gatewayLabel: string
-    partnerName?: string | null
     createdAt: string
     onDetails: () => void
     onCancel?: () => void
@@ -46,7 +45,6 @@ const BillingGridCard = React.memo(
         statusLabel,
         statusVariant,
         gatewayLabel,
-        partnerName,
         createdAt,
         onDetails,
         onCancel,
@@ -61,8 +59,7 @@ const BillingGridCard = React.memo(
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.2 }}
-                className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all duration-300 cursor-pointer group flex flex-col h-full relative"
-                onClick={onDetails}
+                className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all duration-300 group flex flex-col h-full relative"
             >
                 <div className="flex gap-4 mb-2">
                     <div className="w-14 h-14 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
@@ -78,12 +75,6 @@ const BillingGridCard = React.memo(
                             </div>
                             <Badge variant={statusVariant} className="shrink-0 scale-90">{statusLabel}</Badge>
                         </div>
-
-                        {partnerName && (
-                            <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate mt-1">
-                                {partnerName}
-                            </div>
-                        )}
 
                         <div className="mt-2">
                             <span className="text-[16px] font-bold text-brand-dark dark:text-dark-heading">

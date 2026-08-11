@@ -5,6 +5,8 @@ type StockItem = {
   variant_id?: string | null
   quantity: number
   store_product_id?: string | null
+  /** Per-item bypass: user accepted the "no stock, continue anyway" prompt (POS). */
+  allow_sell_without_stock?: boolean | null
 }
 
 type StockClient = {
@@ -25,6 +27,7 @@ function normalizeItems(items: StockItem[]) {
       variant_id: item.variant_id || null,
       quantity: Number(item.quantity || 0),
       store_product_id: item.store_product_id || null,
+      allow_sell_without_stock: Boolean(item.allow_sell_without_stock),
     }))
 }
 

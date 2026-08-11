@@ -1,290 +1,324 @@
 "use client"
 
 import { useMemo } from "react"
+import { formatCurrency, formatDate } from "@/lib/utils"
 import { QUOTE_PREVIEW_PRIMARY_COLOR, QUOTE_PREVIEW_SECONDARY_COLOR } from "@/lib/quotes/quote-preview-theme"
+import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import type { InvoiceData } from "@/lib/billing/types"
-import { formatDocument } from "@/lib/billing/invoice-utils"
 
 interface InvoicePreviewProps {
     data: InvoiceData
     printMode?: boolean
 }
 
-const A4_HEIGHT = 1123
-const ROW_HEIGHT = 40
-const TOTALS_SECTION_HEIGHT = 150
-const PAGE_1_FIXED = 449
-const PAGE_N_FIXED = 246
-
-function formatCurrency(value: number): string {
-    return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value)
+function getStatusLabel(status: string): string {
+    const labels: Record<string, string> = {
+        issued: "Emitida",
+        cancelled: "Cancelada",
+        refunded: "Reembolsada",
+    }
+    return labels[status] || status
 }
 
-function formatDate(iso: string | null): string {
-    if (!iso) return "-"
-    return new Intl.DateTimeFormat("pt-BR", { dateStyle: "long" }).format(new Date(iso))
+function formatPeriod(start: string | null, end: string | null): string {
+    if (!start && !end) return "-"
+    return [start, end].filter(Boolean).join(" → ")
 }
 
-export function InvoicePreview({ data, printMode }: InvoicePreviewProps) {
-    const primaryColor = QUOTE_PREVIEW_PRIMARY_COLOR
+const InvoicePreview = ({ data, printMode = false }: InvoicePreviewProps) => {
+    const primaryColor = data.status === "issued" ? QUOTE_PREVIEW_PRIMARY_COLOR : QUOTE_PREVIEW_PRIMARY_COLOR
     const secondaryColor = QUOTE_PREVIEW_SECONDARY_COLOR
 
-    const partnerAddressFormatted = data.partner.address
-        ? data.partner.address
-            .split('\n')
-            .filter((line: string) => line.trim() && !line.trim().startsWith('CEP:'))
-            .slice(0, 2)
-            .join('\n')
-        : ""
+    const partnerAddressFormatted = useMemo(() => {
+        if (!data.partner.address) return ""
+        const lines = data.partner.address
+            .split("\n")
+            .filter((line: string) => line.trim() && !line.trim().startsWith("CEP:"))
+        return lines.slice(0, 2).join("\n")
+    }, [data.partner.address])
 
-    const { pages } = useMemo(() => {
-        const items = data.items || []
-        const totalRows = items.length
-        const hasTotals = true
+    const items = data.items || []
 
-        const rowsPerPage1 = Math.floor((A4_HEIGHT - PAGE_1_FIXED - TOTALS_SECTION_HEIGHT) / ROW_HEIGHT)
-        const rowsPerPageN = Math.floor((A4_HEIGHT - PAGE_N_FIXED - TOTALS_SECTION_HEIGHT) / ROW_HEIGHT)
+    const pages = useMemo(() => {
+        const ROW_HEIGHT = 40
+        const TOTALS_SECTION_HEIGHT = 150
 
-        if (totalRows === 0) {
-            return {
-                pages: [
-                    {
-                        items: [],
-                        showTotals: true,
-                        showHeader: true,
-                        pageNumber: 1,
-                    },
-                ],
+        const P1_FIXED_CONTENT_HEIGHT = 449
+        const P1_TOTAL_AVAILABLE_HEIGHT = 1123
+        const P1_AVAILABLE_FOR_ROWS_AND_TOTALS = P1_TOTAL_AVAILABLE_HEIGHT - P1_FIXED_CONTENT_HEIGHT
+
+        const PN_FIXED_CONTENT_HEIGHT = 246
+        const PN_AVAILABLE_FOR_ROWS_AND_TOTALS = P1_TOTAL_AVAILABLE_HEIGHT - PN_FIXED_CONTENT_HEIGHT
+
+        const chunks: { items: typeof items; hasTotals: boolean; type: string }[] = []
+        let remainingItems = [...items]
+
+        const requiredHeightAllOnP1 = (remainingItems.length * ROW_HEIGHT) + TOTALS_SECTION_HEIGHT
+
+        if (requiredHeightAllOnP1 <= P1_AVAILABLE_FOR_ROWS_AND_TOTALS) {
+            chunks.push({ items: remainingItems, hasTotals: true, type: "first" })
+            return chunks
+        }
+
+        const maxItemsP1 = Math.floor(P1_AVAILABLE_FOR_ROWS_AND_TOTALS / ROW_HEIGHT)
+        const itemsP1 = remainingItems.slice(0, maxItemsP1)
+        remainingItems = remainingItems.slice(maxItemsP1)
+        chunks.push({ items: itemsP1, hasTotals: false, type: "first" })
+
+        while (remainingItems.length > 0) {
+            const requiredHeightOnPn = (remainingItems.length * ROW_HEIGHT) + TOTALS_SECTION_HEIGHT
+
+            if (requiredHeightOnPn <= PN_AVAILABLE_FOR_ROWS_AND_TOTALS) {
+                chunks.push({ items: remainingItems, hasTotals: true, type: "middle" })
+                remainingItems = []
+            } else {
+                const maxItemsPn = Math.floor(PN_AVAILABLE_FOR_ROWS_AND_TOTALS / ROW_HEIGHT)
+                const itemsPn = remainingItems.slice(0, maxItemsPn)
+                remainingItems = remainingItems.slice(maxItemsPn)
+                chunks.push({ items: itemsPn, hasTotals: false, type: "middle" })
             }
         }
 
-        if (totalRows <= rowsPerPage1) {
-            return {
-                pages: [
-                    {
-                        items,
-                        showTotals: true,
-                        showHeader: true,
-                        pageNumber: 1,
-                    },
-                ],
-            }
+        if (chunks.length > 0 && !chunks[chunks.length - 1].hasTotals) {
+            chunks.push({ items: [], hasTotals: true, type: "middle" })
         }
 
-        const allPages: Array<{ items: typeof items; showTotals: boolean; showHeader: boolean; pageNumber: number }> = []
-        let remaining = [...items]
-        let pageNum = 1
-
-        const firstBatch = remaining.splice(0, rowsPerPage1)
-        allPages.push({ items: firstBatch, showTotals: false, showHeader: true, pageNumber: pageNum++ })
-
-        while (remaining.length > 0) {
-            const batch = remaining.splice(0, rowsPerPageN)
-            const isLast = remaining.length === 0
-            allPages.push({ items: batch, showTotals: isLast, showHeader: false, pageNumber: pageNum++ })
+        if (chunks.length === 0) {
+            chunks.push({ items: [], hasTotals: true, type: "first" })
         }
 
-        if (!allPages[allPages.length - 1].showTotals) {
-            return {
-                pages: [
-                    ...allPages.slice(0, -1),
-                    { ...allPages[allPages.length - 1], showTotals: true },
-                ],
-            }
-        }
-
-        return { pages: allPages }
-    }, [data.items])
+        return chunks
+    }, [items])
 
     return (
-        <div className={cn("flex flex-col items-center", printMode ? "" : "")}>
-            <style>{`
-                @media print {
-                    .invoice-page { page-break-after: always; box-shadow: none !important; margin: 0 !important; }
-                }
-                .invoice-page { width: 210mm; min-height: ${A4_HEIGHT}px; background: white; overflow: hidden; position: relative; }
-                ${!printMode ? `.invoice-page { box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 16px; border-radius: 8px; }` : ""}
-            `}</style>
-
-            {pages.map((page) => (
-                <div key={page.pageNumber} className="invoice-page flex flex-col">
-                    <div
-                        className="relative h-[160px] flex items-center px-10 overflow-hidden"
-                        style={{ backgroundColor: primaryColor }}
-                    >
+        <div className={`flex flex-col w-full h-full bg-white dark:bg-dark-surface relative overflow-hidden ${printMode ? "quote-a4-print" : "border-l border-brand-border dark:border-dark-border"}`}>
+            <div className={printMode ? "w-full p-0" : "absolute top-4 right-4 bottom-4 left-4 bg-[#e5e7eb] dark:bg-dark-surface/50 rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden flex flex-col shadow-sm"}>
+                <div className={printMode ? "w-full flex flex-col items-center p-0" : "flex-1 overflow-auto custom-scrollbar p-4 md:p-12 flex flex-col items-start lg:items-center pt-12 space-y-8"}>
+                    {pages.map((page, pageIndex) => (
                         <div
-                            className="absolute -top-10 -right-10 w-48 h-48 rounded-full opacity-20"
-                            style={{ backgroundColor: secondaryColor }}
-                        />
-                        <div
-                            className="absolute -bottom-10 -left-10 w-36 h-36 rounded-full opacity-20"
-                            style={{ backgroundColor: secondaryColor }}
-                        />
-                        <div className="flex items-center gap-5 z-10 w-full">
-                            {data.partner.image_url && (
-                                <img
-                                    src={data.partner.image_url}
-                                    alt=""
-                                    className="w-16 h-16 rounded-full object-cover border-2 border-white/30"
-                                />
-                            )}
-                            <div className="flex-1">
-                                <h1 className="text-[22px] font-bold text-white">Fatura</h1>
-                                <p className="text-white/80 text-sm font-medium mt-0.5">{data.partner.name}</p>
-                            </div>
-                            <div className="text-right">
-                                <p className="text-white/60 text-[11px] font-medium uppercase tracking-wider">Nº {data.invoice_number}</p>
-                                <div
-                                    className="text-[11px] font-mono mt-1 px-2 py-0.5 rounded inline-block"
-                                    style={{ backgroundColor: secondaryColor, color: primaryColor }}
-                                >
-                                    #{data.verification_hash.slice(0, 8)}
+                            key={pageIndex}
+                            className={`w-[210mm] min-w-[210mm] shrink-0 bg-white text-[#113833] overflow-hidden relative font-sans min-h-[297mm] flex flex-col ${printMode ? "pdf-print-page" : "shadow-md rounded-sm"}`}
+                        >
+                            {/* HEADER */}
+                            <div
+                                className="px-8 py-8 relative overflow-hidden flex flex-col justify-between h-[160px] shrink-0"
+                                style={{ backgroundColor: primaryColor }}
+                            >
+                                <div className="absolute -top-12 right-6 flex gap-3 opacity-90 rotate-180">
+                                    <div className="flex flex-col gap-3">
+                                        <div className="w-14 h-24 rounded-full" style={{ backgroundColor: secondaryColor }}></div>
+                                        <div className="w-14 h-24 rounded-full" style={{ backgroundColor: secondaryColor }}></div>
+                                        <div className="w-14 h-24 rounded-full" style={{ backgroundColor: secondaryColor }}></div>
+                                    </div>
+                                    <div className="flex flex-col gap-3 -mt-12">
+                                        <div className="w-14 h-24 rounded-full" style={{ backgroundColor: secondaryColor }}></div>
+                                        <div className="w-14 h-24 rounded-full" style={{ backgroundColor: secondaryColor }}></div>
+                                        <div className="w-14 h-24 rounded-full" style={{ backgroundColor: secondaryColor }}></div>
+                                    </div>
                                 </div>
-                            </div>
-                        </div>
-                    </div>
 
-                    <div className="flex-1 px-10 py-6">
-                        {page.showHeader && (
-                            <div className="grid grid-cols-4 gap-4 mb-6">
-                                <div>
-                                    <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Número</p>
-                                    <p className="text-sm font-bold text-gray-800">{data.invoice_number}</p>
-                                </div>
-                                <div>
-                                    <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Código</p>
-                                    <p className="text-sm font-mono text-gray-800">#{data.verification_hash.slice(0, 8)}</p>
-                                </div>
-                                <div>
-                                    <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Emissão</p>
-                                    <p className="text-sm font-bold text-gray-800">{formatDate(data.created_at)}</p>
-                                </div>
-                                <div>
-                                    <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Status</p>
-                                    <span className="text-[11px] font-bold px-2.5 py-1 rounded-full inline-block"
-                                        style={{
-                                            backgroundColor: data.status === "issued" ? "#d4f995" : "#fecaca",
-                                            color: data.status === "issued" ? "#003229" : "#991b1b",
-                                        }}
-                                    >
-                                        {data.status === "issued" ? "Emitida" : data.status === "cancelled" ? "Cancelada" : "Reembolsada"}
-                                    </span>
+                                <div className="relative z-10">
+                                    <div className="flex items-center gap-3 mb-6">
+                                        <UserProfileImage
+                                            fullName={data.partner.name}
+                                            imageUrl={data.partner.image_url && !data.partner.image_url.includes("Placeholder.png") ? data.partner.image_url : null}
+                                            className="w-8 h-8 shrink-0 text-[13px] font-bold"
+                                            style={{ backgroundColor: secondaryColor }}
+                                        />
+                                        <span className="text-white font-bold text-md">{data.partner.name}</span>
+                                    </div>
+
+                                    <div>
+                                        <h1 className="text-2xl font-medium text-white">Fatura</h1>
+                                        <p className="text-white/80 text-xs tracking-widest font-light mt-1">
+                                            {`Fatura #${data.invoice_number}`}
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
-                        )}
+                            {/* FIM DO HEADER */}
 
-                        {page.showHeader && (
-                            <div className="grid grid-cols-2 gap-6 mb-6 p-4 rounded-lg bg-gray-50">
-                                <div>
-                                    <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-2">Empresa</p>
-                                    <p className="text-sm font-bold text-gray-800">{data.partner.name}</p>
-                                    {data.partner.document && (
-                                        <p className="text-xs text-gray-500">CNPJ/CPF: {formatDocument(data.partner.document)}</p>
-                                    )}
-                                    {data.partner.phone && <p className="text-xs text-gray-500">{data.partner.phone}</p>}
-                                    {partnerAddressFormatted && <p className="text-xs text-gray-500 whitespace-pre-wrap">{partnerAddressFormatted}</p>}
-                                    {data.partner.email && <p className="text-xs text-gray-500">{data.partner.email}</p>}
+                            <div className={`flex-1 flex flex-col ${page.type !== "first" ? "pt-8" : ""}`}>
+                                {page.type === "first" && (
+                                    <>
+                                        <div className="px-8 py-6">
+                                            <div className="grid grid-cols-4 gap-4 border-b border-brand-border pb-6 w-full">
+                                                <div className="flex flex-col">
+                                                    <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Número</span>
+                                                    <span className="font-bold text-sm text-brand-dark">{data.invoice_number}</span>
+                                                </div>
+                                                <div className="flex flex-col">
+                                                    <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Início</span>
+                                                    <span className="font-bold text-sm text-brand-dark">{formatDate(data.period?.start || data.created_at)}</span>
+                                                </div>
+                                                <div className="flex flex-col">
+                                                    <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Vencimento</span>
+                                                    <span className="font-bold text-sm text-brand-dark">{formatDate(data.period?.end || data.created_at)}</span>
+                                                </div>
+                                                <div className="flex flex-col">
+                                                    <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Status</span>
+                                                    <span className="font-bold text-sm text-brand-dark">{getStatusLabel(data.status)}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="px-8 pb-6">
+                                            <div className="grid grid-cols-2 gap-8">
+                                                <div>
+                                                    <h3 className="font-bold text-sm text-brand-dark mb-3">Dados da empresa</h3>
+                                                    <div className="text-xs text-gray-600 space-y-1">
+                                                        <p className="font-bold text-brand-dark">{data.partner.name}</p>
+                                                        {data.partner.phone && <p>{data.partner.phone}</p>}
+                                                        {partnerAddressFormatted && <p className="whitespace-pre-wrap">{partnerAddressFormatted}</p>}
+                                                        {data.partner.email && <p>{data.partner.email}</p>}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <h3 className="font-bold text-sm text-brand-dark mb-3">Dados do cliente</h3>
+                                                    {data.customer ? (
+                                                        <div className="text-xs text-gray-600 space-y-1">
+                                                            <p className="font-bold text-brand-dark">{data.customer.name}</p>
+                                                            {data.customer.phone && <p>{data.customer.phone}</p>}
+                                                            {data.customer.address && <p className="whitespace-pre-wrap">{data.customer.address}</p>}
+                                                            {data.customer.email && <p>{data.customer.email}</p>}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="text-xs text-gray-600 space-y-1">
+                                                            <p className="font-bold text-black">Cliente</p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+
+                                <div className="px-8 pb-4">
+                                    <table className="w-full text-left border-separate border-spacing-0">
+                                        <thead>
+                                            <tr className="bg-brand-gray/40">
+                                                <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tl-xl border-b border-gray-100">Descrição</th>
+                                                <th className="py-2.5 px-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider text-center w-32 border-b border-gray-100">Período</th>
+                                                <th className="py-2.5 px-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider text-center w-16 border-b border-gray-100">Qtd</th>
+                                                <th className="py-2.5 px-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider text-right w-28 border-b border-gray-100">Valor Unit.</th>
+                                                <th className="py-2.5 pl-4 pr-6 text-[11px] font-bold text-gray-400 uppercase tracking-wider text-right w-32 rounded-tr-xl border-b border-gray-100">Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {page.items.map((item, idx) => (
+                                                <tr key={idx} className="bg-white">
+                                                    <td className="py-2 pl-6 pr-4 border-b border-gray-50">
+                                                        <span className="font-bold text-[13px] text-black block truncate max-w-[250px]">
+                                                            {item.name || "Item"}
+                                                        </span>
+                                                        {item.description && (
+                                                            <span className="text-[11px] text-gray-500 block truncate max-w-[250px]">
+                                                                {item.description}
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                    <td className="py-2 px-4 border-b border-gray-50 text-center">
+                                                        <span className="text-[13px] font-medium text-gray-600">
+                                                            {formatPeriod(data.period?.start || null, data.period?.end || null)}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-2 px-4 border-b border-gray-50 text-center">
+                                                        <span className="text-[13px] font-medium text-gray-600">
+                                                            {item.quantity}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-2 px-4 border-b border-gray-50 text-right">
+                                                        <span className="text-[13px] font-medium text-gray-600">
+                                                            {formatCurrency(item.unit_price)}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-2 pl-4 pr-6 border-b border-gray-50 text-right">
+                                                        <span className="text-[13px] font-bold text-black">
+                                                            {formatCurrency(item.total)}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
                                 </div>
-                                <div>
-                                    <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-2">Cliente</p>
-                                    {data.customer ? (
-                                        <>
-                                            <p className="text-sm font-bold text-gray-800">{data.customer.name}</p>
-                                            {data.customer.document && (
-                                                <p className="text-xs text-gray-500">CPF/CNPJ: {formatDocument(data.customer.document)}</p>
-                                            )}
-                                            {data.customer.email && <p className="text-xs text-gray-500">{data.customer.email}</p>}
-                                        </>
-                                    ) : (
-                                        <p className="text-sm text-gray-400">-</p>
-                                    )}
-                                </div>
-                            </div>
-                        )}
 
-                        {page.showHeader && data.period && (
-                            <div className="flex gap-6 mb-4 text-xs text-gray-500">
-                                <span>Início: {formatDate(data.period.start)}</span>
-                                <span>Fim: {formatDate(data.period.end)}</span>
-                            </div>
-                        )}
+                                {page.hasTotals && (
+                                    <div className="mt-8">
+                                        <div className="px-8 pb-6 flex justify-start">
+                                            <div className="w-full bg-brand-gray/40 p-6 rounded-lg text-black">
+                                                <div className="flex justify-between items-center text-xs mb-2">
+                                                    <span className="text-gray-500 font-medium">Subtotal</span>
+                                                    <span className="font-bold">{formatCurrency(data.purchase.amount)}</span>
+                                                </div>
 
-                        <table className="w-full mb-4">
-                            <thead>
-                                <tr className="border-b-2 border-gray-200">
-                                    <th className="text-left text-[10px] font-bold uppercase tracking-wider text-gray-400 pb-2 w-20">Código</th>
-                                    <th className="text-left text-[10px] font-bold uppercase tracking-wider text-gray-400 pb-2">Descrição</th>
-                                    <th className="text-center text-[10px] font-bold uppercase tracking-wider text-gray-400 pb-2 w-16">Qtd</th>
-                                    <th className="text-right text-[10px] font-bold uppercase tracking-wider text-gray-400 pb-2 w-28">Valor Unit.</th>
-                                    <th className="text-right text-[10px] font-bold uppercase tracking-wider text-gray-400 pb-2 w-28">Total</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {page.items.map((item, i) => (
-                                    <tr key={i} className="border-b border-gray-100">
-                                        <td className="py-2 text-xs text-gray-500">{item.code || "-"}</td>
-                                        <td className="py-2">
-                                            <p className="text-sm font-medium text-gray-800 truncate max-w-[250px]">{item.name}</p>
-                                            {item.description && (
-                                                <p className="text-[11px] text-gray-400 truncate max-w-[250px]">{item.description}</p>
-                                            )}
-                                        </td>
-                                        <td className="py-2 text-center text-sm text-gray-800">{item.quantity}</td>
-                                        <td className="py-2 text-right text-sm text-gray-800">{formatCurrency(item.unit_price)}</td>
-                                        <td className="py-2 text-right text-sm font-bold text-gray-800">{formatCurrency(item.total)}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                                {data.purchase.discount_amount > 0 && (
+                                                    <div className="flex justify-between items-center text-xs mb-2">
+                                                        <span className="text-gray-500 font-medium">Desconto</span>
+                                                        <span className="font-bold text-brand-red">-{formatCurrency(data.purchase.discount_amount)}</span>
+                                                    </div>
+                                                )}
 
-                        {page.showTotals && (
-                            <div className="ml-auto w-64 border-t-2 border-gray-200 pt-3 mt-auto">
-                                <div className="flex justify-between text-sm py-1">
-                                    <span className="text-gray-500">Subtotal</span>
-                                    <span className="font-medium">{formatCurrency(data.purchase.amount)}</span>
-                                </div>
-                                {data.purchase.discount_amount > 0 && (
-                                    <div className="flex justify-between text-sm py-1">
-                                        <span className="text-gray-500">Desconto</span>
-                                        <span className="font-medium text-red-500">-{formatCurrency(data.purchase.discount_amount)}</span>
+                                                <div className="border-t border-gray-200 my-3"></div>
+
+                                                <div className="flex justify-between items-center">
+                                                    <span className="font-bold text-sm">Total</span>
+                                                    <div className="text-white px-3 py-1.5 rounded text-sm font-bold shadow-sm" style={{ backgroundColor: primaryColor }}>
+                                                        {formatCurrency(data.purchase.total_amount)}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="px-8 pb-6">
+                                            <div className="w-full bg-white border border-brand-border rounded-lg p-4 text-[11px] text-gray-600 space-y-1">
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-500 font-medium">Forma de pagamento</span>
+                                                    <span className="font-bold">{data.payment.method_label}</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-500 font-medium">Gateway</span>
+                                                    <span className="font-bold">{data.payment.gateway_label}</span>
+                                                </div>
+                                                {data.payment.paid_at && (
+                                                    <div className="flex justify-between">
+                                                        <span className="text-gray-500 font-medium">Pago em</span>
+                                                        <span className="font-bold">{formatDate(data.payment.paid_at)}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {data.notes && (
+                                            <div className="px-8 pb-12">
+                                                <div className="w-full">
+                                                    <h4 className="font-bold text-xs mb-1.5 text-black">Observações</h4>
+                                                    <p className="text-[11px] text-gray-500 leading-relaxed whitespace-pre-wrap">
+                                                        {data.notes}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
-                                <div className="flex justify-between text-sm pt-2 border-t border-gray-200 mt-1">
-                                    <span className="font-bold">Total</span>
-                                    <span className="font-bold text-lg" style={{ color: primaryColor }}>
-                                        {formatCurrency(data.purchase.total_amount)}
-                                    </span>
-                                </div>
-                            </div>
-                        )}
 
-                        {page.showTotals && (
-                            <div className="mt-6 p-3 rounded-lg bg-gray-50 text-xs text-gray-500 space-y-1">
-                                <p><strong>Forma de pagamento:</strong> {data.payment.method_label}</p>
-                                <p><strong>Gateway:</strong> {data.payment.gateway_label}</p>
-                                {data.payment.paid_at && <p><strong>Pago em:</strong> {formatDate(data.payment.paid_at)}</p>}
-                                <p><strong>Status:</strong> {data.payment.status}</p>
-                                <p><strong>Tipo:</strong> {data.purchase.type}</p>
+                                {!page.hasTotals && <div className="mt-auto"></div>}
                             </div>
-                        )}
 
-                        {page.showTotals && data.notes && (
-                            <div className="mt-4 p-3 rounded-lg bg-yellow-50 text-xs text-gray-600">
-                                <p className="font-bold mb-1">Observações:</p>
-                                <p>{data.notes}</p>
+                            {/* Footer */}
+                            <div
+                                className="text-white/80 px-8 py-2 text-[10px] flex justify-end items-center absolute bottom-0 w-full h-[40px]"
+                                style={{ backgroundColor: primaryColor }}
+                            >
+                                <span>{data.footer}</span>
                             </div>
-                        )}
-                    </div>
-
-                    <div className="h-[40px] flex items-center justify-center" style={{ backgroundColor: primaryColor }}>
-                        <p className="text-[10px] text-white/60 font-medium">{data.footer}</p>
-                    </div>
+                        </div>
+                    ))}
                 </div>
-            ))}
+            </div>
         </div>
     )
 }
 
-function cn(...classes: (string | boolean | undefined | null)[]): string {
-    return classes.filter(Boolean).join(" ")
-}
+export default InvoicePreview
+export { InvoicePreview }

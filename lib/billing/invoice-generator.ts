@@ -52,7 +52,7 @@ export async function generateInvoiceData(
     purchase: BillingPurchase,
     payments: BillingPayment[],
     partnerDetails: { name: string; document: string | null; address: string; email: string | null; phone: string | null; image_url: string | null },
-    customerDetails: { name: string; document: string | null; email: string | null } | null,
+    customerDetails: { name: string; document: string | null; email: string | null; phone: string | null; address: string | null } | null,
     purchaseableDetails?: { name?: string; code?: string; description?: string } | null,
     periodStart?: string | null,
     periodEnd?: string | null,

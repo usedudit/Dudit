@@ -799,9 +799,10 @@ function buildInventoryMovementDelta(previousItems: Array<{
     variantId?: string | null
     customName?: string
     quantity: number
+    allowSellWithoutStock?: boolean | null
 }>) {
     const previousMap = new Map<string, { product_id: string; variant_id: string | null; quantity: number }>()
-    const nextMap = new Map<string, { product_id: string; variant_id: string | null; quantity: number }>()
+    const nextMap = new Map<string, { product_id: string; variant_id: string | null; quantity: number; allowSellWithoutStock: boolean }>()
 
     for (const item of previousItems) {
         if (!item.product_id) continue
@@ -824,16 +825,18 @@ function buildInventoryMovementDelta(previousItems: Array<{
         const current = nextMap.get(key)
         if (current) {
             current.quantity += Number(item.quantity || 0)
+            current.allowSellWithoutStock = current.allowSellWithoutStock || Boolean(item.allowSellWithoutStock)
         } else {
             nextMap.set(key, {
                 product_id: item.productId,
                 variant_id: item.variantId || null,
                 quantity: Number(item.quantity || 0),
+                allowSellWithoutStock: Boolean(item.allowSellWithoutStock),
             })
         }
     }
 
-    const outgoing: Array<{ product_id: string; variant_id?: string | null; quantity: number }> = []
+    const outgoing: Array<{ product_id: string; variant_id?: string | null; quantity: number; allow_sell_without_stock?: boolean }> = []
     const incoming: Array<{ product_id: string; variant_id?: string | null; quantity: number }> = []
 
     for (const [key, nextItem] of nextMap.entries()) {
@@ -844,6 +847,7 @@ function buildInventoryMovementDelta(previousItems: Array<{
                 product_id: nextItem.product_id,
                 variant_id: nextItem.variant_id,
                 quantity: nextItem.quantity - previousQty,
+                allow_sell_without_stock: nextItem.allowSellWithoutStock || undefined,
             })
         }
     }
@@ -1957,6 +1961,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
                 product_id: item.productId,
                 variant_id: item.variantId || null,
                 quantity: item.quantity,
+                allow_sell_without_stock: Boolean(item.allowSellWithoutStock),
             })),
         ...giftItems
             .filter(item => item.product_id)
@@ -2907,6 +2912,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
                 product_id: item.productId,
                 variant_id: item.variantId || null,
                 quantity: item.quantity,
+                allow_sell_without_stock: Boolean(item.allowSellWithoutStock),
             })),
         ...giftItems
             .filter(item => item.product_id)
