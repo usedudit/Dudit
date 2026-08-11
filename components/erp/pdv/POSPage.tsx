@@ -338,6 +338,8 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
         notes: string
         cart: CartItem[]
         hasDelivery?: boolean
+        otherCosts?: number
+        deliveryBreakdown?: Record<string, unknown> | null
     }) => {
         if (!payload.cart.length) return EMPTY_ORDER_SIGNATURE
         return JSON.stringify({
@@ -348,6 +350,8 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
             discountCouponCode: payload.discountCouponCode || "",
             shippingFee: Number(payload.shippingFee || 0),
             hasDelivery: Boolean(payload.hasDelivery),
+            otherCosts: Number(payload.otherCosts || 0),
+            deliveryBreakdown: payload.deliveryBreakdown || null,
             notes: payload.notes || "",
             cart: payload.cart.map((item) => ({
                 id: item.id,
@@ -503,6 +507,8 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
             notes,
             cart,
             hasDelivery,
+            otherCosts,
+            deliveryBreakdown,
         }),
         [
             buildOrderSignature,
@@ -515,6 +521,8 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
             notes,
             cart,
             hasDelivery,
+            otherCosts,
+            deliveryBreakdown,
         ]
     )
     const hasUnsavedOrderChanges = currentOrderSignature !== lastSavedOrderSignature
@@ -817,7 +825,16 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
             shippingFee,
             notes,
             cart,
+            hasDelivery,
+            otherCosts,
+            deliveryBreakdown,
         })
+
+        // Abrir o pagamento não altera o rascunho. Se o pedido já está salvo e
+        // a assinatura continua igual, não fazemos uma segunda gravação completa.
+        if (activePreSaleId && lastSavedOrderSignature === signatureAtSave) {
+            return activePreSaleId
+        }
 
         isSavingDraftRef.current = true
         setIsSavingDraft(true)
@@ -849,6 +866,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                     lineDiscountType: item.lineDiscountType ?? null,
                     lineDiscountValue: item.lineDiscountValue ?? null,
                     isManualPrice: (item as any).isManualPrice || null,
+                    allowSellWithoutStock: Boolean((item as any).allowSellWithoutStock) || null,
                 })),
                 couponId: appliedCouponId,
                 couponCode: appliedCouponCode,
@@ -914,6 +932,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                     qty: Number((item.quantity ?? item.qty) || 0),
                     image: item.image || null,
                     isManualPrice: Boolean(item.isManualPrice ?? item.is_manual_price),
+                    allowSellWithoutStock: Boolean(item.allow_sell_without_stock ?? item.allowSellWithoutStock),
                 }
             })
 
@@ -945,6 +964,9 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
             shippingFee: Number(preSale.shipping_fee || 0),
             notes: preSale.notes || "",
             cart: items,
+            hasDelivery: Number(preSale.shipping_fee || 0) > 0 || Number((preSale as any).distance_km || 0) > 0 || Boolean((preSale as any).delivery_breakdown),
+            otherCosts: Number((preSale as any).other_costs || 0),
+            deliveryBreakdown: (preSale as any).delivery_breakdown || null,
         }))
     }, [buildOrderSignature, selectedSellerId])
 

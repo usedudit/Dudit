@@ -46,6 +46,7 @@ type DraftItemInput = {
     isPromotional?: boolean
     promotionId?: string | null
     isManualPrice?: boolean | null
+    allowSellWithoutStock?: boolean | null
 }
 
 type DraftUpsertInput = {
@@ -233,6 +234,7 @@ function normalizeDraftItems(items: DraftItemInput[]) {
         is_promotional: Boolean(item.isPromotional),
         promotion_id: item.promotionId || null,
         is_manual_price: Boolean(item.isManualPrice),
+        allow_sell_without_stock: Boolean(item.allowSellWithoutStock),
     }))
 
     for (const item of normalized) {
@@ -831,6 +833,7 @@ export async function upsertPreSaleDraftAction(input: DraftUpsertInput) {
                     is_promotional: true,
                     promotion_id: promo.id,
                     is_manual_price: false,
+                    allow_sell_without_stock: false,
                 })
             } else {
                 const serv = giftServices.find((s: any) => s.id === giftId)
@@ -853,6 +856,7 @@ export async function upsertPreSaleDraftAction(input: DraftUpsertInput) {
                         is_promotional: true,
                         promotion_id: promo.id,
                         is_manual_price: false,
+                        allow_sell_without_stock: false,
                     })
                 }
             }
@@ -1095,6 +1099,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
             unitPrice: safeMoney(Number(item.unit_price ?? item.price ?? 0)),
             quantity: Math.max(1, Math.floor(Number(item.quantity ?? item.qty ?? 1))),
             sortOrder: index,
+            allowSellWithoutStock: Boolean(item.allow_sell_without_stock || item.allowSellWithoutStock),
         }
     })
 
@@ -1213,13 +1218,17 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
     const productIds = new Set<string>(
         erpItems.map((item) => item.productId).filter(Boolean) as string[]
     )
-    for (const productId of productIds) {
-        await invalidateProductCache(productId, input.partnerId, "update", { silent: true })
-    }
+    await Promise.all(
+        Array.from(productIds).map((productId) =>
+            invalidateProductCache(productId, input.partnerId, "update", { silent: true })
+        )
+    )
 
-    await revalidateOrders(input.partnerId)
-    await revalidateTransactions(input.partnerId)
-    await revalidateStockMovements(input.partnerId)
+    await Promise.all([
+        revalidateOrders(input.partnerId),
+        revalidateTransactions(input.partnerId),
+        revalidateStockMovements(input.partnerId),
+    ])
 
     return { success: true as const, data: { saleId: orderId, saleNumber: orderNumber, orderId } }
 }

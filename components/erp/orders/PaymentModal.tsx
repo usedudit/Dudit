@@ -510,6 +510,9 @@ const PaymentModal = ({
     const [isPaymentCalculationLoading, setIsPaymentCalculationLoading] = useState(false);
     const [isSplitPreviewLoading, setIsSplitPreviewLoading] = useState(false);
     const lastOptionsConfigRef = useRef<{ methodId: string | null; feeBearer: string | null; amount: number | null }>({ methodId: null, feeBearer: null, amount: null });
+    // Reaproveita respostas idênticas durante a mesma venda. Trocar entre telas
+    // do modal não deve disparar novamente a mesma Server Action.
+    const paymentCalculationCacheRef = useRef<Map<string, any>>(new Map());
     const [wantsChange, setWantsChange] = useState(false);
     const [payWithAmount, setPayWithAmount] = useState<number>(0);
     // CSS animation state matching DefaultModal/AlertModal
@@ -600,7 +603,7 @@ const PaymentModal = ({
     };
 
     // Fetch Partner Payment Methods via React Query (shared cache, deduplicated)
-    const { methods: availableMethods, isLoading: isLoadingMethods, invalidate } = usePaymentMethods(isOpen ? partnerId : '');
+    const { methods: availableMethods, isLoading: isLoadingMethods, invalidate } = usePaymentMethods(isOpen ? partnerId : '', selectedStore?.id);
 
     const activeMethods = useMemo(
         () => (availableMethods || []).filter((method: PartnerPaymentMethod) => method?.is_active !== false),
@@ -617,7 +620,10 @@ const PaymentModal = ({
     useEffect(() => {
         if (!partnerId || typeof window === "undefined") return;
 
-        const refreshOnChange = () => { invalidate(); };
+        const refreshOnChange = () => {
+            paymentCalculationCacheRef.current.clear();
+            invalidate();
+        };
 
         window.addEventListener(PAYMENT_METHODS_UPDATED_EVENT, refreshOnChange);
         return () => window.removeEventListener(PAYMENT_METHODS_UPDATED_EVENT, refreshOnChange);
@@ -639,6 +645,7 @@ const PaymentModal = ({
     // Reset when opening
     useEffect(() => {
         if (isOpen) {
+            paymentCalculationCacheRef.current.clear();
             setView('methods');
             setPaymentBaseAmount(0);
             setInstallments('1');
@@ -1149,6 +1156,23 @@ const PaymentModal = ({
             lastOptionsConfigRef.current = { methodId: selectedMethodId, feeBearer, amount: base };
         }
 
+        const calculationCacheKey = JSON.stringify({
+            methodId: selectedMethodId,
+            amount: base,
+            installmentNumber,
+            feeBearer,
+            includeInstallmentOptions: shouldComputeOptions,
+        });
+        const cachedCalculation = paymentCalculationCacheRef.current.get(calculationCacheKey);
+        if (cachedCalculation) {
+            setPaymentCalculation(cachedCalculation);
+            if (cachedCalculation.installmentOptions?.length > 0) {
+                setInstallmentOptions(cachedCalculation.installmentOptions);
+            }
+            setIsPaymentCalculationLoading(false);
+            return;
+        }
+
         setIsPaymentCalculationLoading(true);
         calculatePaymentMethodAmountsAction({
             originalAmount: base,
@@ -1159,6 +1183,7 @@ const PaymentModal = ({
         }).then((res: any) => {
             if (!active) return;
             if (res?.success) {
+                paymentCalculationCacheRef.current.set(calculationCacheKey, res);
                 setPaymentCalculation(res);
                 // Only overwrite installment options when server computed fresh ones
                 if (res.installmentOptions && res.installmentOptions.length > 0) {
@@ -1176,6 +1201,11 @@ const PaymentModal = ({
                 setPaymentCalculation(null);
                 setInstallmentOptions([]);
             }
+            setIsPaymentCalculationLoading(false);
+        }).catch(() => {
+            if (!active) return;
+            setPaymentCalculation(null);
+            setInstallmentOptions([]);
             setIsPaymentCalculationLoading(false);
         });
         return () => {

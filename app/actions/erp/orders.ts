@@ -42,6 +42,8 @@ export type ERPItemPayload = {
     quantity: number
     unitPrice: number
     sortOrder: number
+    /** POS: user accepted the "no stock, continue anyway" prompt for this line. */
+    allowSellWithoutStock?: boolean | null
 }
 
 export type ERPOrderPayload = {
@@ -666,10 +668,11 @@ async function validateERPItemsStock(params: {
         lineType?: string | null
         customName?: string
         quantity: number
+        allowSellWithoutStock?: boolean | null
     }>
 }) {
     const stockItems = params.items.filter(
-        (item) => !item.serviceId && item.lineType !== 'service_booking' && item.lineType !== 'service' && item.productId
+        (item) => !item.serviceId && item.lineType !== 'service_booking' && item.lineType !== 'service' && item.productId && !item.allowSellWithoutStock
     )
 
     const productIds = Array.from(new Set(stockItems.map((item) => item.productId).filter(Boolean))) as string[]
