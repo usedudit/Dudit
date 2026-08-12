@@ -3,7 +3,7 @@ import { getOrderDetailsAction } from "@/app/actions/erp/orders"
 import { getPartnerReceiptHeaderAction } from "@/app/actions/erp/receipt"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import { requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
-import { buildSaleReceiptFromOrder } from "@/lib/sales/sale-receipt"
+import { buildSaleReceiptFromOrder, DEFAULT_RECEIPT_FOOTER_MESSAGE } from "@/lib/sales/sale-receipt"
 import SaleReceiptA4Preview from "@/components/erp/orders/receipt/SaleReceiptA4Preview"
 import SaleReceiptThermalPreview from "@/components/erp/orders/receipt/SaleReceiptThermalPreview"
 import PrintLayout from "@/components/erp/shared/PrintLayout"
@@ -99,12 +99,13 @@ export default async function PrintReciboPage({ params, searchParams }: PageProp
         storeId = order.store_id
     }
 
-    // Fetch partner header and logo details
-    const [headerRes, storeRes] = await Promise.all([
+    // Fetch partner header, logo details and return policy receipt message
+    const [headerRes, storeRes, policyRes] = await Promise.all([
         getPartnerReceiptHeaderAction(partnerId, storeId),
         storeId
             ? supabase.from("stores").select("logo_url").eq("id", storeId).maybeSingle()
-            : supabase.from("stores").select("logo_url").eq("partner_id", partnerId).limit(1).maybeSingle()
+            : supabase.from("stores").select("logo_url").eq("partner_id", partnerId).limit(1).maybeSingle(),
+        supabase.from("partner_return_policies").select("receipt_message").eq("partner_id", partnerId).maybeSingle(),
     ])
 
     const partnerHeader = headerRes.success && headerRes.data ? headerRes.data : {
@@ -125,7 +126,8 @@ export default async function PrintReciboPage({ params, searchParams }: PageProp
     })
 
     const format = resolvedSearchParams.format === "thermal" ? "thermal" : "a4"
-    const footerMessage = resolvedSearchParams.footerMessage || "Obrigado pela preferência!"
+    const defaultFooterMsg = policyRes.data?.receipt_message?.trim() || DEFAULT_RECEIPT_FOOTER_MESSAGE
+    const footerMessage = resolvedSearchParams.footerMessage || defaultFooterMsg
     const showAcknowledgment = resolvedSearchParams.showAcknowledgment !== "false"
 
     return (

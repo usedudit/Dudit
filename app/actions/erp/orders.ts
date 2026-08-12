@@ -321,6 +321,15 @@ function sanitizePaymentBreakdown(entries: ERPOrderPayload["paymentBreakdown"]) 
         .map((entry) => {
             const amt = Math.max(0, Number(entry?.amount || 0))
             const effectiveAmt = entry?.effectiveAmount != null ? Math.max(0, Number(entry.effectiveAmount)) : amt
+            const adjType = String(entry?.adjustmentType || '').toLowerCase().trim()
+            const pmDiscount = Math.max(
+                0,
+                Number(
+                    entry?.paymentMethodDiscountAmount ||
+                    (adjType === 'discount' ? entry?.adjustmentAmount : 0) ||
+                    0
+                )
+            )
             return {
                 method: normalizePaymentMethodLabel(entry?.method),
                 amount: effectiveAmt,
@@ -331,7 +340,7 @@ function sanitizePaymentBreakdown(entries: ERPOrderPayload["paymentBreakdown"]) 
                 effectiveAmount: effectiveAmt,
                 netAmount: entry?.netAmount != null ? Math.max(0, Number(entry.netAmount)) : effectiveAmt,
                 feeBearer: entry?.feeBearer || null,
-                paymentMethodDiscountAmount: Math.max(0, Number(entry?.paymentMethodDiscountAmount || 0)),
+                paymentMethodDiscountAmount: pmDiscount,
                 interestAmount: Math.max(0, Number(entry?.interestAmount || 0)),
                 feeAmount: Math.max(0, Number(entry?.feeAmount || 0)),
                 fixedFeeAmount: Math.max(0, Number(entry?.fixedFeeAmount || 0)),
@@ -1739,10 +1748,11 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     couponDiscountAmount = pricingResult.couponDiscountAmount
     const serverComputedTotal = pricingResult.finalTotal
     const serverShippingCost = pricingResult.shipping
-    const breakdownTotalReceived = sanitizedPaymentBreakdown.reduce(
-        (s, e) => s + Number(e.amountReceived ?? (data.paymentStatus === "paid" ? e.amount : 0)),
-        0
-    )
+
+    const sumExplicitAmountReceived = sanitizedPaymentBreakdown.reduce((s, e) => {
+        const amtRec = Number(e.amountReceived || 0)
+        return s + (amtRec > 0.005 ? amtRec : 0)
+    }, 0)
     const hasBreakdown = sanitizedPaymentBreakdown.length > 0
 
     // Extract individual adjustment totals from payment breakdown for separate columns
@@ -1758,14 +1768,20 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         const bearer = String(entry.feeBearer || "merchant").toLowerCase().trim()
         const isCustomerBearer = bearer === "customer" || bearer === "buyer"
         const adjType = String(entry.adjustmentType || "").toLowerCase().trim()
+        const pmDisc = Math.max(
+            0,
+            Number(
+                entry.paymentMethodDiscountAmount ||
+                (adjType === "discount" ? entry.adjustmentAmount : 0) ||
+                0
+            )
+        )
 
         if (!isCustomerBearer) {
             paymentMethodInterestAmount = Math.max(0, paymentMethodInterestAmount + Number(entry.interestAmount || 0))
             paymentMethodFeeAmount = Math.max(0, paymentMethodFeeAmount + Number(entry.feeAmount || 0))
             paymentMethodFixedFeeAmount = Math.max(0, paymentMethodFixedFeeAmount + Number(entry.fixedFeeAmount || 0))
-            if (adjType === "discount") {
-                breakdownPaymentMethodDiscountAmount = Math.max(0, breakdownPaymentMethodDiscountAmount + Number(entry.paymentMethodDiscountAmount || 0))
-            }
+            breakdownPaymentMethodDiscountAmount = Math.max(0, breakdownPaymentMethodDiscountAmount + pmDisc)
         } else {
             customerExtraFees = Math.max(0, customerExtraFees + Number(entry.interestAmount || 0) + Number(entry.feeAmount || 0) + Number(entry.fixedFeeAmount || 0))
         }
@@ -1781,7 +1797,13 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     const paymentMethodSummary = buildPaymentMethodSummary(adjustedPaymentBreakdown, data.paymentMethod)
     const effectivePaidAmount = data.paymentStatus === "unpaid"
         ? 0
-        : (hasBreakdown && breakdownTotalReceived > 0 ? breakdownTotalReceived : Number(data.paidAmount || 0))
+        : sumExplicitAmountReceived > 0.005
+            ? sumExplicitAmountReceived
+            : data.paidAmount != null && !isNaN(Number(data.paidAmount))
+                ? Math.max(0, Number(data.paidAmount))
+                : data.paymentStatus === "paid"
+                    ? serverTotalAmount
+                    : 0
 
     const paymentState = resolvePaymentState({
         requestedStatus: data.paymentStatus,
@@ -2746,14 +2768,20 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         const bearer = String(entry.feeBearer || "merchant").toLowerCase().trim()
         const isCustomerBearer = bearer === "customer" || bearer === "buyer"
         const adjType = String(entry.adjustmentType || "").toLowerCase().trim()
+        const pmDisc = Math.max(
+            0,
+            Number(
+                entry.paymentMethodDiscountAmount ||
+                (adjType === "discount" ? entry.adjustmentAmount : 0) ||
+                0
+            )
+        )
 
         if (!isCustomerBearer) {
             updatePaymentMethodInterestAmount = Math.max(0, updatePaymentMethodInterestAmount + Number(entry.interestAmount || 0))
             updatePaymentMethodFeeAmount = Math.max(0, updatePaymentMethodFeeAmount + Number(entry.feeAmount || 0))
             updatePaymentMethodFixedFeeAmount = Math.max(0, updatePaymentMethodFixedFeeAmount + Number(entry.fixedFeeAmount || 0))
-            if (adjType === "discount") {
-                updateBreakdownPaymentMethodDiscountAmount = Math.max(0, updateBreakdownPaymentMethodDiscountAmount + Number(entry.paymentMethodDiscountAmount || 0))
-            }
+            updateBreakdownPaymentMethodDiscountAmount = Math.max(0, updateBreakdownPaymentMethodDiscountAmount + pmDisc)
         } else {
             updateCustomerExtraFees = Math.max(0, updateCustomerExtraFees + Number(entry.interestAmount || 0) + Number(entry.feeAmount || 0) + Number(entry.fixedFeeAmount || 0))
         }

@@ -156,6 +156,18 @@ export default function CreateReturnPage({
         if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5)
     }, [])
 
+    // Checklist table horizontal scroll side shadows
+    const checklistScrollRef = useRef<HTMLDivElement>(null)
+    const [checklistScroll, setChecklistScroll] = useState({ left: false, right: false })
+    const checkChecklistScroll = useCallback(() => {
+        const el = checklistScrollRef.current
+        if (!el) return
+        setChecklistScroll({
+            left: el.scrollLeft > 4,
+            right: el.scrollLeft + el.clientWidth < el.scrollWidth - 4,
+        })
+    }, [])
+
     const orderPicker = usePickerBucket<any>(
         () => fetchReturnOrderBucketAction(partnerId) as Promise<any[]>,
         (order, q) =>
@@ -924,16 +936,20 @@ export default function CreateReturnPage({
                                                                                     setIsOrderSearchOpen(false)
                                                                                     // Map order items to returns checklist items
                                                                                     const mappedItems = (order.order_items || []).map((item: any) => {
+                                                                                        const isServiceItem = !!item.service_id || item.line_type === "service_booking"
                                                                                         const imgKey = Array.isArray(item.products?.images) && item.products.images[0]
                                                                                             ? item.products.images[0]
-                                                                                            : (item.products?.video_thumbnail || item.products?.images || null)
+                                                                                            : (item.products?.video_thumbnail || item.products?.images
+                                                                                                || (Array.isArray(item.services?.images) && item.services.images[0]
+                                                                                                    ? item.services.images[0]
+                                                                                                    : item.services?.video_thumbnail || item.services?.images || null))
                                                                                         const remainingQty = typeof item.remainingQuantity === "number" ? item.remainingQuantity : item.quantity || 1
                                                                                         return {
                                                                                             id: item.id,
-                                                                                            productId: item.product_id || item.products?.sku || item.id,
-                                                                                            productName: item.product_name || item.products?.name || "Produto",
-                                                                                            sku: item.products?.sku || "",
-                                                                                            image: getR2ImageUrl(imgKey, "thumb") || "",
+                                                                                            productId: item.product_id || item.services?.id || item.id,
+                                                                                            productName: item.product_name || item.products?.name || item.services?.name || (isServiceItem ? "Serviço" : "Produto"),
+                                                                                            sku: item.products?.sku || item.services?.sku || "",
+                                                                                            image: getR2ImageUrl(imgKey, "thumb"),
                                                                                             price: item.product_price || 0,
                                                                                             netItemValue: item.net_item_value || item.subtotal || item.product_price || 0,
                                                                                             quantity: Math.min(item.quantity || 1, remainingQty),
@@ -1009,33 +1025,30 @@ export default function CreateReturnPage({
                                                             <div className="bg-white dark:bg-dark-surface">
                                                                 <div className="grid grid-cols-1 divide-y divide-brand-border dark:divide-dark-border md:grid-cols-4 md:divide-x md:divide-y-0">
                                                                     <div className="p-5">
-                                                                        <div className="mb-3 flex items-center gap-2 text-brand-inactive-text dark:text-dark-body">
-                                                                            <CalendarIcon className="h-4 w-4" />
-                                                                            <span className="text-xs font-bold uppercase tracking-[0.14em]">
-                                                                                Data
-                                                                            </span>
-                                                                        </div>
+                                                                        <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mb-3">
+                                                                            Data
+                                                                        </p>
                                                                         <p className="text-2xl font-bold text-brand-dark dark:text-dark-heading">
                                                                             {selectedOrder.orderDate ? formatDate(selectedOrder.orderDate) : "-"}
                                                                         </p>
                                                                     </div>
 
                                                                     <div className="p-5">
-                                                                        <p className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-brand-inactive-text dark:text-dark-body">
+                                                                        <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mb-3">
                                                                             Pagamento
                                                                         </p>
                                                                         <Badge variant={paymentMeta.variant}>{paymentMeta.label}</Badge>
                                                                     </div>
 
                                                                     <div className="p-5">
-                                                                        <p className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-brand-inactive-text dark:text-dark-body">
+                                                                        <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mb-3">
                                                                             Entrega
                                                                         </p>
                                                                         <Badge variant={deliveryMeta.variant}>{deliveryMeta.label}</Badge>
                                                                     </div>
 
                                                                     <div className="p-5">
-                                                                        <p className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-brand-inactive-text dark:text-dark-body">
+                                                                        <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mb-3">
                                                                             Total
                                                                         </p>
                                                                         <p className="text-2xl font-bold text-brand-dark dark:text-dark-heading">

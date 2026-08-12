@@ -312,6 +312,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
     }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
     const isFinalizingRef = useRef(false)
+    const directCheckoutIdRef = useRef<string | null>(null)
     /** Igual venda manual: o carrinho só é limpo ao fechar o PaymentModal após venda concluída, para a tela de sucesso e o recibo exibirem os valores. */
     const clearCartAfterPaymentModalClosesRef = useRef(false)
     const isSavingDraftRef = useRef(false)
@@ -904,6 +905,9 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
     }
 
     const ensurePreSaleToFinalize = async () => {
+        // A new cart is finalized directly. A persisted draft is updated only
+        // when it already exists and the operator changed it.
+        if (!activePreSaleId) return null
         const savedId = await persistDraft()
         if (!savedId) {
             notifyError("Não foi possível atualizar a pré-venda antes de finalizar.")
@@ -1056,11 +1060,6 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
         isFinalizingRef.current = true
 
         const preSaleIdToFinalize = await ensurePreSaleToFinalize()
-        if (!preSaleIdToFinalize) {
-            isFinalizingRef.current = false
-            return { error: "Não foi possível gerar a pré-venda." }
-        }
-
         setIsFinalizing(true)
         try {
             const paymentBreakdown = (paymentData.paymentBreakdown || []).map((entry) => ({
@@ -1073,7 +1072,35 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
             const result = await finalizePreSaleAction({
                 partnerId,
                 storeId: activeStoreId || null,
-                preSaleId: preSaleIdToFinalize,
+                preSaleId: preSaleIdToFinalize || null,
+                checkoutId: preSaleIdToFinalize ? null : (directCheckoutIdRef.current ||= crypto.randomUUID()),
+                draft: preSaleIdToFinalize ? undefined : {
+                    customerId: selectedCustomerId || null,
+                    items: cart.filter((item) => !item.isGift).map((item) => ({
+                        productId: item.productId || null,
+                        serviceId: item.serviceId || null,
+                        variantId: item.variantId || null,
+                        variantName: item.variantName || null,
+                        name: item.name,
+                        qty: item.qty,
+                        price: item.price,
+                        totalPrice: item.price * item.qty,
+                        image: item.image || null,
+                        listUnitPrice: item.listUnitPrice ?? item.price,
+                        isManualPrice: Boolean((item as any).isManualPrice),
+                        allowSellWithoutStock: Boolean(item.allowSellWithoutStock),
+                    })),
+                    subtotal,
+                    discountAmount: discountVal,
+                    totalAmount: total,
+                    shippingFee,
+                    otherCosts,
+                    notes,
+                    deliveryBreakdown,
+                    couponId: appliedCouponId,
+                    couponCode: appliedCouponCode,
+                    couponDiscountAmount: appliedCouponDiscount,
+                },
                 financeAccountId: financeAccountId || null,
                 paidAmount: Number(paymentData.paidAmount || 0),
                 paymentMethod: paymentData.paymentMethod || "Método não definido",
@@ -1090,7 +1117,10 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
             }
 
             notifySuccess("Venda finalizada com sucesso.")
-            setPreSales((prev) => prev.filter((draft) => draft.id !== preSaleIdToFinalize))
+            if (preSaleIdToFinalize) {
+                setPreSales((prev) => prev.filter((draft) => draft.id !== preSaleIdToFinalize))
+            }
+            directCheckoutIdRef.current = null
             clearCartAfterPaymentModalClosesRef.current = true
             router.refresh()
             return { success: true, orderNumber: result.data?.saleNumber || result.data?.saleId, orderId: result.data?.saleId }

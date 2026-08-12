@@ -465,6 +465,9 @@ export async function getFinancialTransactionsAction(
         const t1 = performance.now()
         let listQuery = supabase.from("transactions").select(FINANCIAL_TX_LIST_SELECT).eq("partner_id", partnerId)
 
+        // Filter out legacy recognition and fee rows to prevent double display of past sales
+        listQuery = listQuery.or("kind.is.null,kind.eq.settlement,kind.eq.refund,kind.eq.chargeback")
+
         if (storeId) {
             listQuery = listQuery.eq("store_id", storeId)
         }

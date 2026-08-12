@@ -149,8 +149,6 @@ export async function createRecurringSubscriptionAction(input: {
 
     if (error) throw error
 
-    const { recordSubscriptionSignupMetrics } = await import("@/lib/services/marketplace-metrics.service")
-    await recordSubscriptionSignupMetrics(supabase, data.id as string)
     // @ts-ignore
     revalidateTag(`partner-stats-${input.partnerId}`, "max")
 

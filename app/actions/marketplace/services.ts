@@ -271,24 +271,24 @@ export async function getPublicAvailableTimeSlots(
     // Fetch existing appointments for this staff on this date (by store if available, otherwise by partner)
     let apptQuery = supabase
       .from("appointments")
-      .select("start_time, end_time, duration_minutes")
+      .select("start_time, end_time, duration_minutes, status, store_id")
+      .eq("partner_id", partnerId)
       .eq("staff_partner_user_id", staffId)
-      .eq("start_date", date)
-      .neq("status", "Cancelado")
+      .lte("start_date", date)
+      .or(`end_date.gte.${date},end_date.is.null`)
       .order("start_time", { ascending: true })
-
-    if (storeId) {
-      apptQuery = apptQuery.eq("store_id", storeId)
-    } else {
-      apptQuery = apptQuery.eq("partner_id", partnerId)
-    }
 
     const { data: existingAppts, error } = await apptQuery
 
     if (error) throw error
 
     // Build occupied time ranges (in minutes from midnight)
-    const occupiedRanges: Array<{ start: number; end: number }> = (existingAppts || []).map((apt: any) => {
+    const occupiedRanges: Array<{ start: number; end: number }> = (existingAppts || [])
+      .filter((apt: any) =>
+        !["cancelado", "cancelled", "canceled"].includes(String(apt.status || "").toLowerCase()) &&
+        (!storeId || !apt.store_id || apt.store_id === storeId)
+      )
+      .map((apt: any) => {
       const [sh, sm] = String(apt.start_time || "").split(":").map(Number)
       const startMin = (sh || 0) * 60 + (sm || 0)
 
@@ -296,13 +296,14 @@ export async function getPublicAvailableTimeSlots(
       if (apt.end_time) {
         const [eh, em] = String(apt.end_time).split(":").map(Number)
         endMin = (eh || 0) * 60 + (em || 0)
+        if (endMin <= startMin) endMin = startMin + Number(apt.duration_minutes || 60)
       } else {
         endMin = startMin + Number(apt.duration_minutes || 60)
       }
 
       // Add buffer after each appointment
-      return { start: startMin, end: endMin + bufferMinutes }
-    })
+        return { start: startMin, end: endMin + bufferMinutes }
+      })
 
     // Fetch opening hours: store first, then partner
     let rawOpeningHours = null
@@ -341,7 +342,8 @@ export async function getPublicAvailableTimeSlots(
 
     if (daySchedule && daySchedule.enabled) {
       const dayStartMin = parseTimeToMinutes(daySchedule.from)
-      const dayEndMin = parseTimeToMinutes(daySchedule.to)
+      let dayEndMin = parseTimeToMinutes(daySchedule.to)
+      if (dayEndMin <= dayStartMin) dayEndMin += 24 * 60
       const totalDurationNeeded = serviceDurationMinutes + bufferMinutes
 
       for (let slotStart = dayStartMin; slotStart + serviceDurationMinutes <= dayEndMin; slotStart += SLOT_INCREMENT_MINUTES) {
@@ -541,6 +543,7 @@ export async function validateServiceBookingAvailabilityAction(
     date: string
     time: string
     durationMinutes: number
+    storeId?: string | null
   }>,
 ) {
   const { isStaffSlotAvailable } = await import("@/lib/commerce/scheduling-availability")
@@ -549,13 +552,14 @@ export async function validateServiceBookingAvailabilityAction(
   const partnerIds = [...new Set(items.map((i) => i.partnerId))]
   const { data: stores } = await supabase
     .from("stores")
-    .select("partner_id, opening_hours")
+    .select("id, partner_id, opening_hours")
     .in("partner_id", partnerIds)
 
   const hoursMap: Record<string, any> = {}
   if (stores) {
     for (const s of stores) {
-      hoursMap[s.partner_id] = s.opening_hours
+      hoursMap[`${s.partner_id}:${s.id}`] = s.opening_hours
+      if (!hoursMap[s.partner_id]) hoursMap[s.partner_id] = s.opening_hours
     }
   }
 
@@ -567,7 +571,8 @@ export async function validateServiceBookingAvailabilityAction(
       date: item.date,
       startTime: item.time,
       durationMinutes: item.durationMinutes,
-      openingHours: hoursMap[item.partnerId] || null,
+      openingHours: hoursMap[`${item.partnerId}:${item.storeId || ''}`] || hoursMap[item.partnerId] || null,
+      storeId: item.storeId || null,
     })
     results.push({ available: ok, staffId: item.staffId, date: item.date, time: item.time })
   }

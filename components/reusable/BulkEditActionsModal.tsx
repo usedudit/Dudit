@@ -12,6 +12,8 @@ import {
 
 import { DELIVERY_STATUS_OPTIONS, PICKUP_STATUS_OPTIONS, MIXED_STATUS_OPTIONS } from "@/lib/orders/status"
 import DefaultModal from "./DefaultModal"
+import { isGifFile } from "@/lib/security/file-validator"
+import { useToast } from "@/hooks/use-toast"
 
 // --- Tipagens ---
 export type BulkActionType = 'price' | 'stock' | 'visibility' | 'image' | 'remove_image' | 'delete' | 'status' | 'order_payment' | 'order_delivery' | 'service_order_status'
@@ -110,6 +112,7 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
     serviceOrderSelectionGuards,
     onApply
 }) => {
+    const { toast } = useToast()
     const [view, setView] = useState<BulkActionType | 'menu'>('menu')
     const [isApplying, setIsApplying] = useState(false)
 
@@ -197,6 +200,11 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (file) {
+            if (isGifFile(file)) {
+                toast({ description: "Arquivos GIF não são permitidos no sistema." })
+                e.target.value = ""
+                return
+            }
             setSelectedImageForCrop(file)
             setShowImageCropper(true)
             e.target.value = ""
@@ -567,7 +575,7 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
             case 'image':
                 return (
                     <div className="flex flex-col items-center justify-center pt-2 h-full">
-                        <input ref={fileInputRef} type="file" className="hidden" accept="image/*" onChange={handleFileSelect} />
+                        <input ref={fileInputRef} type="file" className="hidden" accept="image/png, image/jpeg, image/webp, image/avif" onChange={handleFileSelect} />
                         <div
                             className="relative w-64 h-64 rounded-xl border-2 border-dashed border-brand-border hover:border-brand-primary/50 bg-white dark:bg-dark-surface transition-all flex flex-col items-center justify-center overflow-hidden cursor-pointer"
                             onMouseEnter={() => setHoveredImage(true)} onMouseLeave={() => setHoveredImage(false)}

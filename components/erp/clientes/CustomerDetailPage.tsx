@@ -538,6 +538,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                 <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
                                     <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                                         <TabsTrigger value="General">Dados Gerais</TabsTrigger>
+                                        <TabsTrigger value="StoreCredits">Vales-Compra</TabsTrigger>
                                         <TabsTrigger value="Review">Avaliações</TabsTrigger>
                                         {isTablet && (
                                             <TabsTrigger value="Orders">Pedidos</TabsTrigger>
@@ -643,65 +644,6 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                             )}
                                                         </div>
                                                     )}
-
-                                                    {/* Vale-compras on tablet/mobile */}
-                                                    <div className="mt-4 bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-5">
-                                                        <div className="flex justify-between items-center mb-3">
-                                                            <h3 className="font-bold text-sm text-brand-dark dark:text-dark-heading">Vales-Compra</h3>
-                                                            {Number(customer.store_credit || customer.storeCredit || 0) > 0 && (
-                                                                <Badge variant="green" className="scale-90">
-                                                                    Saldo: {formatCurrency(customer.store_credit || customer.storeCredit || 0)}
-                                                                </Badge>
-                                                            )}
-                                                        </div>
-                                                        
-                                                        {isLoadingStoreCredits ? (
-                                                            <div className="text-center py-2 text-brand-inactive-text dark:text-dark-body text-xs">
-                                                                Carregando vales-compra...
-                                                            </div>
-                                                        ) : storeCredits.length === 0 ? (
-                                                            <div className="text-center py-2 text-brand-inactive-text dark:text-dark-body text-xs font-medium">
-                                                                Nenhum vale-compra gerado para este cliente.
-                                                            </div>
-                                                        ) : (
-                                                            <div className="space-y-3 max-h-[250px] overflow-y-auto pr-1">
-                                                                {storeCredits.map((credit: any) => {
-                                                                    const usedAmount = Number(credit.amount) - Number(credit.remaining_amount);
-                                                                    const isExpired = credit.expires_at && new Date(credit.expires_at) < new Date();
-                                                                    return (
-                                                                        <div key={credit.id} className="p-3 bg-gray-50 dark:bg-dark-border/10 rounded-xl border border-brand-border dark:border-dark-border/50 text-xs">
-                                                                            <div className="flex justify-between items-center mb-1.5">
-                                                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                                                    Gerado em {formatDate(credit.created_at)}
-                                                                                </span>
-                                                                                <Badge variant={
-                                                                                    credit.status === 'ACTIVE' && !isExpired ? 'green' :
-                                                                                    credit.status === 'USED' ? 'gray' : 'red'
-                                                                                } className="scale-90">
-                                                                                    {credit.status === 'ACTIVE' && !isExpired ? 'Disponível' :
-                                                                                     credit.status === 'USED' ? 'Utilizado' : 'Expirado'}
-                                                                                </Badge>
-                                                                            </div>
-                                                                            <div className="grid grid-cols-3 gap-1 pt-1.5 border-t border-brand-border dark:border-dark-border/30">
-                                                                                <div>
-                                                                                    <span className="block text-brand-inactive-text dark:text-dark-body text-[10px]">Valor</span>
-                                                                                    <span className="font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(credit.amount)}</span>
-                                                                                </div>
-                                                                                <div>
-                                                                                    <span className="block text-brand-inactive-text dark:text-dark-body text-[10px]">Utilizado</span>
-                                                                                    <span className="font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(usedAmount)}</span>
-                                                                                </div>
-                                                                                <div>
-                                                                                    <span className="block text-brand-inactive-text dark:text-dark-body text-[10px]">Restante</span>
-                                                                                    <span className="font-bold text-brand-green">{formatCurrency(credit.remaining_amount)}</span>
-                                                                                </div>
-                                                                            </div>
-                                                                        </div>
-                                                                    );
-                                                                })}
-                                                            </div>
-                                                        )}
-                                                    </div>
                                                 </div>
                                             ) : (
                                                 <>
@@ -732,6 +674,16 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                     />
                                                 </>
                                             )}
+                                        </motion.div>
+                                    </TabsContent>
+
+                                    {/* Vales-Compra Tab */}
+                                    <TabsContent value="StoreCredits" className="mt-0">
+                                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
+                                            <StoreCreditsContent
+                                                isLoadingStoreCredits={isLoadingStoreCredits}
+                                                storeCredits={storeCredits}
+                                            />
                                         </motion.div>
                                     </TabsContent>
 
@@ -873,77 +825,6 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                         customer={{ ...customer, addresses: customerAddresses }}
                                                         showMap={true}
                                                     />
-                                                </div>
-                                            </div>
-                                        </section>
-
-                                        {/* Vales-Compra Sidebar Section */}
-                                        <section>
-                                            <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden">
-                                                <div className="absolute top-0 left-0 w-full h-1 bg-brand-green dark:bg-dark-border"></div>
-
-                                                <div className="px-6 pt-5 flex justify-between items-center">
-                                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mt-2">Vales-Compra</h3>
-                                                    {Number(customer.store_credit || customer.storeCredit || 0) > 0 && (
-                                                        <Badge variant="green">
-                                                            Saldo: {formatCurrency(customer.store_credit || customer.storeCredit || 0)}
-                                                        </Badge>
-                                                    )}
-                                                </div>
-
-                                                <div className="p-6 text-left space-y-4">
-                                                    {isLoadingStoreCredits ? (
-                                                        <div className="text-center py-4 text-brand-inactive-text dark:text-dark-body text-sm">
-                                                            Carregando vales-compra...
-                                                        </div>
-                                                    ) : storeCredits.length === 0 ? (
-                                                        <div className="text-center py-4 text-brand-inactive-text dark:text-dark-body text-sm font-medium">
-                                                            Nenhum vale-compra gerado para este cliente.
-                                                        </div>
-                                                    ) : (
-                                                        <div className="space-y-3.5 max-h-[300px] overflow-y-auto pr-1">
-                                                            {storeCredits.map((credit: any) => {
-                                                                const usedAmount = Number(credit.amount) - Number(credit.remaining_amount);
-                                                                const isExpired = credit.expires_at && new Date(credit.expires_at) < new Date();
-                                                                return (
-                                                                    <div key={credit.id} className="p-3 bg-gray-50 dark:bg-dark-border/10 rounded-xl border border-brand-border dark:border-dark-border/50 text-sm">
-                                                                        <div className="flex justify-between items-start mb-1.5">
-                                                                            <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                                                Gerado em {formatDate(credit.created_at)}
-                                                                            </span>
-                                                                            <Badge variant={
-                                                                                credit.status === 'ACTIVE' && !isExpired ? 'green' :
-                                                                                credit.status === 'USED' ? 'gray' : 'red'
-                                                                            }>
-                                                                                {credit.status === 'ACTIVE' && !isExpired ? 'Disponível' :
-                                                                                 credit.status === 'USED' ? 'Utilizado' : 'Expirado'}
-                                                                            </Badge>
-                                                                        </div>
-                                                                        
-                                                                        <div className="grid grid-cols-3 gap-2 pt-1.5 border-t border-brand-border dark:border-dark-border/30 text-xs">
-                                                                            <div>
-                                                                                <span className="block text-brand-inactive-text dark:text-dark-body">Valor</span>
-                                                                                <span className="font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(credit.amount)}</span>
-                                                                            </div>
-                                                                            <div>
-                                                                                <span className="block text-brand-inactive-text dark:text-dark-body">Utilizado</span>
-                                                                                <span className="font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(usedAmount)}</span>
-                                                                            </div>
-                                                                            <div>
-                                                                                <span className="block text-brand-inactive-text dark:text-dark-body">Restante</span>
-                                                                                <span className="font-bold text-brand-green">{formatCurrency(credit.remaining_amount)}</span>
-                                                                            </div>
-                                                                        </div>
-                                                                        {credit.expires_at && (
-                                                                            <div className="text-[10px] text-brand-inactive-text dark:text-dark-body mt-2">
-                                                                                Expira em: {formatDate(credit.expires_at)}
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    )}
                                                 </div>
                                             </div>
                                         </section>
@@ -1186,6 +1067,270 @@ const OrdersContent = ({
     );
 };
 
+/* ── Store Credits Content ──────────────────────────────────────────── */
+
+const STORE_CREDIT_COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; width: string }[] = [
+    { id: "credit_id", label: "Vale-Compra", align: "left", width: "200px" },
+    { id: "amount", label: "Valor Original", align: "left", width: "140px" },
+    { id: "used", label: "Utilizado", align: "left", width: "140px" },
+    { id: "remaining", label: "Saldo Restante", align: "left", width: "140px" },
+    { id: "expires", label: "Validade", align: "left", width: "150px" },
+    { id: "status", label: "Status", align: "left", width: "130px" },
+]
+
+function StoreCreditsContent({
+    isLoadingStoreCredits,
+    storeCredits,
+}: {
+    isLoadingStoreCredits: boolean;
+    storeCredits: any[];
+}) {
+    const isMobile = useMediaQuery("(max-width: 767px)");
+    const [page, setPage] = useState(1);
+    const itemsPerPage = 8;
+    const tableContainerRef = useRef<HTMLDivElement>(null);
+    const [scrollState, setScrollState] = useState({ left: false, right: false });
+    const rafRef = useRef<number>(0);
+
+    const checkScroll = useCallback(() => {
+        if (!tableContainerRef.current) return;
+        const { scrollLeft, scrollWidth, clientWidth } = tableContainerRef.current;
+        setScrollState((prev) => {
+            const left = scrollLeft > 0;
+            const right = scrollLeft < scrollWidth - clientWidth - 2;
+            if (prev.left === left && prev.right === right) return prev;
+            return { left, right };
+        });
+    }, []);
+
+    const handleTableScroll = useCallback(() => {
+        if (rafRef.current) cancelAnimationFrame(rafRef.current);
+        rafRef.current = requestAnimationFrame(checkScroll);
+    }, [checkScroll]);
+
+    useEffect(() => {
+        checkScroll();
+        window.addEventListener("resize", checkScroll);
+        return () => {
+            window.removeEventListener("resize", checkScroll);
+            if (rafRef.current) cancelAnimationFrame(rafRef.current);
+        };
+    }, [checkScroll]);
+
+    const stats = useMemo(() => {
+        let totalActiveBalance = 0;
+        let totalGenerated = 0;
+        let totalUsed = 0;
+
+        storeCredits.forEach((c) => {
+            const amount = Number(c.amount) || 0;
+            const remaining = Number(c.remaining_amount) || 0;
+            const used = amount - remaining;
+            const isExpired = c.expires_at && new Date(c.expires_at) < new Date();
+
+            totalGenerated += amount;
+            totalUsed += used > 0 ? used : 0;
+            if (c.status === "ACTIVE" && !isExpired) {
+                totalActiveBalance += remaining;
+            }
+        });
+
+        return {
+            totalCount: storeCredits.length,
+            totalActiveBalance,
+            totalGenerated,
+            totalUsed,
+        };
+    }, [storeCredits]);
+
+    const totalPages = Math.ceil(storeCredits.length / itemsPerPage);
+    const paginatedCredits = useMemo(() => {
+        return storeCredits.slice((page - 1) * itemsPerPage, page * itemsPerPage);
+    }, [storeCredits, page]);
+
+    if (isLoadingStoreCredits) {
+        return (
+            <div className="flex-1 flex items-center justify-center p-8 py-20">
+                <ThreeDotsLoader />
+            </div>
+        );
+    }
+
+    return (
+        <div>
+            {/* KPI Cards */}
+            <HorizontalKPICard
+                items={[
+                    { title: "Vales-Compra", value: stats.totalCount, icon: CreditCardIcon },
+                    { title: "Saldo Disponível", value: formatCurrency(stats.totalActiveBalance), icon: MoneyIcon },
+                    { title: "Total Gerado", value: formatCurrency(stats.totalGenerated), icon: MoneyIcon },
+                    { title: "Total Utilizado", value: formatCurrency(stats.totalUsed), icon: MoneyIcon },
+                ]}
+            />
+
+            {storeCredits.length > 0 ? (
+                <div className="mt-6">
+                    {isMobile ? (
+                        <div className="flex flex-col border-b border-brand-border dark:border-dark-border">
+                            {paginatedCredits.map((credit: any) => {
+                                const usedAmount = Number(credit.amount) - Number(credit.remaining_amount);
+                                const isExpired = credit.expires_at && new Date(credit.expires_at) < new Date();
+                                const isAvailable = credit.status === 'ACTIVE' && !isExpired && Number(credit.remaining_amount) > 0;
+                                const isUsed = credit.status === 'USED' || Number(credit.remaining_amount) <= 0;
+
+                                return (
+                                    <div
+                                        key={credit.id}
+                                        className="py-4 border-b border-gray-100 dark:border-dark-border/50 last:border-none"
+                                    >
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div>
+                                                <span className="font-bold text-[15px] text-brand-dark dark:text-dark-heading block">
+                                                    #{credit.id.substring(0, 8).toUpperCase()}
+                                                </span>
+                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                    Gerado em {formatDate(credit.created_at)}
+                                                </span>
+                                            </div>
+                                            <Badge variant={isAvailable ? 'green' : isUsed ? 'gray' : 'red'}>
+                                                {isAvailable ? 'Disponível' : isUsed ? 'Utilizado' : 'Expirado'}
+                                            </Badge>
+                                        </div>
+
+                                        <div className="grid grid-cols-3 gap-2 p-3 bg-gray-50 dark:bg-dark-border/10 rounded-xl text-xs">
+                                            <div>
+                                                <span className="block text-brand-inactive-text dark:text-dark-body text-[10px]">Valor Original</span>
+                                                <span className="font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(credit.amount)}</span>
+                                            </div>
+                                            <div>
+                                                <span className="block text-brand-inactive-text dark:text-dark-body text-[10px]">Utilizado</span>
+                                                <span className="font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(usedAmount > 0 ? usedAmount : 0)}</span>
+                                            </div>
+                                            <div>
+                                                <span className="block text-brand-inactive-text dark:text-dark-body text-[10px]">Saldo Restante</span>
+                                                <span className="font-bold text-brand-green">{formatCurrency(credit.remaining_amount)}</span>
+                                            </div>
+                                        </div>
+                                        {credit.expires_at && (
+                                            <div className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-2">
+                                                Validade: {formatDate(credit.expires_at)}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                            {totalPages > 1 && (
+                                <div className="flex justify-center mt-6">
+                                    <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="w-full overflow-hidden rounded-xl relative">
+                            <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
+                            <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
+
+                            <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={handleTableScroll}>
+                                <table className="w-full text-left border-separate border-spacing-0 min-w-[800px]">
+                                    <thead>
+                                        <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                            {STORE_CREDIT_COLUMNS.map((col, idx) => {
+                                                const isFirst = idx === 0;
+                                                const isLast = idx === STORE_CREDIT_COLUMNS.length - 1;
+                                                return (
+                                                    <th
+                                                        key={col.id}
+                                                        className={`py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} select-none ${isFirst ? "rounded-l-lg pl-6" : ""} ${isLast ? "rounded-r-lg pr-6" : ""}`}
+                                                        style={{ width: col.width }}
+                                                    >
+                                                        {col.label}
+                                                    </th>
+                                                );
+                                            })}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {paginatedCredits.map((credit: any) => {
+                                            const usedAmount = Number(credit.amount) - Number(credit.remaining_amount);
+                                            const isExpired = credit.expires_at && new Date(credit.expires_at) < new Date();
+                                            const isAvailable = credit.status === 'ACTIVE' && !isExpired && Number(credit.remaining_amount) > 0;
+                                            const isUsed = credit.status === 'USED' || Number(credit.remaining_amount) <= 0;
+
+                                            return (
+                                                <tr
+                                                    key={credit.id}
+                                                    className="group hover:bg-brand-gray dark:hover:bg-dark-border/10 transition-colors bg-white dark:bg-dark-background"
+                                                >
+                                                    <td className="p-3 pl-6 border-b border-brand-border dark:border-dark-border">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                                                                <CreditCardIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                                            </div>
+                                                            <div className="flex flex-col text-left min-w-0">
+                                                                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate leading-tight mb-0.5">
+                                                                    #{credit.id.substring(0, 8).toUpperCase()}
+                                                                </span>
+                                                                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
+                                                                    Gerado em {formatDate(credit.created_at)}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="p-3 border-b border-brand-border dark:border-dark-border">
+                                                        <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
+                                                            {formatCurrency(credit.amount)}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-3 border-b border-brand-border dark:border-dark-border">
+                                                        <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
+                                                            {formatCurrency(usedAmount > 0 ? usedAmount : 0)}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-3 border-b border-brand-border dark:border-dark-border">
+                                                        <span className="text-[13px] font-bold text-brand-green">
+                                                            {formatCurrency(credit.remaining_amount)}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-3 border-b border-brand-border dark:border-dark-border">
+                                                        <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
+                                                            {credit.expires_at ? formatDate(credit.expires_at) : "Sem expiração"}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-3 pr-6 border-b border-brand-border dark:border-dark-border">
+                                                        <Badge variant={isAvailable ? 'green' : isUsed ? 'gray' : 'red'}>
+                                                            {isAvailable ? 'Disponível' : isUsed ? 'Utilizado' : 'Expirado'}
+                                                        </Badge>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {totalPages > 1 && (
+                                <div className="flex justify-center mt-6 w-full hidden md:flex">
+                                    <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            ) : (
+                <div className="mt-6">
+                    <IconPlaceholder
+                        title="Nenhum vale-compra encontrado"
+                        subtitle="Este cliente não possui vales-compra cadastrados."
+                        imageSrc="https://img.dudit.com.br/static/mascots/SacolaVazia.png"
+                        imageAlt="Nenhum vale-compra encontrado"
+                        placeholderType="image"
+                    />
+                </div>
+            )}
+        </div>
+    );
+}
+
 /* ── Reviews Content ──────────────────────────────────────────── */
 
 function ReviewsContent({ reviews, isLoading }: { reviews: any[]; isLoading: boolean }) {
@@ -1201,3 +1346,4 @@ function ReviewsContent({ reviews, isLoading }: { reviews: any[]; isLoading: boo
 }
 
 export default CustomerDetailPage;
+

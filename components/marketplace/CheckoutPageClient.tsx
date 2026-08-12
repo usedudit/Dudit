@@ -821,6 +821,7 @@ export function CheckoutPageClient() {
             date: l.bookingMetadata!.date,
             time: l.bookingMetadata!.time,
             durationMinutes: l.bookingMetadata!.durationMinutes,
+            storeId: l.bookingMetadata!.storeId || null,
         }))
         validateServiceBookingAvailabilityAction(items).then((results) => {
             const map: Record<string, { available: boolean; checked: boolean }> = {}
@@ -1893,6 +1894,7 @@ export function CheckoutPageClient() {
                 date: l.bookingMetadata!.date,
                 time: l.bookingMetadata!.time,
                 durationMinutes: l.bookingMetadata!.durationMinutes,
+                storeId: l.bookingMetadata!.storeId || null,
             }))
             const availResults = await validateServiceBookingAvailabilityAction(availItems)
             const map: Record<string, { available: boolean; checked: boolean }> = {}

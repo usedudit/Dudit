@@ -109,10 +109,11 @@ function ActionButtons({ productId, onShareClick, className = "" }: { productId:
             </Button>
             <Button
                 variant="outline"
+                size="icon"
                 onClick={(e) => { e.stopPropagation(); onShareClick(); }}
-                className="w-9 h-9 flex items-center justify-center"
+                className="w-9 h-9"
             >
-                <ShareIcon className="w-4 h-4 text-brand-green" />
+                <ShareIcon size={18} className="text-brand-green" />
             </Button>
         </div>
     )
@@ -1427,7 +1428,7 @@ export function ProductDetailsPageClient({
             }
 
             {/* Informações importantes Accordion */}
-            <div className="border-t border-brand-border pt-4 mb-6">
+            <div className="border-t border-brand-border pt-4 mb-4">
                 <div className="border-b border-brand-border pb-3">
                     <button
                         type="button"
@@ -1476,7 +1477,7 @@ export function ProductDetailsPageClient({
             </div>
 
             {/* Políticas da loja */}
-            <div className="border-t border-brand-border pt-4 mb-6">
+            <div className="mb-6">
                 <button
                     type="button"
                     onClick={() => setShowPoliciesModal(true)}
@@ -2122,16 +2123,16 @@ export function ProductDetailsPageClient({
                                                 <Button variant="outline" size="icon" className="w-10 h-10"
                                                     onClick={async (e) => { e.stopPropagation(); if (isProductOwner) return; if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname)); await toggleFav(product.id, "produto") }}
                                                     title={isFavProd ? "Remover dos favoritos" : "Adicionar aos favoritos"}>
-                                                    <HeartIcon size={20} className={isFavProd ? "text-brand-green fill-brand-green" : "text-brand-green"} />
+                                                    <HeartIcon size={18} className={isFavProd ? "text-brand-green fill-brand-green" : "text-brand-green"} />
                                                 </Button>
                                             )
                                         })()}
 
-                                        <Button variant="outline" onClick={() => setShowShareModal(true)} className="w-10 h-10 flex items-center justify-center" title="Compartilhar">
-                                            <ShareIcon className="w-5 h-5 text-brand-green" />
+                                        <Button variant="outline" size="icon" onClick={() => setShowShareModal(true)} className="w-10 h-10" title="Compartilhar">
+                                            <ShareIcon size={18} className="text-brand-green" />
                                         </Button>
-                                        <Button variant="outline" onClick={() => { if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname)); setShowCollectionModal(true) }} className="w-10 h-10 flex items-center justify-center" title="Adicionar à coleção">
-                                            <PlusIcon className="w-5 h-5 text-brand-green" />
+                                        <Button variant="outline" size="icon" onClick={() => { if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname)); setShowCollectionModal(true) }} className="w-10 h-10 flex items-center justify-center" title="Adicionar à coleção">
+                                            <PlusIcon size={18} className="text-brand-green" />
                                         </Button>
 
                                         <div className="flex-1 flex items-center">
@@ -2143,7 +2144,6 @@ export function ProductDetailsPageClient({
                                         </div>
                                     </div>
                                 </div>
-
                             </div>
 
                             {/* Buy panel (mobile/tablet) */}

@@ -31,6 +31,7 @@ export const getTransactionsCached = cache(async (partnerId: string, storeId: st
                     .from("transactions")
                     .select("id", { count: "exact", head: true })
                     .eq("partner_id", partnerId)
+                    .or("kind.is.null,kind.eq.settlement,kind.eq.refund,kind.eq.chargeback")
 
                 const totalCount = countResult.count ?? 0
 
@@ -43,6 +44,7 @@ export const getTransactionsCached = cache(async (partnerId: string, storeId: st
                         transaction_contacts(name, type)
                     `)
                     .eq("partner_id", partnerId)
+                    .or("kind.is.null,kind.eq.settlement,kind.eq.refund,kind.eq.chargeback")
                     .order("created_at", { ascending: false })
                     .range(offset, offset + pageSize - 1)
 

@@ -13,6 +13,13 @@ export function hasMinimumPlan(currentSlug: string, minimumSlug: PlanTierSlug): 
   return planTierIndex(currentSlug) >= planTierIndex(minimumSlug)
 }
 
+/** Maximum image attachments allowed per plan tier in ERP attachment tabs */
+export function getPlanImageAttachmentLimit(currentSlug: string): number {
+  if (!hasMinimumPlan(currentSlug, "crescer")) return 0
+  if (currentSlug === "crescer") return 5
+  return 15
+}
+
 export const PLAN_UPGRADE_ICONS = {
   crescer: "https://img.dudit.com.br/static/icons/StarVender.png",
   escalar: "https://img.dudit.com.br/static/icons/StarEscalar.png",

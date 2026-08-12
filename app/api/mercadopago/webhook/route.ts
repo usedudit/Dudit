@@ -302,6 +302,108 @@ async function processWebhookWithRetry(
       }
     }
 
+    // ── Check if this is a SaaS subscription manual payment (preapproval linked to subscriptions table) ──
+    const saasPreapprovalId = paymentInfo.preapproval_id || paymentInfo.metadata?.preapproval_id
+    const saasExternalRef = paymentInfo.external_reference
+    if (saasPreapprovalId || saasExternalRef) {
+      console.log(`[WEBHOOK] Checking for SaaS subscription payment (preapproval: ${saasPreapprovalId}, ext_ref: ${saasExternalRef})`)
+      
+      let saasSubscription = null
+      
+      if (saasPreapprovalId) {
+        const { data: sub } = await supabase
+          .from("subscriptions")
+          .select("id, partner_id, status, plan_id, mercado_pago_subscription_id, current_period_end, billing_email")
+          .eq("mercado_pago_subscription_id", saasPreapprovalId)
+          .maybeSingle()
+        saasSubscription = sub
+      } else if (saasExternalRef) {
+        const { data: sub } = await supabase
+          .from("subscriptions")
+          .select("id, partner_id, status, plan_id, mercado_pago_subscription_id, current_period_end, billing_email")
+          .eq("id", saasExternalRef)
+          .maybeSingle()
+        saasSubscription = sub
+      }
+
+      if (saasSubscription) {
+        console.log(`[WEBHOOK] Found SaaS subscription ${saasSubscription.id} for payment ${paymentId}`)
+        
+        // Verify partner matches
+        if (saasSubscription.partner_id !== partnerId) {
+          console.warn(`[WEBHOOK] Partner mismatch for SaaS subscription payment`)
+        } else if (paymentInfo.status === "approved" && saasSubscription.status === "past_due") {
+          // Reactivate subscription
+          console.log(`[WEBHOOK] Reactivating SaaS subscription ${saasSubscription.id} from past_due to active`)
+          
+          const { error: updateError } = await supabase
+            .from("subscriptions")
+            .update({
+              status: "active",
+              past_due_at: null,
+              // Extend period by 1 month from current_period_end or now
+              current_period_end: saasSubscription.current_period_end
+                ? new Date(new Date(saasSubscription.current_period_end).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()
+                : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", saasSubscription.id)
+
+          if (!updateError) {
+            // Invalidate cache and sync billing
+            const { invalidatePartnerPlanCache } = await import("@/lib/services/subscription.service")
+            invalidatePartnerPlanCache(saasSubscription.partner_id)
+            
+            const { syncSubscriptionToBilling } = await import("@/lib/billing/sync-subscription")
+            await syncSubscriptionToBilling(saasSubscription.id, "webhook").catch(console.error)
+            
+            // Log billing event
+            try {
+              await supabase.from("billing_events").insert({
+                partner_id: saasSubscription.partner_id,
+                event_type: "subscription_reactivated",
+                amount: Number(paymentInfo.transaction_amount || 0),
+                provider: "mercado_pago",
+                metadata: {
+                  mp_subscription_id: saasSubscription.mercado_pago_subscription_id,
+                  mp_payment_id: paymentId.toString(),
+                  previous_status: "past_due",
+                  payment_method: "pix",
+                },
+              })
+            } catch (billErr: any) {
+              console.error("[WEBHOOK] Failed to log billing event:", billErr.message)
+            }
+
+            // Notify partner owner
+            const { data: partner } = await supabase
+              .from("partners")
+              .select("user_id")
+              .eq("id", saasSubscription.partner_id)
+              .single()
+            
+            if (partner?.user_id) {
+              const { sendBillingNotification } = await import("@/lib/billing/notifications")
+              await sendBillingNotification(
+                "billing.payment_received",
+                partner.user_id,
+                saasSubscription.partner_id,
+                {
+                  message: `Pagamento manual da assinatura aprovado! A assinatura foi reativada e o próximo vencimento foi estendido.`,
+                  subscription_id: saasSubscription.id,
+                  mp_payment_id: paymentId.toString(),
+                  amount: paymentInfo.transaction_amount,
+                }
+              )
+            }
+            
+            console.log(`[WEBHOOK] SaaS subscription ${saasSubscription.id} reactivated successfully`)
+          }
+        }
+        return
+      }
+    }
+
     // ── Find order in DB ──
     let orderData = existingOrderData
     if (!orderData) {

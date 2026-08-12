@@ -165,6 +165,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
     searchPromotions = [],
 }) => {
     const isMarketplaceLocked = isPaidOrder || role === 'DELIVERY';
+    const hasOnlyServices = items.length > 0 && items.every((item) => Boolean(item.isService));
     const PaymentRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
         <div className="flex justify-between items-start text-[14px] gap-4">
             <span className="text-brand-inactive-text dark:text-dark-body font-medium">{label}</span>
@@ -659,7 +660,9 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <PaymentRow label="Data do Pedido" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatDateString(orderDate)}</span>} />
                                 <PaymentRow label="Origem da Venda" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{salesChannel}</span>} />
-                                <PaymentRow label="Método de Entrega" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{deliveryMethod === "pickup" ? "Retirada pessoalmente" : "Entrega / Delivery"}</span>} />
+                                {!hasOnlyServices && (
+                                    <PaymentRow label="Método de Entrega" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{deliveryMethod === "pickup" ? "Retirada pessoalmente" : "Entrega / Delivery"}</span>} />
+                                )}
                                 {!isQuickMode && (
                                     <PaymentRow label="Conta de recebimento" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{accountOptions.find(opt => opt.value === financeAccountId)?.label || "Não informado"}</span>} />
                                 )}
@@ -686,13 +689,15 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                     options={salesChannelOptions}
                                 />
 
-                                <FormDropdown
-                                    label="Método de Entrega"
-                                    disabled={isMarketplaceLocked && isPaidOrder}
-                                    value={deliveryMethod}
-                                    setValue={(val: any) => setDeliveryMethod(val)}
-                                    options={deliveryMethodOptions}
-                                />
+                                {!hasOnlyServices && (
+                                    <FormDropdown
+                                        label="Método de Entrega"
+                                        disabled={isMarketplaceLocked && isPaidOrder}
+                                        value={deliveryMethod}
+                                        setValue={(val: any) => setDeliveryMethod(val)}
+                                        options={deliveryMethodOptions}
+                                    />
+                                )}
 
                                 {!isQuickMode && (
                                     <Combobox
@@ -1307,7 +1312,9 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                         <div className="space-y-4 text-left">
                             <PaymentRow label="Data do Pedido" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatDateString(orderDate)}</span>} />
                             <PaymentRow label="Origem da Venda" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{salesChannel}</span>} />
-                            <PaymentRow label="Método de Entrega" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{deliveryMethod === "pickup" ? "Retirada pessoalmente" : "Entrega / Delivery"}</span>} />
+                            {!hasOnlyServices && (
+                                <PaymentRow label="Método de Entrega" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{deliveryMethod === "pickup" ? "Retirada pessoalmente" : "Entrega / Delivery"}</span>} />
+                            )}
                             {!isQuickMode && (
                                 <PaymentRow label="Conta de recebimento" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{accountOptions.find(opt => opt.value === financeAccountId)?.label || "Não informado"}</span>} />
                             )}
@@ -1334,13 +1341,15 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                 options={salesChannelOptions}
                             />
 
-                            <FormDropdown
-                                label="Método de Entrega"
-                                disabled={isMarketplaceLocked && isPaidOrder}
-                                value={deliveryMethod}
-                                setValue={(val: any) => setDeliveryMethod(val)}
-                                options={deliveryMethodOptions}
-                            />
+                            {!hasOnlyServices && (
+                                <FormDropdown
+                                    label="Método de Entrega"
+                                    disabled={isMarketplaceLocked && isPaidOrder}
+                                    value={deliveryMethod}
+                                    setValue={(val: any) => setDeliveryMethod(val)}
+                                    options={deliveryMethodOptions}
+                                />
+                            )}
 
                             {!isQuickMode && (
                                 <Combobox

@@ -51,6 +51,7 @@ import AppointmentsPageControls from './AppointmentsPageControls';
 import { AppointmentListRow } from './AppointmentListRow';
 import SavingStatusModal from '@/components/reusable/SavingStatusModal';
 import { text } from 'node:stream/consumers';
+import { useNotification } from '@/hooks/use-notification';
 
 /**
  * Compute the visible date range based on the current view and date.
@@ -151,6 +152,7 @@ const AppointmentsPage = ({
     const [moreSheetAppointments, setMoreSheetAppointments] = useState<Appointment[]>([]);
     const [isSaving, setIsSaving] = useState(false);
     const { planSlug } = usePermissions();
+    const { error: notifyError } = useNotification();
 
     // Selection Mode
     const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -506,6 +508,8 @@ const AppointmentsPage = ({
                 if (updateRes.success && updateRes.item) {
                     const mapped = mapDbAppointment(updateRes.item);
                     setAppointments((prev) => prev.map((a) => a.id === mapped.id ? mapped : a));
+                } else {
+                    throw new Error(updateRes.error || 'Não foi possível atualizar o agendamento.');
                 }
             } else {
                 const rows = (Array.isArray(payload) ? payload : [payload]).map((item) => ({
@@ -515,8 +519,11 @@ const AppointmentsPage = ({
                     categoryId: item.categoryId || null,
                     date: item.date || formatDateStr(currentDate),
                     time: item.time || getDayOpeningTime(currentDate, openingHours),
-                    endDate: item.endDate || item.date || formatDateStr(currentDate),
-                    endTime: item.endTime || item.time || getDayOpeningTime(currentDate, openingHours),
+                    // The server derives the end from start + duration when it
+                    // is not an explicit range. Using start_time as end_time
+                    // made every appointment look duration-zero to availability.
+                    endDate: item.endDate || null,
+                    endTime: item.endTime || null,
                     duration: Number(item.duration || 60),
                     staffId: String(item.staffId || preSelectedStaffId || realStaffMembers[0]?.id || ''),
                     staffName: item.staffName || realStaffMembers.find((s) => s.id === String(item.staffId || preSelectedStaffId))?.name || realStaffMembers[0]?.name || 'Profissional',
@@ -527,12 +534,17 @@ const AppointmentsPage = ({
                     customerId: item.customerId || realClients.find((c) => c.name === item.customerName)?.id || null,
                     services: item.services || undefined,
                     items: item.items || undefined,
+                    orderId: item.orderId || item.marketplaceOrderId || null,
+                    orderItemId: item.orderItemId || item.order_item_id || null,
+                    fulfillmentMode: item.fulfillmentMode || null,
                     storeId: storeId,
                 }));
 
                 const createRes = await createAppointmentsAction(rows);
                 if (createRes.success) {
                     setAppointments((prev) => [...prev, ...(createRes.created || []).map(mapDbAppointment)]);
+                } else {
+                    throw new Error(createRes.error || 'Não foi possível criar o agendamento.');
                 }
             }
 
@@ -543,6 +555,8 @@ const AppointmentsPage = ({
             setTempSelectionTime(null);
             setDraftData(null);
             setPreSelectedStaffId(undefined);
+        } catch (error: any) {
+            notifyError('Erro', error?.message || 'Não foi possível salvar o agendamento.');
         } finally {
             setIsSaving(false);
         }

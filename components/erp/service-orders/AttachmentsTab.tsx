@@ -7,7 +7,8 @@ import { useToast } from "@/hooks/use-toast"
 import { r2PublicConfig } from "@/lib/r2/r2-public"
 import ImageCropperModal from "@/components/ImageCropperModal"
 import { usePermissions } from "@/lib/permission-context"
-import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
+import { hasMinimumPlan, getPlanImageAttachmentLimit } from "@/lib/subscription/plan-tier"
+import { isGifFile } from "@/lib/security/file-validator"
 import { usePlanUpgrade, planStarIconForTarget } from "@/components/erp/subscription/PlanUpgradeModal"
 import ProductImagesSection from "@/components/erp/product/ProductImagesSection"
 import { getServiceOrderAttachmentUrlAction } from "@/app/actions/erp/service-orders"
@@ -51,11 +52,27 @@ export default function AttachmentsTab({
     }, [attachments])
 
     const advancedEnabled = hasMinimumPlan(planSlug, "crescer")
+    const imagePlanLimit = getPlanImageAttachmentLimit(planSlug)
 
     const handleImageUpload = (category: "normal" | "antes" | "depois", e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         e.target.value = ""
         if (!file) return
+
+        if (isGifFile(file)) {
+            toast({ description: "Arquivos GIF não são permitidos no sistema." })
+            return
+        }
+
+        const totalImagesCount = localAttachments.filter(att =>
+            att.file_type?.startsWith("image/") || att.file?.type?.startsWith("image/")
+        ).length
+
+        if (totalImagesCount >= imagePlanLimit) {
+            toast({ description: `Você atingiu o limite de ${imagePlanLimit} imagem(ns) para o seu plano.` })
+            return
+        }
+
         setPendingCategory(category)
         setImageForCrop(file)
         setShowCropper(true)
@@ -106,6 +123,11 @@ export default function AttachmentsTab({
         const file = e.target.files?.[0]
         e.target.value = ""
         if (!file) return
+
+        if (isGifFile(file)) {
+            toast({ description: "Arquivos GIF não são permitidos no sistema." })
+            return
+        }
 
         if (file.type.startsWith("image/") || /\.(jpg|jpeg|png|webp|gif|avif|bmp|svg)$/i.test(file.name)) {
             toast({ description: "Arquivos de imagem não são permitidos no upload de documentos. Utilize a seção de Imagens." })
@@ -280,6 +302,31 @@ export default function AttachmentsTab({
     }
 
     const hasContent = localAttachments.length > 0
+
+    if (!advancedEnabled) {
+        return (
+            <div className="flex flex-col items-center justify-center text-center py-12 px-6 bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border space-y-4">
+                <div className="w-14 h-14 rounded-full bg-brand-primary/10 flex items-center justify-center">
+                    <FileIcon className="w-7 h-7 text-brand-primary" />
+                </div>
+                <div className="max-w-md space-y-1.5">
+                    <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading">
+                        Aba de Anexos disponível nos planos Crescer e Escalar
+                    </h3>
+                    <p className="text-xs text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                        Você está no plano gratuito. Faça upgrade para o plano Crescer (até 5 imagens) ou Escalar (até 15 imagens) para liberar os anexos da OS.
+                    </p>
+                </div>
+                <Button
+                    type="button"
+                    onClick={() => openPlanUpgrade("crescer")}
+                    className="gap-2"
+                >
+                    <span>Fazer Upgrade de Plano</span>
+                </Button>
+            </div>
+        )
+    }
 
     return (
         <>

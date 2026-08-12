@@ -8,6 +8,7 @@ import { useMediaQuery } from "@/components/erp/hooks"
 import { useStore } from "@/lib/store-context"
 import { getOrderDetailsAction } from "@/app/actions/erp/orders"
 import { getPartnerReceiptHeaderAction } from "@/app/actions/erp/receipt"
+import { getPartnerReturnPolicyAction } from "@/app/actions/erp/return-policies"
 import {
     DEFAULT_RECEIPT_FOOTER_MESSAGE,
     type SaleReceiptData,
@@ -43,7 +44,6 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, orderId }: Sale
             setIsVisible(true)
             const id = setTimeout(() => setIsAnimating(true), 50)
             setActiveTab("Opções")
-            setFooterMessage(DEFAULT_RECEIPT_FOOTER_MESSAGE)
             setShowAcknowledgment(true)
             return () => clearTimeout(id)
         }
@@ -70,9 +70,10 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, orderId }: Sale
 
             const storeId = selectedStore?.id
 
-            const [orderRes, headerRes] = await Promise.all([
+            const [orderRes, headerRes, policyRes] = await Promise.all([
                 getOrderDetailsAction(orderId, partnerId),
                 getPartnerReceiptHeaderAction(partnerId, storeId),
+                getPartnerReturnPolicyAction(partnerId),
             ])
 
             if (cancelled) return
@@ -81,6 +82,11 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, orderId }: Sale
                 setLoading(false)
                 return
             }
+
+            const configuredMsg = policyRes?.success && policyRes.data?.policy?.receiptMessage
+                ? policyRes.data.policy.receiptMessage.trim()
+                : null
+            setFooterMessage(configuredMsg || DEFAULT_RECEIPT_FOOTER_MESSAGE)
 
             const partnerHeader = headerRes.success && headerRes.data ? headerRes.data : {
                 fantasyName: "",

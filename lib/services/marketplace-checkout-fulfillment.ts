@@ -19,6 +19,12 @@ import { onMarketplaceOrderPaid } from "@/lib/services/marketplace-metrics.servi
 
 const STOREFRONT_CHANNEL = "online_storefront"
 
+// Marketplace order sources - orders created via marketplace checkout have these sources
+const marketplaceOrderSources = new Set(["vitrine online", "marketplace", "online store"])
+function isMarketplaceOrderSource(orderSource: string | undefined): boolean {
+  return marketplaceOrderSources.has((orderSource || "").toLowerCase().trim())
+}
+
 function isPaymentConfirmedForFulfillment(order: {
   situation?: string | null
   paid_amount?: number | null
@@ -73,6 +79,7 @@ async function createBookingFromMetadata(
     startTime: params.meta.time,
     durationMinutes: params.meta.durationMinutes,
     bufferMinutes: params.bufferMinutes ?? 0,
+    storeId: params.meta.storeId || null,
   })
 
   const endTime = computeEndTime(params.meta.time, params.meta.durationMinutes)
@@ -292,7 +299,7 @@ export async function fulfillMarketplaceOrder(
     .from("orders")
     .select(`
       id, partner_id, buyer_id, store_id, situation, checkout_fulfillment,
-      finance_account_id, customer_name, delivery_type, delivery_address, payment_method,
+      order_source, finance_account_id, customer_name, delivery_type, delivery_address, payment_method,
       paid_amount, amount_paid
     `)
     .eq("id", orderId)
@@ -321,6 +328,8 @@ export async function fulfillMarketplaceOrder(
   ).length
 
   const paymentConfirmed = isPaymentConfirmedForFulfillment(order)
+
+  const isMarketplace = isMarketplaceOrderSource(order.order_source)
 
   if (existingFulfillment?.status === "completed") {
     const appointmentIds = (existingFulfillment.result as CheckoutFulfillmentResult)?.appointmentIds || []
@@ -373,7 +382,7 @@ export async function fulfillMarketplaceOrder(
       }
     }
     if (appointmentIds.length >= expectedScheduledServices) {
-      if (paymentConfirmed) {
+      if (isMarketplace && paymentConfirmed) {
         await onMarketplaceOrderPaid(supabase, orderId)
       }
       return { success: true, result: (existingFulfillment.result || {}) as CheckoutFulfillmentResult, skipped: true }
@@ -385,7 +394,7 @@ export async function fulfillMarketplaceOrder(
   }
 
   if (!payload?.lines?.length) {
-    if (paymentConfirmed) {
+    if (isMarketplace && paymentConfirmed) {
       await onMarketplaceOrderPaid(supabase, orderId)
     }
     return { success: true, skipped: true }
@@ -553,7 +562,7 @@ export async function fulfillMarketplaceOrder(
       })
       .eq("idempotency_key", idempotencyKey)
 
-    if (paymentConfirmed) {
+    if (isMarketplace && paymentConfirmed) {
       await onMarketplaceOrderPaid(supabase, orderId)
     }
 

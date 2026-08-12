@@ -16,6 +16,8 @@ import AlertModal from "@/components/reusable/AlertModal"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 import { createProductVariantsBatchAction, getProductVariantsAction } from "@/app/actions/erp/products"
 import { useNotification } from "@/hooks/use-notification"
+import { useToast } from "@/hooks/use-toast"
+import { isGifFile } from "@/lib/security/file-validator"
 import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import QuickStockMovementSheet from "./QuickStockMovementSheet"
@@ -65,6 +67,7 @@ const VariantImageUpload = React.memo(({
     onRemove?: () => void,
     size?: "sm" | "md"
 }) => {
+    const { toast } = useToast()
     const inputRef = useRef<HTMLInputElement>(null)
     const [preview, setPreview] = useState<string | null>(null)
 
@@ -85,6 +88,11 @@ const VariantImageUpload = React.memo(({
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (file) {
+            if (isGifFile(file)) {
+                toast({ description: "Arquivos GIF não são permitidos no sistema." })
+                if (inputRef.current) inputRef.current.value = ""
+                return
+            }
             onSelectFile(file)
             if (inputRef.current) inputRef.current.value = ""
         }
@@ -106,7 +114,7 @@ const VariantImageUpload = React.memo(({
                 type="file"
                 className="hidden"
                 ref={inputRef}
-                accept="image/*"
+                accept="image/png, image/jpeg, image/webp, image/avif"
                 onChange={handleFileChange}
             />
 

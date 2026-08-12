@@ -19,6 +19,7 @@ import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { useSupabase } from "@/providers/supabase-provider"
 import type { BusinessMode } from "@/lib/business-info"
 import { getDefaultResourcesForCategory } from "@/lib/system-resources"
+import { isGifFile } from "@/lib/security/file-validator"
 
 const initialPartnerData = {
     categoryId: "",
@@ -145,6 +146,7 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
         const file = e.target.files?.[0]
         e.currentTarget.value = ""
         if (!file) return
+        if (isGifFile(file)) return void toast.error("Arquivos GIF não são permitidos no sistema.")
         if (file.size > 3 * 1024 * 1024) return void toast.error("Máximo 3MB")
         setTempImageFile(file)
         setCropModalOpen(true)
@@ -322,7 +324,7 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                                         <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Selecione uma imagem</p>
                                         <p className="text-xs text-brand-inactive-text dark:text-dark-body">Máx 3MB (PNG, JPG, WEBP)</p>
                                     </div>
-                                    <input ref={fileInputRef} type="file" hidden accept="image/*" onChange={handleImageChange} />
+                                    <input ref={fileInputRef} type="file" hidden accept="image/png, image/jpeg, image/webp, image/avif" onChange={handleImageChange} />
                                 </div>
                                 <div className="grid grid-cols-2 gap-3">
                                     <Input name="storeName" label="Nome da Loja" value={partnerData.storeName} onChange={e => setPartnerData(p => ({ ...p, storeName: e.target.value }))} required />

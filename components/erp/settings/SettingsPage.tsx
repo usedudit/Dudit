@@ -145,7 +145,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
         "payment-methods": "Formas de Pagamentos",
         "crediario": "Crediário",
         "comissao": "Comissão",
-        "recibo": "Recibo/Devolução",
+        "recibo": "Trocas e Devoluções",
         "vitrine": "Minha Vitrine",
         "delivery": "Logística e Entrega",
         "logs": "Histórico de Atividades",
@@ -339,8 +339,8 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                             {canAccessReturns && (
                               <ListItem
                                 icon={PackageReceiveIcon}
-                                title="Recibo/Devolução"
-                                description="Personalize o cabeçalho do recibo e políticas de trocas."
+                                title="Trocas e Devoluções"
+                                description="Defina as políticas de troca e devoluções do seu negócio."
                                 onClick={() => setActivePage("recibo")}
                                 showChevron
                                 className="px-4 py-3 gap-4"

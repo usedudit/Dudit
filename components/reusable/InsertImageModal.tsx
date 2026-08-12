@@ -9,6 +9,7 @@ import { ImageOffIcon } from "@/lib/icons"
 import ImageCropperModal from "@/components/ImageCropperModal"
 import { useR2Upload } from "@/hooks/use-r2-upload"
 import { planStarIconForTarget } from "@/components/erp/subscription/PlanUpgradeModal"
+import { isGifFile } from "@/lib/security/file-validator"
 
 interface EditImageData {
   url: string
@@ -90,6 +91,11 @@ export const InsertImageModal: React.FC<InsertImageModalProps> = ({
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
+      if (isGifFile(file)) {
+        setUploadError("Arquivos GIF não são permitidos no sistema.")
+        if (fileInputRef.current) fileInputRef.current.value = ""
+        return
+      }
       setSelectedFile(file)
       setShowCropper(true)
       if (fileInputRef.current) fileInputRef.current.value = ""
@@ -187,7 +193,7 @@ export const InsertImageModal: React.FC<InsertImageModalProps> = ({
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*"
+                  accept="image/png, image/jpeg, image/webp, image/avif"
                   onChange={handleFileSelect}
                   disabled={isUploading}
                   className="block w-full text-sm text-brand-dark dark:text-dark-body file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-brand-green/10 file:text-brand-green hover:file:bg-brand-green/20 cursor-pointer file:cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"

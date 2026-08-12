@@ -31,6 +31,7 @@ export async function isStaffSlotAvailable(
     durationMinutes: number
     bufferMinutes?: number
     openingHours?: OpeningHoursData | null
+    storeId?: string | null
   },
 ): Promise<boolean> {
   const buffer = params.bufferMinutes ?? 0
@@ -60,21 +61,27 @@ export async function isStaffSlotAvailable(
     }
   }
 
-  const { data: existingAppts, error } = await supabase
+  let appointmentsQuery = supabase
     .from("appointments")
-    .select("start_time, end_time, duration_minutes")
+    .select("start_time, end_time, duration_minutes, status, store_id")
     .eq("partner_id", params.partnerId)
     .eq("staff_partner_user_id", params.staffId)
-    .eq("start_date", params.date)
-    .neq("status", "Cancelado")
+    .lte("start_date", params.date)
+    .or(`end_date.gte.${params.date},end_date.is.null`)
+
+  const { data: existingAppts, error } = await appointmentsQuery
 
   if (error) return false
 
-  const occupiedRanges = (existingAppts || []).map((apt: any) => {
+  const occupiedRanges = (existingAppts || []).filter((apt: any) =>
+    !["cancelado", "cancelled", "canceled"].includes(String(apt.status || "").toLowerCase()) &&
+    (!params.storeId || !apt.store_id || apt.store_id === params.storeId)
+  ).map((apt: any) => {
     const startMin = timeToMinutes(apt.start_time)
     let endMin: number
     if (apt.end_time) {
       endMin = timeToMinutes(apt.end_time)
+      if (endMin <= startMin) endMin = startMin + Number(apt.duration_minutes || 60)
     } else {
       endMin = startMin + Number(apt.duration_minutes || 60)
     }

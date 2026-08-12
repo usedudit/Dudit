@@ -98,7 +98,20 @@ function sanitizeStatus(value?: string | null): AppointmentStatus {
   return "Reservado"
 }
 
+function addMinutesToDateTime(date: string, time: string, durationMinutes: number) {
+  const [year, month, day] = String(date || "").split("-").map(Number)
+  const [hour, minute] = String(time || "00:00").split(":").map(Number)
+  const base = new Date(year || 1970, (month || 1) - 1, day || 1, hour || 0, minute || 0)
+  base.setMinutes(base.getMinutes() + Math.max(0, Number(durationMinutes || 0)))
+  return {
+    date: `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, "0")}-${String(base.getDate()).padStart(2, "0")}`,
+    time: `${String(base.getHours()).padStart(2, "0")}:${String(base.getMinutes()).padStart(2, "0")}`,
+  }
+}
+
 function toDbPayload(input: AppointmentInput, partnerId: string, defaultStoreId?: string | null) {
+  const durationMinutes = Math.max(1, Number(input.duration || 0))
+  const derivedEnd = addMinutesToDateTime(input.date, input.time, durationMinutes)
   return {
     partner_id: partnerId,
     customer_id: input.customerId || null,
@@ -108,9 +121,9 @@ function toDbPayload(input: AppointmentInput, partnerId: string, defaultStoreId?
     category_id: input.categoryId || null,
     start_date: input.date,
     start_time: input.time,
-    end_date: input.endDate || input.date,
-    end_time: input.endTime || input.time,
-    duration_minutes: Math.max(1, Number(input.duration || 0)),
+    end_date: input.endDate || derivedEnd.date,
+    end_time: input.endTime || derivedEnd.time,
+    duration_minutes: durationMinutes,
     staff_partner_user_id: input.staffId,
     staff_name: String(input.staffName || "Profissional").trim(),
     price: Number(input.price || 0),
@@ -144,6 +157,11 @@ function isPaidStatus(status: string | null | undefined) {
 function isPartialStatus(status: string | null | undefined) {
   const s = String(status || "").toLowerCase()
   return s === "partially paid" || s === "pago parcialmente" || s === "parcialmente pago"
+}
+
+function isOrderPriceLocked(situation: string | null | undefined) {
+  const normalized = String(situation || "").toLowerCase()
+  return normalized === "paid" || normalized === "partially_paid"
 }
 
 async function createAppointmentSaleAndSyncGoals(params: {
@@ -478,7 +496,8 @@ export async function getAvailableTimeSlotsAction(
   staffId: string,
   serviceDurationMinutes: number,
   bufferMinutes: number = 0,
-  storeId?: string | null
+  storeId?: string | null,
+  excludeAppointmentId?: string | null
 ) {
   try {
     const { partnerId } = await getPartnerContextWithPermission("view")
@@ -487,11 +506,11 @@ export async function getAvailableTimeSlotsAction(
     // Fetch existing appointments for this staff on this date
     let query = supabase
       .from("appointments")
-      .select("start_time, end_time, duration_minutes")
+      .select("id, start_time, end_time, duration_minutes, status")
       .eq("partner_id", partnerId)
       .eq("staff_partner_user_id", staffId)
-      .eq("start_date", date)
-      .neq("status", "Cancelado")
+      .lte("start_date", date)
+      .or(`end_date.gte.${date},end_date.is.null`)
 
     if (storeId) {
       query = query.eq("store_id", storeId)
@@ -502,7 +521,12 @@ export async function getAvailableTimeSlotsAction(
     if (error) throw error
 
     // Build list of occupied time ranges (in minutes from midnight)
-    const occupiedRanges: Array<{ start: number; end: number }> = (existingAppts || []).map((apt: any) => {
+    const occupiedRanges: Array<{ start: number; end: number }> = (existingAppts || [])
+      .filter((apt: any) =>
+        apt.id !== excludeAppointmentId &&
+        !["cancelado", "cancelled", "canceled"].includes(String(apt.status || "").toLowerCase())
+      )
+      .map((apt: any) => {
       const [sh, sm] = String(apt.start_time || "").split(":").map(Number)
       const startMin = (sh || 0) * 60 + (sm || 0)
 
@@ -510,22 +534,23 @@ export async function getAvailableTimeSlotsAction(
       if (apt.end_time) {
         const [eh, em] = String(apt.end_time).split(":").map(Number)
         endMin = (eh || 0) * 60 + (em || 0)
+        if (endMin <= startMin) endMin = startMin + Number(apt.duration_minutes || 60)
       } else {
         endMin = startMin + Number(apt.duration_minutes || 60)
       }
 
       // Add buffer after each appointment
-      return { start: startMin, end: endMin + bufferMinutes }
-    })
+        return { start: startMin, end: endMin + bufferMinutes }
+      })
 
     // Fetch store opening hours
-    const { data: storeData, error: storeErr } = await supabase
-      .from("stores")
-      .select("opening_hours")
-      .eq("partner_id", partnerId)
-      .order("is_headquarters", { ascending: false })
-      .limit(1)
-      .maybeSingle()
+    let storeQuery = supabase.from("stores").select("opening_hours")
+    if (storeId) {
+      storeQuery = storeQuery.eq("id", storeId)
+    } else {
+      storeQuery = storeQuery.eq("partner_id", partnerId).order("is_headquarters", { ascending: false }).limit(1)
+    }
+    const { data: storeData, error: storeErr } = await storeQuery.maybeSingle()
 
     if (storeErr) throw storeErr
 
@@ -542,10 +567,12 @@ export async function getAvailableTimeSlotsAction(
     const daySchedule = normalized[dayOfWeek]
 
     const slots: string[] = []
+    const conflictingSlots: string[] = []
 
     if (daySchedule && daySchedule.enabled) {
       const dayStartMin = parseTimeToMinutes(daySchedule.from)
-      const dayEndMin = parseTimeToMinutes(daySchedule.to)
+      let dayEndMin = parseTimeToMinutes(daySchedule.to)
+      if (dayEndMin <= dayStartMin) dayEndMin += 24 * 60
       const totalDurationNeeded = serviceDurationMinutes + bufferMinutes
 
       for (let slotStart = dayStartMin; slotStart + serviceDurationMinutes <= dayEndMin; slotStart += SLOT_INCREMENT_MINUTES) {
@@ -556,17 +583,17 @@ export async function getAvailableTimeSlotsAction(
           (range) => slotStart < range.end && slotEnd > range.start
         )
 
-        if (!hasConflict) {
-          const h = Math.floor(slotStart / 60)
-          const m = slotStart % 60
-          slots.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`)
-        }
+        const h = Math.floor(slotStart / 60) % 24
+        const m = slotStart % 60
+        const slot = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`
+        slots.push(slot)
+        if (hasConflict) conflictingSlots.push(slot)
       }
     }
 
-    return { success: true, slots }
+    return { success: true, slots, conflictingSlots }
   } catch (error: any) {
-    return { success: false, error: error?.message || "Erro ao buscar horários", slots: [] }
+    return { success: false, error: error?.message || "Erro ao buscar horários", slots: [], conflictingSlots: [] }
   }
 }
 
@@ -959,7 +986,9 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
         .catch(() => { })
     }
 
-    return { success: true, created: data || [] }
+    // Return the post-processing rows so newly created/linked sale IDs are
+    // immediately available to the calendar without a second fetch.
+    return { success: true, created: createdRows }
   } catch (error: any) {
     return { success: false, error: error?.message || "Erro ao criar agendamento", created: [] }
   }
@@ -983,6 +1012,29 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
     const paymentStatusValue = (payload as any)?.paymentStatus ?? current.payment_status
     const paidAmountValue = Math.max(0, Number((payload as any)?.paidAmount ?? current.paid_amount ?? 0))
 
+    const linkedOrderId = current.marketplace_order_id || null
+    let linkedOrder: { situation?: string | null; payment_method_discount_amount?: number | null; payment_method_extra_amount?: number | null } | null = null
+    if (linkedOrderId) {
+      const { data: orderData, error: orderError } = await supabase
+        .from("orders")
+        .select("situation, payment_method_discount_amount, payment_method_extra_amount")
+        .eq("id", linkedOrderId)
+        .eq("partner_id", partnerId)
+        .maybeSingle()
+      if (orderError) throw orderError
+      linkedOrder = orderData
+    }
+
+    const requestedPrice = payload.price === undefined ? Number(current.price || 0) : Number(payload.price || 0)
+    if (linkedOrder && isOrderPriceLocked(linkedOrder.situation) && Math.abs(requestedPrice - Number(current.price || 0)) > 0.009) {
+      return { success: false, error: "O valor do serviço não pode ser alterado porque esta venda já foi paga ou parcialmente paga." }
+    }
+
+    const nextStartDate = payload.date ?? current.start_date
+    const nextStartTime = payload.time ?? current.start_time
+    const shouldRecalculateEnd = payload.date !== undefined || payload.time !== undefined || payload.duration !== undefined
+    const derivedEnd = addMinutesToDateTime(nextStartDate, nextStartTime, Number(payload.duration ?? current.duration_minutes ?? 0))
+
     const mapped = toDbPayload(
       {
         customerName: payload.customerName ?? current.customer_name,
@@ -992,8 +1044,8 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
         categoryId: payload.categoryId ?? current.category_id,
         date: payload.date ?? current.start_date,
         time: payload.time ?? current.start_time,
-        endDate: payload.endDate ?? current.end_date,
-        endTime: payload.endTime ?? current.end_time,
+        endDate: shouldRecalculateEnd ? derivedEnd.date : (payload.endDate ?? current.end_date),
+        endTime: shouldRecalculateEnd ? derivedEnd.time : (payload.endTime ?? current.end_time),
         duration: payload.duration ?? current.duration_minutes,
         staffId: payload.staffId ?? current.staff_partner_user_id,
         staffName: payload.staffName ?? current.staff_name,
@@ -1003,7 +1055,10 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
         status: payload.status ?? current.status,
         source: payload.source ?? current.source,
         salesChannel: payload.salesChannel ?? current.sales_channel ?? "manual",
+        fulfillmentMode: payload.fulfillmentMode ?? current.fulfillment_mode,
         storeId: payload.storeId ?? current.store_id,
+        orderId: current.marketplace_order_id,
+        orderItemId: current.order_item_id,
       },
       partnerId,
     )
@@ -1020,15 +1075,8 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
     if (updated.marketplace_order_id) {
       const orderPrice = Number(updated.price || 0)
 
-      const { data: ord } = await supabase
-        .from("orders")
-        .select("payment_method_discount_amount, payment_method_extra_amount")
-        .eq("id", updated.marketplace_order_id)
-        .eq("partner_id", partnerId)
-        .maybeSingle()
-
-      const discountAmt = Number(ord?.payment_method_discount_amount || 0)
-      const extraAmt = Number(ord?.payment_method_extra_amount || 0)
+      const discountAmt = Number(linkedOrder?.payment_method_discount_amount || 0)
+      const extraAmt = Number(linkedOrder?.payment_method_extra_amount || 0)
       const nextTotalAmount = Math.max(0, orderPrice - discountAmt + extraAmt)
 
       await supabase
@@ -1039,13 +1087,6 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
         })
         .eq("id", updated.marketplace_order_id)
         .eq("partner_id", partnerId)
-
-      // Delete existing service order_items then recreate with individual services
-      await supabase
-        .from("order_items")
-        .delete()
-        .eq("order_id", updated.marketplace_order_id)
-        .neq("is_gift", true)
 
       const individualSvcs = (payload.services || []) as Array<{ name: string; price: number; id?: string | null }>
       let serviceItems: any[]
@@ -1087,7 +1128,65 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
           promotion_id: null,
         }))
       }
-      await supabase.from("order_items").insert(serviceItems)
+      // Update service lines in place. Deleting/recreating them used to break
+      // appointments.order_item_id, which made the order screen show
+      // "Criar agendamento" again after an edit.
+      if (!linkedOrder || !isOrderPriceLocked(linkedOrder.situation)) {
+        const { data: existingServiceItems, error: serviceItemsError } = await supabase
+          .from("order_items")
+          .select("id, service_id, product_name, is_gift, line_type")
+          .eq("order_id", updated.marketplace_order_id)
+          .eq("line_type", "service_booking")
+          .neq("is_gift", true)
+          .order("created_at", { ascending: true })
+        if (serviceItemsError) throw serviceItemsError
+
+        const unused = [...(existingServiceItems || [])]
+        const updates: Promise<void>[] = []
+        const inserts: any[] = []
+
+        for (const item of serviceItems) {
+          const preferredIndex = current.order_item_id
+            ? unused.findIndex((existing: any) => existing.id === current.order_item_id)
+            : -1
+          const matchIndex = preferredIndex >= 0
+            ? preferredIndex
+            : unused.findIndex((existing: any) =>
+              (item.service_id && existing.service_id === item.service_id) ||
+              String(existing.product_name || "").trim().toLowerCase() === String(item.product_name || "").trim().toLowerCase()
+            )
+          const existing = matchIndex >= 0 ? unused.splice(matchIndex, 1)[0] : null
+          if (existing) {
+            updates.push((async () => {
+              const { error: updateError } = await supabase
+                .from("order_items")
+                .update(item)
+                .eq("id", existing.id)
+                .eq("order_id", updated.marketplace_order_id)
+              if (updateError) throw updateError
+            })())
+          } else {
+            inserts.push(item)
+          }
+        }
+
+        if (updates.length > 0) await Promise.all(updates)
+        if (inserts.length > 0) {
+          const { data: insertedItems, error: insertError } = await supabase.from("order_items").insert(inserts).select("id")
+          if (insertError) throw insertError
+          if (!current.order_item_id && insertedItems?.[0]?.id) {
+            await supabase.from("appointments").update({ order_item_id: insertedItems[0].id }).eq("id", appointmentId).eq("partner_id", partnerId)
+          }
+        }
+        if (unused.length > 0) {
+          const { error: deleteError } = await supabase
+            .from("order_items")
+            .delete()
+            .in("id", unused.map((item: any) => item.id))
+            .eq("order_id", updated.marketplace_order_id)
+          if (deleteError) throw deleteError
+        }
+      }
     }
 
     const paidAmountFromPayload = Math.max(0, Number((payload as any)?.paidAmount ?? updated.paid_amount ?? 0))
@@ -1204,7 +1303,8 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
 
     const wasNotSuccessful = !["Concluído", "Pago", "Pago Parcialmente", "Confirmado"].includes(String(current.status || ""))
     const isNowSuccessful = ["Concluído", "Pago", "Pago Parcialmente", "Confirmado"].includes(String(normalizedStatus || ""))
-    if (wasNotSuccessful && isNowSuccessful) {
+    const isMarketplaceAppointment = finalRow.sales_channel === "online_storefront"
+    if (wasNotSuccessful && isNowSuccessful && isMarketplaceAppointment) {
       import("@/lib/services/marketplace-metrics.service")
         .then(({ recordAppointmentBookingMetrics }) =>
           recordAppointmentBookingMetrics(supabase, appointmentId),
@@ -1490,12 +1590,14 @@ export async function getAppointmentDetailsDataAction(params: {
   appointmentId?: string
   partnerId: string
   linkedOrderId?: string | null
+  includePlan?: boolean
 }) {
   try {
     const user = await requireUser()
     if (!user) return { success: false, error: "Não autenticado" }
 
     const { appointmentId, partnerId, linkedOrderId } = params
+    const includePlan = params.includePlan ?? !appointmentId
 
     // Verify view permissions once
     await requirePermission(partnerId, "appointments", "view")
@@ -1503,37 +1605,23 @@ export async function getAppointmentDetailsDataAction(params: {
     const supabase = createAdminClient()
 
     // Run all database fetches in parallel on the server
-    const [financeAccountsRes, partnerPlanRes, appointmentItemsRes, orderDataRes] = await Promise.all([
-      // 1. Finance accounts
-      supabase
-        .from("finance_accounts")
-        .select("id, is_active, type")
-        .eq("partner_id", partnerId),
-
-      // 2. Partner plan
-      supabase
+    const [partnerPlanRes, appointmentItemsRes, orderDataRes] = await Promise.all([
+      // The plan is only needed by the item editor. Avoid this query when a
+      // read-only appointment is opened.
+      includePlan ? supabase
         .from("subscriptions")
         .select("plan_id, status")
         .eq("partner_id", partnerId)
         .in("status", ["active", "trialing", "past_due"])
-        .maybeSingle(),
+        .maybeSingle() : Promise.resolve({ data: null, error: null }),
 
-      // 3. Appointment items (if appointmentId provided)
+      // Keep the hot path flat. Joining products/services here made an empty
+      // stock tab wait on a much heavier relational query.
       appointmentId ? supabase
         .from("appointment_items")
         .select(`
-            id, 
-            appointment_id, 
-            product_id, 
-            variant_id, 
-            service_id, 
-            name, 
-            quantity, 
-            usage_type, 
-            created_at, 
-            updated_at,
-            products(name, sku, stock_available, images),
-            services(name)
+            id, appointment_id, product_id, variant_id, service_id,
+            name, quantity, usage_type, created_at, updated_at
         `)
         .eq("appointment_id", appointmentId)
         .order("created_at", { ascending: true })
@@ -1555,15 +1643,6 @@ export async function getAppointmentDetailsDataAction(params: {
       ]) : Promise.resolve([null, null])
     ])
 
-    // Process Finance Account
-    let defaultFinanceAccountId = null
-    if (financeAccountsRes.data) {
-      const active = financeAccountsRes.data.filter((a: any) => a.is_active !== false)
-      const bankAcct = active.find((a: any) => a.type === 'bank' || a.account_type === 'bank')
-      const cashAcct = active.find((a: any) => a.type === 'cash' || a.account_type === 'cash')
-      defaultFinanceAccountId = bankAcct?.id || cashAcct?.id || active[0]?.id || null
-    }
-
     // Process Partner Plan
     let planSlug = 'free'
     if (partnerPlanRes.data?.plan_id) {
@@ -1575,12 +1654,24 @@ export async function getAppointmentDetailsDataAction(params: {
       planSlug = plan?.slug || 'free'
     }
 
-    // Process Appointment Items
+    // Enrich appointment items only when there are actual product/service IDs.
     let appointmentItems = []
     if (appointmentItemsRes.data) {
+      const productIds = [...new Set(appointmentItemsRes.data.map((item: any) => item.product_id).filter(Boolean))]
+      const serviceIds = [...new Set(appointmentItemsRes.data.map((item: any) => item.service_id).filter(Boolean))]
+      const [productsRes, servicesRes] = await Promise.all([
+        productIds.length > 0
+          ? supabase.from("products").select("id, name, sku, stock_available, images").in("id", productIds)
+          : Promise.resolve({ data: [] }),
+        serviceIds.length > 0
+          ? supabase.from("services").select("id, name").in("id", serviceIds)
+          : Promise.resolve({ data: [] }),
+      ])
+      const productsMap = new Map<string, any>((productsRes.data || []).map((product: any) => [String(product.id), product]))
+      const servicesMap = new Map<string, any>((servicesRes.data || []).map((service: any) => [String(service.id), service]))
       appointmentItems = appointmentItemsRes.data.map((item: any) => {
-        const p = item.products
-        const s = item.services
+        const p = item.product_id ? productsMap.get(String(item.product_id)) : null
+        const s = item.service_id ? servicesMap.get(String(item.service_id)) : null
         return {
           id: item.id,
           appointmentId: item.appointment_id,
@@ -1633,7 +1724,7 @@ export async function getAppointmentDetailsDataAction(params: {
     return {
       success: true,
       data: {
-        defaultFinanceAccountId,
+        defaultFinanceAccountId: null,
         planSlug,
         appointmentItems,
         orderData,

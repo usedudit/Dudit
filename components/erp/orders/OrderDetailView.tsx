@@ -204,6 +204,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const { error: notifyError, success: notifySuccess } = useNotification()
     const [isAppointmentSheetOpen, setIsAppointmentSheetOpen] = useState(false)
     const [selectedOrderItemForAppointment, setSelectedOrderItemForAppointment] = useState<any>(null)
+    const [appointmentDefaultDate] = useState(() => new Date())
 
     const handleSaveAppointmentFromOrder = async (data: any) => {
         try {
@@ -944,6 +945,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                                                 setIsAppointmentSheetOpen(true)
                                                                                             }}
                                                                                             leftIcon={<CalendarIcon size={12} />}
+                                                                                            className="text-xs p-0"
                                                                                         >
                                                                                             Criar agendamento
                                                                                         </Button>
@@ -1397,17 +1399,17 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                                 </div>
                                                                             ) : (
                                                                                 <div className="my-1.5 mb-2">
-                                                                                    <button
-                                                                                        type="button"
+                                                                                    <Button
+                                                                                        variant="link"
                                                                                         onClick={() => {
                                                                                             setSelectedOrderItemForAppointment(item)
                                                                                             setIsAppointmentSheetOpen(true)
                                                                                         }}
-                                                                                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-green hover:underline cursor-pointer bg-brand-green/10 dark:bg-brand-green/20 px-2.5 py-1 rounded-md transition-colors"
+                                                                                        leftIcon={<CalendarIcon size={12} />}
+                                                                                        className="text-xs p-0"
                                                                                     >
-                                                                                        <CalendarIcon className="w-3.5 h-3.5" />
                                                                                         Criar agendamento
-                                                                                    </button>
+                                                                                    </Button>
                                                                                 </div>
                                                                             )
                                                                         ) : (
@@ -1702,7 +1704,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
             {isAppointmentSheetOpen && (
                 <AppointmentSheet
                     mode="create"
-                    defaultDate={new Date()}
+                    defaultDate={appointmentDefaultDate}
                     linkedOrderId={order?.id}
                     linkedOrderItemId={selectedOrderItemForAppointment?.id}
                     allowedOrderServices={(() => {

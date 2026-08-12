@@ -17,6 +17,7 @@ import {
   ZoomOutIcon,
   RotateIcon,
 } from "@/lib/icons"
+import { isGifFile } from "@/lib/security/file-validator"
 
 interface Props {
   isOpen: boolean
@@ -111,6 +112,10 @@ const ImageCropperModal = memo(({
     }
 
     else if (imageFile) {
+      if (isGifFile(imageFile)) {
+        onClose()
+        return
+      }
 
       const reader = new FileReader()
 

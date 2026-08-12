@@ -43,6 +43,7 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { motion, AnimatePresence } from "framer-motion"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 import SelectProductVariantSheet from "../pdv/SelectProductVariantSheet"
+import { GenericAttachmentsTab } from '@/components/erp/shared/GenericAttachmentsTab'
 
 import { useProductBucket, type ProductBucketItem } from '../hooks'
 
@@ -85,6 +86,10 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
     const [notes, setNotes] = useState('');
     const [reason, setReason] = useState('Selecione um motivo...');
     const [customReason, setCustomReason] = useState('');
+
+    // Staged attachments
+    const [stagedFiles, setStagedFiles] = useState<File[]>([])
+    const [stagedImages, setStagedImages] = useState<(string | File)[]>([])
 
     // Multi-item state
     const [items, setItems] = useState<MovementItem[]>([]);
@@ -819,19 +824,16 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                         </TabsContent>
 
                                         <TabsContent value="Anexos" className="mt-0">
-                                            <motion.div key="Anexos" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden">
-                                                <FormSection title="Gerenciar Anexos">
-                                                    <IconPlaceholder
-                                                        icon={FileIcon}
-                                                        title="Documentos e Anexos"
-                                                        subtitle="Selecione e envie os arquivos desejados para esta movimentação"
-                                                        itemButton={{
-                                                            text: "Adicionar anexo",
-                                                            action: () => { },
-                                                            variant: "outline",
-                                                        }}
-                                                    />
-                                                </FormSection>
+                                            <motion.div key="Anexos" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                                                <GenericAttachmentsTab
+                                                    partnerId=""
+                                                    entityType="stock_movement"
+                                                    isEditing={true}
+                                                    stagedFiles={stagedFiles}
+                                                    onStagedFilesChange={setStagedFiles}
+                                                    stagedImages={stagedImages}
+                                                    onStagedImagesChange={setStagedImages}
+                                                />
                                             </motion.div>
                                         </TabsContent>
                                     </AnimatePresence>

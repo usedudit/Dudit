@@ -62,12 +62,33 @@ const MAGIC_BYTES: Record<string, number[][]> = {
 }
 
 /**
+ * Helper to check if a file or filename is a GIF file.
+ * GIF files are not allowed anywhere in the system.
+ */
+export function isGifFile(file: File | { type?: string; name?: string } | string | null | undefined): boolean {
+  if (!file) return false
+  if (typeof file === "string") {
+    const lower = file.toLowerCase()
+    return lower.endsWith(".gif") || lower.includes("image/gif")
+  }
+  const type = String(file.type || "").toLowerCase()
+  const name = String(file.name || "").toLowerCase()
+  return type === "image/gif" || /\.gif$/i.test(name)
+}
+
+/**
  * Validates file type by MIME type against strict whitelist.
  */
 export function validateFileType(
   file: File,
   allowedTypes: readonly string[] = ALL_ALLOWED_MIME_TYPES
 ): FileValidationResult {
+  if (isGifFile(file)) {
+    return {
+      valid: false,
+      error: "Arquivos GIF não são permitidos no sistema.",
+    }
+  }
   if (!file.type || !allowedTypes.includes(file.type)) {
     return {
       valid: false,
@@ -342,6 +363,11 @@ export function validateUploadRequest(
   contentType: string,
   fileSize?: number
 ): { success: true; data: ValidatedUploadRequest } | { success: false; error: string } {
+  // 0. GIF Check
+  if (isGifFile(filename) || isGifFile(contentType)) {
+    return { success: false, error: "Arquivos GIF não são permitidos no sistema." }
+  }
+
   // 1. Filename validation
   const nameVal = validateFileName(filename)
   if (!nameVal.valid) {

@@ -545,82 +545,8 @@ export async function createTransactionFromOrder(
                 continue
             }
 
-            // 1) Reconhecimento - DRE bruto, não move saldo.
-            // Venda parcelada (2+ parcelas): NÃO cria movimentação com o valor
-            // total - o valor ainda não foi recebido; só os settlements (contas
-            // a receber) representam o que virá, e cada parcela paga gera o
-            // registro de recebimento.
-            if (installments <= 1) {
-                const { error: recError } = await supabase.from("transactions").insert({
-                    partner_id: orderData.partner_id,
-                    store_id: orderData.store_id || null,
-                    description: orderData.order_number,
-                    category: "Vendas",
-                    contact_id: null,
-                    contact_type: "customer",
-                    customer_id: orderData.customer_id || null,
-                    amount: entry.gross,
-                    original_amount: entry.gross,
-                    due_date: null,
-                    payment_date: paymentDate,
-                    status: "paid",
-                    notes: null,
-                    installment_number: null,
-                    total_installments: null,
-                    interest_amount: entry.interestAmount,
-                    fee_amount: round2(entry.feeAmount + entry.fixedFeeAmount),
-                    discount_amount: entry.discountAmount,
-                    payment_type: entry.method,
-                    payment_method_id: entry.paymentMethodId,
-                    transaction_type: "income" as const,
-                    origin: normalizeOrigin(orderData.order_source),
-                    account_id: null,
-                    kind: "recognition" as const,
-                    payment_id: paymentRowId,
-                    reference_note: recognitionRef,
-                })
-                if (recError) {
-                    console.error(`[TRANSACTION] Erro ao criar reconhecimento do pedido ${orderData.order_number}:`, recError.message)
-                    continue
-                }
-            }
-
-            // 2) Taxa do gateway - despesa DRE, não move saldo
-            if (entry.cost > 0.009) {
-                const { error: feeError } = await supabase.from("transactions").insert({
-                    partner_id: orderData.partner_id,
-                    store_id: orderData.store_id || null,
-                    description: orderData.order_number,
-                    category: "Taxas de Pagamento",
-                    contact_id: null,
-                    contact_type: "customer",
-                    customer_id: orderData.customer_id || null,
-                    amount: entry.cost,
-                    original_amount: entry.cost,
-                    due_date: null,
-                    payment_date: paymentDate,
-                    status: "paid",
-                    notes: null,
-                    installment_number: null,
-                    total_installments: null,
-                    interest_amount: entry.interestAmount,
-                    fee_amount: round2(entry.feeAmount + entry.fixedFeeAmount),
-                    discount_amount: entry.discountAmount,
-                    payment_type: entry.method,
-                    payment_method_id: entry.paymentMethodId,
-                    transaction_type: "expense" as const,
-                    origin: normalizeOrigin(orderData.order_source),
-                    account_id: null,
-                    kind: "fee" as const,
-                    payment_id: paymentRowId,
-                    reference_note: feeRef,
-                })
-                if (feeError) {
-                    console.error(`[TRANSACTION] Erro ao criar taxa do pedido ${orderData.order_number}:`, feeError.message)
-                }
-            }
-
-            // 3) Liquidação - único evento que move caixa (valor líquido)
+            // 1) Registro único de liquidação da venda (Fase 2 simplificada)
+            // Cria apenas 1 transação por pagamento. Sem vencimento (due_date = null) para vendas pagas à vista.
             if (installments > 1) {
                 const groupId = await createInstallmentGroupForSale(
                     supabase,
@@ -674,17 +600,17 @@ export async function createTransactionFromOrder(
                     contact_id: null,
                     contact_type: "customer",
                     customer_id: orderData.customer_id || null,
-                    amount: entry.net,
-                    original_amount: entry.net,
-                    due_date: paymentDate,
+                    amount: entry.gross,
+                    original_amount: entry.gross,
+                    due_date: null,
                     payment_date: paymentDate,
                     status: "paid",
                     notes: null,
                     installment_number: null,
                     total_installments: null,
-                    interest_amount: 0,
-                    fee_amount: 0,
-                    discount_amount: 0,
+                    interest_amount: entry.interestAmount,
+                    fee_amount: round2(entry.feeAmount + entry.fixedFeeAmount),
+                    discount_amount: entry.discountAmount,
                     payment_type: entry.method,
                     payment_method_id: entry.paymentMethodId,
                     transaction_type: "income" as const,
@@ -752,7 +678,9 @@ export async function syncReceivableForOrder(
             : await resolveDefaultSalesAccountId(supabase, orderData.partner_id)
         const accountId = explicitAccountId || defaultSalesAccountId
 
-        const dueDate = orderData.due_date ? new Date(orderData.due_date).toISOString() : new Date().toISOString()
+        const defaultDueDate = new Date()
+        defaultDueDate.setDate(defaultDueDate.getDate() + 30)
+        const dueDate = orderData.due_date ? new Date(orderData.due_date).toISOString() : defaultDueDate.toISOString()
         const paymentType = normalizePaymentLabel(orderData.payment_method)
 
         if (existingTx) {

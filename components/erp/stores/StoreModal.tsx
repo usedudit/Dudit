@@ -23,6 +23,7 @@ import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { createStoreAction, updateStoreAction } from "@/app/actions/erp/stores"
 import ImageCropperModal from "@/components/ImageCropperModal"
+import { isGifFile } from "@/lib/security/file-validator"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 
 interface StoreModalProps {
@@ -125,6 +126,10 @@ export function StoreModal({ isOpen, onClose, partnerId, store, onSaved }: Store
     const file = e.target.files?.[0]
     e.currentTarget.value = ""
     if (!file) return
+    if (isGifFile(file)) {
+      setError("Arquivos GIF não são permitidos no sistema.")
+      return
+    }
     if (file.size > 3 * 1024 * 1024) {
       setError("Máximo 3MB por imagem")
       return
@@ -274,7 +279,7 @@ export function StoreModal({ isOpen, onClose, partnerId, store, onSaved }: Store
                     <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Logo da Empresa</p>
                     <p className="text-xs text-brand-inactive-text dark:text-dark-body">Máx 3MB (PNG, JPG, WEBP)</p>
                   </div>
-                  <input ref={fileInputRef} type="file" hidden accept="image/*" onChange={handleImageChange} />
+                  <input ref={fileInputRef} type="file" hidden accept="image/png, image/jpeg, image/webp, image/avif" onChange={handleImageChange} />
                 </div>
               </FormSection>
 

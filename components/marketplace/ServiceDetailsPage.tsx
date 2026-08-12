@@ -23,6 +23,8 @@ import {
     PlusIcon,
     TagIcon,
     WhatsappIcon,
+    StoreIcon,
+    MapPinIcon,
 } from "@/lib/icons"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { useFavorites } from "@/providers/favorites-provider"
@@ -30,7 +32,7 @@ import { fetchCSRFTokenSingleton } from "@/hooks/use-csrf-token"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { checkCanUserBuyFromStoreAction } from "@/app/actions/marketplace/cart-extensions"
 import { InfoCard } from "@/components/reusable/InfoCard"
-import { Button, Input, FormSection, IconPlaceholder, DefaultModal, CepInput, Spinner, StateComboBox, RadioButton, NumberInputWithCheckbox, Badge } from "@/components/reusable"
+import { Button, Input, FormSection, IconPlaceholder, DefaultModal, CepInput, Spinner, StateComboBox, RadioButton, NumberInputWithCheckbox, Badge, ListItem } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils"
 import { getBillingUnitSuffix } from "@/lib/utils/formatters"
 import { ShareModal } from "./ShareModal"
@@ -904,10 +906,6 @@ export function ServiceDetailsPageClient({
                 <span className="text-[11px] font-bold text-brand-dark bg-gray-100 px-2 py-0.5 rounded uppercase tracking-wider">
                     {service.service_type === "online" ? "Remoto" : service.service_type === "hybrid" ? "Híbrido" : "Presencial"}
                 </span>
-                <span className="text-gray-300 text-xs">|</span>
-                <span className="text-[13px] font-semibold text-brand-inactive-text">
-                    Agendamento necessário
-                </span>
             </div>
 
             {/* Rating */}
@@ -1370,23 +1368,23 @@ export function ServiceDetailsPageClient({
             {/* Realization Location */}
             {!isProductOwner && (
                 <FormSection title="Local de realização do serviço" className="mt-6 mb-6">
-                    <div className="flex flex-col border border-brand-border rounded-2xl bg-white overflow-hidden p-5 gap-3.5 shadow-sm">
+                    <div className="flex flex-col">
                         {(!service.fulfillment_modes || service.fulfillment_modes.length === 0) && (
                             <div className="flex items-center gap-2 text-sm text-brand-inactive-text">
                                 <span>Não especificado</span>
                             </div>
                         )}
                         {service.fulfillment_modes?.includes("on_site") && (
-                            <div className="flex items-center gap-3 text-sm text-brand-dark font-medium">
-                                <CheckCircleIcon size={18} className="text-brand-green fill-brand-green/10" />
-                                <span>No estabelecimento/local do vendedor</span>
-                            </div>
+                            <ListItem
+                                icon={StoreIcon}
+                                title="No estabelecimento/local do vendedor"
+                            />
                         )}
                         {service.fulfillment_modes?.includes("customer_location") && (
-                            <div className="flex items-center gap-3 text-sm text-brand-dark font-medium">
-                                <CheckCircleIcon size={18} className="text-brand-green fill-brand-green/10" />
-                                <span>No endereço do cliente</span>
-                            </div>
+                            <ListItem
+                                icon={MapPinIcon}
+                                title="No endereço do cliente"
+                            />
                         )}
                     </div>
                 </FormSection>
@@ -2042,11 +2040,11 @@ export function ServiceDetailsPageClient({
                                             )
                                         })()}
 
-                                        <Button variant="outline" onClick={() => setShowShareModal(true)} className="w-10 h-10 flex items-center justify-center" title="Compartilhar">
-                                            <ShareIcon className="w-5 h-5 text-brand-green" />
+                                        <Button variant="outline" size="icon" onClick={() => setShowShareModal(true)} className="w-10 h-10" title="Compartilhar">
+                                            <ShareIcon size={18} className="text-brand-green" />
                                         </Button>
-                                        <Button variant="outline" onClick={() => { if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname)); setShowCollectionModal(true) }} className="w-10 h-10 flex items-center justify-center" title="Adicionar à coleção">
-                                            <PlusIcon className="w-5 h-5 text-brand-green" />
+                                        <Button variant="outline" size="icon" onClick={() => { if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname)); setShowCollectionModal(true) }} className="w-10 h-10" title="Adicionar à coleção">
+                                            <PlusIcon size={18} className="text-brand-green" />
                                         </Button>
 
                                         <div className="flex-1 flex items-center">

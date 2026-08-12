@@ -77,7 +77,22 @@ type FinalizePaymentEntry = {
 
 type FinalizePreSaleInput = {
     partnerId: string
-    preSaleId: string
+    preSaleId?: string | null
+    checkoutId?: string | null
+    draft?: {
+        customerId?: string | null
+        items: DraftItemInput[]
+        subtotal: number
+        discountAmount: number
+        totalAmount: number
+        shippingFee?: number
+        otherCosts?: number
+        notes?: string
+        deliveryBreakdown?: Record<string, unknown> | null
+        couponId?: string | null
+        couponCode?: string | null
+        couponDiscountAmount?: number
+    }
     financeAccountId?: string | null
     paidAmount: number
     paymentMethod?: string | null
@@ -101,7 +116,7 @@ async function resolvePosFinalTotalWithPaymentMethod(params: {
     supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>
     partnerId: string
     storeId?: string | null
-    preSaleId: string
+    preSaleId?: string | null
     baseTotal?: number
     paymentBreakdown: Array<{ method?: string; amount?: number; paymentMethodId?: string | null; installmentNumber?: number }>
 }): Promise<PosPaymentResolveResult | null> {
@@ -109,6 +124,7 @@ async function resolvePosFinalTotalWithPaymentMethod(params: {
     if (params.baseTotal != null) {
         baseTotal = Math.max(0, Number(params.baseTotal || 0))
     } else {
+        if (!params.preSaleId) return null
         const { data: draft } = await params.supabase
             .from("pre_sales")
             .select("total_amount")
@@ -959,22 +975,54 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
 
     const supabase = createAdminClient()
 
-    if (!input.preSaleId) return { success: false as const, error: "ID da pré-venda é obrigatório." }
     const paidAmount = safeMoney(Number(input.paidAmount || 0))
 
-    // Fetch pre_sale draft
-    const { data: preSaleDraft } = await supabase
-        .from("pre_sales")
-        .select("*")
-        .eq("id", input.preSaleId)
-        .eq("partner_id", input.partnerId)
-        .maybeSingle()
-
-    if (!preSaleDraft) {
-        return { success: false as const, error: "Pré-venda não encontrada." }
+    // A new POS cart can be finalized directly. Existing saved drafts still
+    // use the persisted pre-sale as the source of truth and remain idempotent.
+    let preSaleDraft: any = null
+    if (input.preSaleId) {
+        const { data } = await supabase
+            .from("pre_sales")
+            .select("*")
+            .eq("id", input.preSaleId)
+            .eq("partner_id", input.partnerId)
+            .maybeSingle()
+        preSaleDraft = data
+    } else if (input.draft) {
+        preSaleDraft = {
+            status: "draft",
+            customer_id: input.draft.customerId || null,
+            items: input.draft.items || [],
+            subtotal: input.draft.subtotal,
+            discount_amount: input.draft.discountAmount,
+            total_amount: input.draft.totalAmount,
+            shipping_fee: input.draft.shippingFee || 0,
+            other_costs: input.draft.otherCosts || 0,
+            notes: input.draft.notes || null,
+            delivery_breakdown: input.draft.deliveryBreakdown || null,
+            coupon_id: input.draft.couponId || null,
+            coupon_code: input.draft.couponCode || null,
+            coupon_discount_amount: input.draft.couponDiscountAmount || 0,
+        }
     }
 
-    if (preSaleDraft.status === "completed" && preSaleDraft.order_id) {
+    if (!preSaleDraft) {
+        return { success: false as const, error: "Carrinho ou pré-venda não encontrado." }
+    }
+
+    if (!input.preSaleId && input.checkoutId) {
+        const { data: existingOrder } = await supabase
+            .from("orders")
+            .select("id, order_number")
+            .eq("id", input.checkoutId)
+            .eq("partner_id", input.partnerId)
+            .maybeSingle()
+        if (existingOrder) {
+            return { success: true as const, data: { saleId: existingOrder.id, saleNumber: existingOrder.order_number, orderId: existingOrder.id } }
+        }
+    }
+
+    if (input.preSaleId && preSaleDraft.status === "completed" && preSaleDraft.order_id) {
         // Idempotent: return existing order if already completed
         const { data: existingOrder } = await supabase
             .from("orders")
@@ -1116,6 +1164,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
 
     const { createERPOrderAction } = await import("./orders")
     const orderResult = await createERPOrderAction({
+        id: !input.preSaleId ? input.checkoutId || undefined : undefined,
         partnerId: input.partnerId,
         storeId: input.storeId || undefined,
         customerId: preSaleDraft.customer_id || undefined,
@@ -1155,15 +1204,17 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
 
     // Mark pre_sale as completed. It is independent from cash, commission and
     // goals now that the order id exists, so start it without blocking them.
-    const preSaleCompletionPromise = supabase
-        .from("pre_sales")
-        .update({
-            status: "completed",
-            order_id: orderId,
-            updated_at: new Date().toISOString(),
-        })
-        .eq("id", input.preSaleId)
-        .eq("partner_id", input.partnerId)
+    const preSaleCompletionPromise = input.preSaleId
+        ? supabase
+            .from("pre_sales")
+            .update({
+                status: "completed",
+                order_id: orderId,
+                updated_at: new Date().toISOString(),
+            })
+            .eq("id", input.preSaleId)
+            .eq("partner_id", input.partnerId)
+        : Promise.resolve()
 
     // These post-sale side effects are independent after the order exists.
     // Start them together so the slowest one, rather than their sum, determines

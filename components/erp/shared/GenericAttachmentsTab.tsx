@@ -1,14 +1,16 @@
 "use client"
 
 import React, { useState, useEffect, useRef } from "react"
-import { Button, Spinner, DefaultModal, IconPlaceholder, AlertModal, FormSection, Badge } from "@/components/reusable"
+import { Button, Spinner, DefaultModal, IconPlaceholder, AlertModal, FormSection } from "@/components/reusable"
 import { UploadIcon, TrashIcon, FileIcon, XIcon, CheckCircleIcon, AlertCircleIcon } from "@/lib/icons"
 import { useToast } from "@/hooks/use-toast"
 import { usePermissions } from "@/lib/permission-context"
-import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
+import { hasMinimumPlan, getPlanImageAttachmentLimit } from "@/lib/subscription/plan-tier"
+import { isGifFile } from "@/lib/security/file-validator"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { formatFileSize } from "@/components/erp/orders/OrderAttachmentsTab"
 import ProductImagesSection from "@/components/erp/product/ProductImagesSection"
+import ImageCropperModal from "@/components/ImageCropperModal"
 import { uploadSingleFile } from "@/lib/utils/attachment-uploader"
 
 // Import order actions
@@ -168,6 +170,11 @@ export function GenericAttachmentsTab({
     const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
     const [isSaving, setIsSaving] = useState(false)
 
+    // Image Cropper States
+    const [showCropper, setShowCropper] = useState(false)
+    const [imageForCrop, setImageForCrop] = useState<File | null>(null)
+    const [pendingImageFiles, setPendingImageFiles] = useState<File[]>([])
+
     // Local staged states when not controlled by parent
     const [internalStagedFiles, setInternalStagedFiles] = useState<File[]>([])
     const [internalStagedImages, setInternalStagedImages] = useState<(string | File)[]>([])
@@ -195,7 +202,8 @@ export function GenericAttachmentsTab({
 
     const actions = ACTIONS_MAP[entityType]
     const advancedEnabled = hasMinimumPlan(planSlug, "crescer")
-    const planLimit = planSlug === "crescer" ? 2 : planSlug === "escalar" ? 5 : 0
+    const planLimit = planSlug === "crescer" ? 5 : planSlug === "escalar" ? 15 : 0
+    const imagePlanLimit = getPlanImageAttachmentLimit(planSlug)
 
     const loadAttachments = async () => {
         if (!entityId || isNewMode) {
@@ -296,6 +304,11 @@ export function GenericAttachmentsTab({
 
         for (let i = 0; i < files.length; i++) {
             const file = files[i]
+
+            if (isGifFile(file)) {
+                toast({ description: "Arquivos GIF não são permitidos no sistema." })
+                continue
+            }
 
             const isImg = file.type.startsWith("image/") || /\.(jpg|jpeg|png|webp|gif|avif|bmp|svg)$/i.test(file.name)
             if (isImg) {
@@ -431,34 +444,70 @@ export function GenericAttachmentsTab({
         const files = e.target.files
         if (!files || files.length === 0) return
 
-        const newFiles = Array.from(files).filter(f => f.type.startsWith("image/"))
+        const fileArr = Array.from(files)
+        const hasGif = fileArr.some(f => isGifFile(f))
+        if (hasGif) {
+            toast({ description: "Arquivos GIF não são permitidos no sistema." })
+        }
+
+        let newFiles = fileArr.filter(f => f.type.startsWith("image/") && !isGifFile(f))
         if (newFiles.length === 0) {
-            toast({ description: "Selecione apenas arquivos de imagem." })
+            if (!hasGif) toast({ description: "Selecione apenas arquivos de imagem." })
             return
         }
 
+        const currentImageCount = allImages.length
+        if (currentImageCount + newFiles.length > imagePlanLimit) {
+            toast({ description: `Você atingiu o limite de ${imagePlanLimit} imagem(ns) para o seu plano.` })
+            const allowedCount = imagePlanLimit - currentImageCount
+            if (allowedCount <= 0) return
+            newFiles = newFiles.slice(0, allowedCount)
+        }
+
+        setImageForCrop(newFiles[0])
+        setPendingImageFiles(newFiles.slice(1))
+        setShowCropper(true)
+    }
+
+    const processCroppedImage = async (croppedFile: File) => {
         if (isNewMode) {
-            updateStagedImages([...currentStagedImages, ...newFiles])
-            toast({ description: `${newFiles.length} imagem(ns) adicionada(s). Elas serão salvas ao guardar o registro.` })
+            updateStagedImages([...currentStagedImages, croppedFile])
+            toast({ description: "Imagem adicionada aos anexos pendentes." })
         } else if (entityId) {
             setLoading(true)
             try {
-                const results = await Promise.all(
-                    newFiles.map(file => uploadSingleFile({ partnerId, entityId, entityType, file }))
-                )
-                const hasErrors = results.some(r => !r.success)
-                if (hasErrors) {
-                    toast({ description: "Erro ao enviar algumas imagens." })
+                const res = await uploadSingleFile({ partnerId, entityId, entityType, file: croppedFile })
+                if (res.success) {
+                    toast({ description: "Imagem enviada com sucesso." })
+                    loadAttachments()
+                    onMutation?.()
                 } else {
-                    toast({ description: "Imagens enviadas com sucesso." })
+                    toast({ description: res.error || "Erro ao enviar imagem." })
                 }
-                loadAttachments()
-                onMutation?.()
             } catch (err) {
-                toast({ description: "Erro ao enviar imagens." })
+                toast({ description: "Erro ao enviar imagem." })
             } finally {
                 setLoading(false)
             }
+        }
+    }
+
+    const handleCropComplete = async (croppedDataUrl: string) => {
+        try {
+            const blob = await (await fetch(croppedDataUrl)).blob()
+            const croppedFile = new File([blob], `attachment-${Date.now()}.png`, { type: "image/png" })
+            await processCroppedImage(croppedFile)
+        } catch (err) {
+            toast({ description: "Erro ao recortar imagem." })
+        }
+
+        if (pendingImageFiles.length > 0) {
+            const nextFile = pendingImageFiles[0]
+            setPendingImageFiles(prev => prev.slice(1))
+            setImageForCrop(nextFile)
+        } else {
+            setShowCropper(false)
+            setImageForCrop(null)
         }
     }
 
@@ -490,6 +539,31 @@ export function GenericAttachmentsTab({
             updateStagedImages(nextStaged)
             toast({ description: "Imagem pendente removida." })
         }
+    }
+
+    if (!advancedEnabled) {
+        return (
+            <div className="flex flex-col items-center justify-center text-center py-12 px-6 bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border space-y-4">
+                <div className="w-14 h-14 rounded-full bg-brand-primary/10 flex items-center justify-center">
+                    <FileIcon className="w-7 h-7 text-brand-primary" />
+                </div>
+                <div className="max-w-md space-y-1.5">
+                    <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading">
+                        Aba de Anexos disponível nos planos Crescer e Escalar
+                    </h3>
+                    <p className="text-xs text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                        Você está no plano gratuito. Faça upgrade para o plano Crescer (até 5 imagens) ou Escalar (até 15 imagens) para liberar o gerenciamento de anexos.
+                    </p>
+                </div>
+                <Button
+                    type="button"
+                    onClick={() => openPlanUpgrade("crescer")}
+                    className="gap-2"
+                >
+                    <span>Fazer Upgrade de Plano</span>
+                </Button>
+            </div>
+        )
     }
 
     return (
@@ -764,6 +838,19 @@ export function GenericAttachmentsTab({
                     confirmText="Confirmar Exclusão"
                     cancelText="Cancelar"
                     variant="danger"
+                />
+            )}
+
+            {showCropper && imageForCrop && (
+                <ImageCropperModal
+                    isOpen={showCropper}
+                    onClose={() => {
+                        setShowCropper(false)
+                        setImageForCrop(null)
+                        setPendingImageFiles([])
+                    }}
+                    imageFile={imageForCrop}
+                    onCropComplete={handleCropComplete}
                 />
             )}
         </div>

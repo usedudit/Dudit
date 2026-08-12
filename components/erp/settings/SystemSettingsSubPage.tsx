@@ -1,13 +1,13 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Button, FormSection, FormDropdown } from "@/components/reusable"
+import { Button, FormSection, FormDropdown, FormTextarea, Checkbox } from "@/components/reusable"
 import { ChevronLeftIcon, SaveIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { useNotification } from "@/hooks/use-notification"
 import {
-    getPartnerTimezoneAction,
-    updatePartnerTimezoneAction,
+    getSystemSettingsAction,
+    updateSystemSettingsAction,
 } from "@/app/actions/erp/settings-system"
 
 const TIMEZONE_OPTIONS = [
@@ -29,10 +29,18 @@ export function SystemSettingsSubPage({
     const [saving, setSaving] = useState(false)
     const [timezone, setTimezone] = useState("America/Sao_Paulo")
     const [originalTimezone, setOriginalTimezone] = useState("America/Sao_Paulo")
+    const [receiptMessage, setReceiptMessage] = useState("")
+    const [originalReceiptMessage, setOriginalReceiptMessage] = useState("")
+    const [receiptShowPolicyBlock, setReceiptShowPolicyBlock] = useState(true)
+    const [originalReceiptShowPolicyBlock, setOriginalReceiptShowPolicyBlock] = useState(true)
+
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
 
-    const hasChanges = timezone !== originalTimezone
+    const hasChanges =
+        timezone !== originalTimezone ||
+        receiptMessage !== originalReceiptMessage ||
+        receiptShowPolicyBlock !== originalReceiptShowPolicyBlock
 
     const handleScroll = useCallback(() => {
         if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5)
@@ -44,11 +52,15 @@ export function SystemSettingsSubPage({
         let cancelled = false
             ; (async () => {
                 setLoading(true)
-                const res = await getPartnerTimezoneAction(partnerId)
+                const res = await getSystemSettingsAction(partnerId)
                 if (cancelled) return
                 if (res.success) {
                     setTimezone(res.timezone)
                     setOriginalTimezone(res.timezone)
+                    setReceiptMessage(res.receiptMessage || "")
+                    setOriginalReceiptMessage(res.receiptMessage || "")
+                    setReceiptShowPolicyBlock(res.receiptShowPolicyBlock)
+                    setOriginalReceiptShowPolicyBlock(res.receiptShowPolicyBlock)
                 } else {
                     notifyError(res.error || "Erro ao carregar configurações")
                 }
@@ -59,11 +71,17 @@ export function SystemSettingsSubPage({
 
     async function handleSave() {
         setSaving(true)
-        const res = await updatePartnerTimezoneAction(partnerId, timezone)
+        const res = await updateSystemSettingsAction(partnerId, {
+            timezone,
+            receiptMessage: receiptMessage.trim() || null,
+            receiptShowPolicyBlock,
+        })
         setSaving(false)
         if (res.success) {
             setOriginalTimezone(timezone)
-            notifySuccess("Fuso horário atualizado com sucesso!")
+            setOriginalReceiptMessage(receiptMessage.trim())
+            setOriginalReceiptShowPolicyBlock(receiptShowPolicyBlock)
+            notifySuccess("Configurações do sistema salvas com sucesso!")
         } else {
             notifyError(res.error || "Erro ao salvar")
         }
@@ -140,22 +158,44 @@ export function SystemSettingsSubPage({
                                     </p>
                                 </div>
                             </FormSection>
+
+                            <FormSection title="Mensagem do Recibo" hasSeparator>
+                                <div className="space-y-4">
+                                    <Checkbox
+                                        label="Exibir bloco de política de devolução no recibo"
+                                        checked={receiptShowPolicyBlock}
+                                        onCheckedChange={(v) => setReceiptShowPolicyBlock(Boolean(v))}
+                                    />
+                                    <FormTextarea
+                                        name="receiptMessage"
+                                        label="Mensagem configurável no recibo"
+                                        value={receiptMessage}
+                                        onChange={(e) => setReceiptMessage(e.target.value)}
+                                        rows={3}
+                                        placeholder="Ex.: Obrigado pela preferência! Consulte nossa política de trocas na loja."
+                                        maxLength={1000}
+                                        showCharacterCount
+                                    />
+                                    <p className="text-xs text-brand-inactive-text">
+                                        Esta mensagem é exibida como padrão nos recibos de venda impressos ou em PDF.
+                                    </p>
+                                </div>
+                            </FormSection>
                         </div>
 
                         {/* Right Column / Sidebar */}
                         <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
                             <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden">
                                 <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />
-                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4 mt-2">Sobre o fuso horário</h3>
+                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4 mt-2">Sobre as Configurações do Sistema</h3>
                                 <div className="space-y-4 text-sm text-brand-inactive-text dark:text-dark-body">
                                     <p>
-                                        O fuso horário padroniza a exibição de datas e horários em todo o sistema:
-                                        agendamentos, relatórios, dashboard, notificações e muito mais.
+                                        <strong className="text-brand-dark dark:text-dark-heading">Fuso horário:</strong>{" "}
+                                        Padroniza a exibição de datas e horários em agendamentos, relatórios e dashboard.
                                     </p>
                                     <p>
-                                        <strong className="text-brand-dark dark:text-dark-heading">Importante:</strong>{" "}
-                                        Altere esta configuração apenas se sua loja estiver em um estado com fuso horário
-                                        diferente do horário de Brasília.
+                                        <strong className="text-brand-dark dark:text-dark-heading">Mensagem do Recibo:</strong>{" "}
+                                        Personalize a mensagem final que seus clientes leem ao receber o recibo da compra.
                                     </p>
                                 </div>
                             </div>
@@ -176,3 +216,4 @@ export function SystemSettingsSubPage({
         </FadeIn>
     )
 }
+

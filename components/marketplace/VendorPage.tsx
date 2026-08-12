@@ -987,7 +987,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
     const shareMessage = useMemo(() => `Olha essa vitrine na Dudit!\n\n*${partner.storeName}*\nConfere aqui os produtos:`, [partner.storeName])
 
     return (
-        <div className="container mx-auto px-0 lg:px-4 max-w-[1400px] animate-fade-in lg:mt-6">
+        <div className="container mx-auto px-4 xl:px-0 max-w-[1400px] animate-fade-in lg:mt-6">
             <MarketplaceHeader
                 productName={partner.storeName}
                 storeSearchPlaceholder={`Buscar em ${partner.storeName}`}
@@ -1322,7 +1322,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                         </div>
                                     </div>
                                     {categoryFilteredItems.length > 0 ? (
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-4 lg:gap-6 mt-4">
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5 gap-3 md:gap-4 lg:gap-6 mt-4">
                                             {categoryFilteredItems.map((item: any) => (
                                                 <ItemCard
                                                     key={item.id}

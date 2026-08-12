@@ -10,6 +10,7 @@ import { InfoCard } from "@/components/reusable"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
 import { ImageCropperModal } from "./ImageCropperModal"
 import { uploadImageToR2Action } from "@/app/actions/shared/r2"
+import { isGifFile } from "@/lib/security/file-validator"
 
 interface NewStoreModalProps {
   isOpen: boolean
@@ -31,6 +32,11 @@ export function NewStoreModal({ isOpen, onClose, partnerId, onStoreCreated }: Ne
     const file = e.target.files?.[0]
     e.currentTarget.value = ""
     if (!file) return
+
+    if (isGifFile(file)) {
+      setError("Arquivos GIF não são permitidos no sistema.")
+      return
+    }
 
     // Validate file size (3MB max)
     if (file.size > 3 * 1024 * 1024) {
@@ -141,7 +147,7 @@ export function NewStoreModal({ isOpen, onClose, partnerId, onStoreCreated }: Ne
                   <input
                     id="store-image"
                     type="file"
-                    accept="image/*"
+                    accept="image/png, image/jpeg, image/webp, image/avif"
                     onChange={handleFileSelect}
                     disabled={isLoading}
                     className="hidden"

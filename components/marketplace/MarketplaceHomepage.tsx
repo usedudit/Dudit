@@ -647,7 +647,7 @@ export default function MarketplaceHome({
             <div className="w-full bg-white flex-grow">
                 <HeroBanner />
 
-                <div className="mx-auto max-w-[1400px] px-4 lg:px-0 space-y-10">
+                <div className="mx-auto max-w-[1400px] px-4 xl:px-0 space-y-10">
                     {sections.map((section) => {
                         if (section.id === "topVitrines") {
                             return (

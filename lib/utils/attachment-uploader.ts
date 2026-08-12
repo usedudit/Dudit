@@ -75,6 +75,8 @@ async function saveAttachmentRecord(
     }
 }
 
+import { isGifFile } from "@/lib/security/file-validator"
+
 export async function uploadSingleFile({
     partnerId,
     entityId,
@@ -87,6 +89,10 @@ export async function uploadSingleFile({
     file: File
 }): Promise<{ success: boolean; error?: string }> {
     try {
+        if (isGifFile(file)) {
+            return { success: false, error: "Arquivos GIF não são permitidos no sistema." }
+        }
+
         const presigned = await getPresignedUrl(
             entityType,
             partnerId,

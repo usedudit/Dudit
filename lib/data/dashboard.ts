@@ -33,8 +33,9 @@ const loadRawTransactionsGeneralTab = cache(async (partnerId: string, todayYmd: 
   const supabase = createAdminClient()
   const { data, error } = await supabase
     .from("transactions")
-    .select("id, description, amount, due_date, payment_date, created_at, status, category, transaction_type")
+    .select("id, description, amount, due_date, payment_date, created_at, status, category, transaction_type, kind")
     .eq("partner_id", partnerId)
+    .or("kind.is.null,kind.eq.settlement,kind.eq.refund,kind.eq.chargeback")
     .or(`created_at.gte.${fromYmd}T00:00:00,due_date.gte.${todayYmd}`)
     .order("created_at", { ascending: false })
   if (error) throw error
@@ -512,7 +513,7 @@ async function getCachedFinancial(partnerId: string, storeId = ""): Promise<Fina
         const from = addDays(today, -29)
         const [accounts, transactions] = await Promise.all([
           supabase.from("finance_accounts").select("id, current_balance, initial_balance, is_active").eq("partner_id", partnerId).eq("is_active", true),
-          supabase.from("transactions").select("id, description, amount, due_date, payment_date, created_at, status, category, transaction_type").eq("partner_id", partnerId).or(`created_at.gte.${from}T00:00:00,due_date.gte.${today}`).order("created_at", { ascending: false }).limit(600),
+          supabase.from("transactions").select("id, description, amount, due_date, payment_date, created_at, status, category, transaction_type, kind").eq("partner_id", partnerId).or("kind.is.null,kind.eq.settlement,kind.eq.refund,kind.eq.chargeback").or(`created_at.gte.${from}T00:00:00,due_date.gte.${today}`).order("created_at", { ascending: false }).limit(600),
         ])
         if (accounts.error) throw accounts.error
         if (transactions.error) throw transactions.error

@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { toast } from '@/hooks/use-notification';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { ChevronLeftIcon, XIcon, SearchIcon, ChevronRightIcon, PlusIcon, CalendarIcon, CheckIcon, ClockIcon, RepeatIcon, ArrowRightIcon, ChevronDownIcon, UserIcon, ThreeDotsIcon, Package } from '@/lib/icons';
+import { ChevronLeftIcon, XIcon, SearchIcon, ChevronRightIcon, PlusIcon, CalendarIcon, CheckIcon, ClockIcon, RepeatIcon, ArrowRightIcon, ChevronDownIcon, UserIcon, ThreeDotsIcon, Package, AlertCircleIcon } from '@/lib/icons';
 import { Button, Input, Dropdown, DropdownItem, AlertModal, DatePicker, TimePicker, FormTextarea, ThreeDotsLoader, IconPlaceholder, Spinner, EmailInput, PhoneInput, Checkbox, MoneyInput, InfoCard, Badge, Tabs, TabsList, TabsTrigger, TabsContent, QuantitySelector, DefaultModal } from '@/components/reusable';
 import { getAvailableTimeSlotsAction, getAppointmentDetailsDataAction } from '@/app/actions/erp/appointments';
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
@@ -22,7 +22,7 @@ import BottomSheet from '@/components/BottomSheet';
 import Portal from '@/components/Portal';
 import { UserProfileImage } from '@/lib/utils/UserProfileImage';
 import { createPOSCustomerQuickAction } from '@/app/actions/erp/pdv';
-import { fetchPartnerCustomersBucket } from '@/app/actions/erp/client-loaders';
+import { fetchPartnerCustomersBucket, fetchPartnerTeamMembersBucket } from '@/app/actions/erp/client-loaders';
 import { createServiceAction } from '@/app/actions/erp/servicos';
 import { getFulfillmentModeLabel, getPaymentStatusLabel, getSalesChannelLabel } from '@/lib/orders/status';
 import { useCSRFToken } from '@/hooks/use-csrf-token';
@@ -107,8 +107,12 @@ export const AppointmentSheet = ({
         }
         return groups;
     }, [allowedOrderServices, servicesCatalog]);;
-    const clientsSource = clientsCatalog || [];
-    const staffSource = staffCatalog || [];
+    const [localStaff, setLocalStaff] = useState<any[]>([]);
+    const clientsSource = useMemo(() => clientsCatalog || [], [clientsCatalog]);
+    const staffSource = useMemo(() => {
+        if (staffCatalog && staffCatalog.length > 0) return staffCatalog;
+        return localStaff;
+    }, [staffCatalog, localStaff]);
     const { canEdit, hasSpecific, canDelete } = usePermissions();
     const [currentView, setCurrentView] = useState<'summary' | 'services' | 'client' | 'datetime' | 'items' | 'activity' | 'edit-service' | 'recurrence' | 'notes'>(() => {
         if (mode === 'create') {
@@ -220,11 +224,11 @@ export const AppointmentSheet = ({
     const [aptPromotions, setAptPromotions] = useState<any[]>([])
 
     useEffect(() => {
-        if (!partnerId) return
+        if (!partnerId || (mode === 'view' && !appointment?.marketplaceOrderId && !appointment?.saleId)) return
         listActivePromotionsForMarketplaceAction(partnerId).then(res => {
             if (Array.isArray(res)) setAptPromotions(res)
         }).catch(() => { })
-    }, [partnerId])
+    }, [partnerId, mode, appointment?.marketplaceOrderId, appointment?.saleId])
 
     const [marketplaceOrderData, setMarketplaceOrderData] = useState<{
         totalAmount: number
@@ -390,7 +394,7 @@ export const AppointmentSheet = ({
     }, [clientsCatalog]);
 
     useEffect(() => {
-        if (partnerId) {
+        if (partnerId && mode === 'create') {
             fetchPartnerCustomersBucket(partnerId).then(res => {
                 if (res && res.length > 0) {
                     setLocalClients(res);
@@ -399,7 +403,28 @@ export const AppointmentSheet = ({
                 console.error("Error fetching customers client-side:", err);
             });
         }
-    }, [partnerId]);
+    }, [partnerId, mode]);
+
+    // Load team staff when no staff catalog is provided (e.g. linked-order flow),
+    // so the date/time step always has at least one professional to schedule against.
+    useEffect(() => {
+        if (!partnerId || mode !== 'create') return;
+        if (staffCatalog && staffCatalog.length > 0) return;
+        let cancelled = false;
+        fetchPartnerTeamMembersBucket().then(items => {
+            if (cancelled || !items || items.length === 0) return;
+            setLocalStaff(items.map(m => ({
+                id: String(m.id),
+                name: m.fullName || 'Sem nome',
+                role: m.role || 'staff',
+                avatar: m.avatarUrl || null,
+                email: m.email || undefined,
+            })));
+        }).catch(err => {
+            console.error("Error fetching team members client-side:", err);
+        });
+        return () => { cancelled = true; };
+    }, [partnerId, mode, staffCatalog]);
 
     const filteredClients = useMemo(() => {
         if (!clientSearch) return localClients;
@@ -482,6 +507,7 @@ export const AppointmentSheet = ({
 
     // -- Dynamic time slots from server (replaces hardcoded array) --
     const [timeSlots, setTimeSlots] = useState<string[]>([]);
+    const [conflictingTimeSlots, setConflictingTimeSlots] = useState<Set<string>>(new Set());
     const [isLoadingSlots, setIsLoadingSlots] = useState(false);
 
     // Fetch available time slots when the datetime view is shown
@@ -496,11 +522,15 @@ export const AppointmentSheet = ({
         let cancelled = false;
         setIsLoadingSlots(true);
 
-        getAvailableTimeSlotsAction(targetDate, selectedStaffId, totalDuration, maxBuffer, storeId)
+        getAvailableTimeSlotsAction(targetDate, selectedStaffId, totalDuration, maxBuffer, storeId, appointment?.id)
             .then((res) => {
                 if (cancelled) return;
                 if (res.success) {
                     setTimeSlots(res.slots);
+                    setConflictingTimeSlots(new Set(res.conflictingSlots || []));
+                } else {
+                    setTimeSlots([]);
+                    setConflictingTimeSlots(new Set());
                 }
             })
             .catch(() => { })
@@ -509,7 +539,7 @@ export const AppointmentSheet = ({
             });
 
         return () => { cancelled = true; };
-    }, [currentView, selectedStaffId, selectedServices, selectedCalDate]);
+    }, [currentView, selectedStaffId, selectedServices, selectedCalDate, storeId, appointment?.id]);
 
     // Initial State Setup
     useEffect(() => {
@@ -625,8 +655,6 @@ export const AppointmentSheet = ({
 
             if (initialStaffId) {
                 setSelectedStaffId(initialStaffId);
-            } else if (staffSource.length > 0) {
-                setSelectedStaffId(staffSource[0].id);
             }
 
             // Standard Flow Initialization for Create Mode
@@ -640,7 +668,20 @@ export const AppointmentSheet = ({
                 }
             }
         }
-    }, [mode, appointment, initialTimeSlot, initialDraft, selectedDate, defaultDate, initialStaffId, staffSource]);
+    }, [mode, appointment, initialTimeSlot, initialDraft, selectedDate, initialStaffId]);
+
+    // Ensure a staff member is selected once the staff list is available.
+    // Kept separate so async staff loading does not reset the current step.
+    useEffect(() => {
+        if (mode === 'view') return;
+        if (initialStaffId) {
+            setSelectedStaffId(initialStaffId);
+            return;
+        }
+        if (staffSource.length > 0 && !selectedStaffId) {
+            setSelectedStaffId(staffSource[0].id);
+        }
+    }, [mode, initialStaffId, staffSource, selectedStaffId]);
 
     // Calculate Price dynamically for Time-Based Services
     const isMarketplaceOrder = useMemo(() =>
@@ -770,12 +811,21 @@ export const AppointmentSheet = ({
                 setSelectedItems(resolvedItems);
                 setCurrentView('summary');
             } else {
-                // Normal Flow: Services -> Client inline step
-                setCurrentView('client');
+                // Normal Flow: Services -> Client inline step.
+                // If a client is already attached (e.g. preselected from a linked order),
+                // skip the client picker and go straight to date/time (still editable later).
+                if (selectedClient) {
+                    setCurrentView('datetime');
+                } else {
+                    setCurrentView('client');
+                }
             }
         }
         else if (currentView === 'client') {
-            if (!selectedClient) return;
+            if (!selectedClient) {
+                toast.warning("Cliente obrigatório", "Selecione um cliente para continuar.");
+                return;
+            }
             if (cameFromSummary) {
                 setCurrentView('summary');
                 setCameFromSummary(false);
@@ -1195,6 +1245,9 @@ export const AppointmentSheet = ({
     const linkedOrderId = appointment?.marketplaceOrderId
         || appointment?.saleId
         || null;
+
+    const linkedSalePaymentStatus = String(orderPaymentInfo?.situation || appointment?.paymentStatus || '').toLowerCase();
+    const isSalePriceLocked = mode === 'view' && (linkedSalePaymentStatus === 'paid' || linkedSalePaymentStatus === 'partially_paid');
 
     useEffect(() => {
         if (!partnerId) return;
@@ -1780,9 +1833,12 @@ export const AppointmentSheet = ({
                                                     <button
                                                         key={i}
                                                         onClick={() => { setSelectedTimeSlot(slot); setEditTime(slot); }}
-                                                        className={`w-full p-3 rounded-xl border text-sm font-bold transition-all flex justify-between items-center ${selectedTimeSlot === slot ? 'border-brand-dark border-brand-green text-white' : 'border-brand-border dark:border-dark-border hover:border-brand-dark/30 dark:hover:border-brand-gray/30 text-brand-dark dark:text-dark-heading'}`}
+                                                        className={`w-full p-3 rounded-xl border text-sm font-bold transition-all flex justify-between items-center ${selectedTimeSlot === slot ? 'border-brand-dark border-brand-green text-white' : conflictingTimeSlots.has(slot) ? 'border-amber-300 bg-amber-50/60 text-brand-dark dark:border-amber-800/50 dark:bg-amber-900/10 dark:text-dark-heading' : 'border-brand-border dark:border-dark-border hover:border-brand-dark/30 dark:hover:border-brand-gray/30 text-brand-dark dark:text-dark-heading'}`}
                                                     >
-                                                        {slot}
+                                                        <span className="flex items-center gap-2">
+                                                            {slot}
+                                                            {conflictingTimeSlots.has(slot) && <AlertCircleIcon size={16} className={selectedTimeSlot === slot ? 'text-white' : 'text-amber-600'} />}
+                                                        </span>
                                                         {selectedTimeSlot === slot && <CheckIcon size={18} />}
                                                     </button>
                                                 ))
@@ -2596,6 +2652,17 @@ export const AppointmentSheet = ({
                                 });
                                 if (!created) return;
 
+                                const mappedService = {
+                                    ...created,
+                                    duration: created.duration_minutes,
+                                    bufferMinutes: created.buffer_minutes,
+                                    pricingUnit: created.billing_unit,
+                                    category_id: created.category_id,
+                                    promotional_price: created.promotional_price,
+                                    staff: getSelectedStaffName(),
+                                    staffId: selectedStaffId,
+                                };
+
                                 setLocalServices(prev => {
                                     const next = [...prev];
                                     let group = next.find(g => g.category === 'Serviços');
@@ -2603,11 +2670,11 @@ export const AppointmentSheet = ({
                                         group = { category: 'Serviços', category_display: true, items: [], colorClass: 'bg-brand-primary' };
                                         next.push(group);
                                     }
-                                    group.items = [created, ...group.items];
+                                    group.items = [mappedService, ...group.items];
                                     return next;
                                 });
 
-                                setSelectedServices(prev => [...prev, { ...created, staff: getSelectedStaffName(), staffId: selectedStaffId }]);
+                                setSelectedServices(prev => [...prev, mappedService]);
 
                                 setNewServiceName("");
                                 setNewServicePrice(0);
@@ -2655,6 +2722,7 @@ export const AppointmentSheet = ({
                                 name="price"
                                 value={selectedServices[editingServiceIndex].price}
                                 onChange={(val) => updateEditingService('price', val)}
+                                disabled={isSalePriceLocked}
                             />
 
                             <Input
@@ -2663,7 +2731,19 @@ export const AppointmentSheet = ({
                                 type="number"
                                 value={selectedServices[editingServiceIndex].duration}
                                 onChange={(e) => updateEditingService('duration', e.target.value)}
+                                disabled={mode === 'view'}
                             />
+
+                            {mode === 'view' && (
+                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                    A duração fica fixa depois da criação para manter o horário e os conflitos consistentes.
+                                </p>
+                            )}
+                            {isSalePriceLocked && (
+                                <p className="text-xs text-amber-700 dark:text-amber-300">
+                                    O valor fica bloqueado porque a venda está paga ou parcialmente paga.
+                                </p>
+                            )}
 
                             <div className="flex flex-col gap-1.5">
                                 <label className="text-sm font-bold text-brand-dark dark:text-dark-heading ml-1">Profissional</label>

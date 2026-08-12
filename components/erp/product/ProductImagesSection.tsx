@@ -7,6 +7,8 @@ import IconPlaceholder from "@/components/reusable/IconPlaceholder"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import AlertModal from "@/components/reusable/AlertModal"
 import { Badge, Tooltip, Spinner } from "@/components/reusable"
+import { isGifFile } from "@/lib/security/file-validator"
+import { useToast } from "@/hooks/use-toast"
 
 interface ProductImagesSectionProps {
     images: (string | File)[]
@@ -31,6 +33,7 @@ function ProductImagesSection({
     isSaving = false,
     moderationStatus,
 }: ProductImagesSectionProps) {
+    const { toast } = useToast()
     const fileInputRef = useRef<HTMLInputElement>(null)
     const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
     const [imageToDelete, setImageToDelete] = useState<number | null>(null)
@@ -56,6 +59,13 @@ function ProductImagesSection({
     }, [images])
 
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = e.target.files
+        if (files) {
+            const fileArr = Array.from(files)
+            if (fileArr.some(f => isGifFile(f))) {
+                toast({ description: "Arquivos GIF não são permitidos no sistema." })
+            }
+        }
         onImageUpload(e)
         if (fileInputRef.current) {
             fileInputRef.current.value = ""
@@ -106,7 +116,7 @@ function ProductImagesSection({
                         <input
                             ref={fileInputRef}
                             type="file"
-                            accept="image/*"
+                            accept="image/png, image/jpeg, image/webp, image/avif"
                             multiple
                             onChange={handleImageUpload}
                             disabled={!isEditing}
@@ -200,7 +210,7 @@ function ProductImagesSection({
                                 <input
                                     ref={fileInputRef}
                                     type="file"
-                                    accept="image/*"
+                                    accept="image/png, image/jpeg, image/webp, image/avif"
                                     multiple
                                     onChange={handleImageUpload}
                                     disabled={!isEditing}

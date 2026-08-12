@@ -408,6 +408,33 @@ async function processSubscriptionWebhook(
       },
     })
 
+    // ── Notify partner owner on payment failure ──
+    if (newStatus === "past_due" && sub.status !== "past_due") {
+      try {
+        const { data: partner } = await supabase
+          .from("partners")
+          .select("user_id")
+          .eq("id", sub.partner_id)
+          .single()
+
+        if (partner?.user_id) {
+          const { sendBillingNotification } = await import("@/lib/billing/notifications")
+          await sendBillingNotification(
+            "billing.payment_failed",
+            partner.user_id,
+            sub.partner_id,
+            {
+              message: `O pagamento da assinatura falhou. A assinatura entrou em status "Atrasado". Você tem 3 dias para regularizar antes da suspensão dos recursos.`,
+              subscription_id: sub.id,
+              mp_subscription_id: resourceId,
+            }
+          )
+        }
+      } catch (notifyErr: any) {
+        console.error("[SUB_WEBHOOK] Failed to send payment failed notification:", notifyErr.message)
+      }
+    }
+
     console.log(
       `[SUB_WEBHOOK] ✅ Subscription ${sub.id} updated: "${sub.status}" → "${newStatus}" (MP verified: "${mpStatus}")`,
     )

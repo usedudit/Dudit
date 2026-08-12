@@ -21,6 +21,7 @@ import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { getRandomDefaultBanner } from "@/lib/utils/banner"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { isGifFile } from "@/lib/security/file-validator"
 import { MessageCircle, Laptop } from "lucide-react"
 
 export const ShowcaseSubPage = ({
@@ -93,6 +94,7 @@ export const ShowcaseSubPage = ({
         const file = e.target.files?.[0]
         e.currentTarget.value = ""
         if (!file) return
+        if (isGifFile(file)) return void notifyError("Arquivos GIF não são permitidos no sistema.")
         if (file.size > 3 * 1024 * 1024) return void notifyError("Máximo 3MB por imagem")
         setTempGalleryImageFile(file)
         setGalleryCropModalOpen(true)
@@ -246,6 +248,7 @@ export const ShowcaseSubPage = ({
         const file = e.target.files?.[0]
         e.currentTarget.value = ""
         if (!file) return
+        if (isGifFile(file)) return void notifyError("Arquivos GIF não são permitidos no sistema.")
         if (file.size > 3 * 1024 * 1024) return void notifyError("Máximo 3MB")
         setTempImageFile(file)
         setCropModalOpen(true)
@@ -262,6 +265,7 @@ export const ShowcaseSubPage = ({
         const file = e.target.files?.[0]
         e.currentTarget.value = ""
         if (!file) return
+        if (isGifFile(file)) return void notifyError("Arquivos GIF não são permitidos no sistema.")
         if (file.size > 3 * 1024 * 1024) return void notifyError("Máximo 3MB")
         setTempBannerFile(file)
         setBannerCropModalOpen(true)
@@ -411,7 +415,7 @@ export const ShowcaseSubPage = ({
                                         </div>
                                     </div>
                                     <p className="mt-3 text-xs text-brand-inactive-text dark:text-dark-body">Tamanho recomendado: 1400x300px. Máximo 3MB.</p>
-                                    <input ref={bannerInputRef} type="file" hidden accept="image/*" onChange={handleBannerChange} />
+                                    <input ref={bannerInputRef} type="file" hidden accept="image/png, image/jpeg, image/webp, image/avif" onChange={handleBannerChange} />
                                 </FormSection>
 
                                 {/* Galeria de Fotos */}
@@ -456,7 +460,7 @@ export const ShowcaseSubPage = ({
                                                 <input
                                                     ref={galleryFileInputRef}
                                                     type="file"
-                                                    accept="image/*"
+                                                    accept="image/png, image/jpeg, image/webp, image/avif"
                                                     hidden
                                                     onChange={handleGalleryFileChange}
                                                 />
@@ -490,7 +494,7 @@ export const ShowcaseSubPage = ({
                                             <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Logo</p>
                                             <p className="text-xs text-brand-inactive-text dark:text-dark-body">Máx 3MB (PNG, JPG, WEBP)</p>
                                         </div>
-                                        <input ref={fileInputRef} type="file" hidden accept="image/*" onChange={handleImageChange} />
+                                        <input ref={fileInputRef} type="file" hidden accept="image/png, image/jpeg, image/webp, image/avif" onChange={handleImageChange} />
                                     </div>
                                 </FormSection>
                             </div>

@@ -336,7 +336,7 @@ export default function OrdersPage({
                     unpaid: { label: "Pendente", icon: <ClockIcon size={12} />, color: "gray" },
                 }
                 const statusInfo = statusMap[o.situation] || { label: o.situation, icon: <ClockIcon size={12} />, color: "gray" }
-                
+
                 if (o.situation === "partially_paid") {
                     statusInfo.label = "Parcialmente Pago"
                     statusInfo.color = "orange"

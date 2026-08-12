@@ -134,15 +134,15 @@ export async function createComprehensiveCustomerAction(data: {
   if (data.email && !validateEmail(data.email)) {
     return { error: "E-mail inválido" }
   }
-  
+
   if (data.phone && !validatePhoneBR(data.phone)) {
     return { error: "Celular inválido. Use o formato (00) 90000-0000" }
   }
-  
+
   if (data.phoneFixed && !validatePhoneBR(data.phoneFixed)) {
     return { error: "Telefone fixo inválido. Use o formato (00) 0000-0000" }
   }
-  
+
   if (data.website && !validateURL(data.website)) {
     const urlWithProto = data.website.startsWith("http") ? data.website : `https://${data.website}`
     if (!validateURL(urlWithProto)) {
@@ -235,7 +235,7 @@ export async function createComprehensiveCustomerAction(data: {
       isDefault: true,
       csrf_token: data.csrf_token,
     })
-    
+
     if (addressResult && addressResult.error) {
       console.error("[createComprehensiveCustomerAction] Erro ao salvar endereÃ§o principal:", addressResult.error)
     }
@@ -258,7 +258,7 @@ export async function createComprehensiveCustomerAction(data: {
       isDefault: false,
       csrf_token: data.csrf_token,
     })
-    
+
     if (billingResult && billingResult.error) {
       console.error("[createComprehensiveCustomerAction] Erro ao salvar endereÃ§o de cobranÃ§a:", billingResult.error)
     }
@@ -362,15 +362,15 @@ export async function updateComprehensiveCustomerAction(data: {
   if (data.email && !validateEmail(data.email)) {
     return { error: "E-mail inválido" }
   }
-  
+
   if (data.phone && !validatePhoneBR(data.phone)) {
     return { error: "Celular inválido. Use o formato (00) 90000-0000" }
   }
-  
+
   if (data.phoneFixed && !validatePhoneBR(data.phoneFixed)) {
     return { error: "Telefone fixo inválido. Use o formato (00) 0000-0000" }
   }
-  
+
   if (data.website && !validateURL(data.website)) {
     const urlWithProto = data.website.startsWith("http") ? data.website : `https://${data.website}`
     if (!validateURL(urlWithProto)) {
@@ -485,7 +485,7 @@ export async function updateComprehensiveCustomerAction(data: {
         isDefault: true,
         csrf_token: data.csrf_token,
       })
-      
+
       if (addressResult && addressResult.error) {
         console.error("[updateComprehensiveCustomerAction] Erro ao criar novo endereço principal:", addressResult.error)
       }
@@ -511,7 +511,7 @@ export async function updateComprehensiveCustomerAction(data: {
         state: data.billingState,
         country: data.country || "BR",
       }).eq("id", existingBilling[0].id)
-      
+
       if (billingUpdateError) {
         console.error("[updateComprehensiveCustomerAction] Erro ao atualizar endereÃ§o de cobranÃ§a:", billingUpdateError.message)
       }
@@ -531,7 +531,7 @@ export async function updateComprehensiveCustomerAction(data: {
         isDefault: false,
         csrf_token: data.csrf_token,
       })
-      
+
       if (billingResult && billingResult.error) {
         console.error("[updateComprehensiveCustomerAction] Erro ao criar novo endereÃ§o de cobranÃ§a:", billingResult.error)
       }
@@ -588,22 +588,22 @@ export async function getCustomerByIdAction(customerId: string) {
   // Extract primary address from joined addresses for backwards compatibility
   const primaryAddress = customer.addresses?.find((a: any) => a.address_type === "primary" || a.is_default)
   if (primaryAddress) {
-    ;(customer as any).zip_code = primaryAddress.zip_code
-    ;(customer as any).street = primaryAddress.street
-    ;(customer as any).number = primaryAddress.number
-    ;(customer as any).complement = primaryAddress.complement
-    ;(customer as any).neighborhood = primaryAddress.neighborhood
-    ;(customer as any).city = primaryAddress.city
-    ;(customer as any).state = primaryAddress.state
-    ;(customer as any).country = primaryAddress.country
+    ; (customer as any).zip_code = primaryAddress.zip_code
+      ; (customer as any).street = primaryAddress.street
+      ; (customer as any).number = primaryAddress.number
+      ; (customer as any).complement = primaryAddress.complement
+      ; (customer as any).neighborhood = primaryAddress.neighborhood
+      ; (customer as any).city = primaryAddress.city
+      ; (customer as any).state = primaryAddress.state
+      ; (customer as any).country = primaryAddress.country
   }
 
   const { getPartnerPlan } = await import("@/lib/services/subscription.service")
   const plan = await getPartnerPlan(customer.partner_id)
-  ;(customer as any).planSlug = plan?.slug || "free"
+    ; (customer as any).planSlug = plan?.slug || "free"
 
-  // Dynamically add mobile property for compatibility with frontend components
-  ;(customer as any).mobile = customer.phone
+    // Dynamically add mobile property for compatibility with frontend components
+    ; (customer as any).mobile = customer.phone
 
   // Aggregate order stats for KPI display (by buyer_id AND customer_id)
   let marketplaceUserId = customer.marketplace_user_id
@@ -651,15 +651,15 @@ export async function getCustomerByIdAction(customerId: string) {
         lastOrderDate = o.created_at
       }
     }
-    ;(customer as any).orders_count = totalOrders
-    ;(customer as any).total_spent = totalSpent
-    ;(customer as any).avg_order_value = avgOrder
-    ;(customer as any).last_order_at = lastOrderDate
+    ; (customer as any).orders_count = totalOrders
+      ; (customer as any).total_spent = totalSpent
+      ; (customer as any).avg_order_value = avgOrder
+      ; (customer as any).last_order_at = lastOrderDate
   } else {
-    ;(customer as any).orders_count = 0
-    ;(customer as any).total_spent = 0
-    ;(customer as any).avg_order_value = 0
-    ;(customer as any).last_order_at = null
+    ; (customer as any).orders_count = 0
+      ; (customer as any).total_spent = 0
+      ; (customer as any).avg_order_value = 0
+      ; (customer as any).last_order_at = null
   }
 
   if (customerAccess.roleId === "operator") {
@@ -767,15 +767,6 @@ export async function getCustomerOrdersAction(customerId: string) {
     .or(filter)
     .order("created_at", { ascending: false })
     .limit(50)
-
-  console.log("[getCustomerOrdersAction DEBUG]", {
-    customerId,
-    foundCustomer: customer,
-    allCustomerIds,
-    filter,
-    ordersFetchedCount: orders?.length ?? 0,
-    error: error?.message || null,
-  })
 
   if (error) {
     return { orders: [], error: error.message, stats: null }

@@ -110,7 +110,6 @@ export function mapOrderItemsToReceiptItems(orderItems: any[]): SaleReceiptItem[
         const qty = Number(item.quantity || 0)
         const unitPrice = Number(item.product_price ?? item.unit_price ?? item.unitPrice ?? 0)
         const subtotal = Number(item.subtotal ?? qty * unitPrice)
-        const sku = item.products?.sku || item.product_variants?.sku || item.sku || "00000"
         const name =
             item.product_name ||
             item.custom_name ||
@@ -119,7 +118,7 @@ export function mapOrderItemsToReceiptItems(orderItems: any[]): SaleReceiptItem[
             "Item"
         return {
             index: idx + 1,
-            code: String(sku).slice(0, 8),
+            code: "",
             description: String(name),
             quantity: qty,
             unit: "UN",
@@ -135,7 +134,7 @@ export function mapCartItemsToReceiptItems(cart: any[]): SaleReceiptItem[] {
         const unitPrice = Number(item.unitPrice || 0)
         return {
             index: idx + 1,
-            code: String(item.sku || item.productId || "00000").slice(0, 8),
+            code: "",
             description: String(item.name || "Item"),
             quantity: qty,
             unit: "UN",
@@ -145,20 +144,33 @@ export function mapCartItemsToReceiptItems(cart: any[]): SaleReceiptItem[] {
     })
 }
 
+function groupPaymentMethods(methods: Array<{ method: string; amount: number }>): Array<{ method: string; amount: number }> {
+    const grouped = methods.reduce<(record: { [key: string]: number })>(
+        (acc, curr) => {
+            const key = curr.method
+            acc[key] = (acc[key] || 0) + curr.amount
+            return acc
+        },
+        {},
+    )
+    return Object.entries(grouped).map(([method, amount]) => ({ method, amount: Number(amount) }))
+}
+
 export function buildPaymentLinesFromOrder(order: any): SaleReceiptPaymentLine[] {
     const breakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : []
     const filtered = breakdown.filter((e: any) => e?.method && Number(e.amount || 0) > 0.009)
     if (filtered.length > 0) {
-        return filtered.map((e: any) => {
+        const grouped = groupPaymentMethods(filtered.map((e: any) => ({ method: e.method, amount: Number(e.amount || 0) })))
+        return grouped.map((e) => {
             let label = formatPaymentMethodLabel(e.method)
             if (e.method === "cash" && e.wantsChange) {
-                label = `Dinheiro (Troco para R$ ${Number(e.payWithAmount || 0).toFixed(2).replace('.', ',')})`
+                label = `Dinheiro (Troco para R$ ${e.amount.toFixed(2).replace('.', ',')})`
             } else if (e.method === "cash" && e.wantsChange === false) {
                 label = "Dinheiro (Valor exato)"
             }
             return {
                 label,
-                amount: Number(e.amount || 0),
+                amount: e.amount,
             }
         })
     }
@@ -175,16 +187,17 @@ export function buildPaymentLinesFromBreakdown(
 ): SaleReceiptPaymentLine[] {
     const filtered = (breakdown || []).filter((e) => e?.method && Number(e.amount || 0) > 0.009)
     if (filtered.length > 0) {
-        return filtered.map((e) => {
+        const grouped = groupPaymentMethods(filtered.map((e) => ({ method: e.method, amount: Number(e.amount || 0) })))
+        return grouped.map((e) => {
             let label = formatPaymentMethodLabel(e.method)
             if (e.method === "cash" && e.wantsChange) {
-                label = `Dinheiro (Troco para R$ ${Number(e.payWithAmount || 0).toFixed(2).replace('.', ',')})`
+                label = `Dinheiro (Troco para R$ ${e.amount.toFixed(2).replace('.', ',')})`
             } else if (e.method === "cash" && e.wantsChange === false) {
                 label = "Dinheiro (Valor exato)"
             }
             return {
                 label,
-                amount: Number(e.amount || 0),
+                amount: e.amount,
             }
         })
     }

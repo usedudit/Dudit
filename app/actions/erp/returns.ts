@@ -186,14 +186,22 @@ async function getClientUserAgent(): Promise<string> {
 function normalizeReturnRow(row: any): ReturnRequestListItem & { returnEvents?: any[] } {
     const items = (row.return_items || []).map((item: any) => {
         const productImages = item.products?.images
-        const image = Array.isArray(productImages) && productImages[0] ? productImages[0] : item.products?.video_thumbnail || productImages || null
+        const serviceImages = item.order_items?.services?.images
+        const image = (Array.isArray(productImages) && productImages[0]
+            ? productImages[0]
+            : item.products?.video_thumbnail || productImages
+            || (Array.isArray(serviceImages) && serviceImages[0]
+                ? serviceImages[0]
+                : item.order_items?.services?.video_thumbnail || serviceImages
+            )
+            || null)
         return {
             id: item.id,
             orderItemId: item.order_item_id,
             productId: item.product_id,
             variantId: item.variant_id,
             productName: item.product_name_snapshot,
-            sku: item.sku_snapshot,
+            sku: item.sku_snapshot || item.order_items?.services?.sku || null,
             image,
             price: toNumber(item.unit_price_snapshot),
             netItemValue: toNumber(item.net_item_value_snapshot),
@@ -331,7 +339,8 @@ export async function getReturnRequestsPageAction(
         return_items!return_items_return_request_id_fkey(
           id, order_item_id, product_id, variant_id, product_name_snapshot, sku_snapshot,
           unit_price_snapshot, net_item_value_snapshot, ordered_quantity, quantity, condition, reason, desired_resolution,
-          products!product_id(images, video_thumbnail)
+          products!product_id(images, video_thumbnail),
+          order_items!order_item_id(services(id, name, sku, images, video_thumbnail))
         ),
         return_evidence(id, file_url, file_type, thumbnail_url),
         return_refunds(payment_method)
@@ -1049,6 +1058,7 @@ export async function processReturnRequestAction(input: unknown) {
                             source_return_request_id: data.requestId,
                             store_id: effectiveStoreId,
                             reason: "RETURN_IN",
+                            reference_name: `Devolução DVL-${data.requestId.slice(0, 6).toUpperCase()}`,
                             notes: `Devolução DVL-${data.requestId.slice(0, 6).toUpperCase()}`
                         })
                         .eq("id", v_stock_movement_id)
@@ -1529,11 +1539,20 @@ export async function fetchReturnOrderBucketAction(partnerId: string) {
           net_item_value,
           product_id,
           variant_id,
+          service_id,
+          line_type,
           products (
             sku,
             images,
             video_thumbnail,
             name
+          ),
+          services (
+            id,
+            name,
+            sku,
+            images,
+            video_thumbnail
           )
         )
       `)

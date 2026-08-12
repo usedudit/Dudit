@@ -25,7 +25,6 @@ const SaleReceiptA4Preview = ({
     const primaryColor = data.primaryColor || QUOTE_PREVIEW_PRIMARY_COLOR
     const secondaryColor = data.secondaryColor || QUOTE_PREVIEW_SECONDARY_COLOR
     const partnerName = data.partner.fantasyName
-    const partnerAddress = data.partner.addressLine
     const partnerAvatar = data.partnerAvatar
 
     const quoteItems = data.items.map((item) => ({
@@ -178,7 +177,6 @@ const SaleReceiptA4Preview = ({
                                                         <p>{data.partner.legalName}</p>
                                                     )}
                                                     {data.partner.phone && <p>{data.partner.phone}</p>}
-                                                    <p className="whitespace-pre-wrap">{partnerAddress}</p>
                                                 </div>
                                             </div>
                                             <div>
@@ -217,7 +215,7 @@ const SaleReceiptA4Preview = ({
                                             <tr key={idx} className="bg-white">
                                                 <td className="py-2 pl-6 pr-4 border-b border-gray-50">
                                                     <span className="font-bold text-[13px] text-black block truncate max-w-[250px]">
-                                                        {item.name || "Produto sem nome"}
+                                                        {item.description}
                                                     </span>
                                                 </td>
                                                 <td className="py-2 px-4 border-b border-gray-50 text-center">
@@ -225,12 +223,12 @@ const SaleReceiptA4Preview = ({
                                                 </td>
                                                 <td className="py-2 px-4 border-b border-gray-50 text-right">
                                                     <span className="text-[13px] font-medium text-gray-600">
-                                                        {formatCurrency(item.price).replace("R$", "$")}
+                                                        {formatCurrency(item.unitPrice).replace("R$", "$")}
                                                     </span>
                                                 </td>
                                                 <td className="py-2 pl-4 pr-6 border-b border-gray-50 text-right">
                                                     <span className="text-[13px] font-bold text-black">
-                                                        {formatCurrency(item.price * item.qty).replace("R$", "$")}
+                                                        {formatCurrency(item.unitPrice * item.qty).replace("R$", "$")}
                                                     </span>
                                                 </td>
                                             </tr>

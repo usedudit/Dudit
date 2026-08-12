@@ -78,6 +78,7 @@ import { PixQrDisplayModal } from '@/components/erp/payments/shared/PixQrDisplay
 import { getPaymentMethodDetailsAction, updatePaymentMethodAction } from '@/app/actions/erp/payment-methods';
 import { AlertModal, Input, CpfCnpjInput, EmailInput, PhoneInput } from '@/components/reusable';
 import QRCode from 'qrcode';
+import { text } from 'stream/consumers';
 const SuccessActionCard = React.memo(({ icon: Icon, label, onClick }: { icon: any, label: string, onClick?: () => void }) => (
     <div
         className="flex items-center gap-3 p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20 cursor-pointer transition-colors group"
@@ -582,6 +583,7 @@ const PaymentModal = ({
         paymentMethodId: string | null
         amount: number
         installmentNumber: number
+        paymentMethodDiscountAmount?: number
     }[]>([
         { id: 1, method: null, paymentMethodId: null, amount: 0, installmentNumber: 1 },
         { id: 2, method: null, paymentMethodId: null, amount: 0, installmentNumber: 1 }
@@ -1182,7 +1184,12 @@ const PaymentModal = ({
                 if (currentSlot.amount > 0) {
                     initialAmt = Number(currentSlot.amount);
                 } else {
-                    const otherPaid = payments.reduce((acc, p, idx) => idx !== editingPaymentIndex ? acc + p.amount : acc, 0);
+                    const otherPaid = payments.reduce((acc, p, idx) => {
+                        if (idx === editingPaymentIndex) return acc;
+                        const base = Math.max(0, Number(p.amount || 0));
+                        const disc = Math.max(0, Number((p as any).paymentMethodDiscountAmount || 0));
+                        return acc + base + disc;
+                    }, 0);
                     const needed = Math.max(0, netChargeTarget - otherPaid);
                     initialAmt = needed > 0 ? needed : 0;
                 }
@@ -1369,10 +1376,22 @@ const PaymentModal = ({
         ? ((splitPreview && 'success' in splitPreview && splitPreview.success ? splitPreview.finalTotal : splitBaseSum) < chargeTarget - 0.005)
         : isAllocationUnderpaid;
 
-    const isOverpaid = !isAllocationUnderpaid && paymentBaseAmount > finalTotalWithMethodPricing + 0.005;
+    const splitTotalAbated = useMemo(() => {
+        if (splitPreview && 'success' in splitPreview && splitPreview.success) {
+            return splitPreview.finalTotal;
+        }
+        return payments.reduce((acc, p) => acc + (p.method && p.amount > 0.009 ? p.amount + Number((p as any).paymentMethodDiscountAmount || 0) : 0), 0);
+    }, [payments, splitPreview]);
+
+    const isOverpaid = view === 'split'
+        ? splitTotalAbated > chargeTarget + 0.005
+        : !isAllocationUnderpaid && paymentBaseAmount > finalTotalWithMethodPricing + 0.005;
+
     const changeAmount = view === 'money' && wantsChange
         ? Math.max(0, payWithAmount - paymentBaseAmount)
-        : (isOverpaid ? paymentBaseAmount - finalTotalWithMethodPricing : 0);
+        : view === 'split'
+            ? Math.max(0, splitTotalAbated - chargeTarget)
+            : (isOverpaid ? paymentBaseAmount - finalTotalWithMethodPricing : 0);
 
     /** Valor efetivo pago / a registrar (líquido do método quando houver cálculo). */
     const totalPaidCalculated = useMemo(() => {
@@ -1687,10 +1706,12 @@ const PaymentModal = ({
     const handleSplitPaymentUpdate = (newAmount: number) => {
         if (editingPaymentIndex !== null) {
             const inst = view === 'card' ? Math.max(1, parseInt(String(installments), 10) || 1) : 1;
+            const pmDiscount = Number(paymentCalculation?.paymentMethodDiscountAmount || 0);
             const newPayments = [...payments];
             newPayments[editingPaymentIndex] = {
                 ...newPayments[editingPaymentIndex],
                 amount: newAmount,
+                paymentMethodDiscountAmount: pmDiscount,
                 installmentNumber: inst,
             };
             setPayments(newPayments);
@@ -3118,7 +3139,7 @@ const PaymentModal = ({
                                             {mpStep === 'mp_redirect' && (
                                                 <div className="flex flex-col items-center justify-center py-16 gap-4 text-center">
                                                     <div className="w-20 h-20 rounded-full bg-[#00b1ea]/10 flex items-center justify-center mb-2">
-                                                        <img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="MP" className="w-10 h-10 object-contain" />
+                                                        <img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-10 h-10 object-contain" />
                                                     </div>
                                                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Nova aba aberta</h3>
                                                     <p className="text-sm text-brand-inactive-text max-w-sm">
@@ -3143,14 +3164,17 @@ const PaymentModal = ({
 
                                             {mpStep === 'error' && (
                                                 <div className="flex flex-col items-center justify-center py-16 gap-4 text-center">
-                                                    <div className="w-16 h-16 rounded-full bg-red-50 dark:bg-red-900/20 flex items-center justify-center">
-                                                        <CancelCircleIcon size={32} className="text-brand-red" />
-                                                    </div>
-                                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Erro no pagamento</h3>
-                                                    <p className="text-sm text-brand-red max-w-sm">{mpBrickError || "Ocorreu um erro ao processar o pagamento."}</p>
-                                                    <Button variant="outline" onClick={() => { setMpStep("brick"); setMpBrickError(null); mpBrickInitializedRef.current = false; }} className="mt-2">
-                                                        Tentar novamente
-                                                    </Button>
+                                                    <IconPlaceholder
+                                                        placeholderType="image"
+                                                        imageSrc="https://img.dudit.com.br/static/mascots/Ops.png"
+                                                        imageAlt="Não foi possível concluir a venda"
+                                                        title="Não foi possível concluir a venda"
+                                                        subtitle={mpBrickError || "Ocorreu um erro ao processar o pagamento."}
+                                                        buttons={[{
+                                                            text: "Tentar novamente",
+                                                            action: () => { setMpStep("brick"); setMpBrickError(null); mpBrickInitializedRef.current = false; },
+                                                        }]}
+                                                    />
                                                 </div>
                                             )}
                                         </motion.div>

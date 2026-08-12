@@ -14,10 +14,10 @@ import { useRouter } from "next/navigation"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { useNotification } from "@/hooks/use-notification"
 import { uploadImageToR2Action } from "@/app/actions/shared/r2"
-import { CSRFTokenInput } from "@/components/security/csrf-token-input"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import type { BusinessMode } from "@/lib/business-info"
 import { normalizeBusinessInfo } from "@/lib/business-info"
+import { isGifFile } from "@/lib/security/file-validator"
 
 interface SettingsFormProps {
   partner: any
@@ -133,8 +133,8 @@ export function SettingsForm({ partner, paymentMethods: initialPaymentMethods }:
     }
 
     // Validar tipo
-    if (!file.type.startsWith("image/")) {
-      setError("Por favor, selecione uma imagem válida")
+    if (!file.type.startsWith("image/") || isGifFile(file)) {
+      setError("Arquivos GIF não são permitidos. Por favor, selecione uma imagem válida (PNG, JPG, WebP).")
       return
     }
 
@@ -213,7 +213,7 @@ export function SettingsForm({ partner, paymentMethods: initialPaymentMethods }:
                 ref={fileInputRef}
                 onChange={handleImageUpload}
                 hidden
-                accept="image/*"
+                accept="image/png, image/jpeg, image/webp, image/avif"
                 disabled={imageUploading}
               />
               <div className="flex gap-2">
