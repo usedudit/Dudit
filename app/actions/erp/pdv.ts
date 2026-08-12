@@ -102,17 +102,23 @@ async function resolvePosFinalTotalWithPaymentMethod(params: {
     partnerId: string
     storeId?: string | null
     preSaleId: string
+    baseTotal?: number
     paymentBreakdown: Array<{ method?: string; amount?: number; paymentMethodId?: string | null; installmentNumber?: number }>
 }): Promise<PosPaymentResolveResult | null> {
-    const { data: draft } = await params.supabase
-        .from("pre_sales")
-        .select("total_amount")
-        .eq("id", params.preSaleId)
-        .eq("partner_id", params.partnerId)
-        .eq("status", "draft")
-        .maybeSingle()
-    if (!draft) return null
-    const baseTotal = Math.max(0, Number(draft.total_amount || 0))
+    let baseTotal: number
+    if (params.baseTotal != null) {
+        baseTotal = Math.max(0, Number(params.baseTotal || 0))
+    } else {
+        const { data: draft } = await params.supabase
+            .from("pre_sales")
+            .select("total_amount")
+            .eq("id", params.preSaleId)
+            .eq("partner_id", params.partnerId)
+            .eq("status", "draft")
+            .maybeSingle()
+        if (!draft) return null
+        baseTotal = Math.max(0, Number(draft.total_amount || 0))
+    }
     const rawRows = params.paymentBreakdown || []
     if (rawRows.length === 0) {
         return { ok: true, totalAmount: baseTotal, adjustedBreakdown: [] }
@@ -1046,6 +1052,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
         partnerId: input.partnerId,
         storeId: input.storeId,
         preSaleId: input.preSaleId,
+        baseTotal: Math.max(0, Number(preSaleDraft.total_amount || 0)),
         paymentBreakdown: resolvedBreakdown,
     })
     const customerNamePromise = preSaleDraft.customer_id
@@ -1158,9 +1165,11 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
         .eq("id", input.preSaleId)
         .eq("partner_id", input.partnerId)
 
-    // Record cash register movement for cash payment entries
-    if (activeSessionResult.data?.id) {
-        await Promise.all(
+    // These post-sale side effects are independent after the order exists.
+    // Start them together so the slowest one, rather than their sum, determines
+    // the remaining time shown by the PDV.
+    const cashMovementsPromise = activeSessionResult.data?.id
+        ? Promise.all(
             breakdownForOrder
                 .filter((entry) => {
                     const method = String(entry.method || "").toLowerCase().trim()
@@ -1177,7 +1186,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
                     order_id: orderId,
                 }))
         )
-    }
+        : Promise.resolve()
 
     // Seller commission
     const sellerPartnerUserId = input.sellerId || null
@@ -1208,11 +1217,9 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
         })
         : Promise.resolve()
 
-    await Promise.all([sellerCommissionPromise, goalsPromise, preSaleCompletionPromise])
-
     // Record coupon usage if coupon was applied
-    if (preSaleDraft.coupon_id && orderId) {
-        await supabase.from("coupon_usages").upsert(
+    const couponUsagePromise = preSaleDraft.coupon_id && orderId
+        ? supabase.from("coupon_usages").upsert(
             {
                 coupon_id: preSaleDraft.coupon_id,
                 customer_id: preSaleDraft.customer_id || null,
@@ -1220,22 +1227,32 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
             },
             { onConflict: "coupon_id,order_id", ignoreDuplicates: true }
         )
-    }
+        : Promise.resolve()
 
     // Invalidate product & order caches
     const productIds = new Set<string>(
         erpItems.map((item) => item.productId).filter(Boolean) as string[]
     )
-    await Promise.all(
+    const productCachePromise = Promise.all(
         Array.from(productIds).map((productId) =>
             invalidateProductCache(productId, input.partnerId, "update", { silent: true })
         )
     )
 
-    await Promise.all([
+    const revalidationPromise = Promise.all([
         revalidateOrders(input.partnerId),
         revalidateTransactions(input.partnerId),
         revalidateStockMovements(input.partnerId),
+    ])
+
+    await Promise.all([
+        cashMovementsPromise,
+        sellerCommissionPromise,
+        goalsPromise,
+        preSaleCompletionPromise,
+        couponUsagePromise,
+        productCachePromise,
+        revalidationPromise,
     ])
 
     return { success: true as const, data: { saleId: orderId, saleNumber: orderNumber, orderId } }

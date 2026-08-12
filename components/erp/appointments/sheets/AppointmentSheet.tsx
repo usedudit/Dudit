@@ -2925,11 +2925,52 @@ export const AppointmentSheet = ({
                 cancelText="Continuar editando"
                 variant="warning"
             />
-            isMobile ? (
-            <BottomSheet isOpen={isCancelConfirmOpen} onClose={() => setIsCancelConfirmOpen(false)}>
-                <div className="p-6 space-y-5">
-                    <div className="text-center">
-                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Cancelar agendamento</h3>
+            {isMobile ? (
+                <BottomSheet isOpen={isCancelConfirmOpen} onClose={() => setIsCancelConfirmOpen(false)}>
+                    <div className="p-6 space-y-5">
+                        <div className="text-center">
+                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Cancelar agendamento</h3>
+                            <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-2">
+                                Tem certeza que deseja cancelar este agendamento? Ele será excluído permanentemente.
+                            </p>
+                        </div>
+                        <div>
+                            <FormTextarea
+                                label="Observação (opcional)"
+                                name="cancelNote"
+                                placeholder="Motivo do cancelamento..."
+                                value={cancelNote}
+                                onChange={(e) => setCancelNote(e.target.value)}
+                                maxLength={500}
+                                showCharacterCount
+                            />
+                        </div>
+                        <div className="flex items-center gap-2 justify-center">
+                            <Checkbox
+                                label="Notificar o cliente sobre o cancelamento"
+                                checked={notifyClientOnCancel}
+                                onChange={(checked) => setNotifyClientOnCancel(!!checked)}
+                            />
+                        </div>
+                        <div className="flex justify-end gap-2">
+                            <Button variant="outline" onClick={() => setIsCancelConfirmOpen(false)}>Voltar</Button>
+                            <Button variant="destructive" onClick={async () => {
+                                setIsCancelConfirmOpen(false);
+                                if (appointment?.id && onDelete) {
+                                    const success = await onDelete(appointment.id, notifyClientOnCancel, cancelNote);
+                                    if (success) {
+                                        toast.success("Cancelado", "Agendamento cancelado com sucesso.");
+                                    } else {
+                                        toast.error("Erro", "Não foi possível cancelar o agendamento.");
+                                    }
+                                }
+                            }}>Cancelar agendamento</Button>
+                        </div>
+                    </div>
+                </BottomSheet>
+            ) : (
+                <DefaultModal isOpen={isCancelConfirmOpen} onClose={() => setIsCancelConfirmOpen(false)} title="Cancelar agendamento">
+                    <div className="text-center sm:text-left">
                         <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-2">
                             Tem certeza que deseja cancelar este agendamento? Ele será excluído permanentemente.
                         </p>
@@ -2945,7 +2986,7 @@ export const AppointmentSheet = ({
                             showCharacterCount
                         />
                     </div>
-                    <div className="flex items-center gap-2 justify-center">
+                    <div className="flex items-center gap-2 justify-center sm:justify-start">
                         <Checkbox
                             label="Notificar o cliente sobre o cancelamento"
                             checked={notifyClientOnCancel}
@@ -2966,48 +3007,9 @@ export const AppointmentSheet = ({
                             }
                         }}>Cancelar agendamento</Button>
                     </div>
-                </div>
-            </BottomSheet>
-            ) : (
-            <DefaultModal isOpen={isCancelConfirmOpen} onClose={() => setIsCancelConfirmOpen(false)} title="Cancelar agendamento">
-                <div className="text-center sm:text-left">
-                    <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-2">
-                        Tem certeza que deseja cancelar este agendamento? Ele será excluído permanentemente.
-                    </p>
-                </div>
-                <div>
-                    <FormTextarea
-                        label="Observação (opcional)"
-                        name="cancelNote"
-                        placeholder="Motivo do cancelamento..."
-                        value={cancelNote}
-                        onChange={(e) => setCancelNote(e.target.value)}
-                        maxLength={500}
-                        showCharacterCount
-                    />
-                </div>
-                <div className="flex items-center gap-2 justify-center sm:justify-start">
-                    <Checkbox
-                        label="Notificar o cliente sobre o cancelamento"
-                        checked={notifyClientOnCancel}
-                        onChange={(checked) => setNotifyClientOnCancel(!!checked)}
-                    />
-                </div>
-                <div className="flex justify-end gap-2">
-                    <Button variant="outline" onClick={() => setIsCancelConfirmOpen(false)}>Voltar</Button>
-                    <Button variant="destructive" onClick={async () => {
-                        setIsCancelConfirmOpen(false);
-                        if (appointment?.id && onDelete) {
-                            const success = await onDelete(appointment.id, notifyClientOnCancel, cancelNote);
-                            if (success) {
-                                toast.success("Cancelado", "Agendamento cancelado com sucesso.");
-                            } else {
-                                toast.error("Erro", "Não foi possível cancelar o agendamento.");
-                            }
-                        }
-                    }}>Cancelar agendamento</Button>
-                </div>
-            </DefaultModal>
+                </DefaultModal>
+            )}
+
             <AlertModal
                 isOpen={isDeleteModalOpen}
                 onClose={() => setIsDeleteModalOpen(false)}

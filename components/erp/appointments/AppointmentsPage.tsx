@@ -50,6 +50,7 @@ import FilterSheet from '@/components/reusable/FilterSheet';
 import AppointmentsPageControls from './AppointmentsPageControls';
 import { AppointmentListRow } from './AppointmentListRow';
 import SavingStatusModal from '@/components/reusable/SavingStatusModal';
+import { text } from 'node:stream/consumers';
 
 /**
  * Compute the visible date range based on the current view and date.
@@ -106,7 +107,7 @@ const AppointmentsPage = ({
         { id: "staff", label: "Profissional", align: "left", width: "180px", minWidth: "160px" },
         { id: "price", label: "Valor", align: "left", width: "120px", minWidth: "120px" },
         { id: "status", label: "Status", align: "center", width: "110px", minWidth: "100px" },
-        { id: "actions", label: "Açoes", align: "center", width: "70px", minWidth: "70px" },
+        { id: "actions", label: "Ações", align: "center", width: "70px", minWidth: "70px" },
     ]), []);
 
     const [viewMode, setViewMode] = useState<ModeType>('calendar');
@@ -869,10 +870,16 @@ const AppointmentsPage = ({
                                                 <>
                                                     {visibleAppointments.length === 0 ? (
                                                         <div className="flex flex-col items-center justify-center py-20 text-center h-full">
-                                                            <div className="w-16 h-16 bg-gray-50 dark:bg-zinc-900 rounded-full flex items-center justify-center mb-4 text-brand-inactive-text"><CalendarX size={24} /></div>
-                                                            <h3 className="text-brand-dark dark:text-dark-heading font-bold mb-1">Sem agendamentos</h3>
-                                                            <p className="text-sm text-brand-inactive-text max-w-[240px]">Não há agendamentos para este período.</p>
-                                                            <Button variant="outline" className="mt-4 rounded-full" onClick={() => handleOpenCreate()}>Adicionar</Button>
+                                                            <IconPlaceholder
+                                                                placeholderType="image"
+                                                                imageSrc="https://img.dudit.com.br/static/mascots/Agendamentos.png"
+                                                                imageAlt="Sem Agendamentos"
+                                                                title="Sem agendamentos"
+                                                                subtitle="Não há agendamentos para este período."
+                                                                buttons={[
+                                                                    { text: "Adicionar", action: () => handleOpenCreate(), variant: "default" }
+                                                                ]}
+                                                            />
                                                         </div>
                                                     ) : (
                                                         <>
@@ -943,69 +950,69 @@ const AppointmentsPage = ({
                                                 </>
                                             ) : (
                                                 <>
-                                            {calendarView === 'month' && (
-                                                <>
-                                                    <div className="grid grid-cols-7 border-b border-brand-border dark:border-dark-border bg-gray-50 dark:bg-zinc-900/50 flex-shrink-0">
-                                                        {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => (
-                                                            <div key={day} className="py-2 text-center text-xs font-bold text-brand-inactive-text">
-                                                                {day}
+                                                    {calendarView === 'month' && (
+                                                        <>
+                                                            <div className="grid grid-cols-7 border-b border-brand-border dark:border-dark-border bg-gray-50 dark:bg-zinc-900/50 flex-shrink-0">
+                                                                {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => (
+                                                                    <div key={day} className="py-2 text-center text-xs font-bold text-brand-inactive-text">
+                                                                        {day}
+                                                                    </div>
+                                                                ))}
                                                             </div>
-                                                        ))}
-                                                    </div>
-                                                    <MonthView
-                                                        appointments={visibleAppointments}
-                                                        currentDate={currentDate}
-                                                        handleGenericCellClick={handleGenericCellClick}
-                                                        activePopover={activePopover}
-                                                        handleOpenCreate={handleOpenCreate}
-                                                        handleOpenUnavailable={handleOpenUnavailable}
-                                                        setActivePopover={setActivePopover}
-                                                        handleOpenView={handleOpenView}
-                                                        handleOpenMore={handleOpenMore}
-                                                        openingHours={openingHours}
-                                                    />
-                                                </>
-                                            )}
+                                                            <MonthView
+                                                                appointments={visibleAppointments}
+                                                                currentDate={currentDate}
+                                                                handleGenericCellClick={handleGenericCellClick}
+                                                                activePopover={activePopover}
+                                                                handleOpenCreate={handleOpenCreate}
+                                                                handleOpenUnavailable={handleOpenUnavailable}
+                                                                setActivePopover={setActivePopover}
+                                                                handleOpenView={handleOpenView}
+                                                                handleOpenMore={handleOpenMore}
+                                                                openingHours={openingHours}
+                                                            />
+                                                        </>
+                                                    )}
 
-                                            {calendarView === 'week' && (
-                                                <TimelineView
-                                                    appointments={visibleAppointments}
-                                                    allAppointments={appointments}
-                                                    currentDate={currentDate}
-                                                    staffMembers={visibleStaffMembers}
-                                                    onOpenView={handleOpenView}
-                                                    handleTimelineMouseMove={handleTimelineMouseMove}
-                                                    handleGridMouseLeave={handleGridMouseLeave}
-                                                    handleGridClick={handleGridClick}
-                                                    hoverStaffId={hoverStaffId}
-                                                    hoverTime={hoverTime}
-                                                    activePopover={activePopover}
-                                                    setActivePopover={setActivePopover}
-                                                    handleOpenCreate={handleOpenCreate}
-                                                    handleOpenUnavailable={handleOpenUnavailable}
-                                                    openingHours={openingHours}
-                                                />
-                                            )}
+                                                    {calendarView === 'week' && (
+                                                        <TimelineView
+                                                            appointments={visibleAppointments}
+                                                            allAppointments={appointments}
+                                                            currentDate={currentDate}
+                                                            staffMembers={visibleStaffMembers}
+                                                            onOpenView={handleOpenView}
+                                                            handleTimelineMouseMove={handleTimelineMouseMove}
+                                                            handleGridMouseLeave={handleGridMouseLeave}
+                                                            handleGridClick={handleGridClick}
+                                                            hoverStaffId={hoverStaffId}
+                                                            hoverTime={hoverTime}
+                                                            activePopover={activePopover}
+                                                            setActivePopover={setActivePopover}
+                                                            handleOpenCreate={handleOpenCreate}
+                                                            handleOpenUnavailable={handleOpenUnavailable}
+                                                            openingHours={openingHours}
+                                                        />
+                                                    )}
 
-                                            {calendarView === 'day' && (
-                                                <DayView
-                                                    appointments={visibleAppointments}
-                                                    allAppointments={appointments}
-                                                    currentDate={currentDate}
-                                                    staffMembers={visibleStaffMembers}
-                                                    onOpenView={handleOpenView}
-                                                    handleGridMouseMove={handleGridMouseMove}
-                                                    handleGridMouseLeave={handleGridMouseLeave}
-                                                    handleGridClick={handleGridClick}
-                                                    hoverColIndex={hoverColIndex}
-                                                    hoverTime={hoverTime}
-                                                    activePopover={activePopover}
-                                                    setActivePopover={setActivePopover}
-                                                    handleOpenCreate={handleOpenCreate}
-                                                    handleOpenUnavailable={handleOpenUnavailable}
-                                                    openingHours={openingHours}
-                                                />
-                                            )}
+                                                    {calendarView === 'day' && (
+                                                        <DayView
+                                                            appointments={visibleAppointments}
+                                                            allAppointments={appointments}
+                                                            currentDate={currentDate}
+                                                            staffMembers={visibleStaffMembers}
+                                                            onOpenView={handleOpenView}
+                                                            handleGridMouseMove={handleGridMouseMove}
+                                                            handleGridMouseLeave={handleGridMouseLeave}
+                                                            handleGridClick={handleGridClick}
+                                                            hoverColIndex={hoverColIndex}
+                                                            hoverTime={hoverTime}
+                                                            activePopover={activePopover}
+                                                            setActivePopover={setActivePopover}
+                                                            handleOpenCreate={handleOpenCreate}
+                                                            handleOpenUnavailable={handleOpenUnavailable}
+                                                            openingHours={openingHours}
+                                                        />
+                                                    )}
                                                 </>
                                             )}
                                         </div>
