@@ -144,23 +144,38 @@ export function mapCartItemsToReceiptItems(cart: any[]): SaleReceiptItem[] {
     })
 }
 
-function groupPaymentMethods(methods: Array<{ method: string; amount: number }>): Array<{ method: string; amount: number }> {
-    const grouped = methods.reduce<(record: { [key: string]: number })>(
+function groupPaymentMethods(
+    methods: Array<{ method: string; amount: number; wantsChange?: boolean }>
+): Array<{ method: string; amount: number; wantsChange?: boolean }> {
+    const grouped = methods.reduce<Record<string, { amount: number; wantsChange?: boolean }>>(
         (acc, curr) => {
             const key = curr.method
-            acc[key] = (acc[key] || 0) + curr.amount
+            if (!acc[key]) {
+                acc[key] = { amount: 0, wantsChange: curr.wantsChange }
+            }
+            acc[key].amount += curr.amount
             return acc
         },
         {},
     )
-    return Object.entries(grouped).map(([method, amount]) => ({ method, amount: Number(amount) }))
+    return Object.entries(grouped).map(([method, data]) => ({
+        method,
+        amount: Number(data.amount),
+        wantsChange: data.wantsChange,
+    }))
 }
 
 export function buildPaymentLinesFromOrder(order: any): SaleReceiptPaymentLine[] {
     const breakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : []
     const filtered = breakdown.filter((e: any) => e?.method && Number(e.amount || 0) > 0.009)
     if (filtered.length > 0) {
-        const grouped = groupPaymentMethods(filtered.map((e: any) => ({ method: e.method, amount: Number(e.amount || 0) })))
+        const grouped = groupPaymentMethods(
+            filtered.map((e: any) => ({
+                method: String(e.method),
+                amount: Number(e.amount || 0),
+                wantsChange: e.wantsChange,
+            }))
+        )
         return grouped.map((e) => {
             let label = formatPaymentMethodLabel(e.method)
             if (e.method === "cash" && e.wantsChange) {
@@ -185,9 +200,18 @@ export function buildPaymentLinesFromBreakdown(
     fallbackMethod?: string,
     fallbackAmount?: number,
 ): SaleReceiptPaymentLine[] {
-    const filtered = (breakdown || []).filter((e) => e?.method && Number(e.amount || 0) > 0.009)
+    const filtered = (breakdown || []).filter(
+        (e): e is { method: string; amount?: number; wantsChange?: boolean; payWithAmount?: number } =>
+            Boolean(e?.method) && Number(e?.amount || 0) > 0.009
+    )
     if (filtered.length > 0) {
-        const grouped = groupPaymentMethods(filtered.map((e) => ({ method: e.method, amount: Number(e.amount || 0) })))
+        const grouped = groupPaymentMethods(
+            filtered.map((e) => ({
+                method: e.method,
+                amount: Number(e.amount || 0),
+                wantsChange: e.wantsChange,
+            }))
+        )
         return grouped.map((e) => {
             let label = formatPaymentMethodLabel(e.method)
             if (e.method === "cash" && e.wantsChange) {

@@ -28,9 +28,9 @@ const SaleReceiptA4Preview = ({
     const partnerAvatar = data.partnerAvatar
 
     const quoteItems = data.items.map((item) => ({
-        name: `${item.code} - ${item.description}`,
+        description: item.code ? `${item.code} - ${item.description}` : item.description,
         qty: item.quantity,
-        price: item.unitPrice,
+        unitPrice: item.unitPrice,
     }))
 
     const discountValue =
