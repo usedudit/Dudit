@@ -8,26 +8,33 @@ import type { InvoiceData } from "@/lib/billing/types"
 
 interface InvoicePreviewProps {
     data: InvoiceData
+    invoiceId?: string
     printMode?: boolean
 }
 
-function getStatusLabel(status: string): string {
-    const labels: Record<string, string> = {
-        issued: "Emitida",
-        cancelled: "Cancelada",
-        refunded: "Reembolsada",
-    }
-    return labels[status] || status
+function getStatusLabel(data: InvoiceData): string {
+    if (data.status === "cancelled") return "Cancelado"
+    if (data.status === "refunded") return "Reembolsado"
+    const payStatus = (data.payment?.status || "").toLowerCase()
+    const isPaid = !!data.payment?.paid_at ||
+        ["concluído", "aprovado", "approved", "completed"].some((s) => payStatus.includes(s))
+    return isPaid ? "Pago" : "Não pago"
+}
+
+function shortInvoiceId(invoiceId?: string): string {
+    return invoiceId ? invoiceId.slice(0, 6) : ""
 }
 
 function formatPeriod(start: string | null, end: string | null): string {
     if (!start && !end) return "-"
-    return [start, end].filter(Boolean).join(" → ")
+    const parts = [start, end].filter(Boolean).map((d) => formatDate(d!))
+    return parts.length > 0 ? parts.join(" → ") : "-"
 }
 
-const InvoicePreview = ({ data, printMode = false }: InvoicePreviewProps) => {
-    const primaryColor = data.status === "issued" ? QUOTE_PREVIEW_PRIMARY_COLOR : QUOTE_PREVIEW_PRIMARY_COLOR
+const InvoicePreview = ({ data, invoiceId, printMode = false }: InvoicePreviewProps) => {
+    const primaryColor = QUOTE_PREVIEW_PRIMARY_COLOR
     const secondaryColor = QUOTE_PREVIEW_SECONDARY_COLOR
+    const shortId = shortInvoiceId(invoiceId)
 
     const partnerAddressFormatted = useMemo(() => {
         if (!data.partner.address) return ""
@@ -131,7 +138,7 @@ const InvoicePreview = ({ data, printMode = false }: InvoicePreviewProps) => {
                                     <div>
                                         <h1 className="text-2xl font-medium text-white">Fatura</h1>
                                         <p className="text-white/80 text-xs tracking-widest font-light mt-1">
-                                            {`Fatura #${data.invoice_number}`}
+                                            {shortId ? `Fatura #${shortId}` : `Fatura #${data.invoice_number}`}
                                         </p>
                                     </div>
                                 </div>
@@ -145,11 +152,11 @@ const InvoicePreview = ({ data, printMode = false }: InvoicePreviewProps) => {
                                             <div className="grid grid-cols-4 gap-4 border-b border-brand-border pb-6 w-full">
                                                 <div className="flex flex-col">
                                                     <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Número</span>
-                                                    <span className="font-bold text-sm text-brand-dark">{data.invoice_number}</span>
+                                                    <span className="font-bold text-sm text-brand-dark">{shortId ? `#${shortId}` : data.invoice_number}</span>
                                                 </div>
                                                 <div className="flex flex-col">
-                                                    <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Início</span>
-                                                    <span className="font-bold text-sm text-brand-dark">{formatDate(data.period?.start || data.created_at)}</span>
+                                                    <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Emissão</span>
+                                                    <span className="font-bold text-sm text-brand-dark">{formatDate(data.created_at)}</span>
                                                 </div>
                                                 <div className="flex flex-col">
                                                     <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Vencimento</span>
@@ -157,7 +164,7 @@ const InvoicePreview = ({ data, printMode = false }: InvoicePreviewProps) => {
                                                 </div>
                                                 <div className="flex flex-col">
                                                     <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Status</span>
-                                                    <span className="font-bold text-sm text-brand-dark">{getStatusLabel(data.status)}</span>
+                                                    <span className="font-bold text-sm text-brand-dark">{getStatusLabel(data)}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -267,25 +274,6 @@ const InvoicePreview = ({ data, printMode = false }: InvoicePreviewProps) => {
                                                         {formatCurrency(data.purchase.total_amount)}
                                                     </div>
                                                 </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="px-8 pb-6">
-                                            <div className="w-full bg-white border border-brand-border rounded-lg p-4 text-[11px] text-gray-600 space-y-1">
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-500 font-medium">Forma de pagamento</span>
-                                                    <span className="font-bold">{data.payment.method_label}</span>
-                                                </div>
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-500 font-medium">Gateway</span>
-                                                    <span className="font-bold">{data.payment.gateway_label}</span>
-                                                </div>
-                                                {data.payment.paid_at && (
-                                                    <div className="flex justify-between">
-                                                        <span className="text-gray-500 font-medium">Pago em</span>
-                                                        <span className="font-bold">{formatDate(data.payment.paid_at)}</span>
-                                                    </div>
-                                                )}
                                             </div>
                                         </div>
 

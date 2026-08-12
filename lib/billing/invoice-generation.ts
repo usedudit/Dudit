@@ -102,7 +102,7 @@ export async function generateInvoiceForPurchase(
     if (purchase.user_id) {
         // Customer of a subscription invoice is the owner of the partner
         // (the person who pays for the plan), not the merchant itself.
-        const [profileRes, emailRes, addrRes] = await Promise.all([
+        const [profileRes, emailRes, addrRes, subRes] = await Promise.all([
             admin
                 .from("user_profiles")
                 .select("full_name, phone")
@@ -120,17 +120,47 @@ export async function generateInvoiceForPurchase(
                 .order("is_default", { ascending: false })
                 .limit(1)
                 .maybeSingle(),
+            purchase.subscription_id
+                ? admin
+                    .from("subscriptions")
+                    .select("billing_email, mercado_pago_subscription_id")
+                    .eq("id", purchase.subscription_id)
+                    .maybeSingle()
+                : Promise.resolve({ data: null }),
         ])
 
-        if (profileRes.data || emailRes.data) {
-            const ownerEmail = emailRes.data?.email || null
+        // Mercado Pago returns the payer info (first/last name, email — no phone)
+        // on the preapproval. Prefer it for the customer display when available.
+        let mpPayer: { name?: string; email?: string | null } = {}
+        if (subRes?.data?.mercado_pago_subscription_id) {
+            try {
+                const { getMpPlatformAccessToken } = await import("@/lib/services/mercadopago/subscriptions")
+                const token = await getMpPlatformAccessToken()
+                const mpRes = await fetch(`https://api.mercadopago.com/preapproval/${subRes.data.mercado_pago_subscription_id}`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                })
+                if (mpRes.ok) {
+                    const mp = await mpRes.json()
+                    const mpName = [mp.payer_first_name, mp.payer_last_name].filter(Boolean).join(" ")
+                    if (mpName) mpPayer.name = mpName
+                    if (mp.payer_email) mpPayer.email = mp.payer_email
+                }
+            } catch (err: any) {
+                console.warn("[InvoiceGeneration] MP payer fetch failed:", err?.message)
+            }
+        }
+
+        const billingEmail = subRes?.data?.billing_email || null
+
+        if (profileRes.data || emailRes.data || mpPayer.name) {
+            const ownerEmail = mpPayer.email || billingEmail || emailRes.data?.email || null
             let ownerAddress = ""
             if (addrRes.data) {
                 ownerAddress = buildAddressText(addrRes.data)
             }
 
             customerDetails = {
-                name: profileRes.data?.full_name || "Usuário",
+                name: mpPayer.name || profileRes.data?.full_name || "Usuário",
                 document: null,
                 email: ownerEmail,
                 phone: profileRes.data?.phone || null,

@@ -2,6 +2,7 @@
 
 import { DefaultModal, Badge, InfoCard, Button } from "@/components/reusable"
 import { formatCurrency, formatDate } from "@/lib/utils"
+import { getPaymentMethodLabel } from "@/lib/billing/invoice-utils"
 import { PrinterIcon, XIcon } from "lucide-react"
 import type { PurchaseWithRelations, BillingPayment, BillingInvoice } from "@/lib/billing/types"
 
@@ -85,10 +86,6 @@ export function BillingDetailSheet({ isOpen, onClose, purchase, onInvoice, onCan
                         <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">{getTypeLabel(purchase.purchase_type)}</p>
                     </div>
                     <div>
-                        <p className="text-xs text-brand-inactive-text font-medium">Gateway</p>
-                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading capitalize">{purchase.gateway}</p>
-                    </div>
-                    <div>
                         <p className="text-xs text-brand-inactive-text font-medium">Data</p>
                         <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatDate(purchase.created_at)}</p>
                     </div>
@@ -115,7 +112,7 @@ export function BillingDetailSheet({ isOpen, onClose, purchase, onInvoice, onCan
                                             {getStatusLabel(payment.status)}
                                         </Badge>
                                         <span className="text-xs text-brand-inactive-text">
-                                            {payment.payment_method_type || payment.gateway}
+                                            {getPaymentMethodLabel(payment.payment_method_type)}
                                         </span>
                                     </div>
                                     <div className="text-right">

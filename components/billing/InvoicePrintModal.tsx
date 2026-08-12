@@ -67,7 +67,7 @@ export function InvoicePrintModal({ isOpen, onClose, invoiceData, invoiceId }: I
                     {/* Header */}
                     <div className="shrink-0 flex items-center justify-between px-4 md:px-6 py-4 border-b border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
                         <h2 className="text-lg md:text-xl font-bold text-brand-dark dark:text-dark-heading">
-                            {invoiceData ? `Fatura ${invoiceData.invoice_number}` : "Imprimir fatura"}
+                            {invoiceId ? `Fatura #${invoiceId.slice(0, 6)}` : "Imprimir fatura"}
                         </h2>
                         <Button
                             variant="filled"
@@ -139,7 +139,7 @@ export function InvoicePrintModal({ isOpen, onClose, invoiceData, invoiceId }: I
                                 >
                                     <div className="flex-1 overflow-auto custom-scrollbar p-4 md:p-6 flex justify-center items-start">
                                         <div className="w-full h-full min-h-[400px]">
-                                            <InvoicePreview data={invoiceData} />
+                                            <InvoicePreview data={invoiceData} invoiceId={invoiceId} />
                                         </div>
                                     </div>
                                 </TabsContent>

@@ -86,6 +86,10 @@ export type ERPOrderPayload = {
     csrf_token?: string
     skipCSRF?: boolean
     sellerPartnerUserId?: string | null
+    /** PDV persists commission/goals in its finalization path. */
+    skipPostPaymentSellerSideEffects?: boolean
+    /** PDV performs the final cache refresh after completing the pre-sale. */
+    skipPostCreateRevalidation?: boolean
     paymentProvider?: string | null
     mpPaymentId?: string | null
 }
@@ -1537,9 +1541,9 @@ async function invalidateInventoryItems(partnerId: string, items: Array<{ produc
         new Set(items.map((item) => item.product_id).filter(Boolean))
     ) as string[]
 
-    for (const productId of productIds) {
-        await invalidateProductCache(productId, partnerId, "update", { silent: true })
-    }
+    await Promise.all(
+        productIds.map((productId) => invalidateProductCache(productId, partnerId, "update", { silent: true }))
+    )
 }
 
 async function resolveOrderPreparationEstimate(params: {
@@ -1624,6 +1628,13 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     const sanitizedItemsResult = sanitizeERPItems(data.items)
     if ("error" in sanitizedItemsResult) return { error: sanitizedItemsResult.error }
     const sanitizedItems = sanitizedItemsResult.items
+    const financeAccountPromise = data.financeAccountId ? supabase
+        .from("finance_accounts")
+        .select("id")
+        .eq("id", data.financeAccountId)
+        .eq("partner_id", partnerId)
+        .limit(1)
+        .maybeSingle() : Promise.resolve({ data: null })
     const stockValidationError = await validateERPItemsStock({
         supabase,
         partnerId,
@@ -1631,13 +1642,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     })
     if (stockValidationError) return { error: stockValidationError }
     const sanitizedPaymentBreakdown = sanitizePaymentBreakdown(data.paymentBreakdown)
-    const { data: financeAccount } = data.financeAccountId ? await supabase
-        .from("finance_accounts")
-        .select("id")
-        .eq("id", data.financeAccountId)
-        .eq("partner_id", partnerId)
-        .limit(1)
-        .maybeSingle() : { data: null }
+    const { data: financeAccount } = await financeAccountPromise
     if (data.financeAccountId && !financeAccount?.id) {
         return { error: "Conta de recebimento inválida para esta venda." }
     }
@@ -1645,6 +1650,34 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     if (Number(data.totalAmount || 0) <= 0) {
         return { error: "A venda não pode ser salva com valor total zerado." }
     }
+
+    // Leituras usadas apenas para montar o snapshot do pedido podem ocorrer
+    // enquanto o cupom e as promoções são recalculados.
+    const preparationEstimatePromise = resolveOrderPreparationEstimate({
+        supabase,
+        partnerId,
+        items: sanitizedItems,
+        deliveryMethod: data.deliveryMethod,
+    })
+    const deliveryRowPromise = resolveDeliverySettingsRow(supabase, partnerId, data.storeId)
+    const sellerCommissionPromise = (async () => {
+        if (!user.id) return 0
+        const { calculateCommission } = await import("@/lib/services/commission.service")
+        const { data: sellerCommissions } = await supabase
+            .from("employee_commissions")
+            .select("*")
+            .eq("partner_id", partnerId)
+            .eq("role", "seller")
+            .maybeSingle()
+        if (!sellerCommissions || sellerCommissions.commission_type === "none") return 0
+        return calculateCommission({
+            userId: user.id,
+            role: "seller",
+            commissionType: sellerCommissions.commission_type,
+            value: Number(sellerCommissions.value || 0),
+            saleAmount: Math.max(0, Number(data.subtotal || 0)),
+        })
+    })()
 
     let couponIdToSave: string | null = data.couponId || null
     let couponDiscountAmount = Math.max(0, Number(data.couponDiscountAmount || 0))
@@ -1768,44 +1801,37 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         deliveryAddressStr = buildFormattedAddress(data.address)
     }
 
-    const preparationEstimate = await resolveOrderPreparationEstimate({
-        supabase,
-        partnerId,
-        items: sanitizedItems,
-        deliveryMethod: data.deliveryMethod,
-    })
+    const preparationEstimate = await preparationEstimatePromise
 
     // Fetch delivery_payer setting for snapshot (store-aware)
-    const deliveryRow = await resolveDeliverySettingsRow(supabase, partnerId, data.storeId)
+    const deliveryRow = await deliveryRowPromise
     const deliveryPayer: "customer" | "seller" = deliveryRow?.delivery_payer === "seller" ? "seller" : "customer"
     if (data.storeId && deliveryRow?.store_id === data.storeId) {
         console.log(`[delivery_payer] ERP order using store override: store=${data.storeId}, partner=${partnerId}, payer=${deliveryPayer}`)
     }
 
-    // Calculate seller commission amount for snapshot (frozen at order creation)
-    let sellerCommissionAmount = 0
-    if (user.id) {
-        const { calculateCommission } = await import("@/lib/services/commission.service")
-        const { data: sellerCommissions } = await supabase
-            .from("employee_commissions")
-            .select("*")
-            .eq("partner_id", partnerId)
-            .eq("role", "seller")
-            .maybeSingle()
-
-        if (sellerCommissions && sellerCommissions.commission_type !== "none") {
-            const subtotalValue = Math.max(0, Number(data.subtotal || 0))
-            sellerCommissionAmount = calculateCommission({
-                userId: user.id,
-                role: "seller",
-                commissionType: sellerCommissions.commission_type,
-                value: Number(sellerCommissions.value || 0),
-                saleAmount: subtotalValue,
-            })
-        }
-    }
+    // Commission is part of the persisted snapshot, but its read is already
+    // running in parallel with coupon/promotion validation.
+    const sellerCommissionAmount = await sellerCommissionPromise
 
     const effectiveDeliveryPayer = (data.deliveryBreakdown?.deliveryPayer as "seller" | "customer") || deliveryPayer
+
+    // Cost snapshots are read-only and do not depend on the order id. Start
+    // them before the order insert so this latency overlaps the write.
+    const productIds = sanitizedItems.filter(item => item.productId).map(item => item.productId)
+    const serviceIds = sanitizedItems.filter(item => (item as any).serviceId).map(item => (item as any).serviceId)
+    const variantIds = sanitizedItems.filter(item => item.variantId).map(item => item.variantId)
+    const itemCostPromise = Promise.all([
+        productIds.length > 0
+            ? supabase.from("products").select("id, cost_price").eq("partner_id", partnerId).in("id", productIds)
+            : Promise.resolve({ data: [] as any[] }),
+        variantIds.length > 0
+            ? supabase.from("product_variants").select("id, product_id, cost_price").in("id", variantIds)
+            : Promise.resolve({ data: [] as any[] }),
+        serviceIds.length > 0
+            ? supabase.from("services").select("id, cost_price").eq("partner_id", partnerId).in("id", serviceIds)
+            : Promise.resolve({ data: [] as any[] }),
+    ])
 
     const orderInsertPayload: Record<string, unknown> = {
         ...(data.id ? { id: data.id } : {}),
@@ -1881,22 +1907,8 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         })
     }
 
-    // Fetch cost prices for products and services for unit_cost snapshot
-    const productIds = sanitizedItems.filter(item => item.productId).map(item => item.productId)
-    const serviceIds = sanitizedItems.filter(item => (item as any).serviceId).map(item => (item as any).serviceId)
-    const variantIds = sanitizedItems.filter(item => item.variantId).map(item => item.variantId)
-
-    const [{ data: products }, { data: variants }, { data: services }] = await Promise.all([
-        productIds.length > 0
-            ? supabase.from("products").select("id, cost_price").eq("partner_id", partnerId).in("id", productIds)
-            : Promise.resolve({ data: [] as any[] }),
-        variantIds.length > 0
-            ? supabase.from("product_variants").select("id, product_id, cost_price").in("id", variantIds)
-            : Promise.resolve({ data: [] as any[] }),
-        serviceIds.length > 0
-            ? supabase.from("services").select("id, cost_price").eq("partner_id", partnerId).in("id", serviceIds)
-            : Promise.resolve({ data: [] as any[] }),
-    ])
+    // Fetch cost prices for product/service unit_cost snapshots.
+    const [{ data: products }, { data: variants }, { data: services }] = await itemCostPromise
 
     const productCostMap = new Map<string, number>((products || []).map((p: { id: string; cost_price: number | null }) => [p.id, Number(p.cost_price || 0)]))
     const variantCostMap = new Map<string, number>((variants || []).map((v: { id: string; cost_price: number | null }) => [v.id, Number(v.cost_price || 0)]))
@@ -2083,52 +2095,72 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         })
     }
 
-    const { syncReceivableForOrder } = await import("@/lib/services/transaction.service")
-    await syncReceivableForOrder(supabase, {
-        order_number: order.order_number,
-        partner_id: partnerId,
-        store_id: order.store_id || data.storeId || null,
-        total_amount: Number(order.total_amount || 0),
-        paid_amount: Number(paymentState.paidAmount || 0),
-        situation: paymentState.situation,
-        payment_method: paymentMethodSummary || data.paymentMethod,
-        customer_id: order.customer_id || order.buyer_id || null,
-        customer_name: order.customer_name,
-        finance_account_id: order.finance_account_id || data.financeAccountId,
-        order_source: order.order_source || "manual",
-    })
+    // A newly created paid order cannot have an existing receivable to sync;
+    // avoid an extra read in the hot path. Keep it for partial/unpaid orders
+    // and callers that explicitly provide an existing order id.
+    if (paymentState.situation !== "paid" || data.id) {
+        const { syncReceivableForOrder } = await import("@/lib/services/transaction.service")
+        await syncReceivableForOrder(supabase, {
+            order_number: order.order_number,
+            partner_id: partnerId,
+            store_id: order.store_id || data.storeId || null,
+            total_amount: Number(order.total_amount || 0),
+            paid_amount: Number(paymentState.paidAmount || 0),
+            situation: paymentState.situation,
+            payment_method: paymentMethodSummary || data.paymentMethod,
+            customer_id: order.customer_id || order.buyer_id || null,
+            customer_name: order.customer_name,
+            finance_account_id: order.finance_account_id || data.financeAccountId,
+            order_source: order.order_source || "manual",
+        })
+    }
 
     if (paymentState.situation === "paid") {
-        await fulfillMarketplaceOrderIfNeeded(supabase, order.id)
-        await createSellerCommissionForPaidOrder({
-            supabase,
-            partnerId,
-            orderId: order.id,
-            sellerUserId: user.id,
-            saleAmount: Number(order.total_amount || 0),
-            accountId: order.finance_account_id || data.financeAccountId,
-            createdByUserId: user.id,
-            storeId: order.store_id || data.storeId || null,
-        })
+        // PDV orders are already finalized locally and never need the
+        // marketplace booking lookup. Keep fulfillment for other channels.
+        const fulfillmentPromise = data.salesChannel === "Presencial"
+            ? Promise.resolve()
+            : fulfillMarketplaceOrderIfNeeded(supabase, order.id)
+        const sellerSideEffectsPromise = data.skipPostPaymentSellerSideEffects
+            ? Promise.resolve()
+            : createSellerCommissionForPaidOrder({
+                supabase,
+                partnerId,
+                orderId: order.id,
+                sellerUserId: user.id,
+                saleAmount: Number(order.total_amount || 0),
+                accountId: order.finance_account_id || data.financeAccountId,
+                createdByUserId: user.id,
+                storeId: order.store_id || data.storeId || null,
+            })
+        await Promise.all([
+            fulfillmentPromise,
+            sellerSideEffectsPromise,
+        ])
     }
 
     // Sync payment status to linked appointments
     if (paymentState.situation === "paid" || paymentState.situation === "partially_paid" || paymentState.situation === "pending") {
-        await supabase
-            .from("appointments")
-            .update({ payment_status: paymentState.situation })
-            .eq("marketplace_order_id", order.id)
-            .eq("partner_id", partnerId)
-
-        await supabase
-            .from("service_orders")
-            .update({ payment_status: paymentState.situation })
-            .eq("order_id", order.id)
-            .eq("partner_id", partnerId)
+        await Promise.all([
+            supabase
+                .from("appointments")
+                .update({ payment_status: paymentState.situation })
+                .eq("marketplace_order_id", order.id)
+                .eq("partner_id", partnerId),
+            supabase
+                .from("service_orders")
+                .update({ payment_status: paymentState.situation })
+                .eq("order_id", order.id)
+                .eq("partner_id", partnerId),
+        ])
     }
 
-    await invalidateInventoryItems(partnerId, stockItems)
-    await revalidateOrders(partnerId)
+    if (!data.skipPostCreateRevalidation) {
+        await Promise.all([
+            invalidateInventoryItems(partnerId, stockItems),
+            revalidateOrders(partnerId),
+        ])
+    }
 
     import("@/lib/services/notification-automation.service")
         .then(({ onOrderStatusChanged }) =>

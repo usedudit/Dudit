@@ -4,7 +4,7 @@ import React from "react"
 import { motion } from "framer-motion"
 import { Badge } from "@/components/reusable"
 import { ActionsDropdown } from "@/components/reusable/Accordion"
-import { formatCurrency } from "@/lib/utils"
+import { formatCurrency, formatDate } from "@/lib/utils"
 import { Crown, Tag, CreditCard, ShoppingCart, Calendar } from "lucide-react"
 
 const TYPE_ICONS: Record<string, any> = {
@@ -51,7 +51,7 @@ const BillingGridCard = React.memo(
         onInvoice,
     }: BillingGridCardProps) => {
         const TypeIcon = TYPE_ICONS[type] || Tag
-        const dateStr = new Date(createdAt).toLocaleDateString("pt-BR")
+        const dateStr = formatDate(createdAt)
 
         return (
             <motion.div

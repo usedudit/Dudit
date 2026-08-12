@@ -987,6 +987,10 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
         await requirePermission(input.partnerId, "pdv", "can_apply_discount")
     }
 
+    // Start this independent check before validating the finance account so
+    // the two database calls overlap.
+    const activeSessionPromise = getActiveCashSessionAction(input.partnerId, input.storeId)
+
     // Validate finance account
     if (input.financeAccountId) {
         const { data: acc } = await supabase
@@ -1000,7 +1004,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
     }
 
     // Require open cash session
-    const activeSessionResult = await getActiveCashSessionAction(input.partnerId, input.storeId)
+    const activeSessionResult = await activeSessionPromise
     if (!activeSessionResult.success) {
         return { success: false as const, error: "Não foi possível validar o caixa aberto." }
     }
@@ -1037,13 +1041,22 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
     }
 
     let breakdownForOrder = resolvedBreakdown
-    const paymentAware = await resolvePosFinalTotalWithPaymentMethod({
+    const paymentAwarePromise = resolvePosFinalTotalWithPaymentMethod({
         supabase,
         partnerId: input.partnerId,
         storeId: input.storeId,
         preSaleId: input.preSaleId,
         paymentBreakdown: resolvedBreakdown,
     })
+    const customerNamePromise = preSaleDraft.customer_id
+        ? supabase
+            .from("customers")
+            .select("name")
+            .eq("id", preSaleDraft.customer_id)
+            .eq("partner_id", input.partnerId)
+            .maybeSingle()
+        : Promise.resolve({ data: null })
+    const [paymentAware, customerNameResult] = await Promise.all([paymentAwarePromise, customerNamePromise])
     if (paymentAware && paymentAware.ok && (paymentAware.adjustedBreakdown || []).length > 0) {
         breakdownForOrder = paymentAware.adjustedBreakdown.map((row: any) => ({
             method: row.method,
@@ -1070,16 +1083,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
         : paidAmount
 
     // Customer name lookup if customer_id is provided
-    let customerName: string | undefined = undefined
-    if (preSaleDraft.customer_id) {
-        const { data: cust } = await supabase
-            .from("customers")
-            .select("name")
-            .eq("id", preSaleDraft.customer_id)
-            .eq("partner_id", input.partnerId)
-            .maybeSingle()
-        customerName = cust?.name?.trim() || undefined
-    }
+    const customerName: string | undefined = customerNameResult.data?.name?.trim() || undefined
 
     const hasShipping = Number(preSaleDraft.shipping_fee || 0) > 0
     let finalDeliveryStatus: 'delivered' | 'preparing' | 'pickup_available' = hasShipping ? 'preparing' : 'delivered'
@@ -1131,6 +1135,8 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
         notes: preSaleDraft.notes || undefined,
         skipCSRF: true,
         sellerPartnerUserId: input.sellerId || null,
+        skipPostPaymentSellerSideEffects: true,
+        skipPostCreateRevalidation: true,
     })
 
     if (orderResult.error || !orderResult.orderId) {
@@ -1140,8 +1146,9 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
     const orderId = orderResult.orderId
     const orderNumber = orderResult.orderNumber || orderId
 
-    // Mark pre_sale as completed
-    await supabase
+    // Mark pre_sale as completed. It is independent from cash, commission and
+    // goals now that the order id exists, so start it without blocking them.
+    const preSaleCompletionPromise = supabase
         .from("pre_sales")
         .update({
             status: "completed",
@@ -1153,27 +1160,29 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
 
     // Record cash register movement for cash payment entries
     if (activeSessionResult.data?.id) {
-        for (const entry of breakdownForOrder) {
-            const m = String(entry.method || "").toLowerCase().trim()
-            if (m.includes("dinheiro") || m.includes("cash")) {
-                await supabase.from("cash_movements").insert({
+        await Promise.all(
+            breakdownForOrder
+                .filter((entry) => {
+                    const method = String(entry.method || "").toLowerCase().trim()
+                    return method.includes("dinheiro") || method.includes("cash")
+                })
+                .map((entry) => supabase.from("cash_movements").insert({
                     partner_id: input.partnerId,
                     store_id: input.storeId || null,
-                    cash_session_id: activeSessionResult.data.id,
+                    cash_session_id: activeSessionResult.data!.id,
                     type: "sale",
                     description: `Venda PDV ${orderNumber}`,
                     amount: entry.amount,
                     user_id: user.id,
                     order_id: orderId,
-                })
-            }
-        }
+                }))
+        )
     }
 
     // Seller commission
     const sellerPartnerUserId = input.sellerId || null
-    if (sellerPartnerUserId) {
-        await createCommissionExpenseForEntity({
+    const sellerCommissionPromise = sellerPartnerUserId
+        ? createCommissionExpenseForEntity({
             supabase,
             partnerId: input.partnerId,
             storeId: input.storeId || null,
@@ -1185,22 +1194,21 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
             accountId: input.financeAccountId || null,
             createdByUserId: user.id,
         })
-    }
+        : Promise.resolve()
 
     // Goals tracking
-    {
-        const goalSellerUserId = user.id
-        if (goalSellerUserId) {
-            await applySaleToGoals({
-                supabase,
-                partnerId: input.partnerId,
-                sellerUserId: goalSellerUserId,
-                saleAmount: totalPaidAmount,
-                createdByUserId: user.id,
-                accountId: input.financeAccountId || null,
-            })
-        }
-    }
+    const goalsPromise = user.id
+        ? applySaleToGoals({
+            supabase,
+            partnerId: input.partnerId,
+            sellerUserId: user.id,
+            saleAmount: totalPaidAmount,
+            createdByUserId: user.id,
+            accountId: input.financeAccountId || null,
+        })
+        : Promise.resolve()
+
+    await Promise.all([sellerCommissionPromise, goalsPromise, preSaleCompletionPromise])
 
     // Record coupon usage if coupon was applied
     if (preSaleDraft.coupon_id && orderId) {

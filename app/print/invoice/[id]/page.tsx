@@ -17,7 +17,7 @@ export default async function InvoicePrintPage({ params }: { params: Promise<{ i
 
     return (
         <PrintLayout>
-            <InvoicePreview data={invoiceData} printMode />
+            <InvoicePreview data={invoiceData} invoiceId={id} printMode />
         </PrintLayout>
     )
 }

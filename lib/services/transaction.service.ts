@@ -476,10 +476,17 @@ export async function createTransactionFromOrder(
         const paymentDate = orderData.payment_date || now
         const entries = buildEntries(orderData)
         const explicitAccountId = orderData.finance_account_id || null
-        const mercadoPagoAccountId = await resolveMercadoPagoAccountId(supabase, orderData.partner_id, orderData.payment_provider)
-        const defaultSalesAccountId = explicitAccountId || mercadoPagoAccountId
-            ? null
-            : await resolveDefaultSalesAccountId(supabase, orderData.partner_id)
+        // These are independent reads. When an explicit account is absent,
+        // resolve both candidates in parallel and choose the same priority as
+        // before once both have returned.
+        const mercadoPagoAccountPromise = resolveMercadoPagoAccountId(supabase, orderData.partner_id, orderData.payment_provider)
+        const defaultSalesAccountPromise = explicitAccountId
+            ? Promise.resolve(null)
+            : resolveDefaultSalesAccountId(supabase, orderData.partner_id)
+        const [mercadoPagoAccountId, defaultSalesAccountId] = await Promise.all([
+            mercadoPagoAccountPromise,
+            defaultSalesAccountPromise,
+        ])
         const accountId = explicitAccountId || mercadoPagoAccountId || defaultSalesAccountId
 
         const paymentRowId = await resolveOrCreatePaymentRow(supabase, orderData, entries)

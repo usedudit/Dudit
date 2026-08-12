@@ -4,7 +4,7 @@ import React from "react"
 import { motion } from "framer-motion"
 import { Badge } from "@/components/reusable"
 import { ActionsDropdown } from "@/components/reusable/Accordion"
-import { formatCurrency } from "@/lib/utils"
+import { formatCurrency, formatDate } from "@/lib/utils"
 import { Crown, Tag, CreditCard, ShoppingCart, Calendar } from "lucide-react"
 
 interface ColumnDef {
@@ -58,7 +58,7 @@ const BillingListRow = React.memo(
         onCancel,
         onInvoice,
     }: BillingListRowProps) => {
-        const dateStr = new Date(createdAt).toLocaleDateString("pt-BR")
+        const dateStr = formatDate(createdAt)
 
         const getAlignClass = (align?: string) => {
             if (align === "center") return "text-center"

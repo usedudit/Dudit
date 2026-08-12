@@ -16,6 +16,7 @@ import BillingListRow from "./BillingListRow"
 import { InvoicePrintModal } from "./InvoicePrintModal"
 import { listPurchasesPageAction, updatePurchaseStatusAction, getPurchaseAction } from "@/app/actions/billing/purchases"
 import { generateInvoiceAction, getInvoiceAction } from "@/app/actions/billing/invoices"
+import { getPaymentMethodLabel } from "@/lib/billing/invoice-utils"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { ArrowUpDownIcon, PrinterIcon, XIcon } from "@/lib/icons"
@@ -272,10 +273,6 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
                         <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">{getTypeLabel(selectedPurchase.purchase_type)}</p>
                     </div>
                     <div>
-                        <p className="text-xs text-brand-inactive-text font-medium">Gateway</p>
-                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading capitalize">{getGatewayLabel(selectedPurchase.gateway)}</p>
-                    </div>
-                    <div>
                         <p className="text-xs text-brand-inactive-text font-medium">Data</p>
                         <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatDate(selectedPurchase.created_at)}</p>
                     </div>
@@ -298,7 +295,7 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
                                             {getStatusLabel(payment.status)}
                                         </Badge>
                                         <span className="text-xs text-brand-inactive-text">
-                                            {payment.payment_method_type || payment.gateway}
+                                            {getPaymentMethodLabel(payment.payment_method_type)}
                                         </span>
                                     </div>
                                     <div className="text-right">
