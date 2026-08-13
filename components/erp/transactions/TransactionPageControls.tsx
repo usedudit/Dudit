@@ -42,6 +42,8 @@ interface TransactionFilterState {
 interface TransactionPageControlsProps {
     activeTab: TransactionTab
     setActiveTab: (tab: TransactionTab) => void
+    /** Ordered list of tabs to render in the tab selector */
+    tabs: TransactionTab[]
     search: string
     onSearchChange: (value: string) => void
     onOpenFilter: () => void
@@ -54,14 +56,25 @@ interface TransactionPageControlsProps {
     addDisabled?: boolean
     /** When true, hides the tab selector (used when the tab is forced by the route) */
     hideTabs?: boolean
-    tabCounts?: { "Transações": number; "A pagar": number; "A receber": number; "Vencidos": number; "Cancelados": number }
+    tabCounts?: { "Transações": number; "Entradas": number; "Saídas": number; "A pagar": number; "A receber": number; "Vencidos": number; "Cancelados": number }
     /** Monetary values for each tab (used when forcedTab is set for Receber/Pagar pages) */
     tabValues?: { "A pagar"?: { pending: number; overdue: number; completed: number }; "A receber"?: { pending: number; overdue: number; completed: number }; "Vencidos"?: { total: number }; "Cancelados"?: { total: number } }
+}
+
+const TAB_CONFIG: Record<TransactionTab, { label: string; icon: typeof ListIcon; variant: "gray" | "green" | "red" }> = {
+    "Transações": { label: "Todas", icon: ListIcon, variant: "gray" },
+    "Entradas": { label: "Entradas", icon: ArrowUpIcon, variant: "green" },
+    "Saídas": { label: "Saídas", icon: ArrowDownIcon, variant: "red" },
+    "A pagar": { label: "A pagar", icon: ArrowDownIcon, variant: "red" },
+    "A receber": { label: "A receber", icon: ArrowUpIcon, variant: "green" },
+    "Vencidos": { label: "Vencidos", icon: AlertTriangleIcon, variant: "red" },
+    "Cancelados": { label: "Cancelados", icon: CancelCircleIcon, variant: "gray" },
 }
 
 const TransactionPageControls: React.FC<TransactionPageControlsProps> = ({
     activeTab,
     setActiveTab,
+    tabs,
     search,
     onSearchChange,
     onOpenFilter,
@@ -197,21 +210,20 @@ const TransactionPageControls: React.FC<TransactionPageControlsProps> = ({
                 <div className="mb-6 px-4 md:px-8">
                     <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as TransactionTab)}>
                         <TabsList className="px-0">
-                            <TabsTrigger value="Transações" icon={ListIcon} badge={tabCounts && <TabCountBadge count={tabCounts["Transações"]} variant="gray" />}>
-                                Transações
-                            </TabsTrigger>
-                            <TabsTrigger value="A pagar" icon={ArrowDownIcon} badge={getTabBadge("A pagar") || (tabCounts && <TabCountBadge count={tabCounts["A pagar"]} variant="red" />)}>
-                                A pagar
-                            </TabsTrigger>
-                            <TabsTrigger value="A receber" icon={ArrowUpIcon} badge={getTabBadge("A receber") || (tabCounts && <TabCountBadge count={tabCounts["A receber"]} variant="green" />)}>
-                                A receber
-                            </TabsTrigger>
-                            <TabsTrigger value="Vencidos" icon={AlertTriangleIcon} badge={getTabBadge("Vencidos") || (tabCounts && <TabCountBadge count={tabCounts["Vencidos"]} variant="red" />)}>
-                                Vencidos
-                            </TabsTrigger>
-                            <TabsTrigger value="Cancelados" icon={CancelCircleIcon} badge={getTabBadge("Cancelados") || (tabCounts && <TabCountBadge count={tabCounts["Cancelados"]} variant="gray" />)}>
-                                Cancelados
-                            </TabsTrigger>
+                            {tabs.map((tab) => {
+                                const config = TAB_CONFIG[tab]
+                                const Icon = config.icon
+                                return (
+                                    <TabsTrigger
+                                        key={tab}
+                                        value={tab}
+                                        icon={Icon}
+                                        badge={getTabBadge(tab) || (tabCounts && <TabCountBadge count={tabCounts[tab]} variant={config.variant} />)}
+                                    >
+                                        {config.label}
+                                    </TabsTrigger>
+                                )
+                            })}
                         </TabsList>
                     </Tabs>
                 </div>

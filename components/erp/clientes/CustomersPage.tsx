@@ -1,8 +1,8 @@
 "use client"
 
-import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
+import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { motion, AnimatePresence } from "framer-motion"
+import { AnimatePresence } from "framer-motion"
 import { useMediaQuery } from "../hooks"
 import { useToast } from "@/hooks/use-toast"
 import { useStore } from "@/lib/store-context"
@@ -13,7 +13,7 @@ import { usePermissions } from "@/lib/permission-context"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 
 // Components
-import { Button, IconPlaceholder, ThreeDotsLoader, Checkbox, Badge, AlertModal, SavingStatusModal, SelectionBanner } from "@/components/reusable"
+import { Button, IconPlaceholder, ThreeDotsLoader, Checkbox, Badge, AlertModal, SavingStatusModal, SelectionBanner, Dropdown, DropdownItem } from "@/components/reusable"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
@@ -25,6 +25,7 @@ import NewCustomerPage from "./NewCustomerPage"
 import { deleteCustomersInBatchAction, toggleCustomersStatusAction, archiveCustomerAction, unarchiveCustomerAction } from "@/app/actions/erp/customers"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { formatCurrency, formatDate } from "@/lib/utils"
+import { EMPTY_DATE_PERIOD, isDatePeriodFilterActive, resolveDatePeriodBounds, ymdInBounds, type DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
 
 // Icons
 import {
@@ -35,7 +36,8 @@ import {
     TrashIcon,
     BlockedIcon,
     CheckCircleIcon,
-    UploadIcon
+    UploadIcon,
+    Settings2Icon
 } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { useErpExport } from "@/hooks/use-erp-export"
@@ -49,6 +51,7 @@ interface Customer {
     originalId: string;
     name: string;
     avatar: string;
+    phone?: string;
     orders: number;
     totalOrderValue: number;
     avgOrderValue: number;
@@ -63,24 +66,36 @@ interface Customer {
 
 interface FilterState {
     status: string[]
+    personType: string[]
+    orders: string[]
+    createdPeriod: DatePeriodFilterValue
 }
 
 const INITIAL_FILTERS: FilterState = {
     status: [],
+    personType: [],
+    orders: [],
+    createdPeriod: { ...EMPTY_DATE_PERIOD },
 }
 
 type SortKey = 'name' | 'orders' | 'total_spent' | 'store_credit' | 'status' | 'last_order';
 type SortDirection = 'asc' | 'desc';
 
+interface Column {
+    id: string;
+    label: string;
+    align: "left" | "center" | "right";
+    width: string;
+}
+
 // --- CONFIGURAÇÃO DE COLUNAS ---
-const COLUMNS = [
-    { id: "name", label: "Cliente", align: "left" as const, width: "300px" },
-    { id: "orders", label: "Pedidos", align: "center" as const, width: "100px" },
-    { id: "total_spent", label: "Total Gasto", align: "right" as const, width: "150px" },
-    { id: "store_credit", label: "Crédito", align: "right" as const, width: "130px" },
-    { id: "last_order", label: "Último Pedido", align: "left" as const, width: "160px" },
-    { id: "status", label: "Status", align: "center" as const, width: "120px" },
-    { id: "actions", label: "Ações", align: "center" as const, width: "80px" },
+const COLUMNS: Column[] = [
+    { id: "name", label: "Cliente", align: "left", width: "300px" },
+    { id: "phone", label: "Telefone", align: "left", width: "170px" },
+    { id: "orders", label: "Pedidos", align: "center", width: "100px" },
+    { id: "last_order", label: "Último Pedido", align: "left", width: "160px" },
+    { id: "status", label: "Status", align: "center", width: "120px" },
+    { id: "actions", label: "Ações", align: "center", width: "80px" },
 ]
 
 export default function CustomersPage({
@@ -201,17 +216,22 @@ export default function CustomersPage({
 
     const filterSections = useMemo<FilterSectionConfig[]>(() => {
         if (!rawCustomers) return []
-        
-        const statuses = [...new Set(rawCustomers.map((c: any) => 
-            c.status === 'bloqueado' ? "Bloqueado" : (c.status === 'inativo' ? "Inativo" : "Ativo")
-        ).filter(Boolean))] as string[]
-        
+
+        const statuses = [...new Set(rawCustomers.map((c: any) => {
+            const isArchived = c.status === "arquivado" || c.status === "archived"
+            return isArchived ? "Arquivado" : (c.status === 'bloqueado' ? "Bloqueado" : (c.status === 'inativo' ? "Inativo" : "Ativo"))
+        }).filter(Boolean))] as string[]
+
         const sections: FilterSectionConfig[] = []
-        
+
         if (statuses.length > 1) {
             sections.push({ id: "status", title: "Status", type: "checkbox-list", options: statuses })
         }
-        
+
+        sections.push({ id: "personType", title: "Tipo de Pessoa", type: "checkbox-list", options: ["Pessoa Física", "Pessoa Jurídica"] })
+        sections.push({ id: "orders", title: "Pedidos", type: "checkbox-list", options: ["Com pedidos", "Sem pedidos"] })
+        sections.push({ id: "createdPeriod", title: "Data de cadastro", type: "date-period" })
+
         return sections
     }, [rawCustomers])
 
@@ -219,6 +239,8 @@ export default function CustomersPage({
         if (!rawCustomers) return []
 
         const term = debouncedSearch.toLowerCase()
+        const { startYmd, endYmd } = resolveDatePeriodBounds(filters.createdPeriod)
+        const dateBoundsActive = startYmd !== null || endYmd !== null
 
         const filtered = rawCustomers
             .filter((c: any) => {
@@ -244,13 +266,23 @@ export default function CustomersPage({
 
                 const filterMatch = filters.status.length === 0 || filters.status.includes(statusLabel)
 
-                return tabMatch && filterMatch
+                const personTypeLabel = c.person_type === "pj" ? "Pessoa Jurídica" : "Pessoa Física"
+                const personTypeMatch = filters.personType.length === 0 || filters.personType.includes(personTypeLabel)
+
+                const hasOrders = Number(c.orders_count || 0) > 0
+                const ordersMatch = filters.orders.length === 0 ||
+                    (filters.orders.includes("Com pedidos") ? hasOrders : !hasOrders)
+
+                const createdMatch = !dateBoundsActive || ymdInBounds(c.created_at, startYmd, endYmd)
+
+                return tabMatch && filterMatch && personTypeMatch && ordersMatch && createdMatch
             })
             .map((c: any): Customer => ({
                 id: c.id ? `#${c.id.substring(0, 5).toUpperCase()}` : '-',
                 originalId: c.id,
                 name: c.name || 'Cliente Sem Nome',
-                avatar: c.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(c.name || 'C')}&background=random`,
+                avatar: c.image_url || c.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(c.name || 'C')}&background=random`,
+                phone: c.phone || c.phone_fixed || "",
                 orders: c.orders_count || 0,
                 totalOrderValue: c.total_spent || 0.00,
                 avgOrderValue: 0.00,
@@ -332,7 +364,7 @@ export default function CustomersPage({
         }
     }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage, filteredCustomers.length])
 
-    const hasActiveFilters = filters.status.length > 0 || debouncedSearch.length > 0
+    const hasActiveFilters = filters.status.length > 0 || filters.personType.length > 0 || filters.orders.length > 0 || isDatePeriodFilterActive(filters.createdPeriod) || debouncedSearch.length > 0
     const hasCustomers = (rawCustomers?.length || 0) > 0
 
     const tabCounts = useMemo(() => {
@@ -533,13 +565,23 @@ export default function CustomersPage({
                                 </div>
 
                                 <div className="flex items-center gap-3">
-                                    <Button variant="outline" onClick={handleExport} disabled={isExporting} leftIcon={<ExportFileIcon size={18} />}>
-                                        {isExporting ? "Exportando..." : "Exportar"}
-                                    </Button>
-
-                                    <Button variant="outline" onClick={() => router.push("/erp/clientes/importar")} leftIcon={<UploadIcon size={18} />}>
-                                        Importar
-                                    </Button>
+                                    <Dropdown
+                                        trigger={
+                                            <Button variant="outline" leftIcon={<Settings2Icon size={18} />}>
+                                                Ações
+                                            </Button>
+                                        }
+                                        align="right"
+                                        showChevron={false}
+                                        fullWidth={false}
+                                    >
+                                        <DropdownItem onClick={() => router.push("/erp/clientes/importar")}>
+                                            <UploadIcon size={16} /> Importar
+                                        </DropdownItem>
+                                        <DropdownItem onClick={handleExport} disabled={isExporting}>
+                                            <ExportFileIcon size={16} /> {isExporting ? "Exportando..." : "Exportar"}
+                                        </DropdownItem>
+                                    </Dropdown>
 
                                     <Button onClick={handleAddCustomer} leftIcon={<PlusIcon size={18} />}>
                                         Novo cliente

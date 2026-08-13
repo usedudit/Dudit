@@ -9,7 +9,7 @@ import HelpContent from "@/components/help/HelpContent"
 import HelpTOC from "@/components/help/HelpTOC"
 import HelpHome from "@/components/help/HelpHome"
 import { motion, AnimatePresence } from "framer-motion"
-import { Button } from "@/components/reusable"
+import { Button, IconPlaceholder } from "@/components/reusable"
 import { useTheme } from "next-themes"
 import { MoonIcon, SunIcon, XIcon } from "@/lib/icons"
 import Link from "next/link"
@@ -72,7 +72,6 @@ export default function HelpCenterPage() {
         })
     }
 
-
     // Close mobile menu on navigation
     useEffect(() => {
         setMobileMenuOpen(false)
@@ -81,17 +80,44 @@ export default function HelpCenterPage() {
     // If no article found, maybe redirect to first one or 404
     if (!article && articleSlug) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6 text-center">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900 mb-2">Artigo não encontrado</h1>
-                    <p className="text-gray-500 mb-6">O conteúdo que você está procurando não existe ou foi movido.</p>
-                    <button
-                        onClick={() => router.push("/ajuda")}
-                        className="text-brand-green font-bold hover:underline"
-                    >
-                        Voltar para o início
-                    </button>
-                </div>
+            <div className="flex flex-col min-h-screen">
+                <header className="lg:flex flex-col w-full bg-brand-dark sticky top-0 z-50 shadow-md">
+                    <div className="w-full h-[68px] flex items-center justify-center max-w-[1400px] px-2 mx-auto gap-4">
+                        <a href="/" className="cursor-pointer shrink-0 z-[110] pt-1">
+                            <img
+                                src="https://img.dudit.com.br/static/Logo.png"
+                                alt="Dudit"
+                                width={140}
+                                height={40}
+                                className="h-10 w-auto object-contain"
+                            />
+                        </a>
+                    </div>
+                </header>
+
+                <main className="flex-1 flex flex-col items-center justify-center p-4 mb-6 md:p-8 mt-20 md:mt-32">
+                    <div className="max-w-2xl w-full flex flex-col items-center">
+                        <IconPlaceholder
+                            placeholderType="image"
+                            imageSrc="https://img.dudit.com.br/static/mascots/Ops.png"
+                            imageAlt="Não encontrado"
+                            title="Ops! Essa página não está na vitrine."
+                            subtitle="Não encontramos a página ou o item que você buscou."
+                            itemButton={{
+                                text: "Voltar para o início",
+                                action: "/ajuda"
+                            }}
+                        />
+                    </div>
+                </main>
+
+                <footer className="w-full h-[68px] py-6 border-t border-white/10 bg-brand-dark">
+                    <div className="max-w-[1400px] mx-auto px-6 flex flex-col md:flex-row justify-center items-center">
+                        <p className="text-white text-xs sm:text-sm font-medium tracking-tight">
+                            © {new Date().getFullYear()} Dudit Tecnologia Ltda. Todos os direitos reservados.
+                        </p>
+                    </div>
+                </footer>
             </div>
         )
     }
@@ -109,8 +135,6 @@ export default function HelpCenterPage() {
             <div className="h-[72px]" />
 
             <div className="flex-1 flex items-start w-full max-w-[1440px] mx-auto relative min-h-screen">
-
-
                 {/* Desktop Sidebar */}
                 <HelpSidebar
                     className="hidden lg:flex w-72 shrink-0 border-r border-gray-100 dark:border-dark-border"
@@ -184,7 +208,6 @@ export default function HelpCenterPage() {
                         {!isHome && article && <HelpTOC content={article.content} />}
                     </div>
                 </main>
-
             </div>
         </div>
     )

@@ -1,7 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { sanitizeSearchTerm, resolveExportDateBounds } from "../filters"
 import { fetchAllPages } from "../paginate"
-import { mapTransactionRow, TRANSACTION_EXPORT_COLUMNS } from "../mappers"
+import {
+  mapTransactionRow,
+  TRANSACTION_EXPORT_ALL_COLUMNS,
+  TRANSACTION_EXPORT_COLUMNS,
+} from "../mappers"
 import type { TransactionsExportFilters } from "../types"
 import { EXPORT_CHUNK_SIZE } from "../constants"
 
@@ -13,6 +17,18 @@ const TRANSACTION_SELECT = `
   payment_methods(name)
 `
 
+const TRANSACTION_SELECT_ALL = `
+  id, description, category, amount, discount_amount, paid_amount, status,
+  due_date, payment_date, payment_type, transaction_type, notes, origin,
+  reference_note, contact_type, customer_id, installment_number,
+  total_installments, created_at, updated_at,
+  financial_categories!category_id(name),
+  financial_accounts(name),
+  payment_methods(name),
+  customers:customer_id(name),
+  transaction_contacts:contact_id(name)
+`
+
 export async function fetchTransactionsExport(
   supabase: SupabaseClient,
   partnerId: string,
@@ -20,13 +36,15 @@ export async function fetchTransactionsExport(
 ): Promise<import("../types").ExportResult> {
   const search = sanitizeSearchTerm(filters.search)
   const selectedIds = (filters.selectedIds || []).filter(Boolean)
+  const includeAllColumns = filters.includeAllColumns === true
+  const select = includeAllColumns ? TRANSACTION_SELECT_ALL : TRANSACTION_SELECT
 
   const rawRows = await fetchAllPages<any>({
     chunkSize: EXPORT_CHUNK_SIZE,
     fetchPage: async (cursor) => {
-      let query = supabase
+      let query: any = (supabase as any)
         .from("transactions")
-        .select(TRANSACTION_SELECT)
+        .select(select)
         .eq("partner_id", partnerId)
 
       if (filters.storeId) {
@@ -41,6 +59,8 @@ export async function fetchTransactionsExport(
         const typeMap: Record<string, string[]> = {
           "A pagar": ["expense", "transfer"],
           "A receber": ["income"],
+          "Saídas": ["expense", "transfer"],
+          "Entradas": ["income"],
         }
         const types = typeMap[filters.activeTab]
         if (types?.length) query = query.in("transaction_type", types)
@@ -84,6 +104,7 @@ export async function fetchTransactionsExport(
     },
   })
 
-  const rows = rawRows.map(mapTransactionRow)
-  return { columns: TRANSACTION_EXPORT_COLUMNS, rows, rowCount: rows.length }
+  const rows = rawRows.map((r) => mapTransactionRow(r, includeAllColumns))
+  const columns = includeAllColumns ? TRANSACTION_EXPORT_ALL_COLUMNS : TRANSACTION_EXPORT_COLUMNS
+  return { columns, rows, rowCount: rows.length }
 }

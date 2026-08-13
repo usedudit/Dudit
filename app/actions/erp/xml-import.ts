@@ -563,14 +563,14 @@ export async function uploadXMLAction(
       try {
         partnerDoc = (await decryptCPF(storeDoc.cpf)).replace(/\D/g, "")
       } catch {
-        return { success: false, error: "Erro ao descriptografar CPF do parceiro" }
+        return { success: false, error: "Erro ao descriptografar CPF da loja" }
       }
     }
 
     const xmlDocDest = (metadata.destinatario.cnpj || metadata.destinatario.cpf || "").replace(/\D/g, "")
 
     if (!partnerDoc || !xmlDocDest) {
-      return { success: false, error: "Não foi possível identificar o CNPJ/CPF do destinatário na NF-e ou do parceiro logado." }
+      return { success: false, error: "Não foi possível identificar o CNPJ/CPF do destinatário na NF-e ou da loja atual." }
     }
 
     if (partnerDoc !== xmlDocDest) {
@@ -616,8 +616,12 @@ export async function uploadXMLAction(
         }
       }
       // Failed ou Reversed - permite reimportar: atualiza o registro existente
-      if (existingImport.status === "reversed" || existingImport.status === "failed") {
+      // Só marca como reimport (mensagem "já foi importada e revertida") quando
+      // a importação anterior foi de fato revertida. Falhas não geram essa mensagem.
+      if (existingImport.status === "reversed") {
         isReimport = true
+        reimportId = existingImport.id
+      } else if (existingImport.status === "failed") {
         reimportId = existingImport.id
       }
     }
@@ -697,7 +701,7 @@ export async function uploadXMLAction(
     // 11. Criar ou reabrir xml_imports
     let xmlImport: { id: string } | null = null
 
-    if (isReimport && reimportId) {
+    if (reimportId) {
       // Reimportação: limpa dados de reversão e volta para preview
       // Usa admin client porque xml_import_items não tem política de DELETE via RLS
       const admin = getAdminClient()

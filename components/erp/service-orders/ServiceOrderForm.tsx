@@ -360,6 +360,56 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
         }
     }, [services])
 
+    useEffect(() => {
+        const allNamesValid = services.every(s => !s.isManual || (s.service_name && s.service_name.trim() !== ""))
+        if (allNamesValid) {
+            setFieldErrors(prev => {
+                if (prev.has("servicesName")) {
+                    const next = new Set(prev)
+                    next.delete("servicesName")
+                    return next
+                }
+                return prev
+            })
+        }
+        const allPricesValid = services.every(s => !s.isManual || (s.service_price && Number(s.service_price) > 0))
+        if (allPricesValid) {
+            setFieldErrors(prev => {
+                if (prev.has("servicesPrice")) {
+                    const next = new Set(prev)
+                    next.delete("servicesPrice")
+                    return next
+                }
+                return prev
+            })
+        }
+    }, [services])
+
+    useEffect(() => {
+        const allNamesValid = products.every(p => !p.isManual || (p.product_name && p.product_name.trim() !== ""))
+        if (allNamesValid) {
+            setFieldErrors(prev => {
+                if (prev.has("productsName")) {
+                    const next = new Set(prev)
+                    next.delete("productsName")
+                    return next
+                }
+                return prev
+            })
+        }
+        const allPricesValid = products.every(p => !p.isManual || (p.unit_price && Number(p.unit_price) > 0))
+        if (allPricesValid) {
+            setFieldErrors(prev => {
+                if (prev.has("productsPrice")) {
+                    const next = new Set(prev)
+                    next.delete("productsPrice")
+                    return next
+                }
+                return prev
+            })
+        }
+    }, [products])
+
     // Load coupon pricing data if editData has it
     useEffect(() => {
         if (editData?.coupon_id) {
@@ -1420,8 +1470,8 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                                                                                                 onChange={(e: any) => updateServiceField(index, "service_name", e.target.value)}
                                                                                                 placeholder="Nome do serviço manual..."
                                                                                                 className="mb-0"
-                                                                                                error={hasNameError}
-                                                                                                errorMessage={hasNameError ? "Nome obrigatório" : undefined}
+                                                                                                error={hasNameError && fieldErrors.has("servicesName")}
+                                                                                                errorMessage={hasNameError && fieldErrors.has("servicesName") ? "Nome obrigatório" : undefined}
                                                                                             />
                                                                                         </div>
                                                                                     ) : (
@@ -1524,8 +1574,8 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                                                                                         onChange={(e: any) => updateServiceField(index, "service_name", e.target.value)}
                                                                                         placeholder="Nome do serviço manual..."
                                                                                         className="mb-0"
-                                                                                        error={hasNameError}
-                                                                                        errorMessage={hasNameError ? "Nome obrigatório" : undefined}
+                                                                                        error={hasNameError && fieldErrors.has("servicesName")}
+                                                                                        errorMessage={hasNameError && fieldErrors.has("servicesName") ? "Nome obrigatório" : undefined}
                                                                                     />
                                                                                 </div>
                                                                             ) : (
@@ -1743,8 +1793,8 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                                                                                                 onChange={(e: any) => updateProductField(index, "product_name", e.target.value)}
                                                                                                 placeholder="Nome do produto manual..."
                                                                                                 className="mb-0"
-                                                                                                error={hasNameError}
-                                                                                                errorMessage={hasNameError ? "Nome obrigatório" : undefined}
+                                                                                                error={hasNameError && fieldErrors.has("productsName")}
+                                                                                                errorMessage={hasNameError && fieldErrors.has("productsName") ? "Nome obrigatório" : undefined}
                                                                                             />
                                                                                         </div>
                                                                                     ) : (
@@ -1860,8 +1910,8 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                                                                                         onChange={(e: any) => updateProductField(index, "product_name", e.target.value)}
                                                                                         placeholder="Nome do produto manual..."
                                                                                         className="mb-0"
-                                                                                        error={hasNameError}
-                                                                                        errorMessage={hasNameError ? "Nome obrigatório" : undefined}
+                                                                                        error={hasNameError && fieldErrors.has("productsName")}
+                                                                                        errorMessage={hasNameError && fieldErrors.has("productsName") ? "Nome obrigatório" : undefined}
                                                                                     />
                                                                                 </div>
                                                                             ) : (

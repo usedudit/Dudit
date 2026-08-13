@@ -246,15 +246,37 @@ export default function CashRegisterPage({
 
     const isFiltered = debouncedSearch !== "" || hasActiveFilters
 
+    const allSessions = useMemo(() => {
+        const sessions = [...(history || [])]
+        if (activeSession && !sessions.some((s) => s.id === activeSession.id)) {
+            sessions.unshift({
+                id: activeSession.id,
+                opened_by_user_id: activeSession.opened_by_user_id,
+                closed_by_user_id: null,
+                user_name: activeSession.user_name,
+                opened_by_name: activeSession.opened_by_name,
+                closed_by_name: null,
+                opened_at: activeSession.opened_at,
+                closed_at: null,
+                initial_amount: activeSession.initial_amount,
+                closing_amount: null,
+                status: "open",
+                expected_drawer_total: activeSession.expected_drawer_total,
+                total_received_amount: activeSession.total_received_amount,
+            })
+        }
+        return sessions
+    }, [history, activeSession])
+
     const filtered = useMemo(() => {
         const term = debouncedSearch.trim().toLowerCase()
-        const statusValues = filters.status.map((value) => (value === "Aberto" ? "open" : "closed"))
+        const statusValues = filters.status
         const openedBounds = resolveDatePeriodBounds(filters.dateOpenedPeriod)
         const closedBounds = resolveDatePeriodBounds(filters.dateClosedPeriod)
         const openedBoundsActive = openedBounds.startYmd !== null || openedBounds.endYmd !== null
         const closedBoundsActive = closedBounds.startYmd !== null || closedBounds.endYmd !== null
 
-        let result = (history || []).filter((session) => {
+        let result = allSessions.filter((session) => {
             const openedByName = session.opened_by_name || session.user_name || ""
             const closedByName = session.closed_by_name || ""
             const openTs = session.opened_at ? new Date(session.opened_at).getTime() : Number.NaN
@@ -604,6 +626,11 @@ export default function CashRegisterPage({
                                 viewMode={effectiveViewMode}
                                 onViewModeChange={setViewModeState}
                                 hasActiveFilters={hasActiveFilters}
+                                tabCounts={{
+                                    all: allSessions.length,
+                                    open: allSessions.filter((s) => s.status === "open").length,
+                                    closed: allSessions.filter((s) => s.status === "closed").length,
+                                }}
                             />
 
                             <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">

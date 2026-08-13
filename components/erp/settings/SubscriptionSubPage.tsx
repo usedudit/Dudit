@@ -1,9 +1,8 @@
 "use client"
 
 import React, { useState, useEffect, useCallback, useRef } from "react"
-import { AnimatePresence, motion } from "framer-motion"
-import { Button, Badge, DefaultModal, AlertModal, InfoCard } from "@/components/reusable"
-import { Input as FormInput } from "@/components/reusable/Input"
+import { motion } from "framer-motion"
+import { Button, Badge, DefaultModal, AlertModal, InfoCard, Input } from "@/components/reusable"
 import Portal from "@/components/Portal"
 import {
     CheckCircleIcon,
@@ -899,7 +898,7 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
                         </DialogHeader>
 
                         <div className="py-4 space-y-4">
-                            <FormInput
+                            <Input
                                 label="Email de faturamento"
                                 name="billing_email"
                                 type="email"

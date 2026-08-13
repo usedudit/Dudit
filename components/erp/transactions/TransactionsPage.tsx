@@ -72,9 +72,14 @@ function formatTimeFromRaw(raw: string | null | undefined): string | null {
     return dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
 }
 
+/** Tabs of the main Transações page (Todas / Entradas / Saídas): show settled movements by payment date. */
+function isSettledTab(tab: TransactionTab): boolean {
+    return tab === "Transações" || tab === "Entradas" || tab === "Saídas"
+}
+
 /** A pagar/A receber: vencimento/ocorrência. Transações: pagamento efetivo, senão vencimento. */
 function transactionFilterYmd(item: ERPTransaction, tab: TransactionTab): string | null {
-    if (tab !== "Transações") {
+    if (!isSettledTab(tab)) {
         if (item.occurrenceDate) return item.occurrenceDate.slice(0, 10)
         return ymdFromRaw(item.dueDateRaw)
     }
@@ -400,7 +405,7 @@ export default function TransactionsPage({
             {
                 id: "datePeriod",
                 title:
-                    activeTab !== "Transações"
+                    !isSettledTab(activeTab)
                         ? "Período (vencimento / ocorrência)"
                         : "Período (data de pagamento)",
                 type: "date-period",
@@ -482,16 +487,20 @@ export default function TransactionsPage({
             const isOverdueItem = item.isOverdue || item.status.toLowerCase() === "atrasado" || (item.daysUntilDue !== undefined && item.daysUntilDue < 0)
 
             const matchesLedgerByTab =
-                (activeTab === "A pagar" || (activeTab === "Vencidos" && forcedTab === "A pagar")) ? item.ledgerDirection === "out" :
-                    (activeTab === "A receber" || (activeTab === "Vencidos" && forcedTab === "A receber")) ? item.ledgerDirection === "in" :
+                (activeTab === "A pagar" || ((activeTab === "Vencidos" || activeTab === "Cancelados") && forcedTab === "A pagar")) ? item.ledgerDirection === "out" :
+                    (activeTab === "A receber" || ((activeTab === "Vencidos" || activeTab === "Cancelados") && forcedTab === "A receber")) ? item.ledgerDirection === "in" :
                         true
             const matchesTab = activeTab === "Cancelados"
                 ? isCancelled
                 : activeTab === "Transações"
                     ? (!isPrevisto && !item.isRecurringOccurrence && !isCancelled)
-                    : activeTab === "Vencidos"
-                        ? (isPrevisto && !isCancelled && isOverdueItem)
-                        : (isPrevisto && !isCancelled)
+                    : activeTab === "Entradas"
+                        ? (!isPrevisto && !item.isRecurringOccurrence && !isCancelled && item.ledgerDirection === "in")
+                        : activeTab === "Saídas"
+                            ? (!isPrevisto && !item.isRecurringOccurrence && !isCancelled && item.ledgerDirection === "out")
+                            : activeTab === "Vencidos"
+                                ? (isPrevisto && !isCancelled && isOverdueItem)
+                                : (isPrevisto && !isCancelled)
 
             const matchesStatus = filters.status.length === 0 || filters.status.includes(item.status)
             const matchesCategory = filters.category.length === 0 || filters.category.includes(item.category)
@@ -674,14 +683,14 @@ export default function TransactionsPage({
                         bVal = b.contactName
                         break
                     case "date": {
-                        const at = activeTab !== "Transações"
+                        const at = !isSettledTab(activeTab)
                             ? a.occurrenceDate
                                 ? new Date(`${a.occurrenceDate}T12:00:00`).getTime()
                                 : a.dueDateRaw
                                     ? new Date(a.dueDateRaw).getTime()
                                     : new Date(a.dueDate).getTime()
                             : transactionSortTime(a)
-                        const bt = activeTab !== "Transações"
+                        const bt = !isSettledTab(activeTab)
                             ? b.occurrenceDate
                                 ? new Date(`${b.occurrenceDate}T12:00:00`).getTime()
                                 : b.dueDateRaw
@@ -710,7 +719,7 @@ export default function TransactionsPage({
                 const comparison = aVal < bVal ? -1 : 1
                 return sortConfig.direction === "asc" ? comparison : -comparison
             })
-        } else if (activeTab !== "Transações") {
+        } else if (!isSettledTab(activeTab)) {
             // ALWAYS sort A pagar/A receber by due_date ASC
             result = [...result].sort((a, b) => {
                 // Use occurrenceDate for virtual items, dueDateRaw for real transactions
@@ -755,15 +764,24 @@ export default function TransactionsPage({
     const tabCounts = useMemo(() => {
         const Transacoes = loadedTransactions.length
         let pagar = 0, receber = 0, cancelados = 0, vencidos = 0
+        let entradas = 0, saidas = 0
         for (const t of loadedTransactions) {
             const isCancelled = isCancelledTransaction(t)
             if (isCancelled) {
-                cancelados++
+                if (forcedTab === "A pagar" && (t as any).ledgerDirection === "out") cancelados++
+                else if (forcedTab === "A receber" && (t as any).ledgerDirection === "in") cancelados++
+                else if (forcedTab !== "A pagar" && forcedTab !== "A receber") cancelados++
             } else {
                 if ((t as any).ledgerDirection === "out") pagar++
                 else if ((t as any).ledgerDirection === "in") receber++
 
                 const isPaid = String(t.rawStatus || "").toLowerCase() === "paid" || t.status.toLowerCase() === "recebido" || t.status.toLowerCase() === "pago"
+                const isSettled = !t.isRecurringOccurrence && t.status !== "Pendente" && !t.isOverdue && t.status !== "Atrasado" && (t.transactionType === "adjustment" || t.transactionType === "transfer" || isPaid)
+                if (isSettled) {
+                    if ((t as any).ledgerDirection === "in") entradas++
+                    else if ((t as any).ledgerDirection === "out") saidas++
+                }
+
                 if (!isPaid && (t.isOverdue || t.status.toLowerCase() === "atrasado" || (t.daysUntilDue !== undefined && t.daysUntilDue < 0))) {
                     if (forcedTab === "A pagar" && (t as any).ledgerDirection !== "out") {
                         // skip
@@ -775,7 +793,7 @@ export default function TransactionsPage({
                 }
             }
         }
-        return { "Transações": Math.max(0, Transacoes - cancelados), "A pagar": pagar, "A receber": receber, "Vencidos": vencidos, "Cancelados": cancelados }
+        return { "Transações": Math.max(0, Transacoes - cancelados), "A pagar": pagar, "A receber": receber, "Vencidos": vencidos, "Cancelados": cancelados, "Entradas": entradas, "Saídas": saidas }
     }, [loadedTransactions, forcedTab])
 
     // ── All transactions (including virtual recurring) for tab values calculation ──────────────
@@ -836,7 +854,13 @@ export default function TransactionsPage({
 
         for (const item of allTransactionsForTabValues) {
             if (isCancelledTransaction(item)) {
-                canceladosTotal += item.amount
+                if (forcedTab === "A pagar" && item.ledgerDirection !== "out") {
+                    // skip
+                } else if (forcedTab === "A receber" && item.ledgerDirection !== "in") {
+                    // skip
+                } else {
+                    canceladosTotal += item.amount
+                }
                 continue
             }
             const status = String(item.rawStatus || "").toLowerCase()
@@ -873,6 +897,14 @@ export default function TransactionsPage({
             "Cancelados": { total: canceladosTotal },
         }
     }, [allTransactionsForTabValues, forcedTab])
+
+    // Tabs available per page: main page splits settled movements into Todas/Entradas/Saídas,
+    // while the forced pages only expose their own direction plus Vencidos/Cancelados.
+    const availableTabs = useMemo<TransactionTab[]>(() => {
+        if (forcedTab === "A pagar") return ["A pagar", "Vencidos", "Cancelados"]
+        if (forcedTab === "A receber") return ["A receber", "Vencidos", "Cancelados"]
+        return ["Transações", "Entradas", "Saídas"]
+    }, [forcedTab])
 
     const refreshTransactionsNow = useCallback(async () => {
         // Invalidate cache + list via the entity page pattern (same as Products)
@@ -2171,6 +2203,7 @@ export default function TransactionsPage({
                 <TransactionPageControls
                     activeTab={activeTab}
                     setActiveTab={setActiveTab}
+                    tabs={availableTabs}
                     search={search}
                     onSearchChange={setSearch}
                     onOpenFilter={() => setModals((prev) => ({ ...prev, filter: true }))}

@@ -45,6 +45,7 @@ import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { useSidebar } from "@/lib/sidebar-context"
 import { UnsavedChangesDialog } from "@/components/reusable/UnsavedChangesDialog"
 import SelectCustomerSheet from "@/components/erp/clientes/SelectCustomerSheet"
+import ReturnPrintModal from "./ReturnPrintModal"
 
 const mapPaymentMethodToPt = (method: string): string => {
     const m = String(method || "").toLowerCase().trim();
@@ -256,6 +257,7 @@ export default function CreateReturnPage({
     const [uploadingImages, setUploadingImages] = useState<Set<number>>(new Set())
     const [isUploading, setIsUploading] = useState(false)
     const [isCustomerSheetOpen, setIsCustomerSheetOpen] = useState(false)
+    const [isPrintModalOpen, setIsPrintModalOpen] = useState(false)
 
     const isConsumidorFinal = useMemo(() => {
         if (!selectedOrder) return false
@@ -856,7 +858,7 @@ export default function CreateReturnPage({
                                             {isViewOnly ? "Voltar" : "Cancelar"}
                                         </Button>
                                         {isViewOnly && returnRequest && (
-                                            <Button variant="outline" onClick={() => window.open(`/print/troca/${returnRequest.id}`, "_blank")} leftIcon={<PrinterIcon size={18} />}>
+                                            <Button variant="outline" onClick={() => setIsPrintModalOpen(true)} leftIcon={<PrinterIcon size={18} />}>
                                                 Imprimir
                                             </Button>
                                         )}
@@ -1948,7 +1950,7 @@ export default function CreateReturnPage({
                     {isViewOnly ? "Voltar" : "Cancelar"}
                 </Button>
                 {isViewOnly && returnRequest && (
-                    <Button variant="outline" onClick={() => window.open(`/print/troca/${returnRequest.id}`, "_blank")} className="flex-1" leftIcon={<PrinterIcon size={18} />}>
+                    <Button variant="outline" onClick={() => setIsPrintModalOpen(true)} className="flex-1" leftIcon={<PrinterIcon size={18} />}>
                         Imprimir
                     </Button>
                 )}
@@ -2180,6 +2182,15 @@ export default function CreateReturnPage({
                     />
                 )
             }
+
+            {isPrintModalOpen && returnRequest && (
+                <ReturnPrintModal
+                    isOpen={isPrintModalOpen}
+                    onClose={() => setIsPrintModalOpen(false)}
+                    returnId={returnRequest.id}
+                    partnerId={partnerId}
+                />
+            )}
         </FadeIn >
     )
 }

@@ -59,6 +59,13 @@ const REQUIRED_FIELDS = [
     { field: "cep", tab: "address" },
 ]
 
+const SidebarCard = ({ children, className = "", hasTopStrip = false }: { children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
+    <div className={`bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
+        {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
+        {children}
+    </div>
+)
+
 const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplierId, onSuccess, onError }) => {
     const { success: notifySuccess, error: notifyError } = useNotification()
     const { uploadFile, isLoading: isUploadingImage } = useR2Upload({
@@ -94,6 +101,7 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
     const [showImageCropper, setShowImageCropper] = useState(false)
     const [selectedImageForCrop, setSelectedImageForCrop] = useState<File | null>(null)
     const [imageFile, setImageFile] = useState<File | null>(null)
+    const imageInputRef = useRef<HTMLInputElement>(null)
     const [supplierCode, setSupplierCode] = useState("")
 
     // Address States
@@ -763,40 +771,37 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                                     <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
                                         {activeTab === 'general' ? (
                                             <>
-                                                <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border flex flex-col items-center text-center relative overflow-hidden">
-                                                    <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />
+                                                <SidebarCard hasTopStrip>
                                                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Imagem do Fornecedor</h3>
-                                                    <label className="w-28 h-28 bg-gray-50 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4 relative group cursor-pointer overflow-hidden border-2 border-dashed border-brand-border dark:border-dark-border hover:border-brand-dark transition-colors">
-                                                        <input
-                                                            type="file"
-                                                            accept="image/png, image/jpeg, image/webp"
-                                                            className="hidden"
-                                                            onChange={(e) => {
-                                                                const file = e.target.files?.[0]
-                                                                if (file) {
-                                                                    setSelectedImageForCrop(file)
-                                                                    setShowImageCropper(true)
-                                                                }
-                                                                e.target.value = ""
-                                                            }}
-                                                        />
-                                                        {imagePreview ? (
-                                                            <img
-                                                                src={imagePreview}
-                                                                alt="Imagem do fornecedor"
-                                                                className="w-full h-full object-cover"
-                                                            />
-                                                        ) : (
-                                                            <EditIcon size={32} className="text-gray-300 group-hover:opacity-10 transition-opacity" />
-                                                        )}
-                                                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <span className="text-white text-sm font-bold uppercase tracking-wider">
-                                                                {imagePreview ? "Alterar" : "Enviar"}
-                                                            </span>
+                                                    <div className="flex items-center gap-4 dark:bg-dark-background/50">
+                                                        <div onClick={() => imageInputRef.current?.click()} className="w-16 h-16 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border cursor-pointer relative group overflow-hidden">
+                                                            {imagePreview ? (
+                                                                <img
+                                                                    src={imagePreview.startsWith("data:") ? imagePreview : getR2ImageUrl(imagePreview)}
+                                                                    alt="Imagem do fornecedor"
+                                                                    className="object-cover w-full h-full rounded-full"
+                                                                />
+                                                            ) : (
+                                                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400 w-5 h-5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
+                                                            )}
+                                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                                                            </div>
                                                         </div>
-                                                    </label>
-                                                    <p className="text-xs text-brand-inactive-text max-w-[200px]">Formatos aceitos: PNG, JPG ou WEBP (máx. 5MB)</p>
-                                                </div>
+                                                        <div className="flex-1">
+                                                            <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Imagem</p>
+                                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">Máx 5MB (PNG, JPG, WEBP)</p>
+                                                        </div>
+                                                        <input ref={imageInputRef} type="file" hidden accept="image/png, image/jpeg, image/webp" onChange={(e) => {
+                                                            const file = e.target.files?.[0]
+                                                            if (file) {
+                                                                setSelectedImageForCrop(file)
+                                                                setShowImageCropper(true)
+                                                            }
+                                                            e.target.value = ""
+                                                        }} />
+                                                    </div>
+                                                </SidebarCard>
 
                                                 {supplierCode && (
                                                     <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border mt-8 relative overflow-hidden">

@@ -47,7 +47,7 @@ export async function createNotification(
   const audience = (input.data?.audience as NotificationAudience | undefined) || "customer"
   const origin = input.origin || "system"
 
-  if (origin === "manual") {
+  if (origin === "manual" && audience !== "customer") {
     return { notification: null, created: false }
   }
 

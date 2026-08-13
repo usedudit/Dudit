@@ -16,10 +16,15 @@ import {
     CancelCircleIcon,
     BlockedIcon,
     InfoIcon,
+    ArchiveIcon,
 } from "@/lib/icons"
+import { EMPTY_DATE_PERIOD, isDatePeriodFilterActive, summarizeDatePeriodFilter, type DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
 
 interface FilterState {
     status: string[]
+    personType: string[]
+    orders: string[]
+    createdPeriod: DatePeriodFilterValue
 }
 
 interface CustomerPageControlsProps {
@@ -81,6 +86,30 @@ const CustomerPageControls: React.FC<CustomerPageControlsProps> = ({
                     onRemove={() => setFilters((prev) => ({ ...prev, status: [] }))}
                 />
             )}
+            {filters.personType.length > 0 && (
+                <FilterChip
+                    label="Tipo"
+                    value={filters.personType.join(", ")}
+                    icon={<Users size={12} />}
+                    onRemove={() => setFilters((prev) => ({ ...prev, personType: [] }))}
+                />
+            )}
+            {filters.orders.length > 0 && (
+                <FilterChip
+                    label="Pedidos"
+                    value={filters.orders.join(", ")}
+                    icon={<InfoIcon size={12} />}
+                    onRemove={() => setFilters((prev) => ({ ...prev, orders: [] }))}
+                />
+            )}
+            {isDatePeriodFilterActive(filters.createdPeriod) && (
+                <FilterChip
+                    label="Cadastro"
+                    value={summarizeDatePeriodFilter(filters.createdPeriod) || "Período personalizado"}
+                    icon={<InfoIcon size={12} />}
+                    onRemove={() => setFilters((prev) => ({ ...prev, createdPeriod: { ...EMPTY_DATE_PERIOD } }))}
+                />
+            )}
         </AnimatePresence>
     )
 
@@ -105,7 +134,7 @@ const CustomerPageControls: React.FC<CustomerPageControlsProps> = ({
                         <TabsTrigger value="Bloqueado" icon={BlockedIcon} badge={tabCounts && <TabCountBadge count={tabCounts.Bloqueado} variant="red" />}>
                             Bloqueados
                         </TabsTrigger>
-                        <TabsTrigger value="Arquivado" icon={InfoIcon} badge={tabCounts && <TabCountBadge count={tabCounts.Arquivado} variant="orange" />}>
+                        <TabsTrigger value="Arquivado" icon={ArchiveIcon} badge={tabCounts && <TabCountBadge count={tabCounts.Arquivado} variant="orange" />}>
                             Arquivados
                         </TabsTrigger>
                     </TabsList>

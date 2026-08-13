@@ -1319,7 +1319,7 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
     if (rescheduled && finalRow.source !== "unavailable") {
       import("@/lib/services/whatsapp-automation.service")
         .then(({ onAppointmentRescheduled }) =>
-          onAppointmentRescheduled(finalRow),
+          onAppointmentRescheduled(finalRow, "manual"),
         )
         .catch(console.error)
       import("@/lib/services/notification-automation.service")
@@ -1333,7 +1333,7 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
       if (prevStatus !== nextStatus) {
         import("@/lib/services/whatsapp-automation.service")
           .then(({ onAppointmentStatusChanged }) =>
-            onAppointmentStatusChanged(finalRow, prevStatus, nextStatus),
+            onAppointmentStatusChanged(finalRow, prevStatus, nextStatus, "manual"),
           )
           .catch(console.error)
         import("@/lib/services/notification-automation.service")
@@ -1379,7 +1379,7 @@ export async function deleteAppointmentAction(appointmentId: string, notifyClien
 
         import("@/lib/services/whatsapp-automation.service")
           .then(({ onAppointmentStatusChanged }) =>
-            onAppointmentStatusChanged(currentWithNote, current.status, "Cancelado"),
+            onAppointmentStatusChanged(currentWithNote, current.status, "Cancelado", "manual"),
           )
           .catch(console.error)
 

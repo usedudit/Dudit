@@ -5,7 +5,11 @@ import {
   sanitizeSearchTerm,
 } from "../filters"
 import { buildKeysetOrFilter, fetchAllPages } from "../paginate"
-import { mapOrderRow, ORDER_EXPORT_COLUMNS } from "../mappers"
+import {
+  mapOrderRow,
+  ORDER_EXPORT_ALL_COLUMNS,
+  ORDER_EXPORT_COLUMNS,
+} from "../mappers"
 import type { ExportResult, OrdersExportFilters } from "../types"
 import { EXPORT_CHUNK_SIZE } from "../constants"
 
@@ -17,10 +21,27 @@ const ORDER_SELECT = `
   order_items(product_name, quantity, product_price, subtotal)
 `
 
+const ORDER_SELECT_ALL = `
+  id, order_number, customer_name, buyer_id, created_by, created_at,
+  situation, payment_method, payment_breakdown, delivery_status, order_source,
+  discount_value, discount_amount, payment_method_discount_amount,
+  payment_method_extra_amount, delivery_fee, additional_costs, total_amount,
+  paid_amount, delivery_type, delivery_address, notes,
+  order_items(product_name, quantity, product_price, subtotal)
+`
+
 const SALE_SELECT = `
   id, sale_number, customer_id, created_at, finalized_by_user_id,
   payment_status, status, total_amount, final_amount, discount_amount,
   delivery_fee, paid_amount,
+  sale_items(product_name, quantity, unit_price, subtotal),
+  customers:customer_id(name)
+`
+
+const SALE_SELECT_ALL = `
+  id, sale_number, customer_id, created_at, finalized_by_user_id,
+  payment_status, status, total_amount, final_amount, discount_amount,
+  delivery_fee, paid_amount, notes, delivery_type, delivery_address,
   sale_items(product_name, quantity, unit_price, subtotal),
   customers:customer_id(name)
 `
@@ -108,10 +129,14 @@ export async function fetchOrdersExport(
   filters: OrdersExportFilters,
   includeSales = true,
 ): Promise<ExportResult> {
+  const includeAllColumns = filters.includeAllColumns === true
+  const orderSelect = includeAllColumns ? ORDER_SELECT_ALL : ORDER_SELECT
+  const saleSelect = includeAllColumns ? SALE_SELECT_ALL : SALE_SELECT
+
   const orderRows = await fetchAllPages<any>({
     chunkSize: EXPORT_CHUNK_SIZE,
     fetchPage: async (cursor) => {
-      let query = supabase.from("orders").select(ORDER_SELECT)
+      let query: any = (supabase as any).from("orders").select(orderSelect)
       query = applyOrderFilters(query, filters, partnerId)
       const orFilter = buildKeysetOrFilter(cursor)
       if (orFilter) query = query.or(orFilter)
@@ -134,7 +159,7 @@ export async function fetchOrdersExport(
     saleRows = await fetchAllPages<any>({
       chunkSize: EXPORT_CHUNK_SIZE,
       fetchPage: async (cursor) => {
-        let query = supabase.from("sales").select(SALE_SELECT)
+        let query: any = (supabase as any).from("sales").select(saleSelect)
         query = applySaleFilters(query, filters, partnerId)
         const orFilter = buildKeysetOrFilter(cursor)
         if (orFilter) query = query.or(orFilter)
@@ -173,8 +198,9 @@ export async function fetchOrdersExport(
   const sellerIds = merged.map((r) => String(r.created_by || r.finalized_by_user_id || ""))
   const sellerNames = await resolveSellerNames(supabase, partnerId, sellerIds)
 
-  const rows = merged.map((r) => mapOrderRow(r, sellerNames))
-  return { columns: ORDER_EXPORT_COLUMNS, rows, rowCount: rows.length }
+  const rows = merged.map((r) => mapOrderRow(r, sellerNames, includeAllColumns))
+  const columns = includeAllColumns ? ORDER_EXPORT_ALL_COLUMNS : ORDER_EXPORT_COLUMNS
+  return { columns, rows, rowCount: rows.length }
 }
 
 export async function fetchSalesExport(
@@ -182,10 +208,13 @@ export async function fetchSalesExport(
   partnerId: string,
   filters: OrdersExportFilters,
 ): Promise<ExportResult> {
+  const includeAllColumns = filters.includeAllColumns === true
+  const saleSelect = includeAllColumns ? SALE_SELECT_ALL : SALE_SELECT
+
   const saleRows = await fetchAllPages<any>({
     chunkSize: EXPORT_CHUNK_SIZE,
     fetchPage: async (cursor) => {
-      let query = supabase.from("sales").select(SALE_SELECT)
+      let query: any = (supabase as any).from("sales").select(saleSelect)
       query = applySaleFilters(query, filters, partnerId)
       const orFilter = buildKeysetOrFilter(cursor)
       if (orFilter) query = query.or(orFilter)
@@ -218,6 +247,7 @@ export async function fetchSalesExport(
 
   const sellerIds = saleRows.map((r) => String(r.finalized_by_user_id || ""))
   const sellerNames = await resolveSellerNames(supabase, partnerId, sellerIds)
-  const rows = saleRows.map((r) => mapOrderRow(r, sellerNames))
-  return { columns: ORDER_EXPORT_COLUMNS, rows, rowCount: rows.length }
+  const rows = saleRows.map((r) => mapOrderRow(r, sellerNames, includeAllColumns))
+  const columns = includeAllColumns ? ORDER_EXPORT_ALL_COLUMNS : ORDER_EXPORT_COLUMNS
+  return { columns, rows, rowCount: rows.length }
 }

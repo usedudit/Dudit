@@ -1797,10 +1797,10 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     const paymentMethodSummary = buildPaymentMethodSummary(adjustedPaymentBreakdown, data.paymentMethod)
     const effectivePaidAmount = data.paymentStatus === "unpaid"
         ? 0
-        : sumExplicitAmountReceived > 0.005
-            ? sumExplicitAmountReceived
-            : data.paidAmount != null && !isNaN(Number(data.paidAmount))
-                ? Math.max(0, Number(data.paidAmount))
+        : data.paidAmount != null && !isNaN(Number(data.paidAmount))
+            ? Math.max(0, Number(data.paidAmount))
+            : sumExplicitAmountReceived > 0.005
+                ? sumExplicitAmountReceived
                 : data.paymentStatus === "paid"
                     ? serverTotalAmount
                     : 0
@@ -3130,7 +3130,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
 
     import("@/lib/services/whatsapp-automation.service")
         .then(({ onOrderStatusChanged }) =>
-            onOrderStatusChanged(notifyOrder, notifySituation, notifyDelivery),
+            onOrderStatusChanged(notifyOrder, notifySituation, notifyDelivery, "manual"),
         )
         .catch(console.error)
 
@@ -4521,7 +4521,7 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
         if (order.situation !== nextSituation) {
             const notifyOrder = { ...order, partner_id: payload.partnerId }
             import("@/lib/services/whatsapp-automation.service")
-                .then(({ onOrderStatusChanged }) => onOrderStatusChanged(notifyOrder, nextSituation))
+                .then(({ onOrderStatusChanged }) => onOrderStatusChanged(notifyOrder, nextSituation, undefined, "manual"))
                 .catch(console.error)
             import("@/lib/services/notification-automation.service")
                 .then(({ onOrderStatusChanged }) => onOrderStatusChanged(notifyOrder, nextSituation, undefined, "manual"))

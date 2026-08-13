@@ -1,7 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { sanitizeSearchTerm, resolveExportDateBounds } from "../filters"
 import { buildKeysetOrFilter, fetchAllPages } from "../paginate"
-import { mapQuoteRow, QUOTE_EXPORT_COLUMNS } from "../mappers"
+import {
+  mapQuoteRow,
+  QUOTE_EXPORT_ALL_COLUMNS,
+  QUOTE_EXPORT_COLUMNS,
+} from "../mappers"
 import type { QuotesExportFilters } from "../types"
 import { EXPORT_CHUNK_SIZE } from "../constants"
 
@@ -20,6 +24,28 @@ const QUOTE_SELECT = `
   user_id,
   created_by_user_id,
   created_at,
+  customers (id, name, email),
+  items_count:quote_items(count)
+`
+
+const QUOTE_SELECT_ALL = `
+  id,
+  quote_number,
+  status,
+  issue_date,
+  expiration_date,
+  subtotal,
+  discount_type,
+  discount_value,
+  shipping_cost,
+  additional_costs,
+  total,
+  notes,
+  customer_id,
+  user_id,
+  created_by_user_id,
+  created_at,
+  updated_at,
   customers (id, name, email),
   items_count:quote_items(count)
 `
@@ -43,6 +69,8 @@ export async function fetchQuotesExport(
 ): Promise<import("../types").ExportResult> {
   const search = sanitizeSearchTerm(filters.search).toLowerCase()
   const { startIso, endIso } = resolveExportDateBounds(filters.datePeriod)
+  const includeAllColumns = filters.includeAllColumns === true
+  const select = includeAllColumns ? QUOTE_SELECT_ALL : QUOTE_SELECT
 
   const dbStatuses = (filters.status || [])
     .map(label => STATUS_LABEL_TO_DB[label])
@@ -51,9 +79,9 @@ export async function fetchQuotesExport(
   const rawRows = await fetchAllPages<any>({
     chunkSize: EXPORT_CHUNK_SIZE,
     fetchPage: async (cursor) => {
-      let query = supabase
+      let query: any = (supabase as any)
         .from("quotes")
-        .select(QUOTE_SELECT)
+        .select(select)
         .eq("partner_id", partnerId)
 
       if (filters.storeId) {
@@ -138,6 +166,7 @@ export async function fetchQuotesExport(
     return displayId.includes(search) || customerName.includes(search) || customerId.includes(search)
   })
 
-  const rows = filteredRows.map(mapQuoteRow)
-  return { columns: QUOTE_EXPORT_COLUMNS, rows, rowCount: rows.length }
+  const rows = filteredRows.map((r) => mapQuoteRow(r, includeAllColumns))
+  const columns = includeAllColumns ? QUOTE_EXPORT_ALL_COLUMNS : QUOTE_EXPORT_COLUMNS
+  return { columns, rows, rowCount: rows.length }
 }

@@ -1890,12 +1890,12 @@ async function getHomeSectionsUncached(ctx: DiscoverCtx): Promise<HomeSection[]>
     }
 
     const t1 = performance.now()
-    console.log(`[Discover] END | ${result.length} sections | ${(t1 - t0).toFixed(0)}ms`)
-    console.log(`[Discover] DIAG: partners=${tiers.allIds.size} | pool_before_dedup=${pool.length} | dedup_removed=${totalRemovedByDedup}`)
+    dLog(`[Discover] END | ${result.length} sections | ${(t1 - t0).toFixed(0)}ms`)
+    dLog(`[Discover] DIAG: partners=${tiers.allIds.size} | pool_before_dedup=${pool.length} | dedup_removed=${totalRemovedByDedup}`)
     if (result.length > 0) {
-        console.log(`[Discover] SECTIONS:`, result.map(s => `${s.id}=${s.title} (${s.items.length})`).join(" | "))
+        dLog(`[Discover] SECTIONS:`, result.map(s => `${s.id}=${s.title} (${s.items.length})`).join(" | "))
     } else {
-        console.log(`[Discover] EMPTY - no sections returned!`)
+        dLog(`[Discover] EMPTY - no sections returned!`)
     }
 
     return result

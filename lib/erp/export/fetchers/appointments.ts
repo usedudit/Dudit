@@ -1,7 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { sanitizeSearchTerm } from "../filters"
 import { fetchAllPages } from "../paginate"
-import { mapAppointmentRow, APPOINTMENT_EXPORT_COLUMNS } from "../mappers"
+import {
+  APPOINTMENT_EXPORT_ALL_COLUMNS,
+  APPOINTMENT_EXPORT_COLUMNS,
+  mapAppointmentRow,
+} from "../mappers"
 import type { AppointmentsExportFilters } from "../types"
 import { EXPORT_CHUNK_SIZE } from "../constants"
 
@@ -9,6 +13,13 @@ const APPOINTMENT_SELECT = `
   id, partner_id, customer_id, customer_name, service_name,
   start_date, start_time, staff_partner_user_id, staff_name, status,
   sales_channel, payment_status, fulfillment_mode, created_at
+`
+
+const APPOINTMENT_SELECT_ALL = `
+  id, partner_id, customer_id, customer_name, service_name,
+  start_date, start_time, end_date, end_time, duration_minutes,
+  staff_partner_user_id, staff_name, status, price, pricing_unit,
+  paid_amount, sales_channel, payment_status, fulfillment_mode, notes, created_at
 `
 
 export async function fetchAppointmentsExport(
@@ -19,13 +30,15 @@ export async function fetchAppointmentsExport(
   const search = sanitizeSearchTerm(filters.search)
   const staffIds = (filters.staffIds || []).filter(Boolean)
   const statuses = (filters.statuses || []).filter(Boolean)
+  const includeAllColumns = filters.includeAllColumns === true
+  const select = includeAllColumns ? APPOINTMENT_SELECT_ALL : APPOINTMENT_SELECT
 
   const rawRows = await fetchAllPages<any>({
     chunkSize: EXPORT_CHUNK_SIZE,
     fetchPage: async (cursor) => {
-      let query = supabase
+      let query: any = (supabase as any)
         .from("appointments")
-        .select(APPOINTMENT_SELECT)
+        .select(select)
         .eq("partner_id", partnerId)
         .lte("start_date", filters.endDate)
         .gte("end_date", filters.startDate)
@@ -73,6 +86,7 @@ export async function fetchAppointmentsExport(
     },
   })
 
-  const rows = rawRows.map(mapAppointmentRow)
-  return { columns: APPOINTMENT_EXPORT_COLUMNS, rows, rowCount: rows.length }
+  const rows = rawRows.map((r) => mapAppointmentRow(r, includeAllColumns))
+  const columns = includeAllColumns ? APPOINTMENT_EXPORT_ALL_COLUMNS : APPOINTMENT_EXPORT_COLUMNS
+  return { columns, rows, rowCount: rows.length }
 }

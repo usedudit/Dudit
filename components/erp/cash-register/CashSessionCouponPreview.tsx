@@ -67,7 +67,7 @@ export default function CashSessionCouponPreview({ data, type, printMode = false
 
     return (
         <div
-            className={`mx-auto bg-[#fffef5] text-black font-mono text-[11px] leading-snug shadow-md ${printMode ? "sale-receipt-thermal-print" : ""}`}
+            className={`mx-auto bg-[#fffef5] text-black font-mono text-[11px] leading-snug ${printMode ? "sale-receipt-thermal-print" : ""}`}
             style={{ width: printMode ? "80mm" : "320px", maxWidth: "100%" }}
         >
             <div className="px-3 py-4">
@@ -87,7 +87,7 @@ export default function CashSessionCouponPreview({ data, type, printMode = false
                 <DashedLine className="my-1" />
 
                 <div className="text-[10px] space-y-0.5 mb-2">
-                    <Row left="Caixa:" right={data.sessionId.slice(0, 8).toUpperCase()} />
+                    <Row left="Sessão:" right={data.sessionId.slice(0, 8).toUpperCase()} />
                     <Row left="Abertura:" right={formatShortDateTime(data.openedAt)} />
                     <Row left="Operador:" right={data.openOperator} />
                     {data.closedAt && <Row left="Fechamento:" right={formatShortDateTime(data.closedAt)} />}
@@ -144,10 +144,6 @@ export default function CashSessionCouponPreview({ data, type, printMode = false
                         <p className="text-[9px] text-center">Obs: {data.notes}</p>
                     </>
                 )}
-
-                <DashedLine className="my-2" />
-
-                <p className="text-[10px] font-bold text-center uppercase tracking-wide">* OBRIGADO E VOLTE SEMPRE *</p>
             </div>
         </div>
     )

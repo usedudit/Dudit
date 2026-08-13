@@ -11,7 +11,6 @@ import { getProductUrl, getStoreUrl, getServiceUrl, getPlanUrl } from "@/lib/uti
 import { formatCurrency } from "@/lib/utils";
 import { getBillingUnitSuffix } from "@/lib/utils/formatters"
 import { getRandomDefaultBanner } from "@/lib/utils/banner"
-import { Badge } from "@/components/reusable"
 import { useFavorites } from "@/providers/favorites-provider"
 import { useSupabase } from "@/providers/supabase-provider"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"

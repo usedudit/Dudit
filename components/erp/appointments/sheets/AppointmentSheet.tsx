@@ -2356,8 +2356,6 @@ export const AppointmentSheet = ({
                         );
                     })()}
 
-
-
                     {/* RECURRENCE VIEW */}
                     {currentView === 'recurrence' && (
                         <motion.div key="recurrence" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
@@ -2405,7 +2403,6 @@ export const AppointmentSheet = ({
                             </div>
                         </motion.div>
                     )}
-
                 </AnimatePresence>
             </div>
 

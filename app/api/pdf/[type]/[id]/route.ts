@@ -83,6 +83,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
             .maybeSingle()
         
         partnerId = cashSession?.partner_id || null
+    } else if (type === "troca") {
+        resource = "orders"
+        const { data: returnRequest } = await supabase
+            .from("return_requests")
+            .select("partner_id")
+            .eq("id", id)
+            .maybeSingle()
+        
+        partnerId = returnRequest?.partner_id || null
     } else if (type === "invoice") {
         resource = "billing"
         const { data: inv } = await supabase

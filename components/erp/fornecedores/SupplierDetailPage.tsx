@@ -439,7 +439,7 @@ export const SupplierDetailPage = ({ supplier, onBack, onEdit }: Props) => {
                                                     </div>
 
                                                     <div className="space-y-1">
-                                                        <div className="flex justify-between items-center py-2.5 border-b border-brand-border dark:border-dark-border">
+                                                        <div className="flex justify-between items-center">
                                                             <span className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold">Fornecedor desde</span>
                                                             <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
                                                                 {supplier.created_at ? formatDate(supplier.created_at) : '-'}

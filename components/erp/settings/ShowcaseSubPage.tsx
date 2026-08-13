@@ -33,6 +33,13 @@ export const ShowcaseSubPage = ({
     partnerId: string
     onBack: () => void
 }) => {
+    const SidebarCard = ({ children, className = "", hasTopStrip = false }: { children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
+        <div className={`bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
+            {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
+            {children}
+        </div>
+    )
+
     const { success: notifySuccess, error: notifyError } = useNotification()
     const [isPending, startTransition] = useTransition()
     const [isLoading, setIsLoading] = useState(false)
@@ -387,7 +394,7 @@ export const ShowcaseSubPage = ({
 
                                 {/* Banner da Vitrine */}
                                 <FormSection hasSeparator title="Banner da Vitrine">
-                                    <div className="relative group overflow-hidden rounded-2xl border border-brand-border dark:border-dark-border aspect-[1300/300] bg-brand-gray dark:bg-dark-background flex items-center justify-center">
+                                    <div className="relative group overflow-hidden rounded-2xl border border-brand-border dark:border-dark-border aspect-[1400/300] bg-brand-gray dark:bg-dark-background flex items-center justify-center">
                                         {bannerPreview ? (
                                             <img src={bannerPreview} alt="Banner" className="w-full h-full object-cover" />
                                         ) : (
@@ -473,7 +480,8 @@ export const ShowcaseSubPage = ({
                             {/* Sidebar (Right Column) */}
                             <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border space-y-6">
                                 {/* Logo do Negócio */}
-                                <FormSection title="Logo do Negócio">
+                                <SidebarCard hasTopStrip>
+                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Logo do Negócio</h3>
                                     <div className="flex items-center gap-4 dark:bg-dark-background/50">
                                         <div onClick={() => fileInputRef.current?.click()} className="w-16 h-16 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border cursor-pointer relative group overflow-hidden">
                                             {imagePreview ? (
@@ -496,7 +504,7 @@ export const ShowcaseSubPage = ({
                                         </div>
                                         <input ref={fileInputRef} type="file" hidden accept="image/png, image/jpeg, image/webp, image/avif" onChange={handleImageChange} />
                                     </div>
-                                </FormSection>
+                                </SidebarCard>
                             </div>
                         </div>
                     </div>

@@ -1,11 +1,10 @@
 "use client"
 
 import React, { useState, useEffect, useTransition, useRef, useCallback } from "react"
-import { Button, IconPlaceholder, InfoCard, Input, ThreeDotsLoader, Tabs, TabsList, TabsTrigger, TabsContent, Separator, ActionsDropdown, Badge, AlertModal, DropdownItem, ListItem, RadioButton, Checkbox, Dropdown } from "@/components/reusable"
-import { MailIcon, CheckCircleIcon, ChevronLeftIcon, PlusIcon, CalendarIcon, UserIcon, MotorbikeIcon, ShieldIcon, CrownIcon, ManagerIcon, CopyIcon, ThreeDotsIcon, TrashIcon } from "@/lib/icons"
+import { Button, IconPlaceholder, InfoCard, Input, ThreeDotsLoader, Tabs, TabsList, TabsTrigger, TabsContent, Separator, ActionsDropdown, Badge, AlertModal, DropdownItem, ListItem, RadioButton, Checkbox, Dropdown, FormDropdown } from "@/components/reusable"
+import { MailIcon, CheckCircleIcon, ChevronLeftIcon, PlusIcon, CalendarIcon, UserIcon, MotorbikeIcon, ShieldIcon, CrownIcon, ManagerIcon, CopyIcon, ThreeDotsIcon, TrashIcon, StoreIcon, ChartIcon } from "@/lib/icons"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { getTeamMembers, getTeamMemberStatsAction, removeTeamMember, updateTeamMemberRole } from "@/app/actions/erp/team"
-import { listStoreMembersAction, addStoreMemberAction, removeStoreMemberAction } from "@/app/actions/erp/store-members"
 import type { TeamMember, TeamMemberStats } from "@/app/actions/erp/team"
 import type { PartnerRole } from "@/lib/permissions/types"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -36,6 +35,13 @@ const ROLE_ICONS: Record<PartnerRole, React.ReactNode> = {
     OPERATOR: <UserIcon />,
     DELIVERY: <MotorbikeIcon />,
 }
+
+const STORE_ROLE_OPTIONS = [
+    { value: "OPERATOR", label: "Operador" },
+    { value: "MANAGER", label: "Gestor" },
+    { value: "ADMIN", label: "Administrador" },
+    { value: "DELIVERY", label: "Entregador" },
+]
 
 
 const ROLE_HIERARCHY: Record<PartnerRole, number> = {
@@ -90,12 +96,7 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
     const [isPending, startTransition] = useTransition()
     const [activeTab, setActiveTab] = useState<"members" | "invites" | "store">("members")
     const [inviteFilter, setInviteFilter] = useState<"pending" | "accepted" | "all">("all")
-    const [storeMembers, setStoreMembers] = useState<any[]>([])
-    const [isLoadingStoreMembers, setIsLoadingStoreMembers] = useState(false)
-    const [showAddStoreMemberModal, setShowAddStoreMemberModal] = useState(false)
-    const [selectedStoreMemberUserId, setSelectedStoreMemberUserId] = useState<string | null>(null)
     const [memberToDelete, setMemberToDelete] = useState<string | null>(null)
-    const [memberStoreMap, setMemberStoreMap] = useState<Record<string, string[]>>({})
     const [inviteToDelete, setInviteToDelete] = useState<string | null>(null)
     const [inviteToShare, setInviteToShare] = useState<any | null>(null)
     const [showInviteLinkModal, setShowInviteLinkModal] = useState(false)
@@ -166,7 +167,14 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
     const fetchMembers = async () => {
         setIsLoadingMembers(true)
         setErrorMembers(null)
-        const { members, currentUserRole: role, currentUserId: userId, error } = await getTeamMembers()
+
+        const [{ members, currentUserRole: role, currentUserId: userId, error }, invitationsRes] = await Promise.all([
+            getTeamMembers(),
+            import("@/app/actions/invitations")
+                .then((m) => m.listPartnerInvitations(partnerId))
+                .catch(() => ({ success: false as const, invitations: [] as any[] })),
+        ])
+
         if (error) {
             setErrorMembers(error)
         } else {
@@ -175,13 +183,9 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
             setCurrentUserId(userId || null)
         }
 
-        try {
-            const { listPartnerInvitations } = await import("@/app/actions/invitations")
-            const result = await listPartnerInvitations(partnerId)
-            if (result.success && result.invitations) {
-                setInvitations(result.invitations)
-            }
-        } catch (e) { }
+        if (invitationsRes.success && invitationsRes.invitations) {
+            setInvitations(invitationsRes.invitations)
+        }
 
         setIsLoadingMembers(false)
     }
@@ -189,76 +193,6 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
     useEffect(() => {
         fetchMembers()
     }, [])
-
-    const fetchStoreMembers = useCallback(async () => {
-        if (!selectedStore) return
-        setIsLoadingStoreMembers(true)
-        try {
-            const members = await listStoreMembersAction(selectedStore.id, partnerId)
-            setStoreMembers(members)
-        } catch {
-            setStoreMembers([])
-        }
-        setIsLoadingStoreMembers(false)
-    }, [selectedStore, partnerId])
-
-    useEffect(() => {
-        fetchStoreMembers()
-    }, [fetchStoreMembers])
-
-    // Load store memberships for all stores to display badges
-    useEffect(() => {
-        if (!allStores.length) return
-        const fetchAllStoreMemberships = async () => {
-            const results = await Promise.allSettled(
-                allStores.map(store =>
-                    listStoreMembersAction(store.id, partnerId)
-                        .then(members => ({ storeId: store.id, members }))
-                        .catch(() => ({ storeId: store.id, members: [] }))
-                )
-            )
-            const map: Record<string, string[]> = {}
-            for (const result of results) {
-                if (result.status === "fulfilled") {
-                    const { storeId, members } = result.value
-                    const store = allStores.find(s => s.id === storeId)
-                    const storeName = store?.name || storeId
-                    for (const m of members) {
-                        if (!map[m.partner_user_id]) map[m.partner_user_id] = []
-                        if (!map[m.partner_user_id].includes(storeName)) {
-                            map[m.partner_user_id].push(storeName)
-                        }
-                    }
-                }
-            }
-            setMemberStoreMap(map)
-        }
-        fetchAllStoreMemberships()
-    }, [allStores, partnerId])
-
-    const handleAddStoreMember = async (partnerUserId: string) => {
-        if (!selectedStore) return
-        const result = await addStoreMemberAction(partnerUserId, selectedStore.id, partnerId, "OPERATOR")
-        if (result.success) {
-            toast({ title: "Sucesso", description: "Membro adicionado à loja.", variant: "success" })
-            fetchStoreMembers()
-        } else {
-            toast({ title: "Erro", description: result.error || "Erro ao adicionar membro.", variant: "destructive" })
-        }
-        setShowAddStoreMemberModal(false)
-    }
-
-    const handleRemoveStoreMember = async () => {
-        if (!selectedStoreMemberUserId || !selectedStore) return
-        const result = await removeStoreMemberAction(selectedStoreMemberUserId, selectedStore.id, partnerId)
-        if (result.success) {
-            toast({ title: "Sucesso", description: "Membro removido da loja.", variant: "success" })
-            fetchStoreMembers()
-        } else {
-            toast({ title: "Erro", description: result.error || "Erro ao remover membro.", variant: "destructive" })
-        }
-        setSelectedStoreMemberUserId(null)
-    }
 
     const handleInvite = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -357,10 +291,11 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
     const handleShowMemberStats = useCallback(async (member: TeamMember) => {
         setIsLoadingStats(true)
         setSelectedMemberStats(null)
-        const { stats } = await getTeamMemberStatsAction()
-        if (stats) {
-            const memberStat = stats.find((s) => s.partnerUserId === member.id)
-            setSelectedMemberStats(memberStat || {
+        const { stats } = await getTeamMemberStatsAction(member.id)
+        if (stats && stats.length > 0) {
+            setSelectedMemberStats(stats[0])
+        } else {
+            setSelectedMemberStats({
                 partnerUserId: member.id,
                 fullName: member.fullName,
                 avatarUrl: member.avatarUrl,
@@ -437,7 +372,7 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
                         </div>
 
                         {/* Content Body */}
-                        <div className="px-3 md:px-6 md:py-6 max-w-[1300px] mx-auto min-h-[400px]">
+                        <div className="px-3 md:px-6 max-w-[1300px] mx-auto min-h-[400px]">
                             {isLoadingMembers ? (
                                 <div className="flex justify-center p-12">
                                     <ThreeDotsLoader />
@@ -477,7 +412,7 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
                                                             </thead>
                                                             <tbody className="divide-y divide-brand-border dark:divide-dark-border">
                                                                 {teamMembers.map((member) => (
-                                                                    <tr key={member.userId} className="group hover:bg-brand-gray/50 dark:hover:bg-dark-border/20 transition-colors cursor-pointer" onClick={() => handleShowMemberStats(member)}>
+                                                                    <tr key={member.userId} className="group hover:bg-brand-gray/50 dark:hover:bg-dark-border/20 transition-colors">
                                                                         <td className="py-4 px-6">
                                                                             <div className="flex items-center gap-4">
                                                                                 <UserProfileImage
@@ -520,11 +455,16 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
                                                                                 showChevron={false}
                                                                                 fullWidth={false}
                                                                             >
-                                                                                {(currentUserRole === "OWNER" || currentUserRole === "ADMIN") && (
+                                                                                <DropdownItem
+                                                                                    onClick={() => handleShowMemberStats(member)}
+                                                                                >
+                                                                                    <ChartIcon size={16} /> Ver detalhes
+                                                                                </DropdownItem>
+                                                                                {(currentUserRole === "OWNER" || currentUserRole === "ADMIN") && !member.isOwner && (
                                                                                     <DropdownItem
                                                                                         onClick={() => handleOpenStoreModal(member)}
                                                                                     >
-                                                                                        Gerenciar lojas
+                                                                                        <StoreIcon size={16} /> Gerenciar lojas
                                                                                     </DropdownItem>
                                                                                 )}
                                                                                 {currentUserRole && member.userId !== currentUserId && (
@@ -559,7 +499,7 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
                                                     <div className="md:hidden flex flex-col">
                                                         {teamMembers.map((member, idx) => (
                                                             <React.Fragment key={member.userId}>
-                                                                <div className="py-5 flex items-start justify-between gap-4 cursor-pointer" onClick={() => handleShowMemberStats(member)}>
+                                                                <div className="py-5 flex items-start justify-between gap-4">
                                                                     <div className="flex items-start gap-4 min-w-0 flex-1">
                                                                         <UserProfileImage
                                                                             fullName={member.fullName || "Membro"}
@@ -596,11 +536,16 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
                                                                             showChevron={false}
                                                                             fullWidth={false}
                                                                         >
-                                                                            {(currentUserRole === "OWNER" || currentUserRole === "ADMIN") && (
+                                                                            <DropdownItem
+                                                                                onClick={() => handleShowMemberStats(member)}
+                                                                            >
+                                                                                <ChartIcon size={16} /> Ver detalhes
+                                                                            </DropdownItem>
+                                                                            {(currentUserRole === "OWNER" || currentUserRole === "ADMIN") && !member.isOwner && (
                                                                                 <DropdownItem
                                                                                     onClick={() => handleOpenStoreModal(member)}
                                                                                 >
-                                                                                    Gerenciar lojas
+                                                                                    <StoreIcon size={16} /> Gerenciar lojas
                                                                                 </DropdownItem>
                                                                             )}
                                                                             {currentUserRole && member.userId !== currentUserId && (
@@ -976,16 +921,6 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
                         isLoading={isPending}
                     />
 
-                    <AlertModal
-                        isOpen={!!selectedStoreMemberUserId}
-                        onClose={() => setSelectedStoreMemberUserId(null)}
-                        title="Remover membro da loja?"
-                        description="Este membro perderá o acesso a esta loja. O acesso à equipe do parceiro será mantido."
-                        confirmText="Sim, remover"
-                        variant="danger"
-                        onConfirm={handleRemoveStoreMember}
-                    />
-
                     {/* Gerenciar Lojas Modal (2 Tabs: Lojas com Acesso / Todas as Lojas) */}
                     <DefaultModal
                         isOpen={!!selectedStoreMember}
@@ -998,103 +933,100 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
                             </div>
                         ) : selectedStoreMember && (
                             <div className="space-y-5">
-                                {/* Modal Tabs */}
-                                <div className="flex items-center gap-2 border-b border-brand-border dark:border-dark-border pb-3">
-                                    <Button
-                                        variant={modalStoreTab === "access" ? "filled" : "outline"}
-                                        onClick={() => setModalStoreTab("access")}
-                                        className="h-9 text-xs px-4"
-                                    >
-                                        Lojas com acesso ({Object.values(storeAccessState).filter(s => s.enabled).length})
-                                    </Button>
-                                    <Button
-                                        variant={modalStoreTab === "all" ? "filled" : "outline"}
-                                        onClick={() => setModalStoreTab("all")}
-                                        className="h-9 text-xs px-4"
-                                    >
-                                        Todas as lojas ({allStores.length})
-                                    </Button>
-                                </div>
+                                <Tabs value={modalStoreTab} onValueChange={(v) => setModalStoreTab(v as any)} className="w-full">
+                                    <TabsList className="w-full justify-start gap-6 px-0">
+                                        <TabsTrigger value="access">
+                                            Lojas com acesso ({Object.values(storeAccessState).filter(s => s.enabled).length})
+                                        </TabsTrigger>
+                                        <TabsTrigger value="all">
+                                            Todas as lojas ({allStores.length})
+                                        </TabsTrigger>
+                                    </TabsList>
 
-                                {modalStoreTab === "access" ? (
-                                    <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
-                                        {Object.entries(storeAccessState).filter(([_, s]) => s.enabled).length === 0 ? (
-                                            <div className="text-center py-8">
-                                                <p className="text-sm font-medium text-brand-dark dark:text-dark-heading">Nenhuma loja com acesso individual</p>
-                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1">
-                                                    Alterne para a aba "Todas as lojas" para conceder acesso às lojas da empresa.
-                                                </p>
-                                            </div>
-                                        ) : (
-                                            allStores
-                                                .filter(store => storeAccessState[store.id]?.enabled)
-                                                .map((store) => {
-                                                    const state = storeAccessState[store.id]
-                                                    return (
-                                                        <div key={store.id} className="flex items-center justify-between p-3 rounded-xl bg-brand-gray/50 dark:bg-dark-border/20 border border-brand-border dark:border-dark-border">
-                                                            <div className="flex items-center gap-3">
-                                                                <div className="w-9 h-9 rounded-lg bg-brand-primary/10 text-brand-primary flex items-center justify-center font-bold text-sm">
-                                                                    {store.name.charAt(0).toUpperCase()}
-                                                                </div>
-                                                                <div>
-                                                                    <p className="font-bold text-sm text-brand-dark dark:text-dark-heading">{store.name}</p>
-                                                                    <Badge variant="blue" className="text-[10px] mt-0.5">
-                                                                        {ROLE_LABELS[state.role] || state.role}
-                                                                    </Badge>
-                                                                </div>
-                                                            </div>
-                                                            <Button
-                                                                variant="outline"
-                                                                onClick={() => setStoreAccessState(prev => ({
-                                                                    ...prev,
-                                                                    [store.id]: { ...prev[store.id], enabled: false }
-                                                                }))}
-                                                                className="h-8 text-xs text-red-500 hover:text-red-600 border-red-200 dark:border-red-900/30 hover:bg-red-50 dark:hover:bg-red-950/20"
-                                                            >
-                                                                Remover acesso
-                                                            </Button>
-                                                        </div>
-                                                    )
-                                                })
-                                        )}
-                                    </div>
-                                ) : (
-                                    <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
-                                        {allStores.map((store) => {
-                                            const state = storeAccessState[store.id] || { enabled: false, role: "OPERATOR" }
-                                            return (
-                                                <div key={store.id} className="flex items-center justify-between p-3 rounded-xl border border-brand-border dark:border-dark-border hover:bg-brand-gray/30 dark:hover:bg-dark-border/20 transition-colors">
-                                                    <label className="flex items-center gap-3 cursor-pointer flex-1 min-w-0 mr-3">
-                                                        <Checkbox
-                                                            checked={state.enabled}
-                                                            onChange={() => setStoreAccessState(prev => ({
-                                                                ...prev,
-                                                                [store.id]: { ...prev[store.id], enabled: !prev[store.id]?.enabled }
-                                                            }))}
-                                                        />
-                                                        <span className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">{store.name}</span>
-                                                    </label>
-
-                                                    {state.enabled && (
-                                                        <select
-                                                            value={state.role}
-                                                            onChange={(e) => setStoreAccessState(prev => ({
-                                                                ...prev,
-                                                                [store.id]: { ...prev[store.id], role: e.target.value as PartnerRole }
-                                                            }))}
-                                                            className="h-8 text-xs font-medium bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-lg px-2 text-brand-dark dark:text-dark-heading focus:outline-none focus:ring-1 focus:ring-brand-primary"
-                                                        >
-                                                            <option value="OPERATOR">Operador</option>
-                                                            <option value="MANAGER">Gestor</option>
-                                                            <option value="ADMIN">Administrador</option>
-                                                            <option value="DELIVERY">Entregador</option>
-                                                        </select>
-                                                    )}
+                                    <TabsContent value="access" className="mt-4">
+                                        <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                                            {Object.values(storeAccessState).filter(s => s.enabled).length === 0 ? (
+                                                <div className="text-center py-8">
+                                                    <IconPlaceholder
+                                                        icon={StoreIcon}
+                                                        title="Nenhuma loja com acesso individual"
+                                                        subtitle="Alterne para a aba 'Todas as lojas' para conceder acesso às lojas da empresa."
+                                                    />
                                                 </div>
-                                            )
-                                        })}
-                                    </div>
-                                )}
+                                            ) : (
+                                                allStores
+                                                    .filter(store => storeAccessState[store.id]?.enabled)
+                                                    .map((store) => {
+                                                        const state = storeAccessState[store.id]
+                                                        return (
+                                                            <ListItem
+                                                                key={store.id}
+                                                                left={
+                                                                    <div className="w-9 h-9 rounded-lg bg-brand-primary/10 text-brand-primary flex items-center justify-center font-bold text-sm shrink-0">
+                                                                        {store.name.charAt(0).toUpperCase()}
+                                                                    </div>
+                                                                }
+                                                                title={store.name}
+                                                                description={ROLE_LABELS[state.role] || state.role}
+                                                                right={
+                                                                    <Button
+                                                                        variant="outline"
+                                                                        onClick={() => setStoreAccessState(prev => ({
+                                                                            ...prev,
+                                                                            [store.id]: { ...prev[store.id], enabled: false }
+                                                                        }))}
+                                                                        className="h-8 text-xs text-red-500 hover:text-red-600 border-red-200 dark:border-red-900/30 hover:bg-red-50 dark:hover:bg-red-950/20 shrink-0"
+                                                                    >
+                                                                        Remover acesso
+                                                                    </Button>
+                                                                }
+                                                                className="px-4 py-3"
+                                                            />
+                                                        )
+                                                    })
+                                            )}
+                                        </div>
+                                    </TabsContent>
+
+                                    <TabsContent value="all" className="mt-4">
+                                        <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                                            {allStores.map((store) => {
+                                                const state = storeAccessState[store.id] || { enabled: false, role: "OPERATOR" }
+                                                return (
+                                                    <ListItem
+                                                        key={store.id}
+                                                        left={
+                                                            <Checkbox
+                                                                checked={state.enabled}
+                                                                onChange={() => setStoreAccessState(prev => ({
+                                                                    ...prev,
+                                                                    [store.id]: { ...prev[store.id], enabled: !prev[store.id]?.enabled }
+                                                                }))}
+                                                            />
+                                                        }
+                                                        title={store.name}
+                                                        description="Loja da empresa"
+                                                        right={
+                                                            state.enabled ? (
+                                                                <div className="w-36 shrink-0">
+                                                                    <FormDropdown
+                                                                        options={STORE_ROLE_OPTIONS}
+                                                                        value={state.role}
+                                                                        setValue={(role) => setStoreAccessState(prev => ({
+                                                                            ...prev,
+                                                                            [store.id]: { ...prev[store.id], role: role as PartnerRole }
+                                                                        }))}
+                                                                    />
+                                                                </div>
+                                                            ) : undefined
+                                                        }
+                                                        className="px-4 py-3"
+                                                    />
+                                                )
+                                            })}
+                                        </div>
+                                    </TabsContent>
+                                </Tabs>
 
                                 {/* Footer Actions */}
                                 <div className="flex justify-end gap-3 pt-3 border-t border-brand-border dark:border-dark-border">

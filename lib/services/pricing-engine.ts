@@ -584,9 +584,10 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
       }
     }
 
-    // Clamp to minimum R$ 0.01
+    // Clamp to minimum R$ 0.01 (only for items that actually have a base price;
+    // zero-priced/free items stay at 0)
     let effectiveBest = bestPrice
-    if (effectiveBest < 0.01) {
+    if (unitPrice > 0 && effectiveBest < 0.01) {
       effectiveBest = 0.01
       minPriceWarning = true
     }
@@ -1060,7 +1061,7 @@ export function computeItemCampaignPricing(
   }
 
   let campaignPrice = round2(unitPrice - discountAmt)
-  if (campaignPrice < 0.01) campaignPrice = 0.01
+  if (unitPrice > 0 && campaignPrice < 0.01) campaignPrice = 0.01
 
   // Pick the best price
   const bestPrice = Math.min(unitPrice, manualPrice, campaignPrice)

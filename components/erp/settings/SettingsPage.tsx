@@ -56,7 +56,7 @@ type ActivePage =
   | "payment-methods"
   | "crediario"
   | "comissao"
-  | "recibo"
+  | "trocas"
   | "vitrine"
   | "delivery"
   | "system-settings"
@@ -80,7 +80,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
     "payment-methods": "formas-de-pagamento",
     "crediario": "crediario",
     "comissao": "comissao",
-    "recibo": "recibo-devolucao",
+    "trocas": "trocas-devolucoes",
     "vitrine": "vitrine",
     "delivery": "entrega",
     "system-settings": "configuracoes-sistema",
@@ -89,10 +89,13 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
     "logs": "historico-atividades",
   }
 
-  const SLUG_TO_PAGE: Record<string, ActivePage> = Object.entries(PAGE_TO_SLUG).reduce(
-    (acc, [page, slug]) => ({ ...acc, [slug]: page as ActivePage }),
-    {} as Record<string, ActivePage>
-  )
+  const SLUG_TO_PAGE: Record<string, ActivePage> = {
+    ...Object.entries(PAGE_TO_SLUG).reduce(
+      (acc, [page, slug]) => ({ ...acc, [slug]: page as ActivePage }),
+      {} as Record<string, ActivePage>
+    ),
+    "recibo-devolucao": "trocas", // Legacy fallback compatibility
+  }
 
   // Sync state from URL on mount
   React.useEffect(() => {
@@ -104,7 +107,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
       // Also set the correct category tab for when they go back
       if (["business-data", "team", "subscription"].includes(SLUG_TO_PAGE[tab])) {
         setActiveTab("empresa")
-      } else if (["payment-methods", "crediario", "comissao", "recibo"].includes(SLUG_TO_PAGE[tab])) {
+      } else if (["payment-methods", "crediario", "comissao", "trocas"].includes(SLUG_TO_PAGE[tab])) {
         setActiveTab("vendas")
       } else {
         setActiveTab("adicionais")
@@ -145,7 +148,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
         "payment-methods": "Formas de Pagamentos",
         "crediario": "Crediário",
         "comissao": "Comissão",
-        "recibo": "Trocas e Devoluções",
+        "trocas": "Trocas e Devoluções",
         "vitrine": "Minha Vitrine",
         "delivery": "Logística e Entrega",
         "logs": "Histórico de Atividades",
@@ -200,7 +203,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
     if (activePage === "comissao" && !canAccessCommissions) setActivePage("home")
     if (activePage === "team" && !canAccessTeam) setActivePage("home")
     if (activePage === "payment-methods" && !canAccessPayments) setActivePage("home")
-    if (activePage === "recibo" && !canAccessReturns) setActivePage("home")
+    if (activePage === "trocas" && !canAccessReturns) setActivePage("home")
     if (activePage === "business-data" && !canAccessBusinessData) setActivePage("home")
     if (activePage === "resources" && !canAccessResources) setActivePage("home")
     if (activePage === "logs" && !canAccessLogs) setActivePage("home")
@@ -341,7 +344,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                                 icon={PackageReceiveIcon}
                                 title="Trocas e Devoluções"
                                 description="Defina as políticas de troca e devoluções do seu negócio."
-                                onClick={() => setActivePage("recibo")}
+                                onClick={() => setActivePage("trocas")}
                                 showChevron
                                 className="px-4 py-3 gap-4"
                               />
@@ -459,7 +462,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
           {activePage === "subscription" && canAccessSubscription && <SubscriptionSubPage key="subscription" onBack={() => setActivePage("home")} />}
           {activePage === "crediario" && <SimpleSettingsSubPage key="crediario" title="Crediário" onBack={() => setActivePage("home")} />}
           {activePage === "comissao" && canAccessCommissions && <CommissionsSubPage key="comissao" partnerId={partner.id} onBack={() => setActivePage("home")} planGate={commissionsPlanBlocked ? { requiredPlanSlug: "crescer" as const } : undefined} />}
-          {activePage === "recibo" && <ReturnPolicySubPage key="recibo" partnerId={partner.id} onBack={() => setActivePage("home")} />}
+          {activePage === "trocas" && <ReturnPolicySubPage key="trocas" partnerId={partner.id} onBack={() => setActivePage("home")} />}
           {activePage === "vitrine" && selectedStore && <ShowcaseSubPage key="vitrine" store={selectedStore} partnerId={partner.id} onBack={() => setActivePage("home")} />}
           {activePage === "delivery" && <DeliverySettingsSubPage key="delivery" partnerId={partner.id} storeId={selectedStore?.id} onBack={() => setActivePage("home")} planGate={deliveryPlanBlocked ? { requiredPlanSlug: "crescer" as const } : undefined} />}
           {activePage === "system-settings" && canAccessSystemSettings && (

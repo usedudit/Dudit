@@ -13,6 +13,7 @@ interface ReturnListRowProps {
   columns: Array<{ id: string; align?: "left" | "center" | "right" }>
   onDetails: (returnRequest: ReturnRequest) => void
   onEdit?: (returnRequest: ReturnRequest) => void
+  onPrint?: (returnRequest: ReturnRequest) => void
   onDelete?: (returnRequest: ReturnRequest) => void
   canManage: boolean
 }
@@ -71,10 +72,8 @@ export function getRefundTypeLabel(refundType: ReturnRequest["refundType"]) {
   }
 }
 
-const ReturnListRow = React.memo(({ returnRequest, columns, onDetails, onEdit, onDelete, canManage }: ReturnListRowProps) => {
+const ReturnListRow = React.memo(({ returnRequest, columns, onDetails, onEdit, onPrint, onDelete, canManage }: ReturnListRowProps) => {
   const statusMeta = getReturnStatusMeta(returnRequest.status)
-  
-  const totalQuantity = returnRequest.items.reduce((acc, item) => acc + (item.quantity || 0), 0)
 
   const renderCell = (id: string) => {
     switch (id) {
@@ -88,9 +87,6 @@ const ReturnListRow = React.memo(({ returnRequest, columns, onDetails, onEdit, o
               <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate">
                 {`DVL-${returnRequest.id.slice(0, 6).toUpperCase()}`}
               </span>
-              <Badge variant={statusMeta.variant} className="w-fit mt-0.5 text-[10px] py-0 px-1.5">
-                {statusMeta.label}
-              </Badge>
             </div>
           </div>
         )
@@ -118,17 +114,17 @@ const ReturnListRow = React.memo(({ returnRequest, columns, onDetails, onEdit, o
             {getReturnResolutionLabel(returnRequest.approvedResolution || returnRequest.desiredResolution || returnRequest.refundType || "refund")}
           </span>
         )
-      case "quantity":
+      case "status":
         return (
-          <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
-            {totalQuantity}
-          </span>
+          <Badge variant={statusMeta.variant} className="w-fit">
+            {statusMeta.label}
+          </Badge>
         )
       case "actions":
         return (
           <div className="flex justify-center action-btn" onClick={(e) => e.stopPropagation()}>
             <ActionsDropdown 
-              onView={() => onDetails(returnRequest)}
+              onPrint={() => onPrint?.(returnRequest)}
               onEdit={canManage && !["RESOLVED", "REJECTED", "EXPIRED"].includes(returnRequest.status) ? () => onEdit?.(returnRequest) : undefined}
             />
           </div>

@@ -7,13 +7,20 @@ import {
 import { buildKeysetOrFilter, fetchAllPages } from "../paginate"
 import {
   applyCustomerStatusFilter,
-  mapCustomerRow,
+  CUSTOMER_EXPORT_ALL_COLUMNS,
   CUSTOMER_EXPORT_COLUMNS,
+  mapCustomerRow,
 } from "../mappers"
 import type { CustomersExportFilters } from "../types"
 import { EXPORT_CHUNK_SIZE } from "../constants"
 
 const CUSTOMER_SELECT = "id, name, email, phone, status, created_at"
+
+const CUSTOMER_SELECT_ALL = `
+  id, name, email, phone, phone_fixed, website, birth_date, status,
+  person_type, cpf, cnpj, inscricao_estadual, country, zip_code, street,
+  number, complement, neighborhood, city, state, store_credit, notes, created_at
+`
 
 async function loadCustomerStats(supabase: SupabaseClient, partnerId: string, customerIds: string[]) {
   const stats = new Map<string, { orders: number; ltv: number }>()
@@ -71,11 +78,13 @@ export async function fetchCustomersExport(
 
   const search = sanitizeSearchTerm(filters.search)
   const { startIso, endIso } = resolveExportDateBounds(filters.datePeriod)
+  const includeAllColumns = filters.includeAllColumns === true
+  const select = includeAllColumns ? CUSTOMER_SELECT_ALL : CUSTOMER_SELECT
 
   const rawRows = await fetchAllPages<any>({
     chunkSize: EXPORT_CHUNK_SIZE,
     fetchPage: async (cursor) => {
-      let query = supabase.from("customers").select(CUSTOMER_SELECT).eq("partner_id", partnerId)
+      let query: any = (supabase as any).from("customers").select(select).eq("partner_id", partnerId)
 
       const dbStatuses = [...new Set(statusLabels.map(mapCustomerStatusToDb))]
       if (dbStatuses.length === 1) query = query.eq("status", dbStatuses[0])
@@ -113,6 +122,7 @@ export async function fetchCustomersExport(
     filtered.map((r) => String(r.id)),
   )
 
-  const rows = filtered.map((r) => mapCustomerRow(r, stats.get(String(r.id))))
-  return { columns: CUSTOMER_EXPORT_COLUMNS, rows, rowCount: rows.length }
+  const rows = filtered.map((r) => mapCustomerRow(r, stats.get(String(r.id)), includeAllColumns))
+  const columns = includeAllColumns ? CUSTOMER_EXPORT_ALL_COLUMNS : CUSTOMER_EXPORT_COLUMNS
+  return { columns, rows, rowCount: rows.length }
 }

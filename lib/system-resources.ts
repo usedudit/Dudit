@@ -362,6 +362,66 @@ export function isSystemResourceActive(
   return resolveActiveResources(businessInfo).includes(resourceId)
 }
 
+// ─── Route → Resource Guard ────────────────────────────────────────────────
+// Maps every ERP route (or route prefix) to the SystemResource that controls it.
+// If the resource is deactivated, accessing the route should show "no access".
+// Longest prefix wins so subpages like /erp/produtos/cadastros resolve correctly.
+
+const SYSTEM_RESOURCE_ROUTE_MAP: Record<string, SystemResourceId> = {
+  // ── Vendas
+  "/erp/pedidos": "orders",
+  "/erp/orcamentos": "quotes",
+  "/erp/pdv": "pos",
+  "/erp/devolucoes": "returns",
+  "/erp/logistica": "deliveries",
+  "/erp/metas": "goals",
+  // ── Produtos
+  "/erp/produtos": "products",
+  "/erp/movimentacao-estoque": "stockMovements",
+  "/erp/importacao-xml": "products",
+  "/erp/fornecedores": "products",
+  "/erp/produtos/cadastros": "productCadastros",
+  // ── Serviços
+  "/erp/servicos": "services",
+  "/erp/agendamentos": "appointments",
+  "/erp/ordens-de-servico": "serviceOrders",
+  "/erp/servicos/cadastros": "serviceCadastros",
+  // ── Clientes
+  "/erp/clientes": "customers",
+  // ── Financeiro
+  "/erp/transacoes": "financial",
+  "/erp/contas-a-pagar": "financial",
+  "/erp/contas-a-receber": "financial",
+  "/erp/caixa": "financial",
+  // ── Desempenho
+  "/erp/relatorios": "reports",
+  "/erp/produtividade": "productivity",
+  "/erp/produtividade/metas": "productivity",
+  "/erp/produtividade/comissoes": "productivity",
+  // ── Marketing
+  "/erp/cupons": "coupons",
+  "/erp/promocoes": "campaigns",
+  "/erp/marketing/videos": "communityVideos",
+}
+
+/**
+ * Resolves the SystemResource that gates a given ERP pathname.
+ * Returns null for routes that are not resource-gated (always accessible).
+ */
+export function systemResourceForPath(pathname: string): SystemResourceId | null {
+  let bestMatch: SystemResourceId | null = null
+  let bestLength = 0
+  for (const [path, resourceId] of Object.entries(SYSTEM_RESOURCE_ROUTE_MAP)) {
+    if (pathname === path || pathname.startsWith(path + "/")) {
+      if (path.length > bestLength) {
+        bestMatch = resourceId
+        bestLength = path.length
+      }
+    }
+  }
+  return bestMatch
+}
+
 export function isSystemResourceAvailableForPlan(resource: SystemResourceDefinition, planSlug: string): boolean {
   return !resource.minimumPlan || hasMinimumPlan(planSlug, resource.minimumPlan)
 }

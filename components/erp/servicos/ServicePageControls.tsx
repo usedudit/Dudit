@@ -19,7 +19,10 @@ import {
     PackageIcon,
     MoneyIcon,
     InfoIcon,
-    GridIcon as CategoryIcon
+    GridIcon as CategoryIcon,
+    ArchiveIcon,
+    CancelCircleIcon,
+    CheckCircleIcon
 } from "@/lib/icons"
 
 // Tipos necessários
@@ -151,13 +154,13 @@ const ServicePageControls: React.FC<ServicePageControlsProps> = ({
                         <TabsTrigger value="all" icon={PackageIcon} badge={tabCounts && <TabCountBadge count={tabCounts.all} variant="gray" />}>
                             Todos
                         </TabsTrigger>
-                        <TabsTrigger value="active" icon={InfoIcon} badge={tabCounts && <TabCountBadge count={tabCounts.active} variant="green" />}>
+                        <TabsTrigger value="active" icon={CheckCircleIcon} badge={tabCounts && <TabCountBadge count={tabCounts.active} variant="green" />}>
                             Ativos
                         </TabsTrigger>
-                        <TabsTrigger value="inactive" icon={InfoIcon} badge={tabCounts && <TabCountBadge count={tabCounts.inactive} variant="gray" />}>
+                        <TabsTrigger value="inactive" icon={CancelCircleIcon} badge={tabCounts && <TabCountBadge count={tabCounts.inactive} variant="gray" />}>
                             Inativos
                         </TabsTrigger>
-                        <TabsTrigger value="archived" icon={InfoIcon} badge={tabCounts && <TabCountBadge count={tabCounts.archived} variant="orange" />}>
+                        <TabsTrigger value="archived" icon={ArchiveIcon} badge={tabCounts && <TabCountBadge count={tabCounts.archived} variant="orange" />}>
                             Arquivados
                         </TabsTrigger>
                     </TabsList>

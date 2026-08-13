@@ -119,16 +119,6 @@ export default function SpecificationsTab({
 
     return (
         <div className="space-y-4">
-            {/* Template Selector */}
-            {isEditing && (
-                <div className="pb-2">
-                    <Button variant="outline" size="sm" onClick={() => { setShowTemplateModal(true); setSelectedTemplate(null) }}>
-                        <PlusIcon className="w-4 h-4 mr-1" />
-                        Modelo pré-definido
-                    </Button>
-                </div>
-            )}
-
             {isSpecsEmpty && !isEditing ? (
                 <div className="flex flex-col items-center justify-center text-center py-8">
                     <IconPlaceholder
@@ -143,11 +133,10 @@ export default function SpecificationsTab({
                         icon={ArrowUpDownIcon}
                         title="Nenhuma especificação"
                         subtitle="Adicione características como IMEI, modelo, marca, cor"
-                        itemButton={{
-                            text: "Adicionar atributo",
-                            action: addAttribute,
-                            variant: "outline",
-                        }}
+                        buttons={[
+                            { text: "Adicionar atributo", action: addAttribute, variant: "outline" },
+                            { text: "Modelo pré-definido", action: () => setShowTemplateModal(true), variant: "outline" }
+                        ]}
                     />
                 </div>
             ) : (

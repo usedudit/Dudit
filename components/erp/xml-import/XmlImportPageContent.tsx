@@ -141,7 +141,7 @@ function ImportItemListRow({ item, d, isPreview, onOpenAction, supplierName, sup
                 <div className="flex flex-col gap-0.5 min-w-0">
                     <div className="flex items-center gap-2 min-w-0">
                         <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate">{item.raw_name}</span>
-                        <Badge variant={badge.variant} className="whitespace-nowrap shrink-0">{badge.label}</Badge>
+                        <Badge variant={badge.variant} icon={null} className="whitespace-nowrap scale-90 shrink-0">{badge.label}</Badge>
                     </div>
                     {item.raw_sku && (
                         <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">SKU: {item.raw_sku} • {isPreview && (<span className={`text-[11px] font-semibold ${getDecisionToneClass(d.decision)}`}> {getItemDecisionLabel(d.decision, item)} </span>)} </span>
@@ -1197,7 +1197,7 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                                     <div className="flex flex-col gap-1 overflow-hidden min-w-0">
                                         <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
                                             <span className="truncate">NF-e {preview.invoice.numero || "-"}</span>
-                                            {isPreview && <Badge variant="orange" className="whitespace-nowrap scale-90 shrink-0">Preview</Badge>}
+                                            {isPreview && <Badge variant="orange" className="whitespace-nowrap scale-90 shrink-0">Revisar</Badge>}
                                             {isFailed && <Badge variant="red" className="whitespace-nowrap scale-90 shrink-0">Erro</Badge>}
                                             {isCompleted && !isReversed && <Badge variant="green" className="whitespace-nowrap scale-90 shrink-0">Importado</Badge>}
                                             {isReversed && <Badge variant="gray" className="whitespace-nowrap scale-90 shrink-0">Revertido</Badge>}
@@ -1341,7 +1341,7 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                                                 </div>
                                             </div>
 
-                                            <FormSection title="Produtos">
+                                            <FormSection title="Produtos" hasSeparator>
                                                 <div>
                                                     {isTabletOrMobile ? (
                                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

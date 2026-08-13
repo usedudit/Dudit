@@ -1,13 +1,24 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { sanitizeSearchTerm } from "../filters"
 import { fetchAllPages } from "../paginate"
-import { mapStockMovementRow, STOCK_MOVEMENT_EXPORT_COLUMNS } from "../mappers"
+import {
+  mapStockMovementRow,
+  STOCK_MOVEMENT_EXPORT_ALL_COLUMNS,
+  STOCK_MOVEMENT_EXPORT_COLUMNS,
+} from "../mappers"
 import type { StockMovementsExportFilters } from "../types"
 import { EXPORT_CHUNK_SIZE } from "../constants"
 
 const STOCK_MOVEMENT_SELECT = `
   id, created_at, movement_type, reason, reference_name,
   created_by,
+  stock_movement_items(quantity, products(name, sku)),
+  orders(order_number)
+`
+
+const STOCK_MOVEMENT_SELECT_ALL = `
+  id, created_at, movement_type, reason, reference_name, reference_type,
+  notes, created_by,
   stock_movement_items(quantity, products(name, sku)),
   orders(order_number)
 `
@@ -19,13 +30,15 @@ export async function fetchStockMovementsExport(
 ): Promise<import("../types").ExportResult> {
   const search = sanitizeSearchTerm(filters.search)
   const selectedIds = (filters.selectedIds || []).filter(Boolean)
+  const includeAllColumns = filters.includeAllColumns === true
+  const select = includeAllColumns ? STOCK_MOVEMENT_SELECT_ALL : STOCK_MOVEMENT_SELECT
 
   const rawRows = await fetchAllPages<any>({
     chunkSize: EXPORT_CHUNK_SIZE,
     fetchPage: async (cursor) => {
-      let query = supabase
+      let query: any = (supabase as any)
         .from("stock_movements")
-        .select(STOCK_MOVEMENT_SELECT)
+        .select(select)
         .eq("partner_id", partnerId)
 
       if (filters.storeId) {
@@ -69,6 +82,7 @@ export async function fetchStockMovementsExport(
     },
   })
 
-  const rows = rawRows.map(mapStockMovementRow)
-  return { columns: STOCK_MOVEMENT_EXPORT_COLUMNS, rows, rowCount: rows.length }
+  const rows = rawRows.map((r) => mapStockMovementRow(r, includeAllColumns))
+  const columns = includeAllColumns ? STOCK_MOVEMENT_EXPORT_ALL_COLUMNS : STOCK_MOVEMENT_EXPORT_COLUMNS
+  return { columns, rows, rowCount: rows.length }
 }

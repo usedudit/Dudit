@@ -1,6 +1,7 @@
 import type React from "react"
 import type { Metadata } from "next"
 import { ERPSidebar } from "@/components/erp/ERPSidebar"
+import { ERPResourceGuard } from "@/components/erp/ERPResourceGuard"
 import { ERPHeader } from "@/components/erp/ERPHeader"
 import { SidebarProvider } from "@/lib/sidebar-context"
 import { redirect } from "next/navigation"
@@ -138,7 +139,9 @@ export default async function ERPLayout({
                     <div className="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
                       <OfflineBanner variant="erp" />
                       <ERPHeader userProfile={userProfile} />
-                      {children}
+                      <ERPResourceGuard>
+                        {children}
+                      </ERPResourceGuard>
                     </div>
                   </div>
                   <LimitStatusWidget />

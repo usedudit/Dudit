@@ -1,13 +1,23 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { sanitizeSearchTerm } from "../filters"
 import { fetchAllPages } from "../paginate"
-import { mapServiceOrderRow, SERVICE_ORDER_EXPORT_COLUMNS } from "../mappers"
+import {
+  mapServiceOrderRow,
+  SERVICE_ORDER_EXPORT_ALL_COLUMNS,
+  SERVICE_ORDER_EXPORT_COLUMNS,
+} from "../mappers"
 import type { ServiceOrdersExportFilters } from "../types"
 import { EXPORT_CHUNK_SIZE } from "../constants"
 
 const SERVICE_ORDER_SELECT = `
   id, order_number, title, status, customer_snapshot, assigned_user_id,
   expected_completion_date, total_amount, created_at
+`
+
+const SERVICE_ORDER_SELECT_ALL = `
+  id, order_number, title, status, description, internal_notes,
+  customer_snapshot, assigned_user_id, expected_completion_date, completed_at,
+  total_amount, total_service_amount, total_product_amount, created_at
 `
 
 async function resolveAssignedUserNames(supabase: SupabaseClient, userIds: string[]) {
@@ -33,13 +43,15 @@ export async function fetchServiceOrdersExport(
 ): Promise<import("../types").ExportResult> {
   const search = sanitizeSearchTerm(filters.search)
   const selectedIds = (filters.selectedIds || []).filter(Boolean)
+  const includeAllColumns = filters.includeAllColumns === true
+  const select = includeAllColumns ? SERVICE_ORDER_SELECT_ALL : SERVICE_ORDER_SELECT
 
   const rawRows = await fetchAllPages<any>({
     chunkSize: EXPORT_CHUNK_SIZE,
     fetchPage: async (cursor) => {
-      let query = supabase
+      let query: any = (supabase as any)
         .from("service_orders")
-        .select(SERVICE_ORDER_SELECT)
+        .select(select)
         .eq("partner_id", partnerId)
 
       if (filters.storeId) {
@@ -94,8 +106,9 @@ export async function fetchServiceOrdersExport(
 
   const rows = rawRows.map((r) => {
     const assignedName = assignedNames.get(String(r.assigned_user_id || "")) || "-"
-    return mapServiceOrderRow({ ...r, user_profiles: { full_name: assignedName } })
+    return mapServiceOrderRow({ ...r, user_profiles: { full_name: assignedName } }, includeAllColumns)
   })
 
-  return { columns: SERVICE_ORDER_EXPORT_COLUMNS, rows, rowCount: rows.length }
+  const columns = includeAllColumns ? SERVICE_ORDER_EXPORT_ALL_COLUMNS : SERVICE_ORDER_EXPORT_COLUMNS
+  return { columns, rows, rowCount: rows.length }
 }

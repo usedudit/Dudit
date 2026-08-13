@@ -3,7 +3,7 @@
 import React from "react"
 import { motion } from "framer-motion"
 import { Checkbox, Badge, ActionsDropdown, Tooltip } from "@/components/reusable"
-import { formatCurrency, checkBirthday } from "@/lib/utils";
+import { checkBirthday } from "@/lib/utils";
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { formatBrazilMobile } from "@/lib/utils/phone-utils"
 
@@ -108,26 +108,6 @@ const CustomerGridCard = React.memo(
                         <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate">
                             <span>ID {customer.id || "-"}</span>
                         </div>
-
-                        {/* Linha 3: Celular */}
-                        {mobile && (
-                            <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate flex items-center gap-1">
-                                <svg className="w-3.5 h-3.5 text-brand-inactive-text dark:text-dark-body flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
-                                <span>{formatBrazilMobile(mobile)}</span>
-                            </div>
-                        )}
-
-                        {/* Linha 4: Pedidos */}
-                        <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate flex items-center gap-1">
-                            <svg className="w-3.5 h-3.5 text-brand-inactive-text dark:text-dark-body flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
-                            <span>{orders} pedido{orders !== 1 ? "s" : ""}</span>
-                        </div>
-
-                        {/* Linha 5: Status */}
-                        <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate flex items-center gap-1">
-                            <svg className="w-3.5 h-3.5 text-brand-inactive-text dark:text-dark-body flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                            <span>{status === 'ativo' ? "Ativo" : status === 'inativo' ? "Inativo" : status === 'bloqueado' ? "Bloqueado" : "Arquivado"}</span>
-                        </div>
                     </div>
                 </div>
 
@@ -136,25 +116,25 @@ const CustomerGridCard = React.memo(
                     {/* Linha A: Stats */}
                     <div className="grid grid-cols-2 gap-4">
                         <div className="flex flex-col gap-0.5">
-                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Total Gasto</span>
-                            <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">
-                                {customer.totalOrderValue ? formatCurrency(customer.totalOrderValue) : "-"}
-                            </span>
-                        </div>
-
-                        <div className="flex flex-col gap-0.5 items-end">
                             <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Pedidos</span>
                             <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">
                                 {orders}
+                            </span>
+                        </div>
+
+                        <div className="flex flex-col gap-0.5 items-end min-w-0">
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Telefone</span>
+                            <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading truncate max-w-full">
+                                {mobile ? formatBrazilMobile(mobile) : "-"}
                             </span>
                         </div>
                     </div>
 
                     {/* Linha B: Último Pedido e Ações */}
                     <div className="flex items-end justify-between mt-1">
-                        <div className="flex flex-col">
+                        <div className="flex flex-col min-w-0">
                             <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Último Pedido</span>
-                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{customer.lastOrderDate || "-"}</span>
+                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{customer.lastOrderDate || "-"}</span>
                         </div>
 
                         {/* Botão de Ações */}
@@ -183,6 +163,7 @@ const CustomerGridCard = React.memo(
         prev.customer.originalId === next.customer.originalId &&
         prev.customer.name === next.customer.name &&
         prev.customer.status === next.customer.status &&
+        prev.customer.phone === next.customer.phone &&
         prev.customer.orders === next.customer.orders &&
         prev.customer.totalOrderValue === next.customer.totalOrderValue &&
         prev.customer.birth_date === next.customer.birth_date &&

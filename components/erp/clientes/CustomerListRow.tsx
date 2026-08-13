@@ -4,6 +4,7 @@ import React from "react"
 import { motion } from "framer-motion"
 import { Checkbox, Badge, ActionsDropdown, Tooltip } from "@/components/reusable"
 import { formatCurrency, checkBirthday } from "@/lib/utils";
+import { formatBrazilMobile } from "@/lib/utils/phone-utils"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 
 interface ColumnDef {
@@ -82,6 +83,13 @@ const CustomerListItem = React.memo(
             </div>
           )
         }
+
+        case "phone":
+          return (
+            <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
+              {customer.phone ? formatBrazilMobile(customer.phone) : "-"}
+            </span>
+          )
 
         case "orders":
           return (
@@ -188,6 +196,7 @@ const CustomerListItem = React.memo(
     prev.customer.originalId === next.customer.originalId &&
     prev.customer.name === next.customer.name &&
     prev.customer.status === next.customer.status &&
+    prev.customer.phone === next.customer.phone &&
     prev.customer.orders === next.customer.orders &&
     prev.customer.totalOrderValue === next.customer.totalOrderValue &&
     prev.customer.lastOrderDate === next.customer.lastOrderDate &&

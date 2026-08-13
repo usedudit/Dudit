@@ -227,12 +227,12 @@ export class AiGeneratorService {
         try {
           SecureLogger.info(`[AI GENERATOR] Tentando geração com o modelo: ${currentModel}`)
           const apiResult = await provider.generate(prompt, currentModel, { timeout: 10000 })
-          
+
           apiResponseText = apiResult.text
           modelUsed = apiResult.modelUsed
           tokensPrompt = apiResult.tokensPrompt
           tokensCompletion = apiResult.tokensCompletion
-          
+
           break // Sucesso!
         } catch (err: any) {
           lastError = err
@@ -326,7 +326,7 @@ export class AiGeneratorService {
     } catch (error: any) {
       const durationMs = Date.now() - startTime
       const errorMsg = error.message || "Erro na cadeia de geração da IA."
-      
+
       SecureLogger.error("AI_GENERATION_FAILED", {
         partner_id: partnerId,
         user_id: userId,

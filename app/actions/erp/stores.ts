@@ -11,6 +11,8 @@ import { safeRevalidateTag } from "@/lib/utils/revalidation"
 import { TAGS } from "@/lib/utils/revalidation-tags"
 import { DASHBOARD_TAGS } from "@/lib/data/dashboard"
 import { getRandomDefaultBanner } from "@/lib/utils/banner"
+import { validatePhoneBR, sanitizeInput } from "@/lib/input-validator"
+import { normalizePhoneToE164 } from "@/lib/utils/phone-utils"
 
 export async function listStoresAction(partnerId: string) {
     const user = await requireUser()
@@ -252,7 +254,22 @@ export async function updateStoreAction(input: UpdateStoreInput): Promise<Action
         if (input.name !== undefined) updateData.name = input.name
         if (input.slug !== undefined) updateData.slug = input.slug
         if (input.description !== undefined) updateData.description = input.description
-        if (input.phone !== undefined) updateData.phone = input.phone
+        if (input.phone !== undefined) {
+            const sanitizedPhone = typeof input.phone === "string" ? sanitizeInput(input.phone, 20) : ""
+            if (sanitizedPhone) {
+                let phoneToValidate = sanitizedPhone
+                const digits = sanitizedPhone.replace(/\D/g, "")
+                if (digits.startsWith("55") && (digits.length === 12 || digits.length === 13)) {
+                    phoneToValidate = digits.slice(2)
+                }
+                if (!validatePhoneBR(phoneToValidate)) {
+                    return { success: false, error: "Número de telefone inválido" }
+                }
+                updateData.phone = normalizePhoneToE164(sanitizedPhone)
+            } else {
+                updateData.phone = null
+            }
+        }
         if (input.opening_hours !== undefined) updateData.opening_hours = input.opening_hours
         if (input.banner_url !== undefined) updateData.banner_url = input.banner_url
         if (input.logo_url !== undefined) updateData.logo_url = input.logo_url

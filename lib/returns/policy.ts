@@ -23,6 +23,7 @@ export type ReturnPolicySnapshot = {
     accepts_size_exchange: boolean
     accepts_color_exchange: boolean
     accepts_store_credit: boolean
+    store_credit_validity_days: number
     accepts_in_person_return: boolean
     accepts_shipping_return: boolean
     shipping_payer: ReturnShippingPayer
@@ -44,6 +45,7 @@ export type PartnerReturnPolicy = {
   acceptsSizeExchange: boolean
   acceptsColorExchange: boolean
   acceptsStoreCredit: boolean
+  storeCreditValidityDays: number
   acceptsInPersonReturn: boolean
   acceptsShippingReturn: boolean
   shippingPayer: ReturnShippingPayer
@@ -64,6 +66,7 @@ export const DEFAULT_POLICY: Omit<PartnerReturnPolicy, "partnerId"> = {
   acceptsSizeExchange: true,
   acceptsColorExchange: true,
   acceptsStoreCredit: true,
+  storeCreditValidityDays: 180,
   acceptsInPersonReturn: true,
   acceptsShippingReturn: true,
   shippingPayer: "case_by_case",
@@ -151,6 +154,7 @@ export function policyRowToSnapshot(row: PartnerReturnPolicy, storeName?: string
       accepts_size_exchange: row.acceptsSizeExchange,
       accepts_color_exchange: row.acceptsColorExchange,
       accepts_store_credit: row.acceptsStoreCredit,
+      store_credit_validity_days: row.storeCreditValidityDays,
       accepts_in_person_return: row.acceptsInPersonReturn,
       accepts_shipping_return: row.acceptsShippingReturn,
       shipping_payer: row.shippingPayer,
@@ -174,6 +178,7 @@ export function normalizePolicyRow(row: Record<string, unknown>, partnerId: stri
     acceptsSizeExchange: row.accepts_size_exchange !== false,
     acceptsColorExchange: row.accepts_color_exchange !== false,
     acceptsStoreCredit: row.accepts_store_credit !== false,
+    storeCreditValidityDays: Number(row.store_credit_validity_days ?? DEFAULT_POLICY.storeCreditValidityDays),
     acceptsInPersonReturn: row.accepts_in_person_return !== false,
     acceptsShippingReturn: row.accepts_shipping_return !== false,
     shippingPayer: (row.shipping_payer as ReturnShippingPayer) || "case_by_case",

@@ -11,7 +11,8 @@ import {
   Users,
   CheckCircleIcon,
   CancelCircleIcon,
-  BlockedIcon
+  BlockedIcon,
+  ArchiveIcon
 } from "@/lib/icons"
 
 interface PlanPageControlsProps {
@@ -52,7 +53,7 @@ export const PlanPageControls: React.FC<PlanPageControlsProps> = ({
             <TabsTrigger value="Inativo" icon={CancelCircleIcon} badge={tabCounts && <TabCountBadge count={tabCounts.Inativo} variant="gray" />}>
               Inativos
             </TabsTrigger>
-            <TabsTrigger value="Arquivado" icon={BlockedIcon} badge={tabCounts && <TabCountBadge count={tabCounts.Arquivado} variant="orange" />}>
+            <TabsTrigger value="Arquivado" icon={ArchiveIcon} badge={tabCounts && <TabCountBadge count={tabCounts.Arquivado} variant="orange" />}>
               Arquivados
             </TabsTrigger>
           </TabsList>

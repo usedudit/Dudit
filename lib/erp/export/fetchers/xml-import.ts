@@ -1,13 +1,24 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { sanitizeSearchTerm } from "../filters"
 import { fetchAllPages } from "../paginate"
-import { mapXmlImportRow, XML_IMPORT_EXPORT_COLUMNS } from "../mappers"
+import {
+  mapXmlImportRow,
+  XML_IMPORT_EXPORT_ALL_COLUMNS,
+  XML_IMPORT_EXPORT_COLUMNS,
+} from "../mappers"
 import type { XmlImportExportFilters } from "../types"
 import { EXPORT_CHUNK_SIZE } from "../constants"
 
 const XML_IMPORT_SELECT = `
   id, invoice_number, invoice_series, supplier_name, total_value,
   items_count, status, created_at, access_key
+`
+
+const XML_IMPORT_SELECT_ALL = `
+  id, invoice_number, invoice_series, supplier_name, supplier_document,
+  invoice_date, total_value, items_count, imported_items, skipped_items,
+  status, created_at, updated_at, processed_at, access_key, modelo,
+  protocolo, ambiente, finalidade, tipo_operacao, inf_cpl, inf_ad_fisco, xml_hash
 `
 
 export async function fetchXmlImportExport(
@@ -17,13 +28,15 @@ export async function fetchXmlImportExport(
 ): Promise<import("../types").ExportResult> {
   const search = sanitizeSearchTerm(filters.search)
   const selectedIds = (filters.selectedIds || []).filter(Boolean)
+  const includeAllColumns = filters.includeAllColumns === true
+  const select = includeAllColumns ? XML_IMPORT_SELECT_ALL : XML_IMPORT_SELECT
 
   const rawRows = await fetchAllPages<any>({
     chunkSize: EXPORT_CHUNK_SIZE,
     fetchPage: async (cursor) => {
-      let query = supabase
+      let query: any = (supabase as any)
         .from("xml_imports")
-        .select(XML_IMPORT_SELECT)
+        .select(select)
         .eq("partner_id", partnerId)
 
       if (filters.storeId) {
@@ -72,6 +85,7 @@ export async function fetchXmlImportExport(
     },
   })
 
-  const rows = rawRows.map(mapXmlImportRow)
-  return { columns: XML_IMPORT_EXPORT_COLUMNS, rows, rowCount: rows.length }
+  const rows = rawRows.map((r) => mapXmlImportRow(r, includeAllColumns))
+  const columns = includeAllColumns ? XML_IMPORT_EXPORT_ALL_COLUMNS : XML_IMPORT_EXPORT_COLUMNS
+  return { columns, rows, rowCount: rows.length }
 }

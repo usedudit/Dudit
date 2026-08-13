@@ -1,7 +1,7 @@
 "use client"
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { EditIcon, ChevronLeftIcon, ThreeDotsIcon, StarIcon, ShoppingCartIcon, MoneyIcon, Users, CreditCardIcon } from '@/lib/icons';
+import { EditIcon, ChevronLeftIcon, ThreeDotsIcon, StarIcon, ShoppingCartIcon, MoneyIcon, TruckIcon, Users, CreditCardIcon } from '@/lib/icons';
 import { Button, Badge, Tabs, TabsList, TabsTrigger, TabsContent, ActionsDropdown, ThreeDotsLoader, AlertModal, CustomerCard } from '@/components/reusable';
 import Pagination from '@/components/reusable/Pagination';
 import { useNotification } from '@/hooks/use-notification';
@@ -586,7 +586,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                             </div>
                                                             <div className="flex items-center gap-2 mt-1 text-sm text-brand-inactive-text dark:text-dark-body">
                                                                 <span>Cliente desde {customer.createdAt ? formatDate(customer.createdAt) : '-'}</span>
-                                                                <span className="text-gray-300 dark:text-gray-600">•</span>
+                                                                <span className="text-brand-inactive-text dark:text-dark-body">•</span>
                                                                 <span>{customer.personType === 'pj' || customer.cnpj ? 'Pessoa Jurídica' : 'Pessoa Física'}</span>
                                                             </div>
                                                         </div>
@@ -768,14 +768,14 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                     </div>
 
                                                     <div className="space-y-1">
-                                                        <div className="flex justify-between items-center py-2.5 border-b border-brand-border dark:border-dark-border">
+                                                        <div className="flex justify-between items-center">
                                                             <span className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold">Cliente desde</span>
                                                             <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
                                                                 {customer.createdAt ? formatDate(customer.createdAt) : '-'}
                                                             </span>
                                                         </div>
                                                         {customer.birth_date && (
-                                                            <div className="flex justify-between items-center py-2.5 border-b border-brand-border dark:border-dark-border">
+                                                            <div className="flex justify-between items-center">
                                                                 <span className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold">Nascimento</span>
                                                                 <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
                                                                     {formatDateToBR(customer.birth_date)}
@@ -910,12 +910,12 @@ const OrdersContent = ({
                                             </h3>
                                         </div>
                                         <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                                            <Badge variant={o.statusColor} className="h-5 text-[10px] px-1.5">
+                                            <Badge variant={o.statusColor} icon={<MoneyIcon />} className="h-5 text-[10px] px-1.5">
                                                 {o.statusLabel}
                                             </Badge>
                                             {!o.hasOnlyServices && (
-                                                <Badge variant={o.deliveryStatusColor || "gray"} className="h-5 text-[10px] px-1.5">
-                                                    {o.deliveryStatusLabel || "N/I"}
+                                                <Badge variant={o.deliveryStatusColor || "gray"} icon={<TruckIcon />} className="h-5 text-[10px] px-1.5">
+                                                    {o.deliveryStatusLabel || "Não informado"}
                                                 </Badge>
                                             )}
                                         </div>
@@ -926,7 +926,7 @@ const OrdersContent = ({
                                             <span className="text-brand-inactive-text dark:text-dark-body font-medium">
                                                 {o.items_count} {o.items_count === 1 ? 'item' : 'itens'}
                                             </span>
-                                            <span className="text-gray-300 dark:text-gray-600 font-bold">•</span>
+                                            <span className="text-brand-inactive-text dark:text-dark-body font-bold">•</span>
                                             <span className="font-bold text-brand-primary">
                                                 {formatCurrency(o.total_amount)}
                                             </span>
@@ -1007,12 +1007,12 @@ const OrdersContent = ({
                                                             <Badge variant="red">Cancelado</Badge>
                                                         ) : (
                                                             <>
-                                                                <Badge variant={o.statusColor}>
+                                                                <Badge variant={o.statusColor} icon={<MoneyIcon />}>
                                                                     {o.statusLabel}
                                                                 </Badge>
                                                                 {!o.hasOnlyServices && (
-                                                                    <Badge variant={o.deliveryStatusColor || "gray"}>
-                                                                        {o.deliveryStatusLabel || "N/I"}
+                                                                    <Badge variant={o.deliveryStatusColor || "gray"} icon={<TruckIcon />}>
+                                                                        {o.deliveryStatusLabel || "Não informado"}
                                                                     </Badge>
                                                                 )}
                                                             </>
@@ -1321,7 +1321,7 @@ function StoreCreditsContent({
                     <IconPlaceholder
                         title="Nenhum vale-compra encontrado"
                         subtitle="Este cliente não possui vales-compra cadastrados."
-                        imageSrc="https://img.dudit.com.br/static/mascots/SacolaVazia.png"
+                        imageSrc="https://img.dudit.com.br/static/mascots/ValesCompra.png"
                         imageAlt="Nenhum vale-compra encontrado"
                         placeholderType="image"
                     />

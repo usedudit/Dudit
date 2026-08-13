@@ -1,5 +1,5 @@
 import { formatDateTime } from "@/lib/utils"
-import { formatPaymentMethodLabel } from "@/lib/payments/payment-method"
+import { formatPaymentMethodLabel, toCanonicalPaymentType } from "@/lib/payments/payment-method"
 import { formatAddressParts, stripCep } from "@/lib/utils/format-address"
 
 export type SaleReceiptFormat = "thermal" | "a4"
@@ -144,14 +144,46 @@ export function mapCartItemsToReceiptItems(cart: any[]): SaleReceiptItem[] {
     })
 }
 
+function getReceiptMethodTypeLabel(value?: string | null): string {
+    const raw = String(value || "").trim()
+    if (!raw) return "Método não definido"
+
+    // Ignora o que vier entre parênteses para obter apenas o tipo do método
+    // Ex.: "Pix (Pix 2%)" -> "Pix", "Cartão de Crédito (Visa) (2x)" -> "Cartão de Crédito"
+    const base = raw.split(/[()]/)[0].trim()
+
+    const canonical = toCanonicalPaymentType(base)
+    if (canonical !== "other") {
+        return formatPaymentMethodLabel(canonical)
+    }
+
+    const lower = raw.toLowerCase()
+    if (
+        lower.includes("store_credit") ||
+        lower.includes("store-credit") ||
+        lower.includes("vale-compra") ||
+        lower.includes("vale_compra") ||
+        lower.includes("vale")
+    ) {
+        return "Vale-compra"
+    }
+    if (lower.includes("exchange") || lower.includes("troca")) {
+        return "Crédito de troca"
+    }
+    if (base) {
+        return base.charAt(0).toUpperCase() + base.slice(1)
+    }
+    return raw.charAt(0).toUpperCase() + raw.slice(1)
+}
+
 function groupPaymentMethods(
     methods: Array<{ method: string; amount: number; wantsChange?: boolean }>
-): Array<{ method: string; amount: number; wantsChange?: boolean }> {
-    const grouped = methods.reduce<Record<string, { amount: number; wantsChange?: boolean }>>(
+): Array<{ method: string; label: string; amount: number; wantsChange?: boolean }> {
+    const grouped = methods.reduce<Record<string, { label: string; amount: number; wantsChange?: boolean }>>(
         (acc, curr) => {
-            const key = curr.method
+            const key = getReceiptMethodTypeLabel(curr.method)
             if (!acc[key]) {
-                acc[key] = { amount: 0, wantsChange: curr.wantsChange }
+                acc[key] = { label: key, amount: 0, wantsChange: curr.wantsChange }
             }
             acc[key].amount += curr.amount
             return acc
@@ -160,6 +192,7 @@ function groupPaymentMethods(
     )
     return Object.entries(grouped).map(([method, data]) => ({
         method,
+        label: data.label,
         amount: Number(data.amount),
         wantsChange: data.wantsChange,
     }))
@@ -177,10 +210,10 @@ export function buildPaymentLinesFromOrder(order: any): SaleReceiptPaymentLine[]
             }))
         )
         return grouped.map((e) => {
-            let label = formatPaymentMethodLabel(e.method)
-            if (e.method === "cash" && e.wantsChange) {
+            let label = e.label
+            if (toCanonicalPaymentType(e.method) === "cash" && e.wantsChange) {
                 label = `Dinheiro (Troco para R$ ${e.amount.toFixed(2).replace('.', ',')})`
-            } else if (e.method === "cash" && e.wantsChange === false) {
+            } else if (toCanonicalPaymentType(e.method) === "cash" && e.wantsChange === false) {
                 label = "Dinheiro (Valor exato)"
             }
             return {
@@ -190,7 +223,7 @@ export function buildPaymentLinesFromOrder(order: any): SaleReceiptPaymentLine[]
         })
     }
     if (Number(order.paid_amount || 0) > 0.009 && order.payment_method) {
-        return [{ label: String(order.payment_method), amount: Number(order.paid_amount || 0) }]
+        return [{ label: getReceiptMethodTypeLabel(String(order.payment_method)), amount: Number(order.paid_amount || 0) }]
     }
     return []
 }
@@ -213,10 +246,10 @@ export function buildPaymentLinesFromBreakdown(
             }))
         )
         return grouped.map((e) => {
-            let label = formatPaymentMethodLabel(e.method)
-            if (e.method === "cash" && e.wantsChange) {
+            let label = e.label
+            if (toCanonicalPaymentType(e.method) === "cash" && e.wantsChange) {
                 label = `Dinheiro (Troco para R$ ${e.amount.toFixed(2).replace('.', ',')})`
-            } else if (e.method === "cash" && e.wantsChange === false) {
+            } else if (toCanonicalPaymentType(e.method) === "cash" && e.wantsChange === false) {
                 label = "Dinheiro (Valor exato)"
             }
             return {
@@ -226,7 +259,7 @@ export function buildPaymentLinesFromBreakdown(
         })
     }
     if (fallbackMethod && Number(fallbackAmount || 0) > 0.009) {
-        return [{ label: fallbackMethod, amount: Number(fallbackAmount || 0) }]
+        return [{ label: getReceiptMethodTypeLabel(fallbackMethod), amount: Number(fallbackAmount || 0) }]
     }
     return []
 }

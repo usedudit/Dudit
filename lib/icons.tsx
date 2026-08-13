@@ -156,6 +156,7 @@ import {
     EnergyIcon as EnergyIcon01,
     CollectionsBookmarkIcon,
     PinIcon as PinIcon01,
+    ArchiveArrowDownIcon
 } from "@hugeicons/core-free-icons"
 
 
@@ -425,7 +426,7 @@ export const MegaphoneIcon = CreateIcon(Megaphone03Icon)
 export const NotificationIcon = CreateIcon(Notification01Icon)
 
 export const TagIcon = CreateIcon(Tag01Icon)
-export const ArchiveIcon = CreateIcon(Archive03Icon)
+export const ArchiveIcon = CreateIcon(ArchiveArrowDownIcon)
 
 export const StatusIcon = CreateIcon(StatusIcon1)
 export const BlockedIcon = CreateIcon(UnavailableIcon)

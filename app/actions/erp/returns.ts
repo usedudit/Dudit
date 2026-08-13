@@ -398,7 +398,7 @@ export async function getReturnRequestDetailsAction(partnerId: string, requestId
             .from("return_requests")
             .select(`
         *,
-        orders!order_id(order_number, customer_name, total_amount, amount_paid, paid_amount, payment_method, payment_provider, mp_payment_id, situation, delivery_status, delivery_address, buyer_id),
+        orders!order_id(order_number, customer_name, customer_id, total_amount, amount_paid, paid_amount, payment_method, payment_provider, mp_payment_id, situation, delivery_status, delivery_address, buyer_id),
         return_items!return_items_return_request_id_fkey(*, products!product_id(images, video_thumbnail)),
         return_evidence(*),
         return_refunds(*),
@@ -411,21 +411,48 @@ export async function getReturnRequestDetailsAction(partnerId: string, requestId
 
         if (error) throw error
 
-        // Fetch buyer/customer details separately if buyer_id is present
+        // Fetch buyer/customer details separately if buyer_id/customer_id is present
         let buyerDetails = null
-        if (data?.orders?.buyer_id) {
-            const { data: customerData } = await supabase
-                .from("customers")
-                .select("email, phone")
-                .eq("id", data.orders.buyer_id)
-                .eq("partner_id", partnerId)
-                .maybeSingle()
-            buyerDetails = customerData
+        const buyerId = data?.orders?.buyer_id || null
+        const orderCustomerId = data?.orders?.customer_id || null
+        if (buyerId || orderCustomerId) {
+            // 1. Prefer the disambiguated ERP customer_id on the order
+            if (orderCustomerId) {
+                const { data: customerData } = await supabase
+                    .from("customers")
+                    .select("email, phone")
+                    .eq("id", orderCustomerId)
+                    .eq("partner_id", partnerId)
+                    .maybeSingle()
+                buyerDetails = customerData
+            }
 
-            // If not found in customers, check if there's a user profile (marketplace user)
-            if (!buyerDetails) {
+            // 2. buyer_id may be a customers.id (polymorphic)
+            if (!buyerDetails && buyerId) {
+                const { data: customerData } = await supabase
+                    .from("customers")
+                    .select("email, phone")
+                    .eq("id", buyerId)
+                    .eq("partner_id", partnerId)
+                    .maybeSingle()
+                buyerDetails = customerData
+            }
+
+            // 3. buyer_id may be a marketplace user id mapped to a customer
+            if (!buyerDetails && buyerId) {
+                const { data: customerData } = await supabase
+                    .from("customers")
+                    .select("email, phone")
+                    .eq("marketplace_user_id", buyerId)
+                    .eq("partner_id", partnerId)
+                    .maybeSingle()
+                buyerDetails = customerData
+            }
+
+            // 4. If not found in customers, check if there's a user profile (marketplace user)
+            if (!buyerDetails && buyerId) {
                 try {
-                    const { data: authData } = await supabase.auth.admin.getUserById(data.orders.buyer_id)
+                    const { data: authData } = await supabase.auth.admin.getUserById(buyerId)
                     if (authData?.user?.email) {
                         buyerDetails = { email: authData.user.email, phone: null }
                     }

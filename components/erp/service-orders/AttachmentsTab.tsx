@@ -240,64 +240,58 @@ export default function AttachmentsTab({
         )
     }
 
-    const renderCategoryContent = (category: "normal" | "antes" | "depois") => {
-        const { images, docs } = getImagesAndDocs(grouped[category])
+    const renderDocsContent = (category: "normal" | "antes" | "depois") => {
+        const { docs } = getImagesAndDocs(grouped[category])
+
+        if (docs.length === 0) {
+            return isEditing ? (
+                <div className="flex flex-col items-center justify-center text-center py-6">
+                    <IconPlaceholder
+                        icon={FileIcon}
+                        title="Nenhum documento adicionado"
+                        subtitle="Adicione documentos em PDF, Word, Excel, etc."
+                        itemButton={{
+                            text: "Adicionar Documento",
+                            action: () => handleDocUploadClick(category),
+                            variant: "outline",
+                        }}
+                    />
+                </div>
+            ) : null
+        }
+
+        return (
+            <>
+                {renderDocsGrid(docs)}
+                {isEditing && (
+                    <div className="flex justify-end pt-2">
+                        <Button
+                            type="button"
+                            variant="link"
+                            onClick={() => handleDocUploadClick(category)}
+                            className="text-xs gap-1.5"
+                        >
+                            <UploadIcon className="w-4 h-4" />
+                            Adicionar Documento (PDF, etc.)
+                        </Button>
+                    </div>
+                )}
+            </>
+        )
+    }
+
+    const renderImagesContent = (category: "normal" | "antes" | "depois") => {
+        const { images } = getImagesAndDocs(grouped[category])
         const imagesForSection = images.map(img => img.file || img.file_key)
 
         return (
-            <div className="space-y-6">
-                {/* Documentos */}
-                {(isEditing || docs.length > 0) && (
-                    <div>
-                        {docs.length === 0 ? (
-                            isEditing && (
-                                <div className="flex flex-col items-center justify-center text-center py-6">
-                                    <IconPlaceholder
-                                        icon={FileIcon}
-                                        title="Nenhum documento adicionado"
-                                        subtitle="Adicione documentos em PDF, Word, Excel, etc."
-                                        itemButton={{
-                                            text: "Adicionar Documento",
-                                            action: () => handleDocUploadClick(category),
-                                            variant: "outline",
-                                        }}
-                                    />
-                                </div>
-                            )
-                        ) : (
-                            <>
-                                {renderDocsGrid(docs)}
-                                {isEditing && (
-                                    <div className="flex justify-end pt-2">
-                                        <Button
-                                            type="button"
-                                            variant="link"
-                                            onClick={() => handleDocUploadClick(category)}
-                                            className="text-xs gap-1.5"
-                                        >
-                                            <UploadIcon className="w-4 h-4" />
-                                            Adicionar Documento (PDF, etc.)
-                                        </Button>
-                                    </div>
-                                )}
-                            </>
-                        )}
-                    </div>
-                )}
-
-                {/* Imagens */}
-                {(isEditing || images.length > 0) && (
-                    <div>
-                        <ProductImagesSection
-                            images={imagesForSection}
-                            onImageUpload={(e) => handleImageUpload(category, e)}
-                            onRemoveImage={(idx) => handleRemoveImage(category, idx)}
-                            onSetPrimaryImage={() => { }}
-                            isEditing={isEditing}
-                        />
-                    </div>
-                )}
-            </div>
+            <ProductImagesSection
+                images={imagesForSection}
+                onImageUpload={(e) => handleImageUpload(category, e)}
+                onRemoveImage={(idx) => handleRemoveImage(category, idx)}
+                onSetPrimaryImage={() => { }}
+                isEditing={isEditing}
+            />
         )
     }
 
@@ -331,137 +325,149 @@ export default function AttachmentsTab({
     return (
         <>
             <div className="space-y-6">
-                {/* Normal Section */}
-                {(isEditing || grouped.normal.length > 0) && (
+                {/* Anexos (apenas documentos) */}
+                {(isEditing || getImagesAndDocs(grouped.normal).docs.length > 0) && (
                     <FormSection title="Anexos">
-                        {renderCategoryContent("normal")}
+                        {renderDocsContent("normal")}
                     </FormSection>
                 )}
 
-                {/* Antes Section */}
-                {isEditing ? (
-                    advancedEnabled ? (
-                        <FormSection title="Antes">
-                            {renderCategoryContent("antes")}
-                        </FormSection>
-                    ) : (
-                        <div className="border-t border-brand-border dark:border-dark-border pt-4">
-                            <Accordion
-                                title={
-                                    <span className="text-md font-medium text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                                        Antes
-                                        <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />
-                                    </span>
-                                }
-                                defaultOpen={false}
-                                triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading text-left"
-                                onToggle={(isOpen) => {
-                                    if (isOpen) {
-                                        openPlanUpgrade("crescer")
-                                        return false
-                                    }
-                                }}
-                            >
-                                <div className="text-sm text-brand-inactive-text py-4 text-center">
-                                    Organizar anexos como "Antes" e "Depois" está disponível nos planos Crescer e Escalar.
-                                </div>
-                            </Accordion>
-                        </div>
-                    )
-                ) : (
-                    grouped.antes.length > 0 && (
-                        advancedEnabled ? (
-                            <FormSection title="Antes">
-                                {renderCategoryContent("antes")}
-                            </FormSection>
-                        ) : (
-                            <div className="border-t border-brand-border dark:border-dark-border pt-4">
-                                <Accordion
-                                    title={
-                                        <span className="text-md font-medium text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                                            Antes
-                                            <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />
-                                        </span>
-                                    }
-                                    defaultOpen={false}
-                                    triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading text-left"
-                                    onToggle={(isOpen) => {
-                                        if (isOpen) {
-                                            openPlanUpgrade("crescer")
-                                            return false
-                                        }
-                                    }}
-                                >
-                                    <div className="text-sm text-brand-inactive-text py-4 text-center">
-                                        Organizar anexos como "Antes" e "Depois" está disponível nos planos Crescer e Escalar.
-                                    </div>
-                                </Accordion>
-                            </div>
-                        )
-                    )
+                {/* Imagens */}
+                {(isEditing || getImagesAndDocs(grouped.normal).images.length > 0) && (
+                    <FormSection title="Imagens">
+                        {renderImagesContent("normal")}
+                    </FormSection>
                 )}
 
-                {/* Depois Section */}
-                {isEditing ? (
-                    advancedEnabled ? (
-                        <FormSection title="Depois">
-                            {renderCategoryContent("depois")}
-                        </FormSection>
-                    ) : (
-                        <div className="border-t border-brand-border dark:border-dark-border pt-4">
-                            <Accordion
-                                title={
-                                    <span className="text-md font-medium text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                                        Depois
-                                        <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />
-                                    </span>
-                                }
-                                defaultOpen={false}
-                                triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading text-left"
-                                onToggle={(isOpen) => {
-                                    if (isOpen) {
-                                        openPlanUpgrade("crescer")
-                                        return false
-                                    }
-                                }}
-                            >
-                                <div className="text-sm text-brand-inactive-text py-4 text-center">
-                                    Organizar anexos como "Antes" e "Depois" está disponível nos planos Crescer e Escalar.
-                                </div>
-                            </Accordion>
-                        </div>
-                    )
-                ) : (
-                    grouped.depois.length > 0 && (
-                        advancedEnabled ? (
-                            <FormSection title="Depois">
-                                {renderCategoryContent("depois")}
-                            </FormSection>
-                        ) : (
-                            <div className="border-t border-brand-border dark:border-dark-border pt-4">
-                                <Accordion
-                                    title={
-                                        <span className="text-md font-medium text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                                            Depois
-                                            <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />
-                                        </span>
-                                    }
-                                    defaultOpen={false}
-                                    triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading text-left"
-                                    onToggle={(isOpen) => {
-                                        if (isOpen) {
-                                            openPlanUpgrade("crescer")
-                                            return false
+                {/* Antes/Depois: apenas para OS existentes (visualização/edição) */}
+                {!!serviceOrderId && (
+                    <>
+                        {/* Antes Section */}
+                        {isEditing ? (
+                            advancedEnabled ? (
+                                <FormSection title="Antes">
+                                    {renderImagesContent("antes")}
+                                </FormSection>
+                            ) : (
+                                <div className="border-t border-brand-border dark:border-dark-border pt-4">
+                                    <Accordion
+                                        title={
+                                            <span className="text-md font-medium text-brand-dark dark:text-dark-heading flex items-center gap-2">
+                                                Antes
+                                                <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />
+                                            </span>
                                         }
-                                    }}
-                                >
-                                    <div className="text-sm text-brand-inactive-text py-4 text-center">
-                                        Organizar anexos como "Antes" e "Depois" está disponível nos planos Crescer e Escalar.
+                                        defaultOpen={false}
+                                        triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading text-left"
+                                        onToggle={(isOpen) => {
+                                            if (isOpen) {
+                                                openPlanUpgrade("crescer")
+                                                return false
+                                            }
+                                        }}
+                                    >
+                                        <div className="text-sm text-brand-inactive-text py-4 text-center">
+                                            Organizar anexos como "Antes" e "Depois" está disponível nos planos Crescer e Escalar.
+                                        </div>
+                                    </Accordion>
+                                </div>
+                            )
+                        ) : (
+                            getImagesAndDocs(grouped.antes).images.length > 0 && (
+                                advancedEnabled ? (
+                                    <FormSection title="Antes">
+                                        {renderImagesContent("antes")}
+                                    </FormSection>
+                                ) : (
+                                    <div className="border-t border-brand-border dark:border-dark-border pt-4">
+                                        <Accordion
+                                            title={
+                                                <span className="text-md font-medium text-brand-dark dark:text-dark-heading flex items-center gap-2">
+                                                    Antes
+                                                    <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />
+                                                </span>
+                                            }
+                                            defaultOpen={false}
+                                            triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading text-left"
+                                            onToggle={(isOpen) => {
+                                                if (isOpen) {
+                                                    openPlanUpgrade("crescer")
+                                                    return false
+                                                }
+                                            }}
+                                        >
+                                            <div className="text-sm text-brand-inactive-text py-4 text-center">
+                                                Organizar anexos como "Antes" e "Depois" está disponível nos planos Crescer e Escalar.
+                                            </div>
+                                        </Accordion>
                                     </div>
-                                </Accordion>
-                            </div>
-                        )
-                    )
+                                )
+                            )
+                        )}
+
+                        {/* Depois Section */}
+                        {isEditing ? (
+                            advancedEnabled ? (
+                                <FormSection title="Depois">
+                                    {renderImagesContent("depois")}
+                                </FormSection>
+                            ) : (
+                                <div className="border-t border-brand-border dark:border-dark-border pt-4">
+                                    <Accordion
+                                        title={
+                                            <span className="text-md font-medium text-brand-dark dark:text-dark-heading flex items-center gap-2">
+                                                Depois
+                                                <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />
+                                            </span>
+                                        }
+                                        defaultOpen={false}
+                                        triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading text-left"
+                                        onToggle={(isOpen) => {
+                                            if (isOpen) {
+                                                openPlanUpgrade("crescer")
+                                                return false
+                                            }
+                                        }}
+                                    >
+                                        <div className="text-sm text-brand-inactive-text py-4 text-center">
+                                            Organizar anexos como "Antes" e "Depois" está disponível nos planos Crescer e Escalar.
+                                        </div>
+                                    </Accordion>
+                                </div>
+                            )
+                        ) : (
+                            getImagesAndDocs(grouped.depois).images.length > 0 && (
+                                advancedEnabled ? (
+                                    <FormSection title="Depois">
+                                        {renderImagesContent("depois")}
+                                    </FormSection>
+                                ) : (
+                                    <div className="border-t border-brand-border dark:border-dark-border pt-4">
+                                        <Accordion
+                                            title={
+                                                <span className="text-md font-medium text-brand-dark dark:text-dark-heading flex items-center gap-2">
+                                                    Depois
+                                                    <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />
+                                                </span>
+                                            }
+                                            defaultOpen={false}
+                                            triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading text-left"
+                                            onToggle={(isOpen) => {
+                                                if (isOpen) {
+                                                    openPlanUpgrade("crescer")
+                                                    return false
+                                                }
+                                            }}
+                                        >
+                                            <div className="text-sm text-brand-inactive-text py-4 text-center">
+                                                Organizar anexos como "Antes" e "Depois" está disponível nos planos Crescer e Escalar.
+                                            </div>
+                                        </Accordion>
+                                    </div>
+                                )
+                            )
+                        )}
+                    </>
                 )}
 
                 {!isEditing && !hasContent && (

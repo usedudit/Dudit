@@ -303,7 +303,7 @@ export async function createServiceOrderAction(
       await increment_usage_counter(partnerId, "service_orders_month_count")
     } catch { }
 
-    if (input.assigned_user_id) {
+    if (input.assigned_user_id && input.assigned_user_id !== user.id) {
       try {
         await createNotification({
           userId: input.assigned_user_id,
@@ -318,16 +318,14 @@ export async function createServiceOrderAction(
       } catch { }
     }
 
-    // Create linked order in orders table (mirror appointments flow)
+// Create linked order in orders table (mirror appointments flow)
     const orderRefNote = `service_order:${data.id}:order`
-    const { data: linkedOrder, error: linkedOrderErr } = await admin
-      .from("orders")
-      .insert({
+    const buildLinkedOrderPayload = (total: number) => ({
         partner_id: partnerId,
         store_id: storeId,
         buyer_id: customerId,
         customer_name: (data.customer_snapshot as any)?.name || null,
-        total_amount: 0,
+        total_amount: total,
         subtotal_value: 0,
         discount_value: input.discount_value || 0,
         discount_type: input.discount_type || "fixed",
@@ -342,12 +340,29 @@ export async function createServiceOrderAction(
         notes: orderRefNote,
         created_at: new Date().toISOString(),
         created_by: user.id,
-      })
-      .select("id")
-      .single()
+    })
+
+    let linkedOrderResult: any = await admin
+        .from("orders")
+        .insert(buildLinkedOrderPayload(0))
+        .select("id")
+        .single()
+
+    // Retry with a minimum positive total if the DB still enforces total_amount > 0
+    if (linkedOrderResult?.error && /positive|total_amount|check constraint/i.test(String(linkedOrderResult.error.message || ""))) {
+        linkedOrderResult = await admin
+            .from("orders")
+            .insert(buildLinkedOrderPayload(0.01))
+            .select("id")
+            .single()
+    }
+
+    const linkedOrder = linkedOrderResult?.data || null
+    const linkedOrderErr = linkedOrderResult?.error || null
 
     if (linkedOrderErr || !linkedOrder?.id) {
-      throw new Error("Falha ao criar pedido vinculado à OS")
+        console.error("[createServiceOrderAction] Falha ao criar pedido vinculado à OS:", linkedOrderErr)
+        throw new Error(`Falha ao criar pedido vinculado à OS: ${linkedOrderErr?.message || "erro desconhecido"}`)
     }
 
     await admin.from("service_orders").update({ order_id: linkedOrder.id }).eq("id", data.id)
@@ -615,7 +630,7 @@ export async function assignServiceOrderAction(
       changeLines: [assignedUserId ? `OS atribuída a novo responsável` : `Responsável removido`],
     })
 
-    if (assignedUserId) {
+    if (assignedUserId && assignedUserId !== user.id) {
       try {
         await createNotification({
           userId: assignedUserId,

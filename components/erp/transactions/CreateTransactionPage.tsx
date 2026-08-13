@@ -46,6 +46,7 @@ import {
 import { useNotification } from "@/hooks/use-notification"
 import { usePermissions } from "@/lib/permission-context"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
+import type { TransactionTab } from "../../../lib/services/transactions.types"
 import { formatCurrency } from "@/lib/utils"
 import {
     createManualTransactionAction,
@@ -93,7 +94,7 @@ interface CreateTransactionPageProps {
     editTransaction?: import("../../../lib/services/transactions.types").ERPTransaction
     editRecurringTemplateId?: string
     editRecurringTemplate?: any
-    forcedTab?: "Transações" | "A pagar" | "A receber" | "Vencidos" | "Cancelados"
+    forcedTab?: TransactionTab
 }
 
 type ContactType = "customer" | "supplier" | "service" | "employee" | "partner" | "other"

@@ -26,6 +26,7 @@ import {
     BoxIcon,
     CameraIcon,
     StarIcon,
+    ArchiveIcon,
 } from "@/lib/icons"
 
 // Tipos necessários
@@ -210,7 +211,7 @@ const ProductPageControls: React.FC<ProductPageControlsProps> = ({
                         <TabsTrigger value="out_of_stock" icon={OutProductsIcon} badge={tabCounts && <TabCountBadge count={tabCounts.out_of_stock} variant="red" />}>
                             Esgotado
                         </TabsTrigger>
-                        <TabsTrigger value="archived" icon={BoxIcon} badge={tabCounts && <TabCountBadge count={tabCounts.archived} variant="orange" />}>
+                        <TabsTrigger value="archived" icon={ArchiveIcon} badge={tabCounts && <TabCountBadge count={tabCounts.archived} variant="orange" />}>
                             Arquivados
                         </TabsTrigger>
                     </TabsList>

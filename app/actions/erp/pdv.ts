@@ -1070,6 +1070,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
     const resolvedBreakdown: Array<{
         method: string
         amount: number
+        amountReceived: number
         paymentMethodId: string | null
         payment_method_id: string | null
         installmentNumber?: number
@@ -1088,6 +1089,9 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
         resolvedBreakdown.push({
             method: methodLabel,
             amount,
+            amountReceived: (entry as any).amountReceived != null && !isNaN(Number((entry as any).amountReceived))
+                ? safeMoney(Number((entry as any).amountReceived))
+                : amount,
             paymentMethodId,
             payment_method_id: paymentMethodId,
             installmentNumber: Math.max(1, Math.floor(Number(entry.installmentNumber || 1))),
@@ -1134,8 +1138,17 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
     }
 
     const totalPaidAmount = breakdownForOrder.length > 0
-        ? safeMoney(breakdownForOrder.reduce((acc, row) => acc + Number(row.amount || 0), 0))
+        ? safeMoney(breakdownForOrder.reduce((acc, row) => acc + Number((row as any).amountReceived ?? row.amount ?? 0), 0))
         : paidAmount
+
+    const totalSaleTarget = safeMoney(Number(preSaleDraft.total_amount || 0))
+    const isUnderpaid = totalPaidAmount < totalSaleTarget - 0.005
+    const derivedPaymentStatus: 'paid' | 'partially_paid' | 'unpaid' =
+        totalPaidAmount <= 0.005
+            ? 'unpaid'
+            : isUnderpaid
+                ? 'partially_paid'
+                : 'paid'
 
     // Customer name lookup if customer_id is provided
     const customerName: string | undefined = customerNameResult.data?.name?.trim() || undefined
@@ -1172,7 +1185,9 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
         salesChannel: "Presencial",
         deliveryMethod: hasShipping ? "delivery" : "pickup",
         deliveryStatus: finalDeliveryStatus,
-        paymentStatus: "paid",
+paymentStatus: derivedPaymentStatus,
+        paidAmount: totalPaidAmount,
+        totalAmount: totalSaleTarget,
         paymentMethod: input.paymentMethod || "PDV",
         paymentBreakdown: breakdownForOrder as any,
         financeAccountId: input.financeAccountId || null,
@@ -1186,8 +1201,6 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
         shippingCost: safeMoney(Number(preSaleDraft.shipping_fee || 0)),
         additionalCosts: safeMoney(Number(preSaleDraft.other_costs || 0)),
         deliveryBreakdown: preSaleDraft.delivery_breakdown || null,
-        totalAmount: totalPaidAmount,
-        paidAmount: totalPaidAmount,
         notes: preSaleDraft.notes || undefined,
         skipCSRF: true,
         sellerPartnerUserId: input.sellerId || null,

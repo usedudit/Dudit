@@ -17,6 +17,7 @@ import ExportSelectionModal from "@/components/erp/export/ExportSelectionModal"
 import ExportColumnSelectionModal from "@/components/erp/export/ExportColumnSelectionModal"
 import ReturnListRow, { getReturnStatusMeta } from "./ReturnListRow"
 import ReturnGridCard from "./ReturnGridCard"
+import ReturnPrintModal from "./ReturnPrintModal"
 import CreateReturnPage from "./CreateReturnPage"
 import ReturnPageControls from "./ReturnPageControls"
 import type { ReturnRequest } from "./types"
@@ -25,7 +26,7 @@ import { getReturnResolutionLabel } from "@/lib/returns/types"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 
 type ActiveTab = "Todos" | "Pendentes" | "Analise" | "AguardandoCliente" | "Aprovados" | "Finalizados"
-type SortKey = "id" | "order_number" | "customer" | "date" | "refund_type" | "quantity"
+type SortKey = "id" | "order_number" | "customer" | "date" | "refund_type" | "status"
 type SortDirection = "asc" | "desc"
 
 interface ReturnsPageProps {
@@ -43,7 +44,7 @@ const COLUMNS = [
     { id: "customer", label: "Cliente", align: "left" as const, width: "240px" },
     { id: "date", label: "Data", align: "left" as const, width: "160px" },
     { id: "refund_type", label: "Resolução", align: "left" as const, width: "180px" },
-    { id: "quantity", label: "Qtd", align: "left" as const, width: "100px" },
+    { id: "status", label: "Status", align: "left" as const, width: "180px" },
     { id: "actions", label: "Ações", align: "center" as const, width: "80px" },
 ]
 
@@ -138,6 +139,7 @@ export default function ReturnsPage({ partnerId, roleId, storeId, planGate }: Re
     const [showMpPaymentNotFoundModal, setShowMpPaymentNotFoundModal] = useState(false)
     const [mpPaymentNotFoundChecked, setMpPaymentNotFoundChecked] = useState(false)
     const [pendingProcessData, setPendingProcessData] = useState<Record<string, any> | null>(null)
+    const [printReturnId, setPrintReturnId] = useState<string | null>(null)
 
     const { data: returnsData, isLoading: isReturnsLoading } = useQuery({
         queryKey: ['erp', 'returns', partnerId, storeId],
@@ -349,9 +351,9 @@ export default function ReturnsPage({ partnerId, roleId, storeId, planGate }: Re
                         aVal = getReturnResolutionLabel(a.approvedResolution || a.desiredResolution || "")
                         bVal = getReturnResolutionLabel(b.approvedResolution || b.desiredResolution || "")
                         break
-                    case "quantity":
-                        aVal = a.items.reduce((acc, i) => acc + Number(i.quantity || 0), 0)
-                        bVal = b.items.reduce((acc, i) => acc + Number(i.quantity || 0), 0)
+                    case "status":
+                        aVal = getReturnStatusMeta(a.status).label
+                        bVal = getReturnStatusMeta(b.status).label
                         break
                 }
                 if (aVal === bVal) return 0
@@ -579,6 +581,7 @@ export default function ReturnsPage({ partnerId, roleId, storeId, planGate }: Re
                                                     returnRequest={item}
                                                     onDetails={() => openEntity("view", item.id)}
                                                     onEdit={canManage && !["RESOLVED", "REJECTED", "EXPIRED"].includes(item.status) ? () => openEntity("edit", item.id) : undefined}
+                                                    onPrint={() => setPrintReturnId(item.id)}
                                                     canManage={canManage}
                                                 />
                                             ))}
@@ -620,6 +623,7 @@ export default function ReturnsPage({ partnerId, roleId, storeId, planGate }: Re
                                                                 columns={COLUMNS}
                                                                 onDetails={(r) => openEntity("view", r.id)}
                                                                 onEdit={(r) => openEntity("edit", r.id)}
+                                                                onPrint={(r) => setPrintReturnId(r.id)}
                                                                 canManage={canManage}
                                                             />
                                                         ))}
@@ -719,6 +723,16 @@ export default function ReturnsPage({ partnerId, roleId, storeId, planGate }: Re
                 onConfirm={handleColumnConfirm}
                 onClose={closeColumnSelectionModal}
             />
+
+            {printReturnId && (
+                <ReturnPrintModal
+                    isOpen={!!printReturnId}
+                    onClose={() => setPrintReturnId(null)}
+                    returnId={printReturnId}
+                    partnerId={partnerId}
+                    storeId={selectedStore?.id}
+                />
+            )}
 
             <ExportSelectionModal
                 isOpen={selectionModal.isOpen}

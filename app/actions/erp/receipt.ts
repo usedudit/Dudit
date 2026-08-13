@@ -101,7 +101,7 @@ const getCachedPartnerReceiptHeader = (partnerId: string, storeId?: string) => u
 
         const header: SaleReceiptPartnerHeader = {
             fantasyName: store?.name || "Estabelecimento",
-            legalName: store?.description || store?.name || "Estabelecimento",
+            legalName: "",
             addressLine: addressLine || "Endereço não informado",
             taxIdLine: buildPartnerTaxIdLine({
                 cnpj: store?.cnpj,

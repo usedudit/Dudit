@@ -33,6 +33,7 @@ import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { formatE164ToDisplay } from "@/lib/utils/phone-utils"
+import { validatePhoneBR } from "@/lib/input-validator"
 import { useStore } from "@/lib/store-context"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
 import type { BusinessMode } from "@/lib/business-info"
@@ -248,7 +249,11 @@ export const BusinessDataSubPage = ({
     const validate = useCallback(() => {
         const errors = new Set<string>()
         if (!generalInfo.storeName.trim()) errors.add("storeName")
-        if (!generalInfo.phone.trim()) errors.add("phone")
+        if (!generalInfo.phone.trim()) {
+            errors.add("phone")
+        } else if (!validatePhoneBR(generalInfo.phone)) {
+            errors.add("phone")
+        }
 
         const cleanCep = addresses.zipCode.replace(/\D/g, "")
         if (cleanCep.length !== 8) errors.add("zipCode")
@@ -466,6 +471,7 @@ export const BusinessDataSubPage = ({
                                                                 setFieldErrors(prev => { const n = new Set(prev); n.delete("phone"); return n })
                                                             }}
                                                             error={fieldErrors.has("phone")}
+                                                            errorMessage={fieldErrors.has("phone") && generalInfo.phone.trim() ? "Número de celular inválido. Use (XX) 9XXXX-XXXX" : "Celular é obrigatório"}
                                                         />
                                                     </div>
                                                 </div>

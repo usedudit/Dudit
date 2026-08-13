@@ -439,28 +439,29 @@ export async function processDueScheduledJobs(limit = 20): Promise<number> {
 
 // ─── Entity-specific triggers (delegated to Central Notification Engine) ───────────
 
-export async function onAppointmentCreated(appointment: Record<string, unknown>) {
+export async function onAppointmentCreated(appointment: Record<string, unknown>, origin?: "manual" | "automation" | "system") {
   const { onAppointmentCreated: centralOnAppointmentCreated } = await import("./notification-automation.service")
-  return centralOnAppointmentCreated(appointment)
+  return centralOnAppointmentCreated(appointment, origin)
 }
 
 export async function onAppointmentStatusChanged(
   appointment: Record<string, unknown>,
   previousStatus: string,
   newStatus: string,
+  origin?: "manual" | "automation" | "system",
 ) {
   const { onAppointmentStatusChanged: centralOnAppointmentStatusChanged } = await import("./notification-automation.service")
-  return centralOnAppointmentStatusChanged(appointment, previousStatus, newStatus)
+  return centralOnAppointmentStatusChanged(appointment, previousStatus, newStatus, origin)
 }
 
-export async function onAppointmentRescheduled(appointment: Record<string, unknown>) {
+export async function onAppointmentRescheduled(appointment: Record<string, unknown>, origin?: "manual" | "automation" | "system") {
   const { onAppointmentRescheduled: centralOnAppointmentRescheduled } = await import("./notification-automation.service")
-  return centralOnAppointmentRescheduled(appointment)
+  return centralOnAppointmentRescheduled(appointment, origin)
 }
 
-export async function onOrderStatusChanged(order: Record<string, unknown>, situation?: string, deliveryStatus?: string) {
+export async function onOrderStatusChanged(order: Record<string, unknown>, situation?: string, deliveryStatus?: string, origin?: "manual" | "automation" | "system") {
   const { onOrderStatusChanged: centralOnOrderStatusChanged } = await import("./notification-automation.service")
-  return centralOnOrderStatusChanged(order, situation, deliveryStatus)
+  return centralOnOrderStatusChanged(order, situation, deliveryStatus, origin)
 }
 
 export async function onDeliveryStatusChanged(delivery: Record<string, unknown>, newStatus: string) {

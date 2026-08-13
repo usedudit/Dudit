@@ -16,6 +16,7 @@ import {
     buildSaleReceiptFromOrder,
 } from "@/lib/sales/sale-receipt"
 import { applyQuotePreviewTheme } from "@/lib/quotes/quote-preview-theme"
+import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { downloadPdf } from "@/lib/pdf/download"
 import SaleReceiptThermalPreview from "./SaleReceiptThermalPreview"
 import SaleReceiptA4Preview from "./SaleReceiptA4Preview"
@@ -95,11 +96,13 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, orderId }: Sale
                 taxIdLine: "",
             }
 
-            const partnerAvatar = selectedStore?.image_url || undefined
+            const partnerAvatar = selectedStore?.logo_url || selectedStore?.image_url
+                ? getR2ImageUrl(selectedStore?.logo_url || selectedStore?.image_url)
+                : undefined
             const order = orderRes.data
 
             const receiptData = buildSaleReceiptFromOrder(order, partnerHeader, {
-                partnerAvatar: partnerAvatar ? (partnerAvatar.startsWith("http") ? partnerAvatar : undefined) : undefined,
+                partnerAvatar,
                 sellerName: order.seller_name || undefined,
                 primaryColor: order.primary_color || undefined,
                 secondaryColor: order.secondary_color || undefined,
@@ -111,7 +114,7 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, orderId }: Sale
 
         load()
         return () => { cancelled = true }
-    }, [isOpen, orderId, selectedStore?.partner_id, selectedStore?.image_url])
+    }, [isOpen, orderId, selectedStore?.partner_id, selectedStore?.logo_url, selectedStore?.image_url])
 
     const handlePrint = useCallback(() => {
         if (!orderId) return

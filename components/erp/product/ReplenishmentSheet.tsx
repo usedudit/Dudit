@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react"
 import { Package, ShoppingCartIcon, AlertTriangleIcon, XIcon, ClockIcon, ArrowLeftIcon, SparklesIcon, TagIcon } from "@/lib/icons"
-import { Button, MoneyInput, IconPlaceholder, Spinner, Badge, InfoCard } from "@/components/reusable"
+import { Button, MoneyInput, IconPlaceholder, Spinner, Badge, InfoCard, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
@@ -79,7 +79,7 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId }: Replenishment
             if (res.suggestions) {
                 setSuggestions(res.suggestions)
                 if (res.suggestions.length > 0) {
-                    notifyReplenishmentSuggestedAction().catch(() => {})
+                    notifyReplenishmentSuggestedAction().catch(() => { })
                 }
             }
             setLoadingSuggestions(false)
@@ -141,49 +141,24 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId }: Replenishment
     // --- CONTEÚDO DA SHEET PRINCIPAL ---
     const mainContent = (
         <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
-            {/* Header */}
             <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
-                <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-brand-orange/10 flex items-center justify-center">
-                        <SparklesIcon size={18} className="text-brand-orange" />
-                    </div>
-                    <div>
-                        <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">
-                            Sugestões & Oportunidades
-                        </h2>
-                        <p className="text-xs text-brand-inactive-text">inteligência de estoque do seu negócio</p>
-                    </div>
-                </div>
+                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Sugestões & Oportunidades</h2>
                 <Button variant="filled" onClick={onClose} size="icon">
                     <XIcon className="h-5 w-5" />
                 </Button>
             </header>
 
             {/* Navigation Tabs */}
-            <div className="flex border-b border-brand-border bg-white px-6 dark:border-dark-border dark:bg-dark-surface">
-                <button
-                    onClick={() => setActiveTab("reposicao")}
-                    className={`flex items-center gap-2 py-3 px-3 border-b-2 font-bold text-sm transition-colors ${
-                        activeTab === "reposicao"
-                            ? "border-brand-orange text-brand-orange"
-                            : "border-transparent text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading"
-                    }`}
-                >
-                    <ShoppingCartIcon size={16} />
-                    Reposição ({suggestions.length})
-                </button>
-                <button
-                    onClick={() => setActiveTab("parados")}
-                    className={`flex items-center gap-2 py-3 px-3 border-b-2 font-bold text-sm transition-colors ${
-                        activeTab === "parados"
-                            ? "border-brand-orange text-brand-orange"
-                            : "border-transparent text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading"
-                    }`}
-                >
-                    <ClockIcon size={16} />
-                    Parados +90d ({stagnantProducts.length})
-                </button>
-            </div>
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
+                <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b border-brand-border dark:border-dark-border mb-6">
+                    <TabsTrigger value="reposicao" className="px-0 pb-3 text-sm">
+                        Reposição ({suggestions.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="parados" className="px-0 pb-3 text-sm">
+                        Parados +90d ({stagnantProducts.length})
+                    </TabsTrigger>
+                </TabsList>
+            </Tabs>
 
             {/* Content List */}
             <div className="custom-scrollbar flex-1 overflow-y-auto p-4">
@@ -420,11 +395,10 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId }: Replenishment
                                     key={pct}
                                     type="button"
                                     onClick={() => setPromoPriceInput(calculatedPrice)}
-                                    className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all ${
-                                        isSelected
-                                            ? "border-brand-primary bg-brand-primary/10 text-brand-primary"
-                                            : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading hover:border-brand-primary/50"
-                                    }`}
+                                    className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all ${isSelected
+                                        ? "border-brand-primary bg-brand-primary/10 text-brand-primary"
+                                        : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading hover:border-brand-primary/50"
+                                        }`}
                                 >
                                     -{pct}%
                                 </button>
@@ -435,11 +409,10 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId }: Replenishment
                             <button
                                 type="button"
                                 onClick={() => setPromoPriceInput(selectedStagnant.cost_price!)}
-                                className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all col-span-3 sm:col-span-1 ${
-                                    Math.abs(promoPriceInput - selectedStagnant.cost_price) < 0.05
-                                        ? "border-brand-orange bg-brand-orange/10 text-brand-orange"
-                                        : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading hover:border-brand-orange/50"
-                                }`}
+                                className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all col-span-3 sm:col-span-1 ${Math.abs(promoPriceInput - selectedStagnant.cost_price) < 0.05
+                                    ? "border-brand-orange bg-brand-orange/10 text-brand-orange"
+                                    : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading hover:border-brand-orange/50"
+                                    }`}
                             >
                                 No Custo
                             </button>
@@ -514,19 +487,17 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId }: Replenishment
         <>
             <Portal>
                 <div
-                    className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${
-                        isOpen ? "opacity-100" : "pointer-events-none opacity-0"
-                    }`}
+                    className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"
+                        }`}
                     onClick={onClose}
                 >
                     <div
-                        className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-all duration-300 dark:bg-dark-surface ${
-                            isOpen
-                                ? isDiscountSheetOpen
-                                    ? "-translate-x-10 scale-[0.97] opacity-70"
-                                    : "translate-x-0 opacity-100"
-                                : "translate-x-[120%] opacity-100"
-                        }`}
+                        className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-all duration-300 dark:bg-dark-surface ${isOpen
+                            ? isDiscountSheetOpen
+                                ? "-translate-x-10 scale-[0.97] opacity-70"
+                                : "translate-x-0 opacity-100"
+                            : "translate-x-[120%] opacity-100"
+                            }`}
                         onClick={(e) => e.stopPropagation()}
                     >
                         {mainContent}
@@ -536,15 +507,13 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId }: Replenishment
 
             <Portal>
                 <div
-                    className={`fixed inset-0 z-[60] bg-black/50 transition-opacity duration-300 ${
-                        isDiscountSheetOpen ? "opacity-100" : "pointer-events-none opacity-0"
-                    }`}
+                    className={`fixed inset-0 z-[60] bg-black/50 transition-opacity duration-300 ${isDiscountSheetOpen ? "opacity-100" : "pointer-events-none opacity-0"
+                        }`}
                     onClick={() => setIsDiscountSheetOpen(false)}
                 >
                     <div
-                        className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${
-                            isDiscountSheetOpen ? "translate-x-0" : "translate-x-[120%]"
-                        }`}
+                        className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isDiscountSheetOpen ? "translate-x-0" : "translate-x-[120%]"
+                            }`}
                         onClick={(e) => e.stopPropagation()}
                     >
                         {discountContent}

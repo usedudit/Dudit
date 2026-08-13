@@ -30,6 +30,8 @@ async function notifyPartnerTeam(params: {
   variant?: string
   origin?: "manual" | "automation" | "system"
 }) {
+  if (params.origin === "manual") return
+
   const userIds = await getStoreTeamUserIds({
     partnerId: params.partnerId,
     storeId: params.storeId,

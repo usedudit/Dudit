@@ -194,9 +194,11 @@ export async function getPDVSellersAction(): Promise<{ members: TeamMember[]; er
 
 /**
  * Returns per-member sales and commission stats for the team page.
+ * When `memberId` is provided, only that member's stats are computed with
+ * lightweight aggregate queries (much faster than loading all orders).
  * Requires settings.settings_team permission.
  */
-export async function getTeamMemberStatsAction(): Promise<{ stats: TeamMemberStats[]; error?: string }> {
+export async function getTeamMemberStatsAction(memberId?: string): Promise<{ stats: TeamMemberStats[]; error?: string }> {
     try {
         await requireUser()
         const context = await getCurrentPartnerContext()
@@ -207,12 +209,97 @@ export async function getTeamMemberStatsAction(): Promise<{ stats: TeamMemberSta
             return { stats: [], error: "Sem permissão para visualizar estatísticas." }
         }
 
+        if (memberId) {
+            const memberStats = await fetchTeamMemberStatsCached(context.partnerId, memberId)
+            return { stats: memberStats ? [memberStats] : [] }
+        }
+
         const stats = await fetchTeamStatsCached(context.partnerId)
         return { stats }
     } catch (error: any) {
         return { stats: [], error: error.message }
     }
 }
+
+// Lightweight stats for a single member, cached per partner+member.
+// Uses the (partner_id, seller_partner_user_id) indexes to avoid scanning all
+// of the partner's orders when the user just wants one member's numbers.
+const fetchTeamMemberStatsCached = (partnerId: string, memberId: string) => unstable_cache(
+    async (partnerId: string, memberId: string): Promise<TeamMemberStats | null> => {
+        const admin = getAdminClient()
+
+        // Make sure the member actually belongs to this partner
+        const { data: user } = await admin
+            .from("partner_users")
+            .select("id, user_id")
+            .eq("partner_id", partnerId)
+            .eq("id", memberId)
+            .single()
+        if (!user) return null
+
+        const [countRes, totalsRes, lastSaleRes, commissionsRes] = await Promise.all([
+            admin
+                .from("orders")
+                .select("id", { count: "exact", head: true })
+                .eq("partner_id", partnerId)
+                .eq("seller_partner_user_id", memberId)
+                .neq("situation", "cancelled"),
+            admin
+                .from("orders")
+                .select("total_amount")
+                .eq("partner_id", partnerId)
+                .eq("seller_partner_user_id", memberId)
+                .neq("situation", "cancelled"),
+            admin
+                .from("orders")
+                .select("created_at")
+                .eq("partner_id", partnerId)
+                .eq("seller_partner_user_id", memberId)
+                .neq("situation", "cancelled")
+                .order("created_at", { ascending: false })
+                .limit(1)
+                .maybeSingle(),
+            admin
+                .from("transactions")
+                .select("amount")
+                .eq("partner_id", partnerId)
+                .eq("seller_partner_user_id", memberId)
+                .eq("category", "Comissões")
+                .eq("transaction_type", "expense"),
+        ])
+
+        let totalSalesValue = 0
+        for (const order of totalsRes.data || []) {
+            totalSalesValue += Number(order.total_amount || 0)
+        }
+
+        let totalCommissionValue = 0
+        for (const tx of commissionsRes.data || []) {
+            totalCommissionValue += Number(tx.amount || 0)
+        }
+
+        const { data: profile } = await admin
+            .from("user_profiles")
+            .select("full_name")
+            .eq("user_id", user.user_id)
+            .maybeSingle()
+
+        return {
+            partnerUserId: memberId,
+            fullName: profile?.full_name || null,
+            avatarUrl: null,
+            saleCount: countRes.count || 0,
+            totalSalesValue,
+            totalCommissionValue,
+            lastSaleDate: lastSaleRes.data?.created_at || null,
+        }
+    },
+    ["team-member-stats", partnerId, memberId],
+    {
+        revalidate: 60,
+        tags: [`team-member-stats-${partnerId}-${memberId}`],
+    }
+)(partnerId, memberId)
 
 // Aggregated per-member stats, cached per partner.
 // Sales come from orders (covers both ERP pedidos and PDV sales synced with is_pos_sale),

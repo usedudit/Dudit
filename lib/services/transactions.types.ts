@@ -1,4 +1,4 @@
-export type TransactionTab = "Transações" | "A pagar" | "A receber" | "Vencidos" | "Cancelados"
+export type TransactionTab = "Transações" | "Entradas" | "Saídas" | "A pagar" | "A receber" | "Vencidos" | "Cancelados"
 
 /** Stable keyset cursor for paginating transactions (created_at DESC, id DESC). */
 export type FinancialTransactionCursor = { createdAt: string; id: string }
