@@ -20,7 +20,7 @@ import {
 import { resolveCheckoutCartLinesFresh } from "@/lib/cache/checkout-cache"
 import { buildDepositCheckoutMeta } from "@/lib/services/marketplace-checkout-amounts"
 import { patchDepositCheckoutOnPayment } from "@/lib/payments/order-financial-state"
-import { resolveDeliverySettingsRow } from "@/app/actions/shared/delivery"
+import { quoteDeliveryFeeAction, resolveDeliverySettingsRow } from "@/app/actions/shared/delivery"
 
 const isDev = process.env.NODE_ENV === "development"
 
@@ -513,7 +513,23 @@ async function handler(request: NextRequest) {
     if (isDev) console.log("All items validated. Total amount:", totalAmount)
 
     if (!useUnifiedCart) {
-      deliveryFee = Number(body.deliveryFee || 0)
+      if (normalizedDeliveryType === "delivery") {
+        if (!deliveryAddress?.trim()) {
+          return NextResponse.json({ error: "Endereço de entrega não informado" }, { status: 400 })
+        }
+        const deliveryQuote = await quoteDeliveryFeeAction({
+          partnerId,
+          storeId: storeId || null,
+          destinationAddress: deliveryAddress,
+          orderSubtotal: totalAmount,
+        })
+        if (!deliveryQuote.success) {
+          return NextResponse.json({ error: deliveryQuote.error }, { status: 400 })
+        }
+        deliveryFee = Number(deliveryQuote.fee || 0)
+      } else {
+        deliveryFee = 0
+      }
 
       // ── Build pricing items from validated items ──────────────────────────
       const pricingItems: import("@/lib/services/pricing-engine").PricingItem[] = validatedItems.map((v) => ({
@@ -616,11 +632,6 @@ async function handler(request: NextRequest) {
           error: "Os valores do checkout não conferem. Atualize a página e tente novamente."
         }, { status: 400 })
       }
-      // Usar deliveryFee e descontos do snapshot apenas para manter compatibilidade
-      deliveryFee = checkoutPricing.deliveryFee
-      couponDiscountAmount = checkoutPricing.couponDiscount
-      paymentMethodDiscountAmount = checkoutPricing.paymentMethodDiscount
-      paymentMethodExtraAmount = roundMoney(checkoutPricing.paymentMethodInterest + checkoutPricing.paymentMethodFee)
     }
 
     if (totalAmount <= 0 || totalAmount > 999999) {
@@ -718,7 +729,12 @@ async function handler(request: NextRequest) {
       }
     }
 
-    console.log("[MP PAYMENT REQUEST PAYLOAD]:", JSON.stringify(mpPaymentRequest, null, 2))
+    SecureLogger.info("MP payment request prepared", {
+      paymentMethodId: paymentFormData?.payment_method_id,
+      buyerId,
+      partnerId,
+      hasPaymentToken: Boolean(paymentFormData?.token),
+    })
 
     // SEGURANÃ‡A: Idempotency key determinística (protege contra double-click)
     const idempotencyKey = useUnifiedCart
@@ -744,29 +760,25 @@ async function handler(request: NextRequest) {
 
       try {
         mpErrorText = await mpResponse.text()
-        if (isDev) console.log("MP Error response (raw text):", mpErrorText)
 
         try {
           mpErrorData = JSON.parse(mpErrorText)
-          if (isDev) console.log("MP Error response (parsed JSON):", JSON.stringify(mpErrorData, null, 2))
         } catch (parseErr) {
-          if (isDev) console.log("Could not parse error response as JSON")
+          mpErrorData = null
         }
       } catch (readErr) {
         SecureLogger.error("Failed to read MP error response", {})
       }
 
-      console.error("[CRITICAL MP PAYMENT ERROR]", {
-        status: mpResponse.status,
-        errorData: JSON.stringify(mpErrorData, null, 2),
-        errorText: mpErrorText
-      })
+
 
       // SEGURANÃ‡A: Logar detalhes internamente, retornar mensagem genérica ao frontend
       SecureLogger.error("MP API payment creation failed", {
         status: mpResponse.status,
-        errorData: mpErrorData,
-        errorText: mpErrorText.substring(0, 500)
+        providerErrorCode: mpErrorData?.error || mpErrorData?.code || null,
+        providerMessage: typeof mpErrorData?.message === "string" ? mpErrorData.message.slice(0, 160) : null,
+        providerCauseCount: Array.isArray(mpErrorData?.cause) ? mpErrorData.cause.length : 0,
+        responseWasJson: Boolean(mpErrorData),
       })
       return NextResponse.json({
         error: "Erro ao processar pagamento. Tente novamente."

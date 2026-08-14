@@ -366,101 +366,69 @@ function ProgressCard({
     const stages = buildStages(checklist.items);
     const currentStage = stages[currentStageIdx] || stages[0];
 
-    const stageCompleted = (st: Stage) => st.items.every((i) => i.completed);
-
     return (
         <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 h-[280px] flex flex-col">
-            <div className="flex items-start justify-between gap-4 mb-4">
+            <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
+                    <RocketIcon size={20} className="text-brand-green" />
+                </div>
                 <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Primeiros Passos</h3>
-                    <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
-                        Complete as etapas para deixar sua vitrine pronta.
+                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading leading-tight">
+                        Primeiros Passos
+                    </h3>
+                    <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5 truncate">
+                        {currentStage.title}
                     </p>
                 </div>
-                <div className="flex items-center gap-2 shrink-0 ml-4">
-                    <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider">
-                        {stages.filter(stageCompleted).length} / {stages.length}
+
+                <div className="flex items-center gap-2 shrink-0 ml-2">
+                    <span className="text-[11px] font-bold text-brand-green bg-brand-green-light/70 dark:bg-dark-border/40 px-2.5 py-1 rounded-full uppercase tracking-wider">
+                        {currentStageIdx + 1}/{stages.length}
                     </span>
-                    <div className="w-32 h-1.5 bg-brand-gray dark:bg-dark-border rounded-full overflow-hidden">
-                        {stages.map((st, idx) => {
-                            const done = stageCompleted(st);
-                            const active = idx === currentStageIdx;
-                            const widthPercent = 100 / stages.length;
-                            return (
-                                <div
-                                    key={st.id}
-                                    className={`h-full transition-all duration-300 ${done
-                                        ? "bg-brand-green"
-                                        : active
-                                            ? "bg-brand-green/60"
-                                            : "bg-brand-gray dark:bg-dark-border"
-                                        }`}
-                                    style={{ width: `${widthPercent}%` }}
-                                />
-                            );
-                        })}
-                    </div>
+                    <button
+                        onClick={() => setCurrentStageIdx((p) => Math.max(0, p - 1))}
+                        disabled={currentStageIdx === 0}
+                        className="w-8 h-8 rounded-full flex items-center justify-center bg-brand-gray dark:bg-dark-border disabled:opacity-30 hover:bg-brand-gray/70 dark:hover:bg-dark-border/70 transition-colors"
+                        aria-label="Etapa anterior"
+                    >
+                        <ChevronLeftIcon size={16} className="text-brand-dark dark:text-dark-heading" />
+                    </button>
+                    <button
+                        onClick={() => setCurrentStageIdx((p) => Math.min(stages.length - 1, p + 1))}
+                        disabled={currentStageIdx === stages.length - 1}
+                        className="w-8 h-8 rounded-full flex items-center justify-center bg-brand-gray dark:bg-dark-border disabled:opacity-30 hover:bg-brand-gray/70 dark:hover:bg-dark-border/70 transition-colors"
+                        aria-label="Próxima etapa"
+                    >
+                        <ChevronRightIcon size={16} className="text-brand-dark dark:text-dark-heading" />
+                    </button>
                 </div>
             </div>
 
-            <div className="flex flex-row gap-12 flex-1 min-h-0">
-                <div className="flex flex-col jstify-center gap-2 w-[400px] shrink-0 lg:border-r">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body">
-                        Etapa {currentStageIdx + 1} de {stages.length}
-                    </p>
-                    <h4 className="text-xl font-bold text-brand-dark dark:text-dark-heading leading-tight">
-                        {currentStage.title}
-                    </h4>
-                    <p className="text-xs text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                        {currentStage.items.length === 1
-                            ? currentStage.items[0].description
-                            : `Complete as ${currentStage.items.length} tarefas abaixo para avançar.`}
-                    </p>
-
-                    <div className="flex items-center gap-2 mt-2">
-                        <button
-                            onClick={() => setCurrentStageIdx((p) => Math.max(0, p - 1))}
-                            disabled={currentStageIdx === 0}
-                            className="w-8 h-8 rounded-full flex items-center justify-center bg-brand-gray dark:bg-dark-border disabled:opacity-30 hover:bg-brand-gray/70 dark:hover:bg-dark-border/70 transition-colors"
-                        >
-                            <ChevronLeftIcon size={16} className="text-brand-dark dark:text-dark-heading" />
-                        </button>
-                        <button
-                            onClick={() => setCurrentStageIdx((p) => Math.min(stages.length - 1, p + 1))}
-                            disabled={currentStageIdx === stages.length - 1}
-                            className="w-8 h-8 rounded-full flex items-center justify-center bg-brand-gray dark:bg-dark-border disabled:opacity-30 hover:bg-brand-gray/70 dark:hover:bg-dark-border/70 transition-colors"
-                        >
-                            <ChevronRightIcon size={16} className="text-brand-dark dark:text-dark-heading" />
-                        </button>
-                    </div>
-                </div>
-
-                <div className="flex-1 flex flex-col gap-2 overflow-y-auto min-w-0">
-                    {currentStage.items.map((item) => (
-                        <div
-                            key={item.id}
-                            onClick={() => onItemClick(item)}
-                            className="flex items-center gap-3 px-4 py-3 rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all cursor-pointer"
-                        >
-                            {item.completed ? (
-                                <CheckCircleIcon size={22} className="text-brand-green shrink-0" />
-                            ) : (
-                                <div className="w-[22px] h-[22px] rounded-full border-2 border-brand-border dark:border-dark-border flex items-center justify-center shrink-0">
-                                    <div className="w-2 h-2 rounded-full bg-brand-border dark:bg-dark-border" />
-                                </div>
-                            )}
-                            <div className="flex-1 min-w-0">
-                                <p className={`text-sm font-bold truncate ${item.completed ? 'line-through text-brand-inactive-text dark:text-dark-body' : 'text-brand-dark dark:text-dark-heading'}`}>
-                                    {item.title}
-                                </p>
-                                <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate">
-                                    {item.description}
-                                </p>
+            <div className="flex-1 flex flex-col gap-2 overflow-y-auto min-w-0">
+                {currentStage.items.map((item) => (
+                    <div
+                        key={item.id}
+                        onClick={() => onItemClick(item)}
+                        className="flex items-center gap-3 px-4 py-3 rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all cursor-pointer"
+                    >
+                        {item.completed ? (
+                            <CheckCircleIcon size={22} className="text-brand-green shrink-0" />
+                        ) : (
+                            <div className="w-[22px] h-[22px] rounded-full border-2 border-brand-border dark:border-dark-border flex items-center justify-center shrink-0">
+                                <div className="w-2 h-2 rounded-full bg-brand-border dark:bg-dark-border" />
                             </div>
-                            <ChevronRightIcon size={18} className="text-brand-inactive-text shrink-0" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                            <p className={`text-sm font-bold truncate ${item.completed ? 'line-through text-brand-inactive-text dark:text-dark-body' : 'text-brand-dark dark:text-dark-heading'}`}>
+                                {item.title}
+                            </p>
+                            <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate">
+                                {item.description}
+                            </p>
                         </div>
-                    ))}
-                </div>
+                        <ChevronRightIcon size={18} className="text-brand-inactive-text shrink-0" />
+                    </div>
+                ))}
             </div>
         </div>
     );
@@ -704,6 +672,76 @@ function ModeCard({ partnerId, onSuccess }: { partnerId: string; onSuccess: () =
 }
 
 // ============================================
+// TIPS CARD
+// ============================================
+
+const PLATFORM_TIPS = [
+    "Conecte seu WhatsApp no ERP para responder clientes e fechar vendas mais rápido.",
+    "Mantenha seu catálogo atualizado com boas fotos para vender muito mais.",
+    "Use a Central de Ajuda para descobrir tutoriais e dicas sobre a plataforma.",
+    "Ative as notificações para não perder nenhum pedido que chegar.",
+    "Cadastre cupons promocionais para atrair novos clientes.",
+    "Acompanhe os relatórios para entender o desempenho do seu negócio.",
+    "Configure o horário de funcionamento da sua loja para seus clientes.",
+    "Use o fluxo de caixa para manter as contas da sua empresa em dia.",
+    "Cadastre seus produtos com preço de venda e compare com o custo.",
+    "Divulgue seu perfil de vendedor nas redes sociais para ganhar mais clientes.",
+    "Defina metas de vendas para manter sua equipe motivada.",
+    "Importe planilhas para cadastrar vários produtos de uma vez só.",
+    "Separe as vendas por categoria para facilitar a busca dos clientes.",
+    "Fique de olho no estoque para evitar vender produtos indisponíveis.",
+    "Personalize seu perfil com logo e banner para transmitir mais confiança.",
+];
+
+function TipsCard() {
+    const [tipIdx, setTipIdx] = useState(() => Math.floor(Math.random() * PLATFORM_TIPS.length));
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setTipIdx((prev) => {
+                let next = prev;
+                while (next === prev) {
+                    next = Math.floor(Math.random() * PLATFORM_TIPS.length);
+                }
+                return next;
+            });
+        }, 15000);
+        return () => clearInterval(interval);
+    }, []);
+
+    return (
+        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 h-[280px] flex flex-col">
+            <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
+                    <SparklesIcon size={20} className="text-brand-green" />
+                </div>
+                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Dicas da Dudit</h3>
+            </div>
+
+            <div className="flex-1 flex flex-col justify-center">
+                <p className="text-sm text-brand-dark dark:text-dark-heading leading-relaxed font-medium">
+                    {PLATFORM_TIPS[tipIdx]}
+                </p>
+            </div>
+
+            <div className="flex items-center justify-between mt-4">
+                <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider">
+                    Dica {tipIdx + 1} de {PLATFORM_TIPS.length}
+                </span>
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1 text-brand-green font-bold"
+                    onClick={() => setTipIdx((prev) => (prev + 1) % PLATFORM_TIPS.length)}
+                >
+                    Próxima dica <ChevronRightIcon size={16} />
+                </Button>
+            </div>
+        </div>
+    );
+}
+
+// ============================================
 // MAIN COMPONENT
 // ============================================
 
@@ -775,7 +813,7 @@ export default function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
     return (
         <>
             <ERPPageHeader title={data.storeName || "Início"} />
-            <div className="flex flex-col gap-8 pb-20">
+            <div className="mx-auto w-full pt-4 flex flex-col gap-8 pb-20 px-4 md:px-8">
                 {/* Header com Saudação */}
                 <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
@@ -861,6 +899,9 @@ export default function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
                         <PlanUpgradeCard planSlug={data.planSlug} onUpgrade={openPlanUpgrade} />
                         {data.isQuickMode && (
                             <ModeCard partnerId={partnerId} onSuccess={() => router.refresh()} />
+                        )}
+                        {data.planSlug === "escalar" && !data.isQuickMode && (
+                            <TipsCard />
                         )}
                     </div>
                     <ShortcutsCard

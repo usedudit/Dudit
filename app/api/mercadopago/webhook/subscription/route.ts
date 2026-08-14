@@ -142,11 +142,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 })
     }
 
-    console.log("[SUB_WEBHOOK] Event:", JSON.stringify({
+    SecureLogger.info("[SUB_WEBHOOK] Event received", {
       type: body.type,
       action: body.action,
       dataId,
-    }))
+    })
 
     // ── Step 3: Validate signature (MANDATORY - no bypass) ──
     const isValid = validateWebhookSignature(signature, requestId, dataId)

@@ -7,6 +7,8 @@ import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
 import { validateCoupon } from "@/lib/services/coupons"
 import { calculateOrderPricing } from "@/lib/services/pricing-engine"
 import { resolveCheckoutCartLinesFresh } from "@/lib/cache/checkout-cache"
+import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
+import { issuePaymentQuote } from "@/lib/mercadopago/payment-quote"
 
 interface PreferenceRequest {
   items?: Array<{
@@ -15,6 +17,7 @@ interface PreferenceRequest {
     price: number
     quantity: number
     variant_id?: string
+    service_id?: string
   }>
   products?: Array<{
     id: string
@@ -22,8 +25,10 @@ interface PreferenceRequest {
     price: number
     quantity: number
     variant_id?: string
+    service_id?: string
   }>
   partnerId?: string
+  storeId?: string
   buyerId?: string
   couponCode?: string | null
   deliveryFee?: number
@@ -31,6 +36,7 @@ interface PreferenceRequest {
   deliveryAddress?: string
   cartItemIds?: string[]
   payDepositOnly?: boolean
+  quoteOnly?: boolean
   checkoutPricing?: {
     finalTotal: number
   }
@@ -39,7 +45,13 @@ interface PreferenceRequest {
 async function handler(request: NextRequest) {
   try {
     const body: PreferenceRequest = await request.json()
-    console.log("Request body:", { ...body, partnerId: body.partnerId ? "[HIDDEN]" : undefined })
+    SecureLogger.info("MP preference request received", {
+      hasItems: Boolean(body.items?.length || body.products?.length),
+      cartItemCount: body.cartItemIds?.length || 0,
+      hasCoupon: Boolean(body.couponCode),
+      deliveryType: body.deliveryType || "pickup",
+      hasClientPricingSnapshot: Boolean(body.checkoutPricing),
+    })
 
     const user = await getCurrentUser()
     const adminClient = createAdminClient()
@@ -68,17 +80,20 @@ async function handler(request: NextRequest) {
       }
       partnerId = resolved.partnerId
     } else {
-      const productIds = items.filter(i => !i.variant_id).map(i => i.id)
+      const productIds = items.filter(i => !i.variant_id && !i.service_id).map(i => i.id).filter(Boolean)
+      const serviceIds = items.map(i => i.service_id).filter(Boolean) as string[]
       const variantIds = items.map(i => i.variant_id || i.id).filter(Boolean) as string[]
-      const [productsRes, variantsRes] = await Promise.all([
+      const [productsRes, variantsRes, servicesRes] = await Promise.all([
         adminClient.from("products").select("id, partner_id").in("id", productIds),
         adminClient.from("product_variants").select("id, products!inner(partner_id)").in("id", variantIds),
+        adminClient.from("services").select("id, partner_id").in("id", serviceIds),
       ])
       const productsMap = new Map<string, any>(productsRes.data?.map((p: any) => [p.id, p]))
       const variantsMap = new Map<string, any>(variantsRes.data?.map((v: any) => [v.id, v]))
+      const servicesMap = new Map<string, any>(servicesRes.data?.map((s: any) => [s.id, s]))
       const resolvedPartnerIds = items.map(item => {
         const variant = item.variant_id ? variantsMap.get(item.variant_id) : variantsMap.get(item.id)
-        return variant?.products?.partner_id || productsMap.get(item.id)?.partner_id
+        return variant?.products?.partner_id || productsMap.get(item.id)?.partner_id || (item.service_id ? servicesMap.get(item.service_id)?.partner_id : undefined)
       })
       if (resolvedPartnerIds.some(id => !id) || new Set(resolvedPartnerIds).size !== 1) {
         return NextResponse.json({ error: "Itens de vendedores diferentes ou inválidos" }, { status: 400 })
@@ -149,6 +164,8 @@ async function handler(request: NextRequest) {
     let totalAmount = 0
     const preferenceItems: any[] = []
     let couponItems: any[] = []
+    let deliveryFee = 0
+    let deliveryStoreId: string | null = body.storeId || null
 
     if (useUnifiedCart) {
       // Update pay_deposit_only in DB
@@ -172,6 +189,7 @@ async function handler(request: NextRequest) {
       if (!resolved.success) {
         return NextResponse.json({ error: resolved.error }, { status: 400 })
       }
+      deliveryStoreId = resolved.lines.find((line) => line.storeId)?.storeId || deliveryStoreId
 
       for (const line of resolved.lines) {
         preferenceItems.push({
@@ -190,22 +208,28 @@ async function handler(request: NextRequest) {
         recurringPlanId: l.recurringPlanId || null,
       }))
     } else {
-      const productIds = items.filter(i => !i.variant_id).map(i => i.id)
+      const productIds = items.filter(i => !i.variant_id && !i.service_id).map(i => i.id).filter(Boolean)
+      const serviceIds = items.map(i => i.service_id).filter(Boolean) as string[]
       const variantIds = items.map(i => i.variant_id || i.id).filter(Boolean) as string[]
 
-      const [productsRes, variantsRes] = await Promise.all([
+      const [productsRes, variantsRes, servicesRes] = await Promise.all([
         adminClient
           .from("products")
-          .select("id, price, promotional_price, stock_available, partner_id, name")
+          .select("id, price, promotional_price, stock_available, partner_id, name, store_id")
           .in("id", productIds),
         adminClient
           .from("product_variants")
-          .select("id, price_adjustment, stock_available, product_id, products!inner(partner_id, price, promotional_price, name)")
-          .in("id", variantIds)
+          .select("id, price_adjustment, stock_available, product_id, products!inner(partner_id, price, promotional_price, name, store_id)")
+          .in("id", variantIds),
+        adminClient
+          .from("services")
+          .select("id, price, promotional_price, partner_id, name, store_id")
+          .in("id", serviceIds)
       ])
 
       const productsMap = new Map<string, any>(productsRes.data?.map((p: any) => [p.id, p]))
       const variantsMap = new Map<string, any>(variantsRes.data?.map((v: any) => [v.id, v]))
+      const servicesMap = new Map<string, any>(servicesRes.data?.map((s: any) => [s.id, s]))
 
       for (const item of items) {
         // Validar quantidade
@@ -219,8 +243,17 @@ async function handler(request: NextRequest) {
         let resolvedName: string
 
         const variant = item.variant_id ? variantsMap.get(item.variant_id) : (variantsMap.get(item.id) || null)
+        const service = item.service_id ? servicesMap.get(item.service_id) : null
 
-        if (variant) {
+        if (service) {
+          const basePrice = Number(service.price)
+          const promoPrice = service.promotional_price ? Number(service.promotional_price) : 0
+          resolvedPrice = (promoPrice > 0 && promoPrice < basePrice) ? promoPrice : basePrice
+          resolvedStock = Number.MAX_SAFE_INTEGER
+          resolvedPartnerId = service.partner_id
+          resolvedName = service.name
+          deliveryStoreId = deliveryStoreId || service.store_id || null
+        } else if (variant) {
           // Encontrado como variante
           const parentProduct = variant.products as any
           resolvedPrice = variant.price_adjustment
@@ -229,6 +262,7 @@ async function handler(request: NextRequest) {
           resolvedStock = variant.stock_available ?? 0
           resolvedPartnerId = parentProduct.partner_id
           resolvedName = parentProduct.name
+          deliveryStoreId = deliveryStoreId || parentProduct.store_id || null
         } else {
           // Tentar como produto
           const product = productsMap.get(item.id)
@@ -239,6 +273,7 @@ async function handler(request: NextRequest) {
             resolvedStock = product.stock_available
             resolvedPartnerId = product.partner_id
             resolvedName = product.name
+            deliveryStoreId = deliveryStoreId || product.store_id || null
           } else {
             return NextResponse.json({ error: `Produto/Variante ${item.id} não encontrado` }, { status: 400 })
           }
@@ -246,7 +281,7 @@ async function handler(request: NextRequest) {
 
         // Verificar que o produto pertence ao parceiro
         if (resolvedPartnerId !== partnerId) {
-          SecureLogger.error("Product partner mismatch in preference", { productId: item.id })
+          SecureLogger.error("Catalog item partner mismatch in preference", { productId: item.id, serviceId: item.service_id })
           return NextResponse.json({ error: "Produto não pertence a este vendedor" }, { status: 400 })
         }
 
@@ -260,7 +295,7 @@ async function handler(request: NextRequest) {
 
         preferenceItems.push({
           title: resolvedName,
-          description: `Produto: ${resolvedName}`,
+          description: `${service ? "Serviço" : "Produto"}: ${resolvedName}`,
           unit_price: resolvedPrice,
           quantity: item.quantity,
           currency_id: "BRL",
@@ -271,7 +306,21 @@ async function handler(request: NextRequest) {
     }
 
     // ── Central pricing engine (única fonte de verdade) ──────────────────────
-    const deliveryFee = Number(body.deliveryFee || 0)
+    if (body.deliveryType === "delivery") {
+      if (!body.deliveryAddress?.trim()) {
+        return NextResponse.json({ error: "Endereço de entrega não informado" }, { status: 400 })
+      }
+      const deliveryQuote = await quoteDeliveryFeeAction({
+        partnerId,
+        storeId: deliveryStoreId,
+        destinationAddress: body.deliveryAddress,
+        orderSubtotal: totalAmount,
+      })
+      if (!deliveryQuote.success) {
+        return NextResponse.json({ error: deliveryQuote.error }, { status: 400 })
+      }
+      deliveryFee = Number(deliveryQuote.fee || 0)
+    }
 
     // Build pricing items from already-resolved preference items
     type PricingItem = import("@/lib/services/pricing-engine").PricingItem
@@ -340,22 +389,26 @@ async function handler(request: NextRequest) {
 
     // SEGURANÇA: Validar total
     const checkoutFinalTotal = Number(body.checkoutPricing?.finalTotal || 0)
-    if (checkoutFinalTotal > 0) {
-      const adjustment = Math.round((checkoutFinalTotal - totalAmount + Number.EPSILON) * 100) / 100
-      if (Math.abs(adjustment) > 0.01) {
-        preferenceItems.push({
-          title: "Ajuste do checkout",
-          unit_price: adjustment,
-          quantity: 1,
-          currency_id: "BRL",
-        })
-      }
-      totalAmount = checkoutFinalTotal
+    if (checkoutFinalTotal > 0 && Math.abs(checkoutFinalTotal - totalAmount) > 0.01) {
+      SecureLogger.warn("MP preference pricing snapshot mismatch", {
+        hasClientPricingSnapshot: true,
+      })
+      return NextResponse.json({ error: "Os valores do checkout não conferem. Atualize a página e tente novamente." }, { status: 400 })
     }
 
     if (totalAmount <= 0 || totalAmount > 999999) {
       SecureLogger.error("Invalid preference total amount", { totalAmount })
       return NextResponse.json({ error: "Valor total inválido" }, { status: 400 })
+    }
+
+    const paymentQuote = issuePaymentQuote({
+      userId: user.id,
+      partnerId,
+      maxAmount: totalAmount,
+    })
+
+    if (body.quoteOnly) {
+      return NextResponse.json({ success: true, payment_quote: paymentQuote })
     }
 
     // Criar preferência no Mercado Pago
@@ -410,7 +463,6 @@ async function handler(request: NextRequest) {
       let mpErrorData: any = null
       try {
         mpErrorData = await mpResponse.json()
-        console.error("MP Error Response (full):", JSON.stringify(mpErrorData, null, 2))
 
         if (mpErrorData?.message) {
           errorMessage = mpErrorData.message
@@ -424,11 +476,11 @@ async function handler(request: NextRequest) {
         errorMessage = `HTTP ${mpResponse.status}`
       }
 
-      console.error("Final error message to return:", errorMessage)
       SecureLogger.error("Mercado Pago preference creation failed", {
         status: mpResponse.status,
         errorMessage,
-        mpErrorData
+        providerErrorCode: mpErrorData?.error || mpErrorData?.code || null,
+        providerCauseCount: Array.isArray(mpErrorData?.cause) ? mpErrorData.cause.length : 0,
       })
       return NextResponse.json(
         { error: errorMessage },
@@ -437,10 +489,10 @@ async function handler(request: NextRequest) {
     }
 
     const preference = await mpResponse.json()
-
     return NextResponse.json({
       success: true,
       preference_id: preference.id,
+      payment_quote: paymentQuote,
       preferenceId: preference.id,
       initPoint: preference.init_point,
       init_point: preference.init_point,

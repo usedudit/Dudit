@@ -150,9 +150,9 @@ export async function getServiceReviews(serviceId: string, storeId?: string | nu
   let query = supabase
     .from("reviews")
     .select(`
-      id, rating, comment, created_at, product_id, service_id, store_id,
-      products:product_id(name, images, slug, unit),
-      services:service_id(name, images, slug, unit)
+id, rating, comment, created_at, product_id, service_id, store_id,
+      products:product_id(name, images, unit),
+      services:service_id(name, images, unit)
     `)
     .eq("service_id", serviceId)
 

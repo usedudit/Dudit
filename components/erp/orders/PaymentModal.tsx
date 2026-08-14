@@ -469,6 +469,7 @@ const PaymentModal = ({
     const mpBricksBuilderRef = useRef<any>(null);
     const mpBrickIdRef = useRef<any>(null);
     const mpBrickInitializedRef = useRef(false);
+    const mpPaymentQuoteRef = useRef<string | null>(null);
 
 
     const [depositMpPixData, setDepositMpPixData] = useState<{ qrCode: string; qrCodeBase64: string } | null>(null);
@@ -531,6 +532,24 @@ const PaymentModal = ({
         }
         setGeneratingDepositPix(true);
         try {
+            if (!mpPaymentQuoteRef.current) {
+                const quoteData = await fetchJSONWithCSRF<any>("/api/mercadopago/create-preference", {
+                    method: "POST",
+                    body: {
+                        products: cart.map((item: any) => ({
+                            id: item.productId || item.id,
+                            variant_id: item.variantId || item.variant_id || undefined,
+                            service_id: item.serviceId || item.service_id || undefined,
+                            name: item.name,
+                            quantity: item.quantity,
+                        })),
+                        partnerId,
+                        quoteOnly: true,
+                    },
+                });
+                mpPaymentQuoteRef.current = quoteData.payment_quote || null;
+            }
+            if (!mpPaymentQuoteRef.current) throw new Error("Não foi possível validar a cotação do pagamento.");
             const customerName = (customer?.name || customer?.full_name || customer?.fullName || customer?.customer_name || "").trim();
             const nameParts = customerName ? customerName.split(/\s+/) : [];
             const firstName = nameParts[0] || undefined;
@@ -557,6 +576,7 @@ const PaymentModal = ({
                     },
                     partnerId,
                     amount: depositChargeAmount,
+                    paymentQuote: mpPaymentQuoteRef.current,
                     description: `Sinal - ${customerName || "Cliente"}`,
                 },
             });
@@ -778,6 +798,7 @@ const PaymentModal = ({
             setMpBoletoData(null);
             setMpPaymentId(null);
             setPreCreatedOrderId(null);
+            mpPaymentQuoteRef.current = null;
             setMpCopied(false);
             setMpIsCheckingStatus(false);
             mpBrickInitializedRef.current = false;
@@ -929,6 +950,7 @@ const PaymentModal = ({
                         products: cart.map((item: any) => ({
                             id: item.productId,
                             variant_id: item.variantId || undefined,
+                            service_id: item.serviceId || undefined,
                             name: item.name,
                             price: item.unitPrice,
                             quantity: item.quantity,
@@ -940,6 +962,7 @@ const PaymentModal = ({
                 setMpBrickError(err?.message || "Erro ao preparar pagamento");
                 return;
             }
+            mpPaymentQuoteRef.current = preferenceData.payment_quote || null;
 
             const customerName = (customer?.name || customer?.full_name || customer?.fullName || customer?.customer_name || "").trim();
             const nameParts = customerName ? customerName.split(/\s+/) : [];
@@ -1036,6 +1059,7 @@ const PaymentModal = ({
                     paymentFormData: resolvedFormData,
                     partnerId,
                     amount: chargeTarget,
+                    paymentQuote: mpPaymentQuoteRef.current,
                     description: `Venda ERP - ${customer?.name || "Cliente"}`,
                 },
             });

@@ -175,8 +175,14 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  const forwarded = request.headers.get("x-forwarded-for")
-  const ip = forwarded ? forwarded.split(",")[0].trim() : request.headers.get("x-real-ip") || "unknown"
+  // Never trust the client-controlled first element of x-forwarded-for.
+  // Platform-provided request.ip is preferred; proxy headers are accepted
+  // only when the deployment explicitly sits behind a trusted proxy.
+  const platformIp = (request as NextRequest & { ip?: string }).ip
+  const trustedProxyIp = process.env.TRUSTED_PROXY_HEADERS === "true"
+    ? request.headers.get("cf-connecting-ip") || request.headers.get("x-real-ip")
+    : null
+  const ip = platformIp || trustedProxyIp || "unknown"
 
   // 1. RATE LIMITING (APIs e Auth POST)
   // Uses category-based system with explicit limits. Exempts routes with custom rate limits.

@@ -26,17 +26,16 @@ import {
 
 /**
  * Get the client IP address from Next.js headers.
- * Handles x-forwarded-for (proxy chains) and x-real-ip.
+ * Uses platform IP data first. Proxy headers are accepted only when the
+ * deployment explicitly declares that the proxy is trusted.
  */
 async function getClientIP(): Promise<string> {
     try {
         const headersList = await headers()
-        const forwarded = headersList.get("x-forwarded-for")
-        if (forwarded) {
-            // Take only the first IP from the chain (client IP)
-            return forwarded.split(",")[0].trim()
+        if (process.env.TRUSTED_PROXY_HEADERS === "true") {
+            return headersList.get("cf-connecting-ip") || headersList.get("x-real-ip") || "unknown"
         }
-        return headersList.get("x-real-ip") || "unknown"
+        return "unknown"
     } catch {
         return "unknown"
     }

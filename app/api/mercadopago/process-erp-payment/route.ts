@@ -7,6 +7,7 @@ import { withCSRFProtection } from "@/lib/security/csrf-middleware"
 import { checkRateLimitForAPI } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
+import { verifyPaymentQuote } from "@/lib/mercadopago/payment-quote"
 
 const isDev = process.env.NODE_ENV === "development"
 
@@ -14,6 +15,7 @@ interface ProcessErpPaymentRequest {
   paymentFormData: any
   partnerId: string
   amount: number
+  paymentQuote?: string
   description?: string
 }
 
@@ -35,7 +37,7 @@ async function handler(request: NextRequest) {
     }
 
     const body: ProcessErpPaymentRequest = await request.json()
-    const { paymentFormData, partnerId, amount, description } = body
+    const { paymentFormData, partnerId, amount, paymentQuote, description } = body
 
     // Validações
     if (!paymentFormData?.payment_method_id) {
@@ -115,6 +117,23 @@ async function handler(request: NextRequest) {
     if (!hasAccess) {
       SecureLogger.warn("Unauthorized ERP payment attempt", { userId: user.id, partnerId })
       return NextResponse.json({ error: "Acesso negado" }, { status: 403 })
+    }
+
+    if (!paymentQuote) {
+      return NextResponse.json({ error: "Cotação de pagamento ausente. Atualize a tela e tente novamente." }, { status: 400 })
+    }
+    const quoteValidation = verifyPaymentQuote(paymentQuote, {
+      userId: user.id,
+      partnerId,
+      amount,
+    })
+    if (!quoteValidation.valid) {
+      SecureLogger.warn("ERP payment quote rejected", {
+        userId: user.id,
+        partnerId,
+        reason: quoteValidation.error,
+      })
+      return NextResponse.json({ error: quoteValidation.error }, { status: 400 })
     }
 
     // Obter token do MP
@@ -222,7 +241,11 @@ async function handler(request: NextRequest) {
       }
     }
 
-    if (isDev) console.log("[ERP MP PAYMENT REQUEST]:", JSON.stringify(mpPaymentRequest, null, 2))
+    SecureLogger.info("ERP MP payment request prepared", {
+      paymentMethodId: paymentFormData?.payment_method_id,
+      partnerId,
+      hasPaymentToken: Boolean(paymentFormData?.token),
+    })
 
     // Idempotency key
     const idempotencyKey = generateIdempotencyKey(partnerId, amount)
@@ -242,11 +265,16 @@ async function handler(request: NextRequest) {
       let mpErrorData: any = null
       try {
         const mpErrorText = await mpResponse.text()
-        if (isDev) console.log("[ERP MP Error]:", mpErrorText)
         try { mpErrorData = JSON.parse(mpErrorText) } catch { }
       } catch { }
 
-      SecureLogger.error("MP API ERP payment failed", { status: mpResponse.status, errorData: mpErrorData })
+      SecureLogger.error("MP API ERP payment failed", {
+        status: mpResponse.status,
+        providerErrorCode: mpErrorData?.error || mpErrorData?.code || null,
+        providerMessage: typeof mpErrorData?.message === "string" ? mpErrorData.message.slice(0, 160) : null,
+        providerCauseCount: Array.isArray(mpErrorData?.cause) ? mpErrorData.cause.length : 0,
+        responseWasJson: Boolean(mpErrorData),
+      })
       return NextResponse.json({ error: "Erro ao processar pagamento. Tente novamente." }, { status: 400 })
     }
 

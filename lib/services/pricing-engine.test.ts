@@ -548,13 +548,13 @@ describe("calculateOrderPricing", () => {
   })
 
   // ── Edge cases ─────────────────────────────────────────────────────────
-  it("returns zero for completely free items (clamped to min 0.01)", () => {
+  it("keeps completely free items at zero", () => {
     const r = calculateOrderPricing({
       items: [{ unitPrice: 0, quantity: 5 }],
       shippingCost: 0,
     })
-    expect(r.subtotal).toBe(0.05)
-    expect(r.minPriceWarning).toBe(true)
+    expect(r.subtotal).toBe(0)
+    expect(r.minPriceWarning).toBe(false)
   })
 
   it("handles DISCOUNT with maxDiscountAmount cap", () => {

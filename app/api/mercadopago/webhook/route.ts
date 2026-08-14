@@ -90,11 +90,11 @@ export async function POST(request: NextRequest) {
     // ── Step 2: Parse body ──
     const body = await request.json()
 
-    console.log("[WEBHOOK] Event:", JSON.stringify({
+    SecureLogger.info("[WEBHOOK] Event received", {
       type: body.type,
       action: body.action,
       paymentId: body.data?.id,
-    }))
+    })
 
     if (!body?.data?.id) {
       console.error("[WEBHOOK] Rejected: missing payment ID in body")

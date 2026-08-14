@@ -266,7 +266,9 @@ export async function createMpSubscription(
       SecureLogger.error("MP preapproval creation failed", {
         status: response.status,
         partnerId,
-        error: errorData,
+        providerErrorCode: errorData?.error || errorData?.code || null,
+        providerMessage: typeof errorData?.message === "string" ? errorData.message.slice(0, 160) : null,
+        responseWasJson: Boolean(errorData),
       })
       return { success: false, error: "Erro ao criar assinatura no Mercado Pago" }
     }

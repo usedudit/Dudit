@@ -54,7 +54,7 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
       .select("category_id, is_showcase_active, mp_user_id, business_info")
       .eq("id", partnerId)
       .single(),
-    
+
     // Loja por ID ativo (pode não existir se o cookie estiver desatualizado)
     activeStoreId
       ? supabase.from("stores").select(STORE_SELECT).eq("id", activeStoreId).maybeSingle()
@@ -62,7 +62,7 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
 
     // Fallback: sempre busca a primeira loja do parceiro
     supabase.from("stores").select(STORE_SELECT).eq("partner_id", partnerId).maybeSingle(),
-    
+
     supabase
       .from("addresses")
       .select("city, state")
@@ -165,7 +165,7 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
   const hasPix = (paymentMethodsRes.data || []).some(
     (m: any) => (m.type === "pix" || m.payment_type === "pix") && m.is_active
   );
-  
+
   const activeProducts = productsCountRes.count || 0;
   const activeServices = servicesCountRes.count || 0;
   const hasItems = (activeProducts + activeServices) > 0;
@@ -228,11 +228,11 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
 
   const checklist = percentComplete < 100
     ? {
-        percentComplete,
-        completedCount,
-        totalCount,
-        items: checklistItems
-      }
+      percentComplete,
+      completedCount,
+      totalCount,
+      items: checklistItems
+    }
     : null;
 
   // 6. Gera saudação e mensagens baseadas no modo e preenchimento
@@ -255,12 +255,12 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
 
   const partnerUrl = store && storeSlug && storeId
     ? getStoreUrl({
-        id: storeId,
-        slug: storeSlug,
-        name: store.name,
-        city: storeCity,
-        state: storeState,
-      })
+      id: storeId,
+      slug: storeSlug,
+      name: store.name,
+      city: storeCity,
+      state: storeState,
+    })
     : "/";
 
   if (!store && (addressData.length > 0 || partnerRes.data)) {

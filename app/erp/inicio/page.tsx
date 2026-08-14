@@ -3,7 +3,10 @@ import { redirect } from "next/navigation"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { getUnifiedDashboardAction } from "@/app/actions/erp/quick-mode"
 import QuickModeHome from "@/components/erp/quick-mode/QuickModeHome"
+import { FadeIn } from "@/components/animations/FadeIn"
 import { IconPlaceholder, SkeletonLoader } from "@/components/reusable"
+
+export const dynamic = "force-dynamic"
 
 export default async function InicioPage() {
     const context = await getCurrentPartnerContext()
@@ -29,17 +32,17 @@ export default async function InicioPage() {
     }
 
     return (
-        <main className="mx-auto w-full px-4 md:px-8 pt-8 max-w-[1600px]">
+        <FadeIn className="p-4">
             <Suspense fallback={<QuickModeLoadingSkeleton />}>
                 <QuickModeHome data={result.data as any} partnerId={partnerId} />
             </Suspense>
-        </main>
+        </FadeIn>
     )
 }
 
 function QuickModeLoadingSkeleton() {
     return (
-        <div className="flex flex-col gap-8">
+        <div className="mx-auto w-full pt-4 flex flex-col gap-8 pb-20 px-4 md:px-8">
             <div className="flex flex-col gap-2">
                 <SkeletonLoader className="h-10 w-64" />
                 <SkeletonLoader className="h-6 w-96" />

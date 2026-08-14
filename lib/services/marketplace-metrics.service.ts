@@ -1,6 +1,7 @@
 import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { revalidateTag } from "next/cache"
+import { getAdminClient } from "@/lib/supabase/admin"
 
 const PARTNER_STATS_TAG = "partner-stats"
 const STORE_STATS_TAG = "store-stats"
@@ -14,7 +15,8 @@ export async function recordMarketplaceOrderMetrics(
   orderId: string,
 ): Promise<boolean> {
   try {
-    const { data, error } = await supabase.rpc("record_marketplace_order_metrics", {
+    const server = getAdminClient()
+    const { data, error } = await server.rpc("record_marketplace_order_metrics", {
       p_order_id: orderId,
     })
     if (error) {
@@ -22,7 +24,7 @@ export async function recordMarketplaceOrderMetrics(
       return false
     }
     if (data === true) {
-      await invalidatePartnerStatsForOrder(supabase, orderId)
+      await invalidatePartnerStatsForOrder(server, orderId)
     }
     return data === true
   } catch (e) {
@@ -37,7 +39,8 @@ export async function recordAppointmentBookingMetrics(
   appointmentId: string,
 ): Promise<boolean> {
   try {
-    const { data, error } = await supabase.rpc("record_appointment_booking_metrics", {
+    const server = getAdminClient()
+    const { data, error } = await server.rpc("record_appointment_booking_metrics", {
       p_appointment_id: appointmentId,
     })
     if (error) {
@@ -60,7 +63,8 @@ export async function recordSubscriptionSignupMetrics(
   subscriptionId: string,
 ): Promise<boolean> {
   try {
-    const { data, error } = await supabase.rpc("record_subscription_signup_metrics", {
+    const server = getAdminClient()
+    const { data, error } = await server.rpc("record_subscription_signup_metrics", {
       p_subscription_id: subscriptionId,
     })
     if (error) {

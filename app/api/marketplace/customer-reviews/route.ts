@@ -134,8 +134,8 @@ export async function GET(request: NextRequest) {
       variant_name: orderItem?.variant_name || null,
       variant_options: orderItem?.variant_options || null,
       unit: product?.unit || service?.unit || null,
-      products: product ? { name: product.name, images: product.images, slug: product.slug, unit: product.unit } : null,
-      services: service ? { name: service.name, images: service.images, slug: service.slug, unit: service.unit } : null,
+      products: product ? { name: product.name, images: product.images, unit: product.unit } : null,
+      services: service ? { name: service.name, images: service.images, unit: service.unit } : null,
     }
   })
 

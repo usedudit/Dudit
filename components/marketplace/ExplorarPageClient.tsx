@@ -1583,7 +1583,7 @@ export function ExplorarPageClient({
                                         </div>
                                     ) : (
                                         <div className={viewMode === "grid"
-                                            ? `grid ${currentType === 'vitrines' ? 'grid-cols sm:grid-cols-2 md:grid-cols-3' : 'grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'} gap-3 md:gap-4 lg:gap-6 mt-4`
+                                            ? `grid ${currentType === 'vitrines' ? 'grid-cols sm:grid-cols-2 md:grid-cols-3' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6'} gap-3 md:gap-4 lg:gap-6 mt-4`
                                             : "rounded-lg border border-gray-100 bg-white mt-4"
                                         }>
                                             {filteredResults.map((item, index) => {

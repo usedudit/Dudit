@@ -181,10 +181,10 @@ export function recalculateSplitPaymentFromBaseAmounts(
             installmentNumber: row.installmentNumber,
         })
 
-        const legAbated = round2(amountReceived + (engine.paymentMethodDiscountAmount || 0))
+        const legAmount = engine.effectiveAmount
         return {
             ok: true,
-            finalTotal: legAbated,
+            finalTotal: legAmount,
             feeAmount: engine.feeAmount || 0,
             fixedFeeAmount: engine.fixedFeeAmount || 0,
             interestAmount: engine.interestAmount || 0,
@@ -192,8 +192,8 @@ export function recalculateSplitPaymentFromBaseAmounts(
             adjustedRows: [
                 {
                     ...row,
-                    amount: legAbated,
-                    finalAmount: legAbated,
+                        amount: legAmount,
+                        finalAmount: legAmount,
                     interestAmount: engine.interestAmount || 0,
                     feeAmount: engine.feeAmount || 0,
                     fixedFeeAmount: engine.fixedFeeAmount || 0,
@@ -256,7 +256,7 @@ export function recalculateSplitPaymentFromBaseAmounts(
             installmentNumber: row.installmentNumber,
         })
 
-        const legAbated = round2(amountReceived + (engine.paymentMethodDiscountAmount || 0))
+        const legAmount = engine.effectiveAmount
         totalFee = round2(totalFee + (engine.feeAmount || 0))
         totalFixedFee = round2(totalFixedFee + (engine.fixedFeeAmount || 0))
         totalInterest = round2(totalInterest + (engine.interestAmount || 0))
@@ -264,8 +264,8 @@ export function recalculateSplitPaymentFromBaseAmounts(
 
         adjustedRows.push({
             ...row,
-            amount: legAbated,
-            finalAmount: legAbated,
+            amount: legAmount,
+            finalAmount: legAmount,
             interestAmount: engine.interestAmount || 0,
             feeAmount: engine.feeAmount || 0,
             fixedFeeAmount: engine.fixedFeeAmount || 0,
@@ -279,7 +279,7 @@ export function recalculateSplitPaymentFromBaseAmounts(
             installmentCostAmount: engine.installmentCostAmount,
             feeBearer: engine.feeBearer,
         })
-        finalTotal = round2(finalTotal + legAbated)
+        finalTotal = round2(finalTotal + legAmount)
     }
 
     return {
