@@ -1578,6 +1578,9 @@ export function ProductDetailsPageClient({
                 })()}
             </div>
 
+            {/* Sponsored ad below seller card */}
+            <SponsoredAdDetailSlot ad={sponsoredAd} />
+
             {
                 !isProductOwner && (
                     <button
@@ -2203,8 +2206,6 @@ export function ProductDetailsPageClient({
                             {BuyPanel}
                         </div>
                     </div>
-
-                    <SponsoredAdDetailSlot ad={sponsoredAd} className="px-4 lg:px-8" />
 
                     {/* Mobile bottom bar */}
                     {!isProductOwner && (

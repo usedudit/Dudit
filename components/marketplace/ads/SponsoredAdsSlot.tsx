@@ -2,6 +2,8 @@
 
 import type { SponsoredAd } from "@/lib/ads/types"
 import { SponsoredAdCard } from "@/components/marketplace/ads/SponsoredAdCard"
+import { shouldRenderExternalFallback } from "@/lib/ads/fallback"
+import { GoogleAdSenseFallback } from "@/components/marketplace/ads/GoogleAdSenseFallback"
 
 interface SponsoredAdDetailSlotProps {
     ad: SponsoredAd | null
@@ -9,12 +11,23 @@ interface SponsoredAdDetailSlotProps {
 }
 
 export function SponsoredAdDetailSlot({ ad, className = "" }: SponsoredAdDetailSlotProps) {
-    if (!ad) return null
+    const externalFallback = shouldRenderExternalFallback(ad ? [ad] : [], "detail")
+
+    if (!ad) {
+        if (externalFallback) {
+            return (
+                <div className={`mt-4 ${className}`}>
+                    <GoogleAdSenseFallback slot="detail" format="rectangle" />
+                </div>
+            )
+        }
+        return null
+    }
 
     return (
-        <section className={`mx-auto max-w-[1400px] px-4 lg:px-0 mb-10 ${className}`}>
+        <div className={`mt-4 ${className}`}>
             <SponsoredAdCard ad={ad} variant="compact" />
-        </section>
+        </div>
     )
 }
 
@@ -34,3 +47,4 @@ export function SponsoredAdsSearchInline({ ads, className = "" }: SponsoredAdsSe
         </div>
     )
 }
+

@@ -1540,6 +1540,9 @@ export function ServiceDetailsPageClient({
                     );
                 })()}
             </div>
+
+            {/* Sponsored ad below seller card */}
+            <SponsoredAdDetailSlot ad={sponsoredAd} />
         </div>
     )
 
@@ -2097,8 +2100,6 @@ export function ServiceDetailsPageClient({
                             {BookingPanel}
                         </div>
                     </div>
-
-                    <SponsoredAdDetailSlot ad={sponsoredAd} className="px-4 lg:px-8" />
 
                     {/* Mobile bottom bar */}
                     <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 z-50 flex gap-2 lg:hidden shadow-lg">

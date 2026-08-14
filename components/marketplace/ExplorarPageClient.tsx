@@ -25,7 +25,7 @@ import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { StarIcon } from "@/lib/icons"
 import { getStoreUrl, getPlanUrl, getProductUrl, getServiceUrl } from "@/lib/utils/url-generator"
 import { formatCurrency } from "@/lib/utils"
-import { SponsoredAdsSearchInline } from "@/components/marketplace/ads/SponsoredAdsSlot"
+import { SponsoredAdsCarousel } from "@/components/marketplace/ads/SponsoredAdsCarousel"
 import type { SponsoredAd } from "@/lib/ads/types"
 import citiesData from "@/lib/data/cities.json"
 import { useLocationRedirect } from "@/hooks/use-location-redirect"
@@ -77,6 +77,12 @@ export function ExplorarPageClient({
     isStateRoute = false,
     communityVideos = [],
 }: ExplorarPageClientProps & { hideHeaderAndFooter?: boolean }) {
+    const activeAds = useMemo(() => {
+        if (query && searchAds && searchAds.length > 0) return searchAds
+        if (exploreAds && exploreAds.length > 0) return exploreAds
+        return []
+    }, [query, searchAds, exploreAds])
+
     const router = useRouter()
     const pathname = usePathname()
     const searchParams = useSearchParams()
@@ -1626,19 +1632,7 @@ export function ExplorarPageClient({
                                             ? `grid ${currentType === 'vitrines' ? 'grid-cols sm:grid-cols-2 md:grid-cols-3' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6'} gap-3 md:gap-4 lg:gap-6 mt-4`
                                             : "rounded-lg border border-gray-100 bg-white mt-4"
                                         }>
-                                            {filteredResults.map((item, index) => {
-                                                const resultNode = renderListingItem(item)
-                                                const shouldInjectSearchAds = !!query && searchAds.length > 0 && index === 5
-
-                                                if (!shouldInjectSearchAds) return resultNode
-
-                                                return (
-                                                    <Fragment key={`result-with-ads-${item.id}`}>
-                                                        {resultNode}
-                                                        <SponsoredAdsSearchInline ads={searchAds} />
-                                                    </Fragment>
-                                                )
-                                            })}
+                                            {filteredResults.map((item) => renderListingItem(item))}
 
                                             {hasNextPage && (
                                                 <div
@@ -1680,6 +1674,14 @@ export function ExplorarPageClient({
                                             />
                                         </div>
                                     )}
+
+                                    {/* Seção Patrocinados na sua região */}
+                                    <SponsoredAdsCarousel
+                                        ads={activeAds}
+                                        slot={query ? "search" : "explore"}
+                                        title="Patrocinados na sua região"
+                                        className="mt-12 pt-8 border-t border-gray-100"
+                                    />
                                 </>
                             )}
 

@@ -13,6 +13,7 @@ import { PreventSamePageNavigation } from "@/components/PreventSamePageNavigatio
 import { PWAUpdatePrompt } from "@/components/pwa/PWAUpdatePrompt"
 import { MarketplaceBottomMenu } from "@/components/marketplace/MarketplaceBottomMenu"
 import { TimezoneProvider } from "@/lib/date"
+import Script from "next/script"
 
 export const viewport: Viewport = {
     themeColor: "#003229",
@@ -198,6 +199,7 @@ export default async function RootLayout({
     children: React.ReactNode
 }) {
     const user = await getCurrentUser()
+
     return (
         <html lang="pt-BR">
             <head>
@@ -212,6 +214,7 @@ export default async function RootLayout({
                     rel="stylesheet"
                     href="https://api.mapbox.com/mapbox-gl-js/v3.28.0/mapbox-gl.css"
                 />
+
                 <script
                     type="application/ld+json"
                     dangerouslySetInnerHTML={{
@@ -219,6 +222,7 @@ export default async function RootLayout({
                     }}
                 />
             </head>
+
             <body className="font-sans">
                 <SupabaseProvider initialUser={user} initialSessionData={null}>
                     <QueryProvider>
@@ -237,6 +241,12 @@ export default async function RootLayout({
                         <MarketplaceBottomMenu />
                     </QueryProvider>
                 </SupabaseProvider>
+
+                <Script
+                    async
+                    src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8357337871781593"
+                    crossOrigin="anonymous"
+                />
             </body>
         </html>
     )
