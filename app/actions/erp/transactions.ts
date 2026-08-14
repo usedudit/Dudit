@@ -22,7 +22,8 @@ import { logAuditEvent } from "@/lib/services/timeline.service"
 import { revalidateTransactions, revalidateEntityTimeline } from "@/lib/utils/revalidation"
 import { requireUser } from "@/lib/auth/authorization"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
-import { sanitizeNotes } from "@/lib/input-validator"
+import { sanitizeNotes, sanitizeInput } from "@/lib/input-validator"
+import { sanitizeUUID } from "@/lib/security/input-sanitizer"
 
 type DbTransaction = {
     id: string
@@ -252,13 +253,17 @@ async function paymentMethodDisplayLabel(
     methodId: string | null | undefined,
 ): Promise<string | null> {
     if (!methodId) return null
+    const validUuid = sanitizeUUID(methodId)
+    if (!validUuid) {
+        return formatPaymentMethodLabel(methodId, null)
+    }
     const { data } = await supabase
         .from("payment_methods")
         .select("name, payment_type")
-        .eq("id", methodId)
+        .eq("id", validUuid)
         .eq("partner_id", partnerId)
         .maybeSingle()
-    if (!data?.name) return null
+    if (!data?.name) return formatPaymentMethodLabel(methodId, null)
     return formatPaymentMethodLabel(data.name, data.payment_type)
 }
 
@@ -531,7 +536,7 @@ export async function getFinancialTransactionsAction(
             : Promise.resolve([] as { sale_number: string; customer_id: string | null }[])
 
         // Payment methods lookup
-        const pmIdsArr = [...paymentMethodIds]
+        const pmIdsArr = [...paymentMethodIds].map(sanitizeUUID).filter(Boolean) as string[]
         const paymentMethodsPromise = pmIdsArr.length > 0
             ? supabase
                 .from("payment_methods")
@@ -918,9 +923,9 @@ export async function createManualTransactionAction(input: CreateManualTransacti
         }
 
         // Input validation hardening
-        const description = String(input.description || "").trim()
+        const description = sanitizeInput(String(input.description || ""), 150).trim()
         if (!description) throw new Error("Descrição é obrigatória.")
-        if (description.length > 500) throw new Error("Descrição deve ter no máximo 500 caracteres.")
+        if (description.length > 150) throw new Error("Descrição deve ter no máximo 150 caracteres.")
 
         const amount = Number(input.amount || 0)
         if (!Number.isFinite(amount)) throw new Error("Valor inválido.")
@@ -954,6 +959,9 @@ export async function createManualTransactionAction(input: CreateManualTransacti
             String(input.category || "").trim() === "Vendas" && input.transactionType === "income"
 
         const normalizedCategory = String(input.category || "").trim()
+        const validPaymentMethodId = sanitizeUUID(input.paymentMethodId)
+        const resolvedPaymentType = input.paymentType || (input.paymentMethodId && !validPaymentMethodId ? input.paymentMethodId : null)
+
         const payload: Record<string, unknown> = {
             ...(input.id ? { id: input.id } : {}),
             partner_id: input.partnerId,
@@ -975,15 +983,15 @@ export async function createManualTransactionAction(input: CreateManualTransacti
             transaction_date: transactionDate,
             status,
             notes: sanitizedNotes,
-            payment_type: input.paymentType || null,
-            payment_method_id: input.paymentMethodId || null,
+            payment_type: resolvedPaymentType || null,
+            payment_method_id: validPaymentMethodId,
             original_amount: absAmount,
             interest_amount: null,
             fee_amount: 0,
             transaction_type: input.transactionType,
             origin: input.origin || "manual",
             refund_kind: input.transactionType === "refund" ? input.refundKind ?? null : null,
-            reference_note: input.referenceNote?.trim() || null,
+            reference_note: sanitizeInput(String(input.referenceNote || ""), 150).trim() || null,
             installment_group_id: input.installmentGroupId || null,
             installment_number: input.installmentNumber ?? null,
             created_by_user_id: userId,
@@ -1051,7 +1059,7 @@ export async function createTransferPairAction(input: CreateTransferPairInput) {
         const datePart = (input.transactionDate || new Date().toISOString()).slice(0, 10)
         const transactionTs = startOfDay(datePart).toISOString()
         const status = input.status || "paid"
-        const baseDesc = (input.description && input.description.trim()) || "Transferência entre contas"
+        const baseDesc = sanitizeInput(String(input.description || ""), 150).trim() || "Transferência entre contas"
 
         const { data: accounts } = await supabase
             .from("finance_accounts")
@@ -1064,6 +1072,9 @@ export async function createTransferPairAction(input: CreateTransferPairInput) {
         const toName = nameById.get(input.toAccountId) || "Destino"
 
         const storeIdValue = input.storeId || null
+
+        const validPaymentMethodId = sanitizeUUID(input.paymentMethodId)
+        const resolvedPaymentType = (input.paymentMethodId && !validPaymentMethodId ? input.paymentMethodId : null) || "Transferência"
 
         const outRow = {
             partner_id: input.partnerId,
@@ -1078,7 +1089,8 @@ export async function createTransferPairAction(input: CreateTransferPairInput) {
             transaction_date: transactionTs,
             status,
             notes: null,
-            payment_type: "Transferência",
+            payment_type: resolvedPaymentType,
+            payment_method_id: validPaymentMethodId,
             original_amount: amt,
             interest_amount: null,
             fee_amount: 0,
@@ -1104,7 +1116,8 @@ export async function createTransferPairAction(input: CreateTransferPairInput) {
             transaction_date: transactionTs,
             status,
             notes: null,
-            payment_type: "Transferência",
+            payment_type: resolvedPaymentType,
+            payment_method_id: validPaymentMethodId,
             original_amount: amt,
             interest_amount: null,
             fee_amount: 0,
@@ -1258,13 +1271,19 @@ export async function updateManualTransactionAction(
 
         if (isInstallmentTransaction) {
             if (!systemGateway && patch.accountId !== undefined) payload.account_id = patch.accountId
-            if (patch.paymentMethodId !== undefined) payload.payment_method_id = patch.paymentMethodId
+            if (patch.paymentMethodId !== undefined) {
+                const validPmId = sanitizeUUID(patch.paymentMethodId)
+                payload.payment_method_id = validPmId
+                if (patch.paymentMethodId && !validPmId) {
+                    payload.payment_type = patch.paymentMethodId
+                }
+            }
             if (patch.notes !== undefined) payload.notes = patch.notes
         } else if (paid) {
-            if (patch.description !== undefined) payload.description = patch.description?.trim()
+            if (patch.description !== undefined) payload.description = sanitizeInput(String(patch.description || ""), 150).trim()
             if (patch.notes !== undefined) payload.notes = patch.notes
         } else {
-            if (patch.description !== undefined) payload.description = patch.description?.trim()
+            if (patch.description !== undefined) payload.description = sanitizeInput(String(patch.description || ""), 150).trim()
             if (patch.categoryId !== undefined) payload.category_id = patch.categoryId
             if (patch.subcategoryId !== undefined) payload.subcategory_id = patch.subcategoryId
             if (!systemGateway && patch.accountId !== undefined) payload.account_id = patch.accountId
@@ -1282,7 +1301,13 @@ export async function updateManualTransactionAction(
                 payload.contact_id = nextCustomerId ? null : nextContactIdRaw
                 payload.contact_type = nextCustomerId ? "customer" : nextContactType
             }
-            if (patch.paymentMethodId !== undefined) payload.payment_method_id = patch.paymentMethodId
+            if (patch.paymentMethodId !== undefined) {
+                const validPmId = sanitizeUUID(patch.paymentMethodId)
+                payload.payment_method_id = validPmId
+                if (patch.paymentMethodId && !validPmId) {
+                    payload.payment_type = patch.paymentMethodId
+                }
+            }
             if (patch.dueDate !== undefined) payload.due_date = patch.dueDate
             if (patch.paymentDate !== undefined) payload.payment_date = patch.paymentDate
             if (patch.status !== undefined) payload.status = patch.status
@@ -1473,12 +1498,15 @@ export async function createInstallmentGroupAction(input: {
         const eachAmount = Math.round((totalAmount / count) * 100) / 100
         const amountDiff = Math.round((totalAmount - (eachAmount * count)) * 100) / 100
 
+        const validPaymentMethodId = sanitizeUUID(input.paymentMethodId)
+        const resolvedPaymentType = input.paymentType || (input.paymentMethodId && !validPaymentMethodId ? input.paymentMethodId : null)
+
         const { data: group, error: groupErr } = await supabase
             .from("installment_groups")
             .insert({
                 partner_id: input.partnerId,
                 store_id: input.storeId || null,
-                description: input.description.trim(),
+                description: sanitizeInput(String(input.description || ""), 150).trim(),
                 total_amount: totalAmount,
                 installments_count: count,
                 frequency: input.frequency,
@@ -1489,7 +1517,7 @@ export async function createInstallmentGroupAction(input: {
                 subcategory_id: input.subcategoryId || null,
                 account_id: input.accountId || null,
                 contact_id: input.contactId || null,
-                payment_method_id: input.paymentMethodId || null,
+                payment_method_id: validPaymentMethodId,
                 created_by_user_id: userId,
             })
             .select("id")
@@ -1506,7 +1534,7 @@ export async function createInstallmentGroupAction(input: {
             return {
                 partner_id: input.partnerId,
                 store_id: input.storeId || null,
-                description: input.description.trim(),
+                description: sanitizeInput(String(input.description || ""), 150).trim(),
                 category: String(input.categoryLabel || "").trim() || null,
                 category_id: input.categoryId || null,
                 subcategory_id: input.subcategoryId || null,
@@ -1520,8 +1548,8 @@ export async function createInstallmentGroupAction(input: {
                 transaction_date: due.toISOString(),
                 status: isFirstInstallmentPaid ? "paid" : "pending",
                 notes: input.notes ?? null,
-                payment_type: input.paymentType || null,
-                payment_method_id: input.paymentMethodId || null,
+                payment_type: resolvedPaymentType || null,
+                payment_method_id: validPaymentMethodId,
                 original_amount: lineAmount,
                 interest_amount: null,
                 fee_amount: 0,
@@ -1600,6 +1628,8 @@ export async function getInstallmentGroupDetailsAction(input: { partnerId: strin
             if ((row as any).payment_method_id) paymentMethodIds.add(String((row as any).payment_method_id))
         }
 
+        const validPmIds = [...paymentMethodIds].map(sanitizeUUID).filter(Boolean) as string[]
+
         // PERF: Batch 2 - payments + payment methods (both depend on rows, independent of each other)
         const [paymentsResult, pmsResult] = await Promise.all([
             transactionIds.length > 0
@@ -1609,12 +1639,12 @@ export async function getInstallmentGroupDetailsAction(input: { partnerId: strin
                     .eq("partner_id", input.partnerId)
                     .in("transaction_id", transactionIds)
                 : Promise.resolve({ data: [] as any[], error: null }),
-            paymentMethodIds.size > 0
+            validPmIds.length > 0
                 ? supabase
                     .from("payment_methods")
                     .select("id, name, payment_type")
                     .eq("partner_id", input.partnerId)
-                    .in("id", [...paymentMethodIds])
+                    .in("id", validPmIds)
                 : Promise.resolve({ data: [] as any[], error: null }),
         ])
         if (paymentsResult.error) throw paymentsResult.error
@@ -1730,8 +1760,10 @@ export async function recordInstallmentPaymentAction(input: {
 
         // Parcelas de venda (ledger de vendas) já nascem com o método de pagamento
         // fixado pelo gateway (ex: cartão de crédito) - não pode ser alterado.
-        const lockedPaymentMethodId = tx.payment_method_id || null
-        const effectivePaymentMethodId = lockedPaymentMethodId || input.paymentMethodId || null
+        const lockedPaymentMethodId = sanitizeUUID(tx.payment_method_id)
+        const validPaymentMethodId = sanitizeUUID(input.paymentMethodId)
+        const effectivePaymentMethodId = lockedPaymentMethodId || validPaymentMethodId
+        const rawMethodName = (typeof input.paymentMethodId === "string" && !validPaymentMethodId) ? input.paymentMethodId : null
 
         const paymentAmount = Number(input.paymentAmount || 0)
         const interestAmount = Number(input.interestAmount || 0)
@@ -1842,11 +1874,11 @@ export async function recordInstallmentPaymentAction(input: {
         if (resolvedAccountId) {
             updatePayload.account_id = resolvedAccountId
         }
-        const installmentNewPmLabel = input.paymentMethodId
-            ? await paymentMethodDisplayLabel(supabase, input.partnerId, input.paymentMethodId).catch(() => null)
-            : null
+        const installmentNewPmLabel = effectivePaymentMethodId
+            ? await paymentMethodDisplayLabel(supabase, input.partnerId, effectivePaymentMethodId).catch(() => null)
+            : (rawMethodName || tx.payment_type || null)
         if (input.paymentMethodId !== undefined) {
-            updatePayload.payment_method_id = input.paymentMethodId || null
+            updatePayload.payment_method_id = effectivePaymentMethodId
             updatePayload.payment_type = installmentNewPmLabel || null
         }
         if (fullyPaid) {
@@ -2003,6 +2035,9 @@ export async function recordRegularTransactionPaymentAction(input: {
         const nowIso = new Date().toISOString()
         const idempotencyKey = `regular:${input.transactionId}:${nowIso}:${finalPaid}`
 
+        const validPaymentMethodId = sanitizeUUID(input.paymentMethodId)
+        const rawMethodName = (typeof input.paymentMethodId === "string" && !validPaymentMethodId) ? input.paymentMethodId : null
+
         const { error: insertPaymentErr } = await supabase
             .from("transaction_payments")
             .insert({
@@ -2013,7 +2048,7 @@ export async function recordRegularTransactionPaymentAction(input: {
                 base_amount: baseApplied,
                 interest_amount: interestAmount,
                 discount_amount: discountAmount,
-                payment_method_id: input.paymentMethodId || null,
+                payment_method_id: validPaymentMethodId,
                 created_by_user_id: userId,
                 created_at: nowIso,
             })
@@ -2025,11 +2060,11 @@ export async function recordRegularTransactionPaymentAction(input: {
         }
 
         let resolvedAccountId = tx.account_id
-        if (input.paymentMethodId) {
+        if (validPaymentMethodId) {
             const { data: pm } = await supabase
                 .from("payment_methods")
                 .select("default_finance_account_id")
-                .eq("id", input.paymentMethodId)
+                .eq("id", validPaymentMethodId)
                 .eq("partner_id", input.partnerId)
                 .maybeSingle()
             if (pm?.default_finance_account_id) {
@@ -2045,9 +2080,9 @@ export async function recordRegularTransactionPaymentAction(input: {
             })
         }
 
-        const pmTypeLabel = input.paymentMethodId
-            ? await paymentMethodDisplayLabel(supabase, input.partnerId, input.paymentMethodId)
-            : tx.payment_type
+        const pmTypeLabel = validPaymentMethodId
+            ? await paymentMethodDisplayLabel(supabase, input.partnerId, validPaymentMethodId)
+            : (rawMethodName || tx.payment_type || null)
 
         const existingTotalPaid = (existingPayments || []).reduce(
             (acc: number, row: any) => acc + Number(row.amount ?? 0), 0
@@ -2065,7 +2100,7 @@ export async function recordRegularTransactionPaymentAction(input: {
             updatePayload.account_id = resolvedAccountId
         }
         if (input.paymentMethodId !== undefined) {
-            updatePayload.payment_method_id = input.paymentMethodId || null
+            updatePayload.payment_method_id = validPaymentMethodId
             updatePayload.payment_type = pmTypeLabel || null
         }
         if (fullyPaid) {
@@ -2155,13 +2190,19 @@ export async function settleInstallmentGroupAction(input: {
         // Parcelas de venda mantêm o método fixado pela venda (ex: cartão de crédito)
         const lockedPmByTx = new Map<string, string>(
             (pendingTxs || [])
-                .map((t: any) => [t.id, t.payment_method_id])
+                .map((t: any) => [t.id, sanitizeUUID(t.payment_method_id)])
                 .filter(([, pm]: any[]) => !!pm),
         )
-        const sanitizedPayments = (input.installmentPayments || []).map((p) => ({
-            ...p,
-            paymentMethodId: lockedPmByTx.get(p.transactionId) || p.paymentMethodId || null,
-        }))
+        const sanitizedPayments = (input.installmentPayments || []).map((p) => {
+            const lockedPm = lockedPmByTx.get(p.transactionId)
+            const validPmId = sanitizeUUID(lockedPm) || sanitizeUUID(p.paymentMethodId)
+            const rawMethodName = (typeof p.paymentMethodId === "string" && !sanitizeUUID(p.paymentMethodId)) ? p.paymentMethodId : null
+            return {
+                ...p,
+                paymentMethodId: validPmId,
+                rawPaymentType: rawMethodName,
+            }
+        })
 
         // Execute the atomic settlement RPC
         const { data, error } = await supabase.rpc("settle_installment_group", {
@@ -2175,6 +2216,19 @@ export async function settleInstallmentGroupAction(input: {
             console.error("[transactions] settle_installment_group RPC failed:", error)
             throw new Error(`Falha na transação atômica de liquidação: ${error.message}`)
         }
+
+        // If raw payment types were provided without a UUID payment_method_id, update payment_type on transactions
+        await Promise.allSettled(
+            sanitizedPayments
+                .filter((p) => p.rawPaymentType && !p.paymentMethodId)
+                .map((p) =>
+                    supabase
+                        .from("transactions")
+                        .update({ payment_type: p.rawPaymentType })
+                        .eq("id", p.transactionId)
+                        .eq("partner_id", input.partnerId)
+                )
+        )
 
         // Log audit events for the transactions that were just settled
         const settleCustomPayments = sanitizedPayments
@@ -2211,9 +2265,9 @@ export async function settleInstallmentGroupAction(input: {
                     const baseApplied = Math.round(Math.min(pAmt || txRemaining, txRemaining) * 100) / 100
                     const finalPaid = Math.round((baseApplied + pInt - pDisc) * 100) / 100
 
-                    const methodLabel = txRow?.payment_method_id
+                    const methodLabel = txRow?.payment_method_id && sanitizeUUID(txRow.payment_method_id)
                         ? await paymentMethodDisplayLabel(supabase, input.partnerId, txRow.payment_method_id).catch(() => null)
-                        : null
+                        : (matchedPayment?.rawPaymentType || txRow?.payment_type || null)
 
                     const settleMsg = buildInstallmentPaymentHistoryLine({
                         dir: String(txRow?.transaction_type) === "income" ? "Recebido" : "Pago",
@@ -2348,8 +2402,12 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
 
         const accountId = input.accountId || rec.account_id || null
         const nowIso = new Date().toISOString()
-        const resolvedPmId = input.paymentMethodId || rec.payment_method_id || null
-        const paymentTypeLabel = await paymentMethodDisplayLabel(supabase, input.partnerId, resolvedPmId)
+        const validRecPmId = sanitizeUUID(rec.payment_method_id)
+        const validResolvedPmId = sanitizeUUID(input.paymentMethodId) || validRecPmId
+        const rawMethodName = (typeof input.paymentMethodId === "string" && !sanitizeUUID(input.paymentMethodId)) ? input.paymentMethodId : null
+        const paymentTypeLabel = validResolvedPmId
+            ? await paymentMethodDisplayLabel(supabase, input.partnerId, validResolvedPmId)
+            : (rawMethodName || null)
 
         // Check if a pending transaction already exists (from cron) - upgrade it to paid
         const { data: pendingTx } = await supabase
@@ -2369,7 +2427,7 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
                     status: "paid",
                     payment_date: nowIso,
                     account_id: accountId,
-                    payment_method_id: resolvedPmId,
+                    payment_method_id: validResolvedPmId,
                     payment_type: paymentTypeLabel,
                     amount: finalPaid,
                     original_amount: paymentAmount,
@@ -2396,7 +2454,7 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
                     base_amount: paymentAmount,
                     interest_amount: interestAmount,
                     discount_amount: discountAmount,
-                    payment_method_id: resolvedPmId,
+                    payment_method_id: validResolvedPmId,
                     created_by_user_id: userId,
                     created_at: nowIso,
                     idempotency_key: tpIdempotencyKey,
@@ -2411,17 +2469,13 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
                 "[recurring] occurrence_marked_paid",
                 JSON.stringify({ recurringId: input.recurringId, occurrenceDate: input.occurrenceDate }),
             )
-            let recurringMsg = `Marcou ocorrência recorrente como paga - R$ ${finalPaid.toFixed(2)}`
-            if (interestAmount > 0) recurringMsg += ` (Juros: R$ ${interestAmount.toFixed(2)})`
-            if (discountAmount > 0) recurringMsg += ` (Desconto: R$ ${discountAmount.toFixed(2)})`
             await logAuditEvent({
                 partnerId: input.partnerId,
                 actorUserId: userId,
                 entityType: "transaction",
                 entityId: pendingTx.id,
                 actionType: "paid",
-                changeLines: [recurringMsg],
-                metadata: { oldStatus: "Pendente", newStatus: "Pago" },
+                changeLines: [`Pagamento da recorrência confirmado (R$ ${finalPaid.toFixed(2)})`],
                 source: "manual",
             })
             await revalidateEntityTimeline("transaction", pendingTx.id)
@@ -2430,7 +2484,7 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
         }
 
         // Create a fresh paid transaction from recurring template
-        const payload = {
+        const payload: Record<string, unknown> = {
             partner_id: input.partnerId,
             store_id: rec.store_id || null,
             description: rec.description,
@@ -2456,7 +2510,7 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
             account_id: accountId,
             origin: "system" as const,
             recurring_id: rec.id,
-            payment_method_id: resolvedPmId,
+            payment_method_id: validResolvedPmId,
             created_by_user_id: userId,
         }
 
@@ -2485,7 +2539,7 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
                     base_amount: paymentAmount,
                     interest_amount: interestAmount,
                     discount_amount: discountAmount,
-                    payment_method_id: resolvedPmId,
+                    payment_method_id: validResolvedPmId,
                     created_by_user_id: userId,
                     created_at: nowIso,
                     idempotency_key: tpIdempotencyKey,
@@ -2903,7 +2957,7 @@ export async function getTransactionDetailsAction(
                 })
             }
 
-            const pmIds = [...new Set(paymentRows.map((p: any) => p.payment_method_id).filter(Boolean) || [])]
+            const pmIds = [...new Set(paymentRows.map((p: any) => p.payment_method_id).map(sanitizeUUID).filter(Boolean) as string[])]
             const pmMap = new Map<string, string>()
             if (pmIds.length > 0) {
                 const { data: pmData } = await supabase

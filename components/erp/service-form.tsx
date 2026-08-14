@@ -74,6 +74,7 @@ export function ServiceForm({ partnerId }: ServiceFormProps) {
               id="name"
               name="name"
               required
+              maxLength={150}
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             />

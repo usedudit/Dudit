@@ -63,6 +63,19 @@ export function formatDistance(distanceKm: number | null | undefined): string | 
     return `${distanceKm.toFixed(1)} km`
 }
 
+/**
+ * Formato unificado de distância para os cards do marketplace:
+ * - < 1km → "A 500m"
+ * - <= 10km → "A 1,2 km"
+ * - > 10km → "A 12 km"
+ */
+export function formatDistanceLabel(distanceKm: number | null | undefined): string | null {
+    if (!isFiniteNumber(distanceKm) || distanceKm < 0) return null
+    if (distanceKm < 1) return `A ${Math.round(distanceKm * 1000)}m`
+    if (distanceKm <= 10) return `A ${distanceKm.toFixed(1)} km`
+    return `A ${Math.round(distanceKm)} km`
+}
+
 export function estimateDeliveryTime(distanceKm: number | null | undefined): number | null {
     if (!isFiniteNumber(distanceKm) || distanceKm <= 0) return null
     const avgUrbanSpeedKmH = 22
@@ -249,7 +262,7 @@ export function enrichMarketplaceDistance<T extends { partners?: any }>(
             partners: {
                 ...partner,
                 distance_km: distanceKm,
-                distance_km_formatted: formatDistance(distanceKm),
+                distance_km_formatted: formatDistanceLabel(distanceKm),
             },
         }
     })

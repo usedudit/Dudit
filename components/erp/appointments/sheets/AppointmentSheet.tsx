@@ -2577,6 +2577,7 @@ export const AppointmentSheet = ({
                     placeholder="Nome do serviço"
                     error={!!serviceNameError}
                     errorMessage={serviceNameError || undefined}
+                    maxLength={150}
                 />
                 <MoneyInput
                     label="Preço"
@@ -2805,6 +2806,7 @@ export const AppointmentSheet = ({
                     value={newCustomerName}
                     onChange={(e) => setNewCustomerName(e.target.value)}
                     placeholder="Nome do cliente"
+                    maxLength={150}
                 />
                 <EmailInput
                     label="E-mail"

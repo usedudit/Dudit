@@ -173,7 +173,7 @@ export default function VideoFormPage({ video, onSave, onBack, isLoading, partne
                             <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
                                 <FormSection title="Informações do Vídeo">
                                     <div className="space-y-5">
-                                        <Input label="Título" name="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título do vídeo" error={!!errors.title} errorMessage={errors.title} disabled={readOnly} />
+                                        <Input label="Título" name="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título do vídeo" error={!!errors.title} errorMessage={errors.title} disabled={readOnly} maxLength={150} />
                                         <FormTextarea label="Descrição" name="description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descrição do vídeo..." rows={4} disabled={readOnly} />
                                         {readOnly ? (
                                             <div className="space-y-2">

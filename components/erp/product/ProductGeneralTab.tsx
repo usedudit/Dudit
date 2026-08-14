@@ -144,6 +144,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                     onChange={handleFieldChange}
                                     disabled={!isEditing || isGeneratingDetails}
                                     required
+                                    maxLength={150}
                                     error={fieldErrors?.has("name")}
                                     errorMessage={fieldErrors?.has("name") ? "Nome é obrigatório" : undefined}
                                     labelAddon={

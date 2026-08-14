@@ -141,7 +141,7 @@ export const SecurityView = ({
                             {hasPassword && (
                                 <>
                                     <InfoCard
-                                        message="Ao alterar sua senha, todos os outros dispositivos conectados serão deslogados automaticamente. Apenas este dispositivo atual permanecerá conectado."
+                                        message="Ao alterar sua senha, todos os outros dispositivos conectados serão desconectados. Apenas este dispositivo atual permanecerá conectado."
                                         color="gray"
                                     />
                                     <PasswordInput

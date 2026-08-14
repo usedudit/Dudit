@@ -102,7 +102,7 @@ export const CustomerSchema = z.object({
 // Método de Pagamento
 export const PaymentMethodSchema = z.object({
   partnerId: z.string().uuid(),
-  name: z.string().min(3).max(120),
+  name: z.string().min(3).max(50),
   paymentType: z.enum(["pix", "credit_card", "debit_card", "cash", "other"]),
   pixKeyType: z.enum(["cpf", "cnpj", "email", "phone", "random"]).optional().nullable(),
   pixKey: z.string().max(255).optional().nullable(),

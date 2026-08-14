@@ -552,22 +552,16 @@ export default function ProductsPage({
             const isNewProduct = formMode === 'add'
             const action = isNewProduct ? createProductComprehensiveAction : updateProductAction
             const payload = isNewProduct
-                ? { ...formData, partnerId, storeId: selectedStore?.id }
+                ? {
+                    ...formData,
+                    partnerId,
+                    storeId: selectedStore?.id,
+                    pending_variants: formData.pending_variants || [],
+                    pending_suppliers: formData.pending_suppliers || [],
+                }
                 : { productId: entityState.entityId || formProduct?.id, ...formData }
             const res = await action(payload)
             if (res.success) {
-                if (isNewProduct && res.data?.id && formData.pending_variants?.length > 0) {
-                    const variantsResult = await createProductVariantsBatchAction({
-                        productId: res.data.id,
-                        variants: formData.pending_variants,
-                        csrf_token: formData.csrf_token,
-                        deletedImages: [],
-                    })
-                    if (!variantsResult.success) {
-                        notifyError("Produto criado com ressalvas", "O produto foi salvo, mas houve erro ao salvar as variações.")
-                    }
-                }
-
                 notifySuccess("Sucesso")
 
                 // Invalidate caches

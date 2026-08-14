@@ -275,10 +275,11 @@ export default async function ExplorarPage({
         : null
 
     // Server-side redirect: if no city slug in URL, try to redirect to user's city
+    // (only when the user has a saved address in the profile, or a logged-out visitor with a cookie)
     if (!firstSlug) {
         let redirectSlug: string | null = null
 
-        // 1. Check user profile (logged in with address)
+        // 1. Check user profile (logged in WITH address)
         if (userProfile?.city && userProfile?.state) {
             const normCity = userProfile.city
                 .toLowerCase()
@@ -288,8 +289,9 @@ export default async function ExplorarPage({
                 .replace(/(^-|-$)/g, "")
             redirectSlug = `${normCity}-${userProfile.state.toLowerCase()}`
         }
-        // 2. Check cookie (logged out but has saved location)
-        else {
+        // 2. Logged-in users WITHOUT address: stay on /explorar (Brasil)
+        // 3. Check cookie (only for logged-out visitors with saved location)
+        else if (!userProfile) {
             const cookieStore = await cookies()
             const savedCity = cookieStore.get("dudit_city")?.value
             if (savedCity && savedCity !== "brasil" && !savedCity.startsWith("estado-")) {

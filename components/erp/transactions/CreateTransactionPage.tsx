@@ -29,6 +29,7 @@ import SelectCustomerSheet from "@/components/erp/clientes/SelectCustomerSheet"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { useSidebar } from "@/lib/sidebar-context"
+import { STANDARD_PAYMENT_METHODS } from "@/lib/finance-utils"
 import { GenericAttachmentsTab } from "../shared/GenericAttachmentsTab"
 import { uploadAndSavePendingAttachments } from "@/lib/utils/attachment-uploader"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -276,8 +277,8 @@ export default function CreateTransactionPage({
     })
     const [fromAccountId, setFromAccountId] = useState<string | undefined>(undefined)
     const [toAccountId, setToAccountId] = useState<string | undefined>(undefined)
-    const [paymentType, setPaymentType] = useState<string>("Pix")
-    const [paymentMethodId, setPaymentMethodId] = useState<string | undefined>(() => editRecurringTemplate?.payment_method_id ?? editTransaction?.paymentMethodId ?? paymentMethods?.[0]?.id ?? undefined)
+    const [paymentType, setPaymentType] = useState<string>(() => editTransaction?.paymentType || "Pix")
+    const [paymentMethodId, setPaymentMethodId] = useState<string | undefined>(() => editRecurringTemplate?.payment_method_id ?? editTransaction?.paymentMethodId ?? undefined)
     const [contactType, setContactType] = useState<ContactType>(() => editRecurringTemplate?.contact_type || "customer")
     const [notes, setNotes] = useState(() => editTransaction?.notes || "")
 
@@ -1295,6 +1296,7 @@ export default function CreateTransactionPage({
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
                         placeholder="Ex: Porte entre caixa e banco"
+                        maxLength={150}
                     />
                 </section>
             )}
@@ -1327,6 +1329,7 @@ export default function CreateTransactionPage({
                         placeholder="Ex: Ajuste após conciliação bancária"
                         error={fieldErrors.has("description")}
                         errorMessage={fieldErrors.has("description") ? "Descrição obrigatória" : undefined}
+                        maxLength={150}
                     />
                     <DatePicker label="Data" value={dueDate} onChange={(d) => setDueDate(toYmd(d))} />
                 </section>
@@ -1352,6 +1355,7 @@ export default function CreateTransactionPage({
                         placeholder="Detalhe o reembolso"
                         error={fieldErrors.has("description")}
                         errorMessage={fieldErrors.has("description") ? "Descrição obrigatória" : undefined}
+                        maxLength={150}
                     />
                     <MoneyInput
                         label="Valor"
@@ -1365,6 +1369,7 @@ export default function CreateTransactionPage({
                         value={referenceNote}
                         onChange={(e) => setReferenceNote(e.target.value)}
                         placeholder="Ex: Pedido #1234, NF, despesa anterior…"
+                        maxLength={150}
                     />
                     <DatePicker label="Data" value={dueDate} onChange={(d) => setDueDate(toYmd(d))} />
                 </section>
@@ -1388,6 +1393,7 @@ export default function CreateTransactionPage({
                         required
                         error={fieldErrors.has("description")}
                         errorMessage={fieldErrors.has("description") ? "Descrição obrigatória" : undefined}
+                        maxLength={150}
                     />
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormCombobox
@@ -1652,12 +1658,16 @@ export default function CreateTransactionPage({
                         <>
                             <FormCombobox
                                 label="Forma de pagamento"
-                                options={paymentMethods!.map(pm => ({ value: pm.id, label: pm.name }))}
-                                value={paymentMethodId || ""}
+                                options={paymentMethods && paymentMethods.length > 0 ? paymentMethods.map(pm => ({ value: pm.id, label: pm.name })) : STANDARD_PAYMENT_METHODS}
+                                value={paymentMethodId || paymentType || "Pix"}
                                 onChange={(v) => {
                                     setPaymentMethodId(v)
-                                    const pm = paymentMethods!.find(p => p.id === v)
-                                    if (pm) setPaymentType(pm.payment_type || "Pix")
+                                    const pm = paymentMethods?.find(p => p.id === v)
+                                    if (pm) {
+                                        setPaymentType(pm.payment_type || pm.name || "Pix")
+                                    } else {
+                                        setPaymentType(v || "Pix")
+                                    }
                                 }}
                                 disabled={isSalesOrigin && isEditMode}
                             />
@@ -1997,7 +2007,7 @@ export default function CreateTransactionPage({
                         </div>
                     }
                 >
-                    <Input label="Nome" value={quickName} onChange={(e) => setQuickName(e.target.value)} placeholder="Ex: Marketing" />
+                    <Input label="Nome" value={quickName} onChange={(e) => setQuickName(e.target.value)} placeholder="Ex: Marketing" maxLength={150} />
                 </DefaultModal>
 
                 <DefaultModal
@@ -2022,7 +2032,7 @@ export default function CreateTransactionPage({
                     <p className="text-sm text-brand-inactive-text mb-3">
                         Será criada dentro de: <strong>{selectedCategoryName}</strong>
                     </p>
-                    <Input label="Nome" value={quickName} onChange={(e) => setQuickName(e.target.value)} placeholder="Ex: Energia" />
+                    <Input label="Nome" value={quickName} onChange={(e) => setQuickName(e.target.value)} placeholder="Ex: Energia" maxLength={150} />
                 </DefaultModal>
 
                 <DefaultModal
@@ -2045,7 +2055,7 @@ export default function CreateTransactionPage({
                     }
                 >
                     <div className="space-y-4">
-                        <Input label="Nome" value={quickName} onChange={(e) => setQuickName(e.target.value)} placeholder="Ex: Nubank" />
+                        <Input label="Nome" value={quickName} onChange={(e) => setQuickName(e.target.value)} placeholder="Ex: Nubank" maxLength={150} />
                         <FormDropdown
                             label="Tipo"
                             options={[
@@ -2092,12 +2102,13 @@ export default function CreateTransactionPage({
                             value={newContactModalType === "customer" ? "supplier" : newContactModalType}
                             setValue={(v) => setNewContactModalType(v as ContactType)}
                         />
-                        <Input label="Nome" value={quickName} onChange={(e) => setQuickName(e.target.value)} placeholder="Nome exibido nas transações" />
+                        <Input label="Nome" value={quickName} onChange={(e) => setQuickName(e.target.value)} placeholder="Nome exibido nas transações" maxLength={150} />
                         <Input
                             label="Descrição (opcional)"
                             value={newContactDesc}
                             onChange={(e) => setNewContactDesc(e.target.value)}
                             placeholder="Notas internas"
+                            maxLength={150}
                         />
                     </div>
                 </DefaultModal>

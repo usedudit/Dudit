@@ -29,7 +29,7 @@ import { useFavorites } from "@/providers/favorites-provider"
 import { VendorPaymentMethodsModal } from "./VendorPaymentMethodsModal"
 import { StorePoliciesModal } from "./StorePoliciesModal"
 import { getStoreUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
-import { createSlug } from "@/lib/utils/slugify"
+import { createSlug, createCategorySlug } from "@/lib/utils/slugify"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { SponsoredAdDetailSlot } from "@/components/marketplace/ads/SponsoredAdsSlot"
@@ -2021,14 +2021,14 @@ export function ProductDetailsPageClient({
                         <ChevronRightIcon size={10} />
                         {product.marketplace_category?.parent?.name || product.marketplace_category?.name ? (
                             <>
-                                <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}/${createSlug(product.marketplace_category.parent?.name || product.marketplace_category.name)}?type=produtos`} prefetch={false} className="hover:text-brand-dark transition-colors">
+                                <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}/${createCategorySlug(product.marketplace_category.parent?.name || product.marketplace_category.name)}?type=produtos`} prefetch={false} className="hover:text-brand-dark transition-colors">
                                     {product.marketplace_category.parent?.name || product.marketplace_category.name}
                                 </Link>
                                 <ChevronRightIcon size={10} />
                             </>
                         ) : product.category && !product.marketplace_category ? (
                             <>
-                                <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}/${createSlug(product.category)}?type=produtos`} prefetch={false} className="hover:text-brand-dark transition-colors">
+                                <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}/${createCategorySlug(product.category)}?type=produtos`} prefetch={false} className="hover:text-brand-dark transition-colors">
                                     {product.category}
                                 </Link>
                                 <ChevronRightIcon size={10} />

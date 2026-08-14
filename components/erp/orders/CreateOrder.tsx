@@ -1552,9 +1552,11 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                             Dados gerais
                                             {getTabErrorCount("general") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
                                         </TabsTrigger>
-                                        <TabsTrigger value="payment" className="xl:hidden">
-                                            Pagamento
-                                        </TabsTrigger>
+                                        {!isPaidOrder && (
+                                            <TabsTrigger value="payment" className="xl:hidden">
+                                                Pagamento
+                                            </TabsTrigger>
+                                        )}
                                         {deliveryMethod === 'delivery' && (
                                             <TabsTrigger value="delivery">
                                                 Entrega
@@ -1671,6 +1673,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                 </FadeIn>
                             </TabsContent>
 
+                            {!isPaidOrder && (
                             <TabsContent value="payment" className="xl:hidden mt-0">
                                 <FadeIn key="payment">
                                     <div className="bg-white dark:bg-dark-surface flex flex-col gap-6">
@@ -1870,6 +1873,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                     </div>
                                 </FadeIn>
                             </TabsContent>
+                            )}
 
                             <TabsContent value="delivery" className="mt-0">
                                 <FadeIn key="delivery">
@@ -2128,6 +2132,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                             placeholder="Ex: Caixa loja, Nubank, Banco Itaú"
                             value={newAccountName}
                             onChange={(e) => setNewAccountName(e.target.value)}
+                            maxLength={150}
                         />
                         <Combobox
                             label="Tipo"

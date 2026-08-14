@@ -301,6 +301,7 @@ export default function GoalFormPage({ partnerId, mode, sellers, accounts, initi
                         }}
                         error={Boolean(fieldErrors.name)}
                         errorMessage={fieldErrors.name}
+                        maxLength={150}
                       />
                     </div>
                     <div className="col-span-12 md:col-span-6">
@@ -543,6 +544,7 @@ export default function GoalFormPage({ partnerId, mode, sellers, accounts, initi
             placeholder="Ex: Banco Inter PJ"
             error={newAccountNameError}
             errorMessage={newAccountNameError ? "O nome é obrigatório." : undefined}
+            maxLength={150}
           />
           <FormDropdown
             label="Tipo"

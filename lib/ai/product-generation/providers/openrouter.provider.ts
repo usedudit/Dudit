@@ -1,16 +1,37 @@
 import { AiProvider } from "./index"
 
+const DEFAULT_FALLBACK_MODELS = [
+  "qwen/qwen-2.5-72b-instruct",
+  "deepseek/deepseek-chat",
+]
+
+function getFallbackModels(envKey: string, defaults: string[]): string[] {
+  const raw = process.env[envKey]
+  if (!raw) return defaults
+  return Array.from(
+    new Set(
+      raw
+        .split(",")
+        .map((m) => m.trim())
+        .filter(Boolean)
+    )
+  )
+}
+
+function getTimeoutMs(): number {
+  const parsed = Number(process.env.AI_PRODUCT_TIMEOUT_MS)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 30000
+}
+
 export class OpenRouterProvider implements AiProvider {
   readonly defaultModel: string
-  readonly fallbackModels: string[] = [
-    "qwen/qwen-2.5-72b-instruct",
-    "deepseek/deepseek-chat",
-  ]
+  readonly fallbackModels: string[]
   private apiKey: string
 
   constructor() {
     this.apiKey = process.env.OPENROUTER_API_KEY || ""
     this.defaultModel = process.env.AI_PRODUCT_MODEL || "nvidia/llama-3.3-nemotron-super-49b-v1"
+    this.fallbackModels = getFallbackModels("AI_PRODUCT_FALLBACK_MODELS", DEFAULT_FALLBACK_MODELS)
   }
 
   async generate(
@@ -24,7 +45,7 @@ export class OpenRouterProvider implements AiProvider {
     tokensCompletion: number | null
   }> {
     const targetModel = model || this.defaultModel
-    const timeout = options?.timeout || 10000
+    const timeout = options?.timeout || getTimeoutMs()
 
     if (!this.apiKey) {
       throw new Error("OPENROUTER_API_KEY não configurada no servidor.")

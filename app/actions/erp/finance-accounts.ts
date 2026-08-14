@@ -120,7 +120,7 @@ function parseOptionalBalance(v: unknown): number | null {
 }
 
 function normalizeName(value: string) {
-  return value.trim().replace(/\s+/g, " ")
+  return value.trim().replace(/\s+/g, " ").substring(0, 150)
 }
 
 export async function createFinanceAccountAction(data: {

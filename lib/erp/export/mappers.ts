@@ -135,7 +135,6 @@ export const PRODUCT_EXPORT_ALL_COLUMNS: ExportColumnDef[] = [
   { header: "Preço", key: "price", width: 14 },
   { header: "Preço Promocional", key: "promotionalPrice", width: 16 },
   { header: "Em Promoção", key: "isOnPromotion", width: 14 },
-  { header: "Valor Promoção", key: "promotionValue", width: 14 },
   { header: "Visibilidade", key: "visibility", width: 14 },
   { header: "Status", key: "status", width: 12 },
   { header: "Criado em", key: "createdAt", width: 20 },
@@ -197,10 +196,12 @@ export function mapProductRow(row: any, includeAllColumns?: boolean): ExportRow 
     condition: row.condition || "-",
     unit: row.unit || "-",
     minStock: Number(row.min_stock ?? 0),
-    profitMargin: row.profit_margin !== null && row.profit_margin !== undefined ? formatCurrency(Number(row.profit_margin)) : "-",
+    profitMargin:
+      Number(row.cost_price) > 0
+        ? `${(((Number(row.price) - Number(row.cost_price)) / Number(row.cost_price)) * 100).toFixed(2).replace(".", ",")}%`
+        : "-",
     promotionalPrice: row.promotional_price !== null && row.promotional_price !== undefined ? formatCurrency(Number(row.promotional_price)) : "-",
     isOnPromotion: row.is_on_promotion ? "Sim" : "Não",
-    promotionValue: row.promotion_value !== null && row.promotion_value !== undefined ? formatCurrency(Number(row.promotion_value)) : "-",
     createdAt: row.created_at ? formatDate(row.created_at) : "-",
     ncm: row.ncm || "-",
     cest: row.cest || "-",

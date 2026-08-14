@@ -228,11 +228,11 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                 <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
                     {isPaidOrder ? (
                         <section className="space-y-6">
-                            <FormSection title="Itens do Pedido" hasSeparator={false} className="mt-0">
+                            <FormSection title="Itens do Pedido" className="mb-8">
                                 <div className="space-y-4">
                                     {items.map((item: any, idx: number) => (
                                         <div key={idx} className="flex items-start gap-4">
-                                            <div className="w-16 h-16 overflow-hidden shrink-0 rounded-xl border border-brand-border dark:border-dark-border">
+                                            <div className="w-16 h-16 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
                                                 <img
                                                     src={getR2ImageUrl(item.image, "thumbnail")}
                                                     className="w-full h-full object-cover rounded-xl"
@@ -255,7 +255,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                             </FormSection>
                         </section>
                     ) : (
-                        <FormSection title="Itens do Pedido" hasSeparator={false} className="mb-8">
+                        <FormSection title="Itens do Pedido" className="mb-8">
                             <div ref={searchRef} className={`relative mb-6 ${isMarketplaceLocked ? 'pointer-events-none opacity-60' : ''}`}>
                                 <Input
                                     label=""
@@ -381,21 +381,22 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                                 <div className="flex flex-col text-left flex-1 min-w-0">
                                                                     {item.isEditing ? (
                                                                         <div className="mb-0">
-                                                                            <Input
-                                                                                name={`item-name-${index}`}
-                                                                                value={item.name}
-                                                                                disabled={isMarketplaceLocked}
-                                                                                onChange={(e: any) => {
-                                                                                    updateItemField(index, 'name', e.target.value);
-                                                                                    if (nameErrors[index]) {
-                                                                                        setNameErrors(prev => ({ ...prev, [index]: false }));
-                                                                                    }
-                                                                                }}
-                                                                                placeholder="Nome do produto..."
-                                                                                error={hasNameError}
-                                                                                errorMessage="Nome obrigatório"
-                                                                                className="mb-0"
-                                                                            />
+<Input
+                                                                            name={`item-name-${index}`}
+                                                                            value={item.name}
+                                                                            disabled={isMarketplaceLocked}
+                                                                            onChange={(e: any) => {
+                                                                                updateItemField(index, 'name', e.target.value);
+                                                                                if (nameErrors[index]) {
+                                                                                    setNameErrors(prev => ({ ...prev, [index]: false }));
+                                                                                }
+                                                                            }}
+                                                                            placeholder="Nome do produto..."
+                                                                            error={hasNameError}
+                                                                            errorMessage="Nome obrigatório"
+                                                                            className="mb-0"
+                                                                            maxLength={150}
+                                                                        />
                                                                         </div>
                                                                     ) : (
                                                                         <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate max-w-[250px]">
@@ -524,6 +525,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                                     error={hasNameError}
                                                                     errorMessage="Nome obrigatório"
                                                                     className="mb-0"
+                                                                    maxLength={150}
                                                                 />
                                                             </div>
                                                         ) : (
@@ -722,64 +724,10 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                             </div>
                         )}
                     </FormSection>
-                </div>
-
-                <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
-                    {paymentStatus !== "paid" && remainingPaymentAmount > 0.009 && (
-                        <div className="mb-6">
-                            <InfoCard
-                                title="Valor ainda em aberto"
-                                message={`Falta receber ${formatCurrency(remainingPaymentAmount)} para quitar este pedido.`}
-                                color="orange"
-                            />
-                        </div>
-                    )}
 
                     {isPaidOrder && (
-                        <div className="mb-6">
-                            <InfoCard color="orange" title="Edição Restrita (Pedido Pago)" message="Como o pedido já está pago, não é possível editar itens, valores, cliente ou formas de pagamento. Apenas observações podem ser atualizadas." />
-                        </div>
-                    )}
-
-                    {/* --- 1. CUSTOMER CARD --- */}
-                    {!isQuickMode && (
-                        <div>
-                            {selectedCustomer ? (
-                                <CustomerCard
-                                    customer={selectedCustomer}
-                                    address={selectedCustomer.addresses?.find((a: any) => a.address_type === "primary" || a.is_default) || selectedCustomer.addresses?.[0]}
-                                    billingAddress={selectedCustomer.addresses?.find((a: any) => a.address_type === "billing")}
-                                    onRemove={isMarketplaceLocked ? undefined : () => setSelectedCustomer(null)}
-                                />
-                            ) : (
-                                <div
-                                    className={`bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-8 flex flex-col items-center justify-center text-center relative overflow-hidden mb-6 ${isMarketplaceLocked ? 'opacity-50 pointer-events-none' : ''}`}
-                                    onClick={() => !isMarketplaceLocked && setIsCustomerSheetOpen(true)}
-                                >
-                                    <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border"></div>
-
-                                    <IconPlaceholder
-                                        icon={UserIcon}
-                                        title="Nenhum cliente selecionado"
-                                        subtitle="Selecione um cliente para vincular ao pedido."
-                                        itemButton={isMarketplaceLocked ? undefined : {
-                                            text: "Selecionar Cliente",
-                                            action: () => setIsCustomerSheetOpen(true),
-                                            variant: "outline",
-                                            className: "rounded-full px-8"
-                                        }}
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* --- 2. PAYMENT CARD --- */}
-                    <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 flex flex-col gap-6 mt-6">
-                        <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading leading-tight">Pagamento</h3>
-
-                        {isPaidOrder ? (
-                            <div className="space-y-3">
+                        <FormSection title="Pagamento" hasSeparator>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <PaymentRow
                                     label="Método de Pagamento"
                                     value={
@@ -790,18 +738,20 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                 />
 
                                 {paymentBreakdown.length > 1 && (
-                                    <PaymentRow
-                                        label="Valores por meio"
-                                        value={
-                                            <div className="flex flex-col gap-1">
-                                                {paymentBreakdown.map((entry: any, index: number) => (
-                                                    <span key={`${entry.method}-${index}`} className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                                        {formatPaymentMethodLabel(entry.method, null)}: {formatCurrency(entry.amount || 0)}
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        }
-                                    />
+                                    <div className="md:col-span-2">
+                                        <PaymentRow
+                                            label="Valores por meio"
+                                            value={
+                                                <div className="flex flex-col gap-1">
+                                                    {paymentBreakdown.map((entry: any, index: number) => (
+                                                        <span key={`${entry.method}-${index}`} className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+                                                            {formatPaymentMethodLabel(entry.method, null)}: {formatCurrency(entry.amount || 0)}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            }
+                                        />
+                                    </div>
                                 )}
 
                                 <PaymentRow label="Valor Original" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(subtotal)}</span>} />
@@ -860,8 +810,8 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                     <PaymentRow
                                         label={
                                             originalPaymentMethod === "exchange" ? "Crédito de troca" :
-                                            originalPaymentMethod === "store_credit" ? "Vale-compra" :
-                                            "Desconto do Método"
+                                                originalPaymentMethod === "store_credit" ? "Vale-compra" :
+                                                    "Desconto do Método"
                                         }
                                         value={<span className="text-brand-green font-bold">- {formatCurrency(paymentMethodDiscountAmount)}</span>}
                                     />
@@ -874,12 +824,70 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                     />
                                 )}
 
-                                <div className="flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border mt-3">
+                                <div className="md:col-span-2 flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border mt-3">
                                     <span className="font-bold text-lg text-brand-dark dark:text-dark-heading">Total do Pedido</span>
                                     <span className="font-bold text-2xl text-brand-dark dark:text-dark-heading tracking-tight">{formatCurrency(totalAmount)}</span>
                                 </div>
                             </div>
-                        ) : (
+                        </FormSection>
+                    )}
+                </div>
+
+                <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
+                    {paymentStatus !== "paid" && remainingPaymentAmount > 0.009 && (
+                        <div className="mb-6">
+                            <InfoCard
+                                title="Valor ainda em aberto"
+                                message={`Falta receber ${formatCurrency(remainingPaymentAmount)} para quitar este pedido.`}
+                                color="orange"
+                            />
+                        </div>
+                    )}
+
+                    {isPaidOrder && (
+                        <div className="mb-6">
+                            <InfoCard color="orange" title="Edição Restrita (Pedido Pago)" message="Como o pedido já está pago, não é possível editar itens, valores, cliente ou formas de pagamento. Apenas observações podem ser atualizadas." />
+                        </div>
+                    )}
+
+                    {/* --- 1. CUSTOMER CARD --- */}
+                    {!isQuickMode && (
+                        <div>
+                            {selectedCustomer ? (
+                                <CustomerCard
+                                    customer={selectedCustomer}
+                                    address={selectedCustomer.addresses?.find((a: any) => a.address_type === "primary" || a.is_default) || selectedCustomer.addresses?.[0]}
+                                    billingAddress={selectedCustomer.addresses?.find((a: any) => a.address_type === "billing")}
+                                    onRemove={isMarketplaceLocked ? undefined : () => setSelectedCustomer(null)}
+                                />
+                            ) : (
+                                <div
+                                    className={`bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-8 flex flex-col items-center justify-center text-center relative overflow-hidden mb-6 ${isMarketplaceLocked ? 'opacity-50 pointer-events-none' : ''}`}
+                                    onClick={() => !isMarketplaceLocked && setIsCustomerSheetOpen(true)}
+                                >
+                                    <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border"></div>
+
+                                    <IconPlaceholder
+                                        icon={UserIcon}
+                                        title="Nenhum cliente selecionado"
+                                        subtitle="Selecione um cliente para vincular ao pedido."
+                                        itemButton={isMarketplaceLocked ? undefined : {
+                                            text: "Selecionar Cliente",
+                                            action: () => setIsCustomerSheetOpen(true),
+                                            variant: "outline",
+                                            className: "rounded-full px-8"
+                                        }}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* --- 2. PAYMENT CARD --- */}
+                    <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 flex flex-col gap-6 mt-6">
+                        <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading leading-tight">Pagamento</h3>
+
+                        {!isPaidOrder && (
                             <div className="space-y-4">
                                 <div className="flex flex-col gap-3">
                                     {!isQuickMode && (
@@ -1024,13 +1032,19 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                     )}
                 </FormSection>
 
+                {isPaidOrder && (
+                    <FormSection title="" hasSeparator={false} className="mt-0">
+                        <InfoCard color="orange" title="Edição Restrita (Pedido Pago)" message="Como o pedido já está pago, não é possível editar itens, valores, cliente ou formas de pagamento. Apenas observações podem ser atualizadas." />
+                    </FormSection>
+                )}
+
                 {/* 2. Itens do Pedido */}
                 <FormSection title="Itens do Pedido" hasSeparator={false}>
                     {isPaidOrder ? (
                         <div className="space-y-4">
                             {items.map((item: any, idx: number) => (
                                 <div key={idx} className="flex items-start gap-4">
-                                    <div className="w-16 h-16 overflow-hidden shrink-0 rounded-xl border border-brand-border dark:border-dark-border">
+                                    <div className="w-16 h-16 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
                                         <img
                                             src={getR2ImageUrl(item.image, "thumbnail")}
                                             className="w-full h-full object-cover rounded-xl"
@@ -1178,6 +1192,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                                         error={hasNameError}
                                                                         errorMessage="Nome obrigatório"
                                                                         className="mb-0"
+                                                                        maxLength={150}
                                                                     />
                                                                 </div>
                                                             ) : (

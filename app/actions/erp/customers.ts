@@ -12,10 +12,10 @@ import { requireUser, requireCustomerOwnership } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
-import { sanitizeNotes } from "@/lib/input-validator"
+import { sanitizeNotes, sanitizeInput } from "@/lib/input-validator"
 import { createAddressAction } from "@/app/actions/shared/addresses"
 import { enrichAddressData } from "@/lib/services/location.service"
-import { validateCPF, validateCNPJ, validateEmail, validatePhoneBR, validateURL, validateCEP } from "@/lib/input-validator"
+import { validateCPF, validateCNPJ, validateEmail, validateBrazilMobile, validateBrazilLandline, validateURL, validateCEP } from "@/lib/input-validator"
 import { buildSoftDeletePayload, buildRestorePayload, buildArchivePayload, scopeActiveOnly, scopeArchivedOnly, scopeWithArchived } from "@/lib/supabase/query-helpers"
 import { checkLimit } from "@/lib/services/subscription.service"
 import { requireAuthorizedCustomerContext, requireAuthorizedCustomerRecord } from "@/lib/services/authorized-customer-access"
@@ -135,11 +135,11 @@ export async function createComprehensiveCustomerAction(data: {
     return { error: "E-mail inválido" }
   }
 
-  if (data.phone && !validatePhoneBR(data.phone)) {
+  if (data.phone && !validateBrazilMobile(data.phone)) {
     return { error: "Celular inválido. Use o formato (00) 90000-0000" }
   }
 
-  if (data.phoneFixed && !validatePhoneBR(data.phoneFixed)) {
+  if (data.phoneFixed && !validateBrazilLandline(data.phoneFixed)) {
     return { error: "Telefone fixo inválido. Use o formato (00) 0000-0000" }
   }
 
@@ -189,7 +189,7 @@ export async function createComprehensiveCustomerAction(data: {
 
   const { data: newCustomer, error } = await admin.from("customers").insert({
     partner_id: partnerId,
-    name: data.name,
+    name: sanitizeInput(data.name, 150),
     email: data.email || null,
     phone: data.phone || null,
     phone_fixed: data.phoneFixed || null,
@@ -198,8 +198,8 @@ export async function createComprehensiveCustomerAction(data: {
     cpf: cpfResult.cpf,
     contribuinte: data.contribuinte || null,
     cnpj: data.cnpj ? data.cnpj.replace(/\D/g, "") : null,
-    nome_fantasia: data.nomeFantasia || null,
-    razao_social: data.razaoSocial || null,
+    nome_fantasia: data.nomeFantasia ? sanitizeInput(data.nomeFantasia, 150) : null,
+    razao_social: data.razaoSocial ? sanitizeInput(data.razaoSocial, 150) : null,
     inscricao_estadual: data.ieIsento ? "" : (data.inscricaoEstadual || null),
     ie_isento: data.ieIsento ?? false,
     inscricao_municipal: data.inscricaoMunicipal || null,
@@ -208,8 +208,8 @@ export async function createComprehensiveCustomerAction(data: {
     status: data.status || "ativo",
     notes: sanitizeNotes(data.notes),
     birth_date: data.birthDate || null,
-    mother_name: data.motherName || null,
-    father_name: data.fatherName || null,
+    mother_name: data.motherName ? sanitizeInput(data.motherName, 150) : null,
+    father_name: data.fatherName ? sanitizeInput(data.fatherName, 150) : null,
     image_url: data.image_url || null,
   }).select("id").single()
 
@@ -363,11 +363,11 @@ export async function updateComprehensiveCustomerAction(data: {
     return { error: "E-mail inválido" }
   }
 
-  if (data.phone && !validatePhoneBR(data.phone)) {
+  if (data.phone && !validateBrazilMobile(data.phone)) {
     return { error: "Celular inválido. Use o formato (00) 90000-0000" }
   }
 
-  if (data.phoneFixed && !validatePhoneBR(data.phoneFixed)) {
+  if (data.phoneFixed && !validateBrazilLandline(data.phoneFixed)) {
     return { error: "Telefone fixo inválido. Use o formato (00) 0000-0000" }
   }
 
@@ -405,7 +405,7 @@ export async function updateComprehensiveCustomerAction(data: {
   // Operators can edit operational fields, but do not receive or overwrite
   // sensitive fiscal/family/internal fields they do not need for the flow.
   const customerUpdatePayload: Record<string, any> = {
-    name: data.name,
+    name: sanitizeInput(data.name, 150),
     email: data.email || null,
     phone: data.phone || null,
     phone_fixed: data.phoneFixed || null,
@@ -420,16 +420,16 @@ export async function updateComprehensiveCustomerAction(data: {
       cpf: cpfResult.cpf,
       contribuinte: data.contribuinte || null,
       cnpj: data.cnpj ? data.cnpj.replace(/\D/g, "") : null,
-      nome_fantasia: data.nomeFantasia || null,
-      razao_social: data.razaoSocial || null,
+      nome_fantasia: data.nomeFantasia ? sanitizeInput(data.nomeFantasia, 150) : null,
+      razao_social: data.razaoSocial ? sanitizeInput(data.razaoSocial, 150) : null,
       inscricao_estadual: data.ieIsento ? "" : (data.inscricaoEstadual || null),
       ie_isento: data.ieIsento ?? false,
       inscricao_municipal: data.inscricaoMunicipal || null,
       crt: data.crt || null,
       notes: sanitizeNotes(data.notes),
       birth_date: data.birthDate || null,
-      mother_name: data.motherName || null,
-      father_name: data.fatherName || null,
+      mother_name: data.motherName ? sanitizeInput(data.motherName, 150) : null,
+      father_name: data.fatherName ? sanitizeInput(data.fatherName, 150) : null,
     })
   }
 
@@ -606,24 +606,8 @@ export async function getCustomerByIdAction(customerId: string) {
     ; (customer as any).mobile = customer.phone
 
   // Aggregate order stats for KPI display (by buyer_id AND customer_id)
-  let marketplaceUserId = customer.marketplace_user_id
-  let userId = customer.user_id
-  if (!userId && !marketplaceUserId && customer.email) {
-    try {
-      const adminDb = createAdminClient()
-      const { data: authUserRes } = await adminDb.auth.admin.getUserByEmail(customer.email)
-      if (authUserRes?.user?.id) {
-        marketplaceUserId = authUserRes.user.id
-        await adminDb
-          .from("customers")
-          .update({ marketplace_user_id: marketplaceUserId })
-          .eq("id", customer.id)
-          .eq("partner_id", authorizedPartner.partnerId)
-      }
-    } catch (e) {
-      console.error("[getCustomerAction] Auto-link error:", e)
-    }
-  }
+  const marketplaceUserId = customer.marketplace_user_id
+  const userId = customer.user_id
 
   const allCustomerIds = Array.from(
     new Set([customer.id, userId, marketplaceUserId].filter(Boolean))
@@ -716,24 +700,8 @@ export async function getCustomerOrdersAction(customerId: string) {
   // store-scoped variant is introduced, its storeId must come from the
   // server-side context and be added as another predicate here.
 
-  let userId = customer.user_id
-  let marketplaceUserId = customer.marketplace_user_id
-
-  if (!userId && !marketplaceUserId && customer.email) {
-    try {
-      const { data: authUserRes } = await adminDb.auth.admin.getUserByEmail(customer.email)
-      if (authUserRes?.user?.id) {
-        marketplaceUserId = authUserRes.user.id
-        await adminDb
-          .from("customers")
-          .update({ marketplace_user_id: marketplaceUserId })
-          .eq("id", customer.id)
-          .eq("partner_id", partnerId)
-      }
-    } catch (e) {
-      console.error("[getCustomerOrdersAction] Auto-link error:", e)
-    }
-  }
+  const userId = customer.user_id
+  const marketplaceUserId = customer.marketplace_user_id
 
   const allCustomerIds = Array.from(
     new Set([customer.id, userId, marketplaceUserId].filter(Boolean))

@@ -7,7 +7,7 @@ import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
-import { sanitizeNotes } from "@/lib/input-validator"
+import { sanitizeNotes, sanitizeInput } from "@/lib/input-validator"
 import { errorResponse, successResponse } from "@/lib/utils/action-helpers"
 import type { ActionResponse } from "@/lib/types/action-response"
 import { requireCSRF } from "@/lib/security/csrf-action-wrapper"
@@ -189,7 +189,7 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
             ...(data.id ? { id: data.id } : {}),
             partner_id: finalPartnerId,
             store_id: finalStoreId,
-            name: data.name,
+            name: sanitizeInput(data.name, 150),
             description: data.description || null,
             sku,
             brand: data.brand || null,
@@ -280,7 +280,7 @@ export async function updateServiceAction(data: any): Promise<ActionResponse<any
         const supabase = await getSupabaseServerClient()
         const payload: any = { updated_at: getBrasiliaTime() }
 
-        if (data.name !== undefined) payload.name = data.name
+        if (data.name !== undefined) payload.name = sanitizeInput(data.name, 150)
         if (data.description !== undefined) payload.description = data.description
         if (data.sku !== undefined) payload.sku = data.sku
         if (data.brand !== undefined) payload.brand = data.brand

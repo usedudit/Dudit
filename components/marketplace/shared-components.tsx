@@ -15,6 +15,7 @@ import { useFavorites } from "@/providers/favorites-provider"
 import { useSupabase } from "@/providers/supabase-provider"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
+import { getLocationLabel, type LocationContext } from "@/lib/utils/location-label"
 
 const HOME_BANNERS = [
     { id: 1, src: 'https://img.dudit.com.br/static/banners/Banner-1.png', alt: 'Venda aqui' },
@@ -44,9 +45,10 @@ interface VitrineCardProps {
     vitrine: any
     hideCity?: boolean
     className?: string
+    locationContext?: LocationContext | null
 }
 
-export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity = false, className = "w-[280px] md:w-[320px]" }) => {
+export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity = false, className = "w-[280px] md:w-[320px]", locationContext = null }) => {
     // Resolve partner object (handle array or object)
     const rawPartner = Array.isArray(vitrine.partners) ? vitrine.partners[0] : vitrine.partners
     const partner = rawPartner || {}
@@ -66,13 +68,12 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
         ? getRandomDefaultBanner()
         : getBannerUrlByColor(getAvatarColor(storeName))
     const bannerImage = bannerUrl ? getR2ImageUrl(bannerUrl) : fallbackBanner
-    const rawDistance = partner.distance_km_formatted || vitrine.distance_km_formatted || null
-    const distance = rawDistance && !rawDistance.includes("Infinity") ? rawDistance : null
     const city = partner.city || vitrine.city || ""
     const state = partner.state || vitrine.state || ""
     const category = vitrine.category || partner.category || (typeof partner.category === "string" ? partner.category : null)
     const reviewsCount = partner.reviewsCount ?? vitrine.reviewsCount ?? 0
-    const showRating = (vitrine.rating ?? partner.rating ?? 0) > 0 && reviewsCount >= 3
+    const showRating = (vitrine.rating ?? partner.rating ?? 0) > 0
+    const locationLabel = getLocationLabel(partner, locationContext)
 
     return (
         <Link
@@ -109,16 +110,16 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
                         )}
                     </div>
                     <div className="flex items-center gap-1.5 text-[13px] text-brand-inactive-text mt-0.5">
-                        {distance && (
-                            <span className="font-medium">{distance}</span>
-                        )}
                         {category && (
                             <>
-                                {distance && (
-                                    <span className="w-1 h-1 rounded-full bg-brand-inactive-text" />
-                                )}
                                 <span className="font-medium truncate">{category}</span>
+                                {locationLabel && (
+                                    <span className="w-1 h-1 rounded-full bg-brand-inactive-text shrink-0" />
+                                )}
                             </>
+                        )}
+                        {locationLabel && (
+                            <span className="font-medium truncate">{locationLabel}</span>
                         )}
                     </div>
                 </div>
@@ -226,6 +227,7 @@ interface ItemCardProps {
             distance_km_formatted?: string | null
             city?: string | null
             state?: string | null
+            neighborhood?: string | null
         }
     }
     userCoords?: { lat: number; lng: number } | null
@@ -234,6 +236,7 @@ interface ItemCardProps {
     hidePromoBadge?: boolean
     hideSalesCount?: boolean
     className?: string
+    locationContext?: LocationContext | null
 }
 
 // Simple client-side cache for partner promotions to avoid redundant network requests
@@ -256,7 +259,7 @@ function getCachedPartnerPromotions(partnerId: string) {
     return promotionsCache[partnerId]
 }
 
-export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, showSeller = true, className = "w-[200px] md:w-[230px]", promotions: preloadedPromotions, hidePromoBadge, hideSalesCount }) => {
+export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, showSeller = true, className = "w-[200px] md:w-[230px]", promotions: preloadedPromotions, hidePromoBadge, hideSalesCount, locationContext = null }) => {
     const { user } = useSupabase()
     const router = useRouter()
     const { isFavorited, toggleFavorite } = useFavorites()
@@ -284,6 +287,7 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
     const sellerCategory = (product as any).category as string | null | undefined
     const sellerSubcategory = (product as any).subcategoryName as string | null | undefined
     const sellerLabel = sellerSubcategory || sellerCategory || null
+    const locationLabel = getLocationLabel(partner, locationContext)
 
     const preloadedPromos = (product as any)._promotions || preloadedPromotions
 
@@ -480,11 +484,17 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
                             <p className="text-[11px] md:text-xs text-brand-dark font-medium truncate leading-tight">
                                 {sellerName}
                             </p>
-                            {(sellerLabel || distance) && (
+                            {(locationContext ? locationLabel : (sellerLabel || distance)) && (
                                 <p className="text-[11px] text-gray-500 font-normal truncate">
-                                    {sellerLabel && <span>{sellerLabel}</span>}
-                                    {sellerLabel && distance && <span className="w-1 h-1 rounded-full bg-brand-inactive-text inline-block mx-1 align-middle" />}
-                                    {distance && <span>{distance}</span>}
+                                    {locationContext ? (
+                                        locationLabel && <span>{locationLabel}</span>
+                                    ) : (
+                                        <>
+                                            {sellerLabel && <span>{sellerLabel}</span>}
+                                            {sellerLabel && distance && <span className="w-1 h-1 rounded-full bg-brand-inactive-text inline-block mx-1 align-middle" />}
+                                            {distance && <span>{distance}</span>}
+                                        </>
+                                    )}
                                 </p>
                             )}
                         </div>

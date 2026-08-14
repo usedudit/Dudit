@@ -6,7 +6,7 @@ import { requirePermission } from "@/lib/permissions/access"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
-import { sanitizeNotes } from "@/lib/input-validator"
+import { sanitizeNotes, sanitizeInput } from "@/lib/input-validator"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { generateSignedUploadUrl } from "@/lib/r2/server"
 import {
@@ -255,9 +255,9 @@ export async function createServiceOrderAction(
         partner_id: partnerId,
         store_id: storeId,
         public_token: publicToken,
-        title: input.title,
-        description: input.description || null,
-        diagnosis: input.diagnosis || null,
+        title: sanitizeInput(input.title, 150),
+        description: sanitizeNotes(input.description),
+        diagnosis: sanitizeNotes(input.diagnosis),
         internal_notes: sanitizeNotes(input.internal_notes),
         customer_id: customerId,
         customer_snapshot: customerId ? await getCustomerSnapshot(admin, customerId) : null,
@@ -1266,9 +1266,9 @@ export async function updateServiceOrderAction(
       }
       updateData.store_id = input.store_id
     }
-    if (input.title !== undefined && !isPaid) updateData.title = input.title
-    if (input.description !== undefined && !isPaid) updateData.description = input.description
-    if (input.diagnosis !== undefined && !isPaid) updateData.diagnosis = input.diagnosis
+    if (input.title !== undefined && !isPaid) updateData.title = sanitizeInput(input.title, 150)
+    if (input.description !== undefined && !isPaid) updateData.description = sanitizeNotes(input.description)
+    if (input.diagnosis !== undefined && !isPaid) updateData.diagnosis = sanitizeNotes(input.diagnosis)
     if (input.internal_notes !== undefined) updateData.internal_notes = sanitizeNotes(input.internal_notes)
     if (input.customer_id !== undefined && !isPaid) {
       const customerId = input.customer_id || null

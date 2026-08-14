@@ -5,9 +5,10 @@ import { requirePermission } from "@/lib/permissions/access"
 import { createAdminClient } from "@/lib/supabase/server"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
+import { sanitizeInput } from "@/lib/input-validator"
 
 function normalizeName(value: string) {
-  return value.trim().replace(/\s+/g, " ")
+  return sanitizeInput(value, 150).trim().replace(/\s+/g, " ")
 }
 
 export async function getFinancialCategoriesAction(partnerId: string) {

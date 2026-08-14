@@ -238,22 +238,6 @@ async function resolveUserIdFromCustomerLookup(admin: ReturnType<typeof getAdmin
     return customer.user_id || customer.marketplace_user_id
   }
 
-  if (customer?.email) {
-    try {
-      const { data: authUserRes } = await admin.auth.admin.getUserByEmail(customer.email)
-      if (authUserRes?.user?.id) {
-        const foundId = authUserRes.user.id
-        await admin
-          .from("customers")
-          .update({ marketplace_user_id: foundId })
-          .eq("id", customerId)
-        return foundId
-      }
-    } catch (e) {
-      console.error("[notifications] Error resolving customer user by email:", e)
-    }
-  }
-
   return null
 }
 

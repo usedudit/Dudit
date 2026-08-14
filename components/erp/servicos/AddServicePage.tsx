@@ -825,6 +825,7 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                         placeholder={metadataModal.type === "category" ? "Ex: Beleza, Saúde..." : "Ex: Corte de cabelo, Manutenção..."}
                         disabled={metadataModal.isSaving}
                         className="w-full"
+                        maxLength={150}
                     />
                     <div className="flex gap-3 justify-end">
                         <Button

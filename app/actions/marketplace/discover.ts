@@ -4,7 +4,7 @@ import { cache } from "react"
 import { unstable_cache } from "next/cache"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { TAGS } from "@/lib/utils/revalidation-tags"
-import { calculateDistance } from "@/lib/services/location.service"
+import { calculateDistance, enrichMarketplaceDistance, formatDistanceLabel } from "@/lib/services/location.service"
 
 const DISCOVER_DEBUG = false
 
@@ -374,7 +374,7 @@ const PARTNER_JOIN = `partners!inner(
 stores!left(
     id, name, slug, description, logo_url, banner_url,
     phone, is_showcase_active,
-    addresses!store_id!left(city, state, latitude, longitude)
+    addresses!store_id!left(city, state, neighborhood, latitude, longitude)
 )`
 
 // ─── Process product into ItemCard shape ────────────────────────────────────
@@ -402,6 +402,7 @@ function processProduct(item: RawProduct, extra?: Record<string, any>) {
             longitude: addr?.longitude ?? null,
             city: storeCity,
             state: storeState,
+            neighborhood: addr?.neighborhood ?? null,
         }
         : null
 
@@ -734,12 +735,9 @@ async function fetchNearby(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
 
     const items = chosen.pool.slice(0, 20).map(item => {
         const dist = item._distKm
-        let distText: string | null = null
-        if (Number.isFinite(dist) && dist >= 0 && dist !== Infinity) {
-            if (dist < 1) distText = `A ${Math.round(dist * 1000)}m`
-            else if (dist <= 10) distText = `A ${dist.toFixed(1)} km`
-            else distText = `A ${Math.round(dist)} km`
-        }
+        const distText = Number.isFinite(dist) && dist >= 0 && dist !== Infinity
+            ? formatDistanceLabel(dist)
+            : null
 
         const p = processProduct(item, { _distanceText: distText })
         if (p.partners) {
@@ -844,6 +842,7 @@ async function fetchRecent(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
                 longitude: addr?.longitude ?? null,
                 city: storeCity,
                 state: storeState,
+                neighborhood: addr?.neighborhood ?? null,
             } : null
             return {
                 id: item.id,
@@ -1434,8 +1433,8 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         .select(`
             id, name, description, logo_url, banner_url,
             phone, rating, is_showcase_active, partner_id,
-            addresses!store_id!left(city, state),
-            partners!inner(id)
+            addresses!store_id!left(city, state, neighborhood, latitude, longitude),
+            partners!inner(id, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), reviews(count))
         `)
         .eq("is_active", true)
         .in("partner_id", allIds)
@@ -1483,6 +1482,8 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         const addr = Array.isArray(store.addresses) ? store.addresses[0] : store.addresses
         const storeName = store.name || p?.store_name || "Vendedor"
         const storeImage = store.logo_url || p?.store_image_url
+        const categoryName = p?.category?.parent?.name || p?.category?.name || null
+        const reviewsCount = p?.reviews?.[0]?.count || 0
         return {
             id: store.id,
             name: storeName,
@@ -1491,7 +1492,8 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
             banner_url: store.banner_url || null,
             images: storeImage ? [storeImage] : [],
             rating: store.rating,
-            reviewsCount: 0,
+            reviewsCount,
+            category: categoryName,
             partners: {
                 id: store.id,
                 store_id: store.id,
@@ -1503,6 +1505,7 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
                 longitude: addr?.longitude || null,
                 city: addr?.city || "",
                 state: addr?.state || "",
+                neighborhood: addr?.neighborhood || null,
             },
             itemType: "vitrine" as const,
         }
@@ -1931,6 +1934,16 @@ export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> 
     )()
 
     const sections = [...shared]
+
+    // Enriquecer distância em todas as seções quando temos coordenadas do usuário
+    // (custo baixo: cálculo puro de haversine com lat/lng já selecionados)
+    if (ctx.coords) {
+        for (const section of sections) {
+            if (section.items && section.items.length > 0) {
+                section.items = enrichMarketplaceDistance(section.items, ctx.coords)
+            }
+        }
+    }
 
     if (ctx.userId) {
         const tiers = await getPartnerIdsByTier(ctx.city, ctx.state, ctx.stateOnly)

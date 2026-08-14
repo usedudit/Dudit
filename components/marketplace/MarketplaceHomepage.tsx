@@ -88,6 +88,7 @@ const COMMON_CITY_ACCENTS: Record<string, string> = {
 };
 
 import { MapPinIcon, XIcon } from "@/lib/icons"
+import type { LocationContext } from "@/lib/utils/location-label"
 
 interface MarketplaceHomeProps {
     sections?: HomeSection[]
@@ -238,6 +239,16 @@ export default function MarketplaceHome({
     const userCoords = userProfile?.latitude && userProfile?.longitude
         ? { lat: userProfile.latitude, lng: userProfile.longitude }
         : null
+
+    const locationContext = useMemo<LocationContext | null>(() => {
+        if (!selectedCitySlug) return null
+        if (selectedCityName === "Brasil" || selectedCitySlug === "brasil") return { scope: "country" }
+        if (selectedCitySlug.startsWith("estado-")) {
+            return { scope: "state", state: selectedCitySlug.replace("estado-", "").toUpperCase() }
+        }
+        const state = selectedCitySlug.split("-").pop()?.toUpperCase() || null
+        return { scope: "city", city: selectedCityName || null, state }
+    }, [selectedCitySlug, selectedCityName])
 
     const handleAddressFetched = (addr: any) => {
         setForm(f => ({
@@ -656,7 +667,7 @@ export default function MarketplaceHome({
                                     title={section.title}
                                     subtitle={section.subtitle}
                                     items={section.items}
-                                    renderItem={(item: any) => <VitrineCard vitrine={item} className="w-full" />}
+                                    renderItem={(item: any) => <VitrineCard vitrine={item} locationContext={locationContext} className="w-full" />}
                                     itemWidthClass="w-[270px] sm:w-[320px]"
                                 />
                             )
@@ -667,7 +678,7 @@ export default function MarketplaceHome({
                                 title={section.title}
                                 subtitle={section.subtitle}
                                 items={section.items}
-                                renderItem={(item: any) => <ItemCard product={item} userCoords={userCoords} className="w-full" />}
+                                renderItem={(item: any) => <ItemCard product={item} userCoords={userCoords} locationContext={locationContext} className="w-full" />}
                                 itemWidthClass="w-[190px] sm:w-[210px]"
                             />
                         )

@@ -242,6 +242,26 @@ export async function middleware(request: NextRequest) {
     .filter((origin, index, list): origin is string => !!origin && list.indexOf(origin) === index)
     .join(" ")
 
+  const sentryDsnOrigin = (() => {
+    const rawDsn = process.env.NEXT_PUBLIC_SENTRY_DSN || process.env.SENTRY_DSN
+    if (!rawDsn) return ""
+
+    try {
+      const origin = new URL(rawDsn).origin
+      return new URL(rawDsn).hostname.endsWith(".sentry.io") ? origin : ""
+    } catch {
+      return ""
+    }
+  })()
+
+  const sentryConnectOrigins = [
+    sentryDsnOrigin,
+    "https://*.ingest.us.sentry.io",
+    "https://*.ingest.sentry.io",
+  ]
+    .filter(Boolean)
+    .join(" ")
+
   const cspHeader = `
     default-src 'self';
     worker-src 'self' blob:;
@@ -271,6 +291,7 @@ export async function middleware(request: NextRequest) {
         https://dudit.com.br
         https://www.dudit.com.br;
     connect-src 'self' data: blob: 
+        ${sentryConnectOrigins}
         https://*.supabase.co wss://*.supabase.co ${process.env.NEXT_PUBLIC_SUPABASE_URL || ''} wss://${process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/^https:\/\//, '') || ''} 
         https://dudit.com.br
         https://www.dudit.com.br

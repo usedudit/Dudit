@@ -367,14 +367,6 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                                         <span className="text-sm font-normal text-brand-red">Sair da sessão</span>
                                     </DropdownItem>
                                 </div>
-
-                                <div className="px-4 py-3 border-t border-brand-border dark:border-dark-border">
-                                    <div className="flex items-center justify-between text-[10px] text-brand-inactive-text/60 dark:text-dark-body/60 font-medium">
-                                        <span>v.1.5.69</span>
-                                        <span>•</span>
-                                        <span>Termos e Condições</span>
-                                    </div>
-                                </div>
                             </div>
                         </Dropdown>
                     </div>

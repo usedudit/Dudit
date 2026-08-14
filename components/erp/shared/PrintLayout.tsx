@@ -1,12 +1,14 @@
 "use client"
 
 import { useEffect } from "react"
+import type { PaperSize } from "@/lib/labels/presets"
 
 interface PrintLayoutProps {
     children: React.ReactNode
+    paperSize?: PaperSize
 }
 
-export default function PrintLayout({ children }: PrintLayoutProps) {
+export default function PrintLayout({ children, paperSize = "a4" }: PrintLayoutProps) {
     useEffect(() => {
         const timer = setTimeout(() => {
             window.print()
@@ -23,6 +25,10 @@ export default function PrintLayout({ children }: PrintLayoutProps) {
         }
     }, [])
 
+    const paperWidth = paperSize === "letter" ? "215.9mm" : "210mm"
+    const paperHeight = paperSize === "letter" ? "279.4mm" : "297mm"
+    const pageSize = paperSize === "letter" ? "Letter" : "A4"
+
     return (
         <div className="min-h-screen bg-white text-black print:bg-white print:text-black">
             <style
@@ -35,13 +41,13 @@ export default function PrintLayout({ children }: PrintLayoutProps) {
                                 color: #000000 !important;
                                 margin: 0 !important;
                                 padding: 0 !important;
-                                width: 210mm !important;
-                                height: 297mm !important;
+                                width: ${paperWidth} !important;
+                                height: ${paperHeight} !important;
                             }
                             
                             /* Hide browser-added headers and footers */
                             @page {
-                                size: A4;
+                                size: ${pageSize};
                                 margin: 0 !important;
                             }
 

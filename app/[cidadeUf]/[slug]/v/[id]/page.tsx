@@ -25,7 +25,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
   if (!store) {
     return {
-      title: 'Negócio não encontrado | Dudit'
+      title: 'Negócio não encontrado'
     }
   }
 
@@ -34,13 +34,13 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const canonicalUrl = `https://dudit.com.br${getStoreUrl(store)}`
 
   return {
-    title: `${storeName} | Dudit`,
+    title: `${storeName}`,
     description: storeDescription,
     alternates: {
       canonical: canonicalUrl,
     },
     openGraph: {
-      title: `${storeName} | Dudit`,
+      title: `${storeName}`,
       description: storeDescription,
       url: canonicalUrl,
       images: [

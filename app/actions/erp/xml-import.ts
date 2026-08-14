@@ -10,7 +10,7 @@ import { requirePermission } from "@/lib/permissions/access"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { decryptCPF } from "@/lib/crypto"
-import { validateCPF, validateCNPJ } from "@/lib/input-validator"
+import { validateCPF, validateCNPJ, sanitizeInput } from "@/lib/input-validator"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { enrichAddressData } from "@/lib/services/location.service"
 
@@ -658,8 +658,8 @@ export async function uploadXMLAction(
         .from("suppliers")
         .insert({
           partner_id: partnerId,
-          name: metadata.emitente.nome,
-          nome_fantasia: metadata.emitente.nome_fantasia || metadata.emitente.nome,
+          name: sanitizeInput(metadata.emitente.nome, 150),
+          nome_fantasia: sanitizeInput(metadata.emitente.nome_fantasia || metadata.emitente.nome, 150),
           cnpj: supplier.documentType === "cnpj" ? supplier.document : null,
           cpf: supplier.documentType === "cpf" ? supplier.document : null,
           person_type: supplier.documentType === "cnpj" ? "pj" : "pf",

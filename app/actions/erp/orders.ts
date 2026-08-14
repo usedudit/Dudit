@@ -648,7 +648,7 @@ function sanitizeERPItems(items: ERPItemPayload[]) {
             serviceId: item.serviceId || (isServiceItem ? item.productId : null) || null,
             lineType: item.lineType || (isServiceItem ? 'service_booking' : 'product'),
             variantId: item.variantId || null,
-            customName: item.customName?.trim() || undefined,
+            customName: item.customName?.trim().substring(0, 150) || undefined,
             quantity: Number(item.quantity || 0),
             unitPrice: Number(item.unitPrice || 0),
         }

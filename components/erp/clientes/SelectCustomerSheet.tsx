@@ -428,6 +428,7 @@ const SelectCustomerSheet = ({
                     placeholder="Nome do cliente"
                     error={!!nameError}
                     errorMessage={nameError || undefined}
+                    maxLength={150}
                 />
                 <EmailInput
                     label="E-mail"

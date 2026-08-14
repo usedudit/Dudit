@@ -391,6 +391,7 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId, planG
                         onKeyDown={(e) => e.key === "Enter" && handleSave()}
                         error={nameError}
                         errorMessage={nameError ? "O nome é obrigatório" : undefined}
+                        maxLength={150}
                     />
 
                     {modal.type === "subcategory" && (

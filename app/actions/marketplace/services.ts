@@ -44,7 +44,7 @@ async function _getMarketplaceService(serviceId: string, storeId?: string | null
         mp_public_key,
         created_at,
         addresses (id, street, number, neighborhood, city, state, zip_code),
-        payment_methods (id, type, payment_type, name, is_active, is_default)
+        payment_methods (*)
       ),
       service_categories:service_categories!category_id (name),
       marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),

@@ -236,8 +236,8 @@ async function importProductBatch(
       continue
     }
 
-    if (name.length > 255) {
-      name = name.substring(0, 252) + "..."
+    if (name.length > 150) {
+      name = name.substring(0, 147) + "..."
     }
 
     let rawSku = row["sku"]?.trim() || generateSKUBase(name)
@@ -484,8 +484,8 @@ async function importCustomerBatch(
       continue
     }
 
-    if (name.length > 255) {
-      name = name.substring(0, 252) + "..."
+    if (name.length > 150) {
+      name = name.substring(0, 147) + "..."
     }
 
     let email = row["email"]?.trim() || null
@@ -632,8 +632,8 @@ async function importServiceBatch(
       continue
     }
 
-    if (name.length > 255) {
-      name = name.substring(0, 252) + "..."
+    if (name.length > 150) {
+      name = name.substring(0, 147) + "..."
     }
 
     let sku = row["sku"]?.trim() || null

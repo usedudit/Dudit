@@ -1,17 +1,19 @@
 import * as Sentry from "@sentry/nextjs";
+import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
-class SentryExampleAPIError extends Error {
-  constructor(message: string | undefined) {
-    super(message);
-    this.name = "SentryExampleAPIError";
+// This endpoint is intentionally disabled unless explicitly enabled in a safe environment.
+export async function GET() {
+  if (process.env.SENTRY_TEST_MODE !== "true") {
+    return new NextResponse(null, { status: 404 });
   }
-}
 
-// A faulty API route to test Sentry's error monitoring
-export function GET() {
-  Sentry.logger.info("Sentry example API called");
-  throw new SentryExampleAPIError(
-    "This error is raised on the backend called by the example page.",
+  const eventId = Sentry.captureException(
+    new Error("Safe Sentry integration test: API route"),
+    { tags: { sentry_test: "api_route" } },
   );
+  await Sentry.flush(2000);
+
+  return NextResponse.json({ ok: true, eventId });
 }

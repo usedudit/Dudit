@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react"
 import JsBarcode from "jsbarcode"
-import { type LabelPreset, type LabelContentConfig } from "@/lib/labels/presets"
+import { type LabelPreset, type LabelContentConfig, getPageSize } from "@/lib/labels/presets"
 import { detectBarcodeFormat } from "@/lib/utils/barcode"
 import { formatCurrency } from "@/lib/utils"
 
@@ -61,6 +61,7 @@ export function LabelSheet({ products, preset, contentConfig, printMode = false 
 
   const labelsPerPage = preset.cols * preset.rows
   const totalPages = Math.max(1, Math.ceil(allLabels.length / labelsPerPage))
+  const pageSize = getPageSize(preset)
 
   const labelStyle: React.CSSProperties = {
     width: `${preset.labelWidth}mm`,
@@ -87,8 +88,8 @@ export function LabelSheet({ products, preset, contentConfig, printMode = false 
             key={pageIdx}
             className={printMode ? "pdf-print-page" : ""}
             style={{
-              width: "210mm",
-              minHeight: "297mm",
+              width: `${pageSize.width}mm`,
+              minHeight: `${pageSize.height}mm`,
               padding: `${preset.marginTop}mm ${preset.marginRight}mm ${preset.marginBottom}mm ${preset.marginLeft}mm`,
               margin: printMode ? "0 auto" : "0 auto",
               marginBottom: printMode ? 0 : "16px",

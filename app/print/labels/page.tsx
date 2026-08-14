@@ -20,6 +20,7 @@ interface PrintData {
     marginLeft: number
     spacingX: number
     spacingY: number
+    paperSize?: "a4" | "letter"
   }
   contentConfig: LabelContentConfig
   products: { id: string; quantity: number; barcodeValue?: string }[]
@@ -106,7 +107,7 @@ export default async function PrintLabelsPage({ searchParams }: PageProps) {
       : LABEL_PRESETS.find((p) => p.id === printData.presetId) || LABEL_PRESETS[0]
 
   return (
-    <PrintLayout>
+    <PrintLayout paperSize={preset.paperSize}>
       <LabelSheet
         products={labelProducts}
         preset={preset}

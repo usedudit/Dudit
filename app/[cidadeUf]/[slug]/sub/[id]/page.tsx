@@ -16,7 +16,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     const plan = await getMarketplaceRecurringPlanAction(id)
 
     if (!plan) {
-        return { title: 'Assinatura não encontrada | Dudit' }
+        return { title: 'Assinatura não encontrada' }
     }
 
     const p = plan.partners || {}
@@ -25,7 +25,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
     const planUrl = `https://dudit.com.br${getPlanUrl(plan)}`
 
-    const title = `${plan.name} | Assinatura em ${city} | Dudit`
+    const title = `${plan.name} | Assinatura em ${city}`
     const description = `${plan.description || `Assine ${plan.name} em ${city}. Cancele a qualquer momento na Dudit!`}`
 
     const imgUrl = (plan.images && plan.images[0]) || p?.store_image_url || 'https://img.dudit.com.br/static/Logo.png'

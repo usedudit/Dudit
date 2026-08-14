@@ -731,15 +731,8 @@ export function GenericAttachmentsTab({
                                 multiple
                                 accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.odt,.ppt,.pptx,.zip,.rar,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/plain,application/zip,application/x-rar-compressed"
                             />
-                            <div className="w-12 h-12 rounded-full bg-white dark:bg-dark-border flex items-center justify-center border border-brand-border dark:border-dark-border mb-4">
-                                <UploadIcon className="w-6 h-6 text-brand-inactive-text dark:text-dark-body" />
-                            </div>
-                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading text-center">
-                                Selecione um documento ou arraste & solte aqui.
-                            </p>
-                            <p className="text-xs text-brand-inactive-text dark:text-dark-body text-center mt-1">
-                                Formatos suportados: PDF, Word, Excel, CSV, Zip. Até 10MB por arquivo. (Imagens devem ser enviadas na seção de Imagens).
-                            </p>
+
+                            <IconPlaceholder icon={UploadIcon} title="Upload de Documentos" subtitle="Selecione e envie os documentos desejados (PDF, Word, Excel, CSV, Zip, etc). Max 10MB cada" />
                         </div>
 
                         {pendingFiles.length > 0 && (

@@ -51,6 +51,7 @@ export default function POSQuickProductSheet({
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Ex.: Camiseta Básica"
+          maxLength={150}
         />
         <MoneyInput
           label="Preço de venda"

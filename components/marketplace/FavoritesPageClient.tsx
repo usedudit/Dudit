@@ -228,6 +228,7 @@ export function FavoritesPageClient({ userProfile, cartCount }: FavoritesPageCli
                                         <ItemCard
                                             key={`${item.itemType}-${item.id}`}
                                             product={item}
+                                            locationContext={userProfile?.city && userProfile?.state ? { scope: "city", city: userProfile.city, state: userProfile.state } : null}
                                             className="w-full"
                                         />
                                     ))}

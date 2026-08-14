@@ -1155,6 +1155,7 @@ export default function PromotionFormPage({
                                                             setCampName(e.target.value)
                                                         }}
                                                         required
+                                                        maxLength={150}
                                                         disabled={isReadOnly}
                                                         placeholder="Ex: Dia dos Namorados"
                                                     />

@@ -1,6 +1,6 @@
 import { cache } from "react"
 import type { Metadata } from 'next'
-import { redirect, permanentRedirect, notFound } from 'next/navigation'
+import { redirect, permanentRedirect } from 'next/navigation'
 import { isValidCitySlug } from '@/lib/validation/city'
 import { searchMarketplaceDirect } from '@/app/actions/marketplace/search'
 import ExplorarPage from '@/app/explorar/[[...slug]]/page'
@@ -24,13 +24,6 @@ const revalidate = 86400
 
 type Props = {
   params: Promise<{ cidadeUf: string; slug: string }>
-}
-
-function parseCidadeUf(cidadeUf: string): { state: string; citySlug: string } {
-  const parts = cidadeUf.split("-")
-  const state = parts.pop()?.toUpperCase() || ""
-  const citySlug = parts.join("-")
-  return { state, citySlug }
 }
 
 function isStoreInCity(store: any, cidadeUf: string): boolean {
@@ -63,7 +56,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const hasResults = results && results.length > 0
 
   return {
-    title: `Encontre ${termFormatted} em ${cityFormatted} - ${stateFormatted} | Dudit`,
+    title: `Encontre ${termFormatted} em ${cityFormatted} - ${stateFormatted}`,
     description: `Resultados locais para ${termFormatted} na cidade de ${cityFormatted} (${stateFormatted}). Compare preços, veja avaliações e agende serviços locais sem taxas pela Dudit.`,
     robots: {
       index: hasResults,
@@ -73,7 +66,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       canonical: `https://dudit.com.br/${cidadeUf.toLowerCase()}/${slug.toLowerCase()}`,
     },
     openGraph: {
-      title: `${termFormatted} em ${cityFormatted} | Dudit`,
+      title: `${termFormatted} em ${cityFormatted}`,
       description: `Compre ou agende ${termFormatted} em ${cityFormatted} de forma rápida e segura.`,
       url: `https://dudit.com.br/${cidadeUf}/${slug}`,
       type: 'website',

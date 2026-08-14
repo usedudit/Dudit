@@ -7,6 +7,7 @@ import { requireUser, requireStorePermission } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { generateSKUBase, generateSKUWithSuffix } from "@/lib/utils/code-generators"
+import { sanitizeInput } from "@/lib/input-validator"
 import {
     revalidateProducts,
     revalidateSuppliers,
@@ -420,25 +421,14 @@ export async function createProductComprehensiveAction(data: {
     csrf_token?: string
     marketplace_category_id?: string | null
     marketplaceCategoryId?: string | null
-    variants?: Array<{
-        sku?: string
-        name?: string
-        price?: number
-        promotional_price?: number
-        stock_quantity?: number
-        options?: Record<string, string>
-        image_url?: string
-        is_active?: boolean
-    }>
-    suppliers?: Array<{
-        supplier_id: string
-        supplier_product_code?: string
-        cost_price?: number
-    }>
+    variants?: Array<any>
+    pending_variants?: Array<any>
+    suppliers?: Array<any>
+    pending_suppliers?: Array<any>
 }): Promise<ActionResponse<any>> {
     const actionStart = performance.now()
     try {
-        // 1. GATEKEEPER â€” isolado (bloqueia abuso sem consumir recursos)
+        // 1. GATEKEEPER — isolado (bloqueia abuso sem consumir recursos)
         await requireRateLimit(RateLimitCategory.PRODUCT_CREATE)
 
         // 2. CSRF + Auth em paralelo (independentes entre si)
@@ -448,7 +438,7 @@ export async function createProductComprehensiveAction(data: {
         ])
         if (!csrf.valid) return errorResponse(csrf.error || "CSRF inválido")
 
-        // â”€â”€ SERVER-SIDE CONTEXT FALLBACK â”€â”€
+        // ── SERVER-SIDE CONTEXT FALLBACK ──
         let finalPartnerId = data.partnerId
         if (!finalPartnerId || finalPartnerId.trim() === "") {
             const { getCurrentPartnerContext } = await import("@/lib/auth/partner-context")
@@ -457,10 +447,53 @@ export async function createProductComprehensiveAction(data: {
             else throw new Error("Acesso negado: ID do Parceiro não pôde ser resolvido.")
         }
 
-        const supabase = await getSupabaseServerClient()
+        // 3. Normalização e validação em memória de variantes e fornecedores (zero DB cost)
+        const rawVariants = data.pending_variants || data.variants || []
+        const hasVariants = Array.isArray(rawVariants) && rawVariants.length > 0
 
-        // 3. Permission + Store em paralelo (moderação agora é assíncrona)
-        const [_access, storeResult] = await Promise.all([
+        if (hasVariants) {
+            if (rawVariants.length > 50) {
+                return errorResponse("Limite máximo de 50 variações por produto excedido.")
+            }
+            const uniqueValuesPerType: Record<string, Set<string>> = {}
+            for (const v of rawVariants) {
+                const vType = (v.variantType || v.variant_type || v.type || "").trim()
+                const vVal = (v.variantValue || v.variant_value || v.value || "").trim()
+                if (vType && vVal) {
+                    const types = vType.split(" / ").map((t: string) => t.trim())
+                    const values = vVal.split(" / ").map((val: string) => val.trim())
+                    for (let idx = 0; idx < types.length; idx++) {
+                        const type = types[idx]
+                        const val = values[idx]
+                        if (!type || !val) continue
+                        if (type.length > 30) return errorResponse(`O tipo de variante "${type}" excede o limite máximo de 30 caracteres.`)
+                        if (val.length > 30) return errorResponse(`O valor de variação "${val}" excede o limite máximo de 30 caracteres.`)
+                        if (!uniqueValuesPerType[type]) uniqueValuesPerType[type] = new Set()
+                        uniqueValuesPerType[type].add(val)
+                    }
+                }
+            }
+            for (const [type, uniqueSet] of Object.entries(uniqueValuesPerType)) {
+                if (uniqueSet.size > 30) {
+                    return errorResponse(`O tipo de variante "${type}" excede o limite máximo de 30 valores permitidos (possui ${uniqueSet.size}).`)
+                }
+            }
+        }
+
+        const variantImagesCount = hasVariants
+            ? rawVariants.filter((v: any) => v.image || v.image_url || v.variant_options?.image).length
+            : 0
+        const totalImagesCount = (data.images?.length || 0) + variantImagesCount
+
+        // 4. PARALELIZAÇÃO TOTAL DE VALIDAÇÕES & INFRAESTRUTURA (Reduz latência drasticamente)
+        const [
+            _access,
+            finalStoreId,
+            limitCheck,
+            imagesLimitCheck,
+            partnerDataRes,
+            variantsFeatureAllowed
+        ] = await Promise.all([
             requirePermission(finalPartnerId, "products", "create", _user),
             (async () => {
                 if (data.storeId && data.storeId.trim() !== "") return data.storeId
@@ -469,28 +502,25 @@ export async function createProductComprehensiveAction(data: {
                 if (stores && stores.length > 0) return stores[0].id
                 throw new Error("Erro de infraestrutura: Nenhuma loja associada a este parceiro.")
             })(),
-        ])
-
-        const finalStoreId = storeResult
-
-        // 3.5 Subscription limit check - enforce product and image limits before creating
-        const [limitCheck, imagesLimitCheck] = await Promise.all([
             checkLimit(finalPartnerId, "items"),
-            checkLimit(finalPartnerId, "images_per_item", (data.images?.length || 0)),
+            checkLimit(finalPartnerId, "images_per_item", totalImagesCount),
+            getAdminClient().from('partners').select('business_info').eq('id', finalPartnerId).single(),
+            hasVariants ? canUseFeature(finalPartnerId, "product_variants") : Promise.resolve(true)
         ])
+
         if (!limitCheck.allowed) {
             return errorResponse(limitCheck.message || "Limite de produtos atingido.")
         }
         if (!imagesLimitCheck.allowed) {
             return errorResponse(imagesLimitCheck.message || "Limite de imagens atingido.")
         }
+        if (hasVariants && !variantsFeatureAllowed) {
+            return errorResponse("Seu plano não permite o uso de variantes. Faça upgrade para desbloquear.")
+        }
 
-        const adminForBusinessInfo = getAdminClient()
-        const { data: partnerData } = await adminForBusinessInfo.from('partners').select('business_info').eq('id', finalPartnerId).single()
-        const businessInfo = normalizeBusinessInfo(partnerData?.business_info)
+        const businessInfo = normalizeBusinessInfo(partnerDataRes.data?.business_info)
         const isQuick = businessInfo.mode === "quick"
 
-        // Quick mode: enforce marketplace options (server-side)
         if (isQuick) {
             if (data.showInMarketplace === undefined) data.showInMarketplace = true
             data.subcategoryId = null
@@ -510,11 +540,11 @@ export async function createProductComprehensiveAction(data: {
         if (videoMetadata.video_type === "upload" && !data.id) throw new Error("ID do produto é obrigatório para upload de vídeo")
         if (data.id) await assertUploadVideoOwnership(videoMetadata, _user.id, "products", data.id)
 
-const productData = {
+        const productData = {
             id: data.id || undefined,
             partner_id: finalPartnerId,
             store_id: finalStoreId,
-            name: data.name,
+            name: sanitizeInput(data.name, 150),
             description: data.description || null,
             sku,
             gtin: data.gtin || null,
@@ -522,7 +552,7 @@ const productData = {
             category: data.category || null,
             category_id: (data as any).category_id || data.categoryId || null,
             subcategory: data.subcategory || null,
-            subcategory_id: data.subcategoryId || data.subcategory_id || null, // Handle both names
+            subcategory_id: data.subcategoryId || data.subcategory_id || null,
             marketplace_category_id: (data as any).marketplace_category_id || data.marketplaceCategoryId || null,
             condition: data.condition || "Novo",
             unit: data.unit || null,
@@ -543,7 +573,6 @@ const productData = {
             is_on_promotion: data.isOnPromotion || false,
             show_price_in_store: data.showPriceInStore !== false,
             images: data.images || [],
-            // Marketplace enforced rules
             is_featured: data.featured || false,
             availability_value: data.availability_value || 0,
             availability_unit: data.availability_unit || "Dias",
@@ -590,7 +619,10 @@ const productData = {
             preparation_days: data.preparationDays || 0,
         }
 
-        // INSERT com retry em caso de SKU collision (unique_violation)
+        const supabase = await getSupabaseServerClient()
+        const admin = getAdminClient()
+
+        // 5. INSERT DO PRODUTO com retry em caso de SKU collision
         let insertedProduct: any = null
         let transactionError: any = null
         const maxRetries = 3
@@ -610,48 +642,132 @@ const productData = {
                 "create_product_transaction",
                 {
                     p_product: productPayload,
-                    p_variants: data.variants || [],
-                    p_suppliers: data.suppliers || []
+                    p_variants: [],
+                    p_suppliers: []
                 }
             )
 
-            if (!result.error) {
+            if (!result.error && result.data?.id) {
                 insertedProduct = result.data
                 transactionError = null
                 break
             }
 
-            // Se for unique_violation no SKU, retry com sufixo
-            if (result.error.message?.includes('unique') || result.error.code === '23505') {
+            if (result.error?.message?.includes('unique') || result.error?.code === '23505') {
                 transactionError = result.error
                 continue
             }
 
-            // Qualquer outro erro, retorna imediatamente
-            return errorResponse(result.error.message, result.error)
+            return errorResponse(result.error?.message || "Erro ao criar produto", result.error)
         }
 
-        if (transactionError) return errorResponse(transactionError.message, transactionError)
-
-        const videoUpdate = {
-            video_type: videoMetadata.video_type,
-            video_url: videoMetadata.video_url,
-            video_thumbnail: videoMetadata.video_thumbnail,
-            video_duration: videoMetadata.video_duration,
-            video_provider_id: videoMetadata.video_provider_id,
-        }
-        const { error: videoUpdateError } = await getAdminClient().from("products").update(videoUpdate).eq("id", insertedProduct.id)
-        if (videoUpdateError) return errorResponse(videoUpdateError.message, videoUpdateError)
-
-        // Synchronous revalidation and Redis sync to prevent stale data
-        await invalidateProductCache(insertedProduct.id, finalPartnerId, 'create')
-
-        // DB_TRIGGER handles products_count, so we ONLY handle images_count manually
-        if (data.images && data.images.length > 0) {
-            await increment_usage_counter(finalPartnerId, "images_count", data.images.length)
+        if (transactionError || !insertedProduct?.id) {
+            return errorResponse(transactionError?.message || "Falha ao registrar produto", transactionError)
         }
 
-        return successResponse({ ...insertedProduct, ...fiscalData, ...logisticsData })
+        const createdProductId = insertedProduct.id
+
+        // 6. INSERÇÃO ATÔMICA DE VARIANTES (Se houver)
+        let insertedVariants: any[] = []
+        if (hasVariants) {
+            const usedSkus = new Set<string>()
+            const variantsPayload = rawVariants.map((v: any, index: number) => {
+                const variantName = v.variantName || v.variant_name || v.name || `Variante ${index + 1}`
+                const variantType = v.variantType || v.variant_type || v.type || null
+                const variantValue = v.variantValue || v.variant_value || v.value || null
+                let variantSku = (v.sku && String(v.sku).trim()) ? String(v.sku).trim() : `${productData.sku}-${index + 1}`
+                let counter = 2
+                while (usedSkus.has(variantSku.toLowerCase())) {
+                    variantSku = `${variantSku}-${counter}`
+                    counter++
+                }
+                usedSkus.add(variantSku.toLowerCase())
+
+                const priceAdjustment = Number(v.price !== undefined ? v.price : (v.price_adjustment !== undefined ? v.price_adjustment : 0)) || 0
+                const stockQuantity = Number(v.stockQuantity !== undefined ? v.stockQuantity : (v.stock_quantity !== undefined ? v.stock_quantity : (v.stock !== undefined ? v.stock : 0))) || 0
+                const image = v.image || v.image_url || v.variant_options?.image || null
+                const isActive = v.isActive !== undefined ? v.isActive : (v.is_active !== undefined ? v.is_active : (v.status !== undefined ? v.status : true))
+
+                return {
+                    product_id: createdProductId,
+                    variant_name: sanitizeInput(variantName, 150),
+                    variant_type: variantType ? sanitizeInput(variantType, 100) : null,
+                    variant_value: variantValue ? sanitizeInput(variantValue, 100) : null,
+                    sku: variantSku,
+                    price_adjustment: priceAdjustment,
+                    stock_quantity: stockQuantity,
+                    variant_options: image ? { image } : null,
+                    is_active: isActive !== false,
+                }
+            })
+
+            const { data: variantsData, error: variantsError } = await admin
+                .from("product_variants")
+                .upsert(variantsPayload, { onConflict: 'sku' })
+                .select()
+
+            if (variantsError) {
+                console.error("Erro ao salvar variantes durante criação do produto:", variantsError)
+            } else {
+                insertedVariants = variantsData || []
+            }
+        }
+
+        // 7. INSERÇÃO ATÔMICA DE FORNECEDORES (Se houver)
+        const rawSuppliers = data.pending_suppliers || data.suppliers || []
+        let insertedSuppliers: any[] = []
+        if (Array.isArray(rawSuppliers) && rawSuppliers.length > 0) {
+            const suppliersPayload = rawSuppliers
+                .filter((s: any) => s && (s.supplier_id || s.id))
+                .map((s: any) => ({
+                    product_id: createdProductId,
+                    supplier_id: s.supplier_id || s.id,
+                    supplier_sku: s.supplier_sku || s.supplierSku || s.supplier_product_code || null,
+                    cost_price: s.cost_price !== undefined ? Number(s.cost_price) : (s.costPrice !== undefined ? Number(s.costPrice) : null),
+                    lead_time_days: s.lead_time_days !== undefined ? Number(s.lead_time_days) : (s.leadTimeDays !== undefined ? Number(s.leadTimeDays) : null),
+                }))
+
+            if (suppliersPayload.length > 0) {
+                const { data: suppliersData, error: suppliersError } = await admin
+                    .from("product_suppliers")
+                    .upsert(suppliersPayload, { onConflict: 'product_id,supplier_id' })
+                    .select()
+
+                if (suppliersError) {
+                    console.error("Erro ao salvar fornecedores durante criação do produto:", suppliersError)
+                } else {
+                    insertedSuppliers = suppliersData || []
+                }
+            }
+        }
+
+        // 8. Video update se necessário
+        if (videoMetadata.video_url || videoMetadata.video_thumbnail) {
+            const videoUpdate = {
+                video_type: videoMetadata.video_type,
+                video_url: videoMetadata.video_url,
+                video_thumbnail: videoMetadata.video_thumbnail,
+                video_duration: videoMetadata.video_duration,
+                video_provider_id: videoMetadata.video_provider_id,
+            }
+            await admin.from("products").update(videoUpdate).eq("id", createdProductId)
+        }
+
+        // 9. Revalidação síncrona de Cache e Redis em uma única passagem
+        await invalidateProductCache(createdProductId, finalPartnerId, 'create')
+
+        // 10. Atualização de contadores de imagens (produto + variantes)
+        if (totalImagesCount > 0) {
+            await increment_usage_counter(finalPartnerId, "images_count", totalImagesCount)
+        }
+
+        return successResponse({
+            ...insertedProduct,
+            ...fiscalData,
+            ...logisticsData,
+            variants: insertedVariants,
+            suppliers: insertedSuppliers,
+        })
     } catch (error: any) {
         return errorResponse(error.message)
     }
@@ -776,6 +892,8 @@ export async function updateProductComprehensiveAction(productId: string, data: 
         directMapFields.forEach(field => {
             if (dataRecord[field] !== undefined) payload[field] = dataRecord[field]
         })
+
+        if (payload.name !== undefined) payload.name = sanitizeInput(payload.name, 150)
 
         fiscalMapFields.forEach(field => {
             if (dataRecord[field] !== undefined) fiscalPayload[field] = dataRecord[field]
@@ -1380,7 +1498,7 @@ export async function getProductSuppliersAction(productId: string) {
             .select(`
                 id, product_id, supplier_id, cost_price, supplier_sku, lead_time_days,
                 last_purchase_price, last_purchase_date, last_invoice_key,
-                supplier:suppliers!inner(id, name, email, phone, cnpj, cpf, image_url)
+                supplier:suppliers(id, name, email, phone, cnpj, cpf, image_url)
             `)
             .eq("product_id", productId)
         if (error) return { error: error.message }
@@ -1401,6 +1519,127 @@ export async function getProductSuppliersAction(productId: string) {
             supplier_image_url: ps.supplier?.image_url || null,
         }))
         return { suppliers, partnerId: product.partner_id }
+    } catch (error: any) {
+        return { error: error.message }
+    }
+}
+
+export async function getProductSuppliersOverviewAction(
+    productId: string,
+    options?: { selectedSupplierId?: string | null; purchasesPage?: number; purchasesLimit?: number }
+) {
+    try {
+        const product = await fetchProductAndVerifyOwnership(productId, "view")
+        const admin = getAdminClient()
+        const purchasesPage = options?.purchasesPage || 1
+        const purchasesLimit = options?.purchasesLimit || 5
+        const offset = (purchasesPage - 1) * purchasesLimit
+        const selectedSupplierId = options?.selectedSupplierId || null
+
+        let purchasesQuery = admin
+            .from("xml_import_items")
+            .select(`
+                id, raw_quantity, raw_unit_cost, raw_total_cost, raw_name, created_at,
+                xml_import_id,
+                xml_import:xml_imports(id, invoice_number, invoice_date, supplier_id)
+            `, { count: "exact" })
+            .not("match_status", "eq", "skipped")
+            .or(`matched_product_id.eq.${productId},created_product_id.eq.${productId}`)
+            .order("created_at", { ascending: false })
+            .range(offset, offset + purchasesLimit - 1)
+
+        if (selectedSupplierId) {
+            purchasesQuery = purchasesQuery.eq("xml_import.supplier_id", selectedSupplierId)
+        }
+
+        const [suppliersRes, purchasesRes, costHistoryRes] = await Promise.all([
+            admin.from("product_suppliers").select(`
+                id, product_id, supplier_id, cost_price, supplier_sku, lead_time_days,
+                last_purchase_price, last_purchase_date, last_invoice_key,
+                supplier:suppliers(id, name, email, phone, cnpj, cpf, image_url)
+            `).eq("product_id", productId),
+            purchasesQuery,
+            admin.from("purchase_cost_history").select(
+                `id, previous_cost, new_cost, unit_cost_from_xml, changed_at, invoice_key, supplier_id`
+            ).eq("product_id", productId).order("changed_at", { ascending: false }).limit(10)
+        ])
+
+        if (suppliersRes.error) return { error: suppliersRes.error.message }
+
+        const suppliers = (suppliersRes.data || []).map((ps: any) => ({
+            id: ps.id,
+            product_id: ps.product_id,
+            supplier_id: ps.supplier_id,
+            cost_price: ps.cost_price,
+            supplier_sku: ps.supplier_sku,
+            lead_time_days: ps.lead_time_days,
+            last_purchase_price: ps.last_purchase_price,
+            last_purchase_date: ps.last_purchase_date,
+            last_invoice_key: ps.last_invoice_key,
+            supplier_name: ps.supplier?.name || "",
+            supplier_email: ps.supplier?.email || null,
+            supplier_phone: ps.supplier?.phone || null,
+            supplier_document: ps.supplier?.cnpj || ps.supplier?.cpf || null,
+            supplier_image_url: ps.supplier?.image_url || null,
+        }))
+
+        const supplierNameMap: Record<string, string> = {}
+        suppliers.forEach((s: any) => {
+            if (s.supplier_id) supplierNameMap[s.supplier_id] = s.supplier_name
+        })
+
+        const missingSupplierIds = new Set<string>()
+        purchasesRes.data?.forEach((i: any) => {
+            const sid = i.xml_import?.supplier_id
+            if (sid && !supplierNameMap[sid]) missingSupplierIds.add(sid)
+        })
+        costHistoryRes.data?.forEach((h: any) => {
+            const sid = h.supplier_id
+            if (sid && !supplierNameMap[sid]) missingSupplierIds.add(sid)
+        })
+
+        if (missingSupplierIds.size > 0) {
+            const { data: extraSuppliers } = await admin.from("suppliers").select("id, name").in("id", Array.from(missingSupplierIds))
+            extraSuppliers?.forEach((s: any) => {
+                supplierNameMap[s.id] = s.name
+            })
+        }
+
+        const purchases = (purchasesRes.data || []).map((item: any) => ({
+            id: item.id,
+            quantity: item.raw_quantity,
+            unit_cost: item.raw_unit_cost,
+            total_cost: item.raw_total_cost,
+            product_name: item.raw_name,
+            date: item.xml_import?.invoice_date || item.created_at,
+            invoice_number: item.xml_import?.invoice_number || null,
+            supplier_id: item.xml_import?.supplier_id,
+            supplier_name: supplierNameMap[item.xml_import?.supplier_id] || "",
+            created_at: item.created_at,
+        }))
+
+        const allCostHistory = (costHistoryRes.data || []).map((h: any) => ({
+            id: h.id,
+            previous_cost: h.previous_cost,
+            new_cost: h.new_cost,
+            unit_cost_from_xml: h.unit_cost_from_xml,
+            changed_at: h.changed_at,
+            invoice_key: h.invoice_key,
+            supplier_id: h.supplier_id,
+            supplier_name: supplierNameMap[h.supplier_id] || "",
+        }))
+
+        const costHistory = selectedSupplierId
+            ? allCostHistory.filter((h: any) => h.supplier_id === selectedSupplierId)
+            : allCostHistory
+
+        return {
+            suppliers,
+            purchases,
+            purchasesTotal: purchasesRes.count || 0,
+            costHistory,
+            partnerId: product.partner_id
+        }
     } catch (error: any) {
         return { error: error.message }
     }

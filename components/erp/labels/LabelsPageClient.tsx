@@ -66,12 +66,19 @@ export default function LabelsPageClient({ isFree }: LabelsPageClientProps) {
 
           <div className="p-6 border rounded-lg hover:bg-accent">
             <h3 className="font-semibold text-lg">Modelos Pimaco</h3>
-            <ul className="text-sm text-muted-foreground mt-2 space-y-1">
-              {LABEL_PRESETS.map((p) => (
-                <li key={p.id}>✓ {p.name} - {p.description}</li>
-              ))}
-              <li>✓ Customizado</li>
-            </ul>
+            {(["a4", "letter"] as const).map((paper) => (
+              <div key={paper} className="mt-3">
+                <p className="text-xs font-bold text-brand-dark dark:text-dark-heading uppercase tracking-wide">
+                  {paper === "a4" ? "Folha A4 (21 × 29,7 cm)" : "Folha Carta (21,59 × 27,94 cm)"}
+                </p>
+                <ul className="text-sm text-muted-foreground mt-1 space-y-1">
+                  {LABEL_PRESETS.filter((p) => p.paperSize === paper).map((p) => (
+                    <li key={p.id}>✓ {p.name} - {p.description}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+            <p className="text-sm text-muted-foreground mt-3">✓ Customizado</p>
           </div>
         </div>
       </div>

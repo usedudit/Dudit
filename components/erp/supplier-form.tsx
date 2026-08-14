@@ -85,7 +85,7 @@ export function SupplierForm({ partnerId, supplier }: SupplierFormProps) {
         <CardContent className="pt-6 space-y-4">
           <div className="grid gap-2">
             <Label htmlFor="name">Nome*</Label>
-            <Input id="name" name="name" value={name} onChange={(e) => setName(e.target.value)} required />
+            <Input id="name" name="name" value={name} onChange={(e) => setName(e.target.value)} required maxLength={150} />
           </div>
 
           <div className="grid gap-2">

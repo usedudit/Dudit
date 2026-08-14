@@ -1,5 +1,5 @@
 import type { Metadata } from "next"
-import { getCachedStoreBySlug, getCachedStoreProducts, getCachedStoreServices, getCachedStoreReviews, getCachedStoreStats } from "@/app/actions/marketplace/stores"
+import { getCachedStoreProducts, getCachedStoreServices, getCachedStoreReviews, getCachedStoreStats } from "@/app/actions/marketplace/stores"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
 import { VendorPageClient } from "@/components/marketplace/VendorPage"

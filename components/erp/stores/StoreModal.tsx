@@ -292,6 +292,7 @@ export function StoreModal({ isOpen, onClose, partnerId, store, onSaved }: Store
                   onChange={(e) => setName(e.target.value)}
                   disabled={isLoading}
                   required
+                  maxLength={150}
                 />
                 <div>
                   <PhoneInput

@@ -24,7 +24,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     const service = await getMarketplaceService(id, storeId)
 
     if (!service) {
-        return { title: 'Serviço não encontrado | Dudit' }
+        return { title: 'Serviço não encontrado' }
     }
 
     const p = Array.isArray(service.partners) ? service.partners[0] : service.partners
@@ -33,7 +33,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
     const serviceUrl = `https://dudit.com.br${getServiceUrl(service)}`
 
-    const title = `${service.name} - Agendar em ${city} | Dudit`
+    const title = `${service.name} - Agendar em ${city}`
     const description = `Agende ${service.name} em ${city}. Reserve online pela Dudit com horários disponíveis em tempo real!`
 
     return {

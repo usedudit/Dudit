@@ -2,6 +2,7 @@
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { createAdminClient } from "@/lib/supabase/server"
+import { sanitizeInput } from "@/lib/input-validator"
 import { requireUser, requireStoreAccess } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
 import { revalidateOrders, revalidateTransactions, revalidateStockMovements } from "@/lib/utils/revalidation"
@@ -1416,7 +1417,7 @@ export async function createPOSCustomerQuickAction(input: {
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
     if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
 
-    const name = String(input.name || "").trim()
+    const name = sanitizeInput(String(input.name || ""), 150).trim()
     const email = String(input.email || "").trim().toLowerCase()
     const phone = String(input.phone || "").trim()
     const cpfDigits = String(input.cpf || "").replace(/\D/g, "")

@@ -81,7 +81,7 @@ const getEmptyProduct = () => ({
     pis_cst: "99", pis_rate: 0, cofins_cst: "99", cofins_rate: 0, ipi_cst: "99", ipi_code: null,
     product_situation: "revenda", c_benef: null, inf_ad_prod: null,
     weight_gross: 0, weight_net: 0, width: 0, height: 0, length: 0, packaging_type: "package", preparation_days: 0,
-    tags: [], pending_variants: [],
+    tags: [], pending_variants: [], pending_suppliers: [],
 })
 
 
@@ -662,6 +662,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                 const saveRes = await onSave({
                     ...payload,
                     pending_variants: productData.pending_variants || [],
+                    pending_suppliers: productData.pending_suppliers || [],
                 })
 
                 if (saveRes && saveRes.success === false) {
@@ -677,27 +678,15 @@ const AddProductPage: FC<AddProductPageProps> = ({
 
             const dbPromise = internalMode === "edit" && (initialProduct?.id || productId)
                 ? updateProductComprehensiveAction(initialProduct?.id || productId!, payload)
-                : createProductComprehensiveAction(payload)
+                : createProductComprehensiveAction({
+                    ...payload,
+                    pending_variants: productData.pending_variants || [],
+                    pending_suppliers: productData.pending_suppliers || [],
+                })
 
             const [result] = await Promise.all([dbPromise])
 
             if (result.success) {
-                const createdProductId = internalMode === "add" && result.data?.id ? result.data.id : null
-
-                if (createdProductId && productData.pending_variants?.length > 0) {
-                    try {
-                        await createProductVariantsBatchAction({
-                            productId: createdProductId,
-                            variants: productData.pending_variants,
-                            csrf_token: csrfToken,
-                            deletedImages: [],
-                        })
-                    } catch (variantErr) {
-                        console.error("Error saving pending variants:", variantErr)
-                        notifyError("Produto criado, mas erro ao salvar variáveis.")
-                    }
-                }
-
                 notifySuccess(internalMode === "edit" ? "Produto atualizado!" : "Produto criado!")
                 setPendingImages([])
                 onClose?.()
@@ -742,6 +731,10 @@ const AddProductPage: FC<AddProductPageProps> = ({
 
     const handleSavePendingVariants = useCallback((variantsToSave: any[]) => {
         setProductData((prev: any) => ({ ...prev, pending_variants: variantsToSave }))
+    }, [])
+
+    const handleSavePendingSuppliers = useCallback((suppliersToSave: any[]) => {
+        setProductData((prev: any) => ({ ...prev, pending_suppliers: suppliersToSave }))
     }, [])
 
     const handleDuplicateProduct = useCallback(() => {
@@ -979,7 +972,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                                 <p className="mt-4 text-[15px] text-brand-dark dark:text-dark-heading font-medium">Carregando fornecedores...</p>
                                             </div>
                                         ) : (
-                                            <ProductSuppliersTab isEditing={isEditing} productData={productData} partnerId={partnerId} />
+                                            <ProductSuppliersTab isEditing={isEditing} productData={productData} partnerId={partnerId} onSavePendingSuppliers={handleSavePendingSuppliers} />
                                         )}
                                     </FadeIn>
                                 )}
@@ -1169,6 +1162,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                 onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setMetadataModal(prev => ({ ...prev, name: e.target.value }))}
                                 onKeyDown={(e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => e.key === 'Enter' && handleSaveMetadata()}
                                 autoFocus
+                                maxLength={150}
                             />
                         </div>
 

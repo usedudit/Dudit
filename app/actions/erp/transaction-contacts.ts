@@ -16,7 +16,7 @@ export type TransactionContactRow = {
 const CONTACT_TYPES = new Set(["customer", "supplier", "service", "employee", "partner", "other"])
 
 function normalizeName(value: string) {
-    return value.trim().replace(/\s+/g, " ")
+    return value.trim().replace(/\s+/g, " ").substring(0, 150)
 }
 
 export async function listAllTransactionContactsAction(
@@ -115,7 +115,7 @@ export async function createTransactionContactAction(input: {
                 partner_id: input.partnerId,
                 name: normalizedName,
                 type: input.type,
-                description: input.description?.trim() || null,
+                description: input.description ? input.description.trim().substring(0, 150) : null,
                 store_id: input.store_id || null,
             })
             .select("id, name, type, description, store_id")

@@ -4,6 +4,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { requireMinimumPlan } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
 import { createAdminClient } from "@/lib/supabase/server"
+import { sanitizeInput } from "@/lib/input-validator"
 
 interface ServiceMetadataResponse {
   categories: any[]
@@ -62,7 +63,7 @@ export async function createServiceCategoryAction(data: { partnerId: string, nam
       .from("service_categories")
       .insert({
         partner_id: data.partnerId,
-        name: data.name.trim(),
+        name: sanitizeInput(data.name, 150),
         parent_id: data.parentId || null,
       })
       .select("id, name, parent_id, is_active, created_at")
@@ -97,7 +98,7 @@ export async function updateServiceCategoryAction(id: string, partnerId: string,
     }
 
     const payload: any = {}
-    if (data.name !== undefined) payload.name = data.name.trim()
+    if (data.name !== undefined) payload.name = sanitizeInput(data.name, 150)
     if (data.parentId !== undefined) payload.parent_id = data.parentId
     if (data.isActive !== undefined) payload.is_active = data.isActive
 

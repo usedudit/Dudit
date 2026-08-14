@@ -318,6 +318,7 @@ export function PaymentMethodEditPage({ partnerId, storeId: propStoreId, editing
                                         }}
                                         error={!!fieldErrors.name}
                                         errorMessage={fieldErrors.name}
+                                        maxLength={50}
                                     />
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -722,6 +723,7 @@ export function PaymentMethodEditPage({ partnerId, storeId: propStoreId, editing
                                                 }}
                                                 error={!!fieldErrors.name}
                                                 errorMessage={fieldErrors.name}
+                                                maxLength={50}
                                             />
 
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

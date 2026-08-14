@@ -11,7 +11,7 @@ import { safeRevalidateTag } from "@/lib/utils/revalidation"
 import { TAGS } from "@/lib/utils/revalidation-tags"
 import { DASHBOARD_TAGS } from "@/lib/data/dashboard"
 import { getRandomDefaultBanner } from "@/lib/utils/banner"
-import { validatePhoneBR, sanitizeInput } from "@/lib/input-validator"
+import { validateBrazilMobile, sanitizeInput } from "@/lib/input-validator"
 import { normalizePhoneToE164 } from "@/lib/utils/phone-utils"
 
 export async function listStoresAction(partnerId: string) {
@@ -143,14 +143,28 @@ export async function createStoreAction(input: CreateStoreInput): Promise<Action
 
         const slug = input.slug || generateSlug(input.name)
 
+        let normalizedPhone: string | null = null
+        if (input.phone) {
+            const sanitizedPhone = typeof input.phone === "string" ? sanitizeInput(input.phone, 20) : ""
+            let phoneToValidate = sanitizedPhone
+            const digits = sanitizedPhone.replace(/\D/g, "")
+            if (digits.startsWith("55") && (digits.length === 12 || digits.length === 13)) {
+                phoneToValidate = digits.slice(2)
+            }
+            if (!validateBrazilMobile(phoneToValidate)) {
+                return { success: false, error: "Número de telefone inválido" }
+            }
+            normalizedPhone = normalizePhoneToE164(sanitizedPhone)
+        }
+
         const { data, error } = await supabase
             .from("stores")
             .insert({
                 partner_id: input.partnerId,
-                name: input.name,
+                name: sanitizeInput(input.name, 150),
                 slug,
                 description: input.description || null,
-                phone: input.phone || null,
+                phone: normalizedPhone,
                 opening_hours: input.opening_hours || null,
                 logo_url: input.logo_url || null,
                 banner_url: getRandomDefaultBanner(),
@@ -251,7 +265,7 @@ export async function updateStoreAction(input: UpdateStoreInput): Promise<Action
         const supabase = await getSupabaseServerClient()
         const updateData: Record<string, unknown> = {}
 
-        if (input.name !== undefined) updateData.name = input.name
+        if (input.name !== undefined) updateData.name = sanitizeInput(input.name, 150)
         if (input.slug !== undefined) updateData.slug = input.slug
         if (input.description !== undefined) updateData.description = input.description
         if (input.phone !== undefined) {
@@ -262,7 +276,7 @@ export async function updateStoreAction(input: UpdateStoreInput): Promise<Action
                 if (digits.startsWith("55") && (digits.length === 12 || digits.length === 13)) {
                     phoneToValidate = digits.slice(2)
                 }
-                if (!validatePhoneBR(phoneToValidate)) {
+                if (!validateBrazilMobile(phoneToValidate)) {
                     return { success: false, error: "Número de telefone inválido" }
                 }
                 updateData.phone = normalizePhoneToE164(sanitizedPhone)
@@ -285,8 +299,8 @@ export async function updateStoreAction(input: UpdateStoreInput): Promise<Action
         if (input.timezone !== undefined) updateData.timezone = input.timezone
         // Tax / fiscal fields
         if (input.person_type !== undefined) updateData.person_type = input.person_type
-        if (input.razaoSocial !== undefined) updateData.razao_social = input.razaoSocial
-        if (input.nomeFantasia !== undefined) updateData.nome_fantasia = input.nomeFantasia
+        if (input.razaoSocial !== undefined) updateData.razao_social = sanitizeInput(input.razaoSocial ?? "", 150)
+        if (input.nomeFantasia !== undefined) updateData.nome_fantasia = sanitizeInput(input.nomeFantasia ?? "", 150)
         if (input.cnpj !== undefined) {
             updateData.cnpj = input.cnpj ? input.cnpj.replace(/\D/g, "") : null
             if (updateData.cnpj === "") updateData.cnpj = null

@@ -22,7 +22,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const store = await getCachedStoreById(id)
 
   if (!store) {
-    return { title: 'Loja não encontrada | Dudit' }
+    return { title: 'Loja não encontrada' }
   }
 
   const sname = store.name || store.partners?.store_name || 'Loja Parceira'
@@ -38,7 +38,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     description: sdesc,
     alternates: { canonical: url },
     openGraph: {
-      title: `${sname} | Dudit`,
+      title: `${sname}`,
       description: sdesc,
       url,
       images: [{ url: logo, width: 800, height: 600, alt: `Capa da loja ${sname}` }],

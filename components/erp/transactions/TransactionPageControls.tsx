@@ -137,14 +137,14 @@ const TransactionPageControls: React.FC<TransactionPageControlsProps> = ({
         if (tab !== "A pagar" && tab !== "A receber") return null
         const values = tabValues[tab]
         if (!values) return null
-        
+
         // Show pending + overdue value (everything left to pay/receive) as the main badge
         const tabTotal = values.pending + values.overdue
         if (tabTotal <= 0) return null
         return (
-            <TabCountBadge 
-                value={formatCurrency(tabTotal)} 
-                variant={tab === "A receber" ? "green" : "red"} 
+            <TabCountBadge
+                value={formatCurrency(tabTotal)}
+                variant={tab === "A receber" ? "green" : "red"}
             />
         )
     }

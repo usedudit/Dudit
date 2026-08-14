@@ -7,6 +7,7 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import type { RecurringListCursor, RecurringPlanItem, RecurringPlanStatus, RecurringFrequencyType } from "@/lib/types/recurring"
 import { mapPlanRow } from "@/lib/types/recurring"
+import { sanitizeInput } from "@/lib/input-validator"
 
 const PAGE_SIZE = 20
 
@@ -31,9 +32,9 @@ function validatePlanInput(input: {
   startDate: string
   items: RecurringPlanItem[]
 }) {
-  const name = String(input.name || "").trim()
+  const name = sanitizeInput(String(input.name || ""), 150).trim()
   if (!name) throw new Error("Nome do plano é obrigatório.")
-  if (name.length > 200) throw new Error("Nome deve ter no máximo 200 caracteres.")
+  if (name.length > 150) throw new Error("Nome deve ter no máximo 150 caracteres.")
 
   const allowed: RecurringFrequencyType[] = ["daily", "weekly", "monthly", "yearly", "custom"]
   if (!allowed.includes(input.frequencyType)) throw new Error("Frequência inválida.")

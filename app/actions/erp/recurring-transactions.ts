@@ -1,10 +1,13 @@
 "use server"
+"use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { requirePermission } from "@/lib/permissions/access"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
+import { sanitizeInput } from "@/lib/input-validator"
+import { sanitizeUUID } from "@/lib/security/input-sanitizer"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { requireAuthorizedCustomerContext } from "@/lib/services/authorized-customer-access"
 
@@ -131,9 +134,9 @@ export async function createRecurringTransactionAction(input: {
     const supabase = await getSupabaseServerClient()
 
     // Input validation hardening
-    const description = String(input.description || "").trim()
+    const description = sanitizeInput(String(input.description || ""), 150).trim()
     if (!description) throw new Error("Descrição é obrigatória.")
-    if (description.length > 500) throw new Error("Descrição deve ter no máximo 500 caracteres.")
+    if (description.length > 150) throw new Error("Descrição deve ter no máximo 150 caracteres.")
 
     const amount = Number(input.amount || 0)
     if (!Number.isFinite(amount) || amount <= 0) throw new Error("Valor deve ser maior que zero.")
@@ -174,7 +177,7 @@ export async function createRecurringTransactionAction(input: {
         contact_id: contactId,
         customer_id: customerId,
         contact_type: contactTypeResolved,
-        payment_method_id: input.paymentMethodId ?? null,
+        payment_method_id: sanitizeUUID(input.paymentMethodId),
         active: true,
         status: "active" as RecurringLifecycleStatus,
       })
@@ -229,7 +232,7 @@ export async function updateRecurringTransactionAction(
       delete normalized.useLastDay
     }
     if ("paymentMethodId" in normalized) {
-      normalized.payment_method_id = normalized.paymentMethodId
+      normalized.payment_method_id = sanitizeUUID(normalized.paymentMethodId)
       delete normalized.paymentMethodId
     }
 
@@ -252,9 +255,9 @@ export async function updateRecurringTransactionAction(
 
     // Validate description when patched
     if (payload.description !== undefined) {
-      const patchedDesc = String(payload.description || "").trim()
+      const patchedDesc = sanitizeInput(String(payload.description || ""), 150).trim()
       if (!patchedDesc) throw new Error("Descrição é obrigatória.")
-      if (patchedDesc.length > 500) throw new Error("Descrição deve ter no máximo 500 caracteres.")
+      if (patchedDesc.length > 150) throw new Error("Descrição deve ter no máximo 150 caracteres.")
       payload.description = patchedDesc
     }
 
@@ -512,7 +515,7 @@ export async function generateRecurringOccurrencesAction(partnerId: string) {
     const categoryIds = [...new Set(bulkRows.map((r: any) => r.category_id).filter(Boolean))] as string[]
     const contactIds = [...new Set(bulkRows.map((r: any) => r.contact_id).filter(Boolean))] as string[]
     const customerIds = [...new Set(bulkRows.map((r: any) => r.customer_id).filter(Boolean))] as string[]
-    const pmIds = [...new Set(bulkRows.map((r: any) => r.payment_method_id).filter(Boolean))] as string[]
+    const pmIds = [...new Set(bulkRows.map((r: any) => r.payment_method_id).map(sanitizeUUID).filter(Boolean))] as string[]
 
     const [{ data: cats }, { data: tcontacts }, { data: customers }, { data: pms }] = await Promise.all([
       categoryIds.length
@@ -521,7 +524,7 @@ export async function generateRecurringOccurrencesAction(partnerId: string) {
       contactIds.length
         ? supabase.from("transaction_contacts").select("id,name").in("id", contactIds)
         : Promise.resolve({ data: [] as { id: string; name: string | null }[] }),
-      customerIds.length
+customerIds.length
         ? customerAccess.admin.from("customers").select("id,name").in("id", customerIds).eq("partner_id", customerAccess.partnerId)
         : Promise.resolve({ data: [] as { id: string; name: string | null }[] }),
       pmIds.length

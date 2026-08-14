@@ -487,19 +487,39 @@ export const ProductVariationsTab: React.FC<ProductVariationsTabProps> = ({
         if (!isEditing) return
 
         // Optimistic Update
-        setVariations(p => p.map(v => v.id === id ? { ...v, status: active } : v))
+        const updatedList = variations.map(v => v.id === id ? { ...v, status: active, isActive: active } : v)
+        setVariations(updatedList)
+
+        if (!productData?.id || String(id).startsWith("pending-")) {
+            onSavePendingVariants?.(updatedList)
+            onUpdateVariant?.(id, "status", active)
+            return
+        }
 
         const res = await updateProductVariantAction(String(id), { isActive: active })
         if (!res.success) {
-            setVariations(p => p.map(v => v.id === id ? { ...v, status: !active } : v)) // Rollback
+            setVariations(p => p.map(v => v.id === id ? { ...v, status: !active, isActive: !active } : v)) // Rollback
             notifyError(res.error || "Erro ao atualizar")
         } else {
             onUpdateVariant?.(id, "status", active)
         }
-    }, [isEditing, notifyError, onUpdateVariant])
+    }, [isEditing, notifyError, onUpdateVariant, variations, productData?.id, onSavePendingVariants])
 
     const handleDelete = async () => {
         if (!itemToDelete) return
+
+        if (!productData?.id || String(itemToDelete.id).startsWith("pending-")) {
+            const updated = variations.filter(v => v.id !== itemToDelete.id)
+            setVariations(updated)
+            setSelectedIds(p => { const n = new Set(p); n.delete(itemToDelete.id); return n })
+            onSavePendingVariants?.(updated)
+            notifySuccess("Removido com sucesso")
+            onRemoveVariant?.(itemToDelete.id)
+            setModalState(p => ({ ...p, delete: false }))
+            setItemToDelete(null)
+            return
+        }
+
         const res = await deleteProductVariantAction(String(itemToDelete.id))
         if (res.success) {
             setVariations(p => p.filter(v => v.id !== itemToDelete.id))
@@ -518,8 +538,19 @@ export const ProductVariationsTab: React.FC<ProductVariationsTabProps> = ({
         const ids = Array.from(selectedIds)
         if (ids.length === 0) return
 
+        const isPendingMode = !productData?.id || ids.some(id => String(id).startsWith("pending-"))
+
         // 1. Delete Bulk
         if (payload.type === 'delete') {
+            if (isPendingMode) {
+                const updated = variations.filter(v => !selectedIds.has(v.id))
+                setVariations(updated)
+                setSelectedIds(new Set())
+                onSavePendingVariants?.(updated)
+                notifySuccess(`${ids.length} variações excluídas`)
+                return
+            }
+
             const result = await batchDeleteVariantsAction(ids)
             if (result.success) {
                 setVariations(p => p.filter(v => !selectedIds.has(v.id)))
@@ -533,6 +564,15 @@ export const ProductVariationsTab: React.FC<ProductVariationsTabProps> = ({
 
         // 2. Remove Image Handler
         if (payload.type === 'remove_image') {
+            if (isPendingMode) {
+                const updated = variations.map(v => selectedIds.has(v.id) ? { ...v, image: null } : v)
+                setVariations(updated)
+                onSavePendingVariants?.(updated)
+                notifySuccess(`Imagem removida de ${ids.length} variante(s)`)
+                setSelectedIds(new Set())
+                return
+            }
+
             const updates = ids.map(id => ({ id, image: undefined }))
             const result = await batchUpdateVariantsAction(updates)
             if (result.success) {
@@ -550,14 +590,12 @@ export const ProductVariationsTab: React.FC<ProductVariationsTabProps> = ({
 
         // 3. Image Upload Handler
         let uploadedImageId: string | undefined = undefined
-        let uploadPromise: Promise<Response> | null = null;
         if (payload.type === 'image' && payload.imageFile) {
             try {
                 const formData = new FormData()
                 const extension = payload.imageFile.type === "image/png" ? "png" : payload.imageFile.type === "image/webp" ? "webp" : "jpg"
                 formData.append("file", payload.imageFile, `variant-image.${extension}`)
 
-                // Passar productId na query para cache específico do produto
                 const uploadUrlObj = new URL("/api/upload-image", window.location.origin)
                 if (productData?.id) {
                     uploadUrlObj.searchParams.set("productId", productData.id)
@@ -616,6 +654,26 @@ export const ProductVariationsTab: React.FC<ProductVariationsTabProps> = ({
         }).filter(Boolean)
 
         if (updates.length > 0) {
+            if (isPendingMode) {
+                const updatedList = variations.map(v => {
+                    const update = updates.find((u: any) => u.id === v.id)
+                    if (!update) return v
+                    return {
+                        ...v,
+                        price: update.price !== undefined ? update.price : v.price,
+                        stock: update.stock !== undefined ? update.stock : v.stock,
+                        status: update.active !== undefined ? update.active : v.status,
+                        isActive: update.active !== undefined ? update.active : v.status,
+                        image: update.image !== undefined ? update.image : v.image
+                    }
+                })
+                setVariations(updatedList)
+                onSavePendingVariants?.(updatedList)
+                notifySuccess("Alterações aplicadas com sucesso")
+                setSelectedIds(new Set())
+                return
+            }
+
             const [result] = await Promise.all([batchUpdateVariantsAction(updates)]);
 
             if (result.success) {

@@ -74,6 +74,12 @@ function cleanJsonResponse(text: string): string {
   return cleaned.trim()
 }
 
+// Helper para obter o timeout de geração (configurável via env, default 30s)
+function getAiTimeoutMs(): number {
+  const parsed = Number(process.env.AI_PRODUCT_TIMEOUT_MS)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 30000
+}
+
 export class AiGeneratorService {
   /**
    * Gera detalhes (descrição, marca, tags, especificações e categoria)
@@ -226,7 +232,7 @@ export class AiGeneratorService {
       for (const currentModel of models) {
         try {
           SecureLogger.info(`[AI GENERATOR] Tentando geração com o modelo: ${currentModel}`)
-          const apiResult = await provider.generate(prompt, currentModel, { timeout: 10000 })
+          const apiResult = await provider.generate(prompt, currentModel, { timeout: getAiTimeoutMs() })
 
           apiResponseText = apiResult.text
           modelUsed = apiResult.modelUsed

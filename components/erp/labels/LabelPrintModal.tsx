@@ -5,7 +5,7 @@ import Portal from "@/components/Portal"
 import { Button, Tabs, TabsContent, TabsList, TabsTrigger, Combobox, Checkbox, QuantitySelector, IconPlaceholder } from "@/components/reusable"
 import { XIcon, PrinterIcon, DownloadIcon, TrashIcon, Package } from "@/lib/icons"
 import { useMediaQuery } from "@/components/erp/hooks"
-import { type LabelPreset, type LabelContentConfig, DEFAULT_CONTENT_CONFIG, LABEL_PRESETS, buildCustomPreset } from "@/lib/labels/presets"
+import { type LabelPreset, type LabelContentConfig, type PaperSize, DEFAULT_CONTENT_CONFIG, LABEL_PRESETS, buildCustomPreset, PAPER_SIZES } from "@/lib/labels/presets"
 import { LabelSheet, type LabelProduct } from "./LabelSheet"
 import { formatCurrency } from "@/lib/utils"
 import { generateEAN13 } from "@/lib/utils/barcode"
@@ -72,6 +72,7 @@ export function LabelPrintModal({ isOpen, onClose, allProducts }: LabelPrintModa
         marginLeft: 7,
         spacingX: 3,
         spacingY: 3,
+        paperSize: "a4" as PaperSize,
     })
 
     const totalLabels = selected.reduce((sum, p) => sum + p.quantity, 0)
@@ -341,32 +342,44 @@ export function LabelPrintModal({ isOpen, onClose, allProducts }: LabelPrintModa
 
                                     {/* Custom preset inputs */}
                                     {presetId === "custom" && (
-                                        <div className="grid grid-cols-2 gap-2 p-3 border border-brand-border dark:border-dark-border rounded-lg">
-                                            {[
-                                                { key: "labelWidth", label: "Largura (mm)", min: 10, max: 200 },
-                                                { key: "labelHeight", label: "Altura (mm)", min: 10, max: 200 },
-                                                { key: "cols", label: "Colunas", min: 1, max: 10 },
-                                                { key: "rows", label: "Linhas", min: 1, max: 20 },
-                                                { key: "marginTop", label: "Margem topo (mm)", min: 0, max: 50 },
-                                                { key: "marginRight", label: "Margem dir. (mm)", min: 0, max: 50 },
-                                                { key: "marginBottom", label: "Margem base (mm)", min: 0, max: 50 },
-                                                { key: "marginLeft", label: "Margem esq. (mm)", min: 0, max: 50 },
-                                                { key: "spacingX", label: "Espaço horiz. (mm)", min: 0, max: 20 },
-                                                { key: "spacingY", label: "Espaço vert. (mm)", min: 0, max: 20 },
-                                            ].map((field) => (
-                                                <div key={field.key}>
-                                                    <label className="text-xs text-brand-inactive-text">{field.label}</label>
-                                                    <input
-                                                        type="number"
-                                                        min={field.min}
-                                                        max={field.max}
-                                                        step="0.1"
-                                                        value={(customPreset as any)[field.key]}
-                                                        onChange={(e) => setCustomPreset((prev) => ({ ...prev, [field.key]: Number(e.target.value) }))}
-                                                        className="w-full rounded-lg border border-brand-border dark:border-dark-border bg-transparent px-2 py-1 text-sm"
-                                                    />
-                                                </div>
-                                            ))}
+                                        <div className="p-3 border border-brand-border dark:border-dark-border rounded-lg space-y-3">
+                                            <Combobox
+                                                label="Papel"
+                                                options={[
+                                                    { label: PAPER_SIZES.a4.label, value: "a4" },
+                                                    { label: PAPER_SIZES.letter.label, value: "letter" },
+                                                ]}
+                                                value={customPreset.paperSize}
+                                                onChange={(v) => setCustomPreset((prev) => ({ ...prev, paperSize: v as PaperSize }))}
+                                                placeholder="Selecione o papel..."
+                                            />
+                                            <div className="grid grid-cols-2 gap-2">
+                                                {[
+                                                    { key: "labelWidth", label: "Largura (mm)", min: 10, max: 220 },
+                                                    { key: "labelHeight", label: "Altura (mm)", min: 10, max: 290 },
+                                                    { key: "cols", label: "Colunas", min: 1, max: 10 },
+                                                    { key: "rows", label: "Linhas", min: 1, max: 20 },
+                                                    { key: "marginTop", label: "Margem topo (mm)", min: 0, max: 50 },
+                                                    { key: "marginRight", label: "Margem dir. (mm)", min: 0, max: 50 },
+                                                    { key: "marginBottom", label: "Margem base (mm)", min: 0, max: 50 },
+                                                    { key: "marginLeft", label: "Margem esq. (mm)", min: 0, max: 50 },
+                                                    { key: "spacingX", label: "Espaço horiz. (mm)", min: 0, max: 20 },
+                                                    { key: "spacingY", label: "Espaço vert. (mm)", min: 0, max: 20 },
+                                                ].map((field) => (
+                                                    <div key={field.key}>
+                                                        <label className="text-xs text-brand-inactive-text">{field.label}</label>
+                                                        <input
+                                                            type="number"
+                                                            min={field.min}
+                                                            max={field.max}
+                                                            step="0.1"
+                                                            value={(customPreset as any)[field.key]}
+                                                            onChange={(e) => setCustomPreset((prev) => ({ ...prev, [field.key]: Number(e.target.value) }))}
+                                                            className="w-full rounded-lg border border-brand-border dark:border-dark-border bg-transparent px-2 py-1 text-sm"
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </div>
                                     )}
 

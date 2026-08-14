@@ -283,8 +283,8 @@ function rowToPreviewEntity(
 
   const rawName = get("name")
   let name = rawName || (entityType === "customers" ? `Cliente ${index + 1}` : entityType === "services" ? `Serviço ${index + 1}` : `Item ${index + 1}`)
-  if (name.length > 255) {
-    name = name.substring(0, 252) + "..."
+  if (name.length > 150) {
+    name = name.substring(0, 147) + "..."
   }
 
   const rawStatus = get("status")?.toLowerCase()

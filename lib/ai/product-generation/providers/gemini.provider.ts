@@ -1,16 +1,37 @@
 import { AiProvider } from "./index"
 
+const DEFAULT_FALLBACK_MODELS = [
+  "gemini-2.5-flash",
+  "gemini-1.5-flash",
+]
+
+function getFallbackModels(envKey: string, defaults: string[]): string[] {
+  const raw = process.env[envKey]
+  if (!raw) return defaults
+  return Array.from(
+    new Set(
+      raw
+        .split(",")
+        .map((m) => m.trim())
+        .filter(Boolean)
+    )
+  )
+}
+
+function getTimeoutMs(): number {
+  const parsed = Number(process.env.AI_PRODUCT_TIMEOUT_MS)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 30000
+}
+
 export class GeminiProvider implements AiProvider {
   readonly defaultModel: string
-  readonly fallbackModels: string[] = [
-    "gemini-2.5-flash",
-    "gemini-1.5-flash",
-  ]
+  readonly fallbackModels: string[]
   private apiKey: string
 
   constructor() {
     this.apiKey = process.env.GOOGLE_GEMINI_API_KEY || ""
     this.defaultModel = process.env.AI_PRODUCT_MODEL || "gemini-3.6-flash"
+    this.fallbackModels = getFallbackModels("AI_PRODUCT_FALLBACK_MODELS", DEFAULT_FALLBACK_MODELS)
   }
 
   async generate(
@@ -24,7 +45,7 @@ export class GeminiProvider implements AiProvider {
     tokensCompletion: number | null
   }> {
     const targetModel = model || this.defaultModel
-    const timeout = options?.timeout || 10000
+    const timeout = options?.timeout || getTimeoutMs()
 
     if (!this.apiKey) {
       throw new Error("GOOGLE_GEMINI_API_KEY não configurada no servidor.")

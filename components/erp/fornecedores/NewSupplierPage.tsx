@@ -38,7 +38,7 @@ import { useR2Upload } from "@/hooks/use-r2-upload"
 import ImageCropperModal from "@/components/ImageCropperModal"
 import { consultarCNPJ } from "@/lib/fiscal"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
-import { validateEmail, validateCPF, validateCNPJ, validatePhoneBR, validateURL, validateCEP } from "@/lib/input-validator"
+import { validateEmail, validateCPF, validateCNPJ, validateBrazilMobile, validateBrazilLandline, validateURL, validateCEP } from "@/lib/input-validator"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 
 interface NewSupplierPageProps {
@@ -255,11 +255,11 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
             errors.add("email")
         }
 
-        if (mobile && !validatePhoneBR(mobile)) {
+        if (mobile && !validateBrazilMobile(mobile)) {
             errors.add("mobile")
         }
 
-        if (phone && !validatePhoneBR(phone)) {
+        if (phone && !validateBrazilLandline(phone)) {
             errors.add("phone")
         }
 
@@ -484,6 +484,7 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                                                                     })
                                                                 }}
                                                                 required
+                                                                maxLength={150}
                                                                 error={fieldErrors.has("supplierName")}
                                                                 errorMessage={fieldErrors.has("supplierName") ? "O nome é obrigatório" : undefined}
                                                             />
@@ -580,7 +581,7 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                                                                     </label>
                                                                 </div>
                                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                                                    <Input label="Nome Fantasia" placeholder="Nome comercial" value={fantasia} onChange={(e) => setFantasia(e.target.value)} />
+                                                                    <Input label="Nome Fantasia" placeholder="Nome comercial" value={fantasia} onChange={(e) => setFantasia(e.target.value)} maxLength={150} />
                                                                     <Input label="Inscrição Municipal" placeholder="Ex: 123456" value={inscricaoMunicipal} onChange={(e) => setInscricaoMunicipal(e.target.value)} />
                                                                 </div>
                                                                 <FormDropdown
@@ -656,7 +657,7 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                                                                 })
                                                             }}
                                                             error={fieldErrors.has("mobile")}
-                                                            errorMessage={fieldErrors.has("mobile") ? "Celular inválido" : undefined}
+                                                            errorMessage={fieldErrors.has("mobile") ? "Celular inválido. Use (XX) 9XXXX-XXXX" : undefined}
                                                         />
                                                         <FixedPhoneInput
                                                             label="Telefone Fixo"
@@ -670,7 +671,7 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                                                                 })
                                                             }}
                                                             error={fieldErrors.has("phone")}
-                                                            errorMessage={fieldErrors.has("phone") ? "Telefone inválido" : undefined}
+                                                            errorMessage={fieldErrors.has("phone") ? "Telefone inválido. Use (XX) XXXX-XXXX" : undefined}
                                                         />
                                                         <WebsiteInput
                                                             label="Site"

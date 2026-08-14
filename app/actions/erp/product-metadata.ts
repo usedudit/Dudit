@@ -4,6 +4,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { requireMinimumPlan } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
 import { createAdminClient } from "@/lib/supabase/server"
+import { sanitizeInput } from "@/lib/input-validator"
 
 interface MetadataResponse {
   categories: any[]
@@ -75,7 +76,7 @@ export async function createCategoryAction(data: { partnerId: string, name: stri
       .from("product_categories")
       .insert({
         partner_id: data.partnerId,
-        name: data.name.trim(),
+        name: sanitizeInput(data.name, 150),
         parent_id: data.parentId || null,
       })
       .select("id, name, parent_id, is_active, created_at")
@@ -105,7 +106,7 @@ export async function createBrandAction(data: { partnerId: string, name: string 
       .from("brands")
       .insert({
         partner_id: data.partnerId,
-        name: data.name.trim(),
+        name: sanitizeInput(data.name, 150),
       })
       .select("id, name, is_active, created_at")
       .single()
@@ -134,7 +135,7 @@ export async function createLocationAction(data: { partnerId: string, name: stri
       .from("storage_locations")
       .insert({
         partner_id: data.partnerId,
-        name: data.name.trim(),
+        name: sanitizeInput(data.name, 150),
       })
       .select("id, name, is_active, created_at")
       .single()
@@ -169,7 +170,7 @@ export async function updateCategoryAction(id: string, partnerId: string, data: 
     }
 
     const payload: any = {}
-    if (data.name !== undefined) payload.name = data.name.trim()
+    if (data.name !== undefined) payload.name = sanitizeInput(data.name, 150)
     if (data.parentId !== undefined) payload.parent_id = data.parentId
     if (data.isActive !== undefined) payload.is_active = data.isActive
 
@@ -222,7 +223,7 @@ export async function updateBrandAction(id: string, partnerId: string, data: { n
     const supabase = await getSupabaseServerClient()
 
     const payload: any = {}
-    if (data.name !== undefined) payload.name = data.name
+    if (data.name !== undefined) payload.name = sanitizeInput(data.name, 150)
     if (data.isActive !== undefined) payload.is_active = data.isActive
 
     const { data: updated, error } = await supabase
@@ -274,7 +275,7 @@ export async function updateLocationAction(id: string, partnerId: string, data: 
     const supabase = await getSupabaseServerClient()
 
     const payload: any = {}
-    if (data.name !== undefined) payload.name = data.name
+    if (data.name !== undefined) payload.name = sanitizeInput(data.name, 150)
     if (data.isActive !== undefined) payload.is_active = data.isActive
 
     const { data: updated, error } = await supabase

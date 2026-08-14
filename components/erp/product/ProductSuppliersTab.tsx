@@ -4,7 +4,15 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Checkbox, Button, IconPlaceholder, Input, Spinner } from "@/components/reusable"
 import { PlusIcon, TrashIcon, TagIcon, EditIcon, CheckIcon, XIcon, Package, ClockIcon } from "@/lib/icons"
-import { getProductSuppliersAction, linkProductSupplierAction, unlinkProductSupplierAction, updateProductSupplierAction, getProductPurchaseHistoryAction, getProductCostHistoryAction } from "@/app/actions/erp/products"
+import {
+    getProductSuppliersAction,
+    getProductSuppliersOverviewAction,
+    linkProductSupplierAction,
+    unlinkProductSupplierAction,
+    updateProductSupplierAction,
+    getProductPurchaseHistoryAction,
+    getProductCostHistoryAction
+} from "@/app/actions/erp/products"
 import SelectSupplierSheet from "../fornecedores/SelectSupplierSheet"
 import { useNotification } from "@/hooks/use-notification"
 import { useMediaQuery } from "@/components/erp/hooks"
@@ -17,6 +25,7 @@ interface ProductSuppliersTabProps {
     productData: any
     isEditing: boolean
     partnerId?: string
+    onSavePendingSuppliers?: (suppliers: any[]) => void
 }
 
 interface ColumnDef {
@@ -297,12 +306,26 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
     productData,
     isEditing,
     partnerId: propPartnerId,
+    onSavePendingSuppliers,
 }) => {
     const { error: notifyError, success: notifySuccess } = useNotification()
     const isTablet = useMediaQuery("(max-width: 1279px)")
     const productId = productData?.id
     const partnerId = propPartnerId || productData?.partner_id || ""
-    const [suppliers, setSuppliers] = useState<ProductSupplierWithDetails[]>([])
+
+    const [suppliers, setSuppliers] = useState<ProductSupplierWithDetails[]>(() => {
+        if (productData?.pending_suppliers && Array.isArray(productData.pending_suppliers)) {
+            return productData.pending_suppliers
+        }
+        if (productData?.suppliers && Array.isArray(productData.suppliers)) {
+            return productData.suppliers
+        }
+        if (productData?.product_suppliers && Array.isArray(productData.product_suppliers)) {
+            return productData.product_suppliers
+        }
+        return []
+    })
+
     const [showSelector, setShowSelector] = useState(false)
     const [editingId, setEditingId] = useState<string | null>(null)
     const [editSku, setEditSku] = useState("")
@@ -326,73 +349,96 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
         return () => { mountedRef.current = false }
     }, [])
 
-    const loadSuppliers = useCallback(async () => {
+    // CARREGAMENTO CONSOLIDADO E ULTRA-RÁPIDO (1 única Server Action)
+    const loadOverview = useCallback(async (selectedId?: string | null, page = purchasesPage) => {
         if (!productId) return
-        const res = await getProductSuppliersAction(productId)
+        setPurchasesLoading(true)
+        setCostHistoryLoading(true)
+
+        const res = await getProductSuppliersOverviewAction(productId, {
+            selectedSupplierId: selectedId !== undefined ? selectedId : selectedSupplierId,
+            purchasesPage: page,
+            purchasesLimit: PURCHASES_PER_PAGE
+        })
+
         if (!mountedRef.current) return
+        setPurchasesLoading(false)
+        setCostHistoryLoading(false)
+
         if (!res.error) {
             const list = res.suppliers || []
             setSuppliers(list)
-            if (list.length > 0 && !selectedSupplierId) setSelectedSupplierId(list[0].supplier_id)
-        }
-    }, [productId])
+            setPurchases(res.purchases || [])
+            setPurchasesTotal(res.purchasesTotal || 0)
+            setCostHistory(res.costHistory || [])
 
-    useEffect(() => { loadSuppliers() }, [loadSuppliers])
-
-    const loadPurchaseHistory = useCallback(async (supplierId: string | null, page: number) => {
-        if (!productId) return
-        setPurchasesLoading(true)
-        const offset = (page - 1) * PURCHASES_PER_PAGE
-        const res = await getProductPurchaseHistoryAction(productId, {
-            limit: PURCHASES_PER_PAGE, offset, supplierId: supplierId || undefined,
-        })
-        if (!mountedRef.current) return
-        if (!res.error) {
-            setPurchases(res.items || [])
-            setPurchasesTotal(res.total || 0)
+            if (list.length > 0 && !selectedSupplierId && !selectedId) {
+                setSelectedSupplierId(list[0].supplier_id)
+            }
         }
-        setPurchasesLoading(false)
-    }, [productId])
-
-    const loadCostHistory = useCallback(async (supplierId: string | null) => {
-        if (!productId) return
-        setCostHistoryLoading(true)
-        const res = await getProductCostHistoryAction(productId, 5)
-        if (!mountedRef.current) return
-        if (!res.error) {
-            const items = res.items || []
-            setCostHistory(supplierId ? items.filter((h: any) => h.supplier_id === supplierId) : items)
-        }
-        setCostHistoryLoading(false)
-    }, [productId])
+    }, [productId, purchasesPage, selectedSupplierId])
 
     useEffect(() => {
         if (!productId) return
-        loadPurchaseHistory(selectedSupplierId, purchasesPage)
-    }, [productId, selectedSupplierId, purchasesPage, loadPurchaseHistory])
+        loadOverview()
+    }, [productId])
 
-    useEffect(() => {
-        if (!productId) return
-        loadCostHistory(selectedSupplierId)
-    }, [productId, selectedSupplierId, loadCostHistory])
-
-    useEffect(() => { setSuppliersPage(1) }, [suppliers.length])
-    useEffect(() => { setPurchasesPage(1) }, [selectedSupplierId])
+    const handleSelectSupplier = useCallback((id: string) => {
+        setSelectedSupplierId(id)
+        if (productId) {
+            loadOverview(id, 1)
+        }
+    }, [productId, loadOverview])
 
     const handleAddSupplier = useCallback(async (supplier: any) => {
-        if (!productId) return
         if (suppliers.some(s => s.supplier_id === supplier.id)) return
+
+        if (!productId) {
+            const newSupplier: ProductSupplierWithDetails = {
+                id: `pending-${supplier.id}`,
+                product_id: "",
+                supplier_id: supplier.id,
+                supplier_name: supplier.name || "",
+                supplier_email: supplier.email || null,
+                supplier_phone: supplier.phone || null,
+                supplier_document: supplier.cnpj || supplier.cpf || null,
+                supplier_image_url: supplier.image_url || null,
+                cost_price: null,
+                supplier_sku: null,
+                lead_time_days: null,
+                last_purchase_price: null,
+                last_purchase_date: null,
+                last_invoice_key: null,
+            }
+            const updated = [...suppliers, newSupplier]
+            setSuppliers(updated)
+            setSelectedSupplierId(supplier.id)
+            onSavePendingSuppliers?.(updated)
+            notifySuccess("Fornecedor adicionado")
+            return
+        }
+
         setSavingId(supplier.id)
         const res = await linkProductSupplierAction(productId, supplier.id)
         if (!mountedRef.current) return
         setSavingId(null)
         if (res.error) { notifyError("Erro", res.error); return }
         notifySuccess("Fornecedor vinculado")
-        loadSuppliers()
-    }, [productId, suppliers, notifyError, notifySuccess, loadSuppliers])
+        loadOverview(supplier.id)
+    }, [productId, suppliers, onSavePendingSuppliers, notifySuccess, notifyError, loadOverview])
 
     const handleRemoveSupplier = useCallback(async (supplierId: string) => {
-        if (!productId) return
+        if (!productId) {
+            const updated = suppliers.filter(s => s.supplier_id !== supplierId)
+            setSuppliers(updated)
+            if (selectedSupplierId === supplierId) {
+                setSelectedSupplierId(updated.length > 0 ? updated[0].supplier_id : null)
+            }
+            onSavePendingSuppliers?.(updated)
+            notifySuccess("Fornecedor removido")
+            return
+        }
+
         setSavingId(supplierId)
         const res = await unlinkProductSupplierAction(productId, supplierId)
         if (!mountedRef.current) return
@@ -400,8 +446,8 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
         if (res.error) { notifyError("Erro", res.error); return }
         notifySuccess("Fornecedor removido")
         if (selectedSupplierId === supplierId) setSelectedSupplierId(null)
-        loadSuppliers()
-    }, [productId, selectedSupplierId, notifyError, notifySuccess, loadSuppliers])
+        loadOverview()
+    }, [productId, suppliers, selectedSupplierId, onSavePendingSuppliers, notifySuccess, notifyError, loadOverview])
 
     const handleStartEdit = useCallback((s: ProductSupplierWithDetails) => {
         setEditingId(s.supplier_id)
@@ -418,7 +464,20 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
     }, [])
 
     const handleSaveEdit = useCallback(async (s: ProductSupplierWithDetails) => {
-        if (!productId) return
+        if (!productId) {
+            const updated = suppliers.map(item => item.supplier_id === s.supplier_id ? {
+                ...item,
+                supplier_sku: editSku || null,
+                cost_price: editCost ? Number(editCost) : null,
+                lead_time_days: editLead ? Number(editLead) : null,
+            } : item)
+            setSuppliers(updated)
+            onSavePendingSuppliers?.(updated)
+            notifySuccess("Atualizado")
+            handleCancelEdit()
+            return
+        }
+
         setSavingId(s.supplier_id)
         const res = await updateProductSupplierAction(productId, s.supplier_id, {
             supplierSku: editSku || null,
@@ -429,13 +488,9 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
         setSavingId(null)
         if (res.error) { notifyError("Erro", res.error); return }
         notifySuccess("Atualizado")
-        loadSuppliers()
+        loadOverview()
         handleCancelEdit()
-    }, [productId, editSku, editCost, editLead, notifyError, notifySuccess, loadSuppliers, handleCancelEdit])
-
-    const handleSelectSupplier = useCallback((id: string) => {
-        setSelectedSupplierId(id)
-    }, [])
+    }, [productId, suppliers, editSku, editCost, editLead, onSavePendingSuppliers, notifySuccess, notifyError, loadOverview, handleCancelEdit])
 
     const handleOpenSelector = useCallback(() => {
         setShowSelector(true)
@@ -462,14 +517,6 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
         () => activeSuppliers.slice((suppliersPage - 1) * SUPPLIERS_PER_PAGE, suppliersPage * SUPPLIERS_PER_PAGE),
         [activeSuppliers, suppliersPage, SUPPLIERS_PER_PAGE]
     )
-
-    if (!productId) {
-        return (
-            <div className="flex flex-col items-center justify-center text-center py-12 bg-white dark:bg-dark-surface">
-                <IconPlaceholder icon={TagIcon} title="Produto não salvo" subtitle="Salve o produto primeiro para gerenciar fornecedores." />
-            </div>
-        )
-    }
 
     return (
         <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">

@@ -603,7 +603,12 @@ export async function updatePaymentMethodAction(
     }
 
     const updateData: any = {}
-    if (data.name !== undefined) updateData.name = data.name
+    if (data.name !== undefined) {
+        if (String(data.name).trim().length > 50) {
+            return { error: "Nome deve ter no máximo 50 caracteres." }
+        }
+        updateData.name = data.name
+    }
     if (data.isActive !== undefined) updateData.is_active = data.isActive
     if (data.paymentType !== undefined) {
         const canonicalType = toCanonicalPaymentType(data.paymentType)

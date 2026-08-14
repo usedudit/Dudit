@@ -33,7 +33,7 @@ import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { formatE164ToDisplay } from "@/lib/utils/phone-utils"
-import { validatePhoneBR } from "@/lib/input-validator"
+import { validateBrazilMobile, validateCPF, validateCNPJ } from "@/lib/input-validator"
 import { useStore } from "@/lib/store-context"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
 import type { BusinessMode } from "@/lib/business-info"
@@ -251,8 +251,15 @@ export const BusinessDataSubPage = ({
         if (!generalInfo.storeName.trim()) errors.add("storeName")
         if (!generalInfo.phone.trim()) {
             errors.add("phone")
-        } else if (!validatePhoneBR(generalInfo.phone)) {
+        } else if (!validateBrazilMobile(generalInfo.phone)) {
             errors.add("phone")
+        }
+
+        if (generalInfo.personType === "pj" && generalInfo.cnpj && !validateCNPJ(generalInfo.cnpj)) {
+            errors.add("cnpj")
+        }
+        if (generalInfo.personType === "pf" && generalInfo.cnpj && !validateCPF(generalInfo.cnpj)) {
+            errors.add("cnpj")
         }
 
         const cleanCep = addresses.zipCode.replace(/\D/g, "")
@@ -269,7 +276,7 @@ export const BusinessDataSubPage = ({
 
     const getTabErrorCount = useCallback((tab: string) => {
         if (tab === "general") {
-            return ["storeName", "phone"].filter(f => fieldErrors.has(f)).length
+            return ["storeName", "phone", "cnpj"].filter(f => fieldErrors.has(f)).length
         }
         if (tab === "address") {
             return ["zipCode", "street", "neighborhood", "city", "state"].filter(f => fieldErrors.has(f)).length
@@ -459,6 +466,7 @@ export const BusinessDataSubPage = ({
                                                                 setFieldErrors(prev => { const n = new Set(prev); n.delete("storeName"); return n })
                                                             }}
                                                             error={fieldErrors.has("storeName")}
+                                                            maxLength={150}
                                                         />
                                                     </div>
                                                     <div className="col-span-12 md:col-span-6">
@@ -532,9 +540,14 @@ export const BusinessDataSubPage = ({
                                                                 label={generalInfo.personType === "pj" ? "CNPJ" : "CPF"}
                                                                 placeholder={generalInfo.personType === "pj" ? "00.000.000/0000-00" : "000.000.000-00"}
                                                                 value={generalInfo.cnpj}
-                                                                onChange={(e) => setGeneralInfo({ ...generalInfo, cnpj: e.target.value })}
+                                                                onChange={(e) => {
+                                                                    setGeneralInfo({ ...generalInfo, cnpj: e.target.value })
+                                                                    setFieldErrors(prev => { const n = new Set(prev); n.delete("cnpj"); return n })
+                                                                }}
                                                                 onBlur={generalInfo.personType === "pj" ? handleCnpjBlur : undefined}
                                                                 name="cnpj"
+                                                                error={fieldErrors.has("cnpj")}
+                                                                errorMessage={fieldErrors.has("cnpj") ? (generalInfo.personType === "pj" ? "CNPJ inválido" : "CPF inválido") : undefined}
                                                             />
                                                             {isSearchingCnpj && <span className="text-[11px] text-brand-primary animate-pulse font-medium">Consultando CNPJ...</span>}
                                                         </div>
@@ -548,12 +561,14 @@ export const BusinessDataSubPage = ({
                                                                     placeholder="Razão social da empresa"
                                                                     value={generalInfo.razaoSocial}
                                                                     onChange={(e) => setGeneralInfo({ ...generalInfo, razaoSocial: e.target.value })}
+                                                                    maxLength={150}
                                                                 />
                                                                 <Input
                                                                     label="Nome Fantasia"
                                                                     placeholder="Nome comercial"
                                                                     value={generalInfo.nomeFantasia}
                                                                     onChange={(e) => setGeneralInfo({ ...generalInfo, nomeFantasia: e.target.value })}
+                                                                    maxLength={150}
                                                                 />
                                                             </div>
                                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

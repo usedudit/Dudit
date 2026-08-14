@@ -181,7 +181,7 @@ export async function createCommunityVideo(data: {
       .insert({
         partner_id: partner.id,
         store_id: data.storeId || null,
-        title: data.title?.trim() || null,
+        title: data.title?.trim().substring(0, 150) || null,
         description: data.description?.trim() || null,
         video_url: data.videoUrl,
         video_thumbnail: data.videoThumbnail,
@@ -219,7 +219,7 @@ export async function updateCommunityVideo(
     if (!partner) return { success: false, error: "Partner não encontrado" }
 
     const updateData: Record<string, any> = { updated_at: new Date().toISOString() }
-    if (data.title !== undefined) updateData.title = data.title.trim() || null
+    if (data.title !== undefined) updateData.title = data.title.trim().substring(0, 150) || null
     if (data.description !== undefined) updateData.description = data.description.trim() || null
 
     const { error } = await supabase

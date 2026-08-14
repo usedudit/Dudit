@@ -281,7 +281,7 @@ export default function CustomersPage({
                 id: c.id ? `#${c.id.substring(0, 5).toUpperCase()}` : '-',
                 originalId: c.id,
                 name: c.name || 'Cliente Sem Nome',
-                avatar: c.image_url || c.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(c.name || 'C')}&background=random`,
+                avatar: c.image_url || c.avatar_url || '',
                 phone: c.phone || c.phone_fixed || "",
                 orders: c.orders_count || 0,
                 totalOrderValue: c.total_spent || 0.00,

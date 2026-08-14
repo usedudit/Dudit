@@ -698,6 +698,7 @@ export default function FinancialCategoriesPage({
                         onKeyDown={(e) => e.key === "Enter" && handleSaveCategory()}
                         error={nameError}
                         errorMessage={nameError ? "O nome é obrigatório" : undefined}
+                        maxLength={150}
                     />
 
                     {modal.type === "subcategory" && (
@@ -779,6 +780,7 @@ export default function FinancialCategoriesPage({
                         }}
                         error={accountNameError}
                         errorMessage={accountNameError ? "O nome é obrigatório" : undefined}
+                        maxLength={150}
                     />
 
                     <Combobox
@@ -910,12 +912,14 @@ export default function FinancialCategoriesPage({
                         value={contactModal.name}
                         onChange={(e) => setContactModal((prev) => ({ ...prev, name: e.target.value }))}
                         placeholder="Nome exibido nas transações"
+                        maxLength={150}
                     />
                     <Input
                         label="Descrição (opcional)"
                         value={contactModal.description}
                         onChange={(e) => setContactModal((prev) => ({ ...prev, description: e.target.value }))}
                         placeholder="Notas internas"
+                        maxLength={150}
                     />
                 </div>
             </DefaultModal>

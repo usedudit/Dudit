@@ -472,7 +472,6 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
                 const orderStatuses = view === 'order_payment' ? [
                     { value: 'pending', label: 'Pendente' },
                     { value: 'paid', label: 'Pago' },
-                    { value: 'partially_paid', label: 'Parcialmente Pago' }
                 ] : (() => {
                     const types = orderSelectionGuards?.deliveryTypes || []
                     const hasDelivery = types.some(t => t === "delivery" || !t)

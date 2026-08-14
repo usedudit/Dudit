@@ -54,7 +54,7 @@ import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { VendorPaymentMethodsModal } from "./VendorPaymentMethodsModal"
 import { StorePoliciesModal } from "./StorePoliciesModal"
 import { getStoreUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
-import { createSlug } from "@/lib/utils/slugify"
+import { createSlug, createCategorySlug } from "@/lib/utils/slugify"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { SponsoredAdDetailSlot } from "@/components/marketplace/ads/SponsoredAdsSlot"
@@ -1938,14 +1938,14 @@ export function ServiceDetailsPageClient({
                         <ChevronRightIcon size={10} />
                         {service.marketplace_category?.parent?.name || service.marketplace_category?.name ? (
                             <>
-                                <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}/${createSlug(service.marketplace_category.parent?.name || service.marketplace_category.name)}?type=servicos`} prefetch={false} className="hover:text-brand-dark transition-colors">
+                                <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}/${createCategorySlug(service.marketplace_category.parent?.name || service.marketplace_category.name)}?type=servicos`} prefetch={false} className="hover:text-brand-dark transition-colors">
                                     {service.marketplace_category.parent?.name || service.marketplace_category.name}
                                 </Link>
                                 <ChevronRightIcon size={10} />
                             </>
                         ) : service.service_categories?.name && !service.marketplace_category ? (
                             <>
-                                <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}/${createSlug(service.service_categories.name)}?type=servicos`} prefetch={false} className="hover:text-brand-dark transition-colors">
+                                <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}/${createCategorySlug(service.service_categories.name)}?type=servicos`} prefetch={false} className="hover:text-brand-dark transition-colors">
                                     {service.service_categories.name}
                                 </Link>
                                 <ChevronRightIcon size={10} />

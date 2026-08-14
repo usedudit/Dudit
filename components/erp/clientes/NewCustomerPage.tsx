@@ -39,7 +39,7 @@ import ImageCropperModal from "@/components/ImageCropperModal"
 import { getAddressesAction } from "@/app/actions/shared/addresses"
 import { consultarCNPJ } from "@/lib/fiscal"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
-import { validateEmail, validateCPF, validateCNPJ, validatePhoneBR, validateURL, validateCEP } from "@/lib/input-validator"
+import { validateEmail, validateCPF, validateCNPJ, validateBrazilMobile, validateBrazilLandline, validateURL, validateCEP } from "@/lib/input-validator"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 
 interface NewCustomerPageProps {
@@ -324,11 +324,11 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
             errors.add("email")
         }
 
-        if (mobile && !validatePhoneBR(mobile)) {
+        if (mobile && !validateBrazilMobile(mobile)) {
             errors.add("mobile")
         }
 
-        if (phone && !validatePhoneBR(phone)) {
+        if (phone && !validateBrazilLandline(phone)) {
             errors.add("phone")
         }
 
@@ -578,6 +578,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                                     })
                                                                 }}
                                                                 required
+                                                                maxLength={150}
                                                                 error={fieldErrors.has("customerName")}
                                                                 errorMessage={fieldErrors.has("customerName") ? "O nome é obrigatório" : undefined}
                                                             />
@@ -683,7 +684,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                                     />
                                                                 </div>
                                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                                                    <Input label="Nome Fantasia" placeholder="Nome comercial" value={fantasia} onChange={(e) => setFantasia(e.target.value)} />
+                                                                    <Input label="Nome Fantasia" placeholder="Nome comercial" value={fantasia} onChange={(e) => setFantasia(e.target.value)} maxLength={150} />
                                                                     <Input label="Inscrição Municipal" placeholder="Ex: 123456" value={inscricaoMunicipal} onChange={(e) => setInscricaoMunicipal(e.target.value)} />
                                                                 </div>
                                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -765,7 +766,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                                 })
                                                             }}
                                                             error={fieldErrors.has("mobile")}
-                                                            errorMessage={fieldErrors.has("mobile") ? "Celular inválido" : undefined}
+                                                            errorMessage={fieldErrors.has("mobile") ? "Celular inválido. Use (XX) 9XXXX-XXXX" : undefined}
                                                         />
                                                         <FixedPhoneInput
                                                             label="Telefone Fixo"
@@ -779,7 +780,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                                 })
                                                             }}
                                                             error={fieldErrors.has("phone")}
-                                                            errorMessage={fieldErrors.has("phone") ? "Telefone inválido" : undefined}
+                                                            errorMessage={fieldErrors.has("phone") ? "Telefone inválido. Use (XX) XXXX-XXXX" : undefined}
                                                         />
                                                         <WebsiteInput
                                                             label="Site"
@@ -822,12 +823,14 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                                 placeholder="Ex: Maria da Silva"
                                                                 value={motherName}
                                                                 onChange={(e) => setMotherName(e.target.value)}
+                                                                maxLength={150}
                                                             />
                                                             <Input
                                                                 label="Nome do pai"
                                                                 placeholder="Ex: José da Silva"
                                                                 value={fatherName}
                                                                 onChange={(e) => setFatherName(e.target.value)}
+                                                                maxLength={150}
                                                             />
                                                         </div>
                                                     </FormSection>
@@ -1034,12 +1037,14 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                                 placeholder="Ex: Maria da Silva"
                                                                 value={motherName}
                                                                 onChange={(e) => setMotherName(e.target.value)}
+                                                                maxLength={150}
                                                             />
                                                             <Input
                                                                 label="Nome do pai"
                                                                 placeholder="Ex: José da Silva"
                                                                 value={fatherName}
                                                                 onChange={(e) => setFatherName(e.target.value)}
+                                                                maxLength={150}
                                                             />
                                                         </div>
                                                     </div>

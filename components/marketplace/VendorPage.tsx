@@ -157,20 +157,6 @@ const RatingInline = ({ rating, reviewsCount, short }: { rating: number; reviews
     </div>
 )
 
-const StoreStats = ({ rating, sales, createdAt, reviewsCount }: any) => (
-    <div className="flex items-center justify-between mb-8">
-        <StatItem
-            value={reviewsCount > 0 ? formatNumber(rating || 0, 1, 1) : "Sem avaliações"}
-            label="Avaliação"
-            icon={<StarIcon size={14} className="text-brand-green fill-brand-green" />}
-        />
-        <div className="w-[1px] h-8 bg-brand-border" />
-        <StatItem value={sales >= 1000 ? `${formatNumber(sales / 1000, 1, 1)}k` : sales} label="Vendas" />
-        <div className="w-[1px] h-8 bg-brand-border" />
-        <StatItem value={formatJoinDate(createdAt)} label="Na Dudit" />
-    </div>
-)
-
 const StatItem = ({ value, label, icon }: any) => (
     <div className="flex flex-col items-center flex-1 min-w-0">
         <div className="flex items-center gap-1.5 mb-0.5 min-w-0">

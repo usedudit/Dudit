@@ -178,8 +178,8 @@ export default withSentryConfig(withSerwist(nextConfig), {
   // For all available options, see:
   // https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/
 
-  // Upload a larger set of source maps for prettier stack traces (increases build time)
-  widenClientFileUpload: true,
+  // Keep source-map upload bounded for the MVP build while preserving stack traces.
+  widenClientFileUpload: false,
 
   // Uncomment to route browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers.
   // This can increase your server load as well as your hosting bill.
@@ -188,6 +188,9 @@ export default withSentryConfig(withSerwist(nextConfig), {
   // tunnelRoute: "/monitoring",
 
   webpack: {
+    // Keep automatic capture enabled for App Router pages, route handlers and server actions.
+    autoInstrumentServerFunctions: true,
+
     // Enables automatic instrumentation of Vercel Cron Monitors. (Does not yet work with App Router route handlers.)
     // See the following for more information:
     // https://docs.sentry.io/product/crons/

@@ -100,7 +100,7 @@ const TransactionGridCard = React.memo(
                 </div>
 
                 <div className="mt-auto pt-4 border-t border-brand-border dark:border-dark-border flex flex-col gap-3">
-                        <div className="flex justify-between items-center w-full">
+                    <div className="flex justify-between items-center w-full">
                         <div className="flex flex-col gap-0.5">
                             <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Valor</span>
                             {(() => {
@@ -122,9 +122,12 @@ const TransactionGridCard = React.memo(
                                 );
                             })()}
                         </div>
-                        <span className="inline-flex items-center h-6 px-2.5 rounded-full bg-brand-gray dark:bg-dark-border text-xs font-medium text-brand-inactive-text dark:text-dark-heading whitespace-nowrap">
-                            Origem: {transaction.originSource || "Manual"}
-                        </span>
+                        <div className="flex flex-col gap-0.5 min-w-0">
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Origem</span>
+                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
+                                {transaction.originSource || "Manual"}
+                            </span>
+                        </div>
                     </div>
 
                     <div className="flex justify-between items-start gap-2">

@@ -31,6 +31,7 @@ import { cancelPendingTransactionAction } from "@/app/actions/erp/transactions"
 import { getPaymentMethodsAction } from "@/app/actions/erp/payment-methods"
 import { GenericAttachmentsTab } from "../shared/GenericAttachmentsTab"
 import { STANDARD_PAYMENT_METHODS } from "@/lib/finance-utils"
+import { sanitizeUUID } from "@/lib/security/input-sanitizer"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { useSidebar } from "@/lib/sidebar-context"
 import { useNotification } from "@/hooks/use-notification"
@@ -1007,9 +1008,9 @@ export default function TransactionsPage({
         setPaymentAmount(String(initialAmount.toFixed(2)))
         setInterestAmount("0")
         setDiscountAmount("0")
-        setPaymentMethodId(resolvedPaymentMethods?.[0]?.id || "")
+        setPaymentMethodId(transaction.paymentType && transaction.paymentType !== "Não informado" ? transaction.paymentType : "Pix")
         setPaymentModalOpen(true)
-    }, [resolvedPaymentMethods])
+    }, [])
 
     const handleRequestCancelPending = useCallback((transaction: ERPTransaction) => {
         const status = String(transaction.rawStatus || "").toLowerCase()
@@ -1073,14 +1074,14 @@ export default function TransactionsPage({
                     paymentAmount: String(Number(row.remainingAmount || 0).toFixed(2)),
                     interestAmount: "0",
                     discountAmount: "0",
-                    paymentMethodId: resolvedPaymentMethods?.[0]?.id || "",
+                    paymentMethodId: row.paymentType && row.paymentType !== "Não informado" ? row.paymentType : (row.paymentMethodId || "Pix"),
                 }
             }
             setSettlePaymentsByInstallment(nextState)
             setSettleInstallmentPage(1)
             setConfirmSettleGroup(transaction)
         },
-        [installmentDetail, resolvedPaymentMethods, partnerId, notifyError, setSettleInstallmentPage],
+        [installmentDetail, partnerId, notifyError, setSettleInstallmentPage],
     )
 
     const handleConfirmSettleInstallmentGroup = useCallback(async () => {
@@ -1176,9 +1177,9 @@ export default function TransactionsPage({
         setPaymentAmount(String(Number(row.remainingAmount || 0).toFixed(2)))
         setInterestAmount("0")
         setDiscountAmount("0")
-        setPaymentMethodId(row.paymentMethodId || resolvedPaymentMethods?.[0]?.id || "")
+        setPaymentMethodId(row.paymentType && row.paymentType !== "Não informado" ? row.paymentType : (row.paymentMethodId || "Pix"))
         setPaymentModalOpen(true)
-    }, [installmentDetail, notifyError, resolvedPaymentMethods])
+    }, [installmentDetail, notifyError])
 
     const handleConfirmInstallmentPayment = useCallback(async () => {
         if (!selectedInstallmentForPayment) return
@@ -1332,7 +1333,7 @@ export default function TransactionsPage({
                         const isRecurring = !!selectedInstallmentForPayment.isRecurringOccurrence
                         const isRegular = !isInstallment && !isRecurring
                         // Parcelas de venda nascem com o método fixado pela venda (ex: cartão de crédito)
-                        const lockedPaymentMethod = isInstallment && !!selectedInstallmentForPayment.paymentMethodId
+                        const lockedPaymentMethod = isInstallment && !!selectedInstallmentForPayment.paymentMethodId && sanitizeUUID(selectedInstallmentForPayment.paymentMethodId) !== null
                         const currentRemaining = Number(selectedInstallmentForPayment.remainingAmount ?? selectedInstallmentForPayment.amount ?? 0)
                         const nextRemaining = Math.max(0, currentRemaining - Number(paymentAmount || 0))
 
@@ -1718,7 +1719,7 @@ export default function TransactionsPage({
                                                                     paymentAmount: String(Number(row.remainingAmount || 0).toFixed(2)),
                                                                     interestAmount: "0",
                                                                     discountAmount: "0",
-                                                                    paymentMethodId: row.paymentMethodId || paymentMethods?.[0]?.id || "",
+                                                                    paymentMethodId: row.paymentType && row.paymentType !== "Não informado" ? row.paymentType : (row.paymentMethodId || "Pix"),
                                                                 }
                                                                 const finalPaid = Math.max(0, Number(values.paymentAmount || 0) + Number(values.interestAmount || 0) - Number(values.discountAmount || 0))
                                                                 return (
@@ -1766,7 +1767,7 @@ export default function TransactionsPage({
                                                                                 }))}
                                                                                 options={STANDARD_PAYMENT_METHODS}
                                                                                 placeholder="Selecione"
-                                                                                disabled={!!row.paymentMethodId && row.paymentMethodId !== "Pix"}
+                                                                                disabled={!!row.paymentMethodId && sanitizeUUID(row.paymentMethodId) !== null}
                                                                             />
                                                                         </td>
                                                                         <td className="p-2 border-b border-brand-border dark:border-dark-border" style={{ width: "112px" }}>
@@ -1873,7 +1874,7 @@ export default function TransactionsPage({
                                                                         }))}
                                                                         options={STANDARD_PAYMENT_METHODS}
                                                                         placeholder="Selecione"
-                                                                        disabled={!!row.paymentMethodId && row.paymentMethodId !== "Pix"}
+                                                                        disabled={!!row.paymentMethodId && sanitizeUUID(row.paymentMethodId) !== null}
                                                                     />
                                                                     <MoneyInput
                                                                         label="Juros"

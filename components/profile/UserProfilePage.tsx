@@ -560,7 +560,7 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                         {/* SUA CONTA HOJE */}
                         {dryRunReport && (
                             <div className="space-y-3">
-                                <h4 className="text-xs font-bold text-brand-inactive-text">
+                                <h4 className="text-brand-inactive-text dark:text-dark-body font-medium">
                                     Sua conta hoje
                                 </h4>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">

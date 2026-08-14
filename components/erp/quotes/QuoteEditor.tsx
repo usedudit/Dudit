@@ -352,6 +352,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                                                             error={hasNameError}
                                                                             errorMessage="Nome obrigatório"
                                                                             className="mb-0"
+                                                                            maxLength={150}
                                                                         />
                                                                     </div>
                                                                 ) : (
@@ -468,6 +469,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                                                 error={hasNameError}
                                                                 errorMessage="Nome obrigatório"
                                                                 className="mb-0"
+                                                                maxLength={150}
                                                             />
                                                         </div>
                                                     ) : (

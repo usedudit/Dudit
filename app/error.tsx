@@ -1,5 +1,6 @@
 "use client"
 
+import * as Sentry from "@sentry/nextjs"
 import { useEffect } from "react"
 import IconPlaceholder from "@/components/reusable/IconPlaceholder"
 import { InfoCard } from "@/components/reusable/InfoCard"
@@ -14,7 +15,7 @@ export default function Error({
     reset: () => void
 }) {
     useEffect(() => {
-        // Log the error to an error reporting service
+        Sentry.captureException(error)
         console.error(error)
 
         const isChunkError =

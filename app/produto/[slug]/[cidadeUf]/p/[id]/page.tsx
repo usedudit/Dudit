@@ -3,7 +3,6 @@ import type { Metadata } from 'next'
 import { ProductDetailsPageClient } from "@/components/marketplace/ProductDetailsPage"
 import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld"
 import {
-  getCachedHomeProducts,
   getMarketplaceProduct,
   getProductVariants,
   getProductReviews,
@@ -24,7 +23,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const product = await getMarketplaceProduct(id)
 
   if (!product) {
-    return { title: 'Produto não encontrado | Dudit' }
+    return { title: 'Produto não encontrado' }
   }
 
   const p = Array.isArray(product.partners) ? product.partners[0] : product.partners
@@ -38,7 +37,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
   // Título mais "chamativo" com o preço
   const title = `${product.name} - ${priceFormatted} em ${city}`
-  const ogTitle = `${product.name} - ${priceFormatted} | Dudit ${city}`
+  const ogTitle = `${product.name} - ${priceFormatted} ${city}`
 
   // Descrição com gatilho de "Conexão Direta" e Localização
   const description = `Oferta em ${city}: ${product.name} por apenas ${priceFormatted}. Compre direto do vendedor pela Dudit e economize!`

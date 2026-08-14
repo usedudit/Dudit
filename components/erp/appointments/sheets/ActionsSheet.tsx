@@ -502,7 +502,7 @@ export const AddUnavailableSheet = ({
                             {newTypeEmoji}
                         </button>
                         <div className="flex-1">
-                            <FormInput label="Nome" placeholder="Ex: Almoço" value={newTypeName} onChange={(e) => setNewTypeName(e.target.value)} />
+                            <FormInput label="Nome" placeholder="Ex: Almoço" value={newTypeName} onChange={(e) => setNewTypeName(e.target.value)} maxLength={150} />
                         </div>
                     </div>
                 </div>

@@ -195,14 +195,21 @@ export function LabelGenerator({ products }: { products: Product[] }) {
               <CardTitle className="text-base">Modelos disponíveis</CardTitle>
             </CardHeader>
             <CardContent>
-              <ul className="text-sm text-muted-foreground space-y-1">
-                {LABEL_PRESETS.map((p) => (
-                  <li key={p.id}>
-                    ✓ {p.name} - {p.description}
-                  </li>
-                ))}
-                <li>✓ Customizado - definir medidas manualmente</li>
-              </ul>
+              {(["a4", "letter"] as const).map((paper) => (
+                <div key={paper} className="mb-3">
+                  <p className="text-xs font-bold text-brand-dark dark:text-dark-heading uppercase tracking-wide mb-1">
+                    {paper === "a4" ? "Folha A4 (21 × 29,7 cm)" : "Folha Carta (21,59 × 27,94 cm)"}
+                  </p>
+                  <ul className="text-sm text-muted-foreground space-y-1">
+                    {LABEL_PRESETS.filter((p) => p.paperSize === paper).map((p) => (
+                      <li key={p.id}>
+                        ✓ {p.name} - {p.description}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+              <p className="text-sm text-muted-foreground">✓ Customizado - definir medidas manualmente</p>
               <Button onClick={() => setShowPrintModal(true)} className="w-full mt-4" size="lg">
                 <PrinterIcon className="mr-2 h-4 w-4" />
                 Visualizar e Imprimir

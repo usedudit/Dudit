@@ -9,7 +9,7 @@ import { revalidatePartnerProfile } from "@/lib/utils/revalidation"
 import { requireUser } from "@/lib/auth/authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
-import { sanitizeInput, validatePhoneBR } from "@/lib/input-validator"
+import { sanitizeInput, validateBrazilMobile } from "@/lib/input-validator"
 import { normalizePhoneToE164 } from "@/lib/utils/phone-utils"
 import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { decryptCPF } from "@/lib/crypto"
@@ -583,7 +583,7 @@ export async function updatePartnerAction(partnerId: string, data: any) {
         phoneToValidate = digits.slice(2)
       }
       
-      if (!validatePhoneBR(phoneToValidate)) {
+      if (!validateBrazilMobile(phoneToValidate)) {
         return { error: "Número de telefone inválido" }
       }
       storeUpdateData.phone = normalizePhoneToE164(sanitizedPhone)
@@ -698,7 +698,7 @@ export async function registerPartner(data: any) {
       }
     }
 
-    if (!sanitizedPhone || !validatePhoneBR(sanitizedPhone)) {
+    if (!sanitizedPhone || !validateBrazilMobile(sanitizedPhone)) {
       return { success: false, error: "Número de telefone inválido" }
     }
 

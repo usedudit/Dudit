@@ -4,6 +4,9 @@ import { useState, useMemo, useRef, useEffect, useCallback, Fragment } from "rea
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { MarketplaceFooter } from "./MarketplaceFooter"
 import { ItemCard, VitrineCard, HorizontalCarousel } from "./shared-components"
+import { UserProfileImage } from "@/lib/utils/UserProfileImage"
+import type { LocationContext } from "@/lib/utils/location-label"
+import { getLocationLabel } from "@/lib/utils/location-label"
 import { IconPlaceholder, DefaultModal, SkeletonLoader } from "@/components/reusable"
 import { useRouter, useSearchParams, usePathname, useParams } from "next/navigation"
 import { CommunityVideosCarousel } from "./CommunityVideosCarousel"
@@ -149,6 +152,26 @@ export function ExplorarPageClient({
     const [dbServiceCategories, setDbServiceCategories] = useState<{ id?: string; name: string; icon_url: string | null }[]>([])
     const [dbPartnerCategories, setDbPartnerCategories] = useState<{ id?: string; name: string; icon_url: string | null }[]>([])
     const [viewMode, setViewMode] = useState<ViewMode>("grid")
+
+    const locationContext = useMemo<LocationContext | null>(() => {
+        const currentCity = selectedCitySlug || pathCity || null
+        if (!currentCity || currentCity === "brasil") {
+            return currentCity === "brasil" ? { scope: "country" } : null
+        }
+        if (currentCity.startsWith("estado-")) {
+            return { scope: "state", state: currentCity.replace("estado-", "").toUpperCase() }
+        }
+        const state = currentCity.split("-").pop()?.toUpperCase() || null
+        let city: string | null = null
+        if (currentCity === cidade && resolvedCityName) {
+            city = resolvedCityName.split(" - ")[0] || null
+        }
+        if (!city) {
+            const formatted = formatCitySlug(currentCity)
+            city = formatted.includes(" - ") ? formatted.split(" - ")[0] : formatted
+        }
+        return { scope: "city", city, state }
+    }, [selectedCitySlug, pathCity, cidade, resolvedCityName, formatCitySlug])
 
     const resolveCategoryName = useCallback((value: string) => {
         const normalize = (s: string) => s
@@ -335,11 +358,15 @@ export function ExplorarPageClient({
             return
         }
 
-        // 2. If logged out (or logged in but no profile city), fall back to cookie/localStorage
-        let savedCity = localStorage.getItem("dudit_city")
-        if (!savedCity) {
-            const match = document.cookie.match(/(?:^|; )dudit_city=([^;]*)/)
-            if (match) savedCity = match[1]
+        // 2. Fall back to cookie/localStorage ONLY for logged-out visitors
+        //    (logged-in users without an address stay on /explorar = Brasil)
+        let savedCity: string | null = null
+        if (!userProfile) {
+            savedCity = localStorage.getItem("dudit_city")
+            if (!savedCity) {
+                const match = document.cookie.match(/(?:^|; )dudit_city=([^;]*)/)
+                if (match) savedCity = match[1]
+            }
         }
 
         if (savedCity && savedCity !== selectedCitySlug) {
@@ -1099,14 +1126,13 @@ export function ExplorarPageClient({
         const partner = Array.isArray(item.partners) ? item.partners[0] : item.partners
         const isStore = item.itemType === "loja"
         const showPrice = !isStore && item.show_price_in_store !== false
-        const city = partner?.city || item.city || ""
-        const state = partner?.state || item.state || ""
-        const distance = partner?.distance_km_formatted || item.distance_km_formatted || null
-        const rawLogo = partner?.store_avatar || partner?.store_image_url || item.logo_url || null
-        const storeLogoUrl = rawLogo && !String(rawLogo).includes("Placeholder.png") ? getR2ImageUrl(rawLogo) : null
+        const sellerName = partner?.store_name || item.name || ""
+        const sellerLogoRaw = partner?.store_avatar || partner?.store_image_url || item.logo_url || null
+        const sellerLogoUrl = sellerLogoRaw && !String(sellerLogoRaw).includes("Placeholder.png") ? getR2ImageUrl(sellerLogoRaw) : null
+        const locationLabel = getLocationLabel(partner, locationContext)
 
         const imageUrl = isStore
-            ? (storeLogoUrl || partner?.banner_url || "https://img.dudit.com.br/static/Placeholder.png")
+            ? (sellerLogoUrl || partner?.banner_url || "https://img.dudit.com.br/static/Placeholder.png")
             : getPrimaryProductDisplayImage(item)
 
         return (
@@ -1132,43 +1158,57 @@ export function ExplorarPageClient({
                                 )}
                             </div>
                             {(item.category || item.subcategoryName) && (
-                                <div className="mt-1 flex flex-wrap gap-1">
-                                    {item.category && <span className="text-xs font-medium text-brand-dark">{item.category}</span>}
-                                    {item.subcategoryName && <span className="text-xs font-medium text-brand-green">{item.subcategoryName}</span>}
+                                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px] font-medium text-brand-inactive-text">
+                                    {item.category && <span className="truncate">{item.category}</span>}
+                                    {item.category && item.subcategoryName && <span className="w-1 h-1 rounded-full bg-brand-inactive-text shrink-0" />}
+                                    {item.subcategoryName && <span className="truncate text-brand-green">{item.subcategoryName}</span>}
                                 </div>
                             )}
-                            <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium text-brand-inactive-text">
-                                {city && <span>{city}{state ? ` - ${state}` : ""}</span>}
-                                {city && distance && <span className="w-1 h-1 rounded-full bg-brand-inactive-text" />}
-                                {distance && <span className="font-medium">{distance}</span>}
-                            </div>
+                            {locationLabel && (
+                                <p className="mt-1.5 text-[11px] text-gray-500 font-normal truncate">{locationLabel}</p>
+                            )}
                         </>
                     ) : (
                         <>
-                            <h3 className="line-clamp-2 text-base font-bold text-brand-dark sm:text-lg">{item.name}</h3>
-                            <div className="mt-1">
-                                {showPrice ? (
-                                    <div className="flex flex-wrap items-baseline gap-2">
-                                        {item.originalPrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(item.originalPrice)}</span>}
-                                        <span className="text-base font-bold text-brand-dark">{formatCurrency(item.price || 0)}</span>
+                            <h3 className="line-clamp-2 text-sm md:text-[15px] font-normal text-brand-dark sm:max-w-full">{item.name}</h3>
+                            <div className="flex justify-between items-center mt-1">
+                                <div className="flex flex-col">
+                                    {showPrice ? (
+                                        <div className="flex items-baseline gap-2">
+                                            {item.originalPrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(item.originalPrice)}</span>}
+                                            <span className="text-base font-bold text-brand-dark leading-tight">{formatCurrency(item.price || 0)}</span>
+                                        </div>
+                                    ) : (
+                                        <span className="text-xs font-bold text-brand-dark">Preco sob consulta</span>
+                                    )}
+                                </div>
+                                {(item.rating ?? 0) > 0 && (
+                                    <div className="flex items-center gap-0.5 shrink-0">
+                                        <StarIcon size={12} className="text-brand-green fill-brand-green" />
+                                        <span className="text-[11px] font-bold text-brand-dark">{Number(item.rating).toFixed(1)}</span>
                                     </div>
-                                ) : (
-                                    <span className="text-xs font-bold text-brand-dark">Preco sob consulta</span>
                                 )}
                             </div>
-                            <div className="mt-2 flex items-center gap-2">
-                                {partner?.store_name && (
-                                    <>
-                                        <span className="text-xs font-bold text-brand-dark">{partner.store_name}</span>
-                                        {distance && (
-                                            <>
-                                                <span className="w-1 h-1 rounded-full bg-brand-inactive-text" />
-                                                <span className="text-xs font-medium text-brand-inactive-text">{distance}</span>
-                                            </>
-                                        )}
-                                    </>
-                                )}
-                            </div>
+                            {sellerName && (
+                                <>
+                                    <div className="border-t border-gray-100 my-2" />
+                                    <div className="flex items-start gap-2 pt-0.5">
+                                        <UserProfileImage
+                                            fullName={sellerName}
+                                            imageUrl={sellerLogoUrl}
+                                            className="w-8 h-8 border border-gray-100 shrink-0 bg-gray-50"
+                                        />
+                                        <div className="flex flex-col min-w-0">
+                                            <p className="text-[11px] md:text-xs text-brand-dark font-medium truncate leading-tight">
+                                                {sellerName}
+                                            </p>
+                                            {locationLabel && (
+                                                <p className="text-[11px] text-gray-500 font-normal truncate">{locationLabel}</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </>
+                            )}
                         </>
                     )}
                 </div>
@@ -1192,9 +1232,9 @@ export function ExplorarPageClient({
         if (viewMode === "list") return renderListRow(item)
 
         if (item.itemType === 'loja') {
-            return <VitrineCard key={`loja-${item.id}`} vitrine={item} hideCity={!!selectedCitySlug} className="w-full" />
+            return <VitrineCard key={`loja-${item.id}`} vitrine={item} hideCity={!!selectedCitySlug} locationContext={locationContext} className="w-full" />
         }
-        return <ItemCard key={`${item.itemType}-${item.id}`} product={item as any} userCoords={userCoords} className="w-full" />
+        return <ItemCard key={`${item.itemType}-${item.id}`} product={item as any} userCoords={userCoords} locationContext={locationContext} className="w-full" />
     }
 
     // Renders the category discovery sections
@@ -1225,7 +1265,7 @@ export function ExplorarPageClient({
                         title="🎯 Em promoção"
                         subtitle={`Ofertas especiais em ${categoryName}`}
                         items={categoryPromos}
-                        renderItem={(item: any) => <ItemCard product={item} userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null} className="w-full" />}
+                        renderItem={(item: any) => <ItemCard product={item} userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null} locationContext={locationContext} className="w-full" />}
                         itemWidthClass="w-[190px] sm:w-[210px]"
                     />
                 )}
@@ -1234,7 +1274,7 @@ export function ExplorarPageClient({
                         title="⭐ Melhor avaliados"
                         subtitle={`Os favoritos em ${categoryName}`}
                         items={categoryTopRated}
-                        renderItem={(item: any) => <ItemCard product={item} userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null} className="w-full" />}
+                        renderItem={(item: any) => <ItemCard product={item} userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null} locationContext={locationContext} className="w-full" />}
                         itemWidthClass="w-[190px] sm:w-[210px]"
                     />
                 )}
@@ -1243,7 +1283,7 @@ export function ExplorarPageClient({
                         title="🏪 Lojas que vendem"
                         subtitle={`Vendedores de ${categoryName}`}
                         items={categoryStores}
-                        renderItem={(item: any) => <VitrineCard vitrine={item} hideCity={!!selectedCitySlug} className="w-full" />}
+                        renderItem={(item: any) => <VitrineCard vitrine={item} hideCity={!!selectedCitySlug} locationContext={locationContext} className="w-full" />}
                         itemWidthClass="w-[270px] sm:w-[320px]"
                     />
                 )}
@@ -1399,7 +1439,7 @@ export function ExplorarPageClient({
                                     key={theme.id}
                                     title={`${theme.emoji} ${theme.title}`}
                                     items={theme.items}
-                                    renderItem={(item: any) => <ItemCard product={item} userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null} className="w-full" />}
+                                    renderItem={(item: any) => <ItemCard product={item} userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null} locationContext={locationContext} className="w-full" />}
                                     itemWidthClass="w-[190px] sm:w-[210px]"
                                     onSeeAll={() => {
                                         const catSlug = Object.keys(CATEGORY_SLUG_MAP).find(key => CATEGORY_SLUG_MAP[key] === theme.category) || theme.slug
@@ -1533,7 +1573,7 @@ export function ExplorarPageClient({
                                                 title="Lojas um pouco mais distantes do seu raio de busca"
                                                 items={moreDistantSellers}
                                                 renderItem={(vitrine) => (
-                                                    <VitrineCard key={vitrine.id} vitrine={vitrine} hideCity={false} className="w-full" />
+                                                    <VitrineCard key={vitrine.id} vitrine={vitrine} hideCity={false} locationContext={locationContext} className="w-full" />
                                                 )}
                                                 onSeeAll={() => {
                                                     const stateSlug = userProfile?.state ? `estado-${userProfile.state.toLowerCase()}` : "brasil"
@@ -1627,6 +1667,7 @@ export function ExplorarPageClient({
                                                         key={item.id}
                                                         product={item}
                                                         userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null}
+                                                        locationContext={locationContext}
                                                         className="w-full"
                                                     />
                                                 )}

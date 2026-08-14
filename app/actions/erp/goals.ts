@@ -5,6 +5,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { requireMinimumPlan, requireUser } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
 import { getAdminClient } from "@/lib/supabase/admin"
+import { sanitizeInput } from "@/lib/input-validator"
 
 type GoalInput = {
   id?: string
@@ -143,7 +144,7 @@ export async function upsertSalesGoalAction(input: GoalInput) {
 
   const payload = {
     partner_id: input.partnerId,
-    name: String(input.name || "").trim(),
+    name: sanitizeInput(String(input.name || ""), 150).trim(),
     period_type: input.periodType,
     start_date: input.startDate,
     end_date: input.endDate,

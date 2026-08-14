@@ -429,6 +429,7 @@ const SelectSupplierSheet = ({
                     placeholder="Nome do fornecedor"
                     error={!!nameError}
                     errorMessage={nameError || undefined}
+                    maxLength={150}
                 />
                 <EmailInput
                     label="E-mail"

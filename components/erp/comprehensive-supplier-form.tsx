@@ -267,6 +267,7 @@ export function ComprehensiveSupplierForm({ partnerId, supplier }: Comprehensive
                   id="name"
                   name="name"
                   required
+                  maxLength={150}
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder={formData.personType === "pj" ? "Razão Social" : "Nome completo"}
@@ -282,6 +283,7 @@ export function ComprehensiveSupplierForm({ partnerId, supplier }: Comprehensive
                     value={formData.nomeFantasia}
                     onChange={(e) => setFormData({ ...formData, nomeFantasia: e.target.value })}
                     placeholder="Nome fantasia da empresa"
+                    maxLength={150}
                   />
                 </div>
               )}

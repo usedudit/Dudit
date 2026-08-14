@@ -7,7 +7,7 @@ import { requireUser, requirePartnerAccessWithPermission, requireSupplierOwnersh
 import { requirePermission } from "@/lib/permissions/access"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
-import { sanitizeNotes } from "@/lib/input-validator"
+import { sanitizeNotes, sanitizeInput, validateBrazilMobile, validateCPF, validateCNPJ } from "@/lib/input-validator"
 
 import { generateUniqueSupplierCode } from "@/lib/utils/code-generators"
 import { canUseFeature } from "@/lib/services/subscription.service"
@@ -65,6 +65,18 @@ export async function createComprehensiveSupplierAction(data: {
     return { error: "Nome é obrigatório" }
   }
 
+  if (data.personType !== "foreign" && data.phone && !validateBrazilMobile(data.phone)) {
+    return { error: "Celular inválido. Use o formato (00) 90000-0000" }
+  }
+
+  if (data.personType === "pf" && data.cpf && !validateCPF(data.cpf)) {
+    return { error: "CPF inválido" }
+  }
+
+  if (data.personType === "pj" && data.cnpj && !validateCNPJ(data.cnpj)) {
+    return { error: "CNPJ inválido" }
+  }
+
   const supabase = await getSupabaseServerClient()
 
   const supplierCode = await generateUniqueSupplierCode(supabase)
@@ -72,15 +84,15 @@ export async function createComprehensiveSupplierAction(data: {
   // Criar supplier SEM colunas de endereço
   const { data: newSupplier, error } = await supabase.from("suppliers").insert({
     partner_id: data.partnerId,
-    name: data.name,
+    name: sanitizeInput(data.name, 150),
     email: data.email || null,
     phone: data.phone || null,
     person_type: data.personType || null,
     cpf: data.cpf ? data.cpf.replace(/\D/g, "") : null,
     contribuinte: data.contribuinte || null,
     cnpj: data.cnpj ? data.cnpj.replace(/\D/g, "") : null,
-    nome_fantasia: data.nomeFantasia || null,
-    razao_social: data.razaoSocial || null,
+    nome_fantasia: data.nomeFantasia ? sanitizeInput(data.nomeFantasia, 150) : null,
+    razao_social: data.razaoSocial ? sanitizeInput(data.razaoSocial, 150) : null,
     inscricao_estadual: data.inscricaoEstadual || null,
     ie_isento: data.ieIsento ?? false,
     inscricao_municipal: data.inscricaoMunicipal || null,
@@ -151,7 +163,7 @@ export async function createSupplierAction(data: {
 
   const { data: newSupplier, error } = await supabase.from("suppliers").insert({
     partner_id: data.partnerId,
-    name: data.name,
+    name: sanitizeInput(data.name, 150),
     email: data.email || null,
     phone: data.phone || null,
     cnpj: data.cnpj ? data.cnpj.replace(/\D/g, "") : null,
@@ -197,7 +209,7 @@ export async function updateSupplierAction(
   const { error } = await supabase
     .from("suppliers")
     .update({
-      name: data.name,
+      name: sanitizeInput(data.name, 150),
       email: data.email || null,
       phone: data.phone || null,
       notes: sanitizeNotes(data.notes),
@@ -281,6 +293,18 @@ export async function updateComprehensiveSupplierAction(data: {
 
   await requireSupplierOwnership(data.supplierId)
 
+  if (data.personType !== "foreign" && data.phone && !validateBrazilMobile(data.phone)) {
+    return { error: "Celular inválido. Use o formato (00) 90000-0000" }
+  }
+
+  if (data.personType === "pf" && data.cpf && !validateCPF(data.cpf)) {
+    return { error: "CPF inválido" }
+  }
+
+  if (data.personType === "pj" && data.cnpj && !validateCNPJ(data.cnpj)) {
+    return { error: "CNPJ inválido" }
+  }
+
 
   const supabase = await getSupabaseServerClient()
 
@@ -289,15 +313,15 @@ export async function updateComprehensiveSupplierAction(data: {
   const { error } = await supabase
     .from("suppliers")
     .update({
-      name: data.name,
+      name: sanitizeInput(data.name, 150),
       email: data.email || null,
       phone: data.phone || null,
       person_type: data.personType || null,
       cpf: data.cpf ? data.cpf.replace(/\D/g, "") : null,
       contribuinte: data.contribuinte || null,
       cnpj: data.cnpj ? data.cnpj.replace(/\D/g, "") : null,
-      nome_fantasia: data.nomeFantasia || null,
-      razao_social: data.razaoSocial || null,
+      nome_fantasia: data.nomeFantasia ? sanitizeInput(data.nomeFantasia, 150) : null,
+      razao_social: data.razaoSocial ? sanitizeInput(data.razaoSocial, 150) : null,
       inscricao_estadual: data.inscricaoEstadual || null,
       ie_isento: data.ieIsento ?? false,
       inscricao_municipal: data.inscricaoMunicipal || null,
@@ -378,7 +402,7 @@ export async function duplicateSupplierAction(supplierId: string) {
     .from("suppliers")
     .insert({
       partner_id: originalSupplier.partner_id,
-      name: `${originalSupplier.name} (copia)`,
+      name: sanitizeInput(`${originalSupplier.name} (copia)`, 150),
       email: originalSupplier.email,
       phone: originalSupplier.phone,
       person_type: originalSupplier.person_type,
@@ -636,7 +660,7 @@ export async function createSupplierQuickAction(input: {
   const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
   if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
 
-  const name = String(input.name || "").trim()
+  const name = sanitizeInput(String(input.name || ""), 150).trim()
   const email = String(input.email || "").trim().toLowerCase()
   const phone = String(input.phone || "").trim()
   const cnpjDigits = String(input.cnpj || "").replace(/\D/g, "")

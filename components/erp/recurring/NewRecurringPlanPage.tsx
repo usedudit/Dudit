@@ -597,6 +597,7 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                                                                 })
                                                             }}
                                                             required
+                                                            maxLength={150}
                                                             error={fieldErrors.has("name")}
                                                             errorMessage={fieldErrors.has("name") ? "Nome é obrigatório" : undefined}
                                                         />

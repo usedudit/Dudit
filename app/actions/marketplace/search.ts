@@ -52,7 +52,8 @@ function normalizePlan(item: any) {
         store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
         store_image_url: storeImage,
         city: storeAddr?.city || null,
-        state: storeAddr?.state || null
+        state: storeAddr?.state || null,
+        neighborhood: storeAddr?.neighborhood || null
     } : null
 
     let computedPrice = 0
@@ -546,7 +547,7 @@ async function _searchMarketplaceInternal(
                         category_id, category:product_categories!category_id(name), created_at,
                         marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
                         partners(id, is_showcase_active),
-                    stores!left(id, name, slug, logo_url, banner_url, addresses!store_id!left(city, state)),
+                    stores!left(id, name, slug, logo_url, banner_url, addresses!store_id!left(city, state, neighborhood)),
                     product_variants(variant_options, price_adjustment, is_active),
                     show_price_in_store
                 `)
@@ -562,7 +563,7 @@ async function _searchMarketplaceInternal(
                     id, status, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
                     marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
                     partners(id, is_showcase_active),
-                    stores!left(id, name, slug, logo_url, banner_url, addresses!store_id!left(city, state)),
+                    stores!left(id, name, slug, logo_url, banner_url, addresses!store_id!left(city, state, neighborhood)),
                     show_price_in_store
                 `)
                         .in("id", servicosIds)
@@ -573,7 +574,7 @@ async function _searchMarketplaceInternal(
             if (lojasIds.length > 0) {
                 promises.push(
                     supabase.from("stores").select(`
-                        id, name, slug, description, logo_url, banner_url, phone, rating, is_showcase_active, partner_id, addresses!store_id!left(city, state, latitude, longitude),
+                        id, name, slug, description, logo_url, banner_url, phone, rating, is_showcase_active, partner_id, addresses!store_id!left(city, state, neighborhood, latitude, longitude),
                         partners!inner(id, created_at, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), reviews(count))
                     `).in("id", lojasIds)
                         .eq("is_active", true)
@@ -618,6 +619,7 @@ async function _searchMarketplaceInternal(
                             latitude: item.addresses?.[0]?.latitude,
                             longitude: item.addresses?.[0]?.longitude,
                             city: item.addresses?.[0]?.city || null, state: item.addresses?.[0]?.state || null,
+                            neighborhood: item.addresses?.[0]?.neighborhood || null,
                             reviewsCount: item.reviews?.[0]?.count || 0
                         }, created_at: item.created_at
                     }
@@ -639,7 +641,8 @@ async function _searchMarketplaceInternal(
             latitude: rawStore?.addresses?.[0]?.latitude ?? null,
             longitude: rawStore?.addresses?.[0]?.longitude ?? null,
                     city: rawStore?.addresses?.[0]?.city || null,
-                    state: rawStore?.addresses?.[0]?.state || null
+                    state: rawStore?.addresses?.[0]?.state || null,
+                    neighborhood: rawStore?.addresses?.[0]?.neighborhood || null
                 } : null
 
                 if (item.product_variants !== undefined) {
@@ -728,7 +731,7 @@ async function hydrateMarketplaceSearchHits(
                 marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
                 subcategory_id, subcategory:product_categories!subcategory_id(name),
                 partners(id, is_showcase_active),
-                stores!left(id, name, slug, logo_url, banner_url, addresses!store_id!left(city, state)),
+                stores!left(id, name, slug, logo_url, banner_url, addresses!store_id!left(city, state, neighborhood)),
                 product_variants(variant_options, price_adjustment, is_active),
                 show_price_in_store
             `)
@@ -744,7 +747,7 @@ async function hydrateMarketplaceSearchHits(
                 id, status, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
                 marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
                 partners(id, is_showcase_active),
-                stores!left(id, name, slug, logo_url, banner_url, addresses!store_id!left(city, state)),
+                stores!left(id, name, slug, logo_url, banner_url, addresses!store_id!left(city, state, neighborhood)),
                 show_price_in_store
             `)
                 .in("id", servicosIds)
@@ -755,7 +758,7 @@ async function hydrateMarketplaceSearchHits(
     if (lojasIds.length > 0) {
         promises.push(
             supabase.from("stores").select(`
-                id, name, slug, description, logo_url, banner_url, rating, created_at, is_showcase_active, partner_id, addresses!store_id!left(city, state),
+                id, name, slug, description, logo_url, banner_url, rating, created_at, is_showcase_active, partner_id, addresses!store_id!left(city, state, neighborhood),
                 partners!inner(id, created_at, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), reviews(count))
             `).in("id", lojasIds)
         )
@@ -765,7 +768,7 @@ async function hydrateMarketplaceSearchHits(
             supabase.from("recurring_plans").select(`
                 id, name, description, status, show_in_marketplace, partner_id, frequency_type, frequency_interval, created_at,
                 partners(id, is_showcase_active),
-                stores!left(id, name, logo_url, banner_url, addresses!store_id!left(city, state)),
+                stores!left(id, name, logo_url, banner_url, addresses!store_id!left(city, state, neighborhood)),
                 recurring_plan_items(
                     id, item_type, product_id, variant_id, service_id, quantity, unit_price,
                     products:product_id(id, name, price, images),
@@ -820,6 +823,7 @@ async function hydrateMarketplaceSearchHits(
                     longitude: item.addresses?.[0]?.longitude || null,
                     city: item.addresses?.[0]?.city || null,
                     state: item.addresses?.[0]?.state || null,
+                    neighborhood: item.addresses?.[0]?.neighborhood || null,
                     reviewsCount: item.reviews?.[0]?.count || 0,
                 },
                 created_at: item.created_at,
@@ -841,6 +845,7 @@ async function hydrateMarketplaceSearchHits(
         const storeAddr = rawStore?.addresses?.[0]
         const storeCity = storeAddr?.city || null
         const storeState = storeAddr?.state || null
+        const storeNeighborhood = storeAddr?.neighborhood || null
         const storeLat = storeAddr?.latitude || null
         const storeLng = storeAddr?.longitude || null
         const partner = rawPartner ? {
@@ -854,6 +859,7 @@ async function hydrateMarketplaceSearchHits(
             longitude: storeLng,
             city: storeCity,
             state: storeState,
+            neighborhood: storeNeighborhood,
         } : null
 
         if (hit.item_type === "produto") {
@@ -964,7 +970,7 @@ async function searchMarketplaceByCity(
     if (query.trim()) {
         let partnersQuery = supabase
             .from("stores")
-            .select("id, partner_id, addresses!store_id!inner(city, state, latitude, longitude)")
+            .select("id, partner_id, addresses!store_id!inner(city, state, neighborhood, latitude, longitude)")
             .eq("is_active", true)
             .eq("addresses.state", dbState)
 
@@ -1037,7 +1043,7 @@ async function searchMarketplaceByCity(
         .select(`
             id, partner_id, name, slug, description, logo_url, banner_url,
             rating, created_at,
-            addresses!store_id!inner(city, state, latitude, longitude),
+            addresses!store_id!inner(city, state, neighborhood, latitude, longitude),
             partners!inner(
                 id, is_active, category_id,
                 category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name))
@@ -1107,7 +1113,7 @@ async function searchMarketplaceByCity(
                     marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
                     subcategory_id, subcategory:product_categories!subcategory_id(name),
                     partners!inner(id, is_showcase_active),
-                    stores!left(id, name, slug, logo_url, banner_url, addresses!store_id!left(city, state)),
+                    stores!left(id, name, slug, logo_url, banner_url, addresses!store_id!left(city, state, neighborhood)),
                     product_variants(variant_options, price_adjustment, is_active),
                     show_price_in_store
                 `)
@@ -1129,7 +1135,7 @@ async function searchMarketplaceByCity(
                     id, status, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
                     marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
                     partners!inner(id, is_showcase_active),
-                    stores!left(id, name, slug, logo_url, banner_url, addresses!store_id!left(city, state, latitude, longitude)),
+                    stores!left(id, name, slug, logo_url, banner_url, addresses!store_id!left(city, state, neighborhood, latitude, longitude)),
                     show_price_in_store
                 `)
                 .eq("status", "ativo")

@@ -72,7 +72,7 @@ async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, city
 
         displayCityName = ctxCity
 
-        console.log(`[DIAG] scope=${scope} displayCity=${ctxCity} displayState=${ctxState} cityName=${cityName} isDefaultSP=${isDefaultSP}`)
+        // console.log(`[DIAG] scope=${scope} displayCity=${ctxCity} displayState=${ctxState} cityName=${cityName} isDefaultSP=${isDefaultSP}`)
 
         const [sectionsResult, adsResult] = await Promise.all([
             getHomeSections({
@@ -136,8 +136,8 @@ export default async function HomePage() {
             .replace(/[^a-z0-9]+/g, "-")
             .replace(/(^-|-$)/g, "")
         citySlug = `${normalizedCity}-${dbProfile.state.toLowerCase()}`
-    } else {
-        // If not logged in or has no profile address, check cookie
+    } else if (!user) {
+        // Logged-out visitors only: check the location cookie
         const cookieStore = await cookies()
         const cookieCity = cookieStore.get("dudit_city")?.value
         if (cookieCity) {

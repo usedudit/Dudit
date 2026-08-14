@@ -2,7 +2,7 @@
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { requireUser, getCurrentUser } from "@/lib/auth/authorization"
-import { sanitizeInput, validateCPF, validatePhoneBR } from "@/lib/input-validator"
+import { sanitizeInput, validateCPF, validateBrazilMobile } from "@/lib/input-validator"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { getAdminClient } from "@/lib/supabase/admin"
@@ -96,9 +96,9 @@ export async function updateProfileAction(data: {
   // ── Phone: normalize to E.164 + uniqueness check ──────────────────────────
   if (sanitizedData.phone !== undefined) {
     if (sanitizedData.phone) {
-      // Validate Brazilian phone format
-      if (!validatePhoneBR(sanitizedData.phone)) {
-        return { error: "Número de telefone inválido" }
+      // Validate Brazilian mobile format
+      if (!validateBrazilMobile(sanitizedData.phone)) {
+        return { error: "Número de celular inválido. Use o formato (00) 90000-0000" }
       }
 
       // Normalize to E.164 format (+5511998765432)

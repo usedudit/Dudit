@@ -4,6 +4,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { requirePermission } from "@/lib/permissions/access"
 import { successResponse, errorResponse } from "@/lib/utils/action-helpers"
 import { ActionResponse } from "@/lib/types/action-response"
+import { sanitizeInput } from "@/lib/input-validator"
 
 export async function getUnavailableTypesAction(partnerId: string): Promise<ActionResponse<any[]>> {
     try {
@@ -39,7 +40,7 @@ export async function createUnavailableTypeAction(data: {
             .from("unavailable_types")
             .insert({
                 partner_id: data.partnerId,
-                name: data.name.trim(),
+                name: sanitizeInput(data.name, 150).trim(),
                 default_duration: data.durationMinutes || 60,
                 icon_name: data.iconName || null,
                 color_hex: data.colorHex || null

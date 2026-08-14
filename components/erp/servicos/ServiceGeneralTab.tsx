@@ -116,6 +116,7 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                                     onChange={handleFieldChange}
                                     disabled={!isEditing || isGeneratingDetails}
                                     required
+                                    maxLength={150}
                                     error={fieldErrors?.has("name")}
                                     errorMessage={fieldErrors?.has("name") ? "Nome é obrigatório" : undefined}
                                     labelAddon={

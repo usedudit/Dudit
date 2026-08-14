@@ -449,7 +449,7 @@ export async function createQuoteAction(data: {
             // Map data to JSON for the Postgres RPC Function
             const itemsJson = data.items && data.items.length > 0 ? data.items.map((item, idx) => ({
                 product_id: item.productId || null,
-                custom_name: item.customName || null,
+                custom_name: item.customName?.trim().substring(0, 150) || null,
                 description: item.description || null,
                 quantity: item.quantity,
                 unit_price: item.unitPrice,
@@ -1145,7 +1145,7 @@ export async function addQuoteItemAction(data: {
                 partner_id: data.partnerId,
                 store_id: quote?.store_id || null,
                 product_id: data.productId || null,
-                custom_name: data.customName || null,
+                custom_name: data.customName?.trim().substring(0, 150) || null,
                 description: data.description || null,
                 quantity: data.quantity,
                 unit_price: data.unitPrice,
@@ -1227,7 +1227,7 @@ export async function updateQuoteItemAction(data: {
         }
 
         const updatePayload: any = {}
-        if (data.customName !== undefined) updatePayload.custom_name = data.customName
+        if (data.customName !== undefined) updatePayload.custom_name = String(data.customName || "").trim().substring(0, 150)
         if (data.description !== undefined) updatePayload.description = data.description
         if (data.quantity !== undefined) updatePayload.quantity = data.quantity
         if (data.unitPrice !== undefined) updatePayload.unit_price = data.unitPrice

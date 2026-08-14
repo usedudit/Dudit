@@ -10,6 +10,7 @@ import { calculateOrderPricing } from "@/lib/services/pricing-engine"
 import { validateCoupon } from "@/lib/services/coupons"
 import { setPromotionStores, getPromotionStoreIds } from "@/lib/services/promotions.service"
 import { revalidatePath } from "next/cache"
+import { sanitizeInput } from "@/lib/input-validator"
 
 // ---------------------------------------------------------------------------
 // Schemas
@@ -17,7 +18,7 @@ import { revalidatePath } from "next/cache"
 
 const CampaignSchema = z.object({
   partnerId: z.string().uuid(),
-  name: z.string().min(1, "O nome da campanha é obrigatório."),
+  name: z.string().min(1, "O nome da campanha é obrigatório.").max(150, "O nome da campanha deve ter no máximo 150 caracteres."),
   description: z.string().nullable().optional(),
   customerScope: z.enum(["all", "specific"]).default("all"),
   startsAt: z.string().nullable().optional(),
@@ -30,7 +31,7 @@ const CampaignSchema = z.object({
 const PromotionSchema = z.object({
   partnerId: z.string().uuid(),
   campaignId: z.string().uuid(),
-  name: z.string().min(1, "O nome da promoção é obrigatório."),
+  name: z.string().min(1, "O nome da promoção é obrigatório.").max(150, "O nome da promoção deve ter no máximo 150 caracteres."),
   description: z.string().nullable().optional(),
   promotionType: z.enum(["gift", "buy_x_pay_y", "discount"]),
   discountType: z.enum(["percentage", "fixed"]).nullable().optional(),
