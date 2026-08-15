@@ -10,7 +10,7 @@
 | --- | --- |
 | Conexão PostgreSQL | `POSTGRES_URL_NON_POOLING` presente, SSL `require`, Supavisor session na porta `5432` |
 | Direct connection | `BACKUP_DATABASE_URL` e `DATABASE_URL` não configuradas localmente |
-| R2 account/access key/secret | Presentes localmente, sem exibir valores |
+| R2 account/access key/secret | As credenciais específicas do backup ainda não estavam configuradas; as credenciais existentes são do bucket de imagens/arquivos |
 | Bucket de backup | Presente localmente |
 | `BACKUP_CRON_SECRET` | Ausente |
 | `BACKUP_ENCRYPTION_KEY_BASE64` | Ausente |
@@ -63,7 +63,7 @@ O restore não tocou no banco Supabase de produção.
 
 ## Ajustes necessários antes de repetir
 
-1. Criar uma API token R2 exclusiva para o bucket de backup, com permissões efetivas de listar, ler, gravar e remover objetos, e confirmar account ID + bucket no mesmo account.
+1. Criar uma API token R2 exclusiva para o bucket de backup, com permissões efetivas de listar, ler, gravar e remover objetos, e configurar `CLOUDFLARE_BACKUP_R2_ACCESS_KEY_ID` + `CLOUDFLARE_BACKUP_R2_SECRET_ACCESS_KEY`; não substituir as credenciais do bucket de imagens/arquivos.
 2. Configurar no Railway, fora do repositório:
    - `BACKUP_CRON_SECRET`;
    - `BACKUP_ENCRYPTION_KEY_BASE64` com 32 bytes aleatórios;

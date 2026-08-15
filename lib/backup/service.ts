@@ -20,8 +20,8 @@ const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000
 export type DatabaseBackupConfig = {
   databaseUrl: string
   r2AccountId: string
-  r2AccessKeyId: string
-  r2SecretAccessKey: string
+  backupR2AccessKeyId: string
+  backupR2SecretAccessKey: string
   r2Bucket: string
   encryptionKey: Buffer
   prefix: string
@@ -120,8 +120,8 @@ export function getDatabaseBackupConfig(): DatabaseBackupConfig {
   return {
     databaseUrl,
     r2AccountId: requiredEnv("CLOUDFLARE_ACCOUNT_ID"),
-    r2AccessKeyId: requiredEnv("CLOUDFLARE_R2_ACCESS_KEY_ID"),
-    r2SecretAccessKey: requiredEnv("CLOUDFLARE_R2_SECRET_ACCESS_KEY"),
+    backupR2AccessKeyId: requiredEnv("CLOUDFLARE_BACKUP_R2_ACCESS_KEY_ID"),
+    backupR2SecretAccessKey: requiredEnv("CLOUDFLARE_BACKUP_R2_SECRET_ACCESS_KEY"),
     r2Bucket: requiredEnv("CLOUDFLARE_BACKUP_BUCKET"),
     encryptionKey,
     prefix: normalizePrefix(process.env.BACKUP_R2_PREFIX),
@@ -137,8 +137,8 @@ function createR2BackupClient(config: DatabaseBackupConfig): S3Client {
     region: "auto",
     maxAttempts: 1,
     credentials: {
-      accessKeyId: config.r2AccessKeyId,
-      secretAccessKey: config.r2SecretAccessKey,
+      accessKeyId: config.backupR2AccessKeyId,
+      secretAccessKey: config.backupR2SecretAccessKey,
     },
     endpoint: `https://${config.r2AccountId}.r2.cloudflarestorage.com`,
   })

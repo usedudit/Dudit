@@ -31,8 +31,8 @@ Configure estes segredos apenas no ambiente do Railway. Não os coloque no front
 | `DATABASE_URL` | Não* | Fallback para a URL do banco |
 | `POSTGRES_URL_NON_POOLING` | Não* | Fallback já usado por este projeto |
 | `CLOUDFLARE_ACCOUNT_ID` | Sim | Account ID do R2 |
-| `CLOUDFLARE_R2_ACCESS_KEY_ID` | Sim | Chave de API R2 com escopo no bucket de backup |
-| `CLOUDFLARE_R2_SECRET_ACCESS_KEY` | Sim | Segredo da chave R2 |
+| `CLOUDFLARE_BACKUP_R2_ACCESS_KEY_ID` | Sim | Chave de API R2 exclusiva do bucket de backup |
+| `CLOUDFLARE_BACKUP_R2_SECRET_ACCESS_KEY` | Sim | Segredo da chave R2 exclusiva do backup |
 | `CLOUDFLARE_BACKUP_BUCKET` | Sim | Bucket exclusivo para backups |
 | `BACKUP_CRON_SECRET` | Sim | Bearer token exclusivo deste endpoint |
 | `BACKUP_ENCRYPTION_KEY_BASE64` | Sim | Chave aleatória de 32 bytes para AES-256-GCM |
@@ -62,7 +62,7 @@ Use a primeira saída em `BACKUP_CRON_SECRET` e a segunda em `BACKUP_ENCRYPTION_
 
 1. Crie um bucket privado, por exemplo `dudit-backups`.
 2. Crie uma API token R2 com acesso limitado a esse bucket e somente as permissões necessárias de listar, ler e gravar objetos.
-3. Configure as quatro variáveis `CLOUDFLARE_*` acima no Railway.
+3. Configure as quatro variáveis `CLOUDFLARE_*` acima no Railway. As credenciais com prefixo `CLOUDFLARE_BACKUP_R2_*` são diferentes das credenciais usadas pelo bucket de imagens/arquivos.
 4. Não configure domínio público, CORS ou URL pública para esse bucket.
 
 O endpoint S3-compatible usado internamente é:
