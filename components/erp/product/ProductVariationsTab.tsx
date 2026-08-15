@@ -930,7 +930,7 @@ export const ProductVariationsTab: React.FC<ProductVariationsTabProps> = ({
                                                         return (
                                                             <th
                                                                 key={idx}
-                                                                className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body relative bg-brand-gray dark:bg-dark-border/50 ${isLast ? "rounded-r-lg" : ""} ${col.sortable ? "cursor-pointer hover:bg-gray-200 dark:hover:bg-dark-border transition-colors select-none group" : ""}`}
+                                                                className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${isLast ? "rounded-r-lg" : ""} ${col.sortable ? "cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors" : ""}`}
                                                                 style={{ width: col.width }}
                                                                 onClick={() => col.sortable && col.key && handleSort(col.key)}
                                                             >

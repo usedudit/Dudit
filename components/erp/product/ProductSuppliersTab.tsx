@@ -229,8 +229,8 @@ const SupplierTableSection = React.memo(({ suppliers, totalCount, columns, heade
                 <span className="ml-2 text-sm font-medium text-brand-inactive-text">({totalCount})</span>
             </h3>
             {isEditing && (
-                <Button variant="ghost" onClick={onAddClick} leftIcon={<PlusIcon size={18} />}>
-                    Adicionar
+                <Button variant="link" className="flex items-center hidden md:flex" onClick={onAddClick}>
+                    + Adicionar
                 </Button>
             )}
         </div>

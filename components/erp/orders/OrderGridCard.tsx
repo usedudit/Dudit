@@ -4,7 +4,7 @@ import React from "react"
 import { motion } from "framer-motion"
 import { Checkbox, Badge, ActionsDropdown, Tooltip } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils";
-import { ShoppingCartIcon, TruckIcon, ReturnIcon, MoneyIcon, CancelCircleIcon } from "@/lib/icons"
+import { ShoppingCartIcon, TruckIcon, StoreIcon, ReturnIcon, MoneyIcon, CancelCircleIcon } from "@/lib/icons"
 import { PaymentMethodIndicator } from "../transactions/PaymentMethodIndicator"
 
 interface OrderGridCardProps {
@@ -110,7 +110,7 @@ const OrderGridCard = React.memo(
                                         <Tooltip text={order.deliveryStatusLabel || "Não informado"}>
                                             <Badge
                                                 variant={order.deliveryStatusColor || "gray"}
-                                                icon={<TruckIcon />}
+                                                icon={order.delivery_type === "pickup" ? <StoreIcon /> : <TruckIcon />}
                                                 className="whitespace-nowrap"
                                             />
                                         </Tooltip>

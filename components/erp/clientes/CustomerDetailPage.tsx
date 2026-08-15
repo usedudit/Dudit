@@ -1,7 +1,7 @@
 "use client"
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { EditIcon, ChevronLeftIcon, ThreeDotsIcon, StarIcon, ShoppingCartIcon, MoneyIcon, TruckIcon, Users, CreditCardIcon } from '@/lib/icons';
+import { EditIcon, ChevronLeftIcon, ThreeDotsIcon, StarIcon, ShoppingCartIcon, MoneyIcon, TruckIcon, StoreIcon, Users, CreditCardIcon } from '@/lib/icons';
 import { Button, Badge, Tabs, TabsList, TabsTrigger, TabsContent, ActionsDropdown, ThreeDotsLoader, AlertModal, CustomerCard } from '@/components/reusable';
 import Pagination from '@/components/reusable/Pagination';
 import { useNotification } from '@/hooks/use-notification';
@@ -385,6 +385,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
             deliveryStatusColor: o.deliveryStatusColor,
             situation: o.situation,
             delivery_status: o.delivery_status,
+            delivery_type: o.delivery_type || "delivery",
             hasOnlyServices: o.hasOnlyServices,
             formattedDate: o.date,
             formattedTime: o.formattedTime,
@@ -914,7 +915,7 @@ const OrdersContent = ({
                                                 {o.statusLabel}
                                             </Badge>
                                             {!o.hasOnlyServices && (
-                                                <Badge variant={o.deliveryStatusColor || "gray"} icon={<TruckIcon />} className="h-5 text-[10px] px-1.5">
+                                                <Badge variant={o.deliveryStatusColor || "gray"} icon={o.delivery_type === "pickup" ? <StoreIcon /> : <TruckIcon />} className="h-5 text-[10px] px-1.5">
                                                     {o.deliveryStatusLabel || "Não informado"}
                                                 </Badge>
                                             )}
@@ -1011,7 +1012,7 @@ const OrdersContent = ({
                                                                     {o.statusLabel}
                                                                 </Badge>
                                                                 {!o.hasOnlyServices && (
-                                                                    <Badge variant={o.deliveryStatusColor || "gray"} icon={<TruckIcon />}>
+                                                                    <Badge variant={o.deliveryStatusColor || "gray"} icon={o.delivery_type === "pickup" ? <StoreIcon /> : <TruckIcon />}>
                                                                         {o.deliveryStatusLabel || "Não informado"}
                                                                     </Badge>
                                                                 )}

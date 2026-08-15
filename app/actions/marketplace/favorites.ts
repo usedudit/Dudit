@@ -276,11 +276,23 @@ export async function getUserFavoritesAction(params?: {
 
                 // Extract variant fallback
                 const variants = p.product_variants || []
-                const activeVariant = variants.find((v: any) => v.is_active)
-                const fallbackPrice = activeVariant?.price_adjustment || null
-                const fallbackImage = activeVariant?.variant_options?.image || null
+                const activeVariants = variants.filter((v: any) => v.is_active !== false)
+                const withImage = activeVariants.find((v: any) => v.variant_options?.image) || variants.find((v: any) => v.variant_options?.image)
+                const fallbackImage = withImage?.variant_options?.image || null
+                const prices = (activeVariants.length > 0 ? activeVariants : variants)
+                    .map((v: any) => Number(v.price_adjustment || 0))
+                    .filter((pr: number) => pr > 0)
+                const fallbackPrice = prices.length > 0 ? Math.min(...prices) : null
 
                 const { product_variants, ...rest } = p
+                const basePrice = Number(p.promotional_price || p.price || 0)
+                const price = (!p.promotional_price && fallbackPrice)
+                    ? Number(fallbackPrice)
+                    : (basePrice > 0 ? basePrice : Number(fallbackPrice || 0))
+                const originalPrice = p.promotional_price
+                    ? (Number(p.price) > 0 ? Number(p.price) : (fallbackPrice ? Number(fallbackPrice) : undefined))
+                    : undefined
+
                 productsMap.set(p.id, {
                     ...rest,
                     category: (p.category as any)?.name || null,
@@ -288,8 +300,8 @@ export async function getUserFavoritesAction(params?: {
                     partners: partner,
                     fallback_variant_price: fallbackPrice,
                     fallback_variant_image: fallbackImage,
-                    originalPrice: p.promotional_price ? Number(p.price) : undefined,
-                    price: Number(p.promotional_price || p.price),
+                    originalPrice,
+                    price,
                 })
             }
         }

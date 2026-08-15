@@ -26,6 +26,7 @@ import {
 } from "@/lib/services/marketplace-cart-resolver"
 import { resolveCheckoutCartLinesFresh } from "@/lib/cache/checkout-cache"
 import { fulfillMarketplaceOrder } from "@/lib/services/marketplace-checkout-fulfillment"
+import { captureError, addMonitoringBreadcrumb } from "@/lib/monitoring/sentry"
 
 export type MarketplaceCheckoutPricingSnapshot = {
   subtotal: number
@@ -700,6 +701,11 @@ export async function checkoutCartAction(
   if (!resolved.success) return { error: resolved.error }
 
   const { lines: resolvedLines, partnerId, hasProducts, hasDeliveryLines } = resolved
+  addMonitoringBreadcrumb({
+    domain: "checkout",
+    message: "started",
+    metadata: { partnerId, storeId, itemCount: resolvedLines.length, paymentProvider: useMercadoPago ? "mercadopago" : "other" },
+  })
 
   // Resolve customer_id for promotion tracking (must exist in customers table)
   let customerIdForPromo: string | null = null
@@ -1044,6 +1050,13 @@ export async function checkoutCartAction(
       userId: user.id,
     })
   } catch (e) {
+    captureError(e, {
+      module: "checkout",
+      action: "ensure_marketplace_customer",
+      userId: user.id,
+      partnerId,
+      storeId: targetStoreId,
+    })
     console.error("Error ensuring marketplace customer in checkoutCartAction:", e)
   }
 
@@ -1177,7 +1190,18 @@ export async function checkoutCartAction(
     .select()
     .single()
 
-  if (orderError || !order) return { error: orderError?.message || "Erro ao criar pedido" }
+  if (orderError || !order) {
+    captureError(orderError || new Error("Pedido não retornado após insert"), {
+      module: "checkout",
+      action: "create_order",
+      userId: user.id,
+      partnerId,
+      storeId: targetStoreId,
+      errorCode: orderError?.code,
+      metadata: { paymentProvider: useMercadoPago ? "mercadopago" : "other" },
+    })
+    return { error: "Não foi possível criar o pedido. Tente novamente." }
+  }
 
   if (appliedStoreCredit > 0 && resolvedCustomerId) {
     const { applyStoreCreditDeduction } = await import("@/app/actions/erp/orders")
@@ -1215,31 +1239,18 @@ export async function checkoutCartAction(
   const { error: itemsError } = await supabase.from("order_items").insert(itemsToInsert)
 
   if (itemsError) {
-    console.error("[CHECKOUT] Erro ao inserir order_items:", {
-      orderId: order.id,
-      errorMessage: itemsError.message,
+    captureError(itemsError, {
+      module: "checkout",
+      action: "insert_order_items",
+      userId: user.id,
+      partnerId,
+      storeId: targetStoreId,
+      entityId: order.id,
       errorCode: itemsError.code,
-      errorDetails: itemsError.details,
-      errorHint: itemsError.hint,
-      itemCount: itemsToInsert.length,
-      itemKeys: itemsToInsert.map((item: any) => Object.keys(item)),
-      items: itemsToInsert.map((item: any) => ({
-        product_id: item.product_id,
-        service_id: item.service_id,
-        product_name: item.product_name,
-        product_price: item.product_price,
-        quantity: item.quantity,
-        subtotal: item.subtotal,
-        line_type: item.line_type,
-        fulfillment_mode: item.fulfillment_mode,
-        is_gift: item.is_gift,
-        is_promotional: item.is_promotional,
-        promotion_id: item.promotion_id,
-        original_price: item.original_price,
-      })),
+      metadata: { itemCount: itemsToInsert.length },
     })
     await supabase.from("orders").delete().eq("id", order.id)
-    return { error: `Erro ao adicionar itens ao pedido: ${itemsError.message}${itemsError.details ? ` (${itemsError.details})` : ""}${itemsError.hint ? ` - ${itemsError.hint}` : ""}` }
+    return { error: "Não foi possível adicionar os itens ao pedido. Tente novamente." }
   }
 
   // ATOMIC STOCK DECREMENT (MED-04) - Paralelizado para performance
@@ -1284,6 +1295,15 @@ export async function checkoutCartAction(
   })
 
   if ("error" in reserveResult) {
+    captureError(new Error(reserveResult.error), {
+      module: "stock",
+      action: "reserve_order_inventory",
+      userId: user.id,
+      partnerId,
+      storeId: targetStoreId,
+      entityId: order.id,
+      metadata: { itemCount: reserveItems.length },
+    })
     await supabase.from("order_items").delete().eq("order_id", order.id)
     await supabase.from("orders").delete().eq("id", order.id)
     return { error: reserveResult.error }

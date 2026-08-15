@@ -65,7 +65,20 @@ const nextConfig = {
   poweredByHeader: false,
   productionBrowserSourceMaps: false,
   experimental: {
-    optimizePackageImports: ['@/components', '@/lib'],
+    optimizePackageImports: [
+      '@/components',
+      '@/lib',
+      '@hugeicons/react',
+      '@hugeicons/core-free-icons',
+      'lucide-react',
+      'date-fns',
+      'framer-motion',
+      '@radix-ui/react-dialog',
+      '@radix-ui/react-dropdown-menu',
+      '@radix-ui/react-select',
+      '@radix-ui/react-tooltip',
+      '@radix-ui/react-popover',
+    ],
     optimizeCss: true,
     serverActions: {
       bodySizeLimit: "10mb",
@@ -102,6 +115,15 @@ const nextConfig = {
       },
       {
         source: '/_next/static/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+      {
+        source: '/_next/image(.*)',
         headers: [
           {
             key: 'Cache-Control',

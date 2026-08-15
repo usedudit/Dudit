@@ -11,6 +11,8 @@ export interface ExecutionLockResult {
   acquired: boolean
   /** The Redis key used for the lock (use to release) */
   lockKey: string
+  /** True when Redis was unavailable and fail-closed mode refused execution */
+  unavailable?: boolean
 }
 
 /**
@@ -30,6 +32,7 @@ export interface ExecutionLockResult {
 export async function acquireExecutionLock(
   jobName: string,
   ttlSeconds: number = 55,
+  options: { failClosed?: boolean } = {},
 ): Promise<ExecutionLockResult> {
   const lockKey = `cron:lock:${jobName}`
 
@@ -48,6 +51,14 @@ export async function acquireExecutionLock(
 
     return { acquired, lockKey }
   } catch (err) {
+    if (options.failClosed) {
+      cronLogger.error(jobName, "Failed to acquire execution lock - refusing execution", {
+        lockKey,
+        error: err instanceof Error ? err.message : "unknown",
+      })
+      return { acquired: false, unavailable: true, lockKey }
+    }
+
     // If Redis is unavailable, allow execution to proceed to avoid
     // permanently blocked jobs. Log the error for monitoring.
     cronLogger.error(jobName, "Failed to acquire execution lock - proceeding without lock", {

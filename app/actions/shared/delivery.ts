@@ -4,7 +4,7 @@ import { requirePartnerAccessWithPermission, requireStoreAccess, requireUser } f
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
-import { calculateDeliveryFee, type DeliveryFeeRule, type DeliverySettings } from "@/lib/delivery/fee"
+import { calculateDeliveryFee, hasDeliveryRatesConfigured, type DeliveryFeeRule, type DeliverySettings } from "@/lib/delivery/fee"
 import { resolveDeliveryPlanCapability } from "@/lib/delivery/plan"
 import { calculateDistance, geocodeAddress } from "@/lib/services/location.service"
 
@@ -378,6 +378,7 @@ export async function quoteDeliveryFeeAction(input: {
       isOutsideRadius: Boolean(priced.breakdown.isOutsideRadius),
       maxDeliveryKm: priced.breakdown.maxDeliveryKm ?? effectiveMaxKm,
       outsideRadiusWarning: priced.breakdown.outsideRadiusWarning,
+      hasRatesConfigured: Boolean(priced.breakdown.hasRatesConfigured),
     }
   } catch (error: any) {
     const isOutside = error.message?.toLowerCase().includes("raio") || false

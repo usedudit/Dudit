@@ -29,16 +29,34 @@ function buildCitySlugFromParts(city?: string | null, state?: string | null): st
 export function buildUserAdLocationContext(params: BuildContextParams): UserAdLocationContext {
     const lat = normalizeCoord(params.lat)
     const lng = normalizeCoord(params.lng)
-    const stateFromSlug = params.citySlug?.split("-").pop()?.toUpperCase() || null
+
+    const rawCitySlug = params.citySlug?.toLowerCase().trim() || ""
+    const isGenericSlug = !rawCitySlug || rawCitySlug === "brasil" || rawCitySlug === "vitrine" || rawCitySlug.startsWith("estado-")
+
+    const cleanCitySlug = !isGenericSlug ? rawCitySlug : null
+    const derivedCitySlug = cleanCitySlug || buildCitySlugFromParts(params.city, params.state)
+
+    let state = params.state?.toUpperCase().trim() || null
+    if (state === "BRASIL" || state === "VITRINE") {
+        state = null
+    }
+
+    if (!state && derivedCitySlug) {
+        const stateFromSlug = derivedCitySlug.split("-").pop()?.toUpperCase()
+        if (stateFromSlug && stateFromSlug.length === 2) {
+            state = stateFromSlug
+        }
+    }
 
     return {
         lat,
         lng,
-        citySlug: params.citySlug?.toLowerCase() || buildCitySlugFromParts(params.city, params.state),
-        state: params.state?.toUpperCase() || stateFromSlug,
+        citySlug: derivedCitySlug,
+        state,
         country: (params.country || DEFAULT_COUNTRY).toUpperCase(),
     }
 }
+
 
 export function buildAdCacheKey(context: UserAdLocationContext, slot: string, limit: number): string {
     const latKey = context.lat != null ? context.lat.toFixed(2) : "na"

@@ -33,6 +33,25 @@ const formatProductUnitPrice = (price: number, unit?: string | null) => {
     return formatUnitPriceWithUnit(price, unit);
 };
 
+function calculateDiscountedPrice(item: any, order: any) {
+    const itemsBaseSubtotal = (order.order_items || []).reduce(
+        (sum: number, i: any) => sum + Number(i.subtotal ?? Number(i.product_price || 0) * Number(i.quantity || 0)),
+        0
+    )
+    const couponDiscount = Math.max(0, Number(order.coupon_discount_amount || 0))
+    const pmDiscount = Math.max(0, Number(order.payment_method_discount_amount || 0))
+    const pmExtra = Math.max(0, Number(order.payment_method_extra_amount || 0))
+    const subtotalVal = Number(order.subtotal_value || 0) > 0
+        ? Number(order.subtotal_value || 0)
+        : Number(order.total_amount || 0) - Number(order.delivery_fee || 0) - Number(order.additional_costs || 0) + Number(order.discount_value || 0) + couponDiscount + pmDiscount - pmExtra
+    const hasItemDiscount = itemsBaseSubtotal > 0 && subtotalVal > 0 && Math.abs(itemsBaseSubtotal - subtotalVal) > 0.005
+    const itemDiscountRatio = hasItemDiscount ? subtotalVal / itemsBaseSubtotal : 1
+    const basePrice = Number(item.product_price || 0)
+    if (item.is_gift || item.is_promotional) return { discountedPrice: basePrice, hasItemDiscount: false, basePrice }
+    if (!hasItemDiscount) return { discountedPrice: basePrice, hasItemDiscount: false, basePrice }
+    return { discountedPrice: Math.round(basePrice * itemDiscountRatio * 100) / 100, hasItemDiscount: true, basePrice }
+}
+
 export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { orders: any[], reviewedItemsArray: any[], userId: string }) {
     const searchParams = useSearchParams();
     const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
@@ -268,52 +287,38 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { ord
                                                     <div className="h-px bg-brand-border dark:bg-dark-border w-full mb-6" />
 
                                                     {/* Items List */}
-                                                    {(() => {
-                                                        const itemsBaseSubtotal = (order.order_items || []).reduce(
-                                                            (sum: number, i: any) => sum + Number(i.subtotal ?? Number(i.product_price || 0) * Number(i.quantity || 0)),
-                                                            0
-                                                        )
-                                                        const couponDiscount = Math.max(0, Number(order.coupon_discount_amount || 0))
-                                                        const pmDiscount = Math.max(0, Number(order.payment_method_discount_amount || 0))
-                                                        const pmExtra = Math.max(0, Number(order.payment_method_extra_amount || 0))
-                                                        const subtotalVal = Number(order.subtotal_value || 0) > 0
-                                                            ? Number(order.subtotal_value || 0)
-                                                            : Number(order.total_amount || 0) - Number(order.delivery_fee || 0) - Number(order.additional_costs || 0) + Number(order.discount_value || 0) + couponDiscount + pmDiscount - pmExtra
-                                                        const hasItemDiscount = itemsBaseSubtotal > 0 && subtotalVal > 0 && Math.abs(itemsBaseSubtotal - subtotalVal) > 0.005
-                                                        const itemDiscountRatio = hasItemDiscount ? subtotalVal / itemsBaseSubtotal : 1
-                                                        const getDiscountedPrice = (item: any) => {
-                                                            const basePrice = Number(item.product_price || 0)
-                                                            if (item.is_gift || item.is_promotional) return basePrice
-                                                            if (!hasItemDiscount) return basePrice
-                                                            return Math.round(basePrice * itemDiscountRatio * 100) / 100
-                                                        }
-                                                        return (
-                                                            <div className="space-y-4">
-                                                                {order.order_items?.map((item: any) => {
-                                                                    const discountedPrice = getDiscountedPrice(item)
-                                                                    const itemImage = getPrimaryProductDisplayImage({
-                                                                        images: item.products?.images || item.services?.images || null,
-                                                                        video_thumbnail: item.products?.video_thumbnail || null,
-                                                                        fallback_variant_image: item.product_variants?.variant_options?.image || null,
-                                                                    });
+                                                    <div className="space-y-4">
+                                                        {order.order_items?.map((item: any) => {
+                                                            const { discountedPrice, hasItemDiscount, basePrice } = calculateDiscountedPrice(item, order);
+                                                            const itemImage = getPrimaryProductDisplayImage({
+                                                                images: item.products?.images || item.services?.images || null,
+                                                                video_thumbnail: item.products?.video_thumbnail || null,
+                                                                fallback_variant_image: item.product_variants?.variant_options?.image || null,
+                                                            });
 
-                                                                    const isService = !!item.service_id || item.line_type === "service_booking";
-                                                                    const isPlan = !!item.recurring_plan_id || item.line_type === "subscription";
+                                                            const isService = !!item.service_id || item.line_type === "service_booking";
+                                                            const isPlan = !!item.recurring_plan_id || item.line_type === "subscription";
 
-                                                                    let itemUrl = "";
-                                                                    if (isService) {
-                                                                        itemUrl = getServiceUrl({ ...item.services, id: item.service_id }, storeObj);
-                                                                    } else if (isPlan) {
-                                                                        itemUrl = getPlanUrl({ ...item.recurring_plans, id: item.recurring_plan_id }, storeObj);
-                                                                    } else if (item.product_id) {
-                                                                        itemUrl = getProductUrl({ ...item.products, id: item.product_id }, storeObj);
-                                                                    }
+                                                            let itemUrl = "";
+                                                            if (isService) {
+                                                                itemUrl = getServiceUrl({ ...item.services, id: item.service_id }, storeObj);
+                                                            } else if (isPlan) {
+                                                                itemUrl = getPlanUrl({ ...item.recurring_plans, id: item.recurring_plan_id }, storeObj);
+                                                            } else if (item.product_id) {
+                                                                itemUrl = getProductUrl({ ...item.products, id: item.product_id }, storeObj);
+                                                            }
 
-                                                                    const cardContent = (
-                                                                        <>
-                                                                            <div className="w-12 h-12 bg-white border border-brand-border dark:border-dark-border rounded-[8px] flex items-center justify-center shrink-0">
-                                                                                <img src={itemImage} alt={item.products?.name || item.services?.name || item.product_name} className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal rounded-[4px]" />
-                                                                            </div>
+                                                            const cardContent = (
+                                                                <>
+                                                                    <div className="w-12 h-12 bg-white border border-brand-border dark:border-dark-border rounded-[8px] flex items-center justify-center shrink-0">
+                                                                        <img
+                                                                            src={itemImage}
+                                                                            alt={item.products?.name || item.services?.name || item.product_name}
+                                                                            loading="lazy"
+                                                                            decoding="async"
+                                                                            className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal rounded-[4px]"
+                                                                        />
+                                                                    </div>
                                                                             <div className="flex-1 min-w-0 flex flex-col justify-center">
                                                                                 <div className="flex justify-between items-start">
                                                                                     <div>
@@ -374,8 +379,6 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { ord
                                                                     );
                                                                 })}
                                                             </div>
-                                                        )
-                                                    })()}
 
                                                     {/* Actions Footer */}
                                                     <div className="flex flex-row justify-between items-center gap-4 mt-8 pt-6 border-t border-brand-border dark:border-dark-border w-full flex-wrap">

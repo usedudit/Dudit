@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/server"
 import { requireUser } from "@/lib/auth/authorization"
 import { SecureLogger } from "@/lib/secure-logger"
 import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
+import { captureError } from "@/lib/monitoring/sentry"
 
 export async function POST(request: NextRequest) {
   try {
@@ -48,6 +49,13 @@ export async function POST(request: NextRequest) {
     try {
       mpAccessToken = await getValidMercadoPagoAccessToken(order.partner_id)
     } catch (err: any) {
+      captureError(err, {
+        module: "payments",
+        action: "retry_payment_token",
+        route: "/api/orders/retry-payment",
+        partnerId: order.partner_id,
+        entityId: order.id,
+      })
       SecureLogger.error("Partner has no valid MP access token in retry-payment", { error: err.message })
       return NextResponse.json({ error: "Seller has not configured Mercado Pago" }, { status: 400 })
     }
@@ -144,6 +152,12 @@ export async function POST(request: NextRequest) {
       }
     })
   } catch (error: any) {
+    captureError(error, {
+      module: "payments",
+      action: "retry_payment",
+      route: "/api/orders/retry-payment",
+      metadata: { errorCode: error?.code },
+    })
     SecureLogger.error("Error in retry-payment")
     return NextResponse.json({ error: "Failed to retrieve payment" }, { status: 500 })
   }

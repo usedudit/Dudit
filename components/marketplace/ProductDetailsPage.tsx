@@ -23,6 +23,7 @@ import { useNotification } from "@/hooks/use-notification"
 import { invalidateCartCache } from "@/hooks/use-cart"
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 import { getPartnerDeliveryConfigAction, quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
+import { hasDeliveryRatesConfigured } from "@/lib/delivery/fee"
 import { fetchCSRFTokenSingleton } from "@/hooks/use-csrf-token"
 import { getAddressesAction, createAddressAction } from "@/app/actions/shared/addresses"
 import { useFavorites } from "@/providers/favorites-provider"
@@ -1372,12 +1373,14 @@ export function ProductDetailsPageClient({
                                                             )}
                                                             <span className="text-sm font-bold text-brand-green">Grátis (Pago pela loja)</span>
                                                         </div>
-                                                    ) : isFreeByThreshold || (deliveryFee !== null && deliveryFee === 0) ? (
+                                                    ) : isFreeByThreshold || (deliveryFee !== null && deliveryFee === 0 && (deliveryBreakdown?.hasRatesConfigured ?? hasDeliveryRatesConfigured(deliveryConfig?.settings, deliveryConfig?.rules))) ? (
                                                         <span className="text-sm font-bold text-brand-green">Grátis</span>
-                                                    ) : deliveryFee !== null ? (
+                                                    ) : deliveryFee !== null && deliveryFee > 0 ? (
                                                         <p className="text-sm font-bold text-brand-dark">
                                                             {formatMoney(deliveryFee)}
                                                         </p>
+                                                    ) : deliveryFee !== null && deliveryFee === 0 ? (
+                                                        <p className="text-sm font-bold text-brand-dark">A combinar</p>
                                                     ) : deliveryError === "Entrega não disponível no plano atual." ? (
                                                         <p className="text-sm font-bold text-brand-dark">A combinar</p>
                                                     ) : (
@@ -1492,8 +1495,8 @@ export function ProductDetailsPageClient({
             {/* Store (Reputation & Levels Card) */}
             <div className="mb-8 mt-4">
                 {(() => {
-                    const sellerBannerImage = partner.banner_url ? getR2ImageUrl(partner.banner_url) : "https://img.dudit.com.br/static/Placeholder.png";
-                    const sellerAvatarImage = partner.store_avatar && !partner.store_avatar.includes("Placeholder.png") ? getR2ImageUrl(partner.store_avatar) : null;
+                    const sellerBannerImage = partner.banner_url ? getR2ImageUrl(partner.banner_url, "medium") : "https://img.dudit.com.br/static/Placeholder.png";
+                    const sellerAvatarImage = partner.store_avatar && !partner.store_avatar.includes("Placeholder.png") ? getR2ImageUrl(partner.store_avatar, "thumb") : null;
 
                     return (
                         <div className="border border-brand-border rounded-2xl overflow-hidden bg-white">

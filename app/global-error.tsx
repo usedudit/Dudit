@@ -1,6 +1,8 @@
 "use client"
 
+import { useEffect } from "react"
 import { getErrorMessage } from "@/lib/utils/error-handlers"
+import { captureError } from "@/lib/monitoring/sentry"
 
 export default function GlobalError({
     error,
@@ -9,6 +11,14 @@ export default function GlobalError({
     error: Error & { digest?: string }
     reset: () => void
 }) {
+    useEffect(() => {
+        captureError(error, {
+            module: "client",
+            action: "global_error_boundary",
+            metadata: { boundary: "app/global-error" },
+        })
+    }, [error])
+
     return (
         <html lang="pt-BR">
             <body className="min-h-screen flex items-center justify-center bg-white font-sans p-6">

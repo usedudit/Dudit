@@ -471,15 +471,14 @@ export const BusinessDataSubPage = ({
                                                     </div>
                                                     <div className="col-span-12 md:col-span-6">
                                                         <PhoneInput
-                                                            label="Celular (WhatsApp)"
-                                                            placeholder="(00) 00000-0000"
+                                                            label="Celular"
                                                             value={generalInfo.phone}
                                                             onChange={(e) => {
                                                                 setGeneralInfo({ ...generalInfo, phone: e.target.value })
                                                                 setFieldErrors(prev => { const n = new Set(prev); n.delete("phone"); return n })
                                                             }}
                                                             error={fieldErrors.has("phone")}
-                                                            errorMessage={fieldErrors.has("phone") && generalInfo.phone.trim() ? "Número de celular inválido. Use (XX) 9XXXX-XXXX" : "Celular é obrigatório"}
+                                                            errorMessage={fieldErrors.has("phone") && generalInfo.phone.trim() ? "Número de celular inválido" : "Celular é obrigatório"}
                                                         />
                                                     </div>
                                                 </div>

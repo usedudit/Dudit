@@ -76,6 +76,7 @@ interface RawProduct {
     marketplace_category?: any
     partners?: any
     stores?: any
+    product_variants?: any[]
 }
 
 // ─── Gatilhos psicológicos ──────────────────────────────────────────────────
@@ -365,7 +366,7 @@ function applyTierSort<T>(
 
 // ─── Product query fields ───────────────────────────────────────────────────
 
-const BASE_FIELDS = `id, name, price, promotional_price, images, rating, stock_quantity, stock_available, marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name))`
+const BASE_FIELDS = `id, name, price, promotional_price, images, rating, stock_quantity, stock_available, marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)), product_variants(variant_options, price_adjustment, is_active)`
 const STATS_FIELDS = `views_last_30_days, sales_last_7_days, sales_last_30_days, favorites_count`
 
 const PARTNER_JOIN = `partners!inner(
@@ -376,6 +377,21 @@ stores!left(
     phone, is_showcase_active,
     addresses!store_id!left(city, state, neighborhood, latitude, longitude)
 )`
+
+function extractFirstVariantFallback(variants: any[] | null | undefined, basePrice?: number) {
+    if (!variants || variants.length === 0) return { fallback_variant_image: null, fallback_variant_price: null }
+    const activeVariants = variants.filter((v: any) => v.is_active !== false)
+    const withImage = activeVariants.find((v: any) => v.variant_options?.image) || variants.find((v: any) => v.variant_options?.image)
+    const image = withImage?.variant_options?.image || null
+
+    const prices = (activeVariants.length > 0 ? activeVariants : variants)
+        .map((v: any) => Number(v.price_adjustment || 0))
+        .filter((p: number) => p > 0)
+
+    const lowestPrice = prices.length > 0 ? Math.min(...prices) : null
+
+    return { fallback_variant_image: image, fallback_variant_price: lowestPrice }
+}
 
 // ─── Process product into ItemCard shape ────────────────────────────────────
 
@@ -412,11 +428,21 @@ function processProduct(item: RawProduct, extra?: Record<string, any>) {
     const categoryName = rawCategory?.parent?.name || rawCategory?.name || null
     const subcategoryName = rawCategory?.parent ? rawCategory?.name : null
 
+    const variantFallback = extractFirstVariantFallback(item.product_variants, Number(item.price))
+    const basePrice = Number(item.promotional_price || item.price || 0)
+    const effectivePrice = (!item.promotional_price && variantFallback.fallback_variant_price)
+        ? Number(variantFallback.fallback_variant_price)
+        : (basePrice > 0 ? basePrice : Number(variantFallback.fallback_variant_price || 0))
+
+    const originalPrice = item.promotional_price
+        ? (Number(item.price) > 0 ? Number(item.price) : (variantFallback.fallback_variant_price ? Number(variantFallback.fallback_variant_price) : undefined))
+        : undefined
+
     return {
         id: item.id,
         name: item.name,
-        price: Number(item.promotional_price || item.price || 0),
-        originalPrice: item.promotional_price ? Number(item.price) : undefined,
+        price: effectivePrice,
+        originalPrice,
         images: item.images || [],
         rating: item.rating,
         category: categoryName,
@@ -424,6 +450,9 @@ function processProduct(item: RawProduct, extra?: Record<string, any>) {
         partners: partner,
         itemType: "produto" as const,
         created_at: item.created_at,
+        fallback_variant_price: variantFallback.fallback_variant_price,
+        fallback_variant_image: variantFallback.fallback_variant_image,
+        product_variants: item.product_variants,
         _views: item.views_last_30_days ?? 0,
         _salesWeek: item.sales_last_7_days ?? 0,
         _sales: item.sales_last_30_days ?? 0,
@@ -891,9 +920,12 @@ async function fetchGems(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSec
 
     const tagged = applyTierSort(data as RawProduct[], tiers, item => {
         const r = item as RawProduct
-        const hasPromo = r.promotional_price && Number(r.promotional_price) < Number(r.price)
+        const origPrice = Number(r.price) > 0
+            ? Number(r.price)
+            : Number(extractFirstVariantFallback(r.product_variants).fallback_variant_price || 0)
+        const hasPromo = r.promotional_price && origPrice > 0 && Number(r.promotional_price) < origPrice
         const discountPct = hasPromo
-            ? ((Number(r.price) - Number(r.promotional_price)) / Number(r.price)) * 100
+            ? ((origPrice - Number(r.promotional_price)) / origPrice) * 100
             : 0
         const usedBonus = (r.condition?.toLowerCase() === "used" || r.condition === "usado") ? 10 : 0
         const viewsBonus = (r.views_last_30_days ?? 0) / 100
@@ -926,9 +958,12 @@ async function fetchGems(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSec
 
     const items = scoped.slice(0, 20).map(item => {
         const raw = item as RawProduct
-        const hasPromo = raw.promotional_price && Number(raw.promotional_price) < Number(raw.price)
+        const origPrice = Number(raw.price) > 0
+            ? Number(raw.price)
+            : Number(extractFirstVariantFallback(raw.product_variants).fallback_variant_price || 0)
+        const hasPromo = raw.promotional_price && origPrice > 0 && Number(raw.promotional_price) < origPrice
         const discountPct = hasPromo
-            ? ((Number(raw.price) - Number(raw.promotional_price)) / Number(raw.price)) * 100
+            ? ((origPrice - Number(raw.promotional_price)) / origPrice) * 100
             : 0
         const isGoodDeal = discountPct >= 30 || (raw.condition?.toLowerCase() === "used" || raw.condition === "usado")
         return processProduct(raw, {
@@ -1212,9 +1247,12 @@ async function fetchPromos(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
         return null
     }
 
-    const discounted = (data || []).filter(
-        (item: any) => item.promotional_price && Number(item.promotional_price) < Number(item.price),
-    )
+    const discounted = (data || []).filter((item: any) => {
+        const origPrice = Number(item.price) > 0
+            ? Number(item.price)
+            : Number(extractFirstVariantFallback(item.product_variants).fallback_variant_price || 0)
+        return item.promotional_price && origPrice > 0 && Number(item.promotional_price) < origPrice
+    })
 
     if (discounted.length === 0) {
         dLog(`[Discover] SKIP promos reason=no_discounts`)
@@ -1223,8 +1261,11 @@ async function fetchPromos(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
 
     const tagged = applyTierSort(discounted as RawProduct[], tiers, item => {
         const r = item as RawProduct
-        if (!r.promotional_price || !r.price) return 0
-        return ((Number(r.price) - Number(r.promotional_price)) / Number(r.price)) * 100
+        const origPrice = Number(r.price) > 0
+            ? Number(r.price)
+            : Number(extractFirstVariantFallback(r.product_variants).fallback_variant_price || 0)
+        if (!r.promotional_price || origPrice <= 0) return 0
+        return ((origPrice - Number(r.promotional_price)) / origPrice) * 100
     })
 
     const displayScope = determineDisplayScope(tagged, ctx)
@@ -1238,9 +1279,12 @@ async function fetchPromos(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
 
     const items = scoped.slice(0, 20).map(item => {
         const raw = item as RawProduct
-        const discountPct = Math.round(
-            ((Number(raw.price) - Number(raw.promotional_price)) / Number(raw.price)) * 100,
-        )
+        const origPrice = Number(raw.price) > 0
+            ? Number(raw.price)
+            : Number(extractFirstVariantFallback(raw.product_variants).fallback_variant_price || 0)
+        const discountPct = origPrice > 0
+            ? Math.round(((origPrice - Number(raw.promotional_price)) / origPrice) * 100)
+            : 0
         return processProduct(raw, {
             _badgeLabel: `-${discountPct}%`,
             _badgeVariant: "orange" as const,
@@ -1383,6 +1427,7 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
                 longitude: addr?.longitude ?? null,
                 city: storeCity,
                 state: storeState,
+                neighborhood: addr?.neighborhood ?? null,
             }
             : null
 

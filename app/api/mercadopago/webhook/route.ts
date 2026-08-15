@@ -4,6 +4,7 @@ import { createHmac, timingSafeEqual } from "crypto"
 import { SecureLogger } from "@/lib/secure-logger"
 import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
 import { formatPaymentMethodLabel } from "@/lib/payments/payment-method"
+import { captureError } from "@/lib/monitoring/sentry"
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -122,11 +123,22 @@ export async function POST(request: NextRequest) {
     const response = NextResponse.json({ received: true }, { status: 200 })
 
     processWebhookWithRetry(body, requestId).catch((error) => {
+      captureError(error, {
+        module: "payments",
+        action: "mercadopago_webhook_async",
+        route: "/api/mercadopago/webhook",
+        entityId: typeof body?.data?.id === "string" || typeof body?.data?.id === "number" ? String(body.data.id) : undefined,
+      })
       SecureLogger.error("[WEBHOOK] Async processing failed", { error: error.message })
     })
 
     return response
   } catch (error: any) {
+    captureError(error, {
+      module: "payments",
+      action: "mercadopago_webhook",
+      route: "/api/mercadopago/webhook",
+    })
     SecureLogger.error("[WEBHOOK] Handler error", { error: error.message })
     // Return 200 to prevent MP from retrying on our parsing errors
     return NextResponse.json({ received: true }, { status: 200 })
@@ -718,6 +730,13 @@ async function processWebhookWithRetry(
     console.log(`[WEBHOOK] ✅ PAYMENT WEBHOOK PROCESSED SUCCESSFULLY - Order ${orderId} → "${orderStatus}"`)
     console.log("[WEBHOOK] ==========================================================\n")
   } catch (error: any) {
+    captureError(error, {
+      module: "payments",
+      action: "mercadopago_webhook_processing",
+      route: "/api/mercadopago/webhook",
+      entityId: typeof paymentId === "string" || typeof paymentId === "number" ? String(paymentId) : undefined,
+      metadata: { attempt },
+    })
     console.error("[WEBHOOK] Processing error:", error.message)
 
     if (attempt < MAX_RETRIES - 1) {

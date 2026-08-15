@@ -304,10 +304,9 @@ export default async function ExplorarPage({
         }
     }
 
-    // Se não tem slug, mostra Brasil inteiro (como /explorar/brasil)
+    // Se não tem slug, redireciona para /explorar/brasil
     if (!firstSlug) {
-        slug = ["brasil"]
-        firstSlug = "brasil"
+        redirect("/explorar/brasil")
     }
 
     // Detecta se é um estado (formato: "estado-sp") ou uma cidade
@@ -372,16 +371,76 @@ export default async function ExplorarPage({
     const moreDistantItemsWithDistance = enrichMarketplaceDistance(moreDistantItems || [], refCoords)
 
 
-    const state = stateSlug
-        ? stateSlug.replace(/^estado-/, "").toUpperCase()
-        : (cidade.split("-").pop()?.toUpperCase() || userProfile?.state || null)
+    // Resolução de localização para anúncios:
+    // 1. Se a rota for uma cidade específica (ex: /explorar/franca-sp), prioriza a cidade da rota.
+    // 2. Se for estado (ex: /explorar/estado-sp), filtra pelo estado.
+    // 3. Se for busca nacional / Brasil (/explorar/brasil ou /explorar), usa a localização real do usuário (perfil ou cookie dudit_city).
+    let userCitySlug: string | null = null
+    let userCityName: string | null = userProfile?.city || null
+    let userStateName: string | null = userProfile?.state || null
+    let userLat: number | null = userProfile?.latitude ?? null
+    let userLng: number | null = userProfile?.longitude ?? null
+
+    if (userProfile?.city && userProfile?.state) {
+        const normCity = userProfile.city
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/(^-|-$)/g, "")
+        userCitySlug = `${normCity}-${userProfile.state.toLowerCase()}`
+    } else {
+        const cookieStore = await cookies()
+        const cookieCity = cookieStore.get("dudit_city")?.value
+        if (cookieCity && cookieCity !== "brasil" && !cookieCity.startsWith("estado-")) {
+            userCitySlug = cookieCity
+            const resolved = await resolveCityAndStateFromSlug(cookieCity)
+            if (resolved) {
+                userCityName = resolved.city
+                userStateName = resolved.state
+            }
+            if (!userLat || !userLng) {
+                const cookieCoords = await resolveCityCoordsFromSlug(cookieCity)
+                if (cookieCoords) {
+                    userLat = cookieCoords.lat
+                    userLng = cookieCoords.lng
+                }
+            }
+        }
+    }
+
+    const isSpecificCityRoute = cidade && cidade !== "brasil" && !cidade.startsWith("estado-")
+
+    let targetCitySlug: string | null = null
+    let targetCity: string | null = null
+    let targetState: string | null = null
+    let targetLat: number | null = userLat
+    let targetLng: number | null = userLng
+
+    if (isSpecificCityRoute) {
+        targetCitySlug = cidade
+        targetCity = resolvedCityName ? resolvedCityName.split(" - ")[0] : null
+        targetState = cidade.split("-").pop()?.toUpperCase() || null
+        if (!targetLat || !targetLng) {
+            targetLat = refCoords?.lat ?? null
+            targetLng = refCoords?.lng ?? null
+        }
+    } else if (isStateRoute && stateSlug) {
+        targetState = stateSlug.replace(/^estado-/, "").toUpperCase()
+        targetCitySlug = (userStateName?.toUpperCase() === targetState) ? userCitySlug : null
+        targetCity = (userStateName?.toUpperCase() === targetState) ? userCityName : null
+    } else {
+        targetCitySlug = userCitySlug
+        targetCity = userCityName
+        targetState = userStateName
+    }
 
     const adLocation = {
-        lat: userProfile?.latitude ?? null,
-        lng: userProfile?.longitude ?? null,
-        citySlug: !stateSlug ? cidade : null,
-        city: !stateSlug ? userProfile?.city : null,
-        state,
+        lat: targetLat,
+        lng: targetLng,
+        citySlug: targetCitySlug,
+        city: targetCity,
+        state: targetState,
     }
 
     const [exploreAds, searchAds, communityVideosData] = await Promise.all([

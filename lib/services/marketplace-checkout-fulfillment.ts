@@ -16,6 +16,7 @@ import type {
 import { isStaffSlotAvailable } from "@/lib/commerce/scheduling-availability"
 import { syncAppointmentReceivable } from "@/lib/services/appointment-receivable"
 import { onMarketplaceOrderPaid } from "@/lib/services/marketplace-metrics.service"
+import { captureError, addMonitoringBreadcrumb } from "@/lib/monitoring/sentry"
 
 const STOREFRONT_CHANNEL = "online_storefront"
 
@@ -439,7 +440,8 @@ export async function fulfillMarketplaceOrder(
         line.bookingMetadata &&
         !line.bookingMetadata.instantPurchase &&
         line.bookingMetadata.staffId
-      ) {
+) {
+  addMonitoringBreadcrumb({ domain: "orders", message: "fulfillment.started", metadata: { entityId: orderId } })
         const fullPrice = line.fullPrice ?? line.bookingMetadata.price
         const paidAmount = paymentConfirmed
           ? (line.payDepositOnly
@@ -569,6 +571,12 @@ export async function fulfillMarketplaceOrder(
     return { success: true, result }
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Erro ao concluir fulfillment"
+    captureError(e, {
+      module: "orders",
+      action: "marketplace_fulfillment",
+      entityId: orderId,
+      metadata: { idempotencyKey },
+    })
     await supabase
       .from("checkout_fulfillments")
       .update({ status: "failed", error_message: message })

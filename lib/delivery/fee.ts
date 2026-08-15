@@ -40,6 +40,31 @@ export type DeliveryBreakdown = {
   isFreeByThreshold?: boolean
   freeDeliveryThreshold?: number | null
   freeDeliveryReason?: "threshold" | "coupon"
+  hasRatesConfigured?: boolean
+}
+
+export function hasDeliveryRatesConfigured(
+  settings?: any | null,
+  rules?: any[] | null,
+): boolean {
+  if (!settings) return false
+  const baseFee = Number(settings.baseFee ?? settings.base_fee ?? 0)
+  const includedKm = Number(settings.includedKm ?? settings.included_km ?? 0)
+  const extraKmPrice = Number(settings.extraKmPrice ?? settings.extra_km_price ?? 0)
+  const maxDeliveryKm = settings.maxDeliveryKm ?? settings.max_delivery_km
+  const freeDeliveryThreshold = settings.freeDeliveryThreshold ?? settings.free_delivery_threshold
+  const deliveryPayer = settings.deliveryPayer ?? settings.delivery_payer
+
+  if (baseFee > 0) return true
+  if (includedKm > 0) return true
+  if (extraKmPrice > 0) return true
+  if (maxDeliveryKm != null && Number(maxDeliveryKm) > 0) return true
+  if (freeDeliveryThreshold != null && Number(freeDeliveryThreshold) > 0) return true
+  if (deliveryPayer === "seller") return true
+  if (rules && Array.isArray(rules) && rules.some((r) => (r.isActive ?? r.is_active ?? true) && Number(r.value || 0) > 0)) {
+    return true
+  }
+  return false
 }
 
 export type CalculateDeliveryFeeInput = {
@@ -133,6 +158,8 @@ export function calculateDeliveryFee(input: CalculateDeliveryFeeInput): {
   const orderSubtotal = input.orderSubtotal == null ? null : Math.max(0, Number(input.orderSubtotal))
   const isFreeByThreshold = freeDeliveryThreshold !== null && orderSubtotal !== null && orderSubtotal >= freeDeliveryThreshold
 
+  const hasRatesConfigured = hasDeliveryRatesConfigured(input.settings, input.rules)
+
   if (input.freeDeliveryCoupon || isFreeByThreshold) {
     return {
       fee: 0,
@@ -155,6 +182,7 @@ export function calculateDeliveryFee(input: CalculateDeliveryFeeInput): {
         isFreeByThreshold: Boolean(isFreeByThreshold),
         freeDeliveryThreshold,
         freeDeliveryReason: input.freeDeliveryCoupon ? "coupon" : "threshold",
+        hasRatesConfigured,
       },
     }
   }
@@ -175,6 +203,7 @@ export function calculateDeliveryFee(input: CalculateDeliveryFeeInput): {
         isOutsideRadius,
         maxDeliveryKm: effectiveMaxKm,
         outsideRadiusWarning,
+        hasRatesConfigured,
       },
     }
   }
@@ -194,6 +223,7 @@ export function calculateDeliveryFee(input: CalculateDeliveryFeeInput): {
       isOutsideRadius,
       maxDeliveryKm: effectiveMaxKm,
       outsideRadiusWarning,
+      hasRatesConfigured,
     },
   }
 }

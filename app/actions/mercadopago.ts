@@ -8,6 +8,7 @@ import { requirePartnerAccessWithPermission, requireUser } from "@/lib/auth/auth
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
+import { captureError, addMonitoringBreadcrumb } from "@/lib/monitoring/sentry"
 
 export type MpAcceptedPaymentMethods = {
   credit_card: boolean
@@ -48,6 +49,7 @@ export async function disconnectMercadoPagoAction() {
 
   // Revoga o token no Mercado Pago antes de limpar localmente
   try {
+    addMonitoringBreadcrumb({ domain: "payment", message: "mercadopago.disconnect.started", metadata: { partnerId: ctx.partnerId } })
     const accessToken = partner.mp_access_token_encrypted
       ? decrypt(partner.mp_access_token_encrypted, "mercadopago")
       : null
@@ -71,6 +73,11 @@ export async function disconnectMercadoPagoAction() {
       })
     }
   } catch (err) {
+    captureError(err, {
+      module: "payments",
+      action: "mercadopago_token_revoke",
+      partnerId: partner.id,
+    })
     console.error({ event: "mercadopago_token_revoke_error", partnerId: partner.id, error: err })
   }
 
@@ -151,6 +158,11 @@ export async function getMercadoPagoStatusAction() {
     const status = await getCachedMercadoPagoStatus(ctx.partnerId)()
     return status
   } catch (err: any) {
+    captureError(err, {
+      module: "payments",
+      action: "get_mercadopago_status",
+      partnerId: ctx.partnerId,
+    })
     return { error: err?.message || "Erro ao carregar status do Mercado Pago" }
   }
 }
@@ -215,6 +227,11 @@ export async function refreshMercadoPagoTokenAction() {
     revalidatePath("/erp/configuracoes")
     return { success: true }
   } catch (error: any) {
+    captureError(error, {
+      module: "payments",
+      action: "refresh_mercadopago_token",
+      partnerId: ctx.partnerId,
+    })
     return { error: error.message }
   }
 }
@@ -304,6 +321,12 @@ export async function checkMercadoPagoPaymentStatusAction(paymentId: string) {
       statusDetail: paymentData.status_detail,
     }
   } catch (error: any) {
+    captureError(error, {
+      module: "payments",
+      action: "check_mercadopago_payment_status",
+      partnerId: ctx.partnerId,
+      entityId: paymentId,
+    })
     return { error: error.message }
   }
 }

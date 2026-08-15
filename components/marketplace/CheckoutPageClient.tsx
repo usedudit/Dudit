@@ -24,6 +24,7 @@ import { previewMarketplacePaymentAction } from "@/app/actions/marketplace/payme
 import { invalidateCartCache } from "@/hooks/use-cart"
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
+import { hasDeliveryRatesConfigured } from "@/lib/delivery/fee"
 import type { StorefrontPaymentMethod } from "@/app/actions/marketplace/storefront-payment-methods"
 import type { MpAcceptedPaymentMethods } from "@/app/actions/mercadopago"
 import { useMarketplaceCheckoutContext } from "@/hooks/use-marketplace-checkout-context"
@@ -729,6 +730,12 @@ export function CheckoutPageClient() {
         deliveryEnabled,
     )
     const showDeliveryFeeRow = Boolean(requirements?.showProductFulfillmentOptions)
+    const hasConfiguredDeliveryRates = useMemo(() => {
+        if (deliveryBreakdown?.hasRatesConfigured !== undefined) {
+            return Boolean(deliveryBreakdown.hasRatesConfigured)
+        }
+        return hasDeliveryRatesConfigured(deliverySettings)
+    }, [deliveryBreakdown, deliverySettings])
 
     const totalAmount = useMemo(
         () => products.reduce((sum, p) => sum + p.price * (quantities[p.id] || p.quantity), 0),
@@ -1501,7 +1508,7 @@ export function CheckoutPageClient() {
                 {showDeliveryFeeRow && (
                     <div className="flex justify-between text-sm font-medium text-brand-inactive-text">
                         <span>Entrega</span>
-                        <span className={(isPickup || (deliveryFee === 0 && (hasFreeDeliveryCoupon || !productDeliveryQuoteActive || deliverySettings?.deliveryPayer === "seller" || (deliveryBreakdown as any)?.deliveryPayer === "seller"))) ? "text-brand-green font-semibold" : "text-brand-dark dark:text-dark-heading"}>
+                        <span className={(isPickup || (deliveryFee === 0 && (hasFreeDeliveryCoupon || (deliveryBreakdown as any)?.isFreeByThreshold || deliverySettings?.deliveryPayer === "seller" || (deliveryBreakdown as any)?.deliveryPayer === "seller" || (hasConfiguredDeliveryRates && productDeliveryQuoteActive && !deliveryError && Boolean(formData.deliveryAddress))))) ? "text-brand-green font-semibold" : "text-brand-dark dark:text-dark-heading"}>
                             {isPickup
                                 ? "Grátis"
                                 : deliveryQuoteLoading
@@ -1519,9 +1526,9 @@ export function CheckoutPageClient() {
                                         )
                                         : deliveryFee > 0
                                             ? formatCurrency(deliveryFee)
-                                            : hasFreeDeliveryCoupon
+                                            : (hasFreeDeliveryCoupon || (deliveryBreakdown as any)?.isFreeByThreshold)
                                                 ? "Grátis"
-                                                : !productDeliveryQuoteActive || deliveryError || !formData.deliveryAddress
+                                                : !productDeliveryQuoteActive || deliveryError || !formData.deliveryAddress || !hasConfiguredDeliveryRates
                                                     ? "A combinar"
                                                     : "Grátis"
                             }
@@ -1823,7 +1830,13 @@ export function CheckoutPageClient() {
             }
         }
         if (formData.deliveryType === "delivery") {
-            msg += `- Taxa de Entrega: ${deliveryFee > 0 ? formatCurrency(deliveryFee) : "Grátis"}\n`
+            const isFreeExplicit = hasFreeDeliveryCoupon || (deliveryBreakdown as any)?.isFreeByThreshold || deliverySettings?.deliveryPayer === "seller" || (deliveryBreakdown as any)?.deliveryPayer === "seller"
+            const deliveryLabel = deliveryFee > 0
+                ? formatCurrency(deliveryFee)
+                : isFreeExplicit || (hasConfiguredDeliveryRates && deliveryFee === 0)
+                    ? "Grátis"
+                    : "A combinar"
+            msg += `- Taxa de Entrega: ${deliveryLabel}\n`
         }
         msg += `- *Total do Pedido: ${formatCurrency(checkoutTotalToCharge)}*\n\n`
 

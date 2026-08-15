@@ -471,12 +471,10 @@ export function ImportProductsPage({ partnerId }: ImportProductsPageProps) {
                                             icon={UploadIcon}
                                             title={isDragActive ? "Solte a planilha aqui..." : "Importar Planilha de Produtos"}
                                             subtitle="Arraste o arquivo ou clique para selecionar. Suporta .xlsx, .xls ou .csv (até 10 MB e 2.000 linhas)."
-                                            itemButton={{
-                                                text: "Selecionar Planilha",
-                                                type: "button",
-                                                action: open,
-                                                variant: "default"
-                                            }}
+                                            buttons={[
+                                                { text: "Selecionar Planilha", type: "button", action: open },
+                                                // { text: "Baixar Modelo", type: "button", action: () => downloadTemplate() }
+                                            ]}
                                         />
                                     )}
                                 </div>

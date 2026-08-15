@@ -285,11 +285,6 @@ async function handler(request: NextRequest) {
           return NextResponse.json({ error: "Produto não pertence a este vendedor" }, { status: 400 })
         }
 
-        // Verificar estoque
-        if (resolvedStock < item.quantity) {
-          return NextResponse.json({ error: `Estoque insuficiente para ${resolvedName}` }, { status: 400 })
-        }
-
         const itemTotal = resolvedPrice * item.quantity
         totalAmount += itemTotal
 

@@ -9,14 +9,21 @@ export interface ExternalAdFallbackConfig {
 }
 
 export function getExternalAdFallbackConfig(slot: AdSlot): ExternalAdFallbackConfig {
-    const publisherId = process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID || process.env.NEXT_PUBLIC_GOOGLE_ADSENSE_ID
+    const rawId = (process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID || process.env.NEXT_PUBLIC_GOOGLE_ADSENSE_ID || "").trim()
 
-    if (!publisherId) {
+    if (!rawId) {
         return {
             slot,
             enabled: false,
         }
     }
+
+    const publisherId = rawId.startsWith("ca-pub-")
+        ? rawId
+        : rawId.startsWith("pub-")
+        ? `ca-${rawId}`
+        : `ca-pub-${rawId}`
+
 
     const slotMap: Record<AdSlot, string | undefined> = {
         home: process.env.NEXT_PUBLIC_ADSENSE_SLOT_HOME,

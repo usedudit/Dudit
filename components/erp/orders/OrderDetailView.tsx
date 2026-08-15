@@ -530,7 +530,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const cleanNotes = String(order.notes || "").replace(/\n*Pedido cancelado por:[\s\S]*$/, "").trim()
     const cancelNote = (String(order.notes || "").match(/Pedido cancelado por:[\s\S]*$/)?.[0] || "").trim()
     const canEdit = order.situation !== "cancelled"
-    const isPickupOrder = order.delivery_type === "pickup" || Number(order.delivery_fee || 0) <= 0
+    const isPickupOrder = order.delivery_type === "pickup"
 
     const isMarketplaceOrder = order.order_source === "Marketplace" || order.order_source === "Online Store" || order.order_source === "Vitrine Online"
 

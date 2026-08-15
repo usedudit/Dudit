@@ -14,6 +14,7 @@ import {
   requireCSRF,
   extractCSRFTokenFromObject,
 } from "@/lib/security/csrf-action-wrapper"
+import { captureError, addMonitoringBreadcrumb } from "@/lib/monitoring/sentry"
 
 const reportSchema = z.object({
   returnRequestId: z.string().uuid(),
@@ -49,6 +50,7 @@ async function getRequestHeadersSafe(): Promise<{ ip: string; ua: string }> {
 
 export async function reportReturnToDuditAction(input: z.infer<typeof reportSchema>) {
   try {
+    addMonitoringBreadcrumb({ domain: "returns", message: "report.started", metadata: { entityId: input.returnRequestId } })
     await requireRateLimit(RateLimitCategory.REPORT_CREATE)
 
     const csrfToken = extractCSRFTokenFromObject(input as Record<string, unknown>)
@@ -131,6 +133,12 @@ export async function reportReturnToDuditAction(input: z.infer<typeof reportSche
       idempotent: result?.idempotent === true,
     })
   } catch (e: unknown) {
+    captureError(e, {
+      module: "returns",
+      action: "report_return_to_dudit",
+      entityId: typeof input?.returnRequestId === "string" ? input.returnRequestId : undefined,
+      metadata: { reasonCode: typeof input?.reasonCode === "string" ? input.reasonCode : undefined },
+    })
     console.error("[REPORT_RETURN] Unexpected error:", e)
     return errorResponse("Erro ao enviar reporte")
   }
@@ -210,7 +218,20 @@ export async function addReturnMessageAction(input: {
 
     return successResponse({ id: inserted?.id, createdAt: inserted?.created_at })
   } catch (e: unknown) {
-    return errorResponse(e instanceof Error ? e.message : "Erro ao enviar mensagem")
+    captureError(e, {
+      module: "returns",
+      action: "add_return_message",
+      entityId: input.returnRequestId,
+      partnerId: input.partnerId,
+      metadata: { senderRole: input.senderRole },
+    })
+    return errorResponse(
+      e && typeof e === "object" && "code" in e
+        ? "Não foi possível enviar a mensagem. Tente novamente."
+        : e instanceof Error
+          ? e.message
+          : "Erro ao enviar mensagem",
+    )
   }
 }
 
@@ -266,6 +287,18 @@ export async function getReturnMessagesAction(
       nextBefore: hasMore && page[0] ? page[0].created_at : null,
     })
   } catch (e: unknown) {
-    return errorResponse(e instanceof Error ? e.message : "Erro ao carregar mensagens")
+    captureError(e, {
+      module: "returns",
+      action: "get_return_messages",
+      entityId: returnRequestId,
+      partnerId,
+    })
+    return errorResponse(
+      e && typeof e === "object" && "code" in e
+        ? "Não foi possível carregar as mensagens. Tente novamente."
+        : e instanceof Error
+          ? e.message
+          : "Erro ao carregar mensagens",
+    )
   }
 }

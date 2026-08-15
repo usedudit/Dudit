@@ -1,5 +1,6 @@
 import type React from "react"
 import type { Metadata, Viewport } from "next"
+import { Plus_Jakarta_Sans, Libre_Barcode_128_Text } from "next/font/google"
 import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld"
 import "./globals.css"
 import { SupabaseProvider } from "@/providers/supabase-provider"
@@ -14,6 +15,19 @@ import { PWAUpdatePrompt } from "@/components/pwa/PWAUpdatePrompt"
 import { MarketplaceBottomMenu } from "@/components/marketplace/MarketplaceBottomMenu"
 import { TimezoneProvider } from "@/lib/date"
 import Script from "next/script"
+
+const plusJakartaSans = Plus_Jakarta_Sans({
+    subsets: ["latin"],
+    display: "swap",
+    variable: "--font-sans",
+})
+
+const libreBarcode = Libre_Barcode_128_Text({
+    weight: "400",
+    subsets: ["latin"],
+    display: "swap",
+    variable: "--font-barcode",
+})
 
 export const viewport: Viewport = {
     themeColor: "#003229",
@@ -201,20 +215,8 @@ export default async function RootLayout({
     const user = await getCurrentUser()
 
     return (
-        <html lang="pt-BR">
+        <html lang="pt-BR" className={`${plusJakartaSans.variable} ${libreBarcode.variable}`}>
             <head>
-                <link rel="preconnect" href="https://fonts.googleapis.com" />
-                <link
-                    rel="preconnect"
-                    href="https://fonts.gstatic.com"
-                    crossOrigin="anonymous"
-                />
-                <link
-                    id="mapbox-gl-css"
-                    rel="stylesheet"
-                    href="https://api.mapbox.com/mapbox-gl-js/v3.28.0/mapbox-gl.css"
-                />
-
                 <script
                     type="application/ld+json"
                     dangerouslySetInnerHTML={{
@@ -243,9 +245,9 @@ export default async function RootLayout({
                 </SupabaseProvider>
 
                 <Script
-                    async
                     src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8357337871781593"
                     crossOrigin="anonymous"
+                    strategy="lazyOnload"
                 />
             </body>
         </html>

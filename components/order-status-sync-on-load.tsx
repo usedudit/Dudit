@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 
 interface OrderStatusSyncProps {
   orderId: string
@@ -9,6 +10,8 @@ interface OrderStatusSyncProps {
 }
 
 export function OrderStatusSyncOnLoad({ orderId, status, paymentProvider }: OrderStatusSyncProps) {
+  const router = useRouter()
+
   useEffect(() => {
     if (status === 'pending' && paymentProvider === "Mercado Pago") {
       const syncOnce = async () => {
@@ -21,13 +24,8 @@ export function OrderStatusSyncOnLoad({ orderId, status, paymentProvider }: Orde
 
           if (response.ok) {
             const data = await response.json()
-            console.log('Payment sync result:', data)
-
             if (data.newStatus === 'paid' || data.paymentStatus === 'approved') {
-              console.log('Payment confirmed! Reloading page to show updated status...')
-              setTimeout(() => {
-                window.location.reload()
-              }, 1000)
+              router.refresh()
             }
           }
         } catch (error) {
@@ -37,7 +35,7 @@ export function OrderStatusSyncOnLoad({ orderId, status, paymentProvider }: Orde
 
       syncOnce()
     }
-  }, [orderId, paymentProvider, status])
+  }, [orderId, paymentProvider, status, router])
 
   return null
 }
@@ -47,6 +45,7 @@ interface BatchOrderStatusSyncProps {
 }
 
 export function BatchOrderStatusSyncOnLoad({ orders }: BatchOrderStatusSyncProps) {
+  const router = useRouter()
   const prevKeyRef = useRef("")
 
   useEffect(() => {
@@ -76,13 +75,8 @@ export function BatchOrderStatusSyncOnLoad({ orders }: BatchOrderStatusSyncProps
 
         if (response.ok) {
           const data = await response.json()
-          console.log('Batch payment sync result:', data)
-
           if (data.updatedCount > 0) {
-            console.log('Payment confirmed in batch! Reloading page to show updated status...')
-            setTimeout(() => {
-              window.location.reload()
-            }, 1000)
+            router.refresh()
           }
         }
       } catch (error) {
@@ -91,7 +85,7 @@ export function BatchOrderStatusSyncOnLoad({ orders }: BatchOrderStatusSyncProps
     }
 
     syncBatch()
-  }, [orders])
+  }, [orders, router])
 
   return null
 }

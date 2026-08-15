@@ -1,10 +1,10 @@
 "use client"
 
-import * as Sentry from "@sentry/nextjs"
 import { useEffect } from "react"
 import IconPlaceholder from "@/components/reusable/IconPlaceholder"
 import { InfoCard } from "@/components/reusable/InfoCard"
 import { getErrorMessage } from "@/lib/utils/error-handlers"
+import { captureError } from "@/lib/monitoring/sentry"
 import Link from "next/link"
 
 export default function Error({
@@ -15,7 +15,11 @@ export default function Error({
     reset: () => void
 }) {
     useEffect(() => {
-        Sentry.captureException(error)
+        captureError(error, {
+            module: "client",
+            action: "error_boundary",
+            metadata: { boundary: "app/error" },
+        })
         console.error(error)
 
         const isChunkError =

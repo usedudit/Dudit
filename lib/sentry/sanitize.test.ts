@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest"
 import type { ErrorEvent } from "@sentry/core"
-import { sanitizeBreadcrumb, sanitizeEvent, SENTRY_REDACTED_VALUE } from "./sanitize"
+import {
+  sanitizeBreadcrumb,
+  sanitizeEvent,
+  sanitizeMonitoringData,
+  SENTRY_REDACTED_VALUE,
+} from "./sanitize"
 
 describe("Sentry privacy sanitization", () => {
   it("removes request PII and credentials from events", () => {
@@ -47,5 +52,21 @@ describe("Sentry privacy sanitization", () => {
     expect(
       sanitizeBreadcrumb({ category: "ui.click", message: "email=a@example.com" })?.message,
     ).toBe(`email=${SENTRY_REDACTED_VALUE}`)
+  })
+
+  it("sanitizes centralized monitoring metadata", () => {
+    expect(
+      sanitizeMonitoringData({
+        partnerId: "partner-safe-ref",
+        cpf: "123.456.789-09",
+        authorization: "Bearer secret-token",
+        paymentPayload: { card_number: "4111 1111 1111 1111" },
+      }),
+    ).toEqual({
+      partnerId: "partner-safe-ref",
+      cpf: SENTRY_REDACTED_VALUE,
+      authorization: SENTRY_REDACTED_VALUE,
+      paymentPayload: SENTRY_REDACTED_VALUE,
+    })
   })
 })

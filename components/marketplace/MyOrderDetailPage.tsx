@@ -10,7 +10,7 @@ import Link from 'next/link';
 import { PaymentWrapper } from '@/components/PaymentWrapper';
 import { createMarketplaceCancellationRequestAction, createMarketplaceReturnRequestAction } from '@/app/actions/erp/returns';
 import { cancelBuyerOrderAction, confirmOrderFulfillmentAction } from '@/app/actions/marketplace/orders';
-import { getAddressesAction } from '@/app/actions/shared/addresses';
+import { getPartnerReturnPolicyPublicAction } from '@/app/actions/marketplace/store-policies';
 import { getOrderAttachmentsAction, getOrderAttachmentUrlAction } from '@/app/actions/erp/orders';
 import { FileIcon } from '@/lib/icons';
 import { formatFileSize } from '@/components/erp/orders/OrderAttachmentsTab';
@@ -463,24 +463,27 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
         }
     };
 
-    const [userAddresses, setUserAddresses] = useState<any[]>([]);
     const [activeTab, setActiveTab] = useState<"details" | "history" | "attachments">("details");
     const [attachments, setAttachments] = useState<any[]>([]);
     const [loadingAttachments, setLoadingAttachments] = useState(false);
+    const [storePolicy, setStorePolicy] = useState<any>(null);
 
+    // Fetch store policy if not present in order snapshot
     useEffect(() => {
-        if (!order?.buyer_id) return;
-        getAddressesAction(order.buyer_id, "user")
-            .then(res => {
-                if (res && res.addresses) {
-                    setUserAddresses(res.addresses);
+        if (!order?.partner_id || order.return_policy_snapshot || storePolicy) return;
+        getPartnerReturnPolicyPublicAction(order.partner_id)
+            .then((res) => {
+                if (res?.success && res?.data?.policy) {
+                    setStorePolicy(res.data.policy);
                 }
             })
-            .catch(err => console.error("Error fetching user addresses:", err));
-    }, [order?.buyer_id]);
+            .catch((err) => console.error("[MyOrderDetailPage] Error loading store policy:", err));
+    }, [order?.partner_id, order?.return_policy_snapshot, storePolicy]);
 
+    // Lazy load attachments only when the attachments tab is active
     useEffect(() => {
-        if (!order?.id) return;
+        if (!order?.id || activeTab !== "attachments") return;
+        if (attachments.length > 0) return;
         setLoadingAttachments(true);
         getOrderAttachmentsAction(order.id)
             .then(res => {
@@ -490,7 +493,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
             })
             .catch(err => console.error("Erro ao carregar anexos:", err))
             .finally(() => setLoadingAttachments(false));
-    }, [order?.id]);
+    }, [order?.id, activeTab, attachments.length]);
 
     const handleDownloadAttachment = async (fileKey: string, fileName: string) => {
         try {
@@ -625,20 +628,40 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const canRequestResolution = canRequestPostFulfillmentResolution(order);
     const isPaidOrPartiallyPaid = ["paid", "partially_paid"].includes(order.situation);
     const showReturnRequestButton = isPaidOrPartiallyPaid && !canRequestOrderCancellation(order) && !isCancelled && hasReturnableItems && !storeDeleted;
+    const policyCommercial = (activeReturnRequest?.policy_snapshot || order.return_policy_snapshot)?.commercial;
+    const acceptsStoreCredit = policyCommercial ? (policyCommercial.accepts_store_credit ?? true) : (storePolicy ? (storePolicy.acceptsStoreCredit ?? true) : true);
+    const acceptsSizeExchange = policyCommercial ? (policyCommercial.accepts_size_exchange ?? true) : (storePolicy ? (storePolicy.acceptsSizeExchange ?? true) : true);
+    const acceptsColorExchange = policyCommercial ? (policyCommercial.accepts_color_exchange ?? true) : (storePolicy ? (storePolicy.acceptsColorExchange ?? true) : true);
+    const acceptsAnyExchange = acceptsSizeExchange || acceptsColorExchange;
+
+    const showExchangeOption = !hasOnlyServices && order.delivery_status === "delivered" && acceptsAnyExchange;
+    const showStoreCreditOption = acceptsStoreCredit;
+
+    const resolutionOptions = useMemo(() => {
+        const opts: { value: "exchange" | "refund" | "store_credit"; label: string }[] = [];
+        if (showExchangeOption) {
+            opts.push({ value: "exchange", label: "Troca" });
+        }
+        opts.push({ value: "refund", label: "Reembolso" });
+        if (showStoreCreditOption) {
+            opts.push({ value: "store_credit", label: "Vale-compra" });
+        }
+        return opts;
+    }, [showExchangeOption, showStoreCreditOption]);
+
+    useEffect(() => {
+        if (resolutionOptions.length > 0 && !resolutionOptions.some(opt => opt.value === returnResolution)) {
+            setReturnResolution(resolutionOptions[0].value);
+        }
+    }, [resolutionOptions, returnResolution]);
+
     const returnButtonLabel = order.delivery_status === "delivered"
-        ? "Solicitar troca ou devolução"
-        : "Solicitar reembolso ou vale-compra";
+        ? (showExchangeOption ? "Solicitar troca ou devolução" : "Solicitar devolução")
+        : (showStoreCreditOption ? "Solicitar reembolso ou vale-compra" : "Solicitar reembolso");
     const returnHistoryCount = Array.isArray(order.return_requests) ? order.return_requests.length : 0;
 
     const showConfirmReceiptButton = !isCancelled && hasProducts && ["sent", "shipped", "out_for_delivery"].includes(order.delivery_status || "");
     const showConfirmExecutionButton = !isCancelled && hasAnyService && order.delivery_status !== "delivered";
-
-    const showExchangeOption = !hasOnlyServices && order.delivery_status === "delivered";
-    const resolutionOptions = [
-        ...(showExchangeOption ? [{ value: "exchange", label: "Troca" }] : []),
-        { value: "refund", label: "Reembolso" },
-        { value: "store_credit", label: "Vale-compra" },
-    ];
 
     const renderFulfillmentButtons = () => {
         if (showConfirmReceiptButton && showConfirmExecutionButton) {
@@ -741,16 +764,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     })();
 
     // Address Type Resolution
-    const matchedAddress = userAddresses.find(a => {
-        const cleanDelivery = String(order.delivery_address || "").toLowerCase().replace(/\s/g, "");
-        const cleanStreet = String(a.street || "").toLowerCase().replace(/\s/g, "");
-        const cleanNumber = String(a.number || "").toLowerCase().replace(/\s/g, "");
-        return cleanDelivery.includes(cleanStreet) && cleanDelivery.includes(cleanNumber);
-    });
-
-    const addressTypeLabel = matchedAddress
-        ? (matchedAddress.address_type === "casa" ? "Casa" : matchedAddress.address_type === "trabalho" ? "Trabalho" : "Outro")
-        : null;
+    const addressTypeLabel = "Endereço de Entrega";
 
     // ERP style detail row helper
     const DetailRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
@@ -1013,7 +1027,13 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                     const content = (
                         <>
                             <div className="w-14 h-14 bg-white border border-brand-border dark:border-dark-border rounded-lg flex items-center justify-center shrink-0">
-                                <img src={itemImage} alt={item.products?.name || item.product_name} className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal rounded-[4px]" />
+                                <img
+                                    src={itemImage}
+                                    alt={item.products?.name || item.product_name}
+                                    loading="lazy"
+                                    decoding="async"
+                                    className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal rounded-full"
+                                />
                             </div>
                             <div className="flex-1 min-w-0">
                                 <h3 className="font-bold text-brand-dark dark:text-dark-heading text-sm truncate group-hover:text-brand-green transition-colors">
@@ -1774,7 +1794,13 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                             }
                                                         }}
                                                     />
-                                                    <img src={itemImage} alt={item.products?.name || item.product_name} className="h-12 w-12 rounded-lg border border-brand-border object-contain shrink-0" />
+                                                    <img
+                                                        src={itemImage}
+                                                        alt={item.products?.name || item.product_name}
+                                                        loading="lazy"
+                                                        decoding="async"
+                                                        className="h-12 w-12 rounded-lg border border-brand-border object-contain shrink-0"
+                                                    />
                                                     <div className="flex-1 min-w-0">
                                                         <p className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">
                                                             {item.products?.name || item.product_name}
@@ -1891,7 +1917,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                         />
 
                         <div className="space-y-3">
-                            <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading">Evidencias</h4>
+                            <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading">Evidências</h4>
                             <div className="max-w-full overflow-x-auto">
                                 <ProductImagesSection
                                     images={returnEvidence}

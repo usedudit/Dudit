@@ -4,7 +4,7 @@ import React from "react"
 import { motion } from "framer-motion"
 import { Checkbox, Badge, ActionsDropdown, Tooltip } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils";
-import { ShoppingCartIcon, ArrowDownIcon, ArrowUpIcon, ReturnIcon, MoneyIcon, TruckIcon } from "@/lib/icons"
+import { ShoppingCartIcon, ArrowDownIcon, ArrowUpIcon, ReturnIcon, MoneyIcon, TruckIcon, StoreIcon } from "@/lib/icons"
 import { PaymentMethodIndicator } from "../transactions/PaymentMethodIndicator"
 
 interface ColumnDef {
@@ -153,7 +153,7 @@ const OrderListItem = React.memo(
                                 </Badge>
                             )}
                             {!order.hasOnlyServices && order.situation !== "cancelled" && (
-                                <Badge variant={order.deliveryStatusColor || "gray"} icon={<TruckIcon />}>
+                                <Badge variant={order.deliveryStatusColor || "gray"} icon={order.delivery_type === "pickup" ? <StoreIcon /> : <TruckIcon />}>
                                     {order.deliveryStatusLabel || "Não informado"}
                                 </Badge>
                             )}

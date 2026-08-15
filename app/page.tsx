@@ -111,6 +111,30 @@ async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, city
     )
 }
 
+function HomeFeedSkeleton() {
+    return (
+        <div className="w-full bg-white flex-grow">
+            <section className="mt-6 mb-12 px-4 lg:px-0 flex justify-center w-full">
+                <div className="w-full max-w-[1400px] rounded-xl bg-gray-100 animate-pulse aspect-[16/9] sm:aspect-[2.1/1] md:aspect-[2.2/1] lg:aspect-[2.5/1]" />
+            </section>
+            <div className="mx-auto max-w-[1400px] px-4 xl:px-0 space-y-10 pb-12">
+                <div className="space-y-4">
+                    <div className="h-6 w-48 bg-gray-200 rounded animate-pulse" />
+                    <div className="flex gap-4 overflow-hidden">
+                        {[1, 2, 3, 4, 5, 6].map((i) => (
+                            <div key={i} className="w-[190px] sm:w-[210px] shrink-0 space-y-3">
+                                <div className="w-full aspect-square bg-gray-100 rounded-2xl animate-pulse" />
+                                <div className="h-4 bg-gray-100 rounded w-3/4 animate-pulse" />
+                                <div className="h-4 bg-gray-100 rounded w-1/2 animate-pulse" />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
 export default async function HomePage() {
     // Fetches required for the header
     const user = await getCurrentUser()
@@ -187,13 +211,7 @@ export default async function HomePage() {
         <div className="bg-white min-h-screen font-sans text-brand-dark flex flex-col pt-[110px] lg:pt-[108px]">
             <MarketplaceHeader currentView="home" userProfile={userProfile} cartCount={cartCount} />
 
-            <Suspense
-                fallback={
-                    <div className="flex items-center justify-center min-h-[50vh] w-full pt-10">
-                        <ThreeDotsLoader />
-                    </div>
-                }
-            >
+            <Suspense fallback={<HomeFeedSkeleton />}>
                 <ProductFeedWrapper
                     user={user}
                     userProfile={userProfile}

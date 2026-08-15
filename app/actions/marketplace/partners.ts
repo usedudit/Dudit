@@ -154,12 +154,22 @@ async function _getPartnerProducts(partnerId: string, storeId?: string) {
     let fallback_variant_price: number | null = null
 
     if (variants && variants.length > 0) {
-      const withImage = variants.find((v: any) => v.is_active && v.variant_options?.image)
-      const first = variants.find((v: any) => v.is_active) || variants[0]
+      const activeVariants = variants.filter((v: any) => v.is_active !== false)
+      const withImage = activeVariants.find((v: any) => v.variant_options?.image) || variants.find((v: any) => v.variant_options?.image)
       fallback_variant_image = withImage?.variant_options?.image || null
-      const priceAdj = first?.price_adjustment
-      fallback_variant_price = priceAdj && priceAdj > 0 ? priceAdj : null
+      const prices = (activeVariants.length > 0 ? activeVariants : variants)
+        .map((v: any) => Number(v.price_adjustment || 0))
+        .filter((p: number) => p > 0)
+      fallback_variant_price = prices.length > 0 ? Math.min(...prices) : null
     }
+
+    const basePrice = Number(item.promotional_price || item.price || 0)
+    const price = (!item.promotional_price && fallback_variant_price)
+      ? Number(fallback_variant_price)
+      : (basePrice > 0 ? basePrice : Number(fallback_variant_price || 0))
+    const originalPrice = item.promotional_price
+      ? (Number(item.price) > 0 ? Number(item.price) : (fallback_variant_price ? Number(fallback_variant_price) : undefined))
+      : undefined
 
     const { product_variants, ...rest } = item
     return {
@@ -168,6 +178,8 @@ async function _getPartnerProducts(partnerId: string, storeId?: string) {
       subcategory: item.subcategory?.name || null,
       brand: item.brand?.name || null,
       location: item.location?.name || null,
+      price,
+      originalPrice,
       fallback_variant_image,
       fallback_variant_price
     }
@@ -406,12 +418,22 @@ export const getCachedPartnerProducts = async (partnerId: string, storeId?: stri
         let fallback_variant_price: number | null = null
 
         if (variants && variants.length > 0) {
-          const withImage = variants.find((v: any) => v.is_active && v.variant_options?.image)
-          const first = variants.find((v: any) => v.is_active) || variants[0]
+          const activeVariants = variants.filter((v: any) => v.is_active !== false)
+          const withImage = activeVariants.find((v: any) => v.variant_options?.image) || variants.find((v: any) => v.variant_options?.image)
           fallback_variant_image = withImage?.variant_options?.image || null
-          const priceAdj = first?.price_adjustment
-          fallback_variant_price = priceAdj && priceAdj > 0 ? priceAdj : null
+          const prices = (activeVariants.length > 0 ? activeVariants : variants)
+            .map((v: any) => Number(v.price_adjustment || 0))
+            .filter((p: number) => p > 0)
+          fallback_variant_price = prices.length > 0 ? Math.min(...prices) : null
         }
+
+        const basePrice = Number(item.promotional_price || item.price || 0)
+        const price = (!item.promotional_price && fallback_variant_price)
+          ? Number(fallback_variant_price)
+          : (basePrice > 0 ? basePrice : Number(fallback_variant_price || 0))
+        const originalPrice = item.promotional_price
+          ? (Number(item.price) > 0 ? Number(item.price) : (fallback_variant_price ? Number(fallback_variant_price) : undefined))
+          : undefined
 
         const { product_variants, ...rest } = item
         return {
@@ -420,6 +442,8 @@ export const getCachedPartnerProducts = async (partnerId: string, storeId?: stri
           subcategory: item.subcategory?.name || null,
           brand: item.brand?.name || null,
           location: item.location?.name || null,
+          price,
+          originalPrice,
           fallback_variant_image,
           fallback_variant_price
         }

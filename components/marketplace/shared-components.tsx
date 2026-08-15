@@ -29,12 +29,15 @@ const HOME_CATEGORIES = [
 export const HeroBanner: React.FC<{ height?: number }> = ({ height = 300 }) => {
     return (
         <section className="mt-6 mb-12 px-4 lg:px-0 group flex justify-center w-full">
-            <div className={`w-[82vw] md:w-full max-w-[1400px] h-[${height}px] relative rounded-[20px] overflow-hidden cursor-pointer select-none active:scale-[0.99] hover:shadow-lg transition-all duration-300`}>
+            <div className="relative w-full rounded-xl overflow-hidden cursor-pointer select-none transition-all duration-300 bg-gray-100 aspect-[16/9] sm:aspect-[2.1/1] md:aspect-[2.2/1] lg:aspect-[2.5/1]">
                 <img
                     src="https://img.dudit.com.br/static/banners/Banner-1.png"
                     alt="Dudit"
-                    className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-500"
-                    loading="lazy"
+                    width={1400}
+                    height={560}
+                    className="w-full h-full object-cover object-center transition-transform duration-500"
+                    fetchPriority="high"
+                    decoding="async"
                 />
             </div>
         </section>
@@ -58,7 +61,7 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
         partner.store_image_url ||
         partner.profile_image_url ||
         null
-    const storeAvatar = rawStoreAvatar ? getR2ImageUrl(rawStoreAvatar) : null
+    const storeAvatar = rawStoreAvatar ? getR2ImageUrl(rawStoreAvatar, "thumb") : null
     const hasPartnerLogo = !!rawStoreAvatar && !String(rawStoreAvatar).includes("Placeholder.png")
 
     // Resolve banner logic strictly using banner_url (never logo_url)
@@ -67,7 +70,7 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
     const fallbackBanner = hasPartnerLogo
         ? getRandomDefaultBanner()
         : getBannerUrlByColor(getAvatarColor(storeName))
-    const bannerImage = bannerUrl ? getR2ImageUrl(bannerUrl) : fallbackBanner
+    const bannerImage = bannerUrl ? getR2ImageUrl(bannerUrl, "medium") : fallbackBanner
     const city = partner.city || vitrine.city || ""
     const state = partner.state || vitrine.state || ""
     const category = vitrine.category || partner.category || (typeof partner.category === "string" ? partner.category : null)
@@ -263,7 +266,7 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
     const { user } = useSupabase()
     const router = useRouter()
     const { isFavorited, toggleFavorite } = useFavorites()
-    const imageUrl = getPrimaryProductDisplayImage(product)
+    const imageUrl = getPrimaryProductDisplayImage(product, "medium")
     const rawDistance = product.partners?.distance_km_formatted || null
     const distance = rawDistance && !rawDistance.includes("Infinity") ? rawDistance : null
     const partner = Array.isArray(product.partners) ? product.partners[0] : product.partners
@@ -281,7 +284,7 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
     }, [user, router, toggleFavorite, product.id, itemType, isOwner])
 
     const rawPartnerImage = partner?.store_avatar || partner?.store_image_url || partner?.profile_image_url || null
-    const partnerImageUrl = rawPartnerImage ? getR2ImageUrl(rawPartnerImage) : null
+    const partnerImageUrl = rawPartnerImage ? getR2ImageUrl(rawPartnerImage, "thumb") : null
     const partnerId = partner?.id || null
     const sellerName = partner?.store_name || (product.partners as any)?.store_name || 'Vendedor'
     const sellerCategory = (product as any).category as string | null | undefined
@@ -315,18 +318,43 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
 
     const variantLowestPrice = useMemo(() => {
         const variants = (product as any).product_variants || (product as any).variants
-        if (!variants || variants.length === 0) return null
+        if (!variants || variants.length === 0) {
+            if ((product as any).fallback_variant_price != null && Number((product as any).fallback_variant_price) > 0) {
+                return Number((product as any).fallback_variant_price)
+            }
+            return null
+        }
         const activeVariants = variants.filter((v: any) => v.is_active !== false)
-        if (activeVariants.length === 0) return null
+        if (activeVariants.length === 0) {
+            if ((product as any).fallback_variant_price != null && Number((product as any).fallback_variant_price) > 0) {
+                return Number((product as any).fallback_variant_price)
+            }
+            return null
+        }
         const basePrice = Number(product.originalPrice) || Number(product.price) || 0
-        const prices = activeVariants.map((v: any) => basePrice + Number(v.price_adjustment || 0))
-        return Math.min(...prices)
-    }, [(product as any).product_variants, (product as any).variants, product.price, product.originalPrice])
+        const prices = activeVariants
+            .map((v: any) => {
+                const adj = Number(v.price_adjustment ?? v.price ?? 0)
+                if (adj > 0) return adj
+                return basePrice > 0 ? basePrice : 0
+            })
+            .filter((p: number) => p > 0)
+
+        if (prices.length > 0) {
+            return Math.min(...prices)
+        }
+        if ((product as any).fallback_variant_price != null && Number((product as any).fallback_variant_price) > 0) {
+            return Number((product as any).fallback_variant_price)
+        }
+        return null
+    }, [(product as any).product_variants, (product as any).variants, (product as any).fallback_variant_price, product.price, product.originalPrice])
 
     const pricing = useMemo(() => {
-        const hasVariants = !!(product as any).product_variants?.length || !!(product as any).variants?.length
+        const hasVariants = !!(product as any).product_variants?.length || !!(product as any).variants?.length || !!(product as any).fallback_variant_price
         const basePrice = Number(product.originalPrice) || Number(product.price) || 0
-        const effectivePrice = hasVariants && variantLowestPrice !== null ? variantLowestPrice : basePrice
+        const effectivePrice = (hasVariants && variantLowestPrice !== null && (basePrice === 0 || variantLowestPrice > 0))
+            ? (basePrice > 0 && !hasVariants ? basePrice : variantLowestPrice)
+            : (basePrice > 0 ? basePrice : (variantLowestPrice || 0))
         const individualPromo = hasVariants ? null : (product.originalPrice ? Number(product.price) : null)
         return computeItemDisplayPrice(
             effectivePrice,
@@ -334,7 +362,7 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
             activePromotions,
             { productId: itemType === "produto" ? product.id : undefined, serviceId: itemType === "servico" ? product.id : undefined, categoryId: (product as any).category_id || undefined },
         )
-    }, [activePromotions, product.price, product.originalPrice, product.id, itemType, (product as any).category_id, variantLowestPrice])
+    }, [activePromotions, product.price, product.originalPrice, product.id, itemType, (product as any).category_id, variantLowestPrice, (product as any).product_variants, (product as any).variants, (product as any).fallback_variant_price])
 
     const displayPrice = pricing.bestPrice
     const referencePrice = pricing.referencePrice

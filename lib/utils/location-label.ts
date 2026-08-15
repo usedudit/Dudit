@@ -56,7 +56,7 @@ export function getLocationLabel(partner: LocationPartner | null | undefined, co
         if (neighborhood) return neighborhood
         const distance = partner.distance_km_formatted
         if (distance) return distance
-        return null
+        return partner.city || null
     }
 
     if (sellerCity && ctxState && sellerState === ctxState) return partner.city || null

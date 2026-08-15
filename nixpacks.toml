@@ -1,5 +1,6 @@
 [phases.setup]
 aptPkgs = [
+  "postgresql-client",
   "chromium",
   "fonts-liberation",
   "fonts-noto-color-emoji",

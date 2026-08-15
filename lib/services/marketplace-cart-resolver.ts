@@ -89,7 +89,7 @@ export async function resolveCheckoutCartLines(
     .select(`
       id, user_id, partner_id, item_type, product_id, variant_id, service_id,
       recurring_plan_id, quantity, booking_metadata, pay_deposit_only, fulfillment_mode,
-      products(id, name, price, promotional_price, is_active, stock_available, category_id, product_type, fulfillment_modes, images, cost_price),
+      products(id, name, price, promotional_price, is_active, stock_available, category_id, product_type, fulfillment_modes, images, cost_price, allow_sell_without_stock),
       product_variants(id, variant_name, price_adjustment, stock_available, is_active),
       services(id, name, price, promotional_price, is_active, fulfillment_modes, payment_requirement, buffer_minutes, images, category_id, cost_price),
       recurring_plans(
@@ -149,13 +149,13 @@ export async function resolveCheckoutCartLines(
       if (variantId && row.product_variants) {
         const variant = row.product_variants
         if (!variant.is_active) return { success: false, error: "Variante indisponível." }
-        if ((variant.stock_available ?? 0) < qty) {
+        if (!product.allow_sell_without_stock && (variant.stock_available ?? 0) < qty) {
           return { success: false, error: `Estoque insuficiente: ${variant.variant_name}` }
         }
         unitPrice = Number(variant.price_adjustment || product.price)
         lineName = `${product.name} - ${variant.variant_name}`
       } else {
-        if ((product.stock_available ?? 0) < qty) {
+        if (!product.allow_sell_without_stock && (product.stock_available ?? 0) < qty) {
           return { success: false, error: `Estoque insuficiente: ${product.name}` }
         }
         const base = Number(product.price)

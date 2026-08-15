@@ -55,8 +55,8 @@ export function GoogleAdSenseFallback({
     }
 
     return (
-        <div className={`overflow-hidden rounded-2xl bg-gray-50 border border-gray-100 p-2 text-center ${className}`}>
-            <span className="block text-[10px] font-medium text-gray-400 mb-1">Publicidade</span>
+        <div className={`overflow-hidden rounded-xl bg-gray-50 border border-gray-200/80 p-2 text-center flex flex-col items-center justify-center min-h-[72px] sm:min-h-[90px] ${className}`}>
+            <span className="block text-[9px] font-bold text-gray-400 mb-0.5 tracking-wider uppercase">Publicidade</span>
             <ins
                 ref={adRef}
                 className="adsbygoogle"

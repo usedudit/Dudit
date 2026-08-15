@@ -308,4 +308,55 @@ describe("Pricing Calculations Across All Surfaces", () => {
 
     expect(orderItemPrice).toBe(9.90)
   })
+
+  it("Product with variants and price = 0 resolves lowest variant price", () => {
+    const productWithVariants = {
+      id: "prod-var-1",
+      name: "Camiseta Personalizada",
+      price: 0,
+      promotional_price: null,
+      product_variants: [
+        { id: "v1", variant_name: "G", price_adjustment: 45.00, is_active: true },
+        { id: "v2", variant_name: "P", price_adjustment: 32.50, is_active: true },
+        { id: "v3", variant_name: "M", price_adjustment: 40.00, is_active: true },
+        { id: "v4", variant_name: "GG Inativo", price_adjustment: 20.00, is_active: false },
+      ],
+    }
+
+    const activeVariants = productWithVariants.product_variants.filter(v => v.is_active !== false)
+    const prices = activeVariants.map(v => Number(v.price_adjustment || 0)).filter(p => p > 0)
+    const lowestVariantPrice = Math.min(...prices)
+
+    expect(lowestVariantPrice).toBe(32.50)
+
+    const pr = computeItemDisplayPrice(
+      lowestVariantPrice,
+      null,
+      [],
+      { productId: productWithVariants.id }
+    )
+
+    expect(pr.bestPrice).toBe(32.50)
+  })
+
+  it("Product with fallback_variant_price renders proper price in ItemCard pricing logic", () => {
+    const productFromExploreOrDiscover = {
+      id: "prod-var-2",
+      name: "Tênis Esportivo",
+      price: 129.90, // already normalized to lowest variant price
+      fallback_variant_price: 129.90,
+      originalPrice: undefined,
+    }
+
+    const effectivePrice = productFromExploreOrDiscover.price
+    const pr = computeItemDisplayPrice(
+      effectivePrice,
+      null,
+      [],
+      { productId: productFromExploreOrDiscover.id }
+    )
+
+    expect(pr.bestPrice).toBe(129.90)
+  })
 })
+

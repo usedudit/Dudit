@@ -89,6 +89,15 @@ function sanitizeUnknown(value: unknown, key?: string, depth = 0): unknown {
   return SENTRY_REDACTED_VALUE
 }
 
+/**
+ * Sanitizes arbitrary metadata before it is attached to a monitoring event.
+ * This is intentionally exported so application code never needs to duplicate
+ * Sentry's PII rules when adding context or breadcrumbs.
+ */
+export function sanitizeMonitoringData(value: unknown): unknown {
+  return sanitizeUnknown(value)
+}
+
 function sanitizeRecord(value: unknown): Record<string, unknown> | undefined {
   const sanitized = sanitizeUnknown(value)
   return sanitized && typeof sanitized === "object" && !Array.isArray(sanitized)

@@ -3,7 +3,7 @@
 import React from "react"
 import { motion } from "framer-motion"
 import { Checkbox, Badge, Button, ActionsDropdown } from "@/components/reusable"
-import { StoreIcon } from "@/lib/icons"
+import { StarIcon, StoreIcon } from "@/lib/icons"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import type { StoreRow } from "./StoreGridCard"
 
@@ -62,7 +62,7 @@ const StoreListRow = React.memo(
                                 <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 flex items-center gap-1.5">
                                     <span className="truncate max-w-[150px] xl:max-w-[250px]">{store.name}</span>
                                     {store.is_headquarters && (
-                                        <Badge variant="blue" className="shrink-0">Matriz</Badge>
+                                        <Badge variant="blue" className="whitespace-nowrap scale-90 shrink-0" icon={<StarIcon />}>Matriz</Badge>
                                     )}
                                 </span>
                                 <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">

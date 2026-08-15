@@ -439,11 +439,13 @@ async function handler(request: NextRequest) {
       let resolvedPartnerId: string
       let resolvedVariantId: string | null = null
 
+      let allowSellWithoutStock = false
+
       if (item.variant_id) {
         if (isDev) console.log("Validating variant with ID:", item.variant_id)
         const { data: variant } = await adminClient
           .from("product_variants")
-          .select("id, price_adjustment, stock_available, product_id, products!inner(partner_id, price, promotional_price)")
+          .select("id, price_adjustment, stock_available, product_id, products!inner(partner_id, price, promotional_price, allow_sell_without_stock)")
           .eq("id", item.variant_id)
           .single()
 
@@ -460,11 +462,12 @@ async function handler(request: NextRequest) {
         resolvedPartnerId = parentProduct.partner_id
         resolvedProductId = variant.product_id // Use product_id from variant
         resolvedVariantId = variant.id
+        allowSellWithoutStock = Boolean(parentProduct?.allow_sell_without_stock)
       } else {
         // Se não houver variant_id, buscar como produto padrão
         const { data: product } = await adminClient
           .from("products")
-          .select("id, price, promotional_price, stock_available, partner_id")
+          .select("id, price, promotional_price, stock_available, partner_id, allow_sell_without_stock")
           .eq("id", item.id)
           .single()
 
@@ -476,6 +479,7 @@ async function handler(request: NextRequest) {
           resolvedStock = product.stock_available
           resolvedPartnerId = product.partner_id
           resolvedProductId = product.id
+          allowSellWithoutStock = Boolean(product?.allow_sell_without_stock)
         } else {
           // Nenhum dos dois funcionou
           SecureLogger.warn("Product not found during payment", { productId: item.id })
@@ -491,7 +495,7 @@ async function handler(request: NextRequest) {
       }
 
       // SEGURANÃ‡A: Verificar estoque
-      if (resolvedStock < item.quantity) {
+      if (!allowSellWithoutStock && resolvedStock < item.quantity) {
         SecureLogger.warn("Insufficient stock", { productId: item.id, available: resolvedStock, requested: item.quantity })
         return NextResponse.json({ error: `Estoque insuficiente para ${item.name}` }, { status: 400 })
       }

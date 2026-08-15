@@ -27,6 +27,7 @@ import {
     getOrderAmountPaid,
     getOrderSubtotalOriginal,
 } from "@/lib/returns/calculations"
+import { captureError, addMonitoringBreadcrumb } from "@/lib/monitoring/sentry"
 
 // ─── Segurança: Constantes de Reembolso ────────────────────────────────────
 
@@ -47,6 +48,11 @@ const RETURN_STATUS_SET = new Set([
     "EXPIRED",
     "ESCALATED",
 ])
+
+function getReturnUserMessage(error: unknown, fallback: string): string {
+    if (error && typeof error === "object" && "code" in error) return fallback
+    return error instanceof Error && error.message ? error.message : fallback
+}
 
 const MANAGE_ROLES = new Set(["owner", "admin", "manager"])
 const VIEW_ROLES = new Set(["owner", "admin", "manager", "operator"])
@@ -497,9 +503,18 @@ export async function getReturnRequestDetailsAction(partnerId: string, requestId
 
 export async function createReturnRequestAction(input: unknown) {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+    let partnerId: string | undefined
+    let orderId: string | undefined
+    let userId: string | undefined
+    let resolution: string | undefined
     try {
         const user = await requireUser()
         const data = createReturnSchema.parse(input)
+        partnerId = data.partnerId
+        orderId = data.orderId
+        userId = user.id
+        resolution = data.resolution
+        addMonitoringBreadcrumb({ domain: "returns", message: "create.started", metadata: { entityId: orderId, partnerId, resolution } })
         await requireMinimumPlan(data.partnerId, "crescer")
         const access = await requirePermission(data.partnerId, "orders", "edit")
         assertRole(access.roleId, MANAGE_ROLES)
@@ -595,25 +610,42 @@ export async function createReturnRequestAction(input: unknown) {
         await revalidateReturns(data.partnerId, data.orderId, requestId)
         return successResponse({ id: requestId })
     } catch (e: any) {
-        return errorResponse(e?.message || "Erro ao criar devolução")
+        captureError(e, {
+            module: "returns",
+            action: "create_return_request",
+            userId,
+            partnerId,
+            entityId: orderId,
+            metadata: { resolution },
+        })
+        return errorResponse(getReturnUserMessage(e, "Não foi possível criar a devolução. Tente novamente."))
     }
 }
 
 export async function createMarketplaceReturnRequestAction(input: Omit<z.infer<typeof createReturnSchema>, "partnerId">) {
     await requireRateLimit(RateLimitCategory.ORDER_CREATE)
+    let partnerId: string | undefined
+    let orderId: string | undefined
+    let userId: string | undefined
+    let resolution: string | undefined
     try {
         const user = await requireUser()
         const base = createReturnSchema.omit({ partnerId: true }).parse(input)
+        orderId = base.orderId
+        userId = user.id
+        resolution = base.resolution
         await requireOrderAccess(base.orderId)
         const supabase = createAdminClient()
 
         const { data: order, error: orderError } = await supabase
             .from("orders")
-            .select("id, partner_id, buyer_id, store_id, situation, delivery_status, order_number")
+            .select("id, partner_id, buyer_id, store_id, situation, delivery_status, order_number, return_policy_snapshot")
             .eq("id", base.orderId)
             .single()
 
         if (orderError || !order) throw new Error("Pedido nao encontrado")
+        partnerId = order.partner_id
+        addMonitoringBreadcrumb({ domain: "returns", message: "marketplace_create.started", metadata: { entityId: orderId, partnerId, resolution } })
         if (order.buyer_id !== user.id) throw new Error("Sem permissao")
         if (order.situation !== "paid" && order.situation !== "partially_paid") {
             throw new Error("Não é permitido criar solicitação para pedidos não pagos.")
@@ -639,12 +671,36 @@ export async function createMarketplaceReturnRequestAction(input: Omit<z.infer<t
         const returnedItemIds = new Set(base.items.map((item: any) => item.order_item_id))
         const returnedServices = orderItems.filter((item: any) => returnedItemIds.has(item.id) && (item.service_id || item.line_type === "service_booking"))
 
+        // Validate seller policy for resolutions (vale-compra / troca)
+        let commercialPolicy = (order.return_policy_snapshot as any)?.commercial
+        if (!commercialPolicy) {
+            const { data: policyRow } = await supabase
+                .from("partner_return_policies")
+                .select("accepts_store_credit, accepts_size_exchange, accepts_color_exchange")
+                .eq("partner_id", order.partner_id)
+                .maybeSingle()
+            if (policyRow) {
+                commercialPolicy = {
+                    accepts_store_credit: policyRow.accepts_store_credit,
+                    accepts_size_exchange: policyRow.accepts_size_exchange,
+                    accepts_color_exchange: policyRow.accepts_color_exchange,
+                }
+            }
+        }
+
+        if (base.resolution === "store_credit" && commercialPolicy?.accepts_store_credit === false) {
+            throw new Error("Esta loja não aceita vale-compra para devoluções.")
+        }
+
         if (base.resolution === "exchange") {
             if (order.delivery_status !== "delivered") {
                 throw new Error("A troca só é permitida para pedidos concluídos (entregues/executados).")
             }
             if (returnedServices.length > 0) {
                 throw new Error("Não é permitido realizar troca de itens de serviço.")
+            }
+            if (commercialPolicy && commercialPolicy.accepts_size_exchange === false && commercialPolicy.accepts_color_exchange === false) {
+                throw new Error("Esta loja não aceita trocas para este pedido.")
             }
         }
 
@@ -661,7 +717,10 @@ export async function createMarketplaceReturnRequestAction(input: Omit<z.infer<t
             p_idempotency_key: base.idempotencyKey || crypto.randomUUID(),
             p_expires_at: base.expiresAt || null,
             p_request_type: null,
+            p_origin_request_id: null,
+            p_origin_type: null,
             p_store_id: order.store_id || null,
+            p_customer_id: order.buyer_id || null,
         })
 
         if (error) throw error
@@ -706,7 +765,15 @@ export async function createMarketplaceReturnRequestAction(input: Omit<z.infer<t
 
         return successResponse({ id: requestId })
     } catch (e: any) {
-        return errorResponse(e?.message || "Erro ao enviar solicitação")
+        captureError(e, {
+            module: "returns",
+            action: "create_marketplace_return_request",
+            userId,
+            partnerId,
+            entityId: orderId,
+            metadata: { resolution },
+        })
+        return errorResponse(getReturnUserMessage(e, "Não foi possível enviar a solicitação. Tente novamente."))
     }
 }
 
@@ -754,7 +821,10 @@ export async function createMarketplaceCancellationRequestAction(input: unknown)
             p_idempotency_key: data.idempotencyKey || `cancel:${data.orderId}:${user.id}`,
             p_expires_at: null,
             p_request_type: "cancellation",
+            p_origin_request_id: null,
+            p_origin_type: null,
             p_store_id: order.store_id || null,
+            p_customer_id: order.buyer_id || null,
         })
 
         if (error) throw error

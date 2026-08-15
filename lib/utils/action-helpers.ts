@@ -8,6 +8,7 @@ import type { ActionResponse } from "@/lib/types/action-response"
 import { AUTH_MESSAGES, GENERIC_MESSAGES } from "@/lib/constants/messages"
 import { z } from "zod"
 import { validateCSRFForAction } from "@/lib/security/csrf-middleware"
+import { captureError } from "@/lib/monitoring/sentry"
 
 /**
  * Wrapper para validação CSRF em actions
@@ -190,6 +191,12 @@ export async function handleDatabaseOperation<T>(
 
     if (error) {
       console.error("Erro de banco de dados:", error)
+      captureError(error, {
+        module: "database",
+        action: "handle_database_operation",
+        errorCode: error?.code,
+        metadata: { details: error?.details, hint: error?.hint },
+      })
       return {
         success: false,
         error: errorMessage || GENERIC_MESSAGES.DATABASE_ERROR,
@@ -207,6 +214,10 @@ export async function handleDatabaseOperation<T>(
     return { success: true, data }
   } catch (error) {
     console.error("Erro em handleDatabaseOperation:", error)
+    captureError(error, {
+      module: "database",
+      action: "handle_database_operation",
+    })
     return {
       success: false,
       error: GENERIC_MESSAGES.INTERNAL_ERROR,

@@ -16,9 +16,8 @@ export type ProductImageSource = {
   variants?: VariantLike[] | null
 }
 
-function resolveMediaUrl(path: string): string {
-  if (path.startsWith("http://") || path.startsWith("https://")) return path
-  return getR2ImageUrl(path)
+function resolveMediaUrl(path: string, size?: "thumb" | "thumbnail" | "medium" | "large"): string {
+  return getR2ImageUrl(path, size)
 }
 
 function findVariantImage(variants: VariantLike[]): string | null {
@@ -28,35 +27,41 @@ function findVariantImage(variants: VariantLike[]): string | null {
 }
 
 /** Listing/card images: product photos first, then variant fallback, then variant images, then video thumbnail, then placeholder. */
-export function getProductDisplayImages(product: ProductImageSource): string[] {
+export function getProductDisplayImages(
+  product: ProductImageSource,
+  size?: "thumb" | "thumbnail" | "medium" | "large",
+): string[] {
   const ownImages = (product.images || []).filter(
     (img): img is string => typeof img === "string" && img.trim().length > 0,
   )
 
   if (ownImages.length > 0) {
-    return ownImages.map(resolveMediaUrl)
+    return ownImages.map((img) => resolveMediaUrl(img, size))
   }
 
   if (product.fallback_variant_image && String(product.fallback_variant_image).trim()) {
-    return [resolveMediaUrl(String(product.fallback_variant_image))]
+    return [resolveMediaUrl(String(product.fallback_variant_image), size)]
   }
 
   const variants = product.product_variants || product.variants
   if (variants && variants.length > 0) {
     const variantImg = findVariantImage(variants)
     if (variantImg) {
-      return [resolveMediaUrl(variantImg)]
+      return [resolveMediaUrl(variantImg, size)]
     }
   }
 
   const videoThumb = product.video_thumbnail
   if (videoThumb && String(videoThumb).trim()) {
-    return [resolveMediaUrl(String(videoThumb))]
+    return [resolveMediaUrl(String(videoThumb), size)]
   }
 
   return [PLACEHOLDER]
 }
 
-export function getPrimaryProductDisplayImage(product: ProductImageSource): string {
-  return getProductDisplayImages(product)[0]
+export function getPrimaryProductDisplayImage(
+  product: ProductImageSource,
+  size?: "thumb" | "thumbnail" | "medium" | "large",
+): string {
+  return getProductDisplayImages(product, size)[0]
 }

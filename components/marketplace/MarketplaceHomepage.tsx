@@ -685,9 +685,7 @@ export default function MarketplaceHome({
                     })}
                 </div>
 
-                {homeAds.length > 0 && (
-                    <SponsoredAdsCarousel ads={homeAds} slot="home" title="Patrocinados na sua região" />
-                )}
+                <SponsoredAdsCarousel ads={homeAds || []} slot="home" title="Patrocinados na sua região" />
 
                 {renderAddressModal()}
                 {renderVisitorModal()}

@@ -38,17 +38,6 @@ export function MarketplaceBottomMenu() {
         pathname.startsWith("/quote") ||
         pathname.startsWith("/print")
 
-    // Dynamically apply bottom padding to body to prevent bottom bar from overlapping content
-    useEffect(() => {
-        if (!isExcluded) {
-            document.body.classList.add("max-lg:pb-[72px]")
-        } else {
-            document.body.classList.remove("max-lg:pb-[72px]")
-        }
-        return () => {
-            document.body.classList.remove("max-lg:pb-[72px]")
-        }
-    }, [isExcluded])
 
     if (isExcluded) return null
 

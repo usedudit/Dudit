@@ -31,6 +31,7 @@ import { applySaleToGoals, reverseSaleFromGoals } from "@/lib/services/sales-goa
 import type { PaymentBreakdownEntry } from "@/lib/payments/financial-engine"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 import { resolveDeliverySettingsRow } from "@/app/actions/shared/delivery"
+import { buildNotificationContent } from "@/lib/notifications/templates"
 
 export type ERPItemPayload = {
     productId?: string | null
@@ -4025,6 +4026,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
         const firstOrder = currentOrders?.[0]
         if (!firstOrder) return
 
+        const { buildNotificationContent } = await import("@/lib/notifications/templates")
         const { data: store } = await supabase
             .from("stores")
             .select("name")
@@ -4042,18 +4044,22 @@ export async function updateOrdersStatusInBatchAction(payload: {
             }
             const situation = paymentStatusMap[payload.statusValue] || payload.statusValue
 
-            const sysTitle = situation === "paid" ? "✅ Pagamento confirmado!" : situation === "partially_paid" ? "💳 Pagamento parcial" : "⏳ Pagamento pendente"
-            const sysMsg = situation === "paid"
-                ? `Oba! O pagamento de alguns pedidos seus em ${storeName} foi aprovado. 🎉`
-                : situation === "partially_paid"
-                    ? `Olá! Recebemos um pagamento parcial de alguns pedidos seus em ${storeName}.`
-                    : `Olá! O pagamento de alguns pedidos seus em ${storeName} está pendente.`
-            const partnerTitle = situation === "paid" ? "💰 Pagamento confirmado!" : situation === "partially_paid" ? "💳 Pagamento parcial recebido" : "⏳ Pagamento pendente"
-            const partnerMsg = situation === "paid"
-                ? `Sucesso! O pagamento de ${currentOrders?.length || 0} pedidos foi confirmado.`
-                : situation === "partially_paid"
-                    ? `${currentOrders?.length || 0} pedidos receberam pagamento parcial.`
-                    : `${currentOrders?.length || 0} pedidos estão com pagamento pendente.`;
+            const orderCount = currentOrders?.length || 0
+            const isBatch = orderCount > 1
+            const customerNotifType = (situation === "paid" ? "order_paid" : "order_created") as import("@/lib/notifications/types").NotificationType
+            const customerNotif = (buildNotificationContent as any)(customerNotifType, "customer", {
+                isBatch,
+                batchCount: orderCount,
+                orderNumber: firstOrder.order_number,
+                storeName,
+            })
+            const partnerNotif = (buildNotificationContent as any)("order_paid", "seller", {
+                isBatch,
+                batchCount: orderCount,
+                orderNumber: firstOrder.order_number,
+                storeName,
+                customerName: firstOrder.customer_name || "cliente",
+            })
 
             // System notification consolidated via Central Resolver (In-App + External Channel)
             (async () => {
@@ -4061,17 +4067,18 @@ export async function updateOrdersStatusInBatchAction(payload: {
                 if (firstOrder.buyer_id) {
                     await createNotification({
                         userId: firstOrder.buyer_id as string,
-                        type: situation === "paid" ? "order_paid" : "order_created",
-                        title: sysTitle,
-                        message: sysMsg,
+                        type: customerNotifType,
+                        title: customerNotif.title,
+                        message: customerNotif.message,
                         entityType: "order",
                         entityId: firstOrder.id,
                         data: {
                             audience: "customer",
                             partner_id: payload.partnerId,
                             storeName,
-                            isBatch: true,
-                            batchCount: currentOrders?.length || 2,
+                            isBatch,
+                            batchCount: orderCount,
+                            order_number: firstOrder.order_number,
                             customer_id: firstOrder.customer_id || undefined,
                         },
                         idempotencyKey: `bulk_payment:customer:${payload.partnerId}:${payload.orderIds.sort().join(",")}`,
@@ -4083,11 +4090,18 @@ export async function updateOrdersStatusInBatchAction(payload: {
                     await createNotification({
                         userId,
                         type: "order_paid",
-                        title: partnerTitle,
-                        message: partnerMsg,
+                        title: partnerNotif.title,
+                        message: partnerNotif.message,
                         entityType: "order",
                         entityId: firstOrder.id,
-                        data: { audience: "seller", partner_id: payload.partnerId, count: currentOrders?.length },
+                        data: {
+                            audience: "seller",
+                            partner_id: payload.partnerId,
+                            count: orderCount,
+                            isBatch,
+                            batchCount: orderCount,
+                            order_number: firstOrder.order_number,
+                        },
                         idempotencyKey: `bulk_payment:seller:${payload.partnerId}:${userId}:${payload.orderIds.sort().join(",")}`,
                         origin: "manual",
                     })
@@ -4097,41 +4111,42 @@ export async function updateOrdersStatusInBatchAction(payload: {
 
         if (payload.actionType === "delivery_status" && payload.statusValue) {
             const deliveryStatus = payload.statusValue
+            const orderCount = currentOrders?.length || 0
+            const isBatch = orderCount > 1
 
-            const sysTitle = deliveryStatus === "delivered" ? "✅ Pedidos entregues" : deliveryStatus === "sent" ? "🚚 Pedidos enviados" : deliveryStatus === "pickup_available" ? "📦 Pedidos prontos para retirada" : "📦 Pedidos em preparação"
-            const sysMsg = deliveryStatus === "delivered"
-                ? `Tudo certo! Alguns pedidos seus em ${storeName} foram entregues.`
-                : deliveryStatus === "sent"
-                    ? `Olá! Alguns pedidos seus em ${storeName} foram enviados para entrega.`
-                    : deliveryStatus === "pickup_available"
-                        ? `Olá! Alguns pedidos seus em ${storeName} estão prontos para retirada.`
-                        : `Olá! Alguns pedidos seus em ${storeName} estão sendo preparados.`
-            const partnerMsg = deliveryStatus === "delivered"
-                ? `${currentOrders?.length || 0} pedidos foram entregues.`
-                : deliveryStatus === "sent"
-                    ? `${currentOrders?.length || 0} pedidos foram enviados para entrega.`
-                    : deliveryStatus === "pickup_available"
-                        ? `${currentOrders?.length || 0} pedidos estão prontos para retirada.`
-                        : `${currentOrders?.length || 0} pedidos estão em preparação.`;
+            const notifType = (deliveryStatus === "delivered" ? "order_delivered" : deliveryStatus === "sent" ? "order_shipped" : "order_created") as import("@/lib/notifications/types").NotificationType
+            const customerNotif = (buildNotificationContent as any)(notifType, "customer", {
+                isBatch,
+                batchCount: orderCount,
+                orderNumber: firstOrder.order_number,
+                storeName,
+            })
+            const partnerNotif = (buildNotificationContent as any)(notifType, "seller", {
+                isBatch,
+                batchCount: orderCount,
+                orderNumber: firstOrder.order_number,
+                storeName,
+                customerName: firstOrder.customer_name || "cliente",
+            })
 
             // System notification consolidated via Central Resolver (In-App + External Channel)
             (async () => {
                 const { createNotification, getPartnerTeamUserIds } = await import("@/lib/services/notification.service")
-                const notifType = deliveryStatus === "delivered" ? "order_delivered" : deliveryStatus === "sent" ? "order_shipped" : "order_created"
                 if (firstOrder.buyer_id) {
                     await createNotification({
                         userId: firstOrder.buyer_id as string,
                         type: notifType,
-                        title: sysTitle,
-                        message: sysMsg,
+                        title: customerNotif.title,
+                        message: customerNotif.message,
                         entityType: "order",
                         entityId: firstOrder.id,
                         data: {
                             audience: "customer",
                             partner_id: payload.partnerId,
                             storeName,
-                            isBatch: true,
-                            batchCount: currentOrders?.length || 2,
+                            isBatch,
+                            batchCount: orderCount,
+                            order_number: firstOrder.order_number,
                             customer_id: firstOrder.customer_id || undefined,
                         },
                         idempotencyKey: `bulk_delivery:customer:${payload.partnerId}:${payload.orderIds.sort().join(",")}`,
@@ -4143,11 +4158,18 @@ export async function updateOrdersStatusInBatchAction(payload: {
                     await createNotification({
                         userId,
                         type: notifType,
-                        title: sysTitle,
-                        message: partnerMsg,
+                        title: partnerNotif.title,
+                        message: partnerNotif.message,
                         entityType: "order",
                         entityId: firstOrder.id,
-                        data: { audience: "seller", partner_id: payload.partnerId, count: currentOrders?.length, isBatch: true, batchCount: currentOrders?.length || 2 },
+                        data: {
+                            audience: "seller",
+                            partner_id: payload.partnerId,
+                            count: orderCount,
+                            isBatch,
+                            batchCount: orderCount,
+                            order_number: firstOrder.order_number,
+                        },
                         idempotencyKey: `bulk_delivery:seller:${payload.partnerId}:${userId}:${payload.orderIds.sort().join(",")}`,
                         origin: "manual",
                     })

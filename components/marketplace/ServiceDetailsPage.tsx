@@ -1221,7 +1221,7 @@ export function ServiceDetailsPageClient({
                         </div>
                     ) : isLoadingSlots ? (
                         <div className="flex flex-col items-center justify-center py-10 gap-3">
-                            <div className="w-6 h-6 border-2 border-brand-green border-t-transparent rounded-full animate-spin" />
+                            <Spinner />
                             <span className="text-sm text-brand-inactive-text font-medium">Verificando disponibilidade...</span>
                         </div>
                     ) : isClosedOnSelectedDate ? (

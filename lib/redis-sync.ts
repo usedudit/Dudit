@@ -36,18 +36,21 @@ export function computeExploreRedisScore(
   return rankScore * 1e6 + timePart
 }
 
-// Extrai imagem e preço da primeira variante ativa como fallback
-function extractFirstVariantFallback(variants: any[] | null | undefined, basePrice: number) {
+// Extrai imagem e menor preço das variantes ativas como fallback
+function extractFirstVariantFallback(variants: any[] | null | undefined, basePrice?: number) {
   if (!variants || variants.length === 0) return { fallback_variant_image: null, fallback_variant_price: null }
 
-  const withImage = variants.find((v: any) => v.is_active && v.variant_options?.image)
-  const first = variants.find((v: any) => v.is_active) || variants[0]
-
+  const activeVariants = variants.filter((v: any) => v.is_active !== false)
+  const withImage = activeVariants.find((v: any) => v.variant_options?.image) || variants.find((v: any) => v.variant_options?.image)
   const image = withImage?.variant_options?.image || null
-  const priceAdj = first?.price_adjustment
-  const price = priceAdj && priceAdj > 0 ? priceAdj : null
 
-  return { fallback_variant_image: image, fallback_variant_price: price }
+  const prices = (activeVariants.length > 0 ? activeVariants : variants)
+    .map((v: any) => Number(v.price_adjustment || 0))
+    .filter((p: number) => p > 0)
+
+  const lowestPrice = prices.length > 0 ? Math.min(...prices) : null
+
+  return { fallback_variant_image: image, fallback_variant_price: lowestPrice }
 }
 
 /**

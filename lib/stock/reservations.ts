@@ -1,4 +1,5 @@
 import "server-only"
+import { captureError } from "@/lib/monitoring/sentry"
 
 type StockItem = {
   product_id?: string | null
@@ -10,7 +11,7 @@ type StockItem = {
 }
 
 type StockClient = {
-  rpc: (fn: string, args?: Record<string, unknown>) => Promise<{ data: any; error: { message?: string } | null }>
+  rpc: (fn: string, args?: Record<string, unknown>) => Promise<{ data: any; error: { message?: string; code?: string } | null }>
 }
 
 export const FINAL_DELIVERY_STATUSES = new Set(["sent", "delivered"])
@@ -34,6 +35,12 @@ function normalizeItems(items: StockItem[]) {
 async function executeInventoryRpc(client: StockClient, fn: string, args: Record<string, unknown>) {
   const { data, error } = await client.rpc(fn, args)
   if (error) {
+    captureError(error, {
+      module: "stock",
+      action: fn,
+      errorCode: error.code,
+      metadata: { rpc: fn },
+    })
     return { error: error.message || "Falha ao atualizar o estoque." }
   }
 

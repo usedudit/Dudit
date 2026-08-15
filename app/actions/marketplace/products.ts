@@ -352,16 +352,20 @@ export const getCachedRelatedProducts = async (partnerId: string, currentProduct
           state: null
         }
 
-        const fallbackUrl = item.product_variants?.[0]?.variant_options?.image || null
-        const fallbackPrice = item.product_variants?.[0]?.price_adjustment || null
+        const variantFallback = extractFirstVariantFallback(item.product_variants, Number(item.price))
+        const basePrice = Number(item.promotional_price || item.price || 0)
+        const effectivePrice = (!item.promotional_price && variantFallback.fallback_variant_price)
+          ? Number(variantFallback.fallback_variant_price)
+          : (basePrice > 0 ? basePrice : Number(variantFallback.fallback_variant_price || 0))
 
         const { product_variants, ...rest } = item as any
         return {
           ...rest,
           category: item.category?.name || null,
           partners: partner,
-          fallback_variant_image: fallbackUrl,
-          fallback_variant_price: fallbackPrice
+          price: effectivePrice,
+          fallback_variant_image: variantFallback.fallback_variant_image,
+          fallback_variant_price: variantFallback.fallback_variant_price
         }
       })
 
@@ -388,15 +392,19 @@ export const getCachedExploreProducts = async (query: string, type: MarketplaceS
   return { items: results, moreDistantSellers, moreDistantItems }
 }
 
-// Helper to extract fallback values from product variants
-function extractFirstVariantFallback(variants: any[] | null | undefined, basePrice: number) {
+function extractFirstVariantFallback(variants: any[] | null | undefined, basePrice?: number) {
   if (!variants || variants.length === 0) return { fallback_variant_image: null, fallback_variant_price: null }
-  const withImage = variants.find((v: any) => v.is_active && v.variant_options?.image)
-  const first = variants.find((v: any) => v.is_active) || variants[0]
+  const activeVariants = variants.filter((v: any) => v.is_active !== false)
+  const withImage = activeVariants.find((v: any) => v.variant_options?.image) || variants.find((v: any) => v.variant_options?.image)
   const image = withImage?.variant_options?.image || null
-  const priceAdj = first?.price_adjustment
-  const price = priceAdj && priceAdj > 0 ? priceAdj : null
-  return { fallback_variant_image: image, fallback_variant_price: price }
+
+  const prices = (activeVariants.length > 0 ? activeVariants : variants)
+    .map((v: any) => Number(v.price_adjustment || 0))
+    .filter((p: number) => p > 0)
+
+  const lowestPrice = prices.length > 0 ? Math.min(...prices) : null
+
+  return { fallback_variant_image: image, fallback_variant_price: lowestPrice }
 }
 const cityResolveCache = new Map<string, { city: string; state: string } | null>()
 
@@ -564,12 +572,17 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
       state: rawStore?.addresses?.[0]?.state || null
     } : null
     const variantFallback = extractFirstVariantFallback(item.product_variants, Number(item.price))
+    const basePrice = Number(item.promotional_price || item.price || 0)
+    const effectivePrice = (!item.promotional_price && variantFallback.fallback_variant_price)
+      ? Number(variantFallback.fallback_variant_price)
+      : (basePrice > 0 ? basePrice : Number(variantFallback.fallback_variant_price || 0))
     const { product_variants, ...rest } = item
     return {
       ...rest,
       category: item.category?.name || null,
       itemType: 'produto',
       partners: partner,
+      price: effectivePrice,
       ...variantFallback
     }
   })
