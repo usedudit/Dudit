@@ -8,6 +8,7 @@ import { useDropzone } from "react-dropzone"
 import { useNotification } from "@/hooks/use-notification"
 import { useSidebar } from "@/lib/sidebar-context"
 import { uploadPlanilhaAction, confirmImportAction, applyMappingAction } from "@/app/actions/erp/spreadsheet-import"
+import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import type { ColumnMapping } from "@/lib/erp/import/types"
 import { FadeIn } from "@/components/animations/FadeIn"
 
@@ -226,7 +227,7 @@ function CustomerPreviewRow({
             </td>
             <td className="py-4 px-3 align-middle">
                 <span className="text-[13px] text-brand-dark dark:text-dark-heading font-medium">
-                    {customer.phone || "-"}
+                    {formatBrazilPhone(customer.phone || "") || "-"}
                 </span>
             </td>
             <td className="py-4 px-3 align-middle">

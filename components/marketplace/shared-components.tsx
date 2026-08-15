@@ -31,7 +31,9 @@ export const HeroBanner: React.FC<{ height?: number }> = ({ height = 300 }) => {
         <section className="mt-6 mb-12 px-4 lg:px-0 group flex justify-center w-full">
             <div className="relative w-full rounded-xl overflow-hidden cursor-pointer select-none transition-all duration-300 bg-gray-100 aspect-[16/9] sm:aspect-[2.1/1] md:aspect-[2.2/1] lg:aspect-[2.5/1]">
                 <img
-                    src="https://img.dudit.com.br/static/banners/Banner-1.png"
+                    src="https://img.dudit.com.br/cdn-cgi/image/width=1400,format=auto,quality=85/static/banners/Banner-1.png"
+                    srcSet="https://img.dudit.com.br/cdn-cgi/image/width=750,format=auto,quality=80/static/banners/Banner-1.png 750w, https://img.dudit.com.br/cdn-cgi/image/width=1400,format=auto,quality=85/static/banners/Banner-1.png 1400w"
+                    sizes="(max-width: 768px) 100vw, 1400px"
                     alt="Dudit"
                     width={1400}
                     height={560}
@@ -303,17 +305,14 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
     })
 
     useEffect(() => {
-        if (preloadedPromos) {
-            setActivePromotions(preloadedPromos)
+        if (preloadedPromos || !partnerId || promotionsValueCache[partnerId]) {
             return
         }
-        if (partnerId) {
-            if (promotionsValueCache[partnerId]) {
-                setActivePromotions(promotionsValueCache[partnerId])
-            } else {
-                getCachedPartnerPromotions(partnerId).then(setActivePromotions)
+        getCachedPartnerPromotions(partnerId).then((promos) => {
+            if (promos && promos.length > 0) {
+                setActivePromotions(promos)
             }
-        }
+        })
     }, [partnerId, preloadedPromos])
 
     const variantLowestPrice = useMemo(() => {
@@ -676,30 +675,30 @@ export const HorizontalCarousel = ({
 
     useEffect(() => {
         const el = scrollContainerRef.current
-        if (el) {
-            checkScroll()
-            let rafId: number
-            let debounceTimer: ReturnType<typeof setTimeout>
-            const handleScroll = () => {
-                cancelAnimationFrame(rafId)
-                rafId = requestAnimationFrame(checkScroll)
-            }
-            const handleResize = () => {
-                clearTimeout(debounceTimer)
-                debounceTimer = setTimeout(checkScroll, 150)
-            }
-            el.addEventListener("scroll", handleScroll, { passive: true })
-            window.addEventListener("resize", handleResize, { passive: true })
+        if (!el || typeof window === "undefined" || window.innerWidth < 1024) return
 
-            const timer = setTimeout(checkScroll, 500)
+        checkScroll()
+        let rafId: number
+        let debounceTimer: ReturnType<typeof setTimeout>
+        const handleScroll = () => {
+            cancelAnimationFrame(rafId)
+            rafId = requestAnimationFrame(checkScroll)
+        }
+        const handleResize = () => {
+            clearTimeout(debounceTimer)
+            debounceTimer = setTimeout(checkScroll, 150)
+        }
+        el.addEventListener("scroll", handleScroll, { passive: true })
+        window.addEventListener("resize", handleResize, { passive: true })
 
-            return () => {
-                el.removeEventListener("scroll", handleScroll)
-                window.removeEventListener("resize", handleResize)
-                clearTimeout(timer)
-                cancelAnimationFrame(rafId)
-                clearTimeout(debounceTimer)
-            }
+        const timer = setTimeout(checkScroll, 500)
+
+        return () => {
+            el.removeEventListener("scroll", handleScroll)
+            window.removeEventListener("resize", handleResize)
+            clearTimeout(timer)
+            cancelAnimationFrame(rafId)
+            clearTimeout(debounceTimer)
         }
     }, [items])
 
@@ -756,7 +755,7 @@ export const HorizontalCarousel = ({
             <div
                 ref={scrollContainerRef}
                 className="flex gap-4 overflow-x-auto scrollbar-none snap-x snap-mandatory scroll-smooth pb-3 px-1"
-                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch', willChange: 'transform' }}
+                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}
             >
                 {banner && (
                     <div className="snap-start shrink-0 w-[170px] h-auto">

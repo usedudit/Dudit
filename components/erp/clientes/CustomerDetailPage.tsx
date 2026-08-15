@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion';
 import { EditIcon, ChevronLeftIcon, ThreeDotsIcon, StarIcon, ShoppingCartIcon, MoneyIcon, TruckIcon, StoreIcon, Users, CreditCardIcon } from '@/lib/icons';
 import { Button, Badge, Tabs, TabsList, TabsTrigger, TabsContent, ActionsDropdown, ThreeDotsLoader, AlertModal, CustomerCard } from '@/components/reusable';
+import { formatBrazilPhone } from "@/lib/utils/phone-utils";
 import Pagination from '@/components/reusable/Pagination';
 import { useNotification } from '@/hooks/use-notification';
 import { ReviewsSection } from '@/components/marketplace/ReviewsSection';
@@ -615,13 +616,13 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                         {customer.phone && (
                                                             <div className="flex justify-between items-center py-2">
                                                                 <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">Telefone</span>
-                                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{customer.phone}</span>
+                                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatBrazilPhone(customer.phone)}</span>
                                                             </div>
                                                         )}
                                                         {customer.mobile && (
                                                             <div className="flex justify-between items-center py-2">
                                                                 <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">Celular</span>
-                                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{customer.mobile}</span>
+                                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatBrazilPhone(customer.mobile)}</span>
                                                             </div>
                                                         )}
                                                         {customer.email && (

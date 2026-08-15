@@ -94,10 +94,23 @@ export function PushNotificationManager() {
       }
     }
 
-    setup()
+    let idleHandle: number | ReturnType<typeof setTimeout> | null = null
+
+    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+      idleHandle = (window as any).requestIdleCallback(() => setup(), { timeout: 4000 })
+    } else {
+      idleHandle = setTimeout(setup, 3000)
+    }
 
     return () => {
       cancelled = true
+      if (idleHandle !== null) {
+        if (typeof window !== "undefined" && "cancelIdleCallback" in window && typeof idleHandle === "number") {
+          (window as any).cancelIdleCallback(idleHandle)
+        } else {
+          clearTimeout(idleHandle as any)
+        }
+      }
       if (unsubscribeForeground) unsubscribeForeground()
     }
   }, [user?.id])

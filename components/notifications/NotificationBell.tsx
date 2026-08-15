@@ -63,10 +63,12 @@ export function NotificationBell({
         />
         {badge}
       </Button>
-      <NotificationsSheet
-        isOpen={panelOpen}
-        onClose={() => setPanelOpen(false)}
-      />
+      {panelOpen && (
+        <NotificationsSheet
+          isOpen={panelOpen}
+          onClose={() => setPanelOpen(false)}
+        />
+      )}
     </div>
   )
 }

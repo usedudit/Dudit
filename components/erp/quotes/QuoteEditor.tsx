@@ -205,9 +205,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                     </div>
 
                     {/* 1. PRODUCT SEARCH & TABLE */}
-                    <div className="mb-8">
-                        <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading mb-6">Itens da Proposta</h3>
-
+                    <FormSection title="Itens da Proposta" className="mb-8">
                         <div ref={searchRef} className="relative mb-6">
                             {!itemsLocked && (
                                 <Input
@@ -580,14 +578,10 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                 Adicionar item manual
                             </Button>
                         )}
-                    </div>
-
-                    <div className="border-t border-brand-border dark:border-dark-border w-full my-8"></div>
+                    </FormSection>
 
                     {/* 2. CUSTOMER SECTION */}
-                    <div className="hidden lg:block mb-8">
-                        <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading mb-6">Cliente</h3>
-
+                    <FormSection title="Cliente" hasSeparator>
                         {props.selectedCustomer ? (
                             <div className="flex items-center justify-between p-4 rounded-xl bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border">
                                 <div className="flex gap-4 items-center">
@@ -623,14 +617,10 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                 } : undefined}
                             />
                         )}
-                    </div>
-
-                    <div className="hidden lg:block border-t border-brand-border dark:border-dark-border w-full my-8"></div>
+                    </FormSection>
 
                     {/* 3. SETTINGS SECTION */}
-                    <div className="mb-8">
-                        <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading mb-6">Configurações</h3>
-
+                    <FormSection title="Configurações" hasSeparator>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
                             <DatePicker
                                 label="Data Emissão"
@@ -729,17 +719,13 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                 disabled={financialLocked}
                             />
                         </div>
-                    </div>
+                    </FormSection>
                 </FadeIn>
             </TabsContent>
 
             <TabsContent value="Layout" className="mt-0 focus-visible:outline-none">
                 <FadeIn key="Layout">
-                    <div className="mb-8">
-                        <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading mb-6 flex items-center gap-2">
-                            <SparklesIcon size={20} className="text-brand-dark dark:text-dark-heading" /> Personalizar Aparência
-                        </h3>
-
+                    <FormSection title="Personalizar Aparência">
                         <div className="space-y-6">
                             <div>
                                 <label className="block text-[13px] font-bold text-brand-dark dark:text-dark-heading mb-3">Temas de Cor</label>
@@ -832,13 +818,13 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                 <Switch checked={props.showDecoration} onCheckedChange={() => props.setShowDecoration(!props.showDecoration)} />
                             </div>
                         </div>
-                    </div>
+                    </FormSection>
                 </FadeIn>
             </TabsContent>
 
             <TabsContent value="Observações" className="mt-0 focus-visible:outline-none">
                 <FadeIn key="Observações">
-                    <div className="bg-white dark:bg-dark-surface p-0 space-y-8">
+                    <FormSection title="Observações" className="bg-white dark:bg-dark-surface p-0 space-y-8">
                         <div>
                             <p className="text-xs text-brand-inactive-text dark:text-dark-body mb-4">Texto visível ao cliente na proposta / PDF.</p>
                             <FormTextarea
@@ -865,7 +851,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                 showCharacterCount
                             />
                         </div>
-                    </div>
+                    </FormSection>
                 </FadeIn>
             </TabsContent>
         </div>

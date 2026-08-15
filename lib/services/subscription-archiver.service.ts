@@ -2,7 +2,7 @@ import "server-only"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { buildArchivePayload } from "@/lib/supabase/query-helpers"
 import { removeFromExploreRedis } from "@/lib/redis-sync"
-import { getPartnerPlan } from "@/lib/services/subscription.service"
+import { getPartnerPlan, invalidatePartnerPlanCache } from "@/lib/services/subscription.service"
 
 export interface ArchivingSummary {
   archivedProductsCount: number
@@ -70,6 +70,13 @@ export async function enforcePlanLimitsAndArchiveExcess(
           await Promise.all(
             excessIds.map((id: string) => removeFromExploreRedis(id, "produto"))
           )
+
+          // Sync usage counter to active products count
+          const remainingActiveCount = activeProducts.length - excessIds.length
+          await admin
+            .from("usage_counters")
+            .update({ products_count: remainingActiveCount, updated_at: new Date().toISOString() })
+            .eq("partner_id", partnerId)
         }
       }
     }
@@ -102,6 +109,13 @@ export async function enforcePlanLimitsAndArchiveExcess(
           await Promise.all(
             excessIds.map((id: string) => removeFromExploreRedis(id, "servico"))
           )
+
+          // Sync usage counter to active services count
+          const remainingActiveCount = activeServices.length - excessIds.length
+          await admin
+            .from("usage_counters")
+            .update({ services_count: remainingActiveCount, updated_at: new Date().toISOString() })
+            .eq("partner_id", partnerId)
         }
       }
     }
@@ -135,5 +149,7 @@ export async function enforcePlanLimitsAndArchiveExcess(
     }
   }
 
+  invalidatePartnerPlanCache(partnerId)
   return summary
 }
+

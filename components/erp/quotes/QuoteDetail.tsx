@@ -750,10 +750,10 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                                         Link de Aprovação Online
                                                     </h3>
                                                     <div className="flex flex-col items-center text-center py-4">
-                                                        <img src={PLAN_UPGRADE_MASCOTS.crescer} alt="Crescer" className="w-16 h-16 mb-3 opacity-60" />
+                                                        <img src={PLAN_UPGRADE_MASCOTS.crescer} alt="Crescer" className="w-16 h-16 mb-3" />
                                                         <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading mb-1">Disponível nos planos Crescer e Escalar</p>
                                                         <p className="text-xs text-brand-inactive-text mb-4">Compartilhe o orçamento online e receba aprovação dos clientes em tempo real.</p>
-                                                        <Button onClick={() => openPlanUpgrade("crescer")} className="text-xs h-9">
+                                                        <Button onClick={() => openPlanUpgrade("crescer")} className="h-9">
                                                             Fazer upgrade
                                                         </Button>
                                                     </div>

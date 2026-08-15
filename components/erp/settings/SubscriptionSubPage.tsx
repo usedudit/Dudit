@@ -1015,7 +1015,10 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
                     title="Cancelar assinatura"
                 >
                     <div className="space-y-5 py-2">
-                        <InfoCard title="Poxa, que pena!" message={`Você vai perder os recursos do plano ${subData?.plan?.name || "atual"} e voltar para o plano Grátis. Se mudar de ideia depois, é só assinar novamente`} />
+                        <InfoCard
+                            title="Acesso garantido até o fim do ciclo"
+                            message={`Ao cancelar a renovação, você continuará com acesso total aos recursos do plano ${subData?.plan?.name || "atual"} até ${nextInvoiceDate ? formatDate(nextInvoiceDate) : "o fim do período pago"}. Nenhuma nova cobrança será realizada. Após essa data, sua conta migrará para o plano Grátis e produtos/serviços excedentes serão arquivados (nunca excluídos).`}
+                        />
 
                         <div className="flex flex-col sm:flex-row gap-3 pt-2">
                             <Button
@@ -1035,7 +1038,7 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
                                 }}
                                 disabled={!!actionLoading}
                             >
-                                Cancelar assinatura
+                                Cancelar renovação
                             </Button>
                         </div>
                     </div>
@@ -1047,10 +1050,10 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
                     onClose={() => setCancelConfirmOpen(false)}
                     onConfirm={handleCancel}
                     title="Confirmar cancelamento"
-                    message="Tem certeza que quer cancelar sua assinatura? Você perderá o acesso aos recursos do plano atual."
+                    message="Tem certeza que deseja cancelar a renovação? Nenhuma nova cobrança será feita e você manterá o acesso total aos recursos do seu plano até o fim do ciclo vigente."
                     variant="danger"
-                    confirmText="Sim, cancelar"
-                    cancelText="Não, manter"
+                    confirmText="Sim, cancelar renovação"
+                    cancelText="Não, manter plano"
                     isLoading={actionLoading === "cancel"}
                     disabled={!!actionLoading}
                 />

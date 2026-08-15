@@ -3,6 +3,7 @@
 import { useMemo } from "react"
 import { formatCurrency } from "@/lib/utils"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import {
     DEFAULT_RECEIPT_ACKNOWLEDGMENT,
     type SaleReceiptData,
@@ -152,7 +153,7 @@ const SaleReceiptA4Preview = ({
                             {page.type === "first" && (
                                 <>
                                     <div className="px-8 py-6">
-                                        <div className="grid grid-cols-3 gap-4 border-b border-brand-border pb-6 w-full">
+                                        <div className="grid grid-cols-3 gap-4 border-b border-gray-100 pb-6 w-full">
                                             <div className="flex flex-col">
                                                 <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Pedido</span>
                                                 <span className="font-bold text-sm text-brand-dark">{data.orderNumber}</span>
@@ -176,14 +177,14 @@ const SaleReceiptA4Preview = ({
                                                     {data.partner.legalName && data.partner.legalName !== data.partner.fantasyName && (
                                                         <p>{data.partner.legalName}</p>
                                                     )}
-                                                    {data.partner.phone && <p>{data.partner.phone}</p>}
+                                                    {data.partner.phone && <p>{formatBrazilPhone(data.partner.phone)}</p>}
                                                 </div>
                                             </div>
                                             <div>
                                                 <h3 className="font-bold text-sm text-brand-dark mb-3">Dados do cliente</h3>
                                                 <div className="text-xs text-gray-600 space-y-1">
                                                     <p className="font-bold text-brand-dark">{data.customerName}</p>
-                                                    {data.customerPhone && <p>{data.customerPhone}</p>}
+                                                    {data.customerPhone && <p>{formatBrazilPhone(data.customerPhone)}</p>}
                                                     {data.customerAddress && <p className="whitespace-pre-wrap">{data.customerAddress}</p>}
                                                 </div>
                                             </div>

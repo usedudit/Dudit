@@ -6,15 +6,18 @@ import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
 import { ShoppingBagIcon, MapPinIcon, ChevronDownIcon, SearchIcon, ChevronRightIcon, ChevronLeftIcon, Package, HeartIcon, ShareIcon, XIcon } from "@/lib/icons"
 import { useSupabase } from "@/providers/supabase-provider"
-import { Button, DefaultModal, Input, InfoCard } from "@/components/reusable"
+import { Button } from "@/components/reusable/Button"
+import DefaultModal from "@/components/reusable/DefaultModal"
+import { Input } from "@/components/reusable/Input"
+import { InfoCard } from "@/components/reusable/InfoCard"
 import BottomSheet from "@/components/BottomSheet"
 import { getUserInitials, getAvatarColor } from "@/lib/utils/UserProfileImage"
 import { getSearchSuggestionsBucket, getMarketplaceAutocompleteAction } from "@/app/actions/marketplace/suggestions"
 import { useUserSession } from "@/hooks/use-user-session"
 import { useTransitionDirection } from "@/providers/transition-provider"
 import { useLocationRedirect } from "@/hooks/use-location-redirect"
-import citiesData from "@/lib/data/cities.json"
 import { NotificationBell } from "@/components/notifications/NotificationBell"
+import { getCitiesData } from "@/lib/data/cities-loader"
 
 const COMMON_CITY_ACCENTS: Record<string, string> = {
     "sao-paulo": "São Paulo",
@@ -167,16 +170,23 @@ const Header: React.FC<HeaderProps> = ({
     const [isVisitorModalOpen, setIsVisitorModalOpen] = useState(false)
     const [visitorSearchQuery, setVisitorSearchQuery] = useState("")
     const [isIpLoading, setIsIpLoading] = useState(false)
+    const [citiesList, setCitiesList] = useState<string[]>([])
+
+    useEffect(() => {
+        if (isVisitorModalOpen && citiesList.length === 0) {
+            getCitiesData().then(setCitiesList)
+        }
+    }, [isVisitorModalOpen, citiesList.length])
 
     const filteredCities = useMemo(() => {
-        if (!visitorSearchQuery || visitorSearchQuery.trim().length < 2) return []
+        if (!visitorSearchQuery || visitorSearchQuery.trim().length < 2 || citiesList.length === 0) return []
         const q = visitorSearchQuery
             .toLowerCase()
             .normalize("NFD")
             .replace(/[\u0300-\u036f]/g, "")
             .replace(/[-\s]+/g, " ")
             .trim()
-        return (citiesData as string[])
+        return citiesList
             .filter((slug: string) => {
                 const norm = slug
                     .toLowerCase()
@@ -186,7 +196,7 @@ const Header: React.FC<HeaderProps> = ({
                 return norm.includes(q)
             })
             .slice(0, 5)
-    }, [visitorSearchQuery])
+    }, [visitorSearchQuery, citiesList])
 
     const formatCitySlugForDisplay = (slug: string): string => {
         if (!slug) return ""
@@ -259,6 +269,8 @@ const Header: React.FC<HeaderProps> = ({
     }
 
     const renderVisitorModal = () => {
+        if (!isVisitorModalOpen) return null
+
         return (
             <DefaultModal
                 isOpen={isVisitorModalOpen}
@@ -748,87 +760,91 @@ const Header: React.FC<HeaderProps> = ({
 
             {renderMobileHeader()}
 
-            <BottomSheet isOpen={isMobileUserMenuOpen} onClose={() => setIsMobileUserMenuOpen(false)}>
-                <div className="flex flex-col">
-                    <div className="px-6 py-5 border-b border-brand-border flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-full overflow-hidden border border-brand-border shrink-0 flex items-center justify-center font-semibold text-white ${getAvatarColor(fullName)}`}>
-                            {getUserInitials(fullName)}
+            {isMobileUserMenuOpen && (
+                <BottomSheet isOpen={isMobileUserMenuOpen} onClose={() => setIsMobileUserMenuOpen(false)}>
+                    <div className="flex flex-col">
+                        <div className="px-6 py-5 border-b border-brand-border flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-full overflow-hidden border border-brand-border shrink-0 flex items-center justify-center font-semibold text-white ${getAvatarColor(fullName)}`}>
+                                {getUserInitials(fullName)}
+                            </div>
+                            <h3 className="text-[16px] font-bold text-brand-dark">{userName}</h3>
                         </div>
-                        <h3 className="text-[16px] font-bold text-brand-dark">{userName}</h3>
-                    </div>
 
-                    <div className="py-2">
-                        {([
-                            { label: "Seu Perfil", href: "/perfil" },
-                            { label: "Meus Favoritos", href: "/favoritos" },
-                            { label: "Minhas Avaliações", href: "/perfil?tab=avaliacoes" },
-                            { label: "Minhas Coleções", href: "/colecoes" },
-                            { label: "Central do Parceiro", href: "/erp/trocar-erp" },
-                        ] as any[]).map((item, idx) => {
-                            const ItemWrapper: any = item.href ? Link : "div";
-                            const wrapProps = item.href
-                                ? { href: item.href, prefetch: false }
-                                : { onClick: item.action };
+                        <div className="py-2">
+                            {([
+                                { label: "Seu Perfil", href: "/perfil" },
+                                { label: "Meus Favoritos", href: "/favoritos" },
+                                { label: "Minhas Avaliações", href: "/perfil?tab=avaliacoes" },
+                                { label: "Minhas Coleções", href: "/colecoes" },
+                                { label: "Central do Parceiro", href: "/erp/trocar-erp" },
+                            ] as any[]).map((item, idx) => {
+                                const ItemWrapper: any = item.href ? Link : "div";
+                                const wrapProps = item.href
+                                    ? { href: item.href, prefetch: false }
+                                    : { onClick: item.action };
 
-                            return (
-                                <ItemWrapper
-                                    key={idx}
-                                    {...wrapProps}
-                                    className="px-6 py-3 hover:bg-brand-gray cursor-pointer transition-colors block w-full text-left"
-                                    onClick={() => {
-                                        if (wrapProps.onClick) wrapProps.onClick();
-                                        setIsMobileUserMenuOpen(false);
-                                    }}
-                                >
-                                    <span className="text-[15px] font-normal text-brand-inactive-text hover:text-brand-dark">{item.label}</span>
-                                </ItemWrapper>
-                            )
-                        })}
-                    </div>
+                                return (
+                                    <ItemWrapper
+                                        key={idx}
+                                        {...wrapProps}
+                                        className="px-6 py-3 hover:bg-brand-gray cursor-pointer transition-colors block w-full text-left"
+                                        onClick={() => {
+                                            if (wrapProps.onClick) wrapProps.onClick();
+                                            setIsMobileUserMenuOpen(false);
+                                        }}
+                                    >
+                                        <span className="text-[15px] font-normal text-brand-inactive-text hover:text-brand-dark">{item.label}</span>
+                                    </ItemWrapper>
+                                )
+                            })}
+                        </div>
 
-                    <div className="border-t border-gray-100 py-2 mt-2">
-                        <div
-                            className="px-6 py-3 hover:bg-brand-gray cursor-pointer transition-colors"
-                            onClick={handleSignOut}
-                        >
-                            <span className="text-[15px] font-normal text-brand-inactive-text">Sair da sessão</span>
+                        <div className="border-t border-gray-100 py-2 mt-2">
+                            <div
+                                className="px-6 py-3 hover:bg-brand-gray cursor-pointer transition-colors"
+                                onClick={handleSignOut}
+                            >
+                                <span className="text-[15px] font-normal text-brand-inactive-text">Sair da sessão</span>
+                            </div>
                         </div>
                     </div>
-                </div>
-            </BottomSheet>
+                </BottomSheet>
+            )}
 
-            <BottomSheet isOpen={isMobileCategoryMenuOpen} onClose={() => setIsMobileCategoryMenuOpen(false)}>
-                <div className="flex flex-col py-2">
-                    {navigationLinks.map((link) => (
-                        <Link
-                            key={link.label}
-                            href={link.href}
-                            prefetch={false}
-                            onClick={() => setIsMobileCategoryMenuOpen(false)}
-                            className="px-6 py-3 text-[15px] font-normal text-brand-inactive-text hover:bg-brand-gray hover:text-brand-dark transition-colors"
-                        >
-                            {link.label}
-                        </Link>
-                    ))}
-                    <div className="border-t border-gray-100 mt-2 pt-2">
-                        <Link
-                            href="/auth/login?mode=partner"
-                            prefetch={false}
-                            onClick={() => setIsMobileCategoryMenuOpen(false)}
-                            className="px-6 py-3 font-bold text-brand-orange hover:bg-brand-gray cursor-pointer text-[15px] flex items-center gap-1 transition-colors"
-                        >
-                            <span>Anunciar grátis</span>
-                            <ChevronRightIcon size={16} />
-                        </Link>
+            {isMobileCategoryMenuOpen && (
+                <BottomSheet isOpen={isMobileCategoryMenuOpen} onClose={() => setIsMobileCategoryMenuOpen(false)}>
+                    <div className="flex flex-col py-2">
+                        {navigationLinks.map((link) => (
+                            <Link
+                                key={link.label}
+                                href={link.href}
+                                prefetch={false}
+                                onClick={() => setIsMobileCategoryMenuOpen(false)}
+                                className="px-6 py-3 text-[15px] font-normal text-brand-inactive-text hover:bg-brand-gray hover:text-brand-dark transition-colors"
+                            >
+                                {link.label}
+                            </Link>
+                        ))}
+                        <div className="border-t border-gray-100 mt-2 pt-2">
+                            <Link
+                                href="/auth/login?mode=partner"
+                                prefetch={false}
+                                onClick={() => setIsMobileCategoryMenuOpen(false)}
+                                className="px-6 py-3 font-bold text-brand-orange hover:bg-brand-gray cursor-pointer text-[15px] flex items-center gap-1 transition-colors"
+                            >
+                                <span>Anunciar grátis</span>
+                                <ChevronRightIcon size={16} />
+                            </Link>
+                        </div>
                     </div>
-                </div>
-            </BottomSheet>
+                </BottomSheet>
+            )}
 
             <header className="hidden lg:flex flex-col w-full bg-brand-dark fixed top-0 left-0 right-0 z-[100] shadow-md">
                 <div className="w-full h-[68px] flex items-center justify-between max-w-[1400px] px-2 mx-auto gap-4">
                     <Link href="/" prefetch={false} className="cursor-pointer shrink-0 z-[110] pt-1">
                         <img
-                            src="https://img.dudit.com.br/static/Logo.png"
+                            src="https://img.dudit.com.br/cdn-cgi/image/width=140,format=auto,quality=80/static/Logo.png"
                             alt="Dudit"
                             width={140}
                             height={40}

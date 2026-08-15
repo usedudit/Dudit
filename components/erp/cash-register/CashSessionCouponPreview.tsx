@@ -1,6 +1,7 @@
 "use client"
 
 import { formatCurrency } from "@/lib/utils"
+import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 
 const DASH = "-".repeat(60)
 
@@ -73,7 +74,7 @@ export default function CashSessionCouponPreview({ data, type, printMode = false
             <div className="px-3 py-4">
                 <div className="text-center mb-2">
                     <p className="font-bold text-[13px] uppercase tracking-tight">{data.partnerName}</p>
-                    {data.partnerPhone ? <p className="text-[9px] mt-0.5">{data.partnerPhone}</p> : null}
+                    {data.partnerPhone ? <p className="text-[9px] mt-0.5">{formatBrazilPhone(data.partnerPhone)}</p> : null}
                     <p className="text-[10px] mt-0.5">{data.partnerDoc}</p>
                     <p className="text-[9px] mt-1 leading-tight whitespace-pre-line">{partnerAddressFormatted}</p>
                 </div>

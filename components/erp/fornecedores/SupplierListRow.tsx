@@ -4,6 +4,7 @@ import React from "react"
 import { motion } from "framer-motion"
 import { Checkbox, Badge, ActionsDropdown } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils"
+import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 
 interface ColumnDef {
@@ -65,7 +66,7 @@ const SupplierListRow = React.memo(
           return (
             <div className="flex flex-col">
               {supplier.email && <span className="text-[13px] text-brand-dark dark:text-dark-heading truncate max-w-[200px]">{supplier.email}</span>}
-              {supplier.phone && <span className="text-xs text-brand-inactive-text dark:text-dark-body">{supplier.phone}</span>}
+              {supplier.phone && <span className="text-xs text-brand-inactive-text dark:text-dark-body">{formatBrazilPhone(supplier.phone)}</span>}
               {!supplier.email && !supplier.phone && <span className="text-[13px] text-brand-inactive-text">-</span>}
             </div>
           )

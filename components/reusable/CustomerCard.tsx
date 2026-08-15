@@ -5,6 +5,7 @@ import { Button } from "./Button";
 import { TrashIcon } from "@/lib/icons";
 import { UserProfileImage } from "@/lib/utils/UserProfileImage";
 import { formatAddressParts } from "@/lib/utils/format-address";
+import { formatBrazilPhone } from "@/lib/utils/phone-utils";
 
 interface CustomerCardProps {
     customer?: {
@@ -279,7 +280,7 @@ const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, billingA
                             {resolvedPhone && (
                                 <div className="flex items-center gap-2">
                                     <span className="text-sm font-medium text-[#1e40af] dark:text-[#60a5fa] bg-blue-50 dark:bg-blue-900/20 px-3 py-1.5 rounded-lg border border-blue-100 dark:border-blue-900/30 truncate w-full">
-                                        {resolvedPhone}
+                                        {formatBrazilPhone(resolvedPhone)}
                                     </span>
                                 </div>
                             )}

@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion';
 import { EditIcon, ChevronLeftIcon, ThreeDotsIcon, FileTextIcon } from '@/lib/icons';
 import { Button, Badge, Tabs, TabsList, TabsTrigger, TabsContent, ActionsDropdown, ThreeDotsLoader, AlertModal } from '@/components/reusable';
+import { formatBrazilPhone } from "@/lib/utils/phone-utils";
 import Pagination from '@/components/reusable/Pagination';
 import { useNotification } from '@/hooks/use-notification';
 import { deleteSupplierAction, getSupplierXmlImportsAction } from '@/app/actions/erp/suppliers';
@@ -318,7 +319,7 @@ export const SupplierDetailPage = ({ supplier, onBack, onEdit }: Props) => {
                                                         {supplier.phone && (
                                                             <div className="flex justify-between items-center py-2">
                                                                 <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">Telefone</span>
-                                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{supplier.phone}</span>
+                                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatBrazilPhone(supplier.phone)}</span>
                                                             </div>
                                                         )}
                                                         {supplier.email && (
@@ -536,7 +537,7 @@ export const SupplierDetailPage = ({ supplier, onBack, onEdit }: Props) => {
                                                                 )}
                                                                 {supplier.phone && (
                                                                     <div className="flex items-center gap-2">
-                                                                        <span className="text-sm font-medium text-[#1e40af] dark:text-[#60a5fa] bg-blue-50 dark:bg-blue-900/20 px-3 py-1.5 rounded-lg border border-blue-100 dark:border-blue-900/30 w-fit">{supplier.phone}</span>
+                                                                        <span className="text-sm font-medium text-[#1e40af] dark:text-[#60a5fa] bg-blue-50 dark:bg-blue-900/20 px-3 py-1.5 rounded-lg border border-blue-100 dark:border-blue-900/30 w-fit">{formatBrazilPhone(supplier.phone)}</span>
                                                                     </div>
                                                                 )}
                                                             </div>

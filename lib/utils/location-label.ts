@@ -53,7 +53,7 @@ export function getLocationLabel(partner: LocationPartner | null | undefined, co
     // scope === "city"
     if (sellerCity && ctxCity && sellerCity === ctxCity) {
         const neighborhood = String(partner.neighborhood || "").trim()
-        if (neighborhood) return neighborhood
+        if (neighborhood) return `${neighborhood}, ${partner.city}`
         const distance = partner.distance_km_formatted
         if (distance) return distance
         return partner.city || null

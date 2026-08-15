@@ -141,7 +141,7 @@ const SelectCouponSheet = ({
         />
       </div>
 
-      <div className="custom-scrollbar flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto custom-scrollbar p-6 pb-32 relative">
         {loading ? (
           <div className="py-12 flex justify-center"><ThreeDotsLoader /></div>
         ) : coupons.length > 0 ? (

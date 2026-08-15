@@ -114,7 +114,7 @@ export function LimitStatusWidget() {
             <div className="flex items-center justify-between px-5 py-4 border-b border-brand-border dark:border-dark-border">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
-                  <AlertTriangleIcon className="w-4 h-4 text-red-500" />
+                  <AlertTriangleIcon className="w-4 h-4 text-brand-red" />
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading">
@@ -139,13 +139,13 @@ export function LimitStatusWidget() {
                 <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">
                   {limitItem.current} / {limitItem.limit} usados
                 </span>
-                <span className="text-xs font-bold text-red-500">
+                <span className="text-xs font-bold text-brand-red">
                   {limitItem.percentage}%
                 </span>
               </div>
-              <div className="w-full h-2.5 bg-brand-gray/50 dark:bg-dark-border/50 rounded-full overflow-hidden">
+              <div className="w-full h-2 bg-brand-gray/50 dark:bg-dark-border/50 rounded-full overflow-hidden">
                 <div
-                  className="h-full rounded-full bg-red-500 transition-all duration-500"
+                  className="h-2 rounded-full bg-red-500 transition-all duration-500"
                   style={{ width: `${limitItem.percentage}%` }}
                 />
               </div>

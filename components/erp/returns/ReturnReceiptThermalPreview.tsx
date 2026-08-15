@@ -1,6 +1,7 @@
 "use client"
 
 import { formatDate, formatCurrency } from "@/lib/utils"
+import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import type { SaleReceiptPartnerHeader } from "@/lib/sales/sale-receipt"
 
 const DASH = "-".repeat(60)
@@ -88,7 +89,7 @@ export default function ReturnReceiptThermalPreview({
                 {/* Header estabelecimento */}
                 <div className="text-center mb-2">
                     <p className="font-bold text-[13px] uppercase tracking-tight">{partnerHeader.fantasyName || partnerName}</p>
-                    {partnerHeader.phone ? <p className="text-[9px] mt-0.5">{partnerHeader.phone}</p> : null}
+                    {partnerHeader.phone ? <p className="text-[9px] mt-0.5">{formatBrazilPhone(partnerHeader.phone)}</p> : null}
                     {partnerHeader.addressLine ? (
                         <p className="text-[9px] mt-1 leading-tight whitespace-pre-line">{partnerHeader.addressLine}</p>
                     ) : null}
@@ -109,7 +110,7 @@ export default function ReturnReceiptThermalPreview({
                     <span className="font-bold">Cliente:</span> {returnRequest.customerName}
                 </p>
                 {returnRequest.customerPhone ? (
-                    <p className="text-[10px]">{returnRequest.customerPhone}</p>
+                    <p className="text-[10px]">{formatBrazilPhone(returnRequest.customerPhone)}</p>
                 ) : null}
                 {customerAddress ? (
                     <p className="text-[10px] whitespace-pre-line">{customerAddress}</p>

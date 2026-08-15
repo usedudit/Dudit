@@ -146,22 +146,22 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId }: Replenishment
                 <Button variant="filled" onClick={onClose} size="icon">
                     <XIcon className="h-5 w-5" />
                 </Button>
+
+                {/* Navigation Tabs */}
+                <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
+                    <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b border-brand-border dark:border-dark-border mb-6">
+                        <TabsTrigger value="reposicao" className="px-0 pb-3 text-sm">
+                            Reposição ({suggestions.length})
+                        </TabsTrigger>
+                        <TabsTrigger value="parados" className="px-0 pb-3 text-sm">
+                            Parados +90d ({stagnantProducts.length})
+                        </TabsTrigger>
+                    </TabsList>
+                </Tabs>
             </header>
 
-            {/* Navigation Tabs */}
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-                <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b border-brand-border dark:border-dark-border mb-6">
-                    <TabsTrigger value="reposicao" className="px-0 pb-3 text-sm">
-                        Reposição ({suggestions.length})
-                    </TabsTrigger>
-                    <TabsTrigger value="parados" className="px-0 pb-3 text-sm">
-                        Parados +90d ({stagnantProducts.length})
-                    </TabsTrigger>
-                </TabsList>
-            </Tabs>
-
             {/* Content List */}
-            <div className="custom-scrollbar flex-1 overflow-y-auto p-4">
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 pb-32 relative">
                 {activeTab === "reposicao" ? (
                     loadingSuggestions ? (
                         <div className="flex items-center justify-center py-16">

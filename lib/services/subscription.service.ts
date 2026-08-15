@@ -276,7 +276,75 @@ export const getPartnerPlan = cache(async (partnerId: string): Promise<Plan> => 
     )
 
     if (activeSub?.plan) {
-      plan = activeSub.plan as Plan
+      // If the subscription is scheduled to cancel/downgrade at period end,
+      // check if the current paid period has expired:
+      const isPeriodExpired =
+        activeSub.cancel_at_period_end &&
+        activeSub.current_period_end &&
+        new Date(activeSub.current_period_end).getTime() <= Date.now()
+
+      if (isPeriodExpired) {
+        // The paid cycle has ended. Transition this subscription to cancelled/downgraded.
+        const nowIso = new Date().toISOString()
+        const pendingPlanId = activeSub.pending_plan_id
+
+        if (pendingPlanId) {
+          // Downgrade flow: transition old to cancelled and activate pending plan
+          await admin
+            .from("subscriptions")
+            .update({
+              status: "cancelled",
+              ended_at: nowIso,
+              cancel_at_period_end: false,
+            })
+            .eq("id", activeSub.id)
+
+          const pendingPlan = await getPlanById(pendingPlanId)
+          if (pendingPlan && pendingPlan.is_active) {
+            await admin.from("subscriptions").insert({
+              partner_id: partnerId,
+              plan_id: pendingPlanId,
+              plan_snapshot: pendingPlan,
+              status: "active",
+              current_period_start: nowIso,
+            })
+            plan = pendingPlan
+          }
+
+          try {
+            const { enforcePlanLimitsAndArchiveExcess } = await import(
+              "@/lib/services/subscription-archiver.service"
+            )
+            await enforcePlanLimitsAndArchiveExcess(partnerId, plan?.limits_json)
+          } catch (archErr: any) {
+            console.error("[SUBSCRIPTION] Error archiving on downgrade:", archErr.message)
+          }
+        } else {
+          // Cancellation to Free flow
+          await admin
+            .from("subscriptions")
+            .update({
+              status: "cancelled",
+              ended_at: nowIso,
+              cancel_at_period_end: false,
+            })
+            .eq("id", activeSub.id)
+
+          try {
+            const { enforcePlanLimitsAndArchiveExcess } = await import(
+              "@/lib/services/subscription-archiver.service"
+            )
+            await enforcePlanLimitsAndArchiveExcess(partnerId)
+          } catch (archErr: any) {
+            console.error("[SUBSCRIPTION] Error archiving on period expiry:", archErr.message)
+          }
+
+          plan = await getFreePlan()
+        }
+      } else {
+        // Subscription is still actively valid!
+        plan = activeSub.plan as Plan
+      }
     } else {
       // Check past_due subscriptions against grace period.
       // Grace period is measured from past_due_at - a dedicated column set

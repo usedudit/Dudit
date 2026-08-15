@@ -2,6 +2,7 @@
 
 import { useMemo } from "react"
 import { formatCurrency, formatDate } from "@/lib/utils"
+import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import { QUOTE_PREVIEW_PRIMARY_COLOR, QUOTE_PREVIEW_SECONDARY_COLOR } from "@/lib/quotes/quote-preview-theme"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import type { InvoiceData } from "@/lib/billing/types"
@@ -149,7 +150,7 @@ const InvoicePreview = ({ data, invoiceId, printMode = false }: InvoicePreviewPr
                                 {page.type === "first" && (
                                     <>
                                         <div className="px-8 py-6">
-                                            <div className="grid grid-cols-4 gap-4 border-b border-brand-border pb-6 w-full">
+                                            <div className="grid grid-cols-4 gap-4 border-b border-gray-100 pb-6 w-full">
                                                 <div className="flex flex-col">
                                                     <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Número</span>
                                                     <span className="font-bold text-sm text-brand-dark">{shortId ? `#${shortId}` : data.invoice_number}</span>
@@ -175,7 +176,7 @@ const InvoicePreview = ({ data, invoiceId, printMode = false }: InvoicePreviewPr
                                                     <h3 className="font-bold text-sm text-brand-dark mb-3">Dados da empresa</h3>
                                                     <div className="text-xs text-gray-600 space-y-1">
                                                         <p className="font-bold text-brand-dark">{data.partner.name}</p>
-                                                        {data.partner.phone && <p>{data.partner.phone}</p>}
+                                                        {data.partner.phone && <p>{formatBrazilPhone(data.partner.phone)}</p>}
                                                         {partnerAddressFormatted && <p className="whitespace-pre-wrap">{partnerAddressFormatted}</p>}
                                                         {data.partner.email && <p>{data.partner.email}</p>}
                                                     </div>
@@ -185,7 +186,7 @@ const InvoicePreview = ({ data, invoiceId, printMode = false }: InvoicePreviewPr
                                                     {data.customer ? (
                                                         <div className="text-xs text-gray-600 space-y-1">
                                                             <p className="font-bold text-brand-dark">{data.customer.name}</p>
-                                                            {data.customer.phone && <p>{data.customer.phone}</p>}
+                                                            {data.customer.phone && <p>{formatBrazilPhone(data.customer.phone)}</p>}
                                                             {data.customer.address && <p className="whitespace-pre-wrap">{data.customer.address}</p>}
                                                             {data.customer.email && <p>{data.customer.email}</p>}
                                                         </div>

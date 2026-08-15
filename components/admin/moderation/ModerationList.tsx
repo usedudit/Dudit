@@ -21,6 +21,7 @@ import {
     rejectModeration,
 } from "@/app/actions/admin/moderation"
 import { formatCurrency, formatDate } from "@/lib/utils"
+import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { toast } from "@/hooks/use-notification"
@@ -213,7 +214,7 @@ function ProductModerationSheet({
                         </div>
                         {item.store_phone && (
                             <div className="flex items-center gap-2">
-                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">{item.store_phone}</span>
+                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">{formatBrazilPhone(item.store_phone || "")}</span>
                             </div>
                         )}
                         {item.store_description && (

@@ -3,6 +3,7 @@
 import React, { useState, useRef, useCallback, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
 import { Button, InfoCard, DefaultModal, ListItem, Badge } from "@/components/reusable"
+import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import { Switch } from "@/components/reusable/Switch"
 import { CheckCircleIcon, ChevronLeftIcon, ArrowLeftRightIcon, XIcon, InfoIcon } from "@/lib/icons"
 import {
@@ -479,7 +480,7 @@ export const IntegrationsSubPage = ({
                                             </div>
                                             {waConnection?.phoneNumber || waConnection?.wabaName ? (
                                                 <span className="text-xs text-brand-inactive-text dark:text-dark-body mt-1 block font-medium">
-                                                    {waConnection.phoneNumber || waConnection.wabaName}
+                                                    {formatBrazilPhone(waConnection.phoneNumber || "") || waConnection.wabaName}
                                                 </span>
                                             ) : (
                                                 <span className="text-xs text-brand-inactive-text dark:text-dark-body mt-1 block font-medium">

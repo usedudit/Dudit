@@ -12,6 +12,7 @@ import SavingStatusModal from "../reusable/SavingStatusModal"
 import { TrashIcon } from "@/lib/icons"
 import Link from "next/link"
 import { useERPData } from "./hooks"
+import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import { fetchERPSuppliersClient } from "@/app/actions/erp/client-loaders"
 import { useQueryClient } from "@tanstack/react-query"
 
@@ -101,7 +102,7 @@ export function SuppliersList({ suppliers: initialSuppliers, partnerId }: { supp
                 <TableRow key={supplier.id}>
                   <TableCell className="font-medium">{supplier.name}</TableCell>
                   <TableCell>{supplier.email || "-"}</TableCell>
-                  <TableCell>{supplier.phone || "-"}</TableCell>
+                  <TableCell>{formatBrazilPhone(supplier.phone || "") || "-"}</TableCell>
                   <TableCell>{supplier.cnpj || "-"}</TableCell>
                   <TableCell>
                     <div className="flex gap-2">

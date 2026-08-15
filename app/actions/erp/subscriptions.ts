@@ -218,7 +218,15 @@ export async function cancelSubscriptionAction(): Promise<ActionResponse<any>> {
       return errorResponse(result.error || "Erro ao cancelar assinatura")
     }
 
-    return successResponse({ message: SUBSCRIPTION_MESSAGES.SUBSCRIPTION_CANCELLED })
+    const message = result.cancelAtPeriodEnd
+      ? "Renovação cancelada. Seu plano permanecerá ativo até o final do ciclo atual."
+      : SUBSCRIPTION_MESSAGES.SUBSCRIPTION_CANCELLED
+
+    return successResponse({
+      message,
+      cancelAtPeriodEnd: result.cancelAtPeriodEnd,
+      currentPeriodEnd: result.currentPeriodEnd,
+    })
   } catch (error: any) {
     return errorResponse(error.message)
   }

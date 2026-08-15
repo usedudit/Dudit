@@ -3,6 +3,7 @@ import { toast } from '@/hooks/use-notification';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { ChevronLeftIcon, XIcon, SearchIcon, ChevronRightIcon, PlusIcon, CalendarIcon, CheckIcon, ClockIcon, RepeatIcon, ArrowRightIcon, ChevronDownIcon, UserIcon, ThreeDotsIcon, Package, AlertCircleIcon } from '@/lib/icons';
+import { formatBrazilPhone } from "@/lib/utils/phone-utils";
 import { Button, Input, Dropdown, DropdownItem, AlertModal, DatePicker, TimePicker, FormTextarea, ThreeDotsLoader, IconPlaceholder, Spinner, EmailInput, PhoneInput, Checkbox, MoneyInput, InfoCard, Badge, Tabs, TabsList, TabsTrigger, TabsContent, QuantitySelector, DefaultModal } from '@/components/reusable';
 import { getAvailableTimeSlotsAction, getAppointmentDetailsDataAction } from '@/app/actions/erp/appointments';
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
@@ -1211,7 +1212,7 @@ export const AppointmentSheet = ({
         const title = getHeaderTitle();
 
         return (
-            <div className="p-6 border-b border-brand-border dark:border-dark-border flex justify-between items-center bg-white dark:bg-dark-surface z-20">
+            <div className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
                 <div className="flex items-center gap-3">
                     <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">
                         {title}
@@ -1924,8 +1925,7 @@ export const AppointmentSheet = ({
                                                     <UserProfileImage fullName={client.name || "Cliente"} imageUrl={client.avatar_url || client.avatar} className="w-8 h-8 shrink-0 text-[10px]" />
                                                     <div className="flex flex-col min-w-0">
                                                         <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{client.name}</span>
-                                                        <span className="text-xs text-brand-inactive-text truncate">{client.email || client.phone || 'Cliente'}</span>
-                                                    </div>
+                                                        <span className="text-xs text-brand-inactive-text truncate">{client.email || formatBrazilPhone(client.phone || "") || 'Cliente'}</span>                                                    </div>
                                                 </div>
                                                 {isSelected && <CheckIcon size={18} className="text-brand-green shrink-0" />}
                                             </div>
@@ -2091,7 +2091,7 @@ export const AppointmentSheet = ({
                                                 <div className="flex flex-col">
                                                     <div className="font-bold text-brand-dark dark:text-dark-heading leading-tight">{selectedClient.name}</div>
                                                     {selectedClient.phone && (
-                                                        <div className="text-xs text-brand-inactive-text">{selectedClient.phone}</div>
+                                                        <div className="text-xs text-brand-inactive-text">{formatBrazilPhone(selectedClient.phone || "")}</div>
                                                     )}
                                                     {selectedClient.email && (
                                                         <div className="text-xs text-brand-inactive-text">{selectedClient.email}</div>
@@ -2901,7 +2901,7 @@ export const AppointmentSheet = ({
                                         <UserProfileImage fullName={client.name || "Cliente"} imageUrl={client.avatar_url || client.avatar} className="h-12 w-12 shrink-0 text-lg" />
                                         <div className="flex flex-col min-w-0">
                                             <span className="truncate text-sm font-bold text-brand-dark dark:text-dark-heading">{client.name}</span>
-                                            <span className="truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body">{client.email || client.phone || 'Cliente'}</span>
+                                            <span className="truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body">{client.email || formatBrazilPhone(client.phone || "") || 'Cliente'}</span>
                                         </div>
                                     </div>
                                     {isSelected && <CheckIcon size={18} className="text-brand-green shrink-0" />}

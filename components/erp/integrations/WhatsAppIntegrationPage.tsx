@@ -8,6 +8,7 @@ import { Switch } from "@/components/reusable/Switch"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { ChevronLeftIcon, CheckCircleIcon, QRCodeIcon } from "@/lib/icons"
 import { toast } from "@/hooks/use-notification"
+import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import { WhatsappConnectButton } from "@/components/erp/integrations/WhatsappConnectButton"
 import {
     disconnectWhatsappAction,
@@ -440,7 +441,7 @@ export function WhatsAppIntegrationPage({
                                                             icon={<img src="https://img.dudit.com.br/static/icons/WhatsApp.png" alt="WhatsApp" className="object-contain" />}
                                                             title={
                                                                 evoStatus === "connected"
-                                                                    ? (evoPhoneNumber || evoConnection?.phoneNumber || "WhatsApp Conectado")
+                                                                    ? (formatBrazilPhone(evoPhoneNumber || evoConnection?.phoneNumber || "") || "WhatsApp Conectado")
                                                                     : "Sem conexão ativa"
                                                             }
                                                             description={
@@ -461,7 +462,7 @@ export function WhatsAppIntegrationPage({
                                                             <IconPlaceholder
                                                                 icon={CheckCircleIcon}
                                                                 title="WhatsApp Conectado"
-                                                                subtitle={`Seu WhatsApp (${evoPhoneNumber || evoConnection?.phoneNumber || ""}) está pareado e pronto para o envio de mensagens.`}
+                                                                subtitle={`Seu WhatsApp (${formatBrazilPhone(evoPhoneNumber || evoConnection?.phoneNumber || "")}) está pareado e pronto para o envio de mensagens.`}
                                                             />
 
                                                             <div className="w-full max-w-sm border border-brand-border dark:border-dark-border rounded-2xl p-5 bg-brand-gray/30 dark:bg-dark-surface/50">
@@ -585,7 +586,7 @@ export function WhatsAppIntegrationPage({
                                                             {metaConnection?.phoneNumber && (
                                                                 <div>
                                                                     <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-1">Número</span>
-                                                                    <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">{metaConnection.phoneNumber}</span>
+                                                                    <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">{formatBrazilPhone(metaConnection.phoneNumber || "")}</span>
                                                                 </div>
                                                             )}
                                                             {metaConnection?.lastSyncedAt && (

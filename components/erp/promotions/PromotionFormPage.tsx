@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { SaveIcon, EditIcon, PlusIcon, TrashIcon, SearchIcon, UserIcon, Package, WrenchIcon, TagIcon } from "@/lib/icons"
+import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import { Button, Input, Checkbox, Badge, Tabs, TabsList, TabsTrigger, FormDropdown, FormTextarea, FormRadioGroup, DatePicker, FormSection, Pagination, Separator, MoneyInput, PercentageInput, IconPlaceholder, UnsavedChangesDialog } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { useToast } from "@/hooks/use-toast"
@@ -980,7 +981,7 @@ export default function PromotionFormPage({
                                                     </div>
                                                 </td>
                                                 <td className="p-3 text-brand-inactive-text dark:text-dark-body">
-                                                    {cust.email || cust.phone || "-"}
+                                                    {cust.email || formatBrazilPhone(cust.phone || "") || "-"}
                                                 </td>
                                                 <td className="p-3">
                                                     <Badge variant={cust.status === "inactive" ? "gray" : "green"} className="whitespace-nowrap">
@@ -1017,7 +1018,7 @@ export default function PromotionFormPage({
                                             </div>
                                             <div className="min-w-0">
                                                 <p className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">{cust.name}</p>
-                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate">{cust.email || cust.phone || "Sem contato"}</p>
+                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate">{cust.email || formatBrazilPhone(cust.phone || "") || "Sem contato"}</p>
                                             </div>
                                         </div>
                                         <Button

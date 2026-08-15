@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { SearchIcon, UserIcon, PlusIcon, XIcon } from "@/lib/icons"
 import { Button, Input, IconPlaceholder, Spinner } from "@/components/reusable"
+import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
@@ -128,7 +129,7 @@ export function SupplierSelectorSheet({
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{supplier.name}</p>
                     <p className="text-xs text-brand-inactive-text truncate">
-                      {supplier.email || supplier.phone || supplier.cnpj || supplier.cpf || "Sem contato"}
+                      {supplier.email || formatBrazilPhone(supplier.phone || "") || supplier.cnpj || supplier.cpf || "Sem contato"}
                     </p>
                   </div>
                   {isSelected && (

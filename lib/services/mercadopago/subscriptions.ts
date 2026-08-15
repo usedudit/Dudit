@@ -43,6 +43,8 @@ export interface CreateSubscriptionResult {
 
 export interface CancelSubscriptionResult {
   success: boolean
+  cancelAtPeriodEnd?: boolean
+  currentPeriodEnd?: string | null
   error?: string
 }
 
@@ -299,10 +301,6 @@ export async function createMpSubscription(
       return { success: false, error: insertError.message }
     }
 
-    // NOTE: Do NOT invalidate plan cache here. The subscription is "pending"
-    // and must NOT affect plan resolution until activated via webhook.
-    // invalidatePartnerPlanCache(partnerId) - REMOVED for security
-
     await logBillingEvent(admin, partnerId, "subscription_created", plan.price, {
       plan_slug: plan.slug,
       mp_subscription_id: mpData.id,
@@ -338,7 +336,9 @@ export async function createMpSubscription(
 
 /**
  * Cancel a subscription. If it has a MP subscription ID, cancels on MP too.
- * Sets cancelled_at timestamp and updates status.
+ * If the subscription has remaining paid time, schedules cancellation for period end
+ * (cancel_at_period_end = true) so the partner retains access until current_period_end.
+ * If past_due or expired, cancels immediately and archives excess items.
  */
 export async function cancelMpSubscription(
   subscriptionId: string,
@@ -348,7 +348,7 @@ export async function cancelMpSubscription(
 
   const { data: sub, error: fetchError } = await admin
     .from("subscriptions")
-    .select("id, partner_id, plan_id, mercado_pago_subscription_id, status")
+    .select("id, partner_id, plan_id, mercado_pago_subscription_id, status, current_period_end, cancel_at_period_end")
     .eq("id", subscriptionId)
     .single()
 
@@ -360,7 +360,7 @@ export async function cancelMpSubscription(
     return { success: false, error: "Assinatura já foi cancelada" }
   }
 
-  // Cancel on MP if present
+  // Cancel recurring billing on MP if present
   if (sub.mercado_pago_subscription_id) {
     try {
       const accessToken = await getMpPlatformAccessToken()
@@ -382,7 +382,6 @@ export async function cancelMpSubscription(
           status: response.status,
           mpId: sub.mercado_pago_subscription_id,
         })
-        // Continue with local cancellation even if MP fails
       }
     } catch (err) {
       SecureLogger.error("MP cancellation network error", {
@@ -392,8 +391,56 @@ export async function cancelMpSubscription(
     }
   }
 
-  // Update local subscription
   const now = new Date().toISOString()
+  const hasFuturePeriodEnd =
+    sub.current_period_end && new Date(sub.current_period_end).getTime() > Date.now()
+  const isPaidActive = ["active", "trialing"].includes(sub.status)
+
+  if (isPaidActive && hasFuturePeriodEnd) {
+    // ── KEEP ACCESS UNTIL END OF PAID PERIOD ──
+    const { error: updateError } = await admin
+      .from("subscriptions")
+      .update({
+        cancel_at_period_end: true,
+        cancelled_at: now,
+      })
+      .eq("id", subscriptionId)
+
+    if (updateError) {
+      SecureLogger.error("Failed to schedule subscription cancellation", {
+        error: updateError.message,
+        subscriptionId,
+      })
+      return { success: false, error: updateError.message }
+    }
+
+    invalidatePartnerPlanCache(sub.partner_id)
+
+    await logBillingEvent(admin, sub.partner_id, "subscription_cancel_scheduled", null, {
+      subscription_id: subscriptionId,
+      access_until: sub.current_period_end,
+    })
+
+    await auditLog({
+      action: "subscription.cancelled",
+      actorUserId,
+      partnerId: sub.partner_id,
+      metadata: {
+        subscription_id: subscriptionId,
+        plan_id: sub.plan_id,
+        scheduled_for: sub.current_period_end,
+        type: "at_period_end",
+      },
+    })
+
+    return {
+      success: true,
+      cancelAtPeriodEnd: true,
+      currentPeriodEnd: sub.current_period_end,
+    }
+  }
+
+  // ── IMMEDIATE CANCELLATION (past_due or no future period) ──
   const { error: updateError } = await admin
     .from("subscriptions")
     .update({
@@ -412,6 +459,19 @@ export async function cancelMpSubscription(
     return { success: false, error: updateError.message }
   }
 
+  // Automatically archive excess products/services for free plan
+  try {
+    const { enforcePlanLimitsAndArchiveExcess } = await import(
+      "@/lib/services/subscription-archiver.service"
+    )
+    await enforcePlanLimitsAndArchiveExcess(sub.partner_id)
+  } catch (archErr: any) {
+    SecureLogger.error("Failed to archive excess items on immediate cancellation", {
+      error: archErr.message,
+      partnerId: sub.partner_id,
+    })
+  }
+
   invalidatePartnerPlanCache(sub.partner_id)
 
   await logBillingEvent(admin, sub.partner_id, "subscription_cancelled", null, {
@@ -422,10 +482,10 @@ export async function cancelMpSubscription(
     action: "subscription.cancelled",
     actorUserId,
     partnerId: sub.partner_id,
-    metadata: { subscription_id: subscriptionId, plan_id: sub.plan_id },
+    metadata: { subscription_id: subscriptionId, plan_id: sub.plan_id, type: "immediate" },
   })
 
-  return { success: true }
+  return { success: true, cancelAtPeriodEnd: false }
 }
 
 // ─── Update Subscription (Upgrade / Downgrade) ─────────────────────────────

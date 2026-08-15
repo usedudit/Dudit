@@ -7,6 +7,7 @@ import { CopyIcon, BoxIcon, MapPinIcon, CheckCircleIcon, PrinterIcon } from "@/l
 import { Button, InfoCard, IconPlaceholder, Input, Spinner, Separator } from "@/components/reusable"
 import { useNotification } from "@/hooks/use-notification"
 import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
+import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import Link from "next/link"
 import { fetchJSONWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { formatCurrency } from "@/lib/utils"
@@ -720,7 +721,7 @@ export function PaymentWrapper({
                                                         Após realizar o pagamento, envie o comprovante para o WhatsApp do estabelecimento:
                                                     </p>
                                                     <p className="font-bold text-brand-dark dark:text-dark-heading text-base">
-                                                        {partnerPhone}
+                                                        {formatBrazilPhone(partnerPhone)}
                                                     </p>
                                                     <a
                                                         href={`https://wa.me/${partnerPhone.replace(/\D/g, "")}?text=Olá! Segue o comprovante do sinal referente ao meu agendamento no valor de ${formatCurrency(amount)}.`}

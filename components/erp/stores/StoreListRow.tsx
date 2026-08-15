@@ -5,6 +5,7 @@ import { motion } from "framer-motion"
 import { Checkbox, Badge, Button, ActionsDropdown } from "@/components/reusable"
 import { StarIcon, StoreIcon } from "@/lib/icons"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import type { StoreRow } from "./StoreGridCard"
 
 interface ColumnDef {
@@ -84,7 +85,7 @@ const StoreListRow = React.memo(
                 case "contact":
                     return (
                         <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">
-                            {store.phone || store.whatsapp_phone || "-"}
+                            {formatBrazilPhone(store.phone || store.whatsapp_phone || "") || "-"}
                         </span>
                     )
 

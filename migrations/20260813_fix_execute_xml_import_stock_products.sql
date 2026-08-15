@@ -297,7 +297,7 @@ BEGIN
             p_partner_id,
             'in',
             'Importação XML: ' || v_invoice_key,
-            'Item: ' || v_raw_name,
+            NULL,
             COALESCE(p_created_by, auth.uid()),
             p_store_id,
             v_now

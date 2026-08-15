@@ -5,6 +5,7 @@ import {
     formatReceiptAmount,
     type SaleReceiptData,
 } from "@/lib/sales/sale-receipt"
+import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 
 const DASH = "-".repeat(60)
 
@@ -52,7 +53,7 @@ export default function SaleReceiptThermalPreview({
                 <div className="text-center mb-2">
                     <p className="font-bold text-[13px] uppercase tracking-tight">{data.partner.fantasyName}</p>
                     {data.partner.legalName ? <p className="text-[10px] mt-0.5">{data.partner.legalName}</p> : null}
-                    {data.partner.phone ? <p className="text-[9px] mt-0.5">{data.partner.phone}</p> : null}
+                    {data.partner.phone ? <p className="text-[9px] mt-0.5">{formatBrazilPhone(data.partner.phone)}</p> : null}
                     {data.partner.addressLine ? (
                         <p className="text-[9px] mt-1 leading-tight whitespace-pre-line">{data.partner.addressLine}</p>
                     ) : null}
@@ -68,7 +69,7 @@ export default function SaleReceiptThermalPreview({
                     <span className="font-bold">Cliente:</span> {data.customerName}
                 </p>
                 {data.customerPhone ? (
-                    <p className="text-[10px]">{data.customerPhone}</p>
+                    <p className="text-[10px]">{formatBrazilPhone(data.customerPhone)}</p>
                 ) : null}
                 {data.customerAddress ? (
                     <p className="text-[10px] whitespace-pre-line">{data.customerAddress}</p>

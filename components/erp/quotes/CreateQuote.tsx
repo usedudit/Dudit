@@ -3,11 +3,9 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent, Badge, Button, AlertModal, ThreeDotsLoader } from '@/components/reusable';
 import { FadeIn } from '@/components/animations/FadeIn';
-import { AnimatePresence } from 'framer-motion';
 import { ChevronLeftIcon, EditIcon, SaveIcon } from '@/lib/icons';
 import QuoteEditor from './QuoteEditor';
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
-import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import QuotePreview from './QuotePreview';
 import SelectCustomerSheet from '../clientes/SelectCustomerSheet';
 import SelectProductVariantSheet from '@/components/erp/pdv/SelectProductVariantSheet';
@@ -30,7 +28,7 @@ import {
     duplicateQuoteAction,
     getSalespeopleAction,
 } from '@/app/actions/erp/quotes';
-import { getQuoteEditCaps, QUOTE_DEFAULT_CUSTOMER_LABEL } from "@/lib/quotes/quote-edit-rules";
+import { getQuoteEditCaps } from "@/lib/quotes/quote-edit-rules";
 import { QUOTE_PREVIEW_PRIMARY_COLOR, QUOTE_PREVIEW_SECONDARY_COLOR } from "@/lib/quotes/quote-preview-theme";
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url";
 import { fetchPartnerProductsBucket, fetchPartnerServicesBucket } from "@/app/actions/erp/client-loaders";
@@ -1116,11 +1114,11 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                                                     Dados Gerais
                                                     {getTabErrorCount("Dados Gerais") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
                                                 </TabsTrigger>
+                                                <TabsTrigger value="Layout" className="hidden md:inline-flex">Personalizar</TabsTrigger>
                                                 <TabsTrigger value="Observações">
                                                     Observações
                                                     {getTabErrorCount("Observações") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
                                                 </TabsTrigger>
-                                                <TabsTrigger value="Layout" className="hidden md:inline-flex">Personalizar</TabsTrigger>
                                                 <TabsTrigger value="Visualização" className="lg:hidden">Visualização</TabsTrigger>
                                             </TabsList>
                                         </div>

@@ -172,102 +172,104 @@ export function MarketplaceBottomMenu() {
             )}
 
             {/* Menu Overlay Drawer */}
-            <BottomSheet isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)}>
-                <div className="flex flex-col pb-6 text-brand-dark dark:text-white">
-                    {/* User Profile Header Card */}
-                    <div className="bg-gradient-to-r from-brand-dark to-brand-green rounded-2xl p-5 text-white flex items-center justify-between shadow-md mb-6 -mx-1 mt-1">
-                        <div className="flex items-center min-w-0">
-                            {user ? (
-                                <div className={`w-12 h-12 rounded-full overflow-hidden border-2 border-white/50 shrink-0 flex items-center justify-center font-bold text-lg text-white ${getAvatarColor(fullName)}`}>
-                                    {getUserInitials(fullName)}
-                                </div>
-                            ) : (
-                                <div className="w-12 h-12 rounded-full border-2 border-white/50 bg-white/20 shrink-0 flex items-center justify-center text-white">
-                                    <UserIcon size={24} />
-                                </div>
-                            )}
-                            <div className="flex flex-col ml-3 min-w-0">
-                                <h3 className="text-[16px] font-bold truncate pr-2">
-                                    {user ? `Olá, ${userName}` : "Olá, visitante"}
-                                </h3>
+            {isMenuOpen && (
+                <BottomSheet isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)}>
+                    <div className="flex flex-col py-2">
+                        {/* User Card */}
+                        <div className="flex items-center justify-between p-4 rounded-2xl bg-brand-dark text-white mb-6 shadow-sm">
+                            <div className="flex items-center min-w-0">
                                 {user ? (
-                                    <Link
-                                        href="/perfil"
-                                        onClick={() => setIsMenuOpen(false)}
-                                        className="text-[12px] opacity-90 underline font-medium hover:opacity-100 flex items-center mt-0.5"
-                                    >
-                                        <span>Meu perfil</span>
-                                        <ChevronRightIcon size={12} className="ml-0.5 shrink-0" />
-                                    </Link>
+                                    <div className={`w-12 h-12 rounded-full overflow-hidden border-2 border-white/50 shrink-0 flex items-center justify-center font-bold text-lg text-white ${getAvatarColor(fullName)}`}>
+                                        {getUserInitials(fullName)}
+                                    </div>
                                 ) : (
-                                    <Link
-                                        href="/auth/login"
-                                        onClick={() => setIsMenuOpen(false)}
-                                        className="text-[12px] opacity-90 underline font-medium hover:opacity-100 flex items-center mt-0.5"
-                                    >
-                                        <span>Entrar na minha conta</span>
-                                        <ChevronRightIcon size={12} className="ml-0.5 shrink-0" />
-                                    </Link>
+                                    <div className="w-12 h-12 rounded-full border-2 border-white/50 bg-white/20 shrink-0 flex items-center justify-center text-white">
+                                        <UserIcon size={24} />
+                                    </div>
                                 )}
+                                <div className="flex flex-col ml-3 min-w-0">
+                                    <h3 className="text-[16px] font-bold truncate pr-2">
+                                        {user ? `Olá, ${userName}` : "Olá, visitante"}
+                                    </h3>
+                                    {user ? (
+                                        <Link
+                                            href="/perfil"
+                                            onClick={() => setIsMenuOpen(false)}
+                                            className="text-[12px] opacity-90 underline font-medium hover:opacity-100 flex items-center mt-0.5"
+                                        >
+                                            <span>Meu perfil</span>
+                                            <ChevronRightIcon size={12} className="ml-0.5 shrink-0" />
+                                        </Link>
+                                    ) : (
+                                        <Link
+                                            href="/auth/login"
+                                            onClick={() => setIsMenuOpen(false)}
+                                            className="text-[12px] opacity-90 underline font-medium hover:opacity-100 flex items-center mt-0.5"
+                                        >
+                                            <span>Entrar na minha conta</span>
+                                            <ChevronRightIcon size={12} className="ml-0.5 shrink-0" />
+                                        </Link>
+                                    )}
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    {/* Navigation Group 1: Activity */}
-                    <div className="flex flex-col">
-                        <span className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2 px-2">
-                            Minha atividade
-                        </span>
-                        <div className="space-y-1">
-                            <MenuItem label="Início" href="/" icon={HomeIcon} />
-                            <MenuItem
-                                label="Central de Vendedores"
-                                href={user ? "/erp/trocar-erp" : "/auth/login?mode=partner"}
-                                icon={StoreIcon}
-                            />
-                            <MenuItem label="Central de Ajuda" href="/ajuda" icon={HelpCircleIcon} />
-                            <MenuItem
-                                label="Favoritos"
-                                href={user ? "/favoritos" : "/auth/login?next=/favoritos"}
-                                icon={HeartIcon}
-                            />
-                            <MenuItem
-                                label="Minhas opiniões"
-                                href={user ? "/perfil" : "/auth/login"}
-                                icon={StarIcon}
-                            />
+                        {/* Navigation Group 1: Activity */}
+                        <div className="flex flex-col">
+                            <span className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2 px-2">
+                                Minha atividade
+                            </span>
+                            <div className="space-y-1">
+                                <MenuItem label="Início" href="/" icon={HomeIcon} />
+                                <MenuItem
+                                    label="Central de Vendedores"
+                                    href={user ? "/erp/trocar-erp" : "/auth/login?mode=partner"}
+                                    icon={StoreIcon}
+                                />
+                                <MenuItem label="Central de Ajuda" href="/ajuda" icon={HelpCircleIcon} />
+                                <MenuItem
+                                    label="Favoritos"
+                                    href={user ? "/favoritos" : "/auth/login?next=/favoritos"}
+                                    icon={HeartIcon}
+                                />
+                                <MenuItem
+                                    label="Minhas opiniões"
+                                    href={user ? "/perfil" : "/auth/login"}
+                                    icon={StarIcon}
+                                />
+                            </div>
                         </div>
-                    </div>
 
-                    {/* Navigation Group 2: Institutional */}
-                    <div className="flex flex-col mt-6">
-                        <span className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2 px-2">
-                            Institucional
-                        </span>
-                        <div className="space-y-1">
-                            <MenuItem label="Sobre a Dudit" href="/institucional/sobre" icon={InfoIcon} />
-                            <MenuItem label="Nossos Planos" href="/institucional/planos" icon={MoneyIcon} />
-                            <MenuItem label="Termos e condições" href="/institucional/termos" icon={FileTextIcon} />
-                            <MenuItem label="Política de privacidade" href="/institucional/privacidade" icon={ShieldIcon} />
+                        {/* Navigation Group 2: Institutional */}
+                        <div className="flex flex-col mt-6">
+                            <span className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2 px-2">
+                                Institucional
+                            </span>
+                            <div className="space-y-1">
+                                <MenuItem label="Sobre a Dudit" href="/institucional/sobre" icon={InfoIcon} />
+                                <MenuItem label="Nossos Planos" href="/institucional/planos" icon={MoneyIcon} />
+                                <MenuItem label="Termos e condições" href="/institucional/termos" icon={FileTextIcon} />
+                                <MenuItem label="Política de privacidade" href="/institucional/privacidade" icon={ShieldIcon} />
+                            </div>
                         </div>
-                    </div>
 
-                    {/* Session Log out */}
-                    {user && (
-                        <div className="border-t border-gray-100 dark:border-dark-border mt-6 pt-4 px-2">
-                            <button
-                                onClick={handleSignOut}
-                                className="flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-red-50 dark:hover:bg-red-950/20 text-brand-red font-semibold transition-all duration-200 w-full text-left group"
-                            >
-                                <div className="w-9 h-9 rounded-lg bg-red-50 dark:bg-red-950/40 flex items-center justify-center text-brand-red shrink-0 group-hover:scale-105 transition-transform duration-200">
-                                    <LogoutIcon size={20} className="text-brand-red" />
-                                </div>
-                                <span className="text-[14px]">Sair da sessão</span>
-                            </button>
-                        </div>
-                    )}
-                </div>
-            </BottomSheet>
+                        {/* Session Log out */}
+                        {user && (
+                            <div className="border-t border-gray-100 dark:border-dark-border mt-6 pt-4 px-2">
+                                <button
+                                    onClick={handleSignOut}
+                                    className="flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-red-50 dark:hover:bg-red-950/20 text-brand-red font-semibold transition-all duration-200 w-full text-left group"
+                                >
+                                    <div className="w-9 h-9 rounded-lg bg-red-50 dark:bg-red-950/40 flex items-center justify-center text-brand-red shrink-0 group-hover:scale-105 transition-transform duration-200">
+                                        <LogoutIcon size={20} className="text-brand-red" />
+                                    </div>
+                                    <span className="text-[14px]">Sair da sessão</span>
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </BottomSheet>
+            )}
         </>
     )
 }

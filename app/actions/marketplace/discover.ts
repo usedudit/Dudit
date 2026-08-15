@@ -858,9 +858,9 @@ async function fetchRecent(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
             const rawStore: any = Array.isArray(item.stores) ? item.stores[0] : item.stores
             const storeName = rawStore?.name || "Vendedor"
             const storeImage = rawStore?.logo_url
-            const storeCity = rawStore?.city || rawPartner?.addresses?.[0]?.city || null
-            const storeState = rawStore?.state || rawPartner?.addresses?.[0]?.state || null
             const addr = Array.isArray(rawStore?.addresses) ? rawStore.addresses[0] : rawStore?.addresses
+            const storeCity = addr?.city || rawStore?.city || null
+            const storeState = addr?.state || rawStore?.state || null
             const partner = rawPartner ? {
                 id: rawPartner.id,
                 store_id: rawStore?.id || rawPartner.id,
@@ -1413,9 +1413,9 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         const rawStore: any = Array.isArray(item.stores) ? item.stores[0] : item.stores
         const storeName = rawStore?.name || "Vendedor"
         const storeImage = rawStore?.logo_url
-        const storeCity = rawStore?.city || rawPartner?.addresses?.[0]?.city || null
-        const storeState = rawStore?.state || rawPartner?.addresses?.[0]?.state || null
         const addr = Array.isArray(rawStore?.addresses) ? rawStore.addresses[0] : rawStore?.addresses
+        const storeCity = addr?.city || rawStore?.city || null
+        const storeState = addr?.state || rawStore?.state || null
         const partner = rawPartner
             ? {
                 id: rawPartner.id,

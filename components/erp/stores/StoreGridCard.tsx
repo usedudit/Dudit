@@ -5,6 +5,7 @@ import { motion } from "framer-motion"
 import { Checkbox, Badge, Button, ActionsDropdown, Tooltip } from "@/components/reusable"
 import { StoreIcon, MapPinIcon, PhoneIcon, StarIcon } from "@/lib/icons"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 
 export interface StoreRow {
     id: string
@@ -111,7 +112,7 @@ const StoreGridCard = React.memo(
                         {Boolean(store.phone || store.whatsapp_phone) && (
                             <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate flex items-center mt-1">
                                 <PhoneIcon size={12} className="mr-1 shrink-0 text-brand-inactive-text" />
-                                <span>{store.phone || store.whatsapp_phone}</span>
+                                <span>{formatBrazilPhone(store.phone || store.whatsapp_phone || "")}</span>
                             </div>
                         )}
                     </div>

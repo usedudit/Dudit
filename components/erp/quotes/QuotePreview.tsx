@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { formatAddressParts } from '@/lib/utils/format-address';
+import { formatBrazilPhone } from "@/lib/utils/phone-utils";
 import { QUOTE_DEFAULT_CUSTOMER_LABEL } from "@/lib/quotes/quote-edit-rules";
 import { QUOTE_PREVIEW_PRIMARY_COLOR, QUOTE_PREVIEW_SECONDARY_COLOR } from "@/lib/quotes/quote-preview-theme";
 import { UserProfileImage } from '@/lib/utils/UserProfileImage';
@@ -207,7 +208,7 @@ const QuotePreview = ({
                                 {page.type === 'first' && (
                                     <>
                                         <div className="px-8 py-6">
-                                            <div className="grid grid-cols-4 gap-4 border-b border-brand-border pb-6 w-full">
+                                            <div className="grid grid-cols-4 gap-4 border-b border-gray-100 pb-6 w-full">
                                                 <div className="flex flex-col">
                                                     <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Número</span>
                                                     <span className="font-bold text-sm text-brand-dark">{invoiceNumber}</span>
@@ -235,7 +236,7 @@ const QuotePreview = ({
                                                     <h3 className="font-bold text-sm text-brand-dark mb-3">Dados da empresa</h3>
                                                     <div className="text-xs text-gray-600 space-y-1">
                                                         <p className="font-bold text-brand-dark">{partnerName}</p>
-                                                        {partnerPhone && <p>{partnerPhone}</p>}
+                                                        {partnerPhone && <p>{formatBrazilPhone(partnerPhone)}</p>}
                                                         <p className="whitespace-pre-wrap">{partnerAddressFormatted}</p>
                                                     </div>
                                                 </div>
@@ -244,7 +245,7 @@ const QuotePreview = ({
                                                     {selectedCustomer ? (
                                                         <div className="text-xs text-gray-600 space-y-1">
                                                             <p className="font-bold text-brand-dark">{selectedCustomer.name}</p>
-                                                            {showCustomerContact && selectedCustomer.phone && <p>{selectedCustomer.phone}</p>}
+                                                            {showCustomerContact && selectedCustomer.phone && <p>{formatBrazilPhone(selectedCustomer.phone)}</p>}
                                                             {customerAddressText && <p className="whitespace-pre-wrap">{customerAddressText}</p>}
                                                         </div>
                                                     ) : (
@@ -263,9 +264,9 @@ const QuotePreview = ({
                                         <thead>
                                             <tr className="bg-brand-gray/40">
                                                 <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tl-xl border-b border-gray-100">Item</th>
-                                                <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tl-xl border-b border-gray-100">Qtd</th>
-                                                <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tl-xl border-b border-gray-100">Preço</th>
-                                                <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tl-xl border-b border-gray-100">Total</th>
+                                                <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tl-xl border-b border-gray-100 text-center">Qtd</th>
+                                                <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tl-xl border-b border-gray-100 text-right">Preço</th>
+                                                <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tl-xl border-b border-gray-100 text-right">Total</th>
                                             </tr>
                                         </thead>
                                         <tbody>

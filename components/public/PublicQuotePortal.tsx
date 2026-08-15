@@ -23,6 +23,7 @@ import {
 import QuotePreview from "@/components/erp/quotes/QuotePreview"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { formatCurrency } from "@/lib/utils"
+import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import { useSupabase } from "@/providers/supabase-provider"
 
 interface PublicQuotePortalProps {
@@ -347,7 +348,7 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                                                     <div className="space-y-2">
                                                         <p className="font-bold text-brand-dark dark:text-dark-heading text-sm">{customerName}</p>
                                                         <p className="text-xs text-brand-inactive-text dark:text-dark-body italic">Nenhum endereço especificado.</p>
-                                                        {customerPhone && <p className="text-xs text-brand-inactive-text dark:text-dark-body">Telefone: {customerPhone}</p>}
+                                                        {customerPhone && <p className="text-xs text-brand-inactive-text dark:text-dark-body">Telefone: {formatBrazilPhone(customerPhone)}</p>}
                                                         {customerEmail && <p className="text-xs text-brand-inactive-text dark:text-dark-body">E-mail: {customerEmail}</p>}
                                                     </div>
                                                 )}

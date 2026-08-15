@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useMemo, useCallback } from "react"
+import dynamic from "next/dynamic"
+import { useState, useMemo, useCallback, useEffect } from "react"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import MarketplaceFooter from "./MarketplaceFooter"
 import { HeroBanner, HorizontalCarousel, ItemCard, VitrineCard } from "./shared-components"
@@ -8,22 +9,21 @@ import { SponsoredAdsCarousel } from "@/components/marketplace/ads/SponsoredAdsC
 import type { SponsoredAd } from "@/lib/ads/types"
 import type { HomeSection } from "@/app/actions/marketplace/discover"
 import { CommunityVideoCard } from "./CommunityVideoCard"
-import { VideoModal } from "./VideoModal"
+
+const VideoModal = dynamic(() => import("./VideoModal").then(mod => mod.VideoModal), { ssr: false })
 
 import { useRouter } from "next/navigation"
 import { useLocationRedirect } from "@/hooks/use-location-redirect"
 import { useNotification } from "@/hooks/use-notification"
 import { createAddressAction } from "@/app/actions/shared/addresses"
-import {
-    Button,
-    Input,
-    CepInput,
-    StateComboBox,
-    NumberInputWithCheckbox,
-    DefaultModal,
-    IconPlaceholder
-} from "@/components/reusable"
-import citiesData from "@/lib/data/cities.json"
+import { Button } from "@/components/reusable/Button"
+import { Input } from "@/components/reusable/Input"
+import { CepInput } from "@/components/reusable/Inputs/CepInput"
+import { StateComboBox } from "@/components/reusable/Inputs/StateComboBox"
+import { NumberInputWithCheckbox } from "@/components/reusable/Inputs/NumberInputWithCheckbox"
+import DefaultModal from "@/components/reusable/DefaultModal"
+import IconPlaceholder from "@/components/reusable/IconPlaceholder"
+import { getCitiesData } from "@/lib/data/cities-loader"
 
 const COMMON_CITY_ACCENTS: Record<string, string> = {
     "sao-paulo": "São Paulo",
@@ -133,6 +133,13 @@ export default function MarketplaceHome({
     const [isVisitorModalOpen, setIsVisitorModalOpen] = useState(false)
     const [searchQuery, setSearchQuery] = useState("")
     const [isIpLoading, setIsIpLoading] = useState(false)
+    const [citiesList, setCitiesList] = useState<string[]>([])
+
+    useEffect(() => {
+        if (isVisitorModalOpen && citiesList.length === 0) {
+            getCitiesData().then(setCitiesList)
+        }
+    }, [isVisitorModalOpen, citiesList.length])
 
     const [form, setForm] = useState({
         zipCode: "",
@@ -147,14 +154,14 @@ export default function MarketplaceHome({
     })
 
     const filteredCities = useMemo(() => {
-        if (!searchQuery || searchQuery.trim().length < 2) return []
+        if (!searchQuery || searchQuery.trim().length < 2 || citiesList.length === 0) return []
         const q = searchQuery
             .toLowerCase()
             .normalize("NFD")
             .replace(/[\u0300-\u036f]/g, "")
             .replace(/[-\s]+/g, " ")
             .trim()
-        return (citiesData as string[])
+        return citiesList
             .filter((slug: string) => {
                 const norm = slug
                     .toLowerCase()
@@ -164,7 +171,7 @@ export default function MarketplaceHome({
                 return norm.includes(q)
             })
             .slice(0, 5)
-    }, [searchQuery])
+    }, [searchQuery, citiesList])
 
     const formatCitySlugForDisplay = (slug: string): string => {
         if (!slug) return ""
@@ -348,7 +355,7 @@ export default function MarketplaceHome({
     )
 
     const renderAddressModal = () => {
-        if (!user) return null
+        if (!user || !isAddressModalOpen) return null
 
         return (
             <DefaultModal
@@ -466,6 +473,8 @@ export default function MarketplaceHome({
     }
 
     const renderVisitorModal = () => {
+        if (!isVisitorModalOpen) return null
+
         return (
             <DefaultModal
                 isOpen={isVisitorModalOpen}

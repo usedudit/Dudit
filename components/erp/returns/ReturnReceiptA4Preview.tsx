@@ -2,6 +2,7 @@
 
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { stripCep } from "@/lib/utils/format-address"
+import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import { QUOTE_PREVIEW_PRIMARY_COLOR, QUOTE_PREVIEW_SECONDARY_COLOR } from "@/lib/quotes/quote-preview-theme"
 import type { SaleReceiptPartnerHeader } from "@/lib/sales/sale-receipt"
 
@@ -123,7 +124,7 @@ export default function ReturnReceiptA4Preview({
 
                     {/* Order info grid */}
                     <div className="px-8 py-6">
-                        <div className="grid grid-cols-3 gap-4 border-b border-gray-200 pb-6 w-full">
+                        <div className="grid grid-cols-3 gap-4 border-b border-gray-100 pb-6 w-full">
                             <div className="flex flex-col">
                                 <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">
                                     Pedido Original
@@ -153,7 +154,7 @@ export default function ReturnReceiptA4Preview({
                                 <h3 className="font-bold text-sm text-brand-dark mb-3">Dados da empresa</h3>
                                 <div className="text-xs text-gray-600 space-y-1">
                                     <p className="font-bold text-sm text-brand-dark">{partnerHeader.fantasyName || partnerName}</p>
-                                    {partnerHeader.phone && <p>{partnerHeader.phone}</p>}
+                                    {partnerHeader.phone && <p>{formatBrazilPhone(partnerHeader.phone)}</p>}
                                     {partnerHeader.taxIdLine && <p>{partnerHeader.taxIdLine}</p>}
                                     <p className="whitespace-pre-wrap">{partnerAddress}</p>
                                 </div>
@@ -162,7 +163,7 @@ export default function ReturnReceiptA4Preview({
                                 <h3 className="font-bold text-sm text-brand-dark mb-3">Dados do cliente</h3>
                                 <div className="text-xs text-gray-600 space-y-1">
                                     <p className="font-bold text-sm text-brand-dark">{returnRequest.customerName}</p>
-                                    {returnRequest.customerPhone && <p>{returnRequest.customerPhone}</p>}
+                                    {returnRequest.customerPhone && <p>{formatBrazilPhone(returnRequest.customerPhone)}</p>}
                                     {customerAddress && <p className="whitespace-pre-wrap">{customerAddress}</p>}
                                 </div>
                             </div>

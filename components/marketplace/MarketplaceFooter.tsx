@@ -35,7 +35,7 @@ const Footer: React.FC<FooterProps> = ({ setView }) => {
                     <div className="md:w-1/3">
                         <Link href="/" prefetch={true} className="inline-block mb-6">
                             <img
-                                src="https://img.dudit.com.br/static/Logo.png"
+                                src="https://img.dudit.com.br/cdn-cgi/image/width=140,format=auto,quality=80/static/Logo.png"
                                 alt="Dudit"
                                 width={140}
                                 height={40}

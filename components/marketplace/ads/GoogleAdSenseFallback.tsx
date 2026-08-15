@@ -28,26 +28,54 @@ export function GoogleAdSenseFallback({
     useEffect(() => {
         if (!config.enabled || !config.publisherId || initializedRef.current) return
 
-        // 1. Injetar o script do Google AdSense de forma assíncrona se não estiver presente
-        const scriptId = "google-adsense-script"
-        if (!document.getElementById(scriptId)) {
-            const script = document.createElement("script")
-            script.id = scriptId
-            script.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${config.publisherId}`
-            script.async = true
-            script.crossOrigin = "anonymous"
-            document.head.appendChild(script)
+        const el = adRef.current
+        if (!el) return
+
+        const triggerAdPush = () => {
+            if (initializedRef.current) return
+            initializedRef.current = true
+
+            // Injetar o script do Google AdSense se não estiver presente
+            const scriptId = "google-adsense-script"
+            if (!document.getElementById(scriptId)) {
+                const script = document.createElement("script")
+                script.id = scriptId
+                script.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${config.publisherId}`
+                script.async = true
+                script.crossOrigin = "anonymous"
+                document.head.appendChild(script)
+            }
+
+            try {
+                if (typeof window !== "undefined") {
+                    ;(window.adsbygoogle = window.adsbygoogle || []).push({})
+                }
+            } catch (e) {
+                console.error("AdSense push error:", e)
+            }
         }
 
-        // 2. Executar o push do AdSense após o elemento estar no DOM
-        try {
-            if (typeof window !== "undefined" && adRef.current) {
-                ;(window.adsbygoogle = window.adsbygoogle || []).push({})
-                initializedRef.current = true
-            }
-        } catch (e) {
-            console.error("AdSense push error:", e)
+        if ("IntersectionObserver" in window) {
+            const observer = new IntersectionObserver(
+                (entries) => {
+                    if (entries[0]?.isIntersecting) {
+                        triggerAdPush()
+                        observer.disconnect()
+                    }
+                },
+                { rootMargin: "300px" }
+            )
+            observer.observe(el)
+            return () => observer.disconnect()
         }
+
+        if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+            const handle = (window as any).requestIdleCallback(triggerAdPush, { timeout: 3000 })
+            return () => (window as any).cancelIdleCallback(handle)
+        }
+
+        const timer = setTimeout(triggerAdPush, 2000)
+        return () => clearTimeout(timer)
     }, [config.enabled, config.publisherId])
 
     if (!config.enabled || !config.publisherId) {

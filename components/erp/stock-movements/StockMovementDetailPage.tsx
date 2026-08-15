@@ -195,6 +195,7 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
                                             >
                                                 {isIn ? "Entrada" : "Saída"}
                                             </Badge>
+                                            <span>{movementTitle}</span>
                                         </h1>
 
                                         <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
@@ -324,7 +325,7 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
 
                                                     {/* Detalhes da Movimentação - BELOW Resumo da Operação */}
                                                     <FormSection title="Detalhes da Movimentação" hasSeparator>
-                                                        <div className="grid md:grid-cols-4 gap-4">
+                                                        <div className={hasNotes ? "grid md:grid-cols-2 gap-4" : "grid md:grid-cols-4 gap-4"}>
                                                             <ListItem
                                                                 icon={PinIcon}
                                                                 title="Motivo"
@@ -440,7 +441,7 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
                                             </div >
 
                                             {/* Detalhes da Movimentação - BELOW Resumo da Operação */}
-                                            < FormSection title="Detalhes da Movimentação" hasSeparator={false} className="mt-0" >
+                                            <FormSection title="Detalhes da Movimentação" hasSeparator={false} className="mt-0" >
                                                 <div className="space-y-4">
                                                     <ListItem
                                                         title="Motivo"

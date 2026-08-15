@@ -232,7 +232,7 @@ async function processSubscriptionWebhook(
     // ── Find subscription by MP ID ──
     const { data: sub, error: fetchError } = await supabase
       .from("subscriptions")
-      .select("id, partner_id, plan_id, status, cancel_at_period_end, pending_plan_id")
+      .select("id, partner_id, plan_id, status, current_period_end, cancel_at_period_end, pending_plan_id")
       .eq("mercado_pago_subscription_id", resourceId)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -341,9 +341,23 @@ async function processSubscriptionWebhook(
     }
 
     if (newStatus === "cancelled") {
-      updatePayload.cancelled_at = new Date().toISOString()
-      updatePayload.ended_at = new Date().toISOString()
-      updatePayload.past_due_at = null
+      const isStillInPaidPeriod =
+        sub.cancel_at_period_end &&
+        sub.current_period_end &&
+        new Date(sub.current_period_end).getTime() > Date.now()
+
+      if (isStillInPaidPeriod) {
+        // Keep status active until period end, but record cancelled_at
+        updatePayload.cancelled_at = new Date().toISOString()
+        updatePayload.cancel_at_period_end = true
+        delete updatePayload.status
+      } else {
+        updatePayload.status = "cancelled"
+        updatePayload.cancelled_at = new Date().toISOString()
+        updatePayload.ended_at = new Date().toISOString()
+        updatePayload.past_due_at = null
+        updatePayload.cancel_at_period_end = false
+      }
     }
 
     // ── Update subscription ──
@@ -362,6 +376,18 @@ async function processSubscriptionWebhook(
         subscriptionId: sub.id,
       })
       return
+    }
+
+    // Archive excess items when subscription is officially cancelled
+    if (updatePayload.status === "cancelled") {
+      try {
+        const { enforcePlanLimitsAndArchiveExcess } = await import(
+          "@/lib/services/subscription-archiver.service"
+        )
+        await enforcePlanLimitsAndArchiveExcess(sub.partner_id)
+      } catch (archErr: any) {
+        console.error("[SUB_WEBHOOK] Failed to archive excess items on cancellation:", archErr.message)
+      }
     }
 
     // ── Update the idempotency record with result context ──

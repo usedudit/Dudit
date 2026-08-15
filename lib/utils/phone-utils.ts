@@ -92,3 +92,46 @@ export function isValidBrazilLandline(phone: string): boolean {
 
   return digits.length === 10
 }
+
+/**
+ * Auto-detect and format Brazilian phone number
+ * Handles: +5511998765432, 5511998765432, 11998765432, (11) 99876-5432, 1134567890
+ * Returns: (11) 99876-5432 for mobile, (11) 3456-7890 for landline
+ */
+export function formatBrazilPhone(phone: string): string {
+  if (!phone) return ""
+
+  let digits = getPhoneDigits(phone)
+
+  if (!digits) return ""
+
+  // Remove leading 0 (domestic trunk prefix)
+  if (digits.startsWith("0") && digits.length > 10) {
+    digits = digits.slice(1)
+  }
+
+  // Remove country code 55
+  if (digits.startsWith("55") && (digits.length === 13 || digits.length === 12)) {
+    digits = digits.slice(2)
+  }
+
+  // Mobile: 11 digits with 9 in 3rd position
+  if (digits.length === 11 && digits[2] === "9") {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`
+  }
+
+  // Landline: 10 digits
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`
+  }
+
+  // Fallback: try to format what we have
+  if (digits.length > 2) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2)}`
+  }
+  if (digits.length > 0) {
+    return `(${digits}`
+  }
+
+  return ""
+}
