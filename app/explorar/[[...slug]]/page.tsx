@@ -516,7 +516,7 @@ export default async function ExplorarPage({
     const dehydratedState = dehydrate(queryClient)
 
     return (
-        <div className="min-h-screen bg-white pt-[40px] lg:pt-[110px] font-sans flex flex-col">
+        <div className="min-h-screen bg-white dark:bg-dark-background pt-[40px] lg:pt-[110px] font-sans flex flex-col">
             <script
                 type="application/ld+json"
                 dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(breadcrumbLd) }}
@@ -525,7 +525,7 @@ export default async function ExplorarPage({
 
             <HydrationBoundary state={dehydratedState}>
                 <Suspense fallback={
-                        <div className="min-h-screen bg-white pt-[40px] lg:pt-[110px] font-sans flex flex-col items-center justify-center">
+                        <div className="min-h-screen bg-white dark:bg-dark-background pt-[40px] lg:pt-[110px] font-sans flex flex-col items-center justify-center">
                             <ThreeDotsLoader />
                         </div>
                     }>

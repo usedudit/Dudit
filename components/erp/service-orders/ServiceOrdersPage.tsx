@@ -484,7 +484,7 @@ export default function ServiceOrdersPage({
             </FadeIn>
           )
         ) : entityState.isOpen && entityState.action === "view" ? (
-          (isLoadingDetail || !currentEntity) ? (
+          (isLoadingDetail && !currentEntity) ? (
             <ERPDetailLoading key="loading-detail" />
           ) : (
             <FadeIn key="detail" className="w-full h-full bg-white dark:bg-dark-background">

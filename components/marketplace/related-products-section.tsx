@@ -44,7 +44,7 @@ export async function RelatedProductsSection({ partnerId, currentProductId }: Re
     })
 
     return (
-        <div className="mt-12 lg:mt-24 border-t border-gray-100 pt-12">
+        <div className="mt-12 lg:mt-24 border-t border-gray-100 pt-12 dark:border-dark-border">
             <ProductCarousel
                 title="Mais desta loja"
                 products={displayProducts}

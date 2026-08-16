@@ -779,7 +779,7 @@ export default function OrdersPage({
     return (
         <>
             <AnimatePresence mode="wait">
-                {entityState.isOpen && (entityState.action === 'view' || entityState.action === 'edit') && isLoadingDetail ? (
+                {entityState.isOpen && (entityState.action === 'view' || entityState.action === 'edit') && (isLoadingDetail && !currentEntity) ? (
                     <ERPDetailLoading key="loading-order" />
                 ) : entityState.isOpen && entityState.action === 'view' && entityState.entityId ? (
                     <FadeIn key="view-order" className="w-full h-full bg-white dark:bg-dark-background">

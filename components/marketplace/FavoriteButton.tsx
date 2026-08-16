@@ -69,7 +69,7 @@ export function FavoriteButton({
                 return `${buttonSize} rounded-full flex items-center justify-center border transition-all duration-200 cursor-pointer select-none
                     ${favorited
                         ? "bg-green-50 border-green-200 hover:bg-green-100"
-                        : "bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                        : "bg-white dark:bg-dark-surface border-gray-200 dark:border-dark-border hover:border-gray-300 dark:hover:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-border/30"
                     }`
             case "outline":
                 return `${buttonSize} rounded-full flex items-center justify-center border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-brand-gray dark:hover:bg-dark-border transition-all duration-200 cursor-pointer select-none`

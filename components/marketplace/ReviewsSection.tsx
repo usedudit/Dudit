@@ -142,7 +142,7 @@ export function ReviewsSection({ reviews, showItemInfo = false, className = "" }
                         return (
                             <div key={star} className="flex items-center gap-2">
                                 <span className="text-xs text-brand-inactive-text dark:text-dark-body w-3 shrink-0">{star}</span>
-                                <StarIcon size={10} strokeWidth={0} className="text-brand-inactive-text fill-gray-400 shrink-0" />
+                                <StarIcon size={10} strokeWidth={0} className="text-brand-inactive-text dark:text-dark-body fill-gray-400 shrink-0" />
                                 <div className="flex-1 h-2 bg-brand-gray dark:bg-dark-border/50 rounded-full overflow-hidden">
                                     <div className="h-full bg-brand-green rounded-full" style={{ width: `${pct}%` }} />
                                 </div>
@@ -186,7 +186,7 @@ export function ReviewsSection({ reviews, showItemInfo = false, className = "" }
                                         <StarRow rating={rev.rating} size={11} />
                                         <button
                                             onClick={() => setReportTarget({ id: rev.id, name: `${rev.profiles?.full_name || "Usuário"}` })}
-                                            className="text-brand-inactive-text hover:text-brand-red transition-colors mt-1"
+                                            className="text-brand-inactive-text dark:text-dark-body hover:text-brand-red transition-colors mt-1"
                                             title="Denunciar avaliação"
                                         >
                                             <FlagIcon size={14} />
@@ -204,7 +204,7 @@ export function ReviewsSection({ reviews, showItemInfo = false, className = "" }
                                         const card = (
                                             <>
                                                 <div className="w-12 h-12 bg-white dark:bg-dark-border/50 border border-brand-border dark:border-dark-border rounded-[8px] flex items-center justify-center shrink-0">
-                                                    <img src={itemImage} alt={itemName} className="w-full h-full object-contain mix-blend-multiply rounded-[4px]" />
+                                                    <img src={itemImage} alt={itemName} className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal rounded-[4px]" />
                                                 </div>
                                                 <div className="flex-1 min-w-0 flex flex-col justify-center">
                                                     <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading mb-0.5 truncate">{itemName}</h4>
@@ -213,7 +213,7 @@ export function ReviewsSection({ reviews, showItemInfo = false, className = "" }
                                                     )}
                                                     {rev.quantity != null && (
                                                         <div className="flex items-center gap-2 text-xs mt-1">
-                                                            <span className="text-brand-inactive-text truncate">
+                                                            <span className="text-brand-inactive-text dark:text-dark-body truncate">
                                                                 {formatQty(rev.quantity, unit)}
                                                             </span>
                                                         </div>
@@ -223,7 +223,7 @@ export function ReviewsSection({ reviews, showItemInfo = false, className = "" }
                                         )
                                         if (rev.itemUrl) {
                                             return (
-                                                <Link href={rev.itemUrl} className="flex gap-4 p-2 -mx-2 rounded-lg hover:bg-gray-50 transition-colors group">
+                                                <Link href={rev.itemUrl} className="flex gap-4 p-2 -mx-2 rounded-lg hover:bg-gray-50 dark:hover:bg-dark-border/30 transition-colors group">
                                                     {card}
                                                 </Link>
                                             )
@@ -243,7 +243,7 @@ export function ReviewsSection({ reviews, showItemInfo = false, className = "" }
 
             {hasMore && (
                 <div ref={sentinelRef} className="h-10 flex items-center justify-center mt-4">
-                    <span className="text-xs text-brand-inactive-text">Carregando mais avaliações...</span>
+                    <span className="text-xs text-brand-inactive-text dark:text-dark-body">Carregando mais avaliações...</span>
                 </div>
             )}
 

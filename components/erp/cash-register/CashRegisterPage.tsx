@@ -150,6 +150,36 @@ export default function CashRegisterPage({
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null)
     const [detailedSession, setDetailedSession] = useState<any | null>(null)
     const [isDetailLoading, setIsDetailLoading] = useState(false)
+
+    useEffect(() => {
+        if (!activeViewId || !partnerId) {
+            setDetailedSession(null)
+            return
+        }
+        let mounted = true
+        setIsDetailLoading(true)
+        void (async () => {
+            try {
+                const res = await getCashSessionDetailsAction(partnerId, activeViewId)
+                if (mounted) {
+                    if (res.success && res.data) {
+                        setDetailedSession(res.data)
+                    } else {
+                        notifyError(res.error || "Erro ao carregar detalhes do caixa.")
+                        close()
+                    }
+                }
+            } catch (err: any) {
+                if (mounted) {
+                    notifyError(err?.message || "Erro ao carregar detalhes do caixa.")
+                    close()
+                }
+            } finally {
+                if (mounted) setIsDetailLoading(false)
+            }
+        })()
+        return () => { mounted = false }
+    }, [activeViewId, partnerId, notifyError, close])
     const [openModal, setOpenModal] = useState(false)
     const [closeModal, setCloseModal] = useState(false)
     const [openingBalance, setOpeningBalance] = useState(0)

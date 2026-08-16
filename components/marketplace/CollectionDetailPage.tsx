@@ -122,7 +122,7 @@ export function CollectionDetailPage({ collection }: CollectionDetailProps) {
     return (
         <>
             <MarketplaceHeader simpleTitle={collection.name} />
-            <div className="min-h-screen bg-white pt-[40px] lg:pt-[110px] font-sans flex flex-col">
+            <div className="min-h-screen bg-white dark:bg-dark-background pt-[40px] lg:pt-[110px] font-sans flex flex-col">
                 <div className="container mx-auto px-4 max-w-[1400px] w-full mt-12 lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">
 
                     {/* Page Header */}
@@ -142,16 +142,16 @@ export function CollectionDetailPage({ collection }: CollectionDetailProps) {
                                     <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading truncate">
                                         {collection.name}
                                     </h1>
-                                    <div className="flex items-center gap-2 mt-1 text-sm text-brand-inactive-text">
+                                    <div className="flex items-center gap-2 mt-1 text-sm text-brand-inactive-text dark:text-dark-body">
                                         <UserProfileImage
                                             fullName={authorName}
                                             imageUrl={collection.author?.avatar_url || null}
-                                            className="w-6 h-6 border border-brand-border shrink-0 bg-gray-50"
+                                            className="w-6 h-6 border border-brand-border shrink-0 bg-gray-50 dark:bg-dark-border/30"
                                         />
                                         <span className="font-medium text-brand-dark dark:text-dark-heading whitespace-nowrap">{authorName}</span>
-                                        <span className="text-brand-inactive-text">•</span>
+                                        <span className="text-brand-inactive-text dark:text-dark-body">•</span>
                                         <span className="whitespace-nowrap">{collection.items_count} {collection.items_count === 1 ? "item" : "itens"}</span>
-                                        <span className="text-brand-inactive-text">•</span>
+                                        <span className="text-brand-inactive-text dark:text-dark-body">•</span>
                                         <span className="whitespace-nowrap">{collection.views_count} {collection.views_count === 1 ? "visualização" : "visualizações"}</span>
                                     </div>
                                 </div>
@@ -185,16 +185,16 @@ export function CollectionDetailPage({ collection }: CollectionDetailProps) {
                         </div>
 
                         {/* Mobile/tablet: creator info line (top bar already shows back + title) */}
-                        <div className="lg:hidden flex items-center gap-2 text-sm text-brand-inactive-text">
+                        <div className="lg:hidden flex items-center gap-2 text-sm text-brand-inactive-text dark:text-dark-body">
                             <UserProfileImage
                                 fullName={authorName}
                                 imageUrl={collection.author?.avatar_url || null}
-                                className="w-6 h-6 border border-brand-border shrink-0 bg-gray-50"
+                                className="w-6 h-6 border border-brand-border shrink-0 bg-gray-50 dark:bg-dark-border/30"
                             />
                             <span className="font-medium text-brand-dark dark:text-dark-heading truncate">{authorName}</span>
-                            <span className="text-brand-inactive-text">|</span>
+                            <span className="text-brand-inactive-text dark:text-dark-body">|</span>
                             <span className="whitespace-nowrap">{collection.items_count} {collection.items_count === 1 ? "item" : "itens"}</span>
-                            <span className="text-brand-inactive-text">|</span>
+                            <span className="text-brand-inactive-text dark:text-dark-body">|</span>
                             <span className="whitespace-nowrap">{collection.views_count} {collection.views_count === 1 ? "visualização" : "visualizações"}</span>
                         </div>
                     </div>
@@ -315,8 +315,8 @@ export function CollectionDetailPage({ collection }: CollectionDetailProps) {
                 maxWidth="sm"
             >
                 <div className="flex flex-col gap-4 p-4">
-                    <p className="text-sm text-brand-inactive-text">
-                        Tem certeza que deseja excluir a coleção <strong className="text-brand-dark">{collection.name}</strong>? Esta ação não pode ser desfeita.
+                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                        Tem certeza que deseja excluir a coleção <strong className="text-brand-dark dark:text-dark-heading">{collection.name}</strong>? Esta ação não pode ser desfeita.
                     </p>
                     <div className="flex justify-end gap-2 mt-2">
                         <Button

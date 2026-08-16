@@ -931,7 +931,7 @@ export function CheckoutPageClient() {
                             Troco para <strong className="font-bold">{formatCurrency(payWithAmount || 0)}</strong> (Troco: <span className="text-brand-green font-bold">{formatCurrency(Math.max(0, (payWithAmount || 0) - checkoutTotalToCharge))}</span>)
                         </p>
                     ) : wantsChange === false ? (
-                        <p className="text-brand-inactive-text">Não precisa de troco (valor exato)</p>
+                        <p className="text-brand-inactive-text dark:text-dark-body">Não precisa de troco (valor exato)</p>
                     ) : (
                         <p className="text-amber-600 dark:text-amber-400 font-medium">Defina se precisa de troco</p>
                     )}
@@ -1263,7 +1263,7 @@ export function CheckoutPageClient() {
                 {checkoutContext?.lines && checkoutContext.lines.length > 0 ? (
                     <>
                         {checkoutContext.lines.some((l) => l.lineKind === "product") && (
-                            <p className="text-xs font-bold uppercase text-brand-inactive-text tracking-wide mb-2">Produtos</p>
+                            <p className="text-xs font-bold uppercase text-brand-inactive-text dark:text-dark-body tracking-wide mb-2">Produtos</p>
                         )}
                         {checkoutContext.lines
                             .filter((l) => l.lineKind === "product")
@@ -1289,18 +1289,18 @@ export function CheckoutPageClient() {
                                             </div>
                                         )}
                                         {line.variantName && (
-                                            <div className="text-xs text-brand-inactive-text mt-0.5">
+                                            <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
                                                 {line.variantName}
                                             </div>
                                         )}
-                                        <div className="text-xs text-brand-inactive-text mt-0.5">
+                                        <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
                                             Qtd: {line.quantity}
                                         </div>
                                     </div>
                                     <div className="text-sm font-bold text-brand-dark dark:text-dark-heading shrink-0 pr-1">
                                         {line.isGift ? (
                                             <div className="flex items-center gap-1.5 justify-end">
-                                                <span className="text-xs text-brand-inactive-text line-through font-normal">{formatCurrency(line.originalPrice || 0)}</span>
+                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body line-through font-normal">{formatCurrency(line.originalPrice || 0)}</span>
                                                 <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">Grátis</span>
                                             </div>
                                         ) : (
@@ -1310,7 +1310,7 @@ export function CheckoutPageClient() {
                                 </div>
                             ))}
                         {checkoutContext.lines.some((l) => l.lineKind === "service_booking") && (
-                            <p className="text-xs font-bold uppercase text-brand-inactive-text tracking-wide pt-2 mb-2">Serviços</p>
+                            <p className="text-xs font-bold uppercase text-brand-inactive-text dark:text-dark-body tracking-wide pt-2 mb-2">Serviços</p>
                         )}
                         {checkoutContext.lines
                             .filter((l) => l.lineKind === "service_booking")
@@ -1336,18 +1336,18 @@ export function CheckoutPageClient() {
                                             </div>
                                         )}
                                         {line.bookingSummary && (
-                                            <div className="text-xs text-brand-inactive-text mt-0.5">
+                                            <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
                                                 {line.bookingSummary}
                                             </div>
                                         )}
-                                        <div className="text-xs text-brand-inactive-text mt-0.5">
+                                        <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
                                             Qtd: {line.quantity}
                                         </div>
                                     </div>
                                     <div className="text-sm font-bold text-brand-dark dark:text-dark-heading shrink-0 pr-1">
                                         {line.isGift ? (
                                             <div className="flex items-center gap-1.5 justify-end">
-                                                <span className="text-xs text-brand-inactive-text line-through font-normal">{formatCurrency(line.originalPrice || 0)}</span>
+                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body line-through font-normal">{formatCurrency(line.originalPrice || 0)}</span>
                                                 <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">Grátis</span>
                                             </div>
                                         ) : (
@@ -1358,7 +1358,7 @@ export function CheckoutPageClient() {
                                         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-brand-orange dark:text-orange-400 font-medium">
                                             <span className="w-1.5 h-1.5 rounded-full bg-brand-orange shrink-0" />
                                             <span>Este horário não está mais disponível</span>
-                                            <span className="text-brand-inactive-text/40">•</span>
+                                            <span className="text-brand-inactive-text/40 dark:text-dark-body/40">•</span>
                                             <button
                                                 onClick={() => {
                                                     const service = { id: line.serviceId, name: line.baseName || line.displayName }
@@ -1369,7 +1369,7 @@ export function CheckoutPageClient() {
                                             >
                                                 Remarcar
                                             </button>
-                                            <span className="text-brand-inactive-text/40">•</span>
+                                            <span className="text-brand-inactive-text/40 dark:text-dark-body/40">•</span>
                                             <button
                                                 onClick={async () => {
                                                     await deleteCartItemsAction([line.lineId])
@@ -1384,7 +1384,7 @@ export function CheckoutPageClient() {
                                 </div>
                             ))}
                         {checkoutContext.lines.some((l) => l.lineKind === "subscription") && (
-                            <p className="text-xs font-bold uppercase text-brand-inactive-text tracking-wide pt-2 mb-2">Assinaturas</p>
+                            <p className="text-xs font-bold uppercase text-brand-inactive-text dark:text-dark-body tracking-wide pt-2 mb-2">Assinaturas</p>
                         )}
                         {checkoutContext.lines
                             .filter((l) => l.lineKind === "subscription")
@@ -1404,7 +1404,7 @@ export function CheckoutPageClient() {
                                         <h4 className="font-bold text-brand-dark dark:text-dark-heading text-sm truncate">
                                             {line.baseName || line.displayName}
                                         </h4>
-                                        <div className="text-xs text-brand-inactive-text mt-0.5">
+                                        <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
                                             Qtd: {line.quantity}
                                         </div>
                                     </div>
@@ -1432,7 +1432,7 @@ export function CheckoutPageClient() {
                                         {item.name}
                                     </h4>
                                     {item.variant && (
-                                        <div className="text-xs text-brand-inactive-text mt-0.5">
+                                        <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
                                             {item.variant.includes(":") ? item.variant.split(":")[1].trim() : item.variant}
                                         </div>
                                     )}
@@ -1440,7 +1440,7 @@ export function CheckoutPageClient() {
                                         {formatCurrency(item.price)}
                                     </div>
                                 </div>
-                                <div className="text-sm text-brand-inactive-text shrink-0 pr-1">
+                                <div className="text-sm text-brand-inactive-text dark:text-dark-body shrink-0 pr-1">
                                     x{qty}
                                 </div>
                             </div>
@@ -1495,7 +1495,7 @@ export function CheckoutPageClient() {
             )}
 
             <div className="space-y-3 mb-4">
-                <div className="flex justify-between text-sm font-medium text-brand-inactive-text">
+                <div className="flex justify-between text-sm font-medium text-brand-inactive-text dark:text-dark-body">
                     <span>Subtotal</span>
                     <span className="text-brand-dark dark:text-dark-heading">{formatCurrency(contextTotalSubtotal)}</span>
                 </div>
@@ -1506,7 +1506,7 @@ export function CheckoutPageClient() {
                     </div>
                 )}
                 {showDeliveryFeeRow && (
-                    <div className="flex justify-between text-sm font-medium text-brand-inactive-text">
+                    <div className="flex justify-between text-sm font-medium text-brand-inactive-text dark:text-dark-body">
                         <span>Entrega</span>
                         <span className={(isPickup || (deliveryFee === 0 && (hasFreeDeliveryCoupon || (deliveryBreakdown as any)?.isFreeByThreshold || deliverySettings?.deliveryPayer === "seller" || (deliveryBreakdown as any)?.deliveryPayer === "seller" || (hasConfiguredDeliveryRates && productDeliveryQuoteActive && !deliveryError && Boolean(formData.deliveryAddress))))) ? "text-brand-green font-semibold" : "text-brand-dark dark:text-dark-heading"}>
                             {isPickup
@@ -1517,7 +1517,7 @@ export function CheckoutPageClient() {
                                         ? (
                                             <span className="flex items-center gap-1.5 justify-end">
                                                 {(deliveryBreakdown as any)?.originalFee != null && Number((deliveryBreakdown as any).originalFee) > 0 && (
-                                                    <span className="text-xs line-through text-brand-inactive-text font-normal">
+                                                    <span className="text-xs line-through text-brand-inactive-text dark:text-dark-body font-normal">
                                                         {formatCurrency(Number((deliveryBreakdown as any).originalFee))}
                                                     </span>
                                                 )}
@@ -1536,7 +1536,7 @@ export function CheckoutPageClient() {
                     </div>
                 )}
                 {showDeliveryFeeRow && !isPickup && deliveryBreakdown && (Number(deliveryBreakdown.distanceFee) > 0 || (deliveryBreakdown.timeAdjustmentTotal != null && Number(deliveryBreakdown.timeAdjustmentTotal) !== 0)) && (
-                    <div className="space-y-1 text-xs text-brand-inactive-text">
+                    <div className="space-y-1 text-xs text-brand-inactive-text dark:text-dark-body">
                         {Number(deliveryBreakdown.baseFee) > 0 && <div className="flex justify-between"><span>Taxa base</span><span>{formatCurrency(Number(deliveryBreakdown.baseFee))}</span></div>}
                         {Number(deliveryBreakdown.distanceFee) > 0 && <div className="flex justify-between"><span>Distância {deliveryDistanceKm != null ? `(${deliveryDistanceKm.toFixed(2)} km)` : ""}</span><span>{formatCurrency(Number(deliveryBreakdown.distanceFee))}</span></div>}
                         {deliveryBreakdown.timeAdjustmentTotal != null && Number(deliveryBreakdown.timeAdjustmentTotal) !== 0 && (
@@ -1551,7 +1551,7 @@ export function CheckoutPageClient() {
                     <InfoCard color="orange" message={`Retirada ${getReadyDayLabel(preparationEstimate)} entre ${pickupStartLabel} e ${pickupEndLabel}`} />
                 )}
                 {paymentOption === "traditional" && paymentPreviewLoading && (
-                    <div className="flex items-center justify-between text-sm font-medium text-brand-inactive-text">
+                    <div className="flex items-center justify-between text-sm font-medium text-brand-inactive-text dark:text-dark-body">
                         <span>Calculando pagamento</span>
                         <Spinner size={16} />
                     </div>
@@ -1575,7 +1575,7 @@ export function CheckoutPageClient() {
                     </div>
                 )}
                 {paymentOption === "traditional" && paymentPreview?.success && paymentPreview.feeBearer !== "merchant" && Number(paymentPreview.feeAmount || 0) > 0 && (
-                    <div className="flex justify-between text-sm font-medium text-brand-inactive-text">
+                    <div className="flex justify-between text-sm font-medium text-brand-inactive-text dark:text-dark-body">
                         <span className="flex items-center gap-2">
                             <span>Taxas</span>
                             {paymentMethodPreviewBadge}
@@ -1599,7 +1599,7 @@ export function CheckoutPageClient() {
                     <span className="font-bold text-xl text-brand-dark dark:text-dark-heading">{formatCurrency(remainingBalanceToCharge)}</span>
                 </div>
                 {appliedStoreCredit > 0 && (
-                    <span className="text-xs text-brand-inactive-text text-right">
+                    <span className="text-xs text-brand-inactive-text dark:text-dark-body text-right">
                         (Total original: {formatCurrency(checkoutTotalToCharge)} · Crédito: -{formatCurrency(appliedStoreCredit)})
                     </span>
                 )}
@@ -2399,7 +2399,7 @@ export function CheckoutPageClient() {
                         </div>
                         <div className="text-left w-full">
                             <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading flex items-center">Finalizar Compra</h1>
-                            <p className="text-md text-brand-inactive-text mt-1">Conclua seu pedido informando os dados de entrega e pagamento.</p>
+                            <p className="text-md text-brand-inactive-text dark:text-dark-body mt-1">Conclua seu pedido informando os dados de entrega e pagamento.</p>
                         </div>
                     </div>
 
@@ -2465,7 +2465,7 @@ export function CheckoutPageClient() {
                                                         <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">
                                                             Crédito em Loja
                                                         </div>
-                                                        <div className="text-xs text-brand-inactive-text">
+                                                        <div className="text-xs text-brand-inactive-text dark:text-dark-body">
                                                             Você possui <strong className="text-emerald-600 dark:text-emerald-400">{formatCurrency(availableStoreCredit)}</strong> disponível nesta loja.
                                                         </div>
                                                     </div>
@@ -2520,7 +2520,7 @@ export function CheckoutPageClient() {
                                             <MoneyIcon className="w-12 h-12 p-2.5 rounded-xl bg-brand-slate dark:bg-dark-border/50 text-brand-inactive-text dark:text-dark-body shrink-0" />
                                             <div>
                                                 <p className="text-md font-bold text-brand-dark dark:text-dark-heading">A combinar</p>
-                                                <p className="text-sm text-brand-inactive-text">O pagamento será combinado diretamente com o vendedor.</p>
+                                                <p className="text-sm text-brand-inactive-text dark:text-dark-body">O pagamento será combinado diretamente com o vendedor.</p>
                                             </div>
                                         </div>
                                     ) : partnerInfo.mpConnected && checkoutContext?.partner.orderFlow !== "whatsapp" ? (
@@ -2710,7 +2710,7 @@ export function CheckoutPageClient() {
                                         <>
                                             <div className="flex gap-3 mb-6">
                                                 <div className="w-1 rounded-full bg-brand-border dark:bg-dark-border shrink-0" />
-                                                <p className="text-sm text-brand-inactive-text">Este vendedor aceita apenas pagamentos diretos (Entrega ou Retirada).</p>
+                                                <p className="text-sm text-brand-inactive-text dark:text-dark-body">Este vendedor aceita apenas pagamentos diretos (Entrega ou Retirada).</p>
                                             </div>
                                             <div className="mb-6">
                                                 {!formData.paymentMethod ? (
@@ -2909,7 +2909,7 @@ export function CheckoutPageClient() {
                                             <MoneyIcon className="w-12 h-12 p-2.5 rounded-xl bg-brand-slate dark:bg-dark-border/50 text-brand-inactive-text dark:text-dark-body shrink-0" />
                                             <div>
                                                 <p className="text-md font-bold text-brand-dark dark:text-dark-heading">A combinar</p>
-                                                <p className="text-sm text-brand-inactive-text">O pagamento será combinado diretamente com o vendedor.</p>
+                                                <p className="text-sm text-brand-inactive-text dark:text-dark-body">O pagamento será combinado diretamente com o vendedor.</p>
                                             </div>
                                         </div>
                                     ) : partnerInfo.mpConnected && checkoutContext?.partner.orderFlow !== "whatsapp" ? (
@@ -2993,7 +2993,7 @@ export function CheckoutPageClient() {
                                     ) : (
                                         <div className="flex gap-2.5 pb-2">
                                             <div className="w-1 rounded-full bg-brand-border dark:bg-dark-border shrink-0" />
-                                            <p className="text-xs text-brand-inactive-text">
+                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
                                                 {requirements?.hasPayOnService
                                                     ? "Pagamento direto com o vendedor (reserva / pagar no atendimento)."
                                                     : "Pagamento direto com o vendedor."}
@@ -3144,7 +3144,7 @@ export function CheckoutPageClient() {
 
                                 {/* Totals Summary */}
                                 <FormSection title="Resumo dos Valores" hasSeparator>
-                                    <div className="space-y-2 text-sm text-brand-inactive-text">
+                                    <div className="space-y-2 text-sm text-brand-inactive-text dark:text-dark-body">
                                         <div className="flex justify-between">
                                             <span>Subtotal</span>
                                             <span className="text-brand-dark dark:text-dark-heading">{formatCurrency(contextTotalSubtotal)}</span>
@@ -3220,7 +3220,7 @@ export function CheckoutPageClient() {
                                 </FormSection>
 
                                 {/* Fixed Bottom Bar Step 2 */}
-                                <div className="fixed bg-white bottom-0 left-0 right-0 p-2 z-[100] flex gap-3">
+                                <div className="fixed bg-white dark:bg-dark-surface bottom-0 left-0 right-0 p-2 z-[100] flex gap-3">
                                     <Button
                                         type="button"
                                         variant="outline"
@@ -3338,7 +3338,7 @@ export function CheckoutPageClient() {
                                     <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
                                         {selectedAddress.street}, {selectedAddress.number}
                                     </p>
-                                    <p className="text-xs text-brand-inactive-text truncate">
+                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate">
                                         {selectedAddress.neighborhood} - {selectedAddress.city}/{selectedAddress.state}
                                     </p>
                                 </div>
@@ -3352,11 +3352,11 @@ export function CheckoutPageClient() {
                                 />
                                 <div className="min-w-0">
                                     <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Local de Retirada</p>
-                                    <p className="text-xs text-brand-inactive-text whitespace-pre-line leading-snug">
+                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body whitespace-pre-line leading-snug">
                                         {formatPartnerAddress(partnerInfo.address)}
                                     </p>
                                     {preparationEstimate && (preparationEstimate.preparationTimeMinutes > 0 || preparationEstimate.readyAt.getTime() > preparationEstimate.now.getTime()) && (
-                                        <p className="text-[11px] text-brand-inactive-text mt-1.5 font-medium">
+                                        <p className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-1.5 font-medium">
                                             {getReadyDayLabel(preparationEstimate) === "hoje"
                                                 ? `Pronto em ${preparationEstimate.readyInMinutes} min`
                                                 : `Pronto ${getReadyDayLabel(preparationEstimate)} a partir das ${pickupStartLabel}`
@@ -3366,7 +3366,7 @@ export function CheckoutPageClient() {
                                 </div>
                             </div>
                         ) : (
-                            <div className="text-sm text-brand-inactive-text">Endereço não selecionado</div>
+                            <div className="text-sm text-brand-inactive-text dark:text-dark-body">Endereço não selecionado</div>
                         )}
                     </div>
 
@@ -3404,7 +3404,7 @@ export function CheckoutPageClient() {
 
                     {appliedCoupon && (
                         <div className="space-y-4">
-                            <p className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text">Cupom Aplicado</p>
+                            <p className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body">Cupom Aplicado</p>
                             <ListItem
                                 icon={TagIcon}
                                 title={getCouponTitle(appliedCoupon)}
@@ -3588,7 +3588,7 @@ export function CheckoutPageClient() {
                 maxWidth="md"
             >
                 <div className="space-y-6 py-2">
-                    <p className="text-sm text-brand-inactive-text">
+                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">
                         Este estabelecimento permite pagar um sinal/entrada para confirmar o seu agendamento, restando o valor restante para ser pago presencialmente.
                     </p>
 
@@ -3605,19 +3605,19 @@ export function CheckoutPageClient() {
                                 <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-1">
                                     Pagar Sinal / Entrada
                                 </h3>
-                                <p className="text-xs text-brand-inactive-text mb-4">
+                                <p className="text-xs text-brand-inactive-text dark:text-dark-body mb-4">
                                     Pague apenas uma porcentagem agora para garantir sua reserva.
                                 </p>
                             </div>
                             <div className="mt-4 pt-4 border-t border-brand-border/40 dark:border-dark-border/40">
                                 <div className="flex justify-between items-baseline mb-1">
-                                    <span className="text-xs text-brand-inactive-text">Pagar agora:</span>
+                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body">Pagar agora:</span>
                                     <span className="text-xl font-black text-brand-green">
                                         {formatCurrency(checkoutDepositChargeTotal || checkoutChargeTotal)}
                                     </span>
                                 </div>
                                 <div className="flex justify-between items-baseline">
-                                    <span className="text-xs text-brand-inactive-text">Saldo restante:</span>
+                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body">Saldo restante:</span>
                                     <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
                                         {formatCurrency(checkoutAmounts?.remainingAfterDeposit ?? Math.max(0, checkoutFullTotal - checkoutDepositChargeTotal))}
                                     </span>
@@ -3637,20 +3637,20 @@ export function CheckoutPageClient() {
                                 <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-1">
                                     Pagamento Integral
                                 </h3>
-                                <p className="text-xs text-brand-inactive-text mb-4">
+                                <p className="text-xs text-brand-inactive-text dark:text-dark-body mb-4">
                                     Pague o valor total do pedido agora e evite cobranças adicionais depois.
                                 </p>
                             </div>
                             <div className="mt-4 pt-4 border-t border-brand-border/40 dark:border-dark-border/40">
                                 <div className="flex justify-between items-baseline mb-1">
-                                    <span className="text-xs text-brand-inactive-text">Pagar agora:</span>
+                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body">Pagar agora:</span>
                                     <span className="text-xl font-black text-brand-dark dark:text-dark-heading">
                                         {formatCurrency(checkoutFullTotal || checkoutChargeTotal)}
                                     </span>
                                 </div>
                                 <div className="flex justify-between items-baseline">
-                                    <span className="text-xs text-brand-inactive-text">Pagar no atendimento:</span>
-                                    <span className="text-sm font-semibold text-brand-inactive-text">R$ 0,00</span>
+                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body">Pagar no atendimento:</span>
+                                    <span className="text-sm font-semibold text-brand-inactive-text dark:text-dark-body">R$ 0,00</span>
                                 </div>
                             </div>
                         </div>
@@ -3690,8 +3690,8 @@ export function CheckoutPageClient() {
                             </div>
                             <div className="flex-1 pr-4">
                                 <p className="font-bold text-sm text-brand-dark dark:text-dark-heading">{address.street}, {address.number}</p>
-                                <p className="text-sm text-brand-inactive-text mt-0.5">{address.neighborhood} - {address.city}/{address.state}</p>
-                                <p className="text-xs text-brand-inactive-text mt-1">CEP: {address.zip_code}</p>
+                                <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-0.5">{address.neighborhood} - {address.city}/{address.state}</p>
+                                <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1">CEP: {address.zip_code}</p>
                             </div>
                         </div>
                     ))}
@@ -3930,7 +3930,7 @@ export function CheckoutPageClient() {
                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-2">
                         {partnerInfo.storeName || partnerInfo.store_name || "Este parceiro"} não entrega no endereço selecionado
                     </h3>
-                    <p className="text-brand-inactive-text mb-6">
+                    <p className="text-brand-inactive-text dark:text-dark-body mb-6">
                         Você gostaria de encontrar outro lugar que entregue neste endereço?
                     </p>
                     <div className="flex w-full gap-3">
@@ -4024,7 +4024,7 @@ export function CheckoutPageClient() {
                             {tempPayWithAmount && !isNaN(Number(tempPayWithAmount)) && (
                                 <div className="text-xs space-y-1">
                                     {Number(tempPayWithAmount) >= checkoutTotalToCharge ? (
-                                        <p className="text-brand-inactive-text">
+                                        <p className="text-brand-inactive-text dark:text-dark-body">
                                             Troco estimado: <span className="text-brand-green font-bold">{formatCurrency(Number(tempPayWithAmount) - checkoutTotalToCharge)}</span>
                                         </p>
                                     ) : (

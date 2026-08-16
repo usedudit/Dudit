@@ -351,8 +351,8 @@ export default function CustomersPage({
         if (!entityState.entityId) return null
         // currentEntity comes from cache or list-to-detail mapping
         if (currentEntity) return currentEntity
-        return filteredCustomers.find(c => c.originalId === entityState.entityId) || null
-    }, [entityState.entityId, currentEntity, filteredCustomers])
+        return rawCustomers.find(c => c.id === entityState.entityId || (c as any).originalId === entityState.entityId) || null
+    }, [entityState.entityId, currentEntity, rawCustomers])
 
     const prevFilteredLengthRef = useRef(0)
     useEffect(() => {
@@ -512,7 +512,7 @@ export default function CustomersPage({
         <>
             <AnimatePresence mode="wait">
                 {entityState.isOpen && isViewing ? (
-                    (isLoadingDetail || !selectedCustomer) ? (
+                    (isLoadingDetail && !selectedCustomer) ? (
                         <ERPDetailLoading key="loading-customer" />
                     ) : (
                         <FadeIn key="details" className="w-full h-full">
@@ -524,7 +524,7 @@ export default function CustomersPage({
                         </FadeIn>
                     )
                 ) : (isCreatingEntity || isEditingEntity) ? (
-                    (isEditingEntity && isLoadingDetail) ? (
+                    (isEditingEntity && isLoadingDetail && !currentEntity) ? (
                         <ERPDetailLoading key="loading-customer-edit" />
                     ) : (
                         <FadeIn key="form" className="w-full h-full">

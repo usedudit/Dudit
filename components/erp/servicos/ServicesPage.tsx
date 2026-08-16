@@ -253,13 +253,14 @@ export default function ServicesPage({
     const formService = useMemo(() => {
         if (!entityState.isOpen) return null
         if (entityState.action === 'create') return null
-        if (!currentEntity) return null
+        const target = currentEntity || services.find(s => s.id === entityState.entityId) || null
+        if (!target) return null
         if (isDuplicating) {
-            const sku = generateSKUBase(currentEntity.name ? `${currentEntity.name} Copy` : undefined)
-            return { ...currentEntity, id: undefined, sku, images: currentEntity.images || [] }
+            const sku = generateSKUBase(target.name ? `${target.name} Copy` : undefined)
+            return { ...target, id: undefined, sku, images: target.images || [] }
         }
-        return currentEntity
-    }, [entityState, currentEntity, isDuplicating])
+        return target
+    }, [entityState, currentEntity, services, isDuplicating])
 
     // ── UI State (non-URL) ────────────────────────────────────────────
     const [selection, setSelection] = useState({ ids: new Set<string>(), delete: null as any })
@@ -685,7 +686,7 @@ export default function ServicesPage({
         <>
             <AnimatePresence mode="wait">
                 {entityState.isOpen && formMode ? (
-                    (formMode !== 'add' && (isLoadingDetail || !formService)) ? (
+                    (formMode !== 'add' && isLoadingDetail && !formService) ? (
                         <ERPDetailLoading key="loading-service" />
                     ) : (
                         <FadeIn key="form" className="w-full h-full">

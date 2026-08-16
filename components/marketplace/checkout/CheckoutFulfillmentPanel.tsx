@@ -43,7 +43,7 @@ function AddressBlock({
           />
           <div className="flex flex-col justify-center">
             <p className="text-md font-bold text-brand-dark dark:text-dark-heading">{title}</p>
-            <p className="text-sm text-brand-inactive-text">
+            <p className="text-sm text-brand-inactive-text dark:text-dark-body">
               {selectedAddress.street}, {selectedAddress.number}
               {selectedAddress.neighborhood ? ` - ${selectedAddress.neighborhood}` : ""}
             </p>
@@ -144,7 +144,7 @@ export function CheckoutFulfillmentPanel({
             />
             <div>
               <p className="text-md font-bold text-brand-dark dark:text-dark-heading">A combinar</p>
-              <p className="text-sm text-brand-inactive-text">O vendedor entrará em contato para combinar a entrega.</p>
+              <p className="text-sm text-brand-inactive-text dark:text-dark-body">O vendedor entrará em contato para combinar a entrega.</p>
             </div>
           </div>
         </FormSection>
@@ -177,7 +177,7 @@ export function CheckoutFulfillmentPanel({
                     <p className="text-md font-bold text-brand-dark dark:text-dark-heading">
                       Local de retirada
                     </p>
-                    <p className="text-sm text-brand-inactive-text">{partnerAddressLabel}</p>
+                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">{partnerAddressLabel}</p>
                     {preparationHint}
                   </div>
                 </div>
@@ -259,7 +259,7 @@ export function CheckoutFulfillmentPanel({
                 <p className="text-md font-bold text-brand-dark dark:text-dark-heading">
                   Local do atendimento no estabelecimento
                 </p>
-                <p className="text-sm text-brand-inactive-text">{partnerAddressLabel}</p>
+                <p className="text-sm text-brand-inactive-text dark:text-dark-body">{partnerAddressLabel}</p>
               </div>
             </div>
           )}

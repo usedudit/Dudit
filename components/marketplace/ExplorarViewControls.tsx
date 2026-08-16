@@ -55,7 +55,7 @@ export function ExplorarViewControls({
                 </Button>
 
                 {hasActiveFilters && (
-                    <div className="h-8 w-px bg-gray-100 shrink-0" />
+                    <div className="h-8 w-px bg-gray-100 dark:bg-dark-border/50 shrink-0" />
                 )}
 
                 {/* Active filter badges (horizontal scroll) */}
@@ -90,12 +90,12 @@ export function ExplorarViewControls({
 
             <div className="flex items-center shrink-0">
                 {/* View toggle - ERP Style */}
-                <div className="flex items-center bg-white border border-brand-border rounded-full p-1 h-[42px] shrink-0">
+                <div className="flex items-center bg-white dark:bg-dark-surface border border-brand-border rounded-full p-1 h-[42px] shrink-0">
                     <button
                         onClick={() => onViewModeChange("list")}
                         className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "list"
-                            ? "bg-gray-100 text-brand-dark"
-                            : "text-gray-400 hover:text-gray-600"
+                            ? "bg-gray-100 dark:bg-dark-border/50 text-brand-dark dark:text-dark-heading"
+                            : "text-gray-400 dark:text-dark-body/70 hover:text-gray-600"
                             }`}
                         title="Vista em lista"
                     >
@@ -104,8 +104,8 @@ export function ExplorarViewControls({
                     <button
                         onClick={() => onViewModeChange("grid")}
                         className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "grid"
-                            ? "bg-gray-100 text-brand-dark"
-                            : "text-gray-400 hover:text-gray-600"
+                            ? "bg-gray-100 dark:bg-dark-border/50 text-brand-dark dark:text-dark-heading"
+                            : "text-gray-400 dark:text-dark-body/70 hover:text-gray-600"
                             }`}
                         title="Vista em grade"
                     >

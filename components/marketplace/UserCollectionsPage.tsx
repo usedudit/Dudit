@@ -70,12 +70,12 @@ export function UserCollectionsPage({ collections: initialCollections }: UserCol
                             <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
                                 Minhas Coleções
                                 {initialCollections.length > 0 && (
-                                    <span className="text-brand-inactive-text font-bold text-base lg:text-lg ml-2">
+                                    <span className="text-brand-inactive-text dark:text-dark-body font-bold text-base lg:text-lg ml-2">
                                         ({initialCollections.length})
                                     </span>
                                 )}
                             </h1>
-                            <p className="text-md text-brand-inactive-text mt-1">
+                            <p className="text-md text-brand-inactive-text dark:text-dark-body mt-1">
                                 Organize seus produtos e serviços favoritos em coleções personalizadas
                             </p>
                         </div>

@@ -36,7 +36,7 @@ const getStatusConfig = (status: string) => {
         case 'paid': return { label: 'Pago', color: 'text-brand-green', icon: CheckCircleIcon, statusText: 'Aprovado' };
         case 'pending': return { label: 'Pendente', color: 'text-brand-orange', icon: ClockIcon, statusText: 'Aguardando pagamento' };
         case 'cancelled': return { label: 'Cancelado', color: 'text-brand-red', icon: XIcon, statusText: 'Cancelado' };
-        default: return { label: status, color: 'text-gray-500', icon: AlertCircleIcon, statusText: status };
+        default: return { label: status, color: 'text-gray-500 dark:text-dark-body', icon: AlertCircleIcon, statusText: status };
     }
 };
 
@@ -746,17 +746,17 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const renderPriceSummary = () => {
         return (
             <div className="space-y-3">
-                <div className="flex justify-between text-sm text-brand-inactive-text">
+                <div className="flex justify-between text-sm text-brand-inactive-text dark:text-dark-body">
                     <span>Subtotal</span>
                     <span className="text-brand-dark dark:text-dark-heading font-medium">{formatCurrency(subtotalVal)}</span>
                 </div>
                 {shippingVal > 0 ? (
-                    <div className="flex justify-between text-sm text-brand-inactive-text">
+                    <div className="flex justify-between text-sm text-brand-inactive-text dark:text-dark-body">
                         <span>Entrega</span>
                         <span className="text-brand-dark dark:text-dark-heading font-medium">{formatCurrency(shippingVal)}</span>
                     </div>
                 ) : (
-                    <div className="flex justify-between text-sm text-brand-inactive-text">
+                    <div className="flex justify-between text-sm text-brand-inactive-text dark:text-dark-body">
                         <span>Entrega</span>
                         <span className="text-brand-dark dark:text-dark-heading font-medium">Grátis</span>
                     </div>
@@ -774,19 +774,19 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                     </div>
                 )}
                 {paymentMethodInterestVal > 0 && (
-                    <div className="flex justify-between text-sm text-brand-inactive-text">
+                    <div className="flex justify-between text-sm text-brand-inactive-text dark:text-dark-body">
                         <span>Juros do pagamento</span>
                         <span className="text-brand-dark dark:text-dark-heading font-medium">+{formatCurrency(paymentMethodInterestVal)}</span>
                     </div>
                 )}
                 {paymentMethodFeeVal > 0 && (
-                    <div className="flex justify-between text-sm text-brand-inactive-text">
+                    <div className="flex justify-between text-sm text-brand-inactive-text dark:text-dark-body">
                         <span>Taxa do pagamento</span>
                         <span className="text-brand-dark dark:text-dark-heading font-medium">+{formatCurrency(paymentMethodFeeVal)}</span>
                     </div>
                 )}
                 {paymentMethodFixedFeeVal > 0 && (
-                    <div className="flex justify-between text-sm text-brand-inactive-text">
+                    <div className="flex justify-between text-sm text-brand-inactive-text dark:text-dark-body">
                         <span>Custo do método</span>
                         <span className="text-brand-dark dark:text-dark-heading font-medium">+{formatCurrency(paymentMethodFixedFeeVal)}</span>
                     </div>
@@ -1070,12 +1070,12 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                 {isService ? (
                                     <>
                                         {bookingDate && bookingTime ? (
-                                            <div className="text-xs text-brand-inactive-text mt-0.5">
+                                            <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
                                                 {formatDate(bookingDate)} às {bookingTime}
                                                 {fulfillmentMode ? ` | Local: ${getFulfillmentModeLabel(fulfillmentMode)}` : ""}
                                             </div>
                                         ) : fulfillmentMode ? (
-                                            <div className="text-xs text-brand-inactive-text mt-0.5">
+                                            <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
                                                 {getFulfillmentModeLabel(fulfillmentMode)}
                                             </div>
                                         ) : null}
@@ -1084,7 +1084,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                 ) : (
                                     <>
                                         {item.product_variants?.variant_name && (
-                                            <div className="text-xs text-brand-inactive-text mt-0.5">{item.product_variants.variant_name}</div>
+                                            <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">{item.product_variants.variant_name}</div>
                                         )}
                                     </>
                                 )}
@@ -1096,7 +1096,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                         if (item.is_gift) {
                                             return (
                                                 <div className="flex items-center gap-1.5">
-                                                    <span className="text-xs text-brand-inactive-text line-through font-normal">{formatCurrency(item.original_price || 0)}</span>
+                                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body line-through font-normal">{formatCurrency(item.original_price || 0)}</span>
                                                     <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">Grátis</span>
                                                 </div>
                                             )
@@ -1104,7 +1104,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                         if (hasDiscount) {
                                             return (
                                                 <div className="flex items-center gap-1.5">
-                                                    <span className="text-xs text-brand-inactive-text line-through font-normal">{formatProductUnitPrice(basePrice, item.products?.unit)}</span>
+                                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body line-through font-normal">{formatProductUnitPrice(basePrice, item.products?.unit)}</span>
                                                     <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatProductUnitPrice(displayPrice, item.products?.unit)}</span>
                                                 </div>
                                             )
@@ -1113,7 +1113,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                     })()}
                                 </div>
                             </div>
-                            <div className="text-sm text-brand-inactive-text shrink-0 pr-1">
+                            <div className="text-sm text-brand-inactive-text dark:text-dark-body shrink-0 pr-1">
                                 {!isService ? formatProductQuantity(item.quantity, item.products?.unit) : ""}
                             </div>
                         </>
@@ -1154,11 +1154,11 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
             <div className="border-t border-brand-border dark:border-dark-border my-6"></div>
 
             <div className="space-y-3 pb-6 border-b border-brand-border dark:border-dark-border mb-6">
-                <div className="flex justify-between text-sm text-brand-inactive-text">
+                <div className="flex justify-between text-sm text-brand-inactive-text dark:text-dark-body">
                     <span>Itens ({order.order_items?.length || 0})</span>
                     <span className="text-brand-dark dark:text-dark-heading">{formatCurrency(itemsSubtotal)}</span>
                 </div>
-                <div className="flex justify-between text-sm text-brand-inactive-text">
+                <div className="flex justify-between text-sm text-brand-inactive-text dark:text-dark-body">
                     <span>Entrega</span>
                     <span className="text-brand-dark dark:text-dark-heading">{isDelivery ? "A calcular/Grátis" : "Retirada Grátis"}</span>
                 </div>
@@ -1232,7 +1232,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                         <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-3 flex-wrap">
                             <span>Pedido #{orderNumber}</span>
                         </h1>
-                        <p className="text-md text-brand-inactive-text mt-1">{dateStrFull}</p>
+                        <p className="text-md text-brand-inactive-text dark:text-dark-body mt-1">{dateStrFull}</p>
                     </div>
                     <div className={`flex items-center gap-1.5 text-sm font-bold ${statusConfig.color} shrink-0`}>
                         <statusConfig.icon size={16} />
@@ -1307,12 +1307,12 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                             {isService ? (
                                                                 <>
                                                                     {bookingDate && bookingTime ? (
-                                                                        <div className="text-xs text-brand-inactive-text mt-0.5">
+                                                                        <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
                                                                             {formatDate(bookingDate)} às {bookingTime}
                                                                             {fulfillmentMode ? ` | Local: ${getFulfillmentModeLabel(fulfillmentMode)}` : ""}
                                                                         </div>
                                                                     ) : fulfillmentMode ? (
-                                                                        <div className="text-xs text-brand-inactive-text mt-0.5">
+                                                                        <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
                                                                             {getFulfillmentModeLabel(fulfillmentMode)}
                                                                         </div>
                                                                     ) : null}
@@ -1321,7 +1321,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                             ) : (
                                                                 <>
                                                                     {item.product_variants?.variant_name && (
-                                                                        <div className="text-xs text-brand-inactive-text mt-0.5">{item.product_variants.variant_name}</div>
+                                                                        <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">{item.product_variants.variant_name}</div>
                                                                     )}
                                                                 </>
                                                             )}
@@ -1333,7 +1333,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                                     if (item.is_gift) {
                                                                         return (
                                                                             <div className="flex items-center gap-1.5">
-                                                                                <span className="text-xs text-brand-inactive-text line-through font-normal">{formatCurrency(item.original_price || 0)}</span>
+                                                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body line-through font-normal">{formatCurrency(item.original_price || 0)}</span>
                                                                                 <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">Grátis</span>
                                                                             </div>
                                                                         )
@@ -1341,7 +1341,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                                     if (hasDiscount) {
                                                                         return (
                                                                             <div className="flex items-center gap-1.5">
-                                                                                <span className="text-xs text-brand-inactive-text line-through font-normal">{formatProductUnitPrice(basePrice, item.products?.unit)}</span>
+                                                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body line-through font-normal">{formatProductUnitPrice(basePrice, item.products?.unit)}</span>
                                                                                 <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatProductUnitPrice(displayPrice, item.products?.unit)}</span>
                                                                             </div>
                                                                         )
@@ -1350,7 +1350,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                                 })()}
                                                             </div>
                                                         </div>
-                                                        <div className="text-sm text-brand-inactive-text shrink-0 pr-1">
+                                                        <div className="text-sm text-brand-inactive-text dark:text-dark-body shrink-0 pr-1">
                                                             {!isService ? formatProductQuantity(item.quantity, item.products?.unit) : ""}
                                                         </div>
                                                     </>
@@ -1406,7 +1406,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                         <p className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading">
                                                             {addressTypeLabel || "Endereço de Entrega"}
                                                         </p>
-                                                        <p className="text-xs lg:text-sm text-brand-inactive-text">{order.delivery_address || 'Endereço não informado'}</p>
+                                                        <p className="text-xs lg:text-sm text-brand-inactive-text dark:text-dark-body">{order.delivery_address || 'Endereço não informado'}</p>
                                                     </div>
                                                 </div>
                                             ) : (
@@ -1421,7 +1421,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                     />
                                                     <div className="flex flex-col justify-center">
                                                         <p className="text-md font-bold text-brand-dark dark:text-dark-heading">Retirada no estabelecimento</p>
-                                                        <p className="text-sm text-brand-inactive-text">{formatPartnerAddress(store?.addresses)}</p>
+                                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">{formatPartnerAddress(store?.addresses)}</p>
                                                     </div>
                                                 </div>
                                             )}
@@ -1462,7 +1462,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                                     <p className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading truncate">
                                                                         {addressTitle}
                                                                     </p>
-                                                                    <p className="text-xs lg:text-sm text-brand-inactive-text">
+                                                                    <p className="text-xs lg:text-sm text-brand-inactive-text dark:text-dark-body">
                                                                         {bookingDate && bookingTime ? `${formatDate(bookingDate)} às ${bookingTime} | ` : ""}
                                                                         {address}
                                                                     </p>
@@ -1480,13 +1480,13 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                             <ListItem
                                                 icon={PaymentIconEl}
                                                 title={
-                                                    loadingPayment ? <Spinner size={14} className="text-brand-dark" /> :
+                                                    loadingPayment ? <Spinner size={14} className="text-brand-dark dark:text-dark-heading" /> :
                                                         <span className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading">
                                                             {paymentMethodName}
                                                         </span>
                                                 }
                                                 description={
-                                                    <span className="text-xs lg:text-sm text-brand-inactive-text font-normal">
+                                                    <span className="text-xs lg:text-sm text-brand-inactive-text dark:text-dark-body font-normal">
                                                         {order.payment_provider === "Mercado Pago" ? "Mercado Pago" : "Pagamento direto"}
                                                     </span>
                                                 }
@@ -1516,7 +1516,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                             <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0 inline-block align-middle cursor-help" />
                                                         </Tooltip>
                                                     </div>
-                                                    <div className="text-xs lg:text-sm text-brand-inactive-text mt-0.5 max-w-sm">Este negócio não está mais no Dudit</div>
+                                                    <div className="text-xs lg:text-sm text-brand-inactive-text dark:text-dark-body mt-0.5 max-w-sm">Este negócio não está mais no Dudit</div>
                                                 </div>
                                             </div>
                                         ) : (
@@ -1526,9 +1526,9 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                 </div>
                                                 <div className="flex-1">
                                                     <div className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading">{sellerName}</div>
-                                                    <div className="text-xs lg:text-sm text-brand-inactive-text mt-0.5 max-w-sm">Acessar perfil do vendedor</div>
+                                                    <div className="text-xs lg:text-sm text-brand-inactive-text dark:text-dark-body mt-0.5 max-w-sm">Acessar perfil do vendedor</div>
                                                 </div>
-                                                <ChevronRightIcon size={18} className="text-brand-inactive-text" />
+                                                <ChevronRightIcon size={18} className="text-brand-inactive-text dark:text-dark-body" />
                                             </Link>
                                         )}
                                     </FormSection>
@@ -1826,12 +1826,12 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                                 <span className="ml-1.5 text-xs text-red-500 font-bold">(Já devolvido)</span>
                                                             )}
                                                         </p>
-                                                        <p className="text-xs text-brand-inactive-text">Comprado: {formatProductQuantity(item.quantity, item.products?.unit, true)}</p>
+                                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body">Comprado: {formatProductQuantity(item.quantity, item.products?.unit, true)}</p>
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-3 shrink-0 pl-8 md:pl-0">
                                                     <div className="flex flex-col gap-1 w-24">
-                                                        <span className="text-[10px] text-brand-inactive-text font-bold uppercase">Qtd</span>
+                                                        <span className="text-[10px] text-brand-inactive-text dark:text-dark-body font-bold uppercase">Qtd</span>
                                                         <QuantitySelector
                                                             value={returnItems[item.id] || 1}
                                                             onChange={(val) => setReturnItems(prev => ({ ...prev, [item.id]: val }))}
@@ -1842,7 +1842,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                         />
                                                     </div>
                                                     <div className="flex flex-col gap-1 w-32">
-                                                        <span className="text-[10px] text-brand-inactive-text font-bold uppercase">Condição</span>
+                                                        <span className="text-[10px] text-brand-inactive-text dark:text-dark-body font-bold uppercase">Condição</span>
                                                         <FormDropdown
                                                             value={returnConditions[item.id] || "opened"}
                                                             setValue={(val) => setReturnConditions(prev => ({ ...prev, [item.id]: val as any }))}
@@ -1883,7 +1883,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                             <Badge variant="red">Cancelado</Badge>
                                                         )}
                                                     </div>
-                                                    <p className="text-xs text-brand-inactive-text">Servico</p>
+                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">Servico</p>
                                                 </div>
                                             </div>
                                         )
@@ -1952,7 +1952,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                         isEditing={true}
                                     />
                                 </div>
-                                <p className="text-xs text-brand-inactive-text font-medium">{returnEvidence.length}/5 arquivos</p>
+                                <p className="text-xs text-brand-inactive-text dark:text-dark-body font-medium">{returnEvidence.length}/5 arquivos</p>
                             </div>
                         )}
                     </div>

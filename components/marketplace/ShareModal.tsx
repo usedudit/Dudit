@@ -159,7 +159,7 @@ export function ShareModal({
                                 <div className={`${social.color} w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center text-white transition-all shadow-sm`}>
                                     <social.icon size={24} />
                                 </div>
-                                <span className="text-[10px] sm:text-xs font-medium text-brand-inactive-text group-hover:text-brand-dark transition-colors">
+                                <span className="text-[10px] sm:text-xs font-medium text-brand-inactive-text dark:text-dark-body group-hover:text-brand-dark dark:text-dark-heading transition-colors">
                                     {social.name}
                                 </span>
                             </a>

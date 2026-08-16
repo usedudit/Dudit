@@ -31,10 +31,10 @@ export function ExplorarHeaderSection({
                     </div>
                 )}
                 <div className="flex-1">
-                    <h1 className="text-lg lg:text-2xl font-medium text-brand-dark mb-1">
+                    <h1 className="text-lg lg:text-2xl font-medium text-brand-dark dark:text-dark-heading mb-1">
                         {title}
                     </h1>
-                    <p className="text-sm font-medium text-brand-inactive-text mt-1">
+                    <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mt-1">
                         {resultsCount} resultado{resultsCount !== 1 ? "s" : ""} encontrado{resultsCount !== 1 ? "s" : ""}
                     </p>
                 </div>

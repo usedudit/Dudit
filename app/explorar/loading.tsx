@@ -8,7 +8,7 @@ export default function ExplorarLoading() {
     return (
         <>
             <MarketplaceHeader />
-            <div className="min-h-screen bg-white pt-[110px] lg:pt-[108px] flex flex-col">
+            <div className="min-h-screen bg-white dark:bg-dark-background pt-[110px] lg:pt-[108px] flex flex-col">
                 <main className="container mx-auto px-4 max-w-[1300px] flex-grow pb-24 lg:pb-12 mt-6">
                     {/* 1. Title Skeleton */}
                     <div className="mb-6">

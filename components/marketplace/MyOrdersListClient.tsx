@@ -21,7 +21,7 @@ const getStatusConfig = (status: string) => {
         case 'paid': return { label: 'Pago', color: 'text-green-700', bg: 'bg-green-100', icon: CheckCircleIcon, border: 'border-green-200', dotBg: 'bg-green-500' };
         case 'pending': return { label: 'Pendente', color: 'text-brand-orange', bg: 'bg-orange-100', icon: ClockIcon, border: 'border-orange-200', dotBg: 'bg-brand-orange' };
         case 'cancelled': return { label: 'Cancelado', color: 'text-red-700', bg: 'bg-red-100', icon: XIcon, border: 'border-red-200', dotBg: 'bg-red-500' };
-        default: return { label: status, color: 'text-gray-700', bg: 'bg-gray-100', icon: AlertCircleIcon, border: 'border-gray-200', dotBg: 'bg-gray-500' };
+        default: return { label: status, color: 'text-gray-700 dark:text-dark-body', bg: 'bg-gray-100 dark:bg-dark-border/50', icon: AlertCircleIcon, border: 'border-gray-200 dark:border-dark-border', dotBg: 'bg-gray-500' };
     }
 };
 
@@ -181,7 +181,7 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { ord
                                 <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
                                     Meus Pedidos
                                 </h1>
-                                <p className="text-md text-brand-inactive-text mt-1">Acompanhe o status das suas compras</p>
+                                <p className="text-md text-brand-inactive-text dark:text-dark-body mt-1">Acompanhe o status das suas compras</p>
                             </div>
                         </div>
 
@@ -190,19 +190,19 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { ord
                             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                                 <TabsList className="mb-6">
                                     <TabsTrigger value="todos">
-                                        Todos <span className={`ml-1.5 text-xs font-normal ${activeTab === "todos" ? "text-white/70" : "text-brand-inactive-text"}`}>({tabCounts.todos})</span>
+                                        Todos <span className={`ml-1.5 text-xs font-normal ${activeTab === "todos" ? "text-white/70" : "text-brand-inactive-text dark:text-dark-body"}`}>({tabCounts.todos})</span>
                                     </TabsTrigger>
                                     <TabsTrigger value="pending">
-                                        Aguardando pagamento <span className={`ml-1.5 text-xs font-normal ${activeTab === "pending" ? "text-white/70" : "text-brand-inactive-text"}`}>({tabCounts.pending})</span>
+                                        Aguardando pagamento <span className={`ml-1.5 text-xs font-normal ${activeTab === "pending" ? "text-white/70" : "text-brand-inactive-text dark:text-dark-body"}`}>({tabCounts.pending})</span>
                                     </TabsTrigger>
                                     <TabsTrigger value="preparing">
-                                        Preparando <span className={`ml-1.5 text-xs font-normal ${activeTab === "preparing" ? "text-white/70" : "text-brand-inactive-text"}`}>({tabCounts.preparing})</span>
+                                        Preparando <span className={`ml-1.5 text-xs font-normal ${activeTab === "preparing" ? "text-white/70" : "text-brand-inactive-text dark:text-dark-body"}`}>({tabCounts.preparing})</span>
                                     </TabsTrigger>
                                     <TabsTrigger value="sent">
-                                        Enviado <span className={`ml-1.5 text-xs font-normal ${activeTab === "sent" ? "text-white/70" : "text-brand-inactive-text"}`}>({tabCounts.sent})</span>
+                                        Enviado <span className={`ml-1.5 text-xs font-normal ${activeTab === "sent" ? "text-white/70" : "text-brand-inactive-text dark:text-dark-body"}`}>({tabCounts.sent})</span>
                                     </TabsTrigger>
                                     <TabsTrigger value="delivered">
-                                        Entregue <span className={`ml-1.5 text-xs font-normal ${activeTab === "delivered" ? "text-white/70" : "text-brand-inactive-text"}`}>({tabCounts.delivered})</span>
+                                        Entregue <span className={`ml-1.5 text-xs font-normal ${activeTab === "delivered" ? "text-white/70" : "text-brand-inactive-text dark:text-dark-body"}`}>({tabCounts.delivered})</span>
                                     </TabsTrigger>
                                 </TabsList>
                             </Tabs>
@@ -264,7 +264,7 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { ord
                                                                 )}
                                                             </h3>
                                                             {/* Order ID & Date Bottom */}
-                                                            <div className="text-xs text-brand-inactive-text mt-0.5">
+                                                            <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
                                                                 <div className="flex items-center gap-1.5 flex-wrap">
                                                                     <span>Pedido #{order.order_number || order.id.slice(0, 8)}</span>
                                                                     <span className="hidden lg:inline">•</span>
@@ -327,13 +327,13 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { ord
                                                                                         </h4>
 
                                                                                         {item.product_variants?.variant_name && (
-                                                                                            <div className="text-xs text-brand-inactive-text mt-0.5">
+                                                                                            <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
                                                                                                 {item.product_variants.variant_name}
                                                                                             </div>
                                                                                         )}
 
                                                                                         <div className="flex items-center gap-2 text-xs mt-1">
-                                                                                            <span className="text-brand-inactive-text">{formatProductQuantity(item.quantity, item.products?.unit)}</span>
+                                                                                            <span className="text-brand-inactive-text dark:text-dark-body">{formatProductQuantity(item.quantity, item.products?.unit)}</span>
                                                                                             <span className="text-brand-border dark:text-dark-border">|</span>
                                                                                             <span className="font-medium text-brand-dark dark:text-dark-heading">
                                                                                                 {(() => {
@@ -341,7 +341,7 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { ord
                                                                                                     if (item.is_gift) {
                                                                                                         return (
                                                                                                             <span className="flex items-center gap-1.5 inline-flex">
-                                                                                                                <span className="text-xs text-brand-inactive-text line-through font-normal">{formatCurrency(item.original_price || 0)}</span>
+                                                                                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body line-through font-normal">{formatCurrency(item.original_price || 0)}</span>
                                                                                                                 <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">Grátis</span>
                                                                                                             </span>
                                                                                                         )
@@ -349,7 +349,7 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { ord
                                                                                                     if (hasItemDiscount && Math.abs(basePrice - discountedPrice) > 0.005) {
                                                                                                         return (
                                                                                                             <span className="flex items-center gap-1.5 inline-flex">
-                                                                                                                <span className="text-xs text-brand-inactive-text line-through font-normal">{formatProductUnitPrice(basePrice, item.products?.unit)}</span>
+                                                                                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body line-through font-normal">{formatProductUnitPrice(basePrice, item.products?.unit)}</span>
                                                                                                                 <span className="text-xs font-bold text-brand-dark dark:text-dark-heading">{formatProductUnitPrice(discountedPrice, item.products?.unit)}</span>
                                                                                                             </span>
                                                                                                         )
@@ -384,7 +384,7 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { ord
                                                     <div className="flex flex-row justify-between items-center gap-4 mt-8 pt-6 border-t border-brand-border dark:border-dark-border w-full flex-wrap">
                                                         {/* Left Side: Total Amount */}
                                                         <div className="flex flex-col">
-                                                            <span className="text-xs text-brand-inactive-text">Total</span>
+                                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body">Total</span>
                                                             <span className="text-base font-bold text-brand-dark dark:text-dark-heading">
                                                                 {formatCurrency(order.total_amount)}
                                                             </span>

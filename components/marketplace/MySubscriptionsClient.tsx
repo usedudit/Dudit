@@ -195,7 +195,7 @@ export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] 
           className={`py-3 px-6 text-sm font-semibold border-b-2 transition-all relative ${
             activeTab === "subscriptions"
               ? "border-brand-primary text-brand-primary"
-              : "border-transparent text-brand-inactive-text dark:text-dark-body hover:text-brand-dark"
+              : "border-transparent text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading"
           }`}
         >
           Minhas Assinaturas
@@ -211,7 +211,7 @@ export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] 
           className={`py-3 px-6 text-sm font-semibold border-b-2 transition-all relative ${
             activeTab === "credits"
               ? "border-brand-primary text-brand-primary"
-              : "border-transparent text-brand-inactive-text dark:text-dark-body hover:text-brand-dark"
+              : "border-transparent text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading"
           }`}
         >
           Meus Créditos
@@ -431,10 +431,10 @@ export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] 
                         {loadingHistory ? (
                           <div className="flex items-center gap-2 py-4">
                             <Spinner size={16} className="text-brand-primary" />
-                            <span className="text-xs text-brand-inactive-text">Carregando histórico...</span>
+                            <span className="text-xs text-brand-inactive-text dark:text-dark-body">Carregando histórico...</span>
                           </div>
                         ) : executions.length === 0 ? (
-                          <p className="text-xs text-brand-inactive-text">Nenhuma execução registrada.</p>
+                          <p className="text-xs text-brand-inactive-text dark:text-dark-body">Nenhuma execução registrada.</p>
                         ) : (
                           <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
                             {executions.map((exec) => (
@@ -488,7 +488,7 @@ export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] 
             {loadingCredits ? (
               <div className="flex items-center gap-2 justify-center py-12">
                 <Spinner size={24} className="text-brand-primary" />
-                <span className="text-brand-inactive-text">Carregando seus créditos...</span>
+                <span className="text-brand-inactive-text dark:text-dark-body">Carregando seus créditos...</span>
               </div>
             ) : credits.length === 0 ? (
               <div className="border border-brand-border dark:border-dark-border rounded-[24px] p-12 text-center text-brand-inactive-text bg-white dark:bg-dark-card shadow-sm">

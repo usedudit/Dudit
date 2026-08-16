@@ -3,7 +3,7 @@ import { SkeletonLoader } from "@/components/reusable"
 
 function RadioCardSkeleton() {
     return (
-        <div className="flex items-center border border-gray-100 rounded-[12px] px-4 py-3 gap-4">
+        <div className="flex items-center border border-gray-100 dark:border-dark-border rounded-[12px] px-4 py-3 gap-4">
             <SkeletonLoader width={24} height={24} className="rounded shrink-0" />
             <div className="flex-1">
                 <SkeletonLoader width={96} height={14} className="mb-1.5" />
@@ -16,8 +16,8 @@ function RadioCardSkeleton() {
 
 function SectionSkeleton({ children, collapsed = false }: { children?: React.ReactNode; collapsed?: boolean }) {
     return (
-        <div className="bg-white border border-gray-100 rounded-[12px] overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50">
+        <div className="bg-white dark:bg-dark-surface border border-gray-100 dark:border-dark-border rounded-[12px] overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100 dark:border-dark-border flex items-center justify-between bg-gray-50 dark:bg-dark-border/30">
                 <SkeletonLoader width={96} height={16} />
                 <SkeletonLoader width={20} height={20} />
             </div>
@@ -32,7 +32,7 @@ function SectionSkeleton({ children, collapsed = false }: { children?: React.Rea
 
 export default function CheckoutLoading() {
     return (
-        <div className="min-h-screen flex flex-col bg-white">
+        <div className="min-h-screen flex flex-col bg-white dark:bg-dark-background">
 
             {/* Header */}
             <header className="w-full h-[68px] bg-gray-900 flex items-center justify-between px-4 lg:px-8 sticky top-0 z-50">
@@ -91,10 +91,10 @@ export default function CheckoutLoading() {
 
                     {/* ── Right column – Order summary ── */}
                     <div className="lg:col-span-4">
-                        <div className="border border-gray-100 rounded-[12px] overflow-hidden bg-white">
+                        <div className="border border-gray-100 dark:border-dark-border rounded-[12px] overflow-hidden bg-white dark:bg-dark-surface">
 
                             {/* Card header */}
-                            <div className="bg-gray-50 px-6 py-4 border-b border-gray-100">
+                            <div className="bg-gray-50 dark:bg-dark-border/30 px-6 py-4 border-b border-gray-100 dark:border-dark-border">
                                 <SkeletonLoader width={160} height={16} />
                             </div>
 
@@ -119,7 +119,7 @@ export default function CheckoutLoading() {
                                 </div>
 
                                 {/* Coupon row */}
-                                <div className="flex items-center border border-gray-100 rounded-[12px] px-4 py-3 gap-4 mb-4">
+                                <div className="flex items-center border border-gray-100 dark:border-dark-border rounded-[12px] px-4 py-3 gap-4 mb-4">
                                     <SkeletonLoader width={20} height={20} className="shrink-0" />
                                     <div className="flex-1">
                                         <SkeletonLoader width={112} height={14} className="mb-1.5" />
@@ -139,7 +139,7 @@ export default function CheckoutLoading() {
                                 </div>
 
                                 {/* Separator */}
-                                <div className="border-t border-gray-100 mb-4" />
+                                <div className="border-t border-gray-100 dark:border-dark-border mb-4" />
 
                                 {/* Total */}
                                 <div className="flex justify-between items-end mb-4">
@@ -157,7 +157,7 @@ export default function CheckoutLoading() {
             </div>
 
             {/* Mobile bottom bar */}
-            <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 z-[110] flex gap-3 lg:hidden shadow-lg">
+            <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-dark-surface border-t border-gray-100 dark:border-dark-border p-4 z-[110] flex gap-3 lg:hidden shadow-lg">
                 <div className="flex-1">
                     <SkeletonLoader width="100%" height={48} className="rounded-[10px]" />
                 </div>

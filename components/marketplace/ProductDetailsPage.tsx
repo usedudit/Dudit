@@ -936,8 +936,8 @@ export function ProductDetailsPageClient({
                     processedVariants.some((v) => v.attributes[type] === val && v.hasDbImage))
                 return (
                     <div key={type}>
-                        <label className="block text-sm font-bold text-brand-dark mb-3">
-                            {type}: <span className="font-normal text-gray-600 ml-1">{selectedAttributes[type]}</span>
+                        <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">
+                            {type}: <span className="font-normal text-gray-600 dark:text-dark-body ml-1">{selectedAttributes[type]}</span>
                         </label>
                         <div className="flex flex-wrap gap-3">
                             {uniqueValues.map((value: any) => {
@@ -973,8 +973,8 @@ export function ProductDetailsPageClient({
                                     <button key={value} onClick={() => handleAttributeSelect(type, value)} disabled={!isAvailable}
                                         className={`h-10 min-w-[3rem] px-3 rounded-lg text-sm font-bold transition-all border focus:outline-none
                       ${isSelected && isAvailable ? "border-brand-green text-brand-green bg-green-50" : ""}
-                      ${!isSelected && isAvailable ? "border-brand-border text-brand-dark hover:border-brand-border bg-white" : ""}
-                      ${!isAvailable ? "border-brand-border text-brand-inactive-text bg-brand-gray opacity-50 cursor-not-allowed" : ""}`}>
+                      ${!isSelected && isAvailable ? "border-brand-border text-brand-dark dark:text-dark-heading hover:border-brand-border bg-white" : ""}
+                      ${!isAvailable ? "border-brand-border text-brand-inactive-text dark:text-dark-body bg-brand-gray dark:bg-dark-border/30 opacity-50 cursor-not-allowed" : ""}`}>
                                         {value}
                                     </button>
                                 )
@@ -987,7 +987,7 @@ export function ProductDetailsPageClient({
                 <div className="mt-4">
                     <div className="flex items-center gap-2 mb-1.5">
                         <label className="block text-sm font-medium text-brand-dark dark:text-dark-heading truncate">Quantidade</label>
-                        <span className="text-xs text-brand-inactive-text font-medium leading-none">({MAX_STOCK} disponíveis)</span>
+                        <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium leading-none">({MAX_STOCK} disponíveis)</span>
                     </div>
                     <FormDropdown
                         options={isOutOfStock ? [] : [
@@ -1012,18 +1012,18 @@ export function ProductDetailsPageClient({
     ), [attributeKeys, processedVariants, selectedAttributes, handleAttributeSelect, MAX_STOCK, isOutOfStock, quantity, isProductOwner, showPrice])
 
     const BuyPanel = (
-        <div className="bg-white relative">
+        <div className="bg-white dark:bg-dark-surface relative">
             <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center gap-2">
                     {product.condition === "used" ? (
-                        <span className="text-[11px] font-bold text-brand-dark bg-gray-100 px-2 py-0.5 rounded uppercase tracking-wider">Usado</span>
+                        <span className="text-[11px] font-bold text-brand-dark dark:text-dark-heading bg-gray-100 dark:bg-dark-border/50 px-2 py-0.5 rounded uppercase tracking-wider">Usado</span>
                     ) : product.condition === "refurbished" ? (
-                        <span className="text-[11px] font-bold text-brand-dark bg-gray-100 px-2 py-0.5 rounded uppercase tracking-wider">Recondicionado</span>
+                        <span className="text-[11px] font-bold text-brand-dark dark:text-dark-heading bg-gray-100 dark:bg-dark-border/50 px-2 py-0.5 rounded uppercase tracking-wider">Recondicionado</span>
                     ) : (
-                        <span className="text-[11px] font-bold text-brand-dark bg-gray-100 px-2 py-0.5 rounded uppercase tracking-wider">Novo</span>
+                        <span className="text-[11px] font-bold text-brand-dark dark:text-dark-heading bg-gray-100 dark:bg-dark-border/50 px-2 py-0.5 rounded uppercase tracking-wider">Novo</span>
                     )}
                     <span className="text-gray-300 text-xs">|</span>
-                    <span className="text-[13px] font-semibold text-brand-inactive-text">
+                    <span className="text-[13px] font-semibold text-brand-inactive-text dark:text-dark-body">
                         {product.product_type?.toLowerCase() === "digital" ? "Produto Digital" : (product.product_type?.toLowerCase() === "service" || product.product_type?.toLowerCase() === "serviço" || product.product_type?.toLowerCase() === "servico") ? "Serviço" : "Produto Físico"}
                     </span>
                 </div>
@@ -1031,14 +1031,14 @@ export function ProductDetailsPageClient({
                     <div className="flex items-center gap-1.5 cursor-pointer hover:opacity-80 transition-opacity"
                         onClick={() => reviewsRef.current?.scrollIntoView({ behavior: "smooth" })}>
                         <StarIcon size={16} className="text-brand-green fill-brand-green" strokeWidth={0} />
-                        <span className="text-[11px] sm:text-xs font-medium text-brand-inactive-text mt-0.5">
+                        <span className="text-[11px] sm:text-xs font-medium text-brand-inactive-text dark:text-dark-body mt-0.5">
                             {avgRating.toFixed(1)} ({reviews.length} {reviews.length === 1 ? "avaliação" : "avaliações"})
                         </span>
                     </div>
                 )}
             </div>
 
-            <h1 className="text-xl md:text-3xl leading-[1.1] font-medium text-brand-dark mb-6 tracking-tight">
+            <h1 className="text-xl md:text-3xl leading-[1.1] font-medium text-brand-dark dark:text-dark-heading mb-6 tracking-tight">
                 {product.name}
             </h1>
 
@@ -1054,7 +1054,7 @@ export function ProductDetailsPageClient({
             <div className="mb-6">
                 {!showPrice ? (
                     <div className="space-y-1">
-                        <p className="text-3xl leading-none font-bold text-brand-dark">
+                        <p className="text-3xl leading-none font-bold text-brand-dark dark:text-dark-heading">
                             Preço sob consulta
                         </p>
                     </div>
@@ -1070,7 +1070,7 @@ export function ProductDetailsPageClient({
                         return (
                             <div className="space-y-1">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="text-sm text-brand-inactive-text line-through font-normal">
+                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body line-through font-normal">
                                         {formatMoney(pricing.original)}
                                     </span>
                                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-[10px] md:text-[11px] font-semibold uppercase text-white shadow-sm tracking-wider whitespace-nowrap bg-[#2968c8]">
@@ -1081,18 +1081,18 @@ export function ProductDetailsPageClient({
                                 {hasPix ? (
                                     <>
                                         <div className="flex items-baseline gap-2 flex-wrap">
-                                            <p className="sm:text-lg md:text-4xl leading-none font-semibold text-brand-dark">
+                                            <p className="sm:text-lg md:text-4xl leading-none font-semibold text-brand-dark dark:text-dark-heading">
                                                 {formatMoney(pixUnitPrice)}
                                             </p>
                                             <span className="text-xs md:text-sm font-semibold text-brand-green">no Pix</span>
                                         </div>
-                                        <p className="text-xs md:text-[0.875rem] text-brand-inactive-text mt-1">
+                                        <p className="text-xs md:text-[0.875rem] text-brand-inactive-text dark:text-dark-body mt-1">
                                             ou {formatMoney(displayPrice)} em outros meios
                                         </p>
                                     </>
                                 ) : (
                                     <div className="flex items-baseline gap-2 flex-wrap">
-                                        <p className="sm:text-lg md:text-4xl leading-none font-semibold text-brand-dark">
+                                        <p className="sm:text-lg md:text-4xl leading-none font-semibold text-brand-dark dark:text-dark-heading">
                                             {formatMoney(displayPrice)}
                                         </p>
                                     </div>
@@ -1113,18 +1113,18 @@ export function ProductDetailsPageClient({
                         return (
                             <div className="space-y-1">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="text-sm text-brand-inactive-text line-through font-normal">{formatMoney(pricing.original)}</span>
+                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body line-through font-normal">{formatMoney(pricing.original)}</span>
                                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-[10px] md:text-[11px] font-extrabold uppercase text-white shadow-sm tracking-wider whitespace-nowrap bg-[#ff7a00]">
                                         {pricing.discountPercent}% OFF
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-2 flex-wrap">
-                                    <p className="sm:text-lg md:text-4xl leading-none font-semibold text-brand-dark">
+                                    <p className="sm:text-lg md:text-4xl leading-none font-semibold text-brand-dark dark:text-dark-heading">
                                         {formatMoney(pixUnitPrice)}
                                     </p>
                                     <span className="text-sm font-semibold text-brand-green">no Pix</span>
                                 </div>
-                                <p className="text-xs md:text-[0.875rem] text-brand-inactive-text mt-1">
+                                <p className="text-xs md:text-[0.875rem] text-brand-inactive-text dark:text-dark-body mt-1">
                                     ou {formatMoney(displayPrice)} em outros meios
                                 </p>
                                 <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium text-brand-green mt-3 block text-left px-0 py-0">
@@ -1139,13 +1139,13 @@ export function ProductDetailsPageClient({
                         return (
                             <div className="space-y-1">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="text-sm text-brand-inactive-text line-through font-normal">{formatMoney(pricing.original)}</span>
+                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body line-through font-normal">{formatMoney(pricing.original)}</span>
                                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-[10px] md:text-[11px] font-extrabold uppercase text-white shadow-sm tracking-wider whitespace-nowrap bg-[#ff7a00]">
                                         {pricing.discountPercent}% OFF
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <p className="text-3xl leading-none font-bold text-brand-dark">
+                                    <p className="text-3xl leading-none font-bold text-brand-dark dark:text-dark-heading">
                                         {formatMoney(displayPrice)}
                                     </p>
                                 </div>
@@ -1160,14 +1160,14 @@ export function ProductDetailsPageClient({
                     if (!hasCampaign && !hasProductPromo && hasPix) {
                         return (
                             <div className="space-y-1">
-                                <span className="text-sm text-brand-inactive-text line-through font-normal">{formatMoney(pricing.original)}</span>
+                                <span className="text-sm text-brand-inactive-text dark:text-dark-body line-through font-normal">{formatMoney(pricing.original)}</span>
                                 <div className="flex items-center gap-2 flex-wrap">
-                                    <p className="text-3xl leading-none font-bold text-brand-dark">
+                                    <p className="text-3xl leading-none font-bold text-brand-dark dark:text-dark-heading">
                                         {formatMoney(pixUnitPrice)}
                                     </p>
                                     <span className="text-sm text-brand-green font-medium mt-auto">{pricing.pixDiscountPercent}% no Pix</span>
                                 </div>
-                                <p className="text-xs md:text-[0.875rem] text-brand-inactive-text mt-1">
+                                <p className="text-xs md:text-[0.875rem] text-brand-inactive-text dark:text-dark-body mt-1">
                                     ou {formatMoney(displayPrice)} em outros meios
                                 </p>
                                 <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium text-brand-green mt-3 px-0 py-0 block text-left">
@@ -1180,7 +1180,7 @@ export function ProductDetailsPageClient({
                     // Caso: Sem desconto algum
                     return (
                         <div className="space-y-1">
-                            <p className="text-3xl leading-none font-bold text-brand-dark">
+                            <p className="text-3xl leading-none font-bold text-brand-dark dark:text-dark-heading">
                                 {formatMoney(displayPrice)}
                             </p>
                             <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium text-brand-green mt-3 px-0 py-0 block text-left">
@@ -1218,11 +1218,11 @@ export function ProductDetailsPageClient({
                                     Brinde Incluso
                                 </span>
                             </div>
-                            <span className="text-xs md:text-sm font-bold text-brand-dark mt-0.5">
+                            <span className="text-xs md:text-sm font-bold text-brand-dark dark:text-dark-heading mt-0.5">
                                 {giftDetails.name}
                             </span>
                             {activeGiftPromo?.minSpendAmount ? (
-                                <span className="text-[10px] text-brand-inactive-text mt-0.5">
+                                <span className="text-[10px] text-brand-inactive-text dark:text-dark-body mt-0.5">
                                     Em compras deste item acima de {formatMoney(activeGiftPromo.minSpendAmount)}
                                 </span>
                             ) : null}
@@ -1285,7 +1285,7 @@ export function ProductDetailsPageClient({
                         <div className="flex flex-col">
                             {/* CEP Input or User Address */}
                             {loadingAddresses ? (
-                                <div className="py-4 text-center text-xs text-brand-inactive-text animate-pulse">
+                                <div className="py-4 text-center text-xs text-brand-inactive-text dark:text-dark-body animate-pulse">
                                     Carregando endereços...
                                 </div>
                             ) : userId && userAddresses.length > 0 && selectedAddress ? (
@@ -1298,7 +1298,7 @@ export function ProductDetailsPageClient({
                                         />
                                         <div className="flex flex-col justify-center">
                                             <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Endereço de Entrega</p>
-                                            <p className="text-xs text-brand-inactive-text max-w-[200px] sm:max-w-xs truncate">
+                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body max-w-[200px] sm:max-w-xs truncate">
                                                 {selectedAddress.street}, {selectedAddress.number}
                                             </p>
                                         </div>
@@ -1331,16 +1331,16 @@ export function ProductDetailsPageClient({
                                         return (
                                             <div className="flex justify-between items-start py-4">
                                                 <div>
-                                                    <p className="text-sm text-brand-dark font-medium leading-snug">Entrega pelo vendedor</p>
+                                                    <p className="text-sm text-brand-dark dark:text-dark-heading font-medium leading-snug">Entrega pelo vendedor</p>
                                                     {deliveryLoading ? (
-                                                        <p className="text-xs text-brand-inactive-text animate-pulse">Calculando...</p>
+                                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body animate-pulse">Calculando...</p>
                                                     ) : (deliveryError && deliveryError !== "Entrega não disponível no plano atual.") ? (
                                                         <p className="text-xs text-red-500">{deliveryError}</p>
                                                     ) : calculatedAddress ? (
                                                         <div>
                                                             <p className="text-xs text-brand-green font-medium">Para {calculatedAddress}</p>
                                                             {diffFree > 0 && (
-                                                                <p className="text-[11px] text-brand-inactive-text mt-0.5">
+                                                                <p className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-0.5">
                                                                     Falta <strong className="text-brand-green">{formatMoney(diffFree)}</strong> para entrega grátis nesta loja
                                                                 </p>
                                                             )}
@@ -1352,9 +1352,9 @@ export function ProductDetailsPageClient({
                                                         </div>
                                                     ) : (
                                                         <div>
-                                                            <p className="text-xs text-brand-inactive-text">Informe seu CEP para calcular</p>
+                                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">Informe seu CEP para calcular</p>
                                                             {diffFree > 0 && (
-                                                                <p className="text-[11px] text-brand-inactive-text mt-0.5">
+                                                                <p className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-0.5">
                                                                     Falta <strong className="text-brand-green">{formatMoney(diffFree)}</strong> para entrega grátis nesta loja
                                                                 </p>
                                                             )}
@@ -1367,7 +1367,7 @@ export function ProductDetailsPageClient({
                                                     ) : (deliveryBreakdown?.deliveryPayer === "seller" || deliveryConfig?.settings?.deliveryPayer === "seller") ? (
                                                         <div className="flex flex-col items-end">
                                                             {deliveryBreakdown?.originalFee != null && Number(deliveryBreakdown.originalFee) > 0 && (
-                                                                <span className="text-xs line-through text-brand-inactive-text font-normal">
+                                                                <span className="text-xs line-through text-brand-inactive-text dark:text-dark-body font-normal">
                                                                     {formatMoney(Number(deliveryBreakdown.originalFee))}
                                                                 </span>
                                                             )}
@@ -1376,15 +1376,15 @@ export function ProductDetailsPageClient({
                                                     ) : isFreeByThreshold || (deliveryFee !== null && deliveryFee === 0 && (deliveryBreakdown?.hasRatesConfigured ?? hasDeliveryRatesConfigured(deliveryConfig?.settings, deliveryConfig?.rules))) ? (
                                                         <span className="text-sm font-bold text-brand-green">Grátis</span>
                                                     ) : deliveryFee !== null && deliveryFee > 0 ? (
-                                                        <p className="text-sm font-bold text-brand-dark">
+                                                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
                                                             {formatMoney(deliveryFee)}
                                                         </p>
                                                     ) : deliveryFee !== null && deliveryFee === 0 ? (
-                                                        <p className="text-sm font-bold text-brand-dark">A combinar</p>
+                                                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">A combinar</p>
                                                     ) : deliveryError === "Entrega não disponível no plano atual." ? (
-                                                        <p className="text-sm font-bold text-brand-dark">A combinar</p>
+                                                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">A combinar</p>
                                                     ) : (
-                                                        <p className="text-sm font-semibold text-brand-inactive-text">-</p>
+                                                        <p className="text-sm font-semibold text-brand-inactive-text dark:text-dark-body">-</p>
                                                     )}
                                                 </div>
                                             </div>
@@ -1397,11 +1397,11 @@ export function ProductDetailsPageClient({
                                 <>
                                     <div className="flex justify-between items-start py-4">
                                         <div>
-                                            <p className="text-sm text-brand-dark font-medium leading-snug">Entrega a combinar</p>
-                                            <p className="text-xs text-brand-inactive-text">Fale com o vendedor no WhatsApp após o pedido</p>
+                                            <p className="text-sm text-brand-dark dark:text-dark-heading font-medium leading-snug">Entrega a combinar</p>
+                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">Fale com o vendedor no WhatsApp após o pedido</p>
                                         </div>
                                         <div className="text-right">
-                                            <p className="text-sm font-bold text-brand-dark">A combinar</p>
+                                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">A combinar</p>
                                         </div>
                                     </div>
 
@@ -1413,7 +1413,7 @@ export function ProductDetailsPageClient({
                             {(deliveryConfig?.settings?.isPickupEnabled !== false) && (
                                 <div className="flex justify-between items-start py-4">
                                     <div>
-                                        <p className="text-sm text-brand-dark font-medium leading-snug">Retirar no local</p>
+                                        <p className="text-sm text-brand-dark dark:text-dark-heading font-medium leading-snug">Retirar no local</p>
                                         {preparationEstimate && (Number(product.availability_value || 0) > 0 || preparationEstimate.readyAt.getTime() > preparationEstimate.now.getTime()) && (
                                             <p className="text-xs text-brand-orange">
                                                 Pronto {getReadyDayLabel(preparationEstimate) === "hoje" ? "hoje" : getReadyDayLabel(preparationEstimate)} entre {preparationEstimate.readyAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} e {preparationEstimate.pickupWindowEnd.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
@@ -1438,10 +1438,10 @@ export function ProductDetailsPageClient({
                         onClick={() => setExpandedAccordion(expandedAccordion === "important_info" ? null : "important_info")}
                         className="w-full flex items-center justify-between py-2 text-left hover:text-brand-green transition-colors"
                     >
-                        <span className="font-bold text-brand-dark text-sm">Informações importantes</span>
+                        <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">Informações importantes</span>
                         <ChevronDownIcon
                             size={18}
-                            className={`text-brand-inactive-text transition-transform duration-200 ${expandedAccordion === "important_info" ? "rotate-180" : ""}`}
+                            className={`text-brand-inactive-text dark:text-dark-body transition-transform duration-200 ${expandedAccordion === "important_info" ? "rotate-180" : ""}`}
                         />
                     </button>
                     <AnimatePresence initial={false}>
@@ -1458,19 +1458,19 @@ export function ProductDetailsPageClient({
                                     <button
                                         type="button"
                                         onClick={() => setShowPaymentModal(true)}
-                                        className="w-full text-left py-2 px-1 hover:bg-brand-gray/50 transition-colors flex flex-col gap-0.5"
+                                        className="w-full text-left py-2 px-1 hover:bg-brand-gray/50 dark:hover:bg-dark-border/30 transition-colors flex flex-col gap-0.5"
                                     >
-                                        <span className="text-sm font-semibold text-brand-dark">Pagamento direto ao vendedor</span>
-                                        <span className="text-xs text-brand-inactive-text">Entenda onde vai o seu dinheiro nesta compra</span>
+                                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Pagamento direto ao vendedor</span>
+                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body">Entenda onde vai o seu dinheiro nesta compra</span>
                                     </button>
                                     {/* Item 2 */}
                                     <button
                                         type="button"
                                         onClick={() => setShowResponsibilityModal(true)}
-                                        className="w-full text-left py-2 px-1 hover:bg-brand-gray/50 transition-colors flex flex-col gap-0.5"
+                                        className="w-full text-left py-2 px-1 hover:bg-brand-gray/50 dark:hover:bg-dark-border/30 transition-colors flex flex-col gap-0.5"
                                     >
-                                        <span className="text-sm font-semibold text-brand-dark">Quem cuida do seu pedido?</span>
-                                        <span className="text-xs text-brand-inactive-text">Entenda sobre a entrega, garantia e pós-venda</span>
+                                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Quem cuida do seu pedido?</span>
+                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body">Entenda sobre a entrega, garantia e pós-venda</span>
                                     </button>
                                 </div>
                             </motion.div>
@@ -1486,10 +1486,10 @@ export function ProductDetailsPageClient({
                     onClick={() => setShowPoliciesModal(true)}
                     className="w-full flex items-center justify-between py-2 text-left hover:text-brand-green transition-colors"
                 >
-                    <span className="font-bold text-brand-dark text-sm">Políticas da loja</span>
-                    <ChevronRightIcon size={18} className="text-brand-inactive-text" />
+                    <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">Políticas da loja</span>
+                    <ChevronRightIcon size={18} className="text-brand-inactive-text dark:text-dark-body" />
                 </button>
-                <p className="text-xs text-brand-inactive-text mt-0.5">Trocas, devoluções, prazos e condições do vendedor</p>
+                <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">Trocas, devoluções, prazos e condições do vendedor</p>
             </div>
 
             {/* Store (Reputation & Levels Card) */}
@@ -1499,11 +1499,11 @@ export function ProductDetailsPageClient({
                     const sellerAvatarImage = partner.store_avatar && !partner.store_avatar.includes("Placeholder.png") ? getR2ImageUrl(partner.store_avatar, "thumb") : null;
 
                     return (
-                        <div className="border border-brand-border rounded-2xl overflow-hidden bg-white">
+                        <div className="border border-brand-border rounded-2xl overflow-hidden bg-white dark:bg-dark-surface">
                             {/* Top clickable block linking to partner profile */}
                             <Link href={getStoreUrl(partner)} prefetch={false} className="block group">
                                 {/* Banner */}
-                                <div className="aspect-[2.65/1] w-full relative bg-gray-100 overflow-hidden select-none">
+                                <div className="aspect-[2.65/1] w-full relative bg-gray-100 dark:bg-dark-border/50 overflow-hidden select-none">
                                     <img src={sellerBannerImage} alt={`Banner de ${partner.store_name}`} className="w-full h-full object-cover" />
                                     <div className="absolute inset-0" />
                                 </div>
@@ -1522,15 +1522,15 @@ export function ProductDetailsPageClient({
                                     {/* Store Name and Details */}
                                     <div className="mt-2 min-w-0">
                                         <div className="flex items-center gap-1.5 justify-between">
-                                            <span className="font-bold text-brand-dark text-base truncate">
+                                            <span className="font-bold text-brand-dark dark:text-dark-heading text-base truncate">
                                                 {partner.store_name}
                                             </span>
                                             <div className="flex items-center gap-1 shrink-0 px-1.5 py-0.5">
                                                 <StarIcon size={12} className="text-brand-green fill-brand-green" strokeWidth={0} />
-                                                <span className="text-xs font-bold text-brand-dark">{displayRating}</span>
+                                                <span className="text-xs font-bold text-brand-dark dark:text-dark-heading">{displayRating}</span>
                                             </div>
                                         </div>
-                                        <p className="text-xs text-brand-inactive-text mt-0.5 font-medium">
+                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5 font-medium">
                                             {partner.city} - {partner.state}
                                         </p>
                                     </div>
@@ -1543,8 +1543,8 @@ export function ProductDetailsPageClient({
                                     <div className="flex items-center gap-2">
                                         <span className="text-base leading-none">{reputationLevel.badge}</span>
                                         <div className="flex flex-col">
-                                            <span className="text-sm font-bold text-brand-dark">Selo Dudit: {reputationLevel.name}</span>
-                                            <span className="text-xs text-brand-inactive-text">Nível do vendedor baseado em reputação e vendas</span>
+                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">Selo Dudit: {reputationLevel.name}</span>
+                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body">Nível do vendedor baseado em reputação e vendas</span>
                                         </div>
                                     </div>
 
@@ -1553,7 +1553,7 @@ export function ProductDetailsPageClient({
                                         {[1, 2, 3, 4, 5].map((lvl) => (
                                             <div
                                                 key={lvl}
-                                                className={`flex-1 h-full rounded-sm transition-all duration-300 ${reputationLevel.level >= lvl ? "bg-brand-green" : "bg-gray-200"
+                                                className={`flex-1 h-full rounded-sm transition-all duration-300 ${reputationLevel.level >= lvl ? "bg-brand-green" : "bg-gray-200 dark:bg-dark-border"
                                                     }`}
                                             />
                                         ))}
@@ -1563,16 +1563,16 @@ export function ProductDetailsPageClient({
                                 {/* 3 columns metrics */}
                                 <div className="grid grid-cols-3 gap-2 pt-4 border-t border-brand-border text-center select-none">
                                     <div className="flex flex-col items-center">
-                                        <span className="text-sm font-bold text-brand-dark">{displayRating}</span>
-                                        <span className="text-[10px] font-semibold text-brand-inactive-text mt-0.5">Avaliação</span>
+                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{displayRating}</span>
+                                        <span className="text-[10px] font-semibold text-brand-inactive-text dark:text-dark-body mt-0.5">Avaliação</span>
                                     </div>
                                     <div className="flex flex-col items-center border-x border-brand-border">
-                                        <span className="text-sm font-bold text-brand-dark">{partner.vendas_totais || 0}</span>
-                                        <span className="text-[10px] font-semibold text-brand-inactive-text mt-0.5">Vendas</span>
+                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{partner.vendas_totais || 0}</span>
+                                        <span className="text-[10px] font-semibold text-brand-inactive-text dark:text-dark-body mt-0.5">Vendas</span>
                                     </div>
                                     <div className="flex flex-col items-center">
-                                        <span className="text-sm font-bold text-brand-dark">{formattedJoinedDate}</span>
-                                        <span className="text-[10px] font-semibold text-brand-inactive-text mt-0.5">Cadastro</span>
+                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formattedJoinedDate}</span>
+                                        <span className="text-[10px] font-semibold text-brand-inactive-text dark:text-dark-body mt-0.5">Cadastro</span>
                                     </div>
                                 </div>
                             </div>
@@ -1588,7 +1588,7 @@ export function ProductDetailsPageClient({
                 !isProductOwner && (
                     <button
                         onClick={() => setShowReportModal(true)}
-                        className="w-full mt-4 flex items-center justify-center gap-2 py-2 text-xs font-medium text-brand-inactive-text hover:text-[#d32f2f] transition-colors"
+                        className="w-full mt-4 flex items-center justify-center gap-2 py-2 text-xs font-medium text-brand-inactive-text dark:text-dark-body hover:text-[#d32f2f] transition-colors"
                     >
                         <FlagIcon size={14} />
                         Comunicar algo errado
@@ -1728,10 +1728,10 @@ export function ProductDetailsPageClient({
                 maxWidth="sm"
             >
                 <div className="flex flex-col items-center p-2">
-                    <h4 className="text-lg font-bold text-brand-dark mb-4 text-center">Informe a quantidade</h4>
+                    <h4 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4 text-center">Informe a quantidade</h4>
                     <div className="w-full space-y-4">
                         <div>
-                            <label className="block text-xs font-bold text-brand-inactive-text mb-1 uppercase tracking-wider">Quantidade desejada</label>
+                            <label className="block text-xs font-bold text-brand-inactive-text dark:text-dark-body mb-1 uppercase tracking-wider">Quantidade desejada</label>
                             <Input
                                 type="number"
                                 placeholder="Ex: 10"
@@ -1740,7 +1740,7 @@ export function ProductDetailsPageClient({
                                 autoFocus
                                 className="text-center text-lg font-bold"
                             />
-                            <p className="text-[11px] text-brand-inactive-text mt-2 text-center">
+                            <p className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-2 text-center">
                                 Limite disponível: <span className="font-bold">{getQuantityLabel(MAX_STOCK, product.unit)}</span>
                             </p>
                         </div>
@@ -1790,8 +1790,8 @@ export function ProductDetailsPageClient({
                             </div>
                             <div className="flex-1 pr-4">
                                 <p className="font-bold text-sm text-brand-dark dark:text-dark-heading">{address.street}, {address.number}</p>
-                                <p className="text-sm text-brand-inactive-text mt-0.5">{address.neighborhood} - {address.city}/{address.state}</p>
-                                <p className="text-xs text-brand-inactive-text mt-1">CEP: {address.zip_code}</p>
+                                <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-0.5">{address.neighborhood} - {address.city}/{address.state}</p>
+                                <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1">CEP: {address.zip_code}</p>
                             </div>
                         </div>
                     ))}
@@ -1908,7 +1908,7 @@ export function ProductDetailsPageClient({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.4, ease: "easeOut" }}
-                className="min-h-screen bg-white lg:pt-[50px] font-sans flex flex-col"
+                className="min-h-screen bg-white dark:bg-dark-background lg:pt-[50px] font-sans flex flex-col"
             >
 
                 {isMounted && createPortal(
@@ -2012,35 +2012,35 @@ export function ProductDetailsPageClient({
 
                 <div className="container mx-auto px-4 max-w-[1400px] lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">
                     {/* Breadcrumb */}
-                    <div className="hidden lg:flex items-center gap-2 text-sm text-brand-inactive-text mb-8">
+                    <div className="hidden lg:flex items-center gap-2 text-sm text-brand-inactive-text dark:text-dark-body mb-8">
                         {partner.city && partner.state && (
                             <>
-                                <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}`} prefetch={false} className="hover:text-brand-dark transition-colors">
+                                <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}`} prefetch={false} className="hover:text-brand-dark dark:text-dark-heading transition-colors">
                                     {partner.city} - {partner.state}
                                 </Link>
                                 <ChevronRightIcon size={10} />
                             </>
                         )}
-                        <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}?type=produtos`} prefetch={false} className="hover:text-brand-dark transition-colors">
+                        <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}?type=produtos`} prefetch={false} className="hover:text-brand-dark dark:text-dark-heading transition-colors">
                             Produtos
                         </Link>
                         <ChevronRightIcon size={10} />
                         {product.marketplace_category?.parent?.name || product.marketplace_category?.name ? (
                             <>
-                                <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}/${createCategorySlug(product.marketplace_category.parent?.name || product.marketplace_category.name)}?type=produtos`} prefetch={false} className="hover:text-brand-dark transition-colors">
+                                <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}/${createCategorySlug(product.marketplace_category.parent?.name || product.marketplace_category.name)}?type=produtos`} prefetch={false} className="hover:text-brand-dark dark:text-dark-heading transition-colors">
                                     {product.marketplace_category.parent?.name || product.marketplace_category.name}
                                 </Link>
                                 <ChevronRightIcon size={10} />
                             </>
                         ) : product.category && !product.marketplace_category ? (
                             <>
-                                <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}/${createCategorySlug(product.category)}?type=produtos`} prefetch={false} className="hover:text-brand-dark transition-colors">
+                                <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}/${createCategorySlug(product.category)}?type=produtos`} prefetch={false} className="hover:text-brand-dark dark:text-dark-heading transition-colors">
                                     {product.category}
                                 </Link>
                                 <ChevronRightIcon size={10} />
                             </>
                         ) : null}
-                        <span className="text-brand-inactive-text truncate max-w-[300px]">{product.name}</span>
+                        <span className="text-brand-inactive-text dark:text-dark-body truncate max-w-[300px]">{product.name}</span>
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 xl:gap-12">
@@ -2063,7 +2063,7 @@ export function ProductDetailsPageClient({
                                     {/* Desktop Prev Button */}
                                     <div className="hidden lg:flex w-10 shrink-0 items-center justify-center">
                                         {galleryItems.length > 1 && (
-                                            <button onClick={goToPrev} className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-brand-border hover:bg-brand-gray transition-colors shadow-sm">
+                                            <button onClick={goToPrev} className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-brand-border hover:bg-brand-gray dark:hover:bg-dark-border/50 transition-colors shadow-sm">
                                                 <ChevronLeftIcon size={20} className="text-brand-dark" />
                                             </button>
                                         )}
@@ -2073,7 +2073,7 @@ export function ProductDetailsPageClient({
                                         {/* Desktop main image */}
                                         <div className="hidden lg:block" style={{ paddingBottom: "100%", position: "relative" }}>
                                             <div ref={galleryContainerRef}
-                                                className="absolute inset-0 bg-brand-gray overflow-hidden rounded-2xl cursor-zoom-in"
+                                                className="absolute inset-0 bg-brand-gray dark:bg-dark-border/30 overflow-hidden rounded-2xl cursor-zoom-in"
                                                 onMouseMove={(e) => {
                                                     const { left, top, width, height } = galleryContainerRef.current!.getBoundingClientRect()
                                                     zoomOriginX.set(((e.clientX - left) / width) * 100)
@@ -2104,7 +2104,7 @@ export function ProductDetailsPageClient({
                                         </div>
 
                                         {/* Mobile main image */}
-                                        <div className="lg:hidden relative bg-white rounded-xl overflow-hidden cursor-pointer" style={{ aspectRatio: "1/1" }} onClick={() => openLightbox(activeImgIndex)}>
+                                        <div className="lg:hidden relative bg-white dark:bg-dark-surface rounded-xl overflow-hidden cursor-pointer" style={{ aspectRatio: "1/1" }} onClick={() => openLightbox(activeImgIndex)}>
                                             <AnimatePresence mode="wait" custom={slideDirection}>
                                                 {renderGalleryItem(galleryItems[activeImgIndex], "absolute inset-0 w-full h-full object-contain", `Foto de ${product.name} à venda em ${partner.city} - ${partner.state}`)}
                                             </AnimatePresence>
@@ -2144,7 +2144,7 @@ export function ProductDetailsPageClient({
                                         <div className="flex-1 flex items-center">
                                             {galleryItems.length > 1 && (
                                                 <Button variant="filled" onClick={goToNext} className="w-10 h-10 flex items-center justify-center">
-                                                    <ChevronRightIcon size={20} className="text-brand-dark" />
+                                                    <ChevronRightIcon size={20} className="text-brand-dark dark:text-dark-heading" />
                                                 </Button>
                                             )}
                                         </div>
@@ -2157,7 +2157,7 @@ export function ProductDetailsPageClient({
 
                             {/* Description */}
                             <div className="mb-10">
-                                <h3 className="text-xl font-medium text-brand-dark mb-4">Descrição</h3>
+                                <h3 className="text-xl font-medium text-brand-dark dark:text-dark-heading mb-4">Descrição</h3>
                                 <div className={`relative ${!isDescriptionExpanded ? "max-h-[150px] overflow-hidden" : ""}`}>
                                     {product.description ? (
                                         <div
@@ -2165,10 +2165,10 @@ export function ProductDetailsPageClient({
                                             dangerouslySetInnerHTML={{ __html: product.description }}
                                         />
                                     ) : (
-                                        <p className="text-sm md:text-[0.9375rem] text-gray-600 leading-relaxed">Sem descrição.</p>
+                                        <p className="text-sm md:text-[0.9375rem] text-gray-600 dark:text-dark-body leading-relaxed">Sem descrição.</p>
                                     )}
                                     {!isDescriptionExpanded && product.description?.length > 200 && (
-                                        <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-white to-transparent" />
+                                        <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-white to-transparent dark:from-gray-900 dark:to-transparent" />
                                     )}
                                 </div>
                                 {product.description?.length > 200 && (
@@ -2183,14 +2183,14 @@ export function ProductDetailsPageClient({
                             {/* Technical specs */}
                             {Array.isArray(product.technical_specs) && product.technical_specs.length > 0 && (
                                 <div className="mb-10">
-                                    <h3 className="text-xl font-medium text-brand-dark mb-4">Especificações</h3>
+                                    <h3 className="text-xl font-medium text-brand-dark dark:text-dark-heading mb-4">Especificações</h3>
                                     <div className="border border-brand-border rounded-xl overflow-hidden">
                                         {product.technical_specs.map((spec: any, i: number, arr: any[]) => (
                                             <div key={i} className={`flex justify-between items-center px-4 py-3
-                        ${i % 2 === 0 ? "bg-brand-gray" : "bg-white"}
+                        ${i % 2 === 0 ? "bg-brand-gray dark:bg-dark-border/30" : "bg-white dark:bg-dark-surface"}
                         ${i < arr.length - 1 ? "border-b border-brand-border" : ""}`}>
-                                                <span className="text-sm text-brand-inactive-text font-medium">{spec.label || spec.name || ""}</span>
-                                                <span className="text-sm text-brand-dark font-semibold text-right">{spec.value || ""}</span>
+                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">{spec.label || spec.name || ""}</span>
+                                                <span className="text-sm text-brand-dark dark:text-dark-heading font-semibold text-right">{spec.value || ""}</span>
                                             </div>
                                         ))}
                                     </div>
@@ -2199,7 +2199,7 @@ export function ProductDetailsPageClient({
 
                             {/* Reviews */}
                             <div ref={reviewsRef} className="border-t border-brand-border pt-2">
-                                <h3 className="text-xl font-medium text-brand-dark mb-6 mt-8">Avaliações do produto</h3>
+                                <h3 className="text-xl font-medium text-brand-dark dark:text-dark-heading mb-6 mt-8">Avaliações do produto</h3>
                                 <ReviewsSection reviews={reviews} />
                             </div>
                         </div>
@@ -2212,7 +2212,7 @@ export function ProductDetailsPageClient({
 
                     {/* Mobile bottom bar */}
                     {!isProductOwner && (
-                        <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 z-50 flex gap-3 lg:hidden shadow-lg">
+                        <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-dark-surface border-t dark:border-dark-border p-4 z-50 flex gap-3 lg:hidden shadow-lg">
                             {!showPrice ? (
                                 (() => {
                                     const cleanPhone = partner.phone ? partner.phone.replace(/\D/g, "") : ""

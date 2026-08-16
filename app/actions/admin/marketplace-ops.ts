@@ -89,7 +89,7 @@ export async function getAdminMarketplaceOrders(
             notes,
             created_at,
             stores!left(id, name, person_type, logo_url, phone),
-            order_items(id, product_id, product_name, product_price, quantity, subtotal, net_item_value, variation_description, image_url),
+            order_items(id, product_id, product_name, product_price, quantity, subtotal, net_item_value, product_variants(id, variant_name), products(id, sku, images)),
             return_requests!order_id(id, request_type, status, resolution_type, refund_amount, store_credit_amount, source, created_at)
         `)
 
@@ -162,7 +162,7 @@ export async function getAdminMarketplaceOrderDetail(orderId: string): Promise<a
         .select(`
             *,
             stores!left(id, name, person_type, logo_url, banner_url, phone, description, risk_score, partner_id),
-            order_items(id, product_id, product_name, product_price, quantity, subtotal, net_item_value, variation_description, image_url, sku),
+            order_items(id, product_id, product_name, product_price, quantity, subtotal, net_item_value, product_variants(id, variant_name), products(id, sku, images)),
             return_requests!order_id(
                 id, request_type, status, resolution_type, refund_amount, store_credit_amount, source, created_at,
                 return_items(id, product_name_snapshot, quantity, net_item_value_snapshot, reason)

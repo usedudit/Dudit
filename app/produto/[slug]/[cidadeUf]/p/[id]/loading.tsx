@@ -4,7 +4,7 @@ import { SkeletonLoader } from "@/components/reusable"
 
 function BuyPanelSkeleton() {
     return (
-        <div className="bg-white">
+        <div className="bg-white dark:bg-dark-surface">
             {/* Condition + rating row */}
             <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center gap-2">
@@ -57,8 +57,8 @@ function BuyPanelSkeleton() {
 
             {/* Shipping */}
             <SkeletonLoader width={128} height={16} className="mb-2" />
-            <div className="border border-gray-100 rounded-[10px] overflow-hidden mb-4">
-                <div className="flex justify-between items-start py-3 px-4 border-b border-gray-100">
+            <div className="border border-gray-100 dark:border-dark-border rounded-[10px] overflow-hidden mb-4">
+                <div className="flex justify-between items-start py-3 px-4 border-b border-gray-100 dark:border-dark-border">
                     <div>
                         <SkeletonLoader width={112} height={14} className="mb-1.5" />
                         <SkeletonLoader width={160} height={12} />
@@ -75,9 +75,9 @@ function BuyPanelSkeleton() {
             </div>
 
             {/* Legal rows */}
-            <div className="border-t border-gray-100 mb-6">
+            <div className="border-t border-gray-100 dark:border-dark-border mb-6">
                 {[...Array(2)].map((_, i) => (
-                    <div key={i} className="flex items-center justify-between py-5 border-b border-gray-100">
+                    <div key={i} className="flex items-center justify-between py-5 border-b border-gray-100 dark:border-dark-border">
                         <div className="flex-1 pr-4">
                             <SkeletonLoader width={192} height={14} className="mb-1.5" />
                             <SkeletonLoader width="100%" height={12} />
@@ -88,7 +88,7 @@ function BuyPanelSkeleton() {
             </div>
 
             {/* Store card */}
-            <div className="bg-gray-50 rounded-[12px] p-5 border border-gray-100">
+            <div className="bg-gray-50 dark:bg-dark-border/30 rounded-[12px] p-5 border border-gray-100 dark:border-dark-border">
                 <div className="flex items-center gap-3 mb-4">
                     <SkeletonLoader width={48} height={48} circle />
                     <div>
@@ -110,7 +110,7 @@ function BuyPanelSkeleton() {
 
 export default function ProductDetailsLoading() {
     return (
-        <div className="min-h-screen bg-white lg:pt-[50px] font-sans flex flex-col">
+        <div className="min-h-screen bg-white dark:bg-dark-background lg:pt-[50px] font-sans flex flex-col">
             <MarketplaceHeader />
 
             <div className="container mx-auto px-4 max-w-[1300px] lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">
@@ -173,11 +173,11 @@ export default function ProductDetailsLoading() {
                         {/* Technical specs */}
                         <div className="mb-10">
                             <SkeletonLoader width={128} height={28} className="mb-4" />
-                            <div className="border border-gray-100 rounded-[12px] overflow-hidden">
+                            <div className="border border-gray-100 dark:border-dark-border rounded-[12px] overflow-hidden">
                                 {[...Array(5)].map((_, i) => (
                                     <div
                                         key={i}
-                                        className={`flex justify-between items-center px-4 py-3 ${i % 2 === 0 ? "bg-gray-50" : "bg-white"} ${i < 4 ? "border-b border-gray-100" : ""}`}
+                                        className={`flex justify-between items-center px-4 py-3 ${i % 2 === 0 ? "bg-gray-50 dark:bg-dark-border/30" : "bg-white dark:bg-dark-surface"} ${i < 4 ? "border-b border-gray-100 dark:border-dark-border" : ""}`}
                                     >
                                         <SkeletonLoader width={112} height={14} />
                                         <SkeletonLoader width={80} height={14} />
@@ -187,11 +187,11 @@ export default function ProductDetailsLoading() {
                         </div>
 
                         {/* Reviews */}
-                        <div className="border-t border-gray-100 pt-2">
+                        <div className="border-t border-gray-100 dark:border-dark-border pt-2">
                             <SkeletonLoader width={192} height={28} className="mb-6 mt-8" />
 
                             {/* Rating summary */}
-                            <div className="border border-gray-100 rounded-[12px] p-5 mb-8 flex gap-8 items-center">
+                            <div className="border border-gray-100 dark:border-dark-border rounded-[12px] p-5 mb-8 flex gap-8 items-center">
                                 <div className="text-center shrink-0">
                                     <SkeletonLoader width={64} height={56} className="rounded mb-2 mx-auto" />
                                     <div className="flex justify-center gap-0.5 mb-1.5">
@@ -204,7 +204,7 @@ export default function ProductDetailsLoading() {
                                         <div key={i} className="flex items-center gap-2">
                                             <SkeletonLoader width={12} height={12} circle />
                                             <SkeletonLoader width={8} height={8} circle />
-                                            <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                                            <div className="flex-1 h-2 bg-gray-100 dark:bg-dark-border/50 rounded-full overflow-hidden">
                                                 <SkeletonLoader width={`${[70, 20, 5, 3, 2][i]}%`} height={8} className="rounded-full" />
                                             </div>
                                             <SkeletonLoader width={16} height={12} />
@@ -216,7 +216,7 @@ export default function ProductDetailsLoading() {
                             {/* Individual reviews */}
                             <div className="space-y-6">
                                 {[...Array(3)].map((_, i) => (
-                                    <div key={i} className="border-b border-gray-100 pb-6 last:border-0">
+                                    <div key={i} className="border-b border-gray-100 dark:border-dark-border pb-6 last:border-0">
                                         <div className="flex items-start gap-3 mb-3">
                                             <SkeletonLoader width={36} height={36} circle />
                                             <div className="flex-1">
@@ -247,7 +247,7 @@ export default function ProductDetailsLoading() {
             </div>
 
             {/* Mobile bottom bar */}
-            <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 z-50 flex gap-3 lg:hidden shadow-lg">
+            <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-dark-surface border-t border-gray-100 dark:border-dark-border p-4 z-50 flex gap-3 lg:hidden shadow-lg">
                 <SkeletonLoader width={48} height={48} circle />
                 <div className="flex-1">
                     <SkeletonLoader width="100%" height={48} className="rounded-full" />

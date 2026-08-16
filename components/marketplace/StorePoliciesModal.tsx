@@ -51,24 +51,24 @@ export function StorePoliciesModal({ isOpen, onClose, partnerId, storeName }: St
             <Spinner />
           </div>
         ) : error ? (
-          <div className="text-center py-10 text-brand-inactive-text text-sm">{error}</div>
+          <div className="text-center py-10 text-brand-inactive-text dark:text-dark-body text-sm">{error}</div>
         ) : policy ? (
           <>
-            <div className="text-xs text-brand-inactive-text bg-brand-gray/50 rounded-xl p-4 leading-relaxed">
+            <div className="text-xs text-brand-inactive-text dark:text-dark-body bg-brand-gray/50 dark:bg-dark-border/30 rounded-xl p-4 leading-relaxed">
               As políticas abaixo são de responsabilidade exclusiva do vendedor. A Dudit apenas disponibiliza a plataforma. Consulte nossos Termos de Serviço para mais informações.
             </div>
 
             {policy.fullPolicyText && (
               <div>
-                <h4 className="text-sm font-bold text-brand-dark mb-2">Política de Trocas e Devoluções</h4>
-                <div className="text-sm text-brand-inactive-text whitespace-pre-line leading-relaxed">
+                <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-2">Política de Trocas e Devoluções</h4>
+                <div className="text-sm text-brand-inactive-text dark:text-dark-body whitespace-pre-line leading-relaxed">
                   {policy.fullPolicyText}
                 </div>
               </div>
             )}
 
             <div className="border-t border-brand-border pt-4">
-              <h4 className="text-sm font-bold text-brand-dark mb-3">Informações adicionais</h4>
+              <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Informações adicionais</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                 <InfoItem label="Prazo de arrependimento (online)" value={`${policy.legalOnlineRegretDays} dias`} />
                 <InfoItem label="Troca por tamanho" value={policy.acceptsSizeExchange ? "Aceita" : "Não aceita"} />
@@ -90,14 +90,14 @@ export function StorePoliciesModal({ isOpen, onClose, partnerId, storeName }: St
             </div>
 
             {policy.commercialNotes && (
-              <div className="bg-brand-gray/50 rounded-xl p-4">
-                <h4 className="text-sm font-bold text-brand-dark mb-1">Observações do vendedor</h4>
-                <p className="text-sm text-brand-inactive-text whitespace-pre-line">{policy.commercialNotes}</p>
+              <div className="bg-brand-gray/50 dark:bg-dark-border/30 rounded-xl p-4">
+                <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-1">Observações do vendedor</h4>
+                <p className="text-sm text-brand-inactive-text dark:text-dark-body whitespace-pre-line">{policy.commercialNotes}</p>
               </div>
             )}
 
             <div className="border-t border-brand-border pt-4">
-              <p className="text-xs text-brand-inactive-text leading-relaxed">
+              <p className="text-xs text-brand-inactive-text dark:text-dark-body leading-relaxed">
                 Em caso de divergências ou problemas relacionados a estas políticas, entre em contato diretamente com o vendedor responsável pelo anúncio.
               </p>
             </div>
@@ -111,8 +111,8 @@ export function StorePoliciesModal({ isOpen, onClose, partnerId, storeName }: St
 function InfoItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-xs text-brand-inactive-text">{label}</span>
-      <span className="text-sm font-semibold text-brand-dark">{value}</span>
+      <span className="text-xs text-brand-inactive-text dark:text-dark-body">{label}</span>
+      <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{value}</span>
     </div>
   )
 }

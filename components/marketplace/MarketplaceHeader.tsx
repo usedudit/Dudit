@@ -4,12 +4,14 @@ import type React from "react"
 import { useState, useRef, useEffect, useMemo, memo, useCallback, useTransition } from "react"
 import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
-import { ShoppingBagIcon, MapPinIcon, ChevronDownIcon, SearchIcon, ChevronRightIcon, ChevronLeftIcon, Package, HeartIcon, ShareIcon, XIcon } from "@/lib/icons"
+import { useTheme } from "next-themes"
+import { ShoppingBagIcon, MapPinIcon, ChevronDownIcon, SearchIcon, ChevronRightIcon, ChevronLeftIcon, Package, HeartIcon, ShareIcon, XIcon, MoonIcon } from "@/lib/icons"
 import { useSupabase } from "@/providers/supabase-provider"
 import { Button } from "@/components/reusable/Button"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { Input } from "@/components/reusable/Input"
 import { InfoCard } from "@/components/reusable/InfoCard"
+import { Switch } from "@/components/reusable/Switch"
 import BottomSheet from "@/components/BottomSheet"
 import { getUserInitials, getAvatarColor } from "@/lib/utils/UserProfileImage"
 import { getSearchSuggestionsBucket, getMarketplaceAutocompleteAction } from "@/app/actions/marketplace/suggestions"
@@ -161,6 +163,8 @@ const Header: React.FC<HeaderProps> = ({
     const [rpcSuggestions, setRpcSuggestions] = useState<{ label: string; type: string }[]>([])
     const [isSearchInputFocused, setIsSearchInputFocused] = useState(false)
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
+    const [isThemeTransitioning, setIsThemeTransitioning] = useState(false)
+    const { theme, setTheme } = useTheme()
     const [isMobileUserMenuOpen, setIsMobileUserMenuOpen] = useState(false)
     const [isMobileCategoryMenuOpen, setIsMobileCategoryMenuOpen] = useState(false)
     const [isScrolled, setIsScrolled] = useState(false)
@@ -315,12 +319,12 @@ const Header: React.FC<HeaderProps> = ({
                                 onChange={(e) => setVisitorSearchQuery(e.target.value)}
                             />
                             {filteredCities.length > 0 && (
-                                <div className="absolute z-[110] left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-48 overflow-y-auto divide-y divide-gray-100">
+                                <div className="absolute z-[110] left-0 right-0 mt-1 bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-xl shadow-xl max-h-48 overflow-y-auto divide-y divide-gray-100 dark:divide-dark-border">
                                     {filteredCities.map((slug) => (
                                         <button
                                             key={slug}
                                             onClick={() => handleSelectCitySlug(slug)}
-                                            className="w-full text-left px-4 py-3 hover:bg-brand-gray text-brand-dark text-sm transition-colors font-medium flex items-center gap-2"
+                                            className="w-full text-left px-4 py-3 hover:bg-brand-gray dark:hover:bg-dark-border/30 text-brand-dark dark:text-dark-heading text-sm transition-colors font-medium flex items-center gap-2"
                                         >
                                             <MapPinIcon size={14} className="text-brand-green shrink-0" />
                                             {formatCitySlugForDisplay(slug)}
@@ -485,6 +489,45 @@ const Header: React.FC<HeaderProps> = ({
             setIsUserMenuOpen(false)
         }, 150)
     }, [])
+
+    const handleThemeToggle = useCallback(() => {
+        if (isThemeTransitioning) return
+
+        const newTheme = theme === "dark" ? "light" : "dark"
+
+        // @ts-ignore
+        if (!document.startViewTransition) {
+            setTheme(newTheme)
+            return
+        }
+
+        const x = window.innerWidth - 24
+        const y = 24
+        const endRadius = Math.hypot(x, window.innerHeight - y)
+
+        setIsThemeTransitioning(true)
+
+        // @ts-ignore
+        const transition = document.startViewTransition(() => {
+            setTheme(newTheme)
+        })
+
+        transition.ready.then(() => {
+            const clipPath = [`circle(0px at ${x}px ${y}px)`, `circle(${endRadius}px at ${x}px ${y}px)`]
+            document.documentElement.animate(
+                { clipPath: clipPath },
+                {
+                    duration: 500,
+                    easing: "ease-in-out",
+                    pseudoElement: "::view-transition-new(root)",
+                },
+            )
+        })
+
+        transition.finished.finally(() => {
+            setIsThemeTransitioning(false)
+        })
+    }, [isThemeTransitioning, theme, setTheme])
 
     const handleSearch = useCallback((query: string = searchValue) => {
         const trimmed = query.trim()
@@ -763,11 +806,11 @@ const Header: React.FC<HeaderProps> = ({
             {isMobileUserMenuOpen && (
                 <BottomSheet isOpen={isMobileUserMenuOpen} onClose={() => setIsMobileUserMenuOpen(false)}>
                     <div className="flex flex-col">
-                        <div className="px-6 py-5 border-b border-brand-border flex items-center gap-3">
-                            <div className={`w-10 h-10 rounded-full overflow-hidden border border-brand-border shrink-0 flex items-center justify-center font-semibold text-white ${getAvatarColor(fullName)}`}>
+                        <div className="px-6 py-5 border-b border-brand-border dark:border-dark-border flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-full overflow-hidden border border-brand-border dark:border-dark-border shrink-0 flex items-center justify-center font-semibold text-white ${getAvatarColor(fullName)}`}>
                                 {getUserInitials(fullName)}
                             </div>
-                            <h3 className="text-[16px] font-bold text-brand-dark">{userName}</h3>
+                            <h3 className="text-[16px] font-bold text-brand-dark dark:text-dark-heading">{userName}</h3>
                         </div>
 
                         <div className="py-2">
@@ -787,24 +830,32 @@ const Header: React.FC<HeaderProps> = ({
                                     <ItemWrapper
                                         key={idx}
                                         {...wrapProps}
-                                        className="px-6 py-3 hover:bg-brand-gray cursor-pointer transition-colors block w-full text-left"
+                                        className="px-6 py-3 hover:bg-brand-gray dark:hover:bg-dark-border/30 cursor-pointer transition-colors block w-full text-left"
                                         onClick={() => {
                                             if (wrapProps.onClick) wrapProps.onClick();
                                             setIsMobileUserMenuOpen(false);
                                         }}
                                     >
-                                        <span className="text-[15px] font-normal text-brand-inactive-text hover:text-brand-dark">{item.label}</span>
+                                        <span className="text-[15px] font-normal text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading">{item.label}</span>
                                     </ItemWrapper>
                                 )
                             })}
+
+                            <div className="flex items-center justify-between px-6 py-3 rounded-xl">
+                                <span className="flex items-center gap-3">
+                                    <MoonIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                    <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading">Modo escuro</span>
+                                </span>
+                                <Switch checked={theme === "dark"} onCheckedChange={handleThemeToggle} />
+                            </div>
                         </div>
 
-                        <div className="border-t border-gray-100 py-2 mt-2">
+                        <div className="border-t border-gray-100 dark:border-dark-border py-2 mt-2">
                             <div
-                                className="px-6 py-3 hover:bg-brand-gray cursor-pointer transition-colors"
+                                className="px-6 py-3 hover:bg-brand-gray dark:hover:bg-dark-border/30 cursor-pointer transition-colors"
                                 onClick={handleSignOut}
                             >
-                                <span className="text-[15px] font-normal text-brand-inactive-text">Sair da sessão</span>
+                                <span className="text-[15px] font-normal text-brand-inactive-text dark:text-dark-body">Sair da sessão</span>
                             </div>
                         </div>
                     </div>
@@ -896,11 +947,11 @@ const Header: React.FC<HeaderProps> = ({
                         </div>
 
                         {showSearchDropdown && (
-                            <div className="absolute top-[calc(100%+8px)] left-0 w-full bg-white rounded-[16px] shadow-xl border border-gray-100 overflow-hidden animate-fade-in z-[120]">
+                            <div className="absolute top-[calc(100%+8px)] left-0 w-full bg-white dark:bg-dark-surface rounded-[16px] shadow-xl border border-gray-100 dark:border-dark-border overflow-hidden animate-fade-in z-[120]">
                                 {filteredSuggestions.map((suggestion, index) => (
                                     <div
                                         key={index}
-                                        className="flex items-center gap-3 px-5 py-3 hover:bg-brand-gray cursor-pointer text-brand-inactive-text group"
+                                        className="flex items-center gap-3 px-5 py-3 hover:bg-brand-gray dark:hover:bg-dark-border/30 cursor-pointer text-brand-inactive-text dark:text-dark-body group"
                                         onClick={() => {
                                             setSearchValue(suggestion.label)
                                             handleSearch(suggestion.label)
@@ -949,14 +1000,14 @@ const Header: React.FC<HeaderProps> = ({
                             )}
 
                             {isUserMenuOpen && user && (
-                                <div className="absolute top-[calc(100%+12px)] left-1/2 -translate-x-1/2 w-[280px] bg-white rounded-[8px] shadow-[0_8px_30px_rgba(0,0,0,0.15)] border border-gray-100 overflow-visible animate-fade-in flex flex-col">
-                                    <div className="absolute -top-[6px] left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-t border-l border-gray-100 transform rotate-45" />
+                                <div className="absolute top-[calc(100%+12px)] left-1/2 -translate-x-1/2 w-[280px] bg-white dark:bg-dark-surface rounded-[8px] shadow-[0_8px_30px_rgba(0,0,0,0.15)] border border-gray-100 dark:border-dark-border overflow-visible animate-fade-in flex flex-col">
+                                    <div className="absolute -top-[6px] left-1/2 -translate-x-1/2 w-3 h-3 bg-white dark:bg-dark-surface border-t border-l border-gray-100 dark:border-dark-border transform rotate-45" />
 
-                                    <div className="px-6 py-5 border-b border-gray-100 flex items-center gap-3">
-                                        <div className={`w-10 h-10 rounded-full overflow-hidden border border-gray-100 shrink-0 flex items-center justify-center font-semibold text-white ${getAvatarColor(fullName)}`}>
+                                    <div className="px-6 py-5 border-b border-gray-100 dark:border-dark-border flex items-center gap-3">
+                                        <div className={`w-10 h-10 rounded-full overflow-hidden border border-gray-100 dark:border-dark-border shrink-0 flex items-center justify-center font-semibold text-white ${getAvatarColor(fullName)}`}>
                                             {getUserInitials(fullName)}
                                         </div>
-                                        <h3 className="text-[16px] font-bold text-brand-dark">{userName}</h3>
+                                        <h3 className="text-[16px] font-bold text-brand-dark dark:text-dark-heading">{userName}</h3>
                                     </div>
 
                                     <div className="py-2">
@@ -976,24 +1027,34 @@ const Header: React.FC<HeaderProps> = ({
                                                 <ItemWrapper
                                                     key={idx}
                                                     {...wrapProps}
-                                                    className="px-6 py-2.5 hover:bg-brand-gray cursor-pointer transition-colors block w-full text-left"
+                                                    className="px-6 py-2.5 hover:bg-brand-gray dark:hover:bg-dark-border/30 cursor-pointer transition-colors block w-full text-left"
                                                     onClick={() => {
                                                         if (wrapProps.onClick) wrapProps.onClick();
                                                         setIsUserMenuOpen(false)
                                                     }}
                                                 >
-                                                    <span className="text-[14px] font-normal text-brand-inactive-text hover:text-brand-dark">{item.label}</span>
+                                                    <span className="text-[14px] font-normal text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading">{item.label}</span>
                                                 </ItemWrapper>
                                             )
                                         })}
                                     </div>
 
-                                    <div className="border-t border-gray-100 py-2 mt-auto">
+                                    <div className="border-t border-gray-100 dark:border-dark-border py-2">
+                                        <div className="px-6 py-2.5 flex items-center justify-between hover:bg-brand-gray dark:hover:bg-dark-border/30 cursor-pointer transition-colors">
+                                            <span className="flex items-center gap-3">
+                                                <MoonIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
+                                                <span className="text-[14px] font-normal text-brand-inactive-text dark:text-dark-body">Modo escuro</span>
+                                            </span>
+                                            <Switch checked={theme === "dark"} onCheckedChange={handleThemeToggle} />
+                                        </div>
+                                    </div>
+
+                                    <div className="border-t border-gray-100 dark:border-dark-border py-2 mt-auto">
                                         <div
-                                            className="px-6 py-3 hover:bg-brand-gray cursor-pointer transition-colors"
+                                            className="px-6 py-3 hover:bg-brand-gray dark:hover:bg-dark-border/30 cursor-pointer transition-colors"
                                             onClick={handleSignOut}
                                         >
-                                            <span className="text-[14px] font-normal text-brand-inactive-text">Sair da sessão</span>
+                                            <span className="text-[14px] font-normal text-brand-inactive-text dark:text-dark-body">Sair da sessão</span>
                                         </div>
                                     </div>
                                 </div>

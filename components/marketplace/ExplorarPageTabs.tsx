@@ -55,7 +55,7 @@ export function ExplorarPageTabs({
     }
 
     return (
-        <div className="sticky top-[128px] z-30 bg-white border-b border-gray-100 md:border-b-0">
+        <div className="sticky top-[128px] z-30 bg-white dark:bg-dark-surface border-b border-gray-100 dark:border-dark-border md:border-b-0">
             <div className="container mx-auto px-4 max-w-[1400px]">
                 <div className="relative flex items-center justify-between">
                     {/* Left scroll button */}
@@ -65,7 +65,7 @@ export function ExplorarPageTabs({
                             className="absolute left-0 top-0 bottom-0 z-10 flex items-center justify-center w-8 bg-gradient-to-r from-white to-transparent md:hidden"
                             aria-label="Scroll filtros esquerda"
                         >
-                            <ChevronLeft className="w-4 h-4 text-brand-dark" />
+                            <ChevronLeft className="w-4 h-4 text-brand-dark dark:text-dark-heading" />
                         </button>
                     )}
 
@@ -83,7 +83,7 @@ export function ExplorarPageTabs({
                             <TabsList className="inline-flex gap-0 bg-transparent border-b-0 w-full justify-start h-auto p-0">
                                 <TabsTrigger
                                     value="filtros"
-                                    className="relative px-4 py-3 font-semibold text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-brand-green data-[state=active]:bg-transparent data-[state=active]:text-brand-green data-[state=active]:shadow-none text-brand-dark hover:bg-gray-50 transition-colors"
+                                    className="relative px-4 py-3 font-semibold text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-brand-green data-[state=active]:bg-transparent data-[state=active]:text-brand-green data-[state=active]:shadow-none text-brand-dark dark:text-dark-heading hover:bg-gray-50 dark:hover:bg-dark-border/30 transition-colors"
                                 >
                                     <div className="flex items-center gap-2">
                                         <SlidersHorizontal className="w-4 h-4" />
@@ -98,7 +98,7 @@ export function ExplorarPageTabs({
 
                                 <TabsTrigger
                                     value="ordenar"
-                                    className="relative px-4 py-3 font-semibold text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-brand-green data-[state=active]:bg-transparent data-[state=active]:text-brand-green data-[state=active]:shadow-none text-brand-dark hover:bg-gray-50 transition-colors"
+                                    className="relative px-4 py-3 font-semibold text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-brand-green data-[state=active]:bg-transparent data-[state=active]:text-brand-green data-[state=active]:shadow-none text-brand-dark dark:text-dark-heading hover:bg-gray-50 dark:hover:bg-dark-border/30 transition-colors"
                                 >
                                     <div className="flex items-center gap-2">
                                         <ListOrdered className="w-4 h-4" />
@@ -121,7 +121,7 @@ export function ExplorarPageTabs({
                             className="absolute right-0 top-0 bottom-0 z-10 flex items-center justify-center w-8 bg-gradient-to-l from-white to-transparent md:hidden"
                             aria-label="Scroll filtros direita"
                         >
-                            <ChevronRight className="w-4 h-4 text-brand-dark" />
+                            <ChevronRight className="w-4 h-4 text-brand-dark dark:text-dark-heading" />
                         </button>
                     )}
                 </div>

@@ -180,9 +180,9 @@ export function FavoritesPageClient({
                 <div className="hidden lg:block items-center mb-8">
                     <div>
                         <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                            Favoritos {counts.total > 0 && (<span className="text-brand-inactive-text font-bold text-base lg:text-lg ml-2">({counts.total})</span>)}
+                            Favoritos {counts.total > 0 && (<span className="text-brand-inactive-text dark:text-dark-body font-bold text-base lg:text-lg ml-2">({counts.total})</span>)}
                         </h1>
-                        <p className="text-md text-brand-inactive-text mt-1">Seus produtos e serviços salvos em um só lugar</p>
+                        <p className="text-md text-brand-inactive-text dark:text-dark-body mt-1">Seus produtos e serviços salvos em um só lugar</p>
                     </div>
                 </div>
 
@@ -193,7 +193,7 @@ export function FavoritesPageClient({
                             <TabsTrigger
                                 key={tab.value}
                                 value={tab.value}
-                                badge={<span className="ml-1 text-xs text-brand-inactive-text">({tabCount(tab.value)})</span>}
+                                badge={<span className="ml-1 text-xs text-brand-inactive-text dark:text-dark-body">({tabCount(tab.value)})</span>}
                             >
                                 {tab.label}
                             </TabsTrigger>
@@ -212,7 +212,7 @@ export function FavoritesPageClient({
                                 placeholder="Buscar nos favoritos..."
                                 value={searchInput}
                                 onChange={(e) => handleSearchChange(e.target.value)}
-                                prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
+                                prefix={<SearchIcon size={18} className="text-brand-inactive-text dark:text-dark-body" />}
                                 className="mb-0"
                                 variant="full-rounded"
                             />
@@ -289,12 +289,12 @@ function FavoritesSkeleton() {
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4 lg:gap-6">
             {Array.from({ length: 12 }).map((_, i) => (
                 <div key={i} className="animate-pulse">
-                    <div className="aspect-square rounded-[16px] bg-gray-100 mb-3" />
+                    <div className="aspect-square rounded-[16px] bg-gray-100 dark:bg-dark-border/50 mb-3" />
                     <div className="px-1 space-y-2">
                         <SkeletonLoader height={14} width="80%" />
                         <SkeletonLoader height={18} width="60%" />
-                        <div className="flex items-center gap-2 pt-2 border-t border-gray-100 mt-2">
-                            <div className="w-8 h-8 rounded-full bg-gray-100" />
+                        <div className="flex items-center gap-2 pt-2 border-t border-gray-100 dark:border-dark-border mt-2">
+                            <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-dark-border/50" />
                             <SkeletonLoader height={12} width="50%" />
                         </div>
                     </div>

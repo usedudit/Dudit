@@ -504,7 +504,7 @@ export default function PromotionsPage({
     <>
       <AnimatePresence mode="wait">
         {entityState.isOpen && formMode ? (
-          (formMode !== 'add' && (isLoadingDetail || !formCampaign)) ? (
+          (formMode !== 'add' && isLoadingDetail && !formCampaign) ? (
             <ERPDetailLoading key="loading-promo" />
           ) : (
             <FadeIn key="form" className="w-full h-full">

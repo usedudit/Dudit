@@ -1,22 +1,14 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useRef, useCallback } from "react"
 import {
     ChevronLeftIcon,
-    ShoppingCartIcon,
-    StoreIcon,
-    UserIcon,
-    PackageIcon,
-    ClockIcon,
-    CheckCircleIcon,
-    CancelCircleIcon,
-    TruckIcon,
-    CalendarIcon,
-    InfoIcon,
-    ReturnIcon,
-    FileIcon,
-    MoneyIcon,
     ShareIcon,
+    ReturnIcon,
+    PackageIcon,
+    StoreIcon,
+    TruckIcon,
+    ClockIcon,
 } from "@/lib/icons"
 import {
     Button,
@@ -26,15 +18,24 @@ import {
     TabsTrigger,
     TabsContent,
     ThreeDotsLoader,
+    FormSection,
+    IconPlaceholder,
+    ListItem,
 } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils"
+import { formatCurrency, formatDateTime } from "@/lib/utils"
+import { getPaymentStatusMeta, getDeliveryStatusLabelForType } from "@/lib/orders/status"
 import { getAdminMarketplaceOrderDetail } from "@/app/actions/admin/marketplace-ops"
 import { PaymentMethodIndicator } from "@/components/erp/transactions/PaymentMethodIndicator"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import Link from "next/link"
 import { toast } from "@/hooks/use-notification"
+
+const formatDeliveryStatusLabel = (status?: string | null, deliveryType?: string | null) => {
+    if (!status) return "Não enviado"
+    return getDeliveryStatusLabelForType(status, deliveryType)
+}
 
 interface AdminOrderDetailViewProps {
     orderId: string
@@ -51,13 +52,10 @@ export function AdminOrderDetailView({
     const [isLoading, setIsLoading] = useState(!initialOrder)
     const [activeTab, setActiveTab] = useState("general")
     const [isScrolled, setIsScrolled] = useState(false)
+    const scrollRef = useRef<HTMLDivElement>(null)
 
-    useEffect(() => {
-        const handleScroll = () => {
-            setIsScrolled(window.scrollY > 20)
-        }
-        window.addEventListener("scroll", handleScroll)
-        return () => window.removeEventListener("scroll", handleScroll)
+    const handleScroll = useCallback(() => {
+        setIsScrolled((scrollRef.current?.scrollTop || 0) > 20)
     }, [])
 
     useEffect(() => {
@@ -79,6 +77,11 @@ export function AdminOrderDetailView({
         return () => { isMounted = false }
     }, [orderId])
 
+    const handleShare = useCallback(() => {
+        navigator.clipboard.writeText(window.location.href)
+        toast.success("Link do pedido copiado!")
+    }, [])
+
     if (isLoading && !order) {
         return (
             <div className="flex items-center justify-center min-h-[400px]">
@@ -90,10 +93,18 @@ export function AdminOrderDetailView({
     if (!order) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[400px] p-6 text-center">
-                <p className="text-base font-bold text-brand-dark dark:text-dark-heading">Pedido não encontrado</p>
-                <Button variant="outline" onClick={onBack} className="mt-4">
-                    Voltar aos pedidos
-                </Button>
+                <IconPlaceholder
+                    icon={PackageIcon}
+                    containerSize="w-16 h-16 mb-2"
+                    iconSize="w-6 h-6"
+                    title="Pedido não encontrado"
+                    subtitle="O pedido pode ter sido removido ou o link está incorreto."
+                    itemButton={{
+                        text: "Voltar aos pedidos",
+                        action: onBack,
+                        variant: "outline",
+                    }}
+                />
             </div>
         )
     }
@@ -109,373 +120,409 @@ export function AdminOrderDetailView({
     const shipping = Number(order.shipping_total || 0)
     const total = Number(order.total_amount || order.paid_amount || 0)
 
-    const isPaid = order.situation === "paid"
-    const isCancelled = order.situation === "cancelled"
+    const paymentMeta = getPaymentStatusMeta(order.situation)
+    const deliveryStatusLabel = formatDeliveryStatusLabel(order.delivery_status, order.delivery_type)
+
+    const paymentMethodLabel = (() => {
+        const raw = order.payment_method || order.payment_provider
+        if (!raw) return "Não definido"
+        return String(raw).toLowerCase().includes("mercado pago")
+            ? "Mercado Pago"
+            : raw
+    })()
 
     return (
-        <FadeIn className="flex flex-col w-full min-h-screen bg-white dark:bg-dark-background">
-            {/* Sticky Header */}
-            <div className={`sticky top-0 z-20 bg-white/95 dark:bg-dark-surface/95 backdrop-blur-md border-b border-brand-border dark:border-dark-border transition-all duration-300 ${isScrolled ? "shadow-sm py-3 px-4 md:px-8" : "py-4 px-4 md:px-8"}`}>
-                <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={onBack}
-                            className="p-2 -ml-2 text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading rounded-full"
-                        >
-                            <ChevronLeftIcon className="w-5 h-5" />
-                        </Button>
+        <>
+            <FadeIn>
+                <div className="flex flex-col bg-white dark:bg-dark-background min-h-screen">
+                    <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
+                        <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
 
-                        <div className="flex flex-col min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <h1 className="text-xl md:text-2xl font-bold text-brand-dark dark:text-dark-heading tracking-tight">
-                                    Pedido #{orderNumber}
-                                </h1>
-                                <Badge variant={isPaid ? "green" : isCancelled ? "red" : "orange"}>
-                                    {isPaid ? "Pago" : isCancelled ? "Cancelado" : "Pendente"}
-                                </Badge>
-                                {order.delivery_status && (
-                                    <Badge variant="blue">
-                                        {order.delivery_status === "delivered" ? "Entregue" : order.delivery_status === "in_transit" ? "A Caminho" : "Preparando"}
-                                    </Badge>
-                                )}
-                            </div>
-                            <span className="text-xs text-brand-inactive-text mt-0.5">
-                                Criado em {formatDateTime(order.created_at)} • Origem: {order.order_source || "Marketplace"}
-                            </span>
-                        </div>
-                    </div>
+                            {/* Sticky Header */}
+                            <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
+                                <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
 
-                    <div className="flex items-center gap-2 self-end md:self-auto">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                                navigator.clipboard.writeText(window.location.href)
-                                toast.success("Link do pedido copiado!")
-                            }}
-                            leftIcon={<ShareIcon size={16} />}
-                        >
-                            Compartilhar
-                        </Button>
-                    </div>
-                </div>
+                                    {/* Back button - desktop only */}
+                                    <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                                        <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center">
+                                            <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                        </Button>
+                                    </div>
 
-                {/* Sub-Tabs */}
-                <div className="max-w-7xl mx-auto mt-4">
-                    <Tabs value={activeTab} onValueChange={setActiveTab}>
-                        <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
-                            <TabsTrigger value="general" icon={ShoppingCartIcon}>
-                                Dados Gerais
-                            </TabsTrigger>
-                            <TabsTrigger value="parties" icon={StoreIcon}>
-                                Comprador & Seller
-                            </TabsTrigger>
-                            <TabsTrigger value="timeline" icon={ClockIcon}>
-                                Histórico & Auditoria
-                            </TabsTrigger>
-                        </TabsList>
-                    </Tabs>
-                </div>
-            </div>
+                                    {/* Title row - desktop */}
+                                    <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
+                                        <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                                            <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                                                <span className="hidden md:inline truncate">Pedido #{orderNumber}</span>
+                                                <Badge variant={paymentMeta.variant}>
+                                                    {paymentMeta.label}
+                                                </Badge>
+                                                {order.delivery_status && (
+                                                    <Badge variant="blue">
+                                                        {deliveryStatusLabel}
+                                                    </Badge>
+                                                )}
+                                            </h1>
 
-            {/* Content Body */}
-            <div className="max-w-7xl mx-auto w-full p-4 md:p-8 space-y-6">
-                {/* Banner de Troca / Devolução Vinculada */}
-                {returns.length > 0 && (
-                    <div className="p-4 bg-orange-50 dark:bg-orange-900/15 border border-orange-200 dark:border-orange-900/30 rounded-2xl flex items-start gap-3">
-                        <ReturnIcon className="w-5 h-5 text-orange-600 dark:text-orange-400 mt-0.5 shrink-0" />
-                        <div className="flex-1 min-w-0">
-                            <h3 className="text-sm font-bold text-orange-950 dark:text-orange-300">
-                                Solicitação de Troca ou Devolução Registrada ({returns.length})
-                            </h3>
-                            <p className="text-xs text-orange-900/80 dark:text-orange-400/80 mt-0.5">
-                                Este pedido possui uma ou mais solicitações de pós-venda em andamento ou finalizadas.
-                            </p>
-                        </div>
-                        <Link
-                            href="/ddt-admin/returns"
-                            className="text-xs font-bold text-orange-700 dark:text-orange-400 hover:underline shrink-0"
-                        >
-                            Ver em Devoluções →
-                        </Link>
-                    </div>
-                )}
+                                            <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
+                                                Criado em {formatDateTime(order.created_at)} • Origem: {order.order_source || "Marketplace"}
+                                            </div>
+                                        </div>
 
-                {activeTab === "general" && (
-                    <div className="grid grid-cols-12 gap-6">
-                        {/* Coluna Principal: Itens do Pedido */}
-                        <div className="col-span-12 lg:col-span-8 space-y-6">
-                            <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 shadow-sm">
-                                <div className="flex items-center justify-between pb-4 border-b border-brand-border dark:border-dark-border">
-                                    <div className="flex items-center gap-2">
-                                        <PackageIcon className="w-5 h-5 text-brand-inactive-text" />
-                                        <h2 className="text-base font-bold text-brand-dark dark:text-dark-heading">
-                                            Itens do Pedido ({items.length})
-                                        </h2>
+                                        {/* Desktop action buttons */}
+                                        <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
+                                            <Button
+                                                variant="outline"
+                                                onClick={handleShare}
+                                                leftIcon={<ShareIcon size={16} />}
+                                            >
+                                                Compartilhar
+                                            </Button>
+                                        </div>
+                                    </div>
+
+                                    {/* Title row - mobile */}
+                                    <div className="md:hidden flex items-center justify-between gap-3 py-3">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <Button variant="filled" onClick={onBack} className="w-9 h-9 p-0 flex items-center justify-center shrink-0">
+                                                <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                            </Button>
+                                            <div className="flex flex-col gap-1 min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <h1 className="text-lg font-bold text-brand-dark dark:text-dark-heading truncate">
+                                                        Pedido #{orderNumber}
+                                                    </h1>
+                                                    <Badge variant={paymentMeta.variant}>
+                                                        {paymentMeta.label}
+                                                    </Badge>
+                                                </div>
+                                                <span className="text-xs text-brand-inactive-text truncate">
+                                                    Criado em {formatDateTime(order.created_at)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={handleShare}
+                                            className="shrink-0"
+                                        >
+                                            Compartilhar
+                                        </Button>
+                                    </div>
+
+                                    {/* Tabs */}
+                                    <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
+                                        <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
+                                            <TabsTrigger value="general">Dados Gerais</TabsTrigger>
+                                            <TabsTrigger value="parties">Comprador e Loja</TabsTrigger>
+                                            <TabsTrigger value="timeline">Histórico & Auditoria</TabsTrigger>
+                                        </TabsList>
                                     </div>
                                 </div>
+                            </div>
 
-                                <div className="divide-y divide-brand-border dark:divide-dark-border">
-                                    {items.length === 0 ? (
-                                        <p className="py-6 text-center text-sm text-brand-inactive-text">Nenhum item registrado.</p>
-                                    ) : (
-                                        items.map((item: any) => {
-                                            const itemImg = item.image_url ? getR2ImageUrl(item.image_url) : null
-                                            return (
-                                                <div key={item.id} className="py-4 flex items-center justify-between gap-4">
-                                                    <div className="flex items-center gap-3 min-w-0">
-                                                        <div className="w-14 h-14 rounded-xl bg-brand-gray dark:bg-dark-border/40 border border-brand-border dark:border-dark-border flex items-center justify-center overflow-hidden shrink-0">
-                                                            {itemImg ? (
-                                                                <img src={itemImg} alt="" className="w-full h-full object-cover" />
-                                                            ) : (
-                                                                <PackageIcon className="w-6 h-6 text-brand-inactive-text" />
+                            {/* Content */}
+                            <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
+                                <Tabs value={activeTab} onValueChange={setActiveTab}>
+                                    <TabsContent value="general" className="mt-0">
+                                        <FadeIn key="general">
+                                            {/* Banner de Troca / Devolução Vinculada */}
+                                            {returns.length > 0 && (
+                                                <div className="p-4 bg-orange-50 dark:bg-orange-900/15 border border-orange-200 dark:border-orange-900/30 rounded-2xl flex items-start gap-3 mb-8">
+                                                    <ReturnIcon className="w-5 h-5 text-orange-600 dark:text-orange-400 mt-0.5 shrink-0" />
+                                                    <div className="flex-1 min-w-0">
+                                                        <h3 className="text-sm font-bold text-orange-950 dark:text-orange-300">
+                                                            Solicitação de Troca ou Devolução Registrada ({returns.length})
+                                                        </h3>
+                                                        <p className="text-xs text-orange-900/80 dark:text-orange-400/80 mt-0.5">
+                                                            Este pedido possui uma ou mais solicitações de pós-venda em andamento ou finalizadas.
+                                                        </p>
+                                                    </div>
+                                                    <Link
+                                                        href="/ddt-admin/returns"
+                                                        className="text-xs font-bold text-orange-700 dark:text-orange-400 hover:underline shrink-0"
+                                                    >
+                                                        Ver em Devoluções →
+                                                    </Link>
+                                                </div>
+                                            )}
+
+                                            <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
+                                                {/* Coluna principal */}
+                                                <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
+                                                    <FormSection title={`Itens do Pedido (${items.length})`} hasSeparator>
+                                                        {items.length === 0 ? (
+                                                            <div className="py-6">
+                                                                <IconPlaceholder
+                                                                    icon={PackageIcon}
+                                                                    containerSize="w-14 h-14 mb-2"
+                                                                    iconSize="w-6 h-6"
+                                                                    title="Nenhum item registrado"
+                                                                    subtitle="Este pedido não possui itens vinculados."
+                                                                />
+                                                            </div>
+                                                        ) : (
+                                                            <div className="space-y-4">
+                                                                {items.map((item: any) => {
+                                                                    const itemImg = item.products?.images?.length ? getR2ImageUrl(item.products.images) : null
+                                                                    return (
+                                                                        <div key={item.id} className="flex items-start gap-4">
+                                                                            <div className="w-14 h-14 overflow-hidden shrink-0 rounded-xl border border-brand-border dark:border-dark-border flex items-center justify-center">
+                                                                                {itemImg ? (
+                                                                                    <img src={itemImg} alt="" className="w-full h-full object-cover rounded-xl" />
+                                                                                ) : (
+                                                                                    <IconPlaceholder
+                                                                                        icon={PackageIcon}
+                                                                                        containerSize="w-14 h-14"
+                                                                                        iconSize="w-6 h-6"
+                                                                                    />
+                                                                                )}
+                                                                            </div>
+                                                                            <div className="flex-1 min-w-0">
+                                                                                <div className="flex justify-between items-start gap-2">
+                                                                                    <div className="min-w-0 flex flex-col">
+                                                                                        <h4 className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading truncate">
+                                                                                            {item.product_name || "Produto"}
+                                                                                        </h4>
+                                                                                        {item.product_variants?.variant_name && (
+                                                                                            <span className="text-xs text-brand-inactive-text truncate">
+                                                                                                {item.product_variants.variant_name}
+                                                                                            </span>
+                                                                                        )}
+                                                                                        <span className="text-xs text-brand-inactive-text mt-0.5">
+                                                                                            Qtd: <strong>{item.quantity || 1}</strong> × {formatCurrency(Number(item.product_price || 0))}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                    <span className="font-bold text-sm text-brand-dark dark:text-dark-heading shrink-0">
+                                                                                        {formatCurrency(Number(item.subtotal || item.net_item_value || (item.quantity * item.product_price) || 0))}
+                                                                                    </span>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    )
+                                                                })}
+                                                            </div>
+                                                        )}
+                                                    </FormSection>
+
+                                                    <FormSection title="Informações de Envio & Entrega" hasSeparator>
+                                                        <ListItem
+                                                            left={
+                                                                <div className="w-10 h-10 rounded-full bg-brand-slate dark:bg-dark-border/50 flex items-center justify-center shrink-0">
+                                                                    <TruckIcon className="w-5 h-5 text-brand-dark dark:text-dark-heading" />
+                                                                </div>
+                                                            }
+                                                            title={order.delivery_type === "pickup" ? "Retirada na Loja" : "Entrega / Delivery"}
+                                                            description={`Status: ${deliveryStatusLabel}`}
+                                                            className="border-0 bg-transparent px-0 hover:bg-transparent"
+                                                        />
+                                                    </FormSection>
+                                                </div>
+
+                                                {/* Sidebar */}
+                                                <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-0 xl:border-l border-brand-border dark:border-dark-border">
+                                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
+                                                        <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>
+                                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">
+                                                            Resumo Financeiro
+                                                        </h3>
+                                                        <div className="space-y-2.5 text-sm">
+                                                            <div className="flex justify-between text-brand-inactive-text">
+                                                                <span>Subtotal dos produtos</span>
+                                                                <span className="font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(subtotal)}</span>
+                                                            </div>
+                                                            {discount > 0 && (
+                                                                <div className="flex justify-between text-red-500">
+                                                                    <span>Descontos</span>
+                                                                    <span className="font-semibold">-{formatCurrency(discount)}</span>
+                                                                </div>
                                                             )}
-                                                        </div>
-                                                        <div className="min-w-0 flex flex-col">
-                                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
-                                                                {item.product_name || "Produto"}
-                                                            </span>
-                                                            {item.variation_description && (
-                                                                <span className="text-xs text-brand-inactive-text truncate">
-                                                                    {item.variation_description}
-                                                                </span>
-                                                            )}
-                                                            <span className="text-xs text-brand-inactive-text mt-0.5">
-                                                                Qtd: <strong>{item.quantity || 1}</strong> × {formatCurrency(Number(item.product_price || 0))}
-                                                            </span>
+                                                            <div className="flex justify-between text-brand-inactive-text">
+                                                                <span>Frete</span>
+                                                                <span className="font-semibold text-brand-dark dark:text-dark-heading">{shipping > 0 ? formatCurrency(shipping) : "Grátis"}</span>
+                                                            </div>
+                                                            <div className="pt-3 border-t border-brand-border dark:border-dark-border flex justify-between items-center text-base">
+                                                                <span className="font-bold text-brand-dark dark:text-dark-heading">Total Pago</span>
+                                                                <span className="font-bold text-brand-green text-lg">{formatCurrency(total)}</span>
+                                                            </div>
                                                         </div>
                                                     </div>
 
-                                                    <div className="text-right shrink-0">
-                                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                            {formatCurrency(Number(item.subtotal || item.net_item_value || (item.quantity * item.product_price) || 0))}
-                                                        </span>
+                                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
+                                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">
+                                                            Forma de Pagamento
+                                                        </h3>
+                                                        <div className="space-y-3 text-sm">
+                                                            <div>
+                                                                <span className="text-xs font-semibold text-brand-inactive-text block mb-1">Método</span>
+                                                                <PaymentMethodIndicator label={paymentMethodLabel} />
+                                                            </div>
+                                                            {order.payment_provider && (
+                                                                <div>
+                                                                    <span className="text-xs font-semibold text-brand-inactive-text block">Provedor</span>
+                                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">{order.payment_provider}</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            )
-                                        })
-                                    )}
-                                </div>
-                            </div>
+                                            </div>
+                                        </FadeIn>
+                                    </TabsContent>
 
-                            {/* Entrega e Endereço */}
-                            <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 shadow-sm space-y-4">
-                                <div className="flex items-center gap-2 pb-3 border-b border-brand-border dark:border-dark-border">
-                                    <TruckIcon className="w-5 h-5 text-brand-inactive-text" />
-                                    <h2 className="text-base font-bold text-brand-dark dark:text-dark-heading">
-                                        Informações de Envio & Entrega
-                                    </h2>
-                                </div>
+                                    <TabsContent value="parties" className="mt-0">
+                                        <FadeIn key="parties">
+                                            <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
+                                                {/* Coluna principal */}
+                                                <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
+                                                    <FormSection title="Dados do Comprador" hasSeparator>
+                                                        <ListItem
+                                                            left={
+                                                                <UserProfileImage
+                                                                    fullName={order.customer_name || buyer.full_name || "Cliente"}
+                                                                    imageUrl={buyer.avatar_url}
+                                                                    className="w-12 h-12 text-lg shrink-0"
+                                                                />
+                                                            }
+                                                            title={order.customer_name || buyer.full_name || "Consumidor"}
+                                                            description={buyer.email || "Sem e-mail cadastrado"}
+                                                        />
 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                                    <div>
-                                        <span className="text-xs font-semibold text-brand-inactive-text block">Modalidade</span>
-                                        <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5 block">
-                                            {order.delivery_type === "pickup" ? "Retirada na Loja" : "Entrega / Delivery"}
-                                        </span>
-                                    </div>
-                                    <div>
-                                        <span className="text-xs font-semibold text-brand-inactive-text block">Status da Entrega</span>
-                                        <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5 block">
-                                            {order.delivery_status || "Não enviado"}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                                                        <div className="space-y-2 text-sm pt-2">
+                                                            {buyer.phone && (
+                                                                <div className="flex justify-between">
+                                                                    <span className="text-brand-inactive-text">Telefone</span>
+                                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">{buyer.phone}</span>
+                                                                </div>
+                                                            )}
+                                                            {buyer.cpf && (
+                                                                <div className="flex justify-between">
+                                                                    <span className="text-brand-inactive-text">CPF</span>
+                                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">{buyer.cpf}</span>
+                                                                </div>
+                                                            )}
+                                                            {order.buyer_id && (
+                                                                <div className="pt-2">
+                                                                    <Link
+                                                                        href={`/ddt-admin/users?search=${order.buyer_id}`}
+                                                                        className="text-xs font-bold text-brand-green hover:underline"
+                                                                    >
+                                                                        Ver ficha completa do usuário →
+                                                                    </Link>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </FormSection>
+                                                </div>
 
-                        {/* Coluna Lateral: Resumo Financeiro e Pagamento */}
-                        <div className="col-span-12 lg:col-span-4 space-y-6">
-                            {/* Card de Resumo Financeiro */}
-                            <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 shadow-sm space-y-4">
-                                <div className="flex items-center gap-2 pb-3 border-b border-brand-border dark:border-dark-border">
-                                    <MoneyIcon className="w-5 h-5 text-brand-inactive-text" />
-                                    <h2 className="text-base font-bold text-brand-dark dark:text-dark-heading">
-                                        Resumo Financeiro
-                                    </h2>
-                                </div>
+                                                {/* Sidebar */}
+                                                <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-0 xl:border-l border-brand-border dark:border-dark-border">
+                                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
+                                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">
+                                                            Dados do Vendedor / Loja
+                                                        </h3>
+                                                        <div className="flex items-center gap-3 mb-4">
+                                                            <div className="w-12 h-12 rounded-xl bg-brand-gray dark:bg-dark-border/40 border border-brand-border dark:border-dark-border flex items-center justify-center overflow-hidden shrink-0">
+                                                                {store.logo_url ? (
+                                                                    <img src={getR2ImageUrl(store.logo_url)} alt="" className="w-full h-full object-cover" />
+                                                                ) : (
+                                                                    <IconPlaceholder
+                                                                        icon={StoreIcon}
+                                                                        containerSize="w-12 h-12"
+                                                                        iconSize="w-6 h-6"
+                                                                    />
+                                                                )}
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <h3 className="font-bold text-base text-brand-dark dark:text-dark-heading truncate">
+                                                                    {store.name || "Loja Parceira"}
+                                                                </h3>
+                                                                <span className="text-xs text-brand-inactive-text">
+                                                                    Pontuação de Risco: <strong>{store.risk_score || 0} pts</strong>
+                                                                </span>
+                                                            </div>
+                                                        </div>
 
-                                <div className="space-y-2.5 text-sm">
-                                    <div className="flex justify-between text-brand-inactive-text">
-                                        <span>Subtotal dos produtos</span>
-                                        <span className="font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(subtotal)}</span>
-                                    </div>
-                                    {discount > 0 && (
-                                        <div className="flex justify-between text-red-500">
-                                            <span>Descontos</span>
-                                            <span className="font-semibold">-{formatCurrency(discount)}</span>
-                                        </div>
-                                    )}
-                                    <div className="flex justify-between text-brand-inactive-text">
-                                        <span>Frete</span>
-                                        <span className="font-semibold text-brand-dark dark:text-dark-heading">{shipping > 0 ? formatCurrency(shipping) : "Grátis"}</span>
-                                    </div>
-                                    <div className="pt-3 border-t border-brand-border dark:border-dark-border flex justify-between items-center text-base">
-                                        <span className="font-bold text-brand-dark dark:text-dark-heading">Total Pago</span>
-                                        <span className="font-bold text-brand-green text-lg">{formatCurrency(total)}</span>
-                                    </div>
-                                </div>
-                            </div>
+                                                        <div className="space-y-2 text-sm">
+                                                            {store.phone && (
+                                                                <div className="flex justify-between">
+                                                                    <span className="text-brand-inactive-text">Telefone</span>
+                                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">{store.phone}</span>
+                                                                </div>
+                                                            )}
+                                                            {store.partner_id && (
+                                                                <div className="pt-2">
+                                                                    <Link
+                                                                        href={`/ddt-admin/partners?search=${store.name || store.partner_id}`}
+                                                                        className="text-xs font-bold text-brand-green hover:underline"
+                                                                    >
+                                                                        Ver ficha completa do parceiro →
+                                                                    </Link>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </FadeIn>
+                                    </TabsContent>
 
-                            {/* Card de Pagamento */}
-                            <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 shadow-sm space-y-4">
-                                <div className="flex items-center gap-2 pb-3 border-b border-brand-border dark:border-dark-border">
-                                    <InfoIcon className="w-5 h-5 text-brand-inactive-text" />
-                                    <h2 className="text-base font-bold text-brand-dark dark:text-dark-heading">
-                                        Forma de Pagamento
-                                    </h2>
-                                </div>
+                                    <TabsContent value="timeline" className="mt-0">
+                                        <FadeIn key="timeline">
+                                            <FormSection title="Histórico de Auditoria e Eventos" hasSeparator>
+                                                {(() => {
+                                                    const events = order.audit_events || []
+                                                    if (events.length === 0) {
+                                                        return (
+                                                            <IconPlaceholder
+                                                                icon={ClockIcon}
+                                                                containerSize="w-14 h-14 mb-2"
+                                                                iconSize="w-6 h-6"
+                                                                title="Nenhum evento registrado"
+                                                                subtitle="Este pedido ainda não possui eventos de auditoria."
+                                                            />
+                                                        )
+                                                    }
+                                                    return (
+                                                        <div className="space-y-4">
+                                                            <div className="flex items-start gap-3 border-l-2 border-brand-green pl-4 py-1">
+                                                                <div className="flex-1">
+                                                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Pedido Criado</p>
+                                                                    <p className="text-xs text-brand-inactive-text">{formatDateTime(order.created_at)}</p>
+                                                                </div>
+                                                            </div>
 
-                                <div className="space-y-3 text-sm">
-                                    <div>
-                                        <span className="text-xs font-semibold text-brand-inactive-text block mb-1">Método</span>
-                                        <PaymentMethodIndicator label={order.payment_method || order.payment_provider || "Não definido"} />
-                                    </div>
-                                    {order.payment_provider && (
-                                        <div>
-                                            <span className="text-xs font-semibold text-brand-inactive-text block">Provedor</span>
-                                            <span className="font-bold text-brand-dark dark:text-dark-heading">{order.payment_provider}</span>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {activeTab === "parties" && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Comprador */}
-                        <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 shadow-sm space-y-4">
-                            <div className="flex items-center gap-2 pb-3 border-b border-brand-border dark:border-dark-border">
-                                <UserIcon className="w-5 h-5 text-brand-inactive-text" />
-                                <h2 className="text-base font-bold text-brand-dark dark:text-dark-heading">
-                                    Dados do Comprador
-                                </h2>
-                            </div>
-
-                            <div className="flex items-center gap-3">
-                                <UserProfileImage
-                                    fullName={order.customer_name || buyer.full_name || "Cliente"}
-                                    imageUrl={buyer.avatar_url}
-                                    className="w-12 h-12 text-lg shrink-0"
-                                />
-                                <div className="min-w-0">
-                                    <h3 className="font-bold text-base text-brand-dark dark:text-dark-heading truncate">
-                                        {order.customer_name || buyer.full_name || "Consumidor"}
-                                    </h3>
-                                    <span className="text-xs text-brand-inactive-text truncate block">
-                                        {buyer.email || "Sem e-mail cadastrado"}
-                                    </span>
-                                </div>
-                            </div>
-
-                            <div className="space-y-2 pt-2 text-sm border-t border-brand-border dark:border-dark-border">
-                                {buyer.phone && (
-                                    <div className="flex justify-between">
-                                        <span className="text-brand-inactive-text">Telefone</span>
-                                        <span className="font-bold text-brand-dark dark:text-dark-heading">{buyer.phone}</span>
-                                    </div>
-                                )}
-                                {buyer.cpf && (
-                                    <div className="flex justify-between">
-                                        <span className="text-brand-inactive-text">CPF</span>
-                                        <span className="font-bold text-brand-dark dark:text-dark-heading">{buyer.cpf}</span>
-                                    </div>
-                                )}
-                                {order.buyer_id && (
-                                    <div className="pt-2">
-                                        <Link
-                                            href={`/ddt-admin/users?search=${order.buyer_id}`}
-                                            className="text-xs font-bold text-brand-green hover:underline"
-                                        >
-                                            Ver ficha completa do usuário →
-                                        </Link>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Loja / Seller */}
-                        <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 shadow-sm space-y-4">
-                            <div className="flex items-center gap-2 pb-3 border-b border-brand-border dark:border-dark-border">
-                                <StoreIcon className="w-5 h-5 text-brand-inactive-text" />
-                                <h2 className="text-base font-bold text-brand-dark dark:text-dark-heading">
-                                    Dados do Vendedor / Loja
-                                </h2>
-                            </div>
-
-                            <div className="flex items-center gap-3">
-                                <div className="w-12 h-12 rounded-xl bg-brand-gray dark:bg-dark-border/40 border border-brand-border dark:border-dark-border flex items-center justify-center overflow-hidden shrink-0">
-                                    {store.logo_url ? (
-                                        <img src={getR2ImageUrl(store.logo_url)} alt="" className="w-full h-full object-cover" />
-                                    ) : (
-                                        <StoreIcon className="w-6 h-6 text-brand-inactive-text" />
-                                    )}
-                                </div>
-                                <div className="min-w-0">
-                                    <h3 className="font-bold text-base text-brand-dark dark:text-dark-heading truncate">
-                                        {store.name || "Loja Parceira"}
-                                    </h3>
-                                    <span className="text-xs text-brand-inactive-text">
-                                        Pontuação de Risco: <strong>{store.risk_score || 0} pts</strong>
-                                    </span>
-                                </div>
-                            </div>
-
-                            <div className="space-y-2 pt-2 text-sm border-t border-brand-border dark:border-dark-border">
-                                {store.phone && (
-                                    <div className="flex justify-between">
-                                        <span className="text-brand-inactive-text">Telefone</span>
-                                        <span className="font-bold text-brand-dark dark:text-dark-heading">{store.phone}</span>
-                                    </div>
-                                )}
-                                {store.partner_id && (
-                                    <div className="pt-2">
-                                        <Link
-                                            href={`/ddt-admin/partners?search=${store.name || store.partner_id}`}
-                                            className="text-xs font-bold text-brand-green hover:underline"
-                                        >
-                                            Ver ficha completa do parceiro →
-                                        </Link>
-                                    </div>
-                                )}
+                                                            {events.map((ev: any) => (
+                                                                <div key={ev.id} className="flex items-start gap-3 border-l-2 border-brand-border dark:border-dark-border pl-4 py-1">
+                                                                    <div className="flex-1">
+                                                                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                                            {ev.action_type || "Ação Administrativa"}
+                                                                        </p>
+                                                                        <p className="text-xs text-brand-inactive-text">{formatDateTime(ev.created_at)}</p>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )
+                                                })()}
+                                            </FormSection>
+                                        </FadeIn>
+                                    </TabsContent>
+                                </Tabs>
                             </div>
                         </div>
-                    </div>
-                )}
+                    </Tabs>
+                </div>
+            </FadeIn>
 
-                {activeTab === "timeline" && (
-                    <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 shadow-sm space-y-4">
-                        <h2 className="text-base font-bold text-brand-dark dark:text-dark-heading pb-3 border-b border-brand-border dark:border-dark-border">
-                            Histórico de Auditoria e Eventos
-                        </h2>
-
-                        <div className="space-y-4">
-                            <div className="flex items-start gap-3 border-l-2 border-brand-green pl-4 py-1">
-                                <div className="flex-1">
-                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Pedido Criado</p>
-                                    <p className="text-xs text-brand-inactive-text">{formatDateTime(order.created_at)}</p>
-                                </div>
-                            </div>
-
-                            {(order.audit_events || []).map((ev: any) => (
-                                <div key={ev.id} className="flex items-start gap-3 border-l-2 border-brand-border dark:border-dark-border pl-4 py-1">
-                                    <div className="flex-1">
-                                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                            {ev.action_type || "Ação Administrativa"}
-                                        </p>
-                                        <p className="text-xs text-brand-inactive-text">{formatDateTime(ev.created_at)}</p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
+            {/* Mobile bottom bar */}
+            <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
+                <Button variant="outline" className="flex-1" onClick={handleShare} leftIcon={<ShareIcon size={16} />}>
+                    Compartilhar
+                </Button>
             </div>
-        </FadeIn>
+        </>
     )
 }
 

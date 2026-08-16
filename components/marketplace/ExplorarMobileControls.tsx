@@ -16,7 +16,7 @@ export function ExplorarMobileControls({
     onOpenSort,
 }: ExplorarMobileControlsProps) {
     return (
-        <div className="lg:hidden fixed top-[52px] left-0 right-0 h-[46px] z-40 bg-white border-b border-gray-100 shadow-sm flex items-center px-4 gap-2">
+        <div className="lg:hidden fixed top-[52px] left-0 right-0 h-[46px] z-40 bg-white dark:bg-dark-surface border-b border-gray-100 dark:border-dark-border shadow-sm flex items-center px-4 gap-2">
             {/* Filtros Button */}
             <Button
                 variant="outline"

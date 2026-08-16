@@ -335,13 +335,14 @@ export default function ProductsPage({
     const formProduct = useMemo(() => {
         if (!entityState.isOpen) return null
         if (entityState.action === 'create') return null
-        if (!currentEntity) return null
+        const target = currentEntity || products.find(p => p.id === entityState.entityId) || null
+        if (!target) return null
         if (isDuplicating) {
-            const sku = generateSKUBase(currentEntity.name ? `${currentEntity.name} Copy` : undefined)
-            return { ...currentEntity, id: undefined, sku, images: (currentEntity as any).images || [] } as any
+            const sku = generateSKUBase(target.name ? `${target.name} Copy` : undefined)
+            return { ...target, id: undefined, sku, images: (target as any).images || [] } as any
         }
-        return currentEntity as any
-    }, [entityState, currentEntity, isDuplicating])
+        return target as any
+    }, [entityState, currentEntity, products, isDuplicating])
 
     const hasProducts = products.length > 0
     const hasActiveFilters =
@@ -892,7 +893,7 @@ export default function ProductsPage({
         <>
             <AnimatePresence mode="wait">
                 {entityState.isOpen && formMode ? (
-                    (formMode !== 'add' && (isLoadingDetail || !formProduct)) ? (
+                    (formMode !== 'add' && isLoadingDetail && !formProduct) ? (
                         <ERPDetailLoading key="loading-product" />
                     ) : (
                         <FadeIn key="form" className="w-full h-full">

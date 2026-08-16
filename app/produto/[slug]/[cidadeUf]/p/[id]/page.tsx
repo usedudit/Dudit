@@ -175,7 +175,7 @@ export default async function ProductDetailsPage({
   };
 
   return (
-    <div className="bg-white min-h-screen font-sans text-brand-dark flex flex-col pt-[60px]">
+    <div className="bg-white dark:bg-dark-background min-h-screen font-sans text-brand-dark dark:text-dark-heading flex flex-col pt-[60px]">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(schemaJsonLd) }}

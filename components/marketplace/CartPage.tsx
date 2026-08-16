@@ -440,7 +440,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
             const fee = Number(settings.base_fee || 0)
             return (
                 <span className="flex items-center gap-1.5 justify-end">
-                    {fee > 0 && <span className="text-xs line-through text-brand-inactive-text font-normal">{formatCurrency(fee)}</span>}
+                    {fee > 0 && <span className="text-xs line-through text-brand-inactive-text dark:text-dark-body font-normal">{formatCurrency(fee)}</span>}
                     <span className="text-brand-green font-semibold">Grátis (Pago pela loja)</span>
                 </span>
             )
@@ -465,7 +465,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                 <div className="hidden lg:block items-center mb-8">
                     <div>
                         <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Minha sacola</h1>
-                        <p className="text-md text-brand-inactive-text mt-1">Veja os itens da sua sacola</p>
+                        <p className="text-md text-brand-inactive-text dark:text-dark-body mt-1">Veja os itens da sua sacola</p>
                     </div>
                 </div>
 
@@ -560,8 +560,8 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                         ? []
                                                                         : [
                                                                             <div key={`${storeKey}-${section.title}-hdr`} className="flex items-center justify-between mb-3 mt-2 first:mt-0">
-                                                                                <h4 className="text-xs font-bold uppercase tracking-wide text-brand-inactive-text">{section.title}</h4>
-                                                                                <span className="text-xs text-brand-inactive-text">
+                                                                                <h4 className="text-xs font-bold uppercase tracking-wide text-brand-inactive-text dark:text-dark-body">{section.title}</h4>
+                                                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body">
                                                                                     {section.items.filter((i: any) => getItemSelected(i)).length} itens · {formatCurrency(
                                                                                         section.items
                                                                                             .filter((i: any) => getItemSelected(i))
@@ -622,13 +622,13 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                 </div>
 
                                                                                                 {item.variant_id && item.product_variants && (
-                                                                                                    <p className="text-[12px] text-brand-inactive-text mt-0.5">
+                                                                                                    <p className="text-[12px] text-brand-inactive-text dark:text-dark-body mt-0.5">
                                                                                                         {item.product_variants.variant_type}: <span className="font-medium text-brand-dark dark:text-dark-heading">{item.product_variants.variant_name}</span>
                                                                                                     </p>
                                                                                                 )}
 
                                                                                                 {item.item_type === "service_booking" && getItemBooking(item) && (
-                                                                                                    <p className="text-[12px] text-brand-inactive-text mt-0.5">{getItemBooking(item)}</p>
+                                                                                                    <p className="text-[12px] text-brand-inactive-text dark:text-dark-body mt-0.5">{getItemBooking(item)}</p>
                                                                                                 )}
 
                                                                                                 <div className="flex items-center justify-between mt-2">
@@ -661,7 +661,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                                         </p>
                                                                                                                     )}
                                                                                                                     {ctx.referencePrice && (
-                                                                                                                        <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(isOutOfStock ? ctx.referencePrice : ctx.referencePrice * itemQty)}</span>
+                                                                                                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body line-through">{formatCurrency(isOutOfStock ? ctx.referencePrice : ctx.referencePrice * itemQty)}</span>
                                                                                                                     )}
                                                                                                                 </div>
                                                                                                                 <span className="text-[15px] font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(total)}</span>
@@ -673,14 +673,14 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-brand-orange dark:text-orange-400 font-medium">
                                                                                                             <span className="w-1.5 h-1.5 rounded-full bg-brand-orange shrink-0" />
                                                                                                             <span>Este horário não está mais disponível</span>
-                                                                                                            <span className="text-brand-inactive-text/40">•</span>
+                                                                                                            <span className="text-brand-inactive-text/40 dark:text-dark-body/40">•</span>
                                                                                                             <Link
                                                                                                                 href={getServiceUrl({ id: item.service_id, name: item.services?.name || item.booking_metadata?.serviceName }, data.partner)}
                                                                                                                 className="font-semibold text-brand-green hover:underline"
                                                                                                             >
                                                                                                                 Remarcar
                                                                                                             </Link>
-                                                                                                            <span className="text-brand-inactive-text/40">•</span>
+                                                                                                            <span className="text-brand-inactive-text/40 dark:text-dark-body/40">•</span>
                                                                                                             <button
                                                                                                                 onClick={() => setDeleteModal({ open: true, cartItemId: item.id })}
                                                                                                                 className="font-semibold text-brand-red hover:underline"
@@ -709,7 +709,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-brand-gray dark:bg-dark-surface dark:hover:bg-zinc-800 border border-brand-border dark:border-dark-border hover:border-brand-green dark:hover:border-brand-green font-medium text-brand-dark dark:text-dark-heading transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
                                                                                                             >
                                                                                                                 <span>{alt.variant_name}</span>
-                                                                                                                <span className="text-brand-inactive-text">•</span>
+                                                                                                                <span className="text-brand-inactive-text dark:text-dark-body">•</span>
                                                                                                                 <span className="font-semibold text-brand-green">{formatCurrency(getAlternativePrice(alt, item.products))}</span>
                                                                                                             </button>
                                                                                                         ))}
@@ -754,12 +754,12 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                         {getItemName(item)}
                                                                                                     </Link>
                                                                                                     {item.variant_id && item.product_variants && (
-                                                                                                        <p className="text-[13px] text-brand-inactive-text mb-1">
+                                                                                                        <p className="text-[13px] text-brand-inactive-text dark:text-dark-body mb-1">
                                                                                                             {item.product_variants.variant_type}: <span className="font-medium text-brand-dark dark:text-dark-heading">{item.product_variants.variant_name}</span>
                                                                                                         </p>
                                                                                                     )}
                                                                                                     {item.item_type === "service_booking" && getItemBooking(item) && (
-                                                                                                        <p className="text-[13px] text-brand-inactive-text mb-1">{getItemBooking(item)}</p>
+                                                                                                        <p className="text-[13px] text-brand-inactive-text dark:text-dark-body mb-1">{getItemBooking(item)}</p>
                                                                                                     )}
                                                                                                     {(() => {
                                                                                                         const ctx = getItemPricingContext(item, partnerPromos)
@@ -774,14 +774,14 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                         <div className="mt-1 mb-1 flex flex-wrap items-center gap-1.5 text-xs text-brand-orange dark:text-orange-400 font-medium">
                                                                                                             <span className="w-1.5 h-1.5 rounded-full bg-brand-orange shrink-0" />
                                                                                                             <span>Este horário não está mais disponível</span>
-                                                                                                            <span className="text-brand-inactive-text/40">•</span>
+                                                                                                            <span className="text-brand-inactive-text/40 dark:text-dark-body/40">•</span>
                                                                                                             <Link
                                                                                                                 href={getServiceUrl({ id: item.service_id, name: item.services?.name || item.booking_metadata?.serviceName }, data.partner)}
                                                                                                                 className="font-semibold text-brand-green hover:underline"
                                                                                                             >
                                                                                                                 Remarcar
                                                                                                             </Link>
-                                                                                                            <span className="text-brand-inactive-text/40">•</span>
+                                                                                                            <span className="text-brand-inactive-text/40 dark:text-dark-body/40">•</span>
                                                                                                             <button
                                                                                                                 onClick={() => setDeleteModal({ open: true, cartItemId: item.id })}
                                                                                                                 className="font-semibold text-brand-red hover:underline"
@@ -820,7 +820,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                                             -{ctx.discountPercent}%
                                                                                                                         </p>
                                                                                                                     )}
-                                                                                                                    {ctx.referencePrice && <p className="text-xs text-brand-inactive-text line-through">{formatCurrency(isOutOfStock ? ctx.referencePrice : ctx.referencePrice * itemQty)}</p>}
+                                                                                                                    {ctx.referencePrice && <p className="text-xs text-brand-inactive-text dark:text-dark-body line-through">{formatCurrency(isOutOfStock ? ctx.referencePrice : ctx.referencePrice * itemQty)}</p>}
                                                                                                                 </div>
                                                                                                                 <p className="font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(total)}</p>
                                                                                                             </div>
@@ -847,7 +847,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                                 className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white hover:bg-brand-gray dark:bg-dark-surface dark:hover:bg-zinc-800 border border-brand-border dark:border-dark-border hover:border-brand-green dark:hover:border-brand-green font-medium text-brand-dark dark:text-dark-heading transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
                                                                                                             >
                                                                                                                 <span>{alt.variant_name}</span>
-                                                                                                                <span className="text-brand-inactive-text">•</span>
+                                                                                                                <span className="text-brand-inactive-text dark:text-dark-body">•</span>
                                                                                                                 <span className="font-semibold text-brand-green">{formatCurrency(getAlternativePrice(alt, item.products))}</span>
                                                                                                             </button>
                                                                                                         ))}
@@ -866,12 +866,12 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                 <div className="mt-4 pt-4 border-t border-brand-border dark:border-dark-border md:hidden space-y-3">
                                                                     {renderPromoBanners(storeKey, partnerItemsTotal)}
                                                                     <div className="flex justify-between items-center text-sm">
-                                                                        <span className="text-brand-inactive-text">Total dos itens</span>
+                                                                        <span className="text-brand-inactive-text dark:text-dark-body">Total dos itens</span>
                                                                         <span className="font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(partnerItemsTotal)}</span>
                                                                     </div>
                                                                     {getDeliveryLabel(data, partnerItemsTotal) !== null && (
                                                                         <div className="flex justify-between items-center text-sm">
-                                                                            <span className="text-brand-inactive-text">Entrega</span>
+                                                                            <span className="text-brand-inactive-text dark:text-dark-body">Entrega</span>
                                                                             <span className="text-brand-green font-semibold">{getDeliveryLabel(data, partnerItemsTotal)}</span>
                                                                         </div>
                                                                     )}
@@ -916,12 +916,12 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                 <div className="p-6 space-y-4">
                                                                     {renderPromoBanners(storeKey, partnerItemsTotal)}
                                                                     <div className="flex justify-between items-center text-sm font-medium">
-                                                                        <span className="text-brand-inactive-text">Total dos itens</span>
+                                                                        <span className="text-brand-inactive-text dark:text-dark-body">Total dos itens</span>
                                                                         <span className="text-brand-dark dark:text-dark-heading">{formatCurrency(partnerItemsTotal)}</span>
                                                                     </div>
                                                                     {getDeliveryLabel(data, partnerItemsTotal) !== null && (
                                                                         <div className="flex justify-between items-center text-sm font-medium">
-                                                                            <span className="text-brand-inactive-text">Entrega</span>
+                                                                            <span className="text-brand-inactive-text dark:text-dark-body">Entrega</span>
                                                                             <span className="text-brand-green font-semibold">{getDeliveryLabel(data, partnerItemsTotal)}</span>
                                                                         </div>
                                                                     )}

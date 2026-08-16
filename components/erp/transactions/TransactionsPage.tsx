@@ -1537,7 +1537,7 @@ export default function TransactionsPage({
     }
 
     if (entityState.isOpen && entityState.action === "view" && entityState.entityId && !entityState.entityType) {
-        if (isLoadingDetail || !currentEntity) {
+        if (isLoadingDetail && !currentEntity) {
             return <ERPDetailLoading key="loading-tx-detail" />
         }
         return (
@@ -1945,7 +1945,7 @@ export default function TransactionsPage({
     }
 
     if (isViewing && entityState.entityType === "installment") {
-        if (installmentDetailLoading || !installmentDetail) {
+        if (installmentDetailLoading && !installmentDetail) {
             return <ERPDetailLoading key="loading-installment-detail" />
         }
         const representativeTxId = installmentDetail?.installments?.[0]?.id || entityState.entityId

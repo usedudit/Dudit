@@ -268,8 +268,8 @@ export default function SuppliersPage({
     const selectedSupplier = useMemo(() => {
         if (!entityState.entityId) return null
         if (currentEntity) return currentEntity
-        return filteredSuppliers.find(s => s.originalId === entityState.entityId) || null
-    }, [entityState.entityId, currentEntity, filteredSuppliers])
+        return rawSuppliers?.find(s => s.id === entityState.entityId || (s as any).originalId === entityState.entityId) || null
+    }, [entityState.entityId, currentEntity, rawSuppliers])
 
     const prevFilteredLengthRef = useRef(0)
     useEffect(() => {
@@ -400,7 +400,7 @@ export default function SuppliersPage({
         <>
             <AnimatePresence mode="wait">
                 {entityState.isOpen && isViewing ? (
-                    (isLoadingDetail || !selectedSupplier) ? (
+                    (isLoadingDetail && !selectedSupplier) ? (
                         <ERPDetailLoading key="loading-supplier" />
                     ) : (
                         <FadeIn key="details" className="w-full h-full">
@@ -412,7 +412,7 @@ export default function SuppliersPage({
                         </FadeIn>
                     )
                 ) : (isCreatingEntity || isEditingEntity) ? (
-                    (isEditingEntity && (isLoadingDetail || !selectedSupplier)) ? (
+                    (isEditingEntity && (isLoadingDetail && !selectedSupplier)) ? (
                         <ERPDetailLoading key="loading-supplier-form" />
                     ) : (
                         <FadeIn key="form" className="w-full h-full">

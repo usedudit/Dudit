@@ -382,7 +382,7 @@ export function PlanDetailsPageClient({
     }, [partner.rating])
 
     const BuyPanel = (
-        <div className="bg-white relative">
+        <div className="bg-white dark:bg-dark-surface relative">
             <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center gap-2">
                     <span className="px-3 py-1 bg-[#ecfdf5] text-brand-green font-bold text-xs rounded-full uppercase tracking-wider">
@@ -391,20 +391,20 @@ export function PlanDetailsPageClient({
                 </div>
             </div>
 
-            <h1 className="text-xl md:text-3xl leading-[1.1] font-medium text-brand-dark mb-6 tracking-tight">
+            <h1 className="text-xl md:text-3xl leading-[1.1] font-medium text-brand-dark dark:text-dark-heading mb-6 tracking-tight">
                 {plan.name}
             </h1>
 
             {/* Price details */}
             <div className="mb-6 pb-6 border-b border-brand-border">
-                <span className="text-xs text-brand-inactive-text font-medium block mb-1">
+                <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium block mb-1">
                     Valor da assinatura
                 </span>
                 <div className="flex items-baseline gap-1.5">
-                    <span className="text-[32px] lg:text-[40px] font-bold text-brand-dark leading-none tracking-tight">
+                    <span className="text-[32px] lg:text-[40px] font-bold text-brand-dark dark:text-dark-heading leading-none tracking-tight">
                         {formatCurrency(planPrice)}
                     </span>
-                    <span className="text-sm font-semibold text-brand-inactive-text uppercase">
+                    <span className="text-sm font-semibold text-brand-inactive-text dark:text-dark-body uppercase">
                         / {plan.frequency_type === "monthly" ? "mês" : plan.frequency_type === "weekly" ? "semana" : plan.frequency_type === "daily" ? "dia" : "período"}
                     </span>
                 </div>
@@ -425,13 +425,13 @@ export function PlanDetailsPageClient({
                 <>
                     {/* Delivery Options */}
                     <div className="mb-6">
-                        <h3 className="text-sm font-bold text-brand-dark mb-3">Como deseja receber?</h3>
+                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Como deseja receber?</h3>
                         <div className="flex gap-3">
                             <button
                                 onClick={() => setDeliveryType("pickup")}
                                 className={`flex-1 py-3 px-4 rounded-xl border text-center transition-all ${deliveryType === "pickup"
                                     ? "border-brand-green bg-[#ecfdf5] text-brand-green font-bold"
-                                    : "border-brand-border bg-white text-brand-dark hover:border-gray-300"
+                                    : "border-brand-border bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading hover:border-gray-300 dark:hover:border-dark-border"
                                     }`}
                             >
                                 Retirar no Local
@@ -440,7 +440,7 @@ export function PlanDetailsPageClient({
                                 onClick={() => setDeliveryType("delivery")}
                                 className={`flex-1 py-3 px-4 rounded-xl border text-center transition-all ${deliveryType === "delivery"
                                     ? "border-brand-green bg-[#ecfdf5] text-brand-green font-bold"
-                                    : "border-brand-border bg-white text-brand-dark hover:border-gray-300"
+                                    : "border-brand-border bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading hover:border-gray-300 dark:hover:border-dark-border"
                                     }`}
                             >
                                 Entrega
@@ -451,7 +451,7 @@ export function PlanDetailsPageClient({
                     {/* Address select when delivery */}
                     {deliveryType === "delivery" && (
                         <div className="mb-6 animate-fade-in">
-                            <h3 className="text-sm font-bold text-brand-dark mb-3">Endereço de entrega</h3>
+                            <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Endereço de entrega</h3>
 
                             {loadingAddresses ? (
                                 <div className="flex items-center justify-center py-4">
@@ -465,12 +465,12 @@ export function PlanDetailsPageClient({
                                             onClick={() => setSelectedAddressId(a.id)}
                                             className={`p-3 rounded-xl border cursor-pointer flex items-start gap-2.5 transition-all ${selectedAddressId === a.id
                                                 ? "border-brand-green bg-[#ecfdf5] text-brand-green"
-                                                : "border-brand-border hover:border-gray-300 text-brand-dark"
+                                                : "border-brand-border hover:border-gray-300 dark:hover:border-dark-border text-brand-dark dark:text-dark-heading"
                                                 }`}
                                         >
-                                            <MapPinIcon size={16} className="mt-0.5 shrink-0 text-brand-inactive-text" />
+                                            <MapPinIcon size={16} className="mt-0.5 shrink-0 text-brand-inactive-text dark:text-dark-body" />
                                             <div className="text-xs font-medium leading-relaxed flex-1">
-                                                <span className="font-bold text-brand-dark block mb-0.5 uppercase tracking-wide">
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading block mb-0.5 uppercase tracking-wide">
                                                     {a.address_type || "Casa"}
                                                 </span>
                                                 {buildAddressString(a)}
@@ -482,7 +482,7 @@ export function PlanDetailsPageClient({
                                     ))}
                                 </div>
                             ) : (
-                                <p className="text-xs text-brand-inactive-text mb-3">Nenhum endereço cadastrado.</p>
+                                <p className="text-xs text-brand-inactive-text dark:text-dark-body mb-3">Nenhum endereço cadastrado.</p>
                             )}
 
                             {!showAddressForm ? (
@@ -493,8 +493,8 @@ export function PlanDetailsPageClient({
                                     + Cadastrar novo endereço
                                 </button>
                             ) : (
-                                <div className="p-4 rounded-xl border border-dashed border-gray-300 space-y-4">
-                                    <h4 className="text-xs font-bold text-brand-dark mb-1">Novo Endereço</h4>
+                                <div className="p-4 rounded-xl border border-dashed border-gray-300 dark:border-dark-border space-y-4">
+                                    <h4 className="text-xs font-bold text-brand-dark dark:text-dark-heading mb-1">Novo Endereço</h4>
                                     <CepInput
                                         id="new-addr-cep"
                                         name="zipCode"
@@ -534,7 +534,7 @@ export function PlanDetailsPageClient({
                                             checked={newAddressData.noNumber}
                                             onChange={e => setNewAddressData(prev => ({ ...prev, noNumber: e.target.checked, number: e.target.checked ? "S/N" : "" }))}
                                         />
-                                        <label htmlFor="new-addr-noNumber" className="text-xs text-brand-dark font-medium">Sem número (S/N)</label>
+                                        <label htmlFor="new-addr-noNumber" className="text-xs text-brand-dark dark:text-dark-heading font-medium">Sem número (S/N)</label>
                                     </div>
                                     <Input
                                         label="Bairro"
@@ -594,7 +594,7 @@ export function PlanDetailsPageClient({
                         )}
                     </button>
 
-                    <p className="text-[11px] text-brand-inactive-text text-center mt-4 leading-relaxed font-medium">
+                    <p className="text-[11px] text-brand-inactive-text dark:text-dark-body text-center mt-4 leading-relaxed font-medium">
                         Ao assinar, você concorda com os termos da Dudit e autoriza cobranças recorrentes no período selecionado. Cancele quando quiser.
                     </p>
                 </>
@@ -612,14 +612,14 @@ export function PlanDetailsPageClient({
     }
 
     return (
-        <div className="bg-white min-h-screen text-brand-dark flex flex-col pt-4">
+        <div className="bg-white dark:bg-dark-background min-h-screen text-brand-dark dark:text-dark-heading flex flex-col pt-4">
             {!hideHeaderAndFooter && <MarketplaceHeader userProfile={userProfile} cartCount={cartCount} />}
 
             <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.4, ease: "easeOut" }}
-                className="min-h-screen bg-white lg:pt-[50px] font-sans flex flex-col"
+                className="min-h-screen bg-white dark:bg-dark-background lg:pt-[50px] font-sans flex flex-col"
             >
                 {isMounted && createPortal(
                     <AnimatePresence>
@@ -705,20 +705,20 @@ export function PlanDetailsPageClient({
 
                 <div className="container mx-auto px-4 max-w-[1400px] lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">
                     {/* Breadcrumbs */}
-                    <div className="hidden lg:flex items-center gap-2 text-sm text-brand-inactive-text mb-8">
+                    <div className="hidden lg:flex items-center gap-2 text-sm text-brand-inactive-text dark:text-dark-body mb-8">
                         {partner.city && partner.state && (
                             <>
-                                <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}`} prefetch={false} className="hover:text-brand-dark transition-colors">
+                                <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}`} prefetch={false} className="hover:text-brand-dark dark:text-dark-heading transition-colors">
                                     {partner.city} - {partner.state}
                                 </Link>
                                 <ChevronRightIcon size={10} />
                             </>
                         )}
-                        <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}?type=planos`} prefetch={false} className="hover:text-brand-dark transition-colors">
+                        <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}?type=planos`} prefetch={false} className="hover:text-brand-dark dark:text-dark-heading transition-colors">
                             Assinaturas
                         </Link>
                         <ChevronRightIcon size={10} />
-                        <span className="text-brand-inactive-text truncate max-w-[300px]">{plan.name}</span>
+                        <span className="text-brand-inactive-text dark:text-dark-body truncate max-w-[300px]">{plan.name}</span>
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 xl:gap-12">
@@ -742,7 +742,7 @@ export function PlanDetailsPageClient({
                                     {/* Desktop Prev Button */}
                                     <div className="hidden lg:flex w-10 shrink-0 items-center justify-center">
                                         {galleryItems.length > 1 && (
-                                            <button onClick={goToPrev} className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-brand-border hover:bg-brand-gray transition-colors shadow-sm">
+                                            <button onClick={goToPrev} className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-brand-border hover:bg-brand-gray dark:hover:bg-dark-border/50 transition-colors shadow-sm">
                                                 <ChevronLeftIcon size={20} className="text-brand-dark" />
                                             </button>
                                         )}
@@ -752,7 +752,7 @@ export function PlanDetailsPageClient({
                                         {/* Desktop main image */}
                                         <div className="hidden lg:block" style={{ paddingBottom: "100%", position: "relative" }}>
                                             <div ref={galleryContainerRef}
-                                                className="absolute inset-0 bg-brand-gray overflow-hidden rounded-2xl cursor-zoom-in"
+                                                className="absolute inset-0 bg-brand-gray dark:bg-dark-border/30 overflow-hidden rounded-2xl cursor-zoom-in"
                                                 onMouseMove={(e) => {
                                                     const { left, top, width, height } = galleryContainerRef.current!.getBoundingClientRect()
                                                     zoomOriginX.set(((e.clientX - left) / width) * 100)
@@ -774,7 +774,7 @@ export function PlanDetailsPageClient({
                                         </div>
 
                                         {/* Mobile main image */}
-                                        <div className="lg:hidden relative bg-white rounded-xl overflow-hidden" style={{ aspectRatio: "1/1" }}>
+                                        <div className="lg:hidden relative bg-white dark:bg-dark-surface rounded-xl overflow-hidden" style={{ aspectRatio: "1/1" }}>
                                             <AnimatePresence mode="wait" custom={slideDirection}>
                                                 {renderGalleryItem(galleryItems[activeImgIndex], "absolute inset-0 w-full h-full object-contain", `Foto de ${plan.name} à venda em ${partner.city} - ${partner.state}`)}
                                             </AnimatePresence>
@@ -790,7 +790,7 @@ export function PlanDetailsPageClient({
                                         <div className="flex-1 flex items-center">
                                             {galleryItems.length > 1 && (
                                                 <Button variant="filled" onClick={goToNext} className="w-10 h-10 flex items-center justify-center">
-                                                    <ChevronRightIcon size={20} className="text-brand-dark" />
+                                                    <ChevronRightIcon size={20} className="text-brand-dark dark:text-dark-heading" />
                                                 </Button>
                                             )}
                                         </div>
@@ -803,13 +803,13 @@ export function PlanDetailsPageClient({
 
                             {/* Description */}
                             <div className="mb-10">
-                                <h3 className="text-xl font-medium text-brand-dark mb-4">Descrição</h3>
+                                <h3 className="text-xl font-medium text-brand-dark dark:text-dark-heading mb-4">Descrição</h3>
                                 <div className={`relative ${!isDescriptionExpanded ? "max-h-[150px] overflow-hidden" : ""}`}>
-                                    <p className="text-sm md:text-[0.9375rem] text-gray-600 leading-relaxed whitespace-pre-wrap">
+                                    <p className="text-sm md:text-[0.9375rem] text-gray-600 dark:text-dark-body leading-relaxed whitespace-pre-wrap">
                                         {plan.description || "Sem descrição."}
                                     </p>
                                     {!isDescriptionExpanded && plan.description?.length > 200 && (
-                                        <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-white to-transparent" />
+                                        <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-white to-transparent dark:from-gray-900 dark:to-transparent" />
                                     )}
                                 </div>
                                 {plan.description?.length > 200 && (
@@ -823,7 +823,7 @@ export function PlanDetailsPageClient({
 
                             {/* Items Included */}
                             <div className="border-t border-brand-border pt-8 mb-10">
-                                <h3 className="text-xl font-medium text-brand-dark mb-5 flex items-center gap-2">
+                                <h3 className="text-xl font-medium text-brand-dark dark:text-dark-heading mb-5 flex items-center gap-2">
                                     Itens inclusos na assinatura
                                 </h3>
                                 <div className="space-y-4">
@@ -839,7 +839,7 @@ export function PlanDetailsPageClient({
                                             return (
                                                 <div
                                                     key={item.id}
-                                                    className="flex items-center gap-4 p-4 rounded-xl border border-brand-border bg-brand-gray hover:border-gray-200 transition-colors"
+                                                    className="flex items-center gap-4 p-4 rounded-xl border border-brand-border bg-brand-gray dark:bg-dark-border/30 hover:border-gray-200 dark:hover:border-dark-border transition-colors"
                                                 >
                                                     <div className="w-16 h-16 rounded-[12px] bg-white border border-brand-border overflow-hidden shrink-0">
                                                         <img
@@ -849,10 +849,10 @@ export function PlanDetailsPageClient({
                                                         />
                                                     </div>
                                                     <div className="flex-1 min-w-0">
-                                                        <h3 className="text-[15px] font-medium text-brand-dark truncate">
+                                                        <h3 className="text-[15px] font-medium text-brand-dark dark:text-dark-heading truncate">
                                                             {name}
                                                         </h3>
-                                                        <p className="text-xs text-brand-inactive-text font-medium mt-0.5">
+                                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body font-medium mt-0.5">
                                                             Qtd: {quantity}x • {type === "product" ? "Entregável" : "Serviço/Agendável"}
                                                         </p>
                                                     </div>
@@ -860,23 +860,23 @@ export function PlanDetailsPageClient({
                                             )
                                         })
                                     ) : (
-                                        <p className="text-sm text-brand-inactive-text">Nenhum item adicionado a este plano.</p>
+                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">Nenhum item adicionado a este plano.</p>
                                     )}
                                 </div>
                             </div>
 
                             {/* Seller / Store Reputation & Levels Card */}
                             <div className="border-t border-brand-border pt-8 mb-10">
-                                <h3 className="text-xl font-medium text-brand-dark mb-5">Quem oferece?</h3>
+                                <h3 className="text-xl font-medium text-brand-dark dark:text-dark-heading mb-5">Quem oferece?</h3>
                                 {(() => {
                                     const sellerBannerImage = partner.banner_url ? getR2ImageUrl(partner.banner_url, "large") : PLACEHOLDER
                                     const sellerAvatarImage = partner.store_avatar && !partner.store_avatar.includes("Placeholder.png") ? getR2ImageUrl(partner.store_avatar) : null
 
                                     return (
-                                        <div className="border border-brand-border rounded-2xl overflow-hidden bg-white">
+                                        <div className="border border-brand-border rounded-2xl overflow-hidden bg-white dark:bg-dark-surface">
                                             {/* Banner Link to Partner Profile */}
                                             <Link href={getStoreUrl(partner)} className="block group">
-                                                <div className="aspect-[2.65/1] w-full relative bg-gray-100 overflow-hidden select-none">
+                                                <div className="aspect-[2.65/1] w-full relative bg-gray-100 dark:bg-dark-border/50 overflow-hidden select-none">
                                                     <img src={sellerBannerImage} alt={`Banner de ${partner.store_name}`} className="w-full h-full object-cover" />
                                                     <div className="absolute inset-0" />
                                                 </div>
@@ -893,15 +893,15 @@ export function PlanDetailsPageClient({
 
                                                     <div className="mt-3 min-w-0">
                                                         <div className="flex items-center gap-1.5 justify-between">
-                                                            <span className="font-bold text-brand-dark text-lg truncate">
+                                                            <span className="font-bold text-brand-dark dark:text-dark-heading text-lg truncate">
                                                                 {partner.store_name || partner.store_name}
                                                             </span>
                                                             <div className="flex items-center gap-1 shrink-0">
                                                                 <StarIcon size={14} className="text-brand-green fill-brand-green" strokeWidth={0} />
-                                                                <span className="text-sm font-bold text-brand-dark">{displayRating}</span>
+                                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{displayRating}</span>
                                                             </div>
                                                         </div>
-                                                        <p className="text-xs text-brand-inactive-text mt-0.5 font-medium">
+                                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5 font-medium">
                                                             {partner.city} - {partner.state}
                                                         </p>
                                                     </div>
@@ -914,15 +914,15 @@ export function PlanDetailsPageClient({
                                                     <div className="flex items-center gap-2">
                                                         <span className="text-lg leading-none">{reputationLevel.badge}</span>
                                                         <div className="flex flex-col">
-                                                            <span className="text-sm font-bold text-brand-dark">Selo Dudit: {reputationLevel.name}</span>
-                                                            <span className="text-xs text-brand-inactive-text">Nível do vendedor baseado em reputação e vendas</span>
+                                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">Selo Dudit: {reputationLevel.name}</span>
+                                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body">Nível do vendedor baseado em reputação e vendas</span>
                                                         </div>
                                                     </div>
                                                     <div className="flex gap-1 h-1.5 w-full bg-transparent rounded-full overflow-hidden mt-1 select-none">
                                                         {[1, 2, 3, 4, 5].map((lvl) => (
                                                             <div
                                                                 key={lvl}
-                                                                className={`flex-1 h-full rounded-sm transition-all duration-300 ${reputationLevel.level >= lvl ? "bg-brand-green" : "bg-gray-200"}`}
+                                                                className={`flex-1 h-full rounded-sm transition-all duration-300 ${reputationLevel.level >= lvl ? "bg-brand-green" : "bg-gray-200 dark:bg-dark-border"}`}
                                                             />
                                                         ))}
                                                     </div>
@@ -930,16 +930,16 @@ export function PlanDetailsPageClient({
 
                                                 <div className="grid grid-cols-3 gap-2 pt-4 border-t border-brand-border text-center select-none">
                                                     <div className="flex flex-col items-center">
-                                                        <span className="text-sm font-bold text-brand-dark">{displayRating}</span>
-                                                        <span className="text-[10px] font-semibold text-brand-inactive-text mt-0.5">Avaliação</span>
+                                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{displayRating}</span>
+                                                        <span className="text-[10px] font-semibold text-brand-inactive-text dark:text-dark-body mt-0.5">Avaliação</span>
                                                     </div>
                                                     <div className="flex flex-col items-center border-x border-brand-border">
-                                                        <span className="text-sm font-bold text-brand-dark">{partner.vendas_totais || 0}</span>
-                                                        <span className="text-[10px] font-semibold text-brand-inactive-text mt-0.5">Vendas</span>
+                                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{partner.vendas_totais || 0}</span>
+                                                        <span className="text-[10px] font-semibold text-brand-inactive-text dark:text-dark-body mt-0.5">Vendas</span>
                                                     </div>
                                                     <div className="flex flex-col items-center">
-                                                        <span className="text-sm font-bold text-brand-dark">{formattedJoinedDate}</span>
-                                                        <span className="text-[10px] font-semibold text-brand-inactive-text mt-0.5">Cadastro</span>
+                                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formattedJoinedDate}</span>
+                                                        <span className="text-[10px] font-semibold text-brand-inactive-text dark:text-dark-body mt-0.5">Cadastro</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -950,7 +950,7 @@ export function PlanDetailsPageClient({
 
                             {/* Accordion FAQs */}
                             <div className="border-t border-brand-border pt-8 mb-10">
-                                <h3 className="text-xl font-medium text-brand-dark mb-5">Dúvidas Frequentes</h3>
+                                <h3 className="text-xl font-medium text-brand-dark dark:text-dark-heading mb-5">Dúvidas Frequentes</h3>
                                 <div className="border border-brand-border rounded-2xl overflow-hidden divide-y divide-brand-border">
                                     {[
                                         {
@@ -969,13 +969,13 @@ export function PlanDetailsPageClient({
                                             content: "Você define a modalidade de entrega na hora de assinar. Se optar por Entrega, ela será efetuada no endereço fornecido em cada período de recorrência do plano. Se preferir Retirada, basta comparecer ao local do vendedor no dia combinado."
                                         }
                                     ].map((item) => (
-                                        <div key={item.id} className="bg-white">
+                                        <div key={item.id} className="bg-white dark:bg-dark-surface">
                                             <button
                                                 onClick={() => setExpandedAccordion(expandedAccordion === item.id ? null : item.id)}
-                                                className="w-full text-left px-5 py-4 flex items-center justify-between text-[15px] font-medium text-brand-dark hover:bg-brand-gray transition-colors"
+                                                className="w-full text-left px-5 py-4 flex items-center justify-between text-[15px] font-medium text-brand-dark dark:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border/50 transition-colors"
                                             >
                                                 <span>{item.title}</span>
-                                                <ChevronDownIcon size={16} className={`transform transition-transform text-brand-inactive-text duration-200 ${expandedAccordion === item.id ? "rotate-180" : ""}`} />
+                                                <ChevronDownIcon size={16} className={`transform transition-transform text-brand-inactive-text dark:text-dark-body duration-200 ${expandedAccordion === item.id ? "rotate-180" : ""}`} />
                                             </button>
                                             <AnimatePresence initial={false}>
                                                 {expandedAccordion === item.id && (
@@ -986,7 +986,7 @@ export function PlanDetailsPageClient({
                                                         transition={{ duration: 0.2, ease: "easeInOut" }}
                                                         className="overflow-hidden"
                                                     >
-                                                        <div className="px-5 pb-4 text-sm text-brand-inactive-text leading-relaxed">
+                                                        <div className="px-5 pb-4 text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
                                                             {item.content}
                                                         </div>
                                                     </motion.div>
@@ -1007,12 +1007,12 @@ export function PlanDetailsPageClient({
 
                 {/* Mobile Bottom Bar */}
                 {!isPlanOwner && (
-                    <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 z-50 flex gap-3 lg:hidden shadow-lg items-center justify-between">
+                    <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-dark-surface border-t dark:border-dark-border p-4 z-50 flex gap-3 lg:hidden shadow-lg items-center justify-between">
                         <div className="flex flex-col">
-                            <span className="text-[10px] text-brand-inactive-text font-bold uppercase tracking-wider">Assinatura</span>
-                            <span className="text-lg font-bold text-brand-dark leading-none mt-0.5">
+                            <span className="text-[10px] text-brand-inactive-text dark:text-dark-body font-bold uppercase tracking-wider">Assinatura</span>
+                            <span className="text-lg font-bold text-brand-dark dark:text-dark-heading leading-none mt-0.5">
                                 {formatCurrency(planPrice)}
-                                <span className="text-xs text-brand-inactive-text font-normal"> / {plan.frequency_type === "monthly" ? "mês" : "período"}</span>
+                                <span className="text-xs text-brand-inactive-text dark:text-dark-body font-normal"> / {plan.frequency_type === "monthly" ? "mês" : "período"}</span>
                             </span>
                         </div>
                         <button

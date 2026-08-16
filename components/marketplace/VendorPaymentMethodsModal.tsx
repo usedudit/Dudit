@@ -33,9 +33,9 @@ const getUniqueBrands = (methods: any[]) => Array.from(new Set(methods
     .filter(Boolean)))
 
 const PaymentPill = ({ icon, label }: { icon?: string; label: string }) => (
-    <div className="h-9 px-3 rounded-[8px] border border-brand-border bg-white flex items-center gap-2">
+    <div className="h-9 px-3 rounded-[8px] border border-brand-border bg-white dark:bg-dark-surface flex items-center gap-2">
         {icon && <img src={icon} alt={label} className="h-4 max-w-[52px] object-contain" />}
-        <span className="text-[13px] text-brand-dark font-medium">{label}</span>
+        <span className="text-[13px] text-brand-dark dark:text-dark-heading font-medium">{label}</span>
     </div>
 )
 
@@ -120,7 +120,7 @@ export function VendorPaymentMethodsModal({
             <div className="py-2 space-y-6">
                 {mpConnected && (
                     <div>
-                        <h4 className="text-[14px] font-bold text-brand-dark mb-3">Mercado Pago</h4>
+                        <h4 className="text-[14px] font-bold text-brand-dark dark:text-dark-heading mb-3">Mercado Pago</h4>
                         <ListItem
                             className="!border-none !bg-transparent p-0 cursor-default"
                             icon={
@@ -140,7 +140,7 @@ export function VendorPaymentMethodsModal({
                     <div className="space-y-6">
                         {hasSimplePayments && (
                             <div>
-                                <h4 className="text-[14px] font-bold text-brand-dark mb-3">À Vista / Imediato</h4>
+                                <h4 className="text-[14px] font-bold text-brand-dark dark:text-dark-heading mb-3">À Vista / Imediato</h4>
                                 <div className="flex flex-wrap gap-2.5">
                                     {pixMethods.length > 0 && <PaymentPill icon="https://img.dudit.com.br/static/icons/payments/Pix.png" label="Pix" />}
                                     {cashMethods.length > 0 && <PaymentPill icon="https://img.dudit.com.br/static/icons/payments/Dinheiro.png" label="Dinheiro" />}
@@ -151,30 +151,30 @@ export function VendorPaymentMethodsModal({
 
                         {debitMethods.length > 0 && (
                             <div>
-                                <h4 className="text-[14px] font-bold text-brand-dark mb-1">Cartão de Débito</h4>
+                                <h4 className="text-[14px] font-bold text-brand-dark dark:text-dark-heading mb-1">Cartão de Débito</h4>
                                 {debitBrands.length > 0 ? (
                                     <CardBrands brands={debitBrands} />
                                 ) : (
-                                    <p className="text-[13px] text-brand-inactive-text">Bandeiras não informadas.</p>
+                                    <p className="text-[13px] text-brand-inactive-text dark:text-dark-body">Bandeiras não informadas.</p>
                                 )}
                             </div>
                         )}
 
                         {creditMethods.length > 0 && (
                             <div>
-                                <h4 className="text-[14px] font-bold text-brand-dark mb-1">Cartão de Crédito</h4>
+                                <h4 className="text-[14px] font-bold text-brand-dark dark:text-dark-heading mb-1">Cartão de Crédito</h4>
                                 {creditBrands.length > 0 ? (
                                     <CardBrands brands={creditBrands} />
                                 ) : (
-                                    <p className="text-[13px] text-brand-inactive-text">Bandeiras não informadas.</p>
+                                    <p className="text-[13px] text-brand-inactive-text dark:text-dark-body">Bandeiras não informadas.</p>
                                 )}
 
                                 {maxCcInstallments > 1 && price > 0 && (
                                     <div className="mt-4">
-                                        <span className="text-[13px] font-bold text-brand-dark">Opções de parcelamento</span>
+                                        <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">Opções de parcelamento</span>
 
                                         {isLoadingInstallments ? (
-                                            <div className="mt-2 py-6 text-center text-xs text-brand-inactive-text select-none">
+                                            <div className="mt-2 py-6 text-center text-xs text-brand-inactive-text dark:text-dark-body select-none">
                                                 Carregando opções de parcelamento...
                                             </div>
                                         ) : installmentOptions.length > 0 ? (
@@ -184,7 +184,7 @@ export function VendorPaymentMethodsModal({
                                                     return (
                                                         <div
                                                             key={opt.installments}
-                                                            className={`flex justify-between items-center py-2.5 px-4 text-brand-dark transition-colors ${isEven ? "bg-brand-gray/30" : "bg-white"
+                                                            className={`flex justify-between items-center py-2.5 px-4 text-brand-dark dark:text-dark-heading transition-colors ${isEven ? "bg-brand-gray/30 dark:bg-dark-border/30" : "bg-white dark:bg-dark-surface"
                                                                 }`}
                                                         >
                                                             <div className="flex flex-col min-w-0">
@@ -192,12 +192,12 @@ export function VendorPaymentMethodsModal({
                                                                     {opt.installments}x de {formatCurrency(opt.installmentValue)}
                                                                 </span>
                                                                 {!opt.hasInterest && (
-                                                                    <span className="text-[11px] text-brand-inactive-text mt-0.5">
+                                                                    <span className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-0.5">
                                                                         Sem Juros
                                                                     </span>
                                                                 )}
                                                             </div>
-                                                            <span className="text-[13px] sm:text-sm font-semibold text-brand-dark">
+                                                            <span className="text-[13px] sm:text-sm font-semibold text-brand-dark dark:text-dark-heading">
                                                                 {formatCurrency(opt.finalAmount)}
                                                             </span>
                                                         </div>
@@ -213,18 +213,18 @@ export function VendorPaymentMethodsModal({
                                                     return (
                                                         <div
                                                             key={count}
-                                                            className={`flex justify-between items-center py-2.5 px-4 text-brand-dark ${isEven ? "bg-brand-gray/30" : "bg-white"
+                                                            className={`flex justify-between items-center py-2.5 px-4 text-brand-dark dark:text-dark-heading ${isEven ? "bg-brand-gray/30 dark:bg-dark-border/30" : "bg-white dark:bg-dark-surface"
                                                                 }`}
                                                         >
                                                             <div className="flex flex-col min-w-0">
                                                                 <span className="font-bold text-[13px] sm:text-sm">
                                                                     {count}x de {formatCurrency(val)}
                                                                 </span>
-                                                                <span className="text-[11px] text-brand-inactive-text mt-0.5">
+                                                                <span className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-0.5">
                                                                     Sem Juros
                                                                 </span>
                                                             </div>
-                                                            <span className="text-[13px] sm:text-sm font-semibold text-brand-dark">
+                                                            <span className="text-[13px] sm:text-sm font-semibold text-brand-dark dark:text-dark-heading">
                                                                 {formatCurrency(price)}
                                                             </span>
                                                         </div>
@@ -238,7 +238,7 @@ export function VendorPaymentMethodsModal({
                         )}
                     </div>
                 ) : !mpConnected ? (
-                    <div className="text-center py-8 text-brand-inactive-text text-sm">
+                    <div className="text-center py-8 text-brand-inactive-text dark:text-dark-body text-sm">
                         Nenhum meio de pagamento cadastrado por este vendedor.
                     </div>
                 ) : null}

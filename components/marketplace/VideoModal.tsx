@@ -30,10 +30,12 @@ interface VideoModalProps {
 }
 
 const MAX_DESC_LENGTH = 120
+const PANEL_IDLE_HIDE_MS = 4000
 
 export function VideoModal({ video, isOpen, onClose }: VideoModalProps) {
   const [mounted, setMounted] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [linkedItem, setLinkedItem] = useState<LinkedItemData | null>(null)
   const [linkedItemLoading, setLinkedItemLoading] = useState(false)
   const [descriptionExpanded, setDescriptionExpanded] = useState(false)
@@ -42,6 +44,26 @@ export function VideoModal({ video, isOpen, onClose }: VideoModalProps) {
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  const clearHideTimer = useCallback(() => {
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current)
+      hideTimerRef.current = null
+    }
+  }, [])
+
+  const handleMouseMove = useCallback(() => {
+    clearHideTimer()
+    setShowPanel(true)
+    hideTimerRef.current = setTimeout(() => setShowPanel(false), PANEL_IDLE_HIDE_MS)
+  }, [clearHideTimer])
+
+  const handleMouseLeave = useCallback(() => {
+    clearHideTimer()
+    setShowPanel(false)
+  }, [clearHideTimer])
+
+  useEffect(() => clearHideTimer, [clearHideTimer])
 
   useEffect(() => {
     if (isOpen) {
@@ -73,6 +95,7 @@ export function VideoModal({ video, isOpen, onClose }: VideoModalProps) {
 
   useEffect(() => {
     setDescriptionExpanded(false)
+    clearHideTimer()
     setShowPanel(false)
     if (!video?.linked_item_type || !video?.linked_item_id) {
       setLinkedItem(null)
@@ -83,7 +106,7 @@ export function VideoModal({ video, isOpen, onClose }: VideoModalProps) {
       .then(setLinkedItem)
       .catch(() => setLinkedItem(null))
       .finally(() => setLinkedItemLoading(false))
-  }, [video?.id, video?.linked_item_type, video?.linked_item_id])
+  }, [video?.id, video?.linked_item_type, video?.linked_item_id, clearHideTimer])
 
   const handleLinkedClick = useCallback(() => {
     if (video) {
@@ -106,8 +129,8 @@ export function VideoModal({ video, isOpen, onClose }: VideoModalProps) {
           transition={{ duration: 0.25, ease: "easeOut" }}
           className="fixed inset-0 z-[9999] bg-black overflow-hidden"
           onClick={onClose}
-          onMouseEnter={() => setShowPanel(true)}
-          onMouseLeave={() => setShowPanel(false)}
+          onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
         >
           {/* Close button */}
           <button
@@ -159,10 +182,10 @@ export function VideoModal({ video, isOpen, onClose }: VideoModalProps) {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 40 }}
                 transition={{ duration: 0.25, ease: "easeOut" }}
-                className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/95 via-black/70 to-transparent p-4 sm:p-6 pt-14"
+                className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/90 via-black/45 to-transparent px-3 sm:px-4 pb-3 sm:pb-4 pt-10"
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="w-full max-w-2xl mx-auto space-y-3">
+                <div className="w-full max-w-2xl mx-auto space-y-2">
                   {/* Title & Store */}
                   <div>
                     {video.title && (

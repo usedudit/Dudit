@@ -33,7 +33,7 @@ export function CommunityVideoCard({ video, onOpen, className = "w-[170px]" }: C
       onClick={handleOpen}
       className={`flex flex-col group cursor-pointer active:scale-[0.98] transition-all duration-300 text-left ${className}`}
     >
-      <div className="relative w-full aspect-[9/16] rounded-[16px] overflow-hidden bg-brand-gray mb-3 shrink-0 shadow-sm">
+      <div className="relative w-full aspect-[9/16] rounded-[16px] overflow-hidden bg-brand-gray mb-3 shrink-0 shadow-sm dark:bg-dark-border/30">
         <img
           src={video.video_thumbnail}
           alt={video.title || "Vídeo"}
@@ -54,10 +54,10 @@ export function CommunityVideoCard({ video, onOpen, className = "w-[170px]" }: C
       </div>
 
       <div className="px-1">
-        <h3 className="text-sm font-normal text-brand-dark line-clamp-2 leading-snug">
+        <h3 className="text-sm font-normal text-brand-dark line-clamp-2 leading-snug dark:text-dark-heading">
           {video.title || "Vídeo da comunidade"}
         </h3>
-        <p className="text-[11px] text-brand-inactive-text mt-1">
+        <p className="text-[11px] text-brand-inactive-text mt-1 dark:text-dark-body">
           {video.partner?.name || video.partner?.store_name || "Loja parceira"}
         </p>
       </div>

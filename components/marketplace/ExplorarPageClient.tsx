@@ -909,8 +909,8 @@ export function ExplorarPageClient({
             return (
                 <>
                     Ainda não encontramos resultados para{" "}
-                    <strong className="text-brand-dark">"{term}"</strong> em{" "}
-                    <strong className="text-brand-dark">{cityNameOnly}</strong>.
+                    <strong className="text-brand-dark dark:text-dark-heading">"{term}"</strong> em{" "}
+                    <strong className="text-brand-dark dark:text-dark-heading">{cityNameOnly}</strong>.
                     Conhece alguém que vende? Convide pra Dudit!
                 </>
             )
@@ -920,7 +920,7 @@ export function ExplorarPageClient({
             return (
                 <>
                     Nenhum produto cadastrado em{" "}
-                    <strong className="text-brand-dark">{cityNameOnly}</strong> ainda.
+                    <strong className="text-brand-dark dark:text-dark-heading">{cityNameOnly}</strong> ainda.
                     Seja o primeiro a vender aqui - é gratuito e sem comissão!
                 </>
             )
@@ -930,7 +930,7 @@ export function ExplorarPageClient({
             return (
                 <>
                     Nenhum serviço cadastrado em{" "}
-                    <strong className="text-brand-dark">{cityNameOnly}</strong> ainda.
+                    <strong className="text-brand-dark dark:text-dark-heading">{cityNameOnly}</strong> ainda.
                     Seja o primeiro a oferecer seus serviços - é gratuito e sem comissão!
                 </>
             )
@@ -940,7 +940,7 @@ export function ExplorarPageClient({
             return (
                 <>
                     Nenhum plano recorrente cadastrado em{" "}
-                    <strong className="text-brand-dark">{cityNameOnly}</strong> ainda.
+                    <strong className="text-brand-dark dark:text-dark-heading">{cityNameOnly}</strong> ainda.
                     Seja o primeiro a oferecer assinaturas - é gratuito e sem comissão!
                 </>
             )
@@ -950,7 +950,7 @@ export function ExplorarPageClient({
             return (
                 <>
                     Nenhuma loja cadastrada em{" "}
-                    <strong className="text-brand-dark">{cityNameOnly}</strong> ainda.
+                    <strong className="text-brand-dark dark:text-dark-heading">{cityNameOnly}</strong> ainda.
                     Crie sua vitrine - é gratuito e sem comissão!
                 </>
             )
@@ -960,7 +960,7 @@ export function ExplorarPageClient({
             return (
                 <>
                     Nenhum negócio cadastrado em{" "}
-                    <strong className="text-brand-dark">{cityNameOnly}</strong> ainda.
+                    <strong className="text-brand-dark dark:text-dark-heading">{cityNameOnly}</strong> ainda.
                     Seja o primeiro a vender aqui - é gratuito e sem comissão!
                 </>
             )
@@ -970,7 +970,7 @@ export function ExplorarPageClient({
             return (
                 <>
                     Nenhum item bem avaliado cadastrado em{" "}
-                    <strong className="text-brand-dark">{cityNameOnly}</strong> ainda.
+                    <strong className="text-brand-dark dark:text-dark-heading">{cityNameOnly}</strong> ainda.
                     Seja o primeiro a vender aqui - é gratuito e sem comissão!
                 </>
             )
@@ -980,7 +980,7 @@ export function ExplorarPageClient({
             return (
                 <>
                     Nenhum item em oferta cadastrado em{" "}
-                    <strong className="text-brand-dark">{cityNameOnly}</strong> ainda.
+                    <strong className="text-brand-dark dark:text-dark-heading">{cityNameOnly}</strong> ainda.
                     Seja o primeiro a vender aqui - é gratuito e sem comissão!
                 </>
             )
@@ -990,7 +990,7 @@ export function ExplorarPageClient({
             return (
                 <>
                     Nenhum item em alta cadastrado em{" "}
-                    <strong className="text-brand-dark">{cityNameOnly}</strong> ainda.
+                    <strong className="text-brand-dark dark:text-dark-heading">{cityNameOnly}</strong> ainda.
                     Seja o primeiro a vender aqui - é gratuito e sem comissão!
                 </>
             )
@@ -1000,7 +1000,7 @@ export function ExplorarPageClient({
             return (
                 <>
                     Nenhum item novo cadastrado em{" "}
-                    <strong className="text-brand-dark">{cityNameOnly}</strong> ainda.
+                    <strong className="text-brand-dark dark:text-dark-heading">{cityNameOnly}</strong> ainda.
                     Seja o primeiro a vender aqui - é gratuito e sem comissão!
                 </>
             )
@@ -1009,7 +1009,7 @@ export function ExplorarPageClient({
         return (
             <>
                 Nenhum vendedor cadastrado em{" "}
-                <strong className="text-brand-dark">{cityNameOnly}</strong> ainda.
+                <strong className="text-brand-dark dark:text-dark-heading">{cityNameOnly}</strong> ainda.
                 Seja o primeiro ou convide quem você conhece!
             </>
         )
@@ -1146,70 +1146,70 @@ export function ExplorarPageClient({
                 key={`${item.itemType}-${item.id}`}
                 href={getItemUrl(item)}
                 prefetch={false}
-                className="group grid grid-cols-[80px_1fr] gap-3 border-t border-gray-100 py-3 sm:grid-cols-[180px_1fr] hover:bg-gray-50/60"
+                className="group grid grid-cols-[80px_1fr] gap-3 border-t border-gray-100 dark:border-dark-border py-3 sm:grid-cols-[180px_1fr] hover:bg-gray-50/60 dark:hover:bg-dark-border/30"
             >
-                <div className="relative aspect-square overflow-hidden rounded-lg bg-brand-gray">
+                <div className="relative aspect-square overflow-hidden rounded-lg bg-brand-gray dark:bg-dark-border/30">
                     <img src={imageUrl} alt={item.name} className="h-full w-full object-cover" loading="lazy" />
                 </div>
                 <div className="min-w-0 py-1">
                     {isStore ? (
                         <>
                             <div className="flex items-center gap-2">
-                                <h3 className="line-clamp-2 text-base font-bold text-brand-dark sm:text-lg">{item.name}</h3>
+                                <h3 className="line-clamp-2 text-base font-bold text-brand-dark dark:text-dark-heading sm:text-lg">{item.name}</h3>
                                 {(item.rating ?? 0) > 0 && (
-                                    <span className="flex items-center gap-1 text-xs font-bold text-brand-dark shrink-0">
+                                    <span className="flex items-center gap-1 text-xs font-bold text-brand-dark dark:text-dark-heading shrink-0">
                                         <StarIcon size={12} className="text-brand-green fill-brand-green" />
                                         {Number(item.rating).toFixed(1)}
                                     </span>
                                 )}
                             </div>
                             {(item.category || item.subcategoryName) && (
-                                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px] font-medium text-brand-inactive-text">
+                                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
                                     {item.category && <span className="truncate">{item.category}</span>}
                                     {item.category && item.subcategoryName && <span className="w-1 h-1 rounded-full bg-brand-inactive-text shrink-0" />}
                                     {item.subcategoryName && <span className="truncate text-brand-green">{item.subcategoryName}</span>}
                                 </div>
                             )}
                             {locationLabel && (
-                                <p className="mt-1.5 text-[11px] text-gray-500 font-normal truncate">{locationLabel}</p>
+                                <p className="mt-1.5 text-[11px] text-gray-500 dark:text-dark-body font-normal truncate">{locationLabel}</p>
                             )}
                         </>
                     ) : (
                         <>
-                            <h3 className="line-clamp-2 text-sm md:text-[15px] font-normal text-brand-dark sm:max-w-full">{item.name}</h3>
+                            <h3 className="line-clamp-2 text-sm md:text-[15px] font-normal text-brand-dark dark:text-dark-heading sm:max-w-full">{item.name}</h3>
                             <div className="flex justify-between items-center mt-1">
                                 <div className="flex flex-col">
                                     {showPrice ? (
                                         <div className="flex items-baseline gap-2">
-                                            {item.originalPrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(item.originalPrice)}</span>}
-                                            <span className="text-base font-bold text-brand-dark leading-tight">{formatCurrency(item.price || 0)}</span>
+                                            {item.originalPrice && <span className="text-xs text-brand-inactive-text dark:text-dark-body line-through">{formatCurrency(item.originalPrice)}</span>}
+                                            <span className="text-base font-bold text-brand-dark dark:text-dark-heading leading-tight">{formatCurrency(item.price || 0)}</span>
                                         </div>
                                     ) : (
-                                        <span className="text-xs font-bold text-brand-dark">Preco sob consulta</span>
+                                        <span className="text-xs font-bold text-brand-dark dark:text-dark-heading">Preco sob consulta</span>
                                     )}
                                 </div>
                                 {(item.rating ?? 0) > 0 && (
                                     <div className="flex items-center gap-0.5 shrink-0">
                                         <StarIcon size={12} className="text-brand-green fill-brand-green" />
-                                        <span className="text-[11px] font-bold text-brand-dark">{Number(item.rating).toFixed(1)}</span>
+                                        <span className="text-[11px] font-bold text-brand-dark dark:text-dark-heading">{Number(item.rating).toFixed(1)}</span>
                                     </div>
                                 )}
                             </div>
                             {sellerName && (
                                 <>
-                                    <div className="border-t border-gray-100 my-2" />
+                                    <div className="border-t border-gray-100 dark:border-dark-border my-2" />
                                     <div className="flex items-start gap-2 pt-0.5">
                                         <UserProfileImage
                                             fullName={sellerName}
                                             imageUrl={sellerLogoUrl}
-                                            className="w-8 h-8 border border-gray-100 shrink-0 bg-gray-50"
+                                            className="w-8 h-8 border border-gray-100 dark:border-dark-border shrink-0 bg-gray-50 dark:bg-dark-border/30"
                                         />
                                         <div className="flex flex-col min-w-0">
-                                            <p className="text-[11px] md:text-xs text-brand-dark font-medium truncate leading-tight">
+                                            <p className="text-[11px] md:text-xs text-brand-dark dark:text-dark-heading font-medium truncate leading-tight">
                                                 {sellerName}
                                             </p>
                                             {locationLabel && (
-                                                <p className="text-[11px] text-gray-500 font-normal truncate">{locationLabel}</p>
+                                                <p className="text-[11px] text-gray-500 dark:text-dark-body font-normal truncate">{locationLabel}</p>
                                             )}
                                         </div>
                                     </div>
@@ -1251,14 +1251,14 @@ export function ExplorarPageClient({
                 {subcategoriesList.length > 0 && (
                     <div className="w-full">
                         <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-lg lg:text-2xl font-medium text-brand-dark">Subcategorias</h2>
+                            <h2 className="text-lg lg:text-2xl font-medium text-brand-dark dark:text-dark-heading">Subcategorias</h2>
                         </div>
                         <div className="flex gap-3 overflow-x-auto scrollbar-none snap-x snap-mandatory pb-2">
                             {subcategoriesList.map((sub) => (
                                 <button
                                     key={sub}
                                     onClick={() => {/* would filter by subcategory */ }}
-                                    className="shrink-0 px-4 py-2 rounded-full border border-gray-200 bg-white text-sm font-bold text-brand-dark hover:border-brand-green hover:bg-green-50 transition-colors whitespace-nowrap"
+                                    className="shrink-0 px-4 py-2 rounded-full border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface text-sm font-bold text-brand-dark dark:text-dark-heading hover:border-brand-green hover:bg-green-50 transition-colors whitespace-nowrap"
                                 >
                                     {sub}
                                 </button>
@@ -1366,7 +1366,7 @@ export function ExplorarPageClient({
     return (
         <>
             {!hideHeaderAndFooter && <MarketplaceHeader userProfile={userProfile} cartCount={cartCount} />}
-            <div className="min-h-screen bg-white font-sans animate-fade-in flex flex-col pt-2">
+            <div className="min-h-screen bg-white dark:bg-dark-background font-sans animate-fade-in flex flex-col pt-2">
                 <style>{`
                     .scrollbar-none::-webkit-scrollbar { display: none; }
                     .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
@@ -1390,7 +1390,7 @@ export function ExplorarPageClient({
                     {/* CATEGORIAS EM CÍRCULOS (type-aware) */}
                     {!query && activeCategoriesList.length > 0 && !isLandingPage && (
                         <div className="mb-6 lg:mb-8">
-                            <h2 className="text-lg lg:text-2xl font-medium text-brand-dark mb-4">Categorias</h2>
+                            <h2 className="text-lg lg:text-2xl font-medium text-brand-dark dark:text-dark-heading mb-4">Categorias</h2>
                             <div className="flex gap-4 overflow-x-auto scrollbar-none snap-x snap-mandatory pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                                 {activeCategoriesList.map((cat) => (
                                     <button
@@ -1398,14 +1398,14 @@ export function ExplorarPageClient({
                                         onClick={() => goToCategory(cat.name)}
                                         className="snap-start shrink-0 flex flex-col items-center gap-2 group w-[85px]"
                                     >
-                                        <div className="w-[68px] h-[68px] rounded-full bg-brand-gray border border-gray-100 flex items-center justify-center overflow-hidden group-hover:border-brand-green group-hover:shadow-md transition-all duration-200">
+                                        <div className="w-[68px] h-[68px] rounded-full bg-brand-gray dark:bg-dark-border/30 border border-gray-100 dark:border-dark-border flex items-center justify-center overflow-hidden group-hover:border-brand-green group-hover:shadow-md transition-all duration-200">
                                             {cat.icon_url ? (
                                                 <img src={cat.icon_url} alt={cat.name} className="w-9 h-9 object-contain" />
                                             ) : (
                                                 <span className="text-2xl">📦</span>
                                             )}
                                         </div>
-                                        <span className="text-[11px] font-bold text-center leading-tight text-brand-dark line-clamp-2">{cat.name}</span>
+                                        <span className="text-[11px] font-bold text-center leading-tight text-brand-dark dark:text-dark-heading line-clamp-2">{cat.name}</span>
                                     </button>
                                 ))}
                             </div>
@@ -1606,7 +1606,7 @@ export function ExplorarPageClient({
                                     ) : (
                                         <div className={viewMode === "grid"
                                             ? `grid ${currentType === 'vitrines' ? 'grid-cols sm:grid-cols-2 md:grid-cols-3' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6'} gap-3 md:gap-4 lg:gap-6 mt-4`
-                                            : "rounded-lg border border-gray-100 bg-white mt-4"
+                                            : "rounded-lg border border-gray-100 dark:border-dark-border bg-white dark:bg-dark-surface mt-4"
                                         }>
                                             {filteredResults.map((item) => renderListingItem(item))}
 
@@ -1618,7 +1618,7 @@ export function ExplorarPageClient({
                                                     {isFetchingNextPage ? (
                                                         <div className="flex flex-col items-center gap-2 animate-pulse">
                                                             <SkeletonLoader height={24} width={180} />
-                                                            <span className="text-[11px] font-bold text-brand-inactive-text">Carregando mais opcoes...</span>
+                                                            <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body">Carregando mais opcoes...</span>
                                                         </div>
                                                     ) : null}
                                                 </div>
@@ -1628,7 +1628,7 @@ export function ExplorarPageClient({
 
                                     {/* Carrossel de Itens Distantes na Busca */}
                                     {!!query && moreDistantItems.length > 0 && (
-                                        <div className="mt-12 pt-8 border-t border-gray-100">
+                                        <div className="mt-12 pt-8 border-t border-gray-100 dark:border-dark-border">
                                             <HorizontalCarousel
                                                 title="Um pouco mais distantes do seu raio de busca"
                                                 items={moreDistantItems}
@@ -1656,7 +1656,7 @@ export function ExplorarPageClient({
                                         ads={activeAds}
                                         slot={query ? "search" : "explore"}
                                         title="Patrocinados na sua região"
-                                        className="mt-12 pt-8 border-t border-gray-100"
+                                        className="mt-12 pt-8 border-t border-gray-100 dark:border-dark-border"
                                     />
                                 </>
                             )}
@@ -1716,9 +1716,9 @@ export function ExplorarPageClient({
                 title="📍 Localização"
                 maxWidth="md"
             >
-                <div className="flex flex-col gap-4 py-2 text-brand-dark">
+                <div className="flex flex-col gap-4 py-2 text-brand-dark dark:text-dark-heading">
                     <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-gray-500">Filtrar vendedores da cidade:</span>
+                        <span className="text-xs font-bold text-gray-500 dark:text-dark-body">Filtrar vendedores da cidade:</span>
                         {selectedCitySlug && (
                             <button
                                 onClick={() => {
@@ -1736,7 +1736,7 @@ export function ExplorarPageClient({
                         <input
                             type="text"
                             placeholder="Buscar cidade... (ex: São Paulo, Bauru)"
-                            className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none text-brand-dark"
+                            className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none text-brand-dark dark:text-dark-heading"
                             value={citySearchText}
                             onChange={(e) => setCitySearchText(e.target.value)}
                         />
@@ -1747,7 +1747,7 @@ export function ExplorarPageClient({
                             requestLocation()
                             setIsCityModalOpen(false)
                         }}
-                        className="w-full flex items-center justify-center gap-2 py-2.5 px-4 border rounded-md text-xs font-bold text-brand-dark"
+                        className="w-full flex items-center justify-center gap-2 py-2.5 px-4 border rounded-md text-xs font-bold text-brand-dark dark:text-dark-heading"
                     >
                         <MapPin className="w-4 h-4" />
                         <span>Usar minha localização</span>
@@ -1762,7 +1762,7 @@ export function ExplorarPageClient({
                                         handleSelectCity(slug)
                                         setIsCityModalOpen(false)
                                     }}
-                                    className="w-full text-left px-4 py-3 flex items-center justify-between text-sm font-medium text-brand-dark"
+                                    className="w-full text-left px-4 py-3 flex items-center justify-between text-sm font-medium text-brand-dark dark:text-dark-heading"
                                 >
                                     <span>{formatCitySlug(slug)}</span>
                                     {selectedCitySlug === slug && <Check className="w-4 h-4 text-brand-green" />}
@@ -1787,7 +1787,7 @@ export function ExplorarPageClient({
                             <button
                                 key={cat.name}
                                 onClick={() => toggleCategory(cat.name)}
-                                className="w-full text-left px-4 py-3 flex items-center justify-between text-sm font-medium text-brand-dark"
+                                className="w-full text-left px-4 py-3 flex items-center justify-between text-sm font-medium text-brand-dark dark:text-dark-heading"
                             >
                                 <div className="flex items-center gap-3">
                                     {cat.icon_url ? (

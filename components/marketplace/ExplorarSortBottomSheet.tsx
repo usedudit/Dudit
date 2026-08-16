@@ -32,7 +32,7 @@ export function ExplorarSortBottomSheet({
                         }}
                         className={`flex w-full items-center justify-between rounded-lg px-3 py-3 text-sm font-semibold transition-colors ${sortBy === option.value
                             ? "bg-[#ecfdf5] text-brand-green"
-                            : "text-brand-dark hover:bg-gray-50"
+                            : "text-brand-dark dark:text-dark-heading hover:bg-gray-50 dark:hover:bg-dark-border/30"
                             }`}
                     >
                         <span>{option.label}</span>

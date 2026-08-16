@@ -143,17 +143,17 @@ const getUniqueBrands = (methods: any[]) => Array.from(new Set(methods
     .filter(Boolean)))
 
 const RatingInline = ({ rating, reviewsCount, short }: { rating: number; reviewsCount: number; short?: boolean }) => (
-    <div className="flex items-center gap-1 text-[12px] lg:text-[13px] text-brand-dark">
+    <div className="flex items-center gap-1 text-[12px] lg:text-[13px] text-brand-dark dark:text-dark-heading">
         <StarIcon size={14} className="text-brand-green fill-brand-green shrink-0" />
         {reviewsCount > 0 ? (
             <>
                 <span className="font-semibold">{formatNumber(rating || 0, 1, 1)}</span>
-                <span className="text-brand-inactive-text">
+                <span className="text-brand-inactive-text dark:text-dark-body">
                     {short ? `(${reviewsCount})` : `(${reviewsCount} avaliações)`}
                 </span>
             </>
         ) : (
-            <span className="text-brand-inactive-text">{short ? "(0)" : "Sem avaliações"}</span>
+            <span className="text-brand-inactive-text dark:text-dark-body">{short ? "(0)" : "Sem avaliações"}</span>
         )}
     </div>
 )
@@ -162,9 +162,9 @@ const StatItem = ({ value, label, icon }: any) => (
     <div className="flex flex-col items-center flex-1 min-w-0">
         <div className="flex items-center gap-1.5 mb-0.5 min-w-0">
             {icon}
-            <span className="text-[14px] lg:text-[16px] font-semibold text-brand-dark truncate">{value}</span>
+            <span className="text-[14px] lg:text-[16px] font-semibold text-brand-dark dark:text-dark-heading truncate">{value}</span>
         </div>
-        <span className="text-[11px] text-brand-inactive-text font-medium uppercase">{label}</span>
+        <span className="text-[11px] text-brand-inactive-text dark:text-dark-body font-medium uppercase">{label}</span>
     </div>
 )
 
@@ -310,18 +310,18 @@ const MapboxMap = ({ lat, lng, name, address, isActive }: { lat?: number; lng?: 
     }, [isActive])
 
     if (!process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || !isMapping) {
-        return <div className="w-full h-full bg-gray-100 flex items-center justify-center p-4 text-center text-[12px] text-brand-inactive-text">Localização indisponível no mapa.</div>
+        return <div className="w-full h-full bg-gray-100 dark:bg-dark-border/50 flex items-center justify-center p-4 text-center text-[12px] text-brand-inactive-text dark:text-dark-body">Localização indisponível no mapa.</div>
     }
     if (mapError) {
-        return <div className="w-full h-full bg-gray-100 flex items-center justify-center p-4 text-center text-[12px] text-brand-inactive-text">Não foi possível carregar o mapa.</div>
+        return <div className="w-full h-full bg-gray-100 dark:bg-dark-border/50 flex items-center justify-center p-4 text-center text-[12px] text-brand-inactive-text dark:text-dark-body">Não foi possível carregar o mapa.</div>
     }
-    return <div ref={mapContainerRef} className="w-full h-full bg-gray-100" />
+    return <div ref={mapContainerRef} className="w-full h-full bg-gray-100 dark:bg-dark-border/50" />
 }
 
 const PaymentPill = ({ icon, label }: { icon?: string; label: string }) => (
-    <div className="h-9 px-3 rounded-[8px] border border-brand-border bg-white flex items-center gap-2">
+    <div className="h-9 px-3 rounded-[8px] border border-brand-border bg-white dark:bg-dark-surface flex items-center gap-2">
         {icon && <img src={icon} alt={label} className="h-4 max-w-[52px] object-contain" />}
-        <span className="text-[13px] text-brand-dark font-medium">{label}</span>
+        <span className="text-[13px] text-brand-dark dark:text-dark-heading font-medium">{label}</span>
     </div>
 )
 
@@ -367,8 +367,8 @@ const InfoTab = ({ partner, stats, isActive }: any) => {
             {partner.storeDescription && (
                 <>
                     <div>
-                        <h3 className="text-md lg:text-lg font-medium text-brand-dark mb-4">Sobre {partner.storeName}</h3>
-                        <p className="text-[15px] text-brand-inactive-text leading-relaxed whitespace-pre-wrap">{partner.storeDescription}</p>
+                        <h3 className="text-md lg:text-lg font-medium text-brand-dark dark:text-dark-heading mb-4">Sobre {partner.storeName}</h3>
+                        <p className="text-[15px] text-brand-inactive-text dark:text-dark-body leading-relaxed whitespace-pre-wrap">{partner.storeDescription}</p>
                     </div>
                     <div className="h-[1px] bg-brand-border w-full" />
                 </>
@@ -377,7 +377,7 @@ const InfoTab = ({ partner, stats, isActive }: any) => {
             {hasPaymentSections && (
                 <>
                     <div>
-                        <h3 className="text-md lg:text-lg font-medium text-brand-dark mb-4">Formas de pagamento</h3>
+                        <h3 className="text-md lg:text-lg font-medium text-brand-dark dark:text-dark-heading mb-4">Formas de pagamento</h3>
                         <div className="space-y-5">
                             {hasSimplePayments && (
                                 <div className="flex flex-wrap gap-2">
@@ -388,14 +388,14 @@ const InfoTab = ({ partner, stats, isActive }: any) => {
                             )}
                             {creditMethods.length > 0 && (
                                 <div>
-                                    <h4 className="text-[14px] font-semibold text-brand-dark mb-2">Cartão de crédito</h4>
-                                    {creditBrands.length > 0 ? <CardBrands brands={creditBrands} /> : <p className="text-[13px] text-brand-inactive-text">Bandeiras não informadas.</p>}
+                                    <h4 className="text-[14px] font-semibold text-brand-dark dark:text-dark-heading mb-2">Cartão de crédito</h4>
+                                    {creditBrands.length > 0 ? <CardBrands brands={creditBrands} /> : <p className="text-[13px] text-brand-inactive-text dark:text-dark-body">Bandeiras não informadas.</p>}
                                 </div>
                             )}
                             {debitMethods.length > 0 && (
                                 <div>
-                                    <h4 className="text-[14px] font-semibold text-brand-dark mb-2">Cartão de débito</h4>
-                                    {debitBrands.length > 0 ? <CardBrands brands={debitBrands} /> : <p className="text-[13px] text-brand-inactive-text">Bandeiras não informadas.</p>}
+                                    <h4 className="text-[14px] font-semibold text-brand-dark dark:text-dark-heading mb-2">Cartão de débito</h4>
+                                    {debitBrands.length > 0 ? <CardBrands brands={debitBrands} /> : <p className="text-[13px] text-brand-inactive-text dark:text-dark-body">Bandeiras não informadas.</p>}
                                 </div>
                             )}
                         </div>
@@ -407,11 +407,11 @@ const InfoTab = ({ partner, stats, isActive }: any) => {
             {hoursList.length > 0 && (
                 <>
                     <div>
-                        <h3 className="text-md lg:text-lg font-medium text-brand-dark mb-4">Horário de Funcionamento</h3>
+                        <h3 className="text-md lg:text-lg font-medium text-brand-dark dark:text-dark-heading mb-4">Horário de Funcionamento</h3>
                         <div className="space-y-3">
                             {hoursList.map((item: any) => {
-                                let dayColor = "text-brand-dark"
-                                let timeColor = "text-brand-inactive-text"
+                                let dayColor = "text-brand-dark dark:text-dark-heading"
+                                let timeColor = "text-brand-inactive-text dark:text-dark-body"
                                 if (item.isCurrentDay) {
                                     if (item.status === "closing_soon") {
                                         dayColor = "text-yellow-600 font-medium"
@@ -446,16 +446,16 @@ const InfoTab = ({ partner, stats, isActive }: any) => {
             )}
 
             <div>
-                <h3 className="text-md lg:text-lg font-medium text-brand-dark mb-4">Endereço</h3>
+                <h3 className="text-md lg:text-lg font-medium text-brand-dark dark:text-dark-heading mb-4">Endereço</h3>
                 <div className="flex items-start gap-3 mb-5">
-                    <MapPinIcon size={20} className="text-brand-inactive-text mt-1 shrink-0" />
+                    <MapPinIcon size={20} className="text-brand-inactive-text dark:text-dark-body mt-1 shrink-0" />
                     <div>
-                        <p className="text-[15px] text-brand-inactive-text">{partner.street}, {partner.number}</p>
-                        <p className="text-[15px] text-brand-inactive-text">{partner.city} - {partner.state}</p>
-                        <p className="text-[15px] text-brand-inactive-text">CEP: {partner.zipCode}</p>
+                        <p className="text-[15px] text-brand-inactive-text dark:text-dark-body">{partner.street}, {partner.number}</p>
+                        <p className="text-[15px] text-brand-inactive-text dark:text-dark-body">{partner.city} - {partner.state}</p>
+                        <p className="text-[15px] text-brand-inactive-text dark:text-dark-body">CEP: {partner.zipCode}</p>
                     </div>
                 </div>
-                <div className="w-full h-[150px] lg:h-[260px] rounded-[12px] overflow-hidden bg-gray-100 shrink-0">
+                <div className="w-full h-[150px] lg:h-[260px] rounded-[12px] overflow-hidden bg-gray-100 dark:bg-dark-border/50 shrink-0">
                     <MapboxMap lat={partner.lat} lng={partner.lng} name={partner.storeName} address={`${partner.street}, ${partner.number}, ${partner.city}/${partner.state}`} isActive={isActive} />
                 </div>
             </div>
@@ -498,7 +498,7 @@ function CarouselNav({ targetRef, showSeeAll, onSeeAll }: { targetRef: React.Ref
             {showSeeAll && <button onClick={onSeeAll} className="text-[13px] font-bold text-brand-green hover:underline px-2">Ver todos</button>}
             <div className="hidden lg:flex items-center gap-2">
                 {canLeft && (
-                    <Button variant="filled" onClick={() => scroll(-1)} className="h-9 w-9 p-0 rounded-full bg-brand-gray text-brand-dark hover:bg-gray-200">
+                    <Button variant="filled" onClick={() => scroll(-1)} className="h-9 w-9 p-0 rounded-full bg-brand-gray dark:bg-dark-border/30 text-brand-dark dark:text-dark-heading hover:bg-gray-200 dark:hover:bg-dark-border">
                         <ChevronLeftIcon size={18} />
                     </Button>
                 )}
@@ -518,7 +518,7 @@ function ItemsCarousel({ title, items, partner, onSeeAll, sectionId, promotions 
     return (
         <section id={sectionId} data-category-section={sectionId} className="scroll-mt-[150px] mb-10 lg:mb-12">
             <div className="flex items-end justify-between px-4 lg:px-0">
-                <h2 className="text-lg lg:text-2xl font-medium text-brand-dark mb-6">{title}</h2>
+                <h2 className="text-lg lg:text-2xl font-medium text-brand-dark dark:text-dark-heading mb-6">{title}</h2>
                 <CarouselNav targetRef={ref} showSeeAll={!!onSeeAll} onSeeAll={onSeeAll} />
             </div>
             <div ref={ref} className="flex gap-4 lg:gap-5 overflow-x-auto scrollbar-hide snap-x snap-mandatory pb-3">
@@ -538,7 +538,7 @@ function CouponsCarousel({ coupons, onCouponClick }: { coupons: any[]; onCouponC
     return (
         <section id="coupons" className="mb-10 lg:mb-12 scroll-mt-[150px]">
             <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg lg:text-2xl font-medium text-brand-dark mb-6">Cupons do vendedor</h2>
+                <h2 className="text-lg lg:text-2xl font-medium text-brand-dark dark:text-dark-heading mb-6">Cupons do vendedor</h2>
                 <CarouselNav targetRef={ref} />
             </div>
             <div ref={ref} className="flex gap-3 overflow-x-auto scrollbar-hide snap-x snap-mandatory pb-2">
@@ -1001,12 +1001,12 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                 cartCount={cartCount}
             />
 
-            <div className={`hidden lg:block fixed top-[108px] left-0 right-0 bg-white border-b border-brand-border z-[80] transition-all duration-200 ${isStickyVisible ? "translate-y-0 opacity-100" : "-translate-y-3 opacity-0 pointer-events-none"}`}>
+            <div className={`hidden lg:block fixed top-[108px] left-0 right-0 bg-white dark:bg-dark-surface border-b border-brand-border z-[80] transition-all duration-200 ${isStickyVisible ? "translate-y-0 opacity-100" : "-translate-y-3 opacity-0 pointer-events-none"}`}>
                 <div className="max-w-[1400px] mx-auto h-[76px] flex items-center gap-4">
-                    <UserProfileImage fullName={partner.storeName} imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl} className="w-12 h-12 border border-brand-border shrink-0 bg-gray-50" />
+                    <UserProfileImage fullName={partner.storeName} imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl} className="w-12 h-12 border border-brand-border shrink-0 bg-gray-50 dark:bg-dark-border/30" />
                     <div className="min-w-0">
-                        <h2 className="text-[17px] font-bold text-brand-dark truncate">{partner.storeName}</h2>
-                        <div className="flex items-center gap-2 text-[12px] text-brand-inactive-text">
+                        <h2 className="text-[17px] font-bold text-brand-dark dark:text-dark-heading truncate">{partner.storeName}</h2>
+                        <div className="flex items-center gap-2 text-[12px] text-brand-inactive-text dark:text-dark-body">
                             <span>{partner.city}, {partner.state}</span>
                             {partner.distance_km_formatted && <span>{partner.distance_km_formatted}</span>}
                             <RatingInline rating={displayRating} reviewsCount={displayReviewsCount} />
@@ -1035,21 +1035,21 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                     {/* Desktop Layout */}
                     <div className="hidden lg:flex items-center justify-between gap-4">
                         <div className="flex items-center gap-4 min-w-0 flex-1">
-                            <UserProfileImage fullName={partner.storeName} imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl} className="w-[80px] h-[80px] border border-brand-border shrink-0 bg-gray-50" />
+                            <UserProfileImage fullName={partner.storeName} imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl} className="w-[80px] h-[80px] border border-brand-border shrink-0 bg-gray-50 dark:bg-dark-border/30" />
                             <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center gap-2 mb-1">
-                                    <h1 className="text-[24px] font-semibold text-brand-dark leading-tight truncate">{partner.storeName}</h1>
+                                    <h1 className="text-[24px] font-semibold text-brand-dark dark:text-dark-heading leading-tight truncate">{partner.storeName}</h1>
                                     {displayReviewsCount > 0 && (
                                         <div className="flex items-center gap-1 text-[12px] text-brand-green bg-[#ecfdf5] border border-brand-green/20 px-2 py-0.5 rounded-full shrink-0">
                                             <StarIcon size={11} className="fill-brand-green text-brand-green" />
                                             <span className="font-bold">{formatNumber(displayRating || 0, 1, 1)}</span>
                                         </div>
                                     )}
-                                    <button onClick={() => setShowShareModal(true)} className="flex w-[26px] h-[26px] rounded-full border border-brand-border items-center justify-center text-brand-inactive-text hover:text-brand-green hover:border-brand-green transition-colors">
+                                    <button onClick={() => setShowShareModal(true)} className="flex w-[26px] h-[26px] rounded-full border border-brand-border items-center justify-center text-brand-inactive-text dark:text-dark-body hover:text-brand-green hover:border-brand-green transition-colors">
                                         <ShareIcon size={14} />
                                     </button>
                                 </div>
-                                <p className="text-[14px] text-brand-inactive-text font-normal">{partner.city}, {partner.state}</p>
+                                <p className="text-[14px] text-brand-inactive-text dark:text-dark-body font-normal">{partner.city}, {partner.state}</p>
                                 <div className="mt-1.5"><RatingInline rating={displayRating} reviewsCount={displayReviewsCount} /></div>
                             </div>
                         </div>
@@ -1059,11 +1059,11 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                         </div>
 
                         <div className="flex items-start gap-3">
-                            <button className="w-[42px] h-[42px] rounded-full border border-brand-border flex items-center justify-center text-brand-inactive-text hover:text-[#ef4444] hover:border-[#ef4444] transition-colors">
+                            <button className="w-[42px] h-[42px] rounded-full border border-brand-border flex items-center justify-center text-brand-inactive-text dark:text-dark-body hover:text-[#ef4444] hover:border-[#ef4444] transition-colors">
                                 <HeartIcon size={20} />
                             </button>
                             {!isStoreOwner && (
-                                <button onClick={() => setShowReportModal(true)} className="w-[42px] h-[42px] rounded-full border border-brand-border flex items-center justify-center text-brand-inactive-text hover:text-[#d32f2f] hover:border-[#d32f2f] transition-colors" title="Comunicar algo errado sobre este vendedor">
+                                <button onClick={() => setShowReportModal(true)} className="w-[42px] h-[42px] rounded-full border border-brand-border flex items-center justify-center text-brand-inactive-text dark:text-dark-body hover:text-[#d32f2f] hover:border-[#d32f2f] transition-colors" title="Comunicar algo errado sobre este vendedor">
                                     <FlagIcon size={20} />
                                 </button>
                             )}
@@ -1073,20 +1073,20 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                     {/* Mobile/Tablet Layout (lg:hidden) */}
                     <div className="lg:hidden flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <UserProfileImage fullName={partner.storeName} imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl} className="w-[60px] h-[60px] border border-brand-border shrink-0 bg-gray-50" />
+                            <UserProfileImage fullName={partner.storeName} imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl} className="w-[60px] h-[60px] border border-brand-border shrink-0 bg-gray-50 dark:bg-dark-border/30" />
                             <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
-                                    <h1 className="text-[16px] font-semibold text-brand-dark leading-tight truncate">{partner.storeName}</h1>
+                                    <h1 className="text-[16px] font-semibold text-brand-dark dark:text-dark-heading leading-tight truncate">{partner.storeName}</h1>
                                     <RatingInline rating={displayRating} reviewsCount={displayReviewsCount} short />
                                 </div>
-                                <p className="text-[12px] text-brand-inactive-text font-normal leading-tight">{partner.city}, {partner.state}</p>
+                                <p className="text-[12px] text-brand-inactive-text dark:text-dark-body font-normal leading-tight">{partner.city}, {partner.state}</p>
                             </div>
                         </div>
 
                         <div className="flex items-center gap-1.5 shrink-0">
                             <button
                                 onClick={() => setIsAboutPageOpen(true)}
-                                className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-brand-dark active:bg-gray-200 transition-colors"
+                                className="w-8 h-8 rounded-full bg-gray-100 dark:bg-dark-border/50 flex items-center justify-center text-brand-dark dark:text-dark-heading active:bg-gray-200 dark:active:bg-dark-border transition-colors"
                             >
                                 <InfoIcon size={14} />
                             </button>
@@ -1154,12 +1154,12 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
             )}
 
             <div className="flex flex-col lg:flex-row gap-10 px-0 pb-20 items-start">
-                <aside className="hidden lg:block w-[260px] shrink-0 sticky top-[198px] z-20 bg-white self-start">
+                <aside className="hidden lg:block w-[260px] shrink-0 sticky top-[198px] z-20 bg-white dark:bg-dark-surface self-start">
                     {categoryView ? (
-                        <div className="border-r border-gray-100 pr-5">
+                        <div className="border-r border-gray-100 dark:border-dark-border pr-5">
                             <div className="sticky top-[128px] space-y-6 py-5 max-h-[calc(100vh-140px)] overflow-y-hidden">
                                 <div className="flex items-center justify-between gap-3">
-                                    <h2 className="text-base font-bold text-brand-dark">Filtros</h2>
+                                    <h2 className="text-base font-bold text-brand-dark dark:text-dark-heading">Filtros</h2>
                                     {categoryActiveFiltersCount > 0 && (
                                         <button
                                             onClick={() => {
@@ -1177,11 +1177,11 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                 </div>
                                 <Separator className="my-0" />
                                 <section>
-                                    <h3 className="mb-3 text-sm font-bold text-brand-dark">Ordenar</h3>
+                                    <h3 className="mb-3 text-sm font-bold text-brand-dark dark:text-dark-heading">Ordenar</h3>
                                     <select
                                         value={categorySortBy}
                                         onChange={(e) => setCategorySortBy(e.target.value as any)}
-                                        className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-semibold text-brand-dark focus:outline-none focus:border-brand-green"
+                                        className="w-full rounded-lg border border-gray-200 dark:border-dark-border px-3 py-2.5 text-sm font-semibold text-brand-dark dark:text-dark-heading focus:outline-none focus:border-brand-green"
                                     >
                                         <option value="relevancia">Relevância</option>
                                         <option value="preco_menor">Menor Preço</option>
@@ -1190,7 +1190,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                     </select>
                                 </section>
                                 <section>
-                                    <h3 className="mb-3 text-sm font-bold text-brand-dark">Preço</h3>
+                                    <h3 className="mb-3 text-sm font-bold text-brand-dark dark:text-dark-heading">Preço</h3>
                                     <div className="grid grid-cols-2 gap-2">
                                         <MoneyInput
                                             value={categoryMinPrice}
@@ -1207,20 +1207,20 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                     </div>
                                 </section>
                                 <section>
-                                    <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-50 transition-colors">
+                                    <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-dark-border/30 transition-colors">
                                         <Checkbox
                                             checked={categoryPromoOn}
                                             onChange={() => setCategoryPromoOn(!categoryPromoOn)}
                                         />
-                                        <span className="text-sm font-medium text-brand-dark">Em promoção</span>
+                                        <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">Em promoção</span>
                                     </label>
                                 </section>
                                 {categoryAvailableBrands.length > 0 && (
                                     <section>
-                                        <h3 className="mb-3 text-sm font-bold text-brand-dark">Marca</h3>
+                                        <h3 className="mb-3 text-sm font-bold text-brand-dark dark:text-dark-heading">Marca</h3>
                                         <div className="space-y-2">
                                             {categoryAvailableBrands.map(brand => (
-                                                <label key={brand} className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-50 transition-colors">
+                                                <label key={brand} className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-dark-border/30 transition-colors">
                                                     <Checkbox
                                                         checked={categorySelectedBrands.includes(brand)}
                                                         onChange={() => {
@@ -1229,7 +1229,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                                             )
                                                         }}
                                                     />
-                                                    <span className="text-sm font-medium text-brand-dark truncate">{brand}</span>
+                                                    <span className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate">{brand}</span>
                                                 </label>
                                             ))}
                                         </div>
@@ -1240,10 +1240,10 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                     ) : (
                         <div>
                             <div className="mb-8">
-                                <h3 className="font-normal text-brand-dark text-[16px] mb-3">Sobre {partner.storeName}</h3>
+                                <h3 className="font-normal text-brand-dark dark:text-dark-heading text-[16px] mb-3">Sobre {partner.storeName}</h3>
                                 <div className="flex flex-col gap-1">
                                     {([{ id: "info", label: "Informações" }, { id: "reviews", label: "Avaliações" }, { id: "gallery", label: "Galeria" }] as const).map(b => (
-                                        <button key={b.id} onClick={() => setActiveSection(b.id)} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeSection === b.id ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text hover:bg-brand-gray"}`}>
+                                        <button key={b.id} onClick={() => setActiveSection(b.id)} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeSection === b.id ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/50"}`}>
                                             <span>{b.label}</span>
                                             {activeSection === b.id && <Check size={16} className="ml-auto" />}
                                         </button>
@@ -1256,20 +1256,20 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
 
                             {(services.length > 0 || hasPlans) && (
                                 <div className="mb-8 border-t border-brand-border pt-6">
-                                    <h3 className="font-normal text-brand-dark text-[16px] mb-3">Catálogo</h3>
+                                    <h3 className="font-normal text-brand-dark dark:text-dark-heading text-[16px] mb-3">Catálogo</h3>
                                     <div className="flex flex-col gap-1">
-                                        <button onClick={() => { setActiveContext("Produtos"); setActiveSection("products"); setActiveTag("todos"); setCategoryView(null) }} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeContext === "Produtos" && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text hover:bg-brand-gray"}`}>
+                                        <button onClick={() => { setActiveContext("Produtos"); setActiveSection("products"); setActiveTag("todos"); setCategoryView(null) }} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeContext === "Produtos" && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/50"}`}>
                                             <span>Produtos</span>
                                             {activeContext === "Produtos" && activeSection === "products" && <Check size={16} className="ml-auto" />}
                                         </button>
                                         {services.length > 0 && (
-                                            <button onClick={() => { setActiveContext("Servicos"); setActiveSection("products"); setActiveTag("todos"); setCategoryView(null) }} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeContext === "Servicos" && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text hover:bg-brand-gray"}`}>
+                                            <button onClick={() => { setActiveContext("Servicos"); setActiveSection("products"); setActiveTag("todos"); setCategoryView(null) }} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeContext === "Servicos" && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/50"}`}>
                                                 <span>Serviços</span>
                                                 {activeContext === "Servicos" && activeSection === "products" && <Check size={16} className="ml-auto" />}
                                             </button>
                                         )}
                                         {hasPlans && (
-                                            <button onClick={() => { setActiveContext("Planos"); setActiveSection("products"); setActiveTag("todos"); setCategoryView(null) }} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeContext === "Planos" && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text hover:bg-brand-gray"}`}>
+                                            <button onClick={() => { setActiveContext("Planos"); setActiveSection("products"); setActiveTag("todos"); setCategoryView(null) }} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeContext === "Planos" && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/50"}`}>
                                                 <span>Assinaturas</span>
                                                 {activeContext === "Planos" && activeSection === "products" && <Check size={16} className="ml-auto" />}
                                             </button>
@@ -1278,20 +1278,20 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                 </div>
                             )}
 
-                            <h3 className="font-normal text-brand-dark text-[16px] mb-4">Seções</h3>
+                            <h3 className="font-normal text-brand-dark dark:text-dark-heading text-[16px] mb-4">Seções</h3>
                             <div className="flex flex-col gap-1 mb-8">
                                 {featuredItems.length > 0 && (
-                                    <button onClick={() => selectTab("featured")} className={`text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center justify-between ${activeTag === "featured" && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text hover:bg-brand-gray"}`}>
+                                    <button onClick={() => selectTab("featured")} className={`text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center justify-between ${activeTag === "featured" && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/50"}`}>
                                         <span>Itens destacados</span>
                                         {activeTag === "featured" && activeSection === "products" && <Check size={16} />}
                                     </button>
                                 )}
-                                <button onClick={() => selectTab("todos")} className={`text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center justify-between ${activeTag === "todos" && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text hover:bg-brand-gray"}`}>
+                                <button onClick={() => selectTab("todos")} className={`text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center justify-between ${activeTag === "todos" && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/50"}`}>
                                     <span>Todos</span>
                                     {activeTag === "todos" && activeSection === "products" && <Check size={16} />}
                                 </button>
                                 {groupedItems.map(group => (
-                                    <button key={group.id} onClick={() => selectTab(group.id)} className={`text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center justify-between ${activeTag === group.id && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text hover:bg-brand-gray"}`}>
+                                    <button key={group.id} onClick={() => selectTab(group.id)} className={`text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center justify-between ${activeTag === group.id && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/50"}`}>
                                         <span className="capitalize">{group.name}</span>
                                         {activeTag === group.id && activeSection === "products" && <Check size={16} />}
                                     </button>
@@ -1311,8 +1311,8 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                             <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                         </Button>
                                         <div>
-                                            <h2 className="text-xl lg:text-[24px] font-semibold text-brand-dark">{categoryName}</h2>
-                                            <p className="text-sm font-medium text-brand-inactive-text mt-1">{categoryFilteredItems.length} resultado{categoryFilteredItems.length !== 1 ? "s" : ""} encontrado{categoryFilteredItems.length !== 1 ? "s" : ""}</p>
+                                            <h2 className="text-xl lg:text-[24px] font-semibold text-brand-dark dark:text-dark-heading">{categoryName}</h2>
+                                            <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mt-1">{categoryFilteredItems.length} resultado{categoryFilteredItems.length !== 1 ? "s" : ""} encontrado{categoryFilteredItems.length !== 1 ? "s" : ""}</p>
                                         </div>
                                     </div>
                                     {categoryFilteredItems.length > 0 ? (
@@ -1374,7 +1374,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                                                 promotions={partnerPromotions}
                                                                 hidePromoBadge={true}
                                                                 hideSalesCount
-                                                                className="w-[145px] md:w-[175px] bg-white p-2.5 rounded-xl border border-gray-100 shadow-sm"
+                                                                className="w-[145px] md:w-[175px] bg-white dark:bg-dark-surface p-2.5 rounded-xl border border-gray-100 dark:border-dark-border shadow-sm"
                                                             />
                                                         </div>
                                                     ))}
@@ -1420,7 +1420,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                         <div style={{ display: activeSection === "info" ? "block" : "none" }}>
                             {infoHasBeenOpened && (
                                 <>
-                                    <h2 className="text-[24px] font-normal text-brand-dark mb-6">Informações de {partner.storeName}</h2>
+                                    <h2 className="text-[24px] font-normal text-brand-dark dark:text-dark-heading mb-6">Informações de {partner.storeName}</h2>
                                     <InfoTab partner={{ ...partner, rating: displayRating }} stats={{ ...stats, reviewsCount: displayReviewsCount }} isActive={activeSection === "info"} />
                                 </>
                             )}
@@ -1428,7 +1428,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                         <div style={{ display: activeSection === "reviews" ? "block" : "none" }}>
                             {reviewsHasBeenOpened && (
                                 <>
-                                    <h2 className="text-[24px] font-normal text-brand-dark mb-6">Avaliações</h2>
+                                    <h2 className="text-[24px] font-normal text-brand-dark dark:text-dark-heading mb-6">Avaliações</h2>
                                     <ReviewsTab reviews={reviews} />
                                 </>
                             )}
@@ -1436,7 +1436,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                         <div style={{ display: activeSection === "gallery" ? "block" : "none" }}>
                             {galleryHasBeenOpened && (
                                 <>
-                                    <h2 className="text-[24px] font-normal text-brand-dark mb-6">Galeria</h2>
+                                    <h2 className="text-[24px] font-normal text-brand-dark dark:text-dark-heading mb-6">Galeria</h2>
                                     <GalleryTab partner={partner} isStoreOwner={isStoreOwner} gallery={gallery} setGallery={setGallery} localImages={localImages} setLocalImages={setLocalImages} />
                                 </>
                             )}
@@ -1451,14 +1451,14 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
             <DefaultModal isOpen={!!selectedCoupon} onClose={() => setSelectedCoupon(null)} title={selectedCoupon?.code || "Cupom"} maxWidth="sm">
                 {selectedCoupon && (
                     <div className="space-y-4">
-                        <div className="rounded-[8px] bg-brand-gray p-4">
-                            <p className="text-[28px] font-bold text-brand-dark">{formatCouponValue(selectedCoupon)}</p>
-                            <p className="text-sm text-brand-inactive-text mt-1">{couponScopeLabel(selectedCoupon.apply_scope)}</p>
+                        <div className="rounded-[8px] bg-brand-gray dark:bg-dark-border/30 p-4">
+                            <p className="text-[28px] font-bold text-brand-dark dark:text-dark-heading">{formatCouponValue(selectedCoupon)}</p>
+                            <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-1">{couponScopeLabel(selectedCoupon.apply_scope)}</p>
                         </div>
-                        {Number(selectedCoupon.min_cart_value || 0) > 0 && <p className="text-sm text-brand-inactive-text">Pedido minimo de {formatCurrency(Number(selectedCoupon.min_cart_value))}.</p>}
-                        {Number(selectedCoupon.max_discount_value || 0) > 0 && <p className="text-sm text-brand-inactive-text">Desconto maximo de {formatCurrency(Number(selectedCoupon.max_discount_value))}.</p>}
-                        {selectedCoupon.first_purchase_only && <p className="text-sm text-brand-inactive-text">Valido apenas para primeira compra.</p>}
-                        {selectedCoupon.ends_at && <p className="text-sm text-brand-inactive-text">Valido ate {formatDate(selectedCoupon.ends_at)}.</p>}
+                        {Number(selectedCoupon.min_cart_value || 0) > 0 && <p className="text-sm text-brand-inactive-text dark:text-dark-body">Pedido minimo de {formatCurrency(Number(selectedCoupon.min_cart_value))}.</p>}
+                        {Number(selectedCoupon.max_discount_value || 0) > 0 && <p className="text-sm text-brand-inactive-text dark:text-dark-body">Desconto maximo de {formatCurrency(Number(selectedCoupon.max_discount_value))}.</p>}
+                        {selectedCoupon.first_purchase_only && <p className="text-sm text-brand-inactive-text dark:text-dark-body">Valido apenas para primeira compra.</p>}
+                        {selectedCoupon.ends_at && <p className="text-sm text-brand-inactive-text dark:text-dark-body">Valido ate {formatDate(selectedCoupon.ends_at)}.</p>}
                     </div>
                 )}
             </DefaultModal>
@@ -1471,7 +1471,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                         ...(hasPlans ? [{ value: "Planos", label: "Assinaturas" }] : [])
                     ].map((opt, i, arr) => (
                         <div key={opt.value} onClick={() => { setActiveContext(opt.value as any); setCategoryView(null); setActiveTag("todos"); setIsContextModalOpen(false) }} className={`flex items-center justify-between py-5 cursor-pointer ${i < arr.length - 1 ? "border-b border-brand-border" : ""}`}>
-                            <span className={`text-[16px] ${activeContext === opt.value ? "font-medium text-brand-green" : "font-normal text-brand-dark"}`}>{opt.label}</span>
+                            <span className={`text-[16px] ${activeContext === opt.value ? "font-medium text-brand-green" : "font-normal text-brand-dark dark:text-dark-heading"}`}>{opt.label}</span>
                             <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${activeContext === opt.value ? "border-brand-green" : "border-brand-border"}`}>
                                 {activeContext === opt.value && <div className="w-3 h-3 bg-brand-green rounded-full animate-scale-in" />}
                             </div>
@@ -1484,21 +1484,21 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                 <div className="flex flex-col">
                     <div className="px-1 py-2 flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <UserProfileImage fullName={partner.storeName} imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl} className="w-[50px] h-[50px] border border-brand-border shrink-0 bg-gray-50" />
+                            <UserProfileImage fullName={partner.storeName} imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl} className="w-[50px] h-[50px] border border-brand-border shrink-0 bg-gray-50 dark:bg-dark-border/30" />
                             <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center gap-1.5 min-w-0">
-                                    <h2 className="text-[16px] font-bold text-brand-dark leading-tight truncate">{partner.storeName}</h2>
+                                    <h2 className="text-[16px] font-bold text-brand-dark dark:text-dark-heading leading-tight truncate">{partner.storeName}</h2>
                                     <RatingInline rating={displayRating} reviewsCount={displayReviewsCount} short />
                                 </div>
-                                <p className="text-[13px] text-brand-inactive-text font-normal leading-tight mt-0.5">{partner.city}, {partner.state}</p>
+                                <p className="text-[13px] text-brand-inactive-text dark:text-dark-body font-normal leading-tight mt-0.5">{partner.city}, {partner.state}</p>
                             </div>
                         </div>
                         <div className="flex flex-col items-end shrink-0 text-right">
-                            <span className="text-[13px] font-medium text-brand-dark leading-tight">{stats.salesCount >= 1000 ? `${formatNumber(stats.salesCount / 1000, 1, 1)}k` : stats.salesCount} vendas</span>
-                            <span className="text-[13px] font-medium text-brand-inactive-text leading-tight mt-1">{formatJoinDate(partner.createdAt)}</span>
+                            <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading leading-tight">{stats.salesCount >= 1000 ? `${formatNumber(stats.salesCount / 1000, 1, 1)}k` : stats.salesCount} vendas</span>
+                            <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body leading-tight mt-1">{formatJoinDate(partner.createdAt)}</span>
                         </div>
                     </div>
-                    <div className="sticky top-0 z-40 bg-white border-b border-brand-border my-4">
+                    <div className="sticky top-0 z-40 bg-white dark:bg-dark-surface border-b border-brand-border my-4">
                         <Tabs value={mobileModalTab} onValueChange={(v) => setMobileModalTab(v as any)}>
                             <TabsList className="justify-center gap-6 bg-transparent">
                                 <TabsTrigger value="reviews" className="text-[15px] pb-3">Avaliações</TabsTrigger>
@@ -1735,7 +1735,7 @@ function GalleryTab({ partner, isStoreOwner, gallery, setGallery, localImages, s
                     {localImages.map((img, idx) => {
                         const srcUrl = img.startsWith("data:") ? img : getR2ImageUrl(img)
                         return (
-                            <div key={idx} className="relative aspect-square rounded-2xl overflow-hidden border border-brand-border bg-brand-gray group shadow-sm">
+                            <div key={idx} className="relative aspect-square rounded-2xl overflow-hidden border border-brand-border bg-brand-gray dark:bg-dark-border/30 group shadow-sm">
                                 <img
                                     src={srcUrl}
                                     alt={`Galeria ${idx + 1}`}
@@ -1765,9 +1765,9 @@ function GalleryTab({ partner, isStoreOwner, gallery, setGallery, localImages, s
                             onClick={() => fileInputRef.current?.click()}
                             className="relative aspect-square rounded-2xl border-2 border-dashed border-gray-300 hover:border-brand-green dark:border-white/10 dark:hover:border-brand-green flex flex-col items-center justify-center cursor-pointer transition-colors hover:bg-brand-green/[0.02]"
                         >
-                            <PlusIcon size={24} className="text-brand-inactive-text hover:text-brand-green transition-colors mb-2" />
-                            <span className="text-[13px] font-semibold text-brand-dark">Adicionar foto</span>
-                            <span className="text-[11px] text-brand-inactive-text mt-1">{localImages.length} de {limit}</span>
+                            <PlusIcon size={24} className="text-brand-inactive-text dark:text-dark-body hover:text-brand-green transition-colors mb-2" />
+                            <span className="text-[13px] font-semibold text-brand-dark dark:text-dark-heading">Adicionar foto</span>
+                            <span className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-1">{localImages.length} de {limit}</span>
                             <input
                                 ref={fileInputRef}
                                 type="file"
@@ -1783,8 +1783,8 @@ function GalleryTab({ partner, isStoreOwner, gallery, setGallery, localImages, s
             {isStoreOwner && isDirty && (
                 <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-white/90 dark:bg-dark-surface/90 border border-brand-border dark:border-dark-border backdrop-blur-md px-6 py-4 rounded-2xl shadow-xl flex items-center gap-6 animate-slide-up max-w-[90%] md:max-w-md w-full justify-between">
                     <div className="flex flex-col">
-                        <span className="text-[13px] font-bold text-brand-dark">Alterações pendentes</span>
-                        <span className="text-[11px] text-brand-inactive-text">Galeria modificada ({localImages.length} de {limit})</span>
+                        <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">Alterações pendentes</span>
+                        <span className="text-[11px] text-brand-inactive-text dark:text-dark-body">Galeria modificada ({localImages.length} de {limit})</span>
                     </div>
                     <div className="flex gap-2.5">
                         <Button variant="outline" size="sm" onClick={handleCancel} disabled={isSaving} className="h-9 px-3">

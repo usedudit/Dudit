@@ -318,16 +318,16 @@ export default function MarketplaceHome({
     const hasNoProductsOrVitrines = selectedCityName && sections.length === 0
 
     const renderMarketingSection = () => (
-        <section className="bg-[#fff3db] py-16 md:py-24 mb-0 w-full mt-auto">
+        <section className="bg-[#fff3db] py-16 md:py-24 mb-0 w-full mt-auto dark:bg-[#2a2417]">
             <div className="mx-auto max-w-[1400px] px-4 flex flex-col md:flex-row items-center gap-12 md:gap-24">
                 <div className="flex-1 md:max-w-[500px]">
-                    <h1 className="text-4xl md:text-[3.5rem] font-black text-brand-dark mb-6 leading-[1.1] tracking-tight">
+                    <h1 className="text-4xl md:text-[3.5rem] font-black text-brand-dark mb-6 leading-[1.1] tracking-tight dark:text-dark-heading">
                         Pare de trabalhar para pagar comissão. Fique com o lucro.
                     </h1>
-                    <p className="font-bold text-gray-800 text-lg mb-4">
+                    <p className="font-bold text-gray-800 text-lg mb-4 dark:text-dark-heading">
                         Chega de dar 20% da sua venda pros aplicativos e depender de algoritmos.
                     </p>
-                    <p className="text-gray-600 text-base md:text-lg mb-8 leading-relaxed">
+                    <p className="text-gray-600 text-base md:text-lg mb-8 leading-relaxed dark:text-dark-body">
                         Monte sua vitrine, organize seus clientes e venda direto, de graça. <br /><br />
                         Não somos um marketplace mercenário. Aqui não tem taxa e o cliente é seu do começo ao fim.
                     </p>
@@ -377,7 +377,7 @@ export default function MarketplaceHome({
                                 onClick={() => setForm(f => ({ ...f, addressType: opt.value }))}
                                 className={`px-4 py-1.5 rounded-full text-[13px] font-medium border transition-all ${form.addressType === opt.value
                                     ? "bg-brand-green text-white border-brand-green"
-                                    : "bg-white text-brand-inactive-text border-gray-200 hover:border-gray-300"
+                                    : "bg-white text-brand-inactive-text border-gray-200 hover:border-gray-300 dark:bg-dark-surface dark:text-dark-body dark:border-dark-border dark:hover:border-dark-border"
                                     }`}
                             >
                                 {opt.label}
@@ -503,8 +503,8 @@ export default function MarketplaceHome({
                         />
                     </div>
 
-                    <h4 className="text-xl font-bold text-brand-dark mb-4 text-center">Onde você está?</h4>
-                    <p className="text-gray-500 text-sm text-center mb-6 leading-relaxed">
+                    <h4 className="text-xl font-bold text-brand-dark mb-4 text-center dark:text-dark-heading">Onde você está?</h4>
+                    <p className="text-gray-500 text-sm text-center mb-6 leading-relaxed dark:text-dark-body">
                         Informe sua cidade para ver os produtos, vitrines e serviços pertinho de você.
                     </p>
 
@@ -519,12 +519,12 @@ export default function MarketplaceHome({
                                 onChange={(e) => setSearchQuery(e.target.value)}
                             />
                             {filteredCities.length > 0 && (
-                                <div className="absolute z-[100] left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-48 overflow-y-auto divide-y divide-gray-100">
+                                <div className="absolute z-[100] left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-48 overflow-y-auto divide-y divide-gray-100 dark:bg-dark-surface dark:border-dark-border dark:divide-dark-border">
                                     {filteredCities.map((slug) => (
                                         <button
                                             key={slug}
                                             onClick={() => handleSelectCitySlug(slug)}
-                                            className="w-full text-left px-4 py-3 hover:bg-brand-gray text-brand-dark text-sm transition-colors font-medium flex items-center gap-2"
+                                            className="w-full text-left px-4 py-3 hover:bg-brand-gray text-brand-dark text-sm transition-colors font-medium flex items-center gap-2 dark:hover:bg-dark-border/50 dark:text-dark-heading"
                                         >
                                             <MapPinIcon size={14} className="text-brand-green shrink-0" />
                                             {formatCitySlugForDisplay(slug)}
@@ -553,8 +553,8 @@ export default function MarketplaceHome({
                         </button>
                     </div>
 
-                    <div className="text-center mt-8 pt-5 border-t border-gray-100">
-                        <p className="text-xs text-gray-400">
+                    <div className="text-center mt-8 pt-5 border-t border-gray-100 dark:border-dark-border">
+                        <p className="text-xs text-gray-400 dark:text-dark-body/70">
                             Já tem uma conta cadastrada com endereço salvo?
                         </p>
                         <button
@@ -576,14 +576,14 @@ export default function MarketplaceHome({
 
     if (hasNoLocation) {
         content = (
-            <div className="w-full bg-white flex-grow flex flex-col">
+            <div className="w-full bg-white flex-grow flex flex-col dark:bg-dark-surface">
                 <HeroBanner />
 
                 <div className="container mx-auto px-4 lg:px-0 max-w-[1400px] my-12 flex-grow flex items-center justify-center">
-                    <div className="bg-[#fcf8f2] rounded-[24px] border border-[#f5e9d9] p-8 md:p-12 w-full flex flex-col md:flex-row items-center justify-between gap-8 shadow-sm">
+                    <div className="bg-[#fcf8f2] rounded-[24px] border border-[#f5e9d9] p-8 md:p-12 w-full flex flex-col md:flex-row items-center justify-between gap-8 shadow-sm dark:bg-[#2a2417] dark:border-[#3a3120]">
                         <div className="flex-grow text-center md:text-left md:max-w-[65%]">
-                            <h2 className="text-3xl font-black text-brand-dark mb-4 leading-tight">Onde você está?</h2>
-                            <p className="text-gray-600 text-lg mb-6 leading-relaxed">
+                            <h2 className="text-3xl font-black text-brand-dark mb-4 leading-tight dark:text-dark-heading">Onde você está?</h2>
+                            <p className="text-gray-600 text-lg mb-6 leading-relaxed dark:text-dark-body">
                                 Para encontrar os melhores produtos, serviços e negócios locais pertinho de você, precisamos saber a sua localização.
                             </p>
                             <div className="flex flex-wrap gap-4 justify-center md:justify-start">
@@ -606,7 +606,7 @@ export default function MarketplaceHome({
                                 <button
                                     onClick={requestLocation}
                                     disabled={isLocationLoading}
-                                    className="bg-white border-2 border-brand-green text-brand-green font-bold py-3.5 px-8 rounded-full hover:bg-brand-green/5 transition-all transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
+                                    className="bg-white border-2 border-brand-green text-brand-green font-bold py-3.5 px-8 rounded-full hover:bg-brand-green/5 transition-all transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 dark:bg-dark-surface"
                                 >
                                     {isLocationLoading ? (
                                         <>
@@ -635,7 +635,7 @@ export default function MarketplaceHome({
         )
     } else if (hasNoProductsOrVitrines) {
         content = (
-            <div className="w-full bg-white flex-grow flex flex-col">
+            <div className="w-full bg-white flex-grow flex flex-col dark:bg-dark-surface">
                 <HeroBanner />
 
                 <div className="container mx-auto px-4 lg:px-0 max-w-[1400px] my-12 flex-grow flex items-center justify-center">
@@ -664,7 +664,7 @@ export default function MarketplaceHome({
         )
     } else {
         content = (
-            <div className="w-full bg-white flex-grow">
+            <div className="w-full bg-white flex-grow dark:bg-dark-surface">
                 <HeroBanner />
 
                 <div className="mx-auto max-w-[1400px] px-4 xl:px-0 space-y-10">
@@ -707,7 +707,7 @@ export default function MarketplaceHome({
     }
 
     return (
-        <div className="min-h-screen bg-white pt-[40px] lg:pt-[110px] font-sans flex flex-col">
+        <div className="min-h-screen bg-white pt-[40px] lg:pt-[110px] font-sans flex flex-col dark:bg-dark-background">
             {/* Header com setView opcional para evitar erros */}
             <MarketplaceHeader currentView="home" userProfile={userProfile} cartCount={cartCount} />
 

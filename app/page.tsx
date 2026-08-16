@@ -113,19 +113,19 @@ async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, city
 
 function HomeFeedSkeleton() {
     return (
-        <div className="w-full bg-white flex-grow">
+        <div className="w-full bg-white flex-grow dark:bg-dark-surface">
             <section className="mt-6 mb-12 px-4 lg:px-0 flex justify-center w-full">
-                <div className="w-full max-w-[1400px] rounded-xl lg:rounded-2xl bg-gray-100 animate-pulse aspect-[2.65/1] md:aspect-auto md:h-[300px]" />
+                <div className="w-full max-w-[1400px] rounded-xl lg:rounded-2xl bg-gray-100 animate-pulse aspect-[2.65/1] md:aspect-auto md:h-[300px] dark:bg-dark-border/50" />
             </section>
             <div className="mx-auto max-w-[1400px] px-4 xl:px-0 space-y-10 pb-12">
                 <div className="space-y-4">
-                    <div className="h-6 w-48 bg-gray-200 rounded animate-pulse" />
+                    <div className="h-6 w-48 bg-gray-200 rounded animate-pulse dark:bg-dark-border" />
                     <div className="flex gap-4 overflow-hidden">
                         {[1, 2, 3, 4, 5, 6].map((i) => (
                             <div key={i} className="w-[190px] sm:w-[210px] shrink-0 space-y-3">
-                                <div className="w-full aspect-square bg-gray-100 rounded-2xl animate-pulse" />
-                                <div className="h-4 bg-gray-100 rounded w-3/4 animate-pulse" />
-                                <div className="h-4 bg-gray-100 rounded w-1/2 animate-pulse" />
+                                <div className="w-full aspect-square bg-gray-100 rounded-2xl animate-pulse dark:bg-dark-border/50" />
+                                <div className="h-4 bg-gray-100 rounded w-3/4 animate-pulse dark:bg-dark-border/50" />
+                                <div className="h-4 bg-gray-100 rounded w-1/2 animate-pulse dark:bg-dark-border/50" />
                             </div>
                         ))}
                     </div>
@@ -208,7 +208,7 @@ export default async function HomePage() {
     const cartCount = sessionData?.cartCount || 0
 
     return (
-        <div className="bg-white min-h-screen font-sans text-brand-dark flex flex-col pt-[110px] lg:pt-[108px]">
+        <div className="bg-white min-h-screen font-sans text-brand-dark flex flex-col pt-[110px] lg:pt-[108px] dark:bg-dark-background dark:text-dark-heading">
             <link
                 rel="preload"
                 as="image"

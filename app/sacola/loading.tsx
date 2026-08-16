@@ -25,7 +25,7 @@ export default function CartLoading() {
                                 {/* Vendor Cart */}
                                 <div className="lg:col-span-8">
 
-                                    <div className="px-6 py-4 flex items-center justify-between bg-brand-gray rounded-[10px]">
+                                    <div className="px-6 py-4 flex items-center justify-between bg-brand-gray dark:bg-dark-border/30 rounded-[10px]">
                                         <div className="flex items-center gap-3">
                                             <SkeletonLoader width={18} height={18} />
                                             <SkeletonLoader width={26} height={26} circle />

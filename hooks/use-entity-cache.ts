@@ -151,6 +151,8 @@ export function useEntityCache<TListItem extends { id: string }, TDetail extends
             const isFresh = entry && !entry.partial && Date.now() - entry.timestamp < staleTime
             const needsFetch = !entry || entry.partial || Date.now() - entry.timestamp >= staleTime
 
+            const flightKey = `${cacheKey}:${id}`
+
             // If fresh AND full (not partial), return immediately - no fetch
             if (isFresh) {
                 return { data: entry!.data, isLoading: false, isStale: false }
@@ -158,7 +160,6 @@ export function useEntityCache<TListItem extends { id: string }, TDetail extends
 
             // If partial, stale, or missing → trigger background fetch (deduplicated)
             if (needsFetch) {
-                const flightKey = `${cacheKey}:${id}`
                 if (!inFlightRequests.has(flightKey)) {
                     const promise = withTimeout(getDetailFn(id), FETCH_TIMEOUT_MS)
                         .then((detail) => {
@@ -180,15 +181,16 @@ export function useEntityCache<TListItem extends { id: string }, TDetail extends
                         })
                         .finally(() => {
                             inFlightRequests.delete(flightKey)
+                            notifySubscribers(cacheKey)
                         })
                     inFlightRequests.set(flightKey, promise)
                 }
             }
 
-            // Return cached data or null, with accurate isLoading status (true while fetching full detail)
+            // Return cached data or null, with accurate isLoading status (true only while fetching in-flight or awaiting initial entry)
             return {
                 data: entry?.data ?? null,
-                isLoading: !entry || !!entry.partial,
+                isLoading: inFlightRequests.has(flightKey) || !entry,
                 isStale: !!entry?.partial || (!!entry && Date.now() - entry.timestamp >= staleTime),
             }
         },

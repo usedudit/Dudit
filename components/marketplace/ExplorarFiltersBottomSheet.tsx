@@ -132,7 +132,7 @@ export function ExplorarFiltersBottomSheet({
 
     const headerRow = (
         <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-brand-dark">Filtros</h3>
+            <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading">Filtros</h3>
             {hasDraftFilters && (
                 <button
                     onClick={handleClear}
@@ -149,13 +149,13 @@ export function ExplorarFiltersBottomSheet({
             {/* Local Section */}
             {filterConfig.showRadius !== false && (
                 <section>
-                    <h4 className="mb-3 text-sm font-bold text-brand-dark">Local</h4>
+                    <h4 className="mb-3 text-sm font-bold text-brand-dark dark:text-dark-heading">Local</h4>
                     <button
                         onClick={() => {
                             onCitySelect()
                             onClose()
                         }}
-                        className="flex w-full items-center justify-between gap-2 rounded-lg border border-gray-200 px-3 py-2.5 text-left text-sm font-semibold text-brand-dark hover:border-brand-green transition-colors"
+                        className="flex w-full items-center justify-between gap-2 rounded-lg border border-gray-200 dark:border-dark-border px-3 py-2.5 text-left text-sm font-semibold text-brand-dark dark:text-dark-heading hover:border-brand-green transition-colors"
                     >
                         <span className="truncate">
                             {selectedCitySlug
@@ -182,7 +182,7 @@ export function ExplorarFiltersBottomSheet({
             {/* Type Section */}
             {filterConfig.showType !== false && (
                 <section>
-                    <h4 className="mb-3 text-sm font-bold text-brand-dark">Tipo</h4>
+                    <h4 className="mb-3 text-sm font-bold text-brand-dark dark:text-dark-heading">Tipo</h4>
                     <div className="space-y-2">
                         {typeOptions.map((option) => (
                             <button
@@ -190,7 +190,7 @@ export function ExplorarFiltersBottomSheet({
                                 onClick={() => handleTypeSelect(option.value)}
                                 className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${draftType === option.value
                                     ? "bg-[#ecfdf5] text-brand-green"
-                                    : "text-brand-dark hover:bg-gray-50"
+                                    : "text-brand-dark dark:text-dark-heading hover:bg-gray-50 dark:hover:bg-dark-border/30"
                                     }`}
                             >
                                 <span>{option.label}</span>
@@ -206,7 +206,7 @@ export function ExplorarFiltersBottomSheet({
             {/* Categories Section */}
             {filterConfig.showCategory !== false && draftCategoryList.length > 0 && (
                 <section>
-                    <h4 className="mb-3 text-sm font-bold text-brand-dark">Categorias</h4>
+                    <h4 className="mb-3 text-sm font-bold text-brand-dark dark:text-dark-heading">Categorias</h4>
                     <div className="space-y-2">
                         {draftCategoryList.map((cat) => {
                             const isSelected = draftCategories.includes(cat.name)
@@ -216,13 +216,13 @@ export function ExplorarFiltersBottomSheet({
                                     onClick={() => handleToggleCategory(cat.name)}
                                     className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-semibold transition-colors ${isSelected
                                         ? "bg-[#ecfdf5] text-brand-green"
-                                        : "text-brand-dark hover:bg-gray-50"
+                                        : "text-brand-dark dark:text-dark-heading hover:bg-gray-50 dark:hover:bg-dark-border/30"
                                         }`}
                                 >
                                     <span
                                         className={`flex h-4 w-4 items-center justify-center rounded border shrink-0 ${isSelected
                                             ? "border-brand-green bg-brand-green"
-                                            : "border-gray-200 bg-white"
+                                            : "border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface"
                                             }`}
                                     >
                                         {isSelected && (
@@ -249,7 +249,7 @@ export function ExplorarFiltersBottomSheet({
             {/* Price Section */}
             {filterConfig.showPrice !== false && (
                 <section>
-                    <h4 className="mb-3 text-sm font-bold text-brand-dark">Preço</h4>
+                    <h4 className="mb-3 text-sm font-bold text-brand-dark dark:text-dark-heading">Preço</h4>
                     <div className="grid grid-cols-2 gap-2">
                         <Input
                             value={draftMinPrice}
@@ -276,13 +276,13 @@ export function ExplorarFiltersBottomSheet({
                         onClick={() => setDraftPromo(!draftPromo)}
                         className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${draftPromo
                             ? "bg-[#ecfdf5] text-brand-green"
-                            : "text-brand-dark hover:bg-gray-50"
+                            : "text-brand-dark dark:text-dark-heading hover:bg-gray-50 dark:hover:bg-dark-border/30"
                             }`}
                     >
                         <span
                             className={`flex h-4 w-4 items-center justify-center rounded border shrink-0 ${draftPromo
                                 ? "border-brand-green bg-brand-green"
-                                : "border-gray-200 bg-white"
+                                : "border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface"
                                 }`}
                         >
                             {draftPromo && (
@@ -341,11 +341,11 @@ export function ExplorarFiltersBottomSheet({
                 onClick={onClose}
             >
                 <div
-                    className={`fixed right-4 top-4 bottom-4 w-96 max-w-[calc(100vw-2rem)] bg-white shadow-2xl rounded-2xl transition-transform duration-300 overflow-hidden flex flex-col ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
+                    className={`fixed right-4 top-4 bottom-4 w-96 max-w-[calc(100vw-2rem)] bg-white dark:bg-dark-surface shadow-2xl rounded-2xl transition-transform duration-300 overflow-hidden flex flex-col ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
                     onClick={(e) => e.stopPropagation()}
                 >
                     <header className="border-b border-brand-border p-6 flex justify-between items-center shrink-0">
-                        <h2 className="text-xl font-bold text-brand-dark">Filtros</h2>
+                        <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Filtros</h2>
                         <Button variant="filled" onClick={onClose} size="icon">
                             <XIcon className="w-5 h-5" />
                         </Button>
@@ -357,7 +357,7 @@ export function ExplorarFiltersBottomSheet({
                         </div>
                     </div>
 
-                    <footer className="shrink-0 border-t border-brand-border bg-white p-4">
+                    <footer className="shrink-0 border-t border-brand-border bg-white dark:bg-dark-surface p-4">
                         <div className="flex items-center gap-4">
                             {footerButtons}
                         </div>

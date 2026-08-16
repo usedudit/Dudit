@@ -55,7 +55,7 @@ export const CategoryCarousel = ({
     return (
         <div className="w-full animate-fade-in">
             <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg lg:text-2xl font-medium text-brand-dark">Categorias</h2>
+                <h2 className="text-lg lg:text-2xl font-medium text-brand-dark dark:text-dark-heading">Categorias</h2>
                 <div className="flex items-center gap-3">
                     <button
                         onClick={onSeeAllCategories}
@@ -67,17 +67,17 @@ export const CategoryCarousel = ({
                         {showLeftArrow && (
                             <button
                                 onClick={() => scroll('left')}
-                                className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center bg-white hover:bg-gray-50 transition-colors duration-200 shadow-sm cursor-pointer"
+                                className="w-8 h-8 rounded-full border border-gray-200 dark:border-dark-border flex items-center justify-center bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/30 transition-colors duration-200 shadow-sm cursor-pointer"
                             >
-                                <ChevronLeft className="w-4 h-4 text-brand-dark" />
+                                <ChevronLeft className="w-4 h-4 text-brand-dark dark:text-dark-heading" />
                             </button>
                         )}
                         {showRightArrow && (
                             <button
                                 onClick={() => scroll('right')}
-                                className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center bg-white hover:bg-gray-50 transition-colors duration-200 shadow-sm cursor-pointer"
+                                className="w-8 h-8 rounded-full border border-gray-200 dark:border-dark-border flex items-center justify-center bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/30 transition-colors duration-200 shadow-sm cursor-pointer"
                             >
-                                <ChevronRight className="w-4 h-4 text-brand-dark" />
+                                <ChevronRight className="w-4 h-4 text-brand-dark dark:text-dark-heading" />
                             </button>
                         )}
                     </div>
@@ -94,10 +94,10 @@ export const CategoryCarousel = ({
                         onClick={() => onToggleCategory("__all__")}
                         className={`flex flex-col items-center gap-2 p-3 rounded-[16px] transition-all duration-200 w-full h-full border ${selectedCategories.length === 0
                             ? 'bg-brand-green text-white border-brand-green'
-                            : 'bg-white text-brand-dark border-gray-200 hover:border-brand-green hover:bg-green-50'
+                            : 'bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading border-gray-200 dark:border-dark-border hover:border-brand-green hover:bg-green-50'
                             }`}
                     >
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${selectedCategories.length === 0 ? 'bg-white/20' : 'bg-brand-gray'
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${selectedCategories.length === 0 ? 'bg-white/20' : 'bg-brand-gray dark:bg-dark-border/30'
                             }`}>
                             <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <rect x="3" y="3" width="7" height="7" rx="1" />
@@ -118,13 +118,13 @@ export const CategoryCarousel = ({
                                 onClick={() => onToggleCategory(cat.name)}
                                 className={`flex flex-col items-center gap-2 p-3 rounded-[16px] transition-all duration-200 w-full h-full border ${isSelected
                                     ? 'bg-brand-green text-white border-brand-green'
-                                    : 'bg-white text-brand-dark border-gray-200 hover:border-brand-green hover:bg-green-50'
+                                    : 'bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading border-gray-200 dark:border-dark-border hover:border-brand-green hover:bg-green-50'
                                     }`}
                             >
                                 {cat.icon_url ? (
                                     <img src={cat.icon_url} alt={cat.name} className="w-10 h-10 object-contain" />
                                 ) : (
-                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isSelected ? 'bg-white/20' : 'bg-brand-gray'
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isSelected ? 'bg-white/20' : 'bg-brand-gray dark:bg-dark-border/30'
                                         }`}>
                                         <span className="text-lg">📦</span>
                                     </div>

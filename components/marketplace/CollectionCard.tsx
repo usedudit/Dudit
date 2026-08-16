@@ -30,7 +30,7 @@ export function CollectionCard({ collection, className = "w-[270px] sm:w-[320px]
       prefetch={false}
       className={`flex flex-col group cursor-pointer active:scale-[0.98] transition-all duration-300 ${className}`}
     >
-      <div className="relative w-full aspect-[16/10] rounded-[16px] overflow-hidden bg-brand-gray mb-3 shrink-0">
+      <div className="relative w-full aspect-[16/10] rounded-[16px] overflow-hidden bg-brand-gray dark:bg-dark-border/30 mb-3 shrink-0">
         {collection.cover_url ? (
           <img
             src={collection.cover_url}
@@ -57,10 +57,10 @@ export function CollectionCard({ collection, className = "w-[270px] sm:w-[320px]
           className={`w-10 h-10 border border-brand-border shrink-0 ${avatarBgColor}`}
         />
         <div className="flex-1 min-w-0">
-          <h3 className="font-bold text-brand-dark text-sm truncate">
+          <h3 className="font-bold text-brand-dark dark:text-dark-heading text-sm truncate">
             {collection.name}
           </h3>
-          <p className="text-[12px] text-brand-inactive-text truncate">
+          <p className="text-[12px] text-brand-inactive-text dark:text-dark-body truncate">
             {collection.items_count} {collection.items_count === 1 ? "item" : "itens"}
           </p>
         </div>

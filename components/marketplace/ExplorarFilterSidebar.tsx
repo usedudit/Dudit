@@ -86,7 +86,7 @@ export function ExplorarFilterSidebar({
                 <div className="sticky top-[128px] space-y-6 py-5 px-5 max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
                 {/* Header */}
                 <div className="flex items-center justify-between gap-3 pb-0">
-                    <h2 className="text-base font-bold text-brand-dark">Filtros</h2>
+                    <h2 className="text-base font-bold text-brand-dark dark:text-dark-heading">Filtros</h2>
                     {activeFiltersCount > 0 && (
                         <button
                             onClick={onClearFilters}
@@ -103,10 +103,10 @@ export function ExplorarFilterSidebar({
                 {/* Local Section */}
                 {filterConfig.showRadius !== false && (
                     <section>
-                        <h3 className="mb-3 text-sm font-bold text-brand-dark">Local</h3>
+                        <h3 className="mb-3 text-sm font-bold text-brand-dark dark:text-dark-heading">Local</h3>
                         <button
                             onClick={onCitySelect}
-                            className="flex w-full items-center justify-between gap-2 rounded-lg border border-gray-200 px-3 py-2.5 text-left text-sm font-semibold text-brand-dark hover:border-brand-green transition-colors"
+                            className="flex w-full items-center justify-between gap-2 rounded-lg border border-gray-200 dark:border-dark-border px-3 py-2.5 text-left text-sm font-semibold text-brand-dark dark:text-dark-heading hover:border-brand-green transition-colors"
                         >
                             <span className="truncate">
                                 {selectedCitySlug ? formatCitySlug(selectedCitySlug) : "Selecionar cidade"}
@@ -146,7 +146,7 @@ export function ExplorarFilterSidebar({
                 {filterConfig.showCategory !== false && activeCategoriesList.length > 0 && (
                     <section>
                         <Separator className="my-6" />
-                        <h3 className="mb-3 text-sm font-bold text-brand-dark">
+                        <h3 className="mb-3 text-sm font-bold text-brand-dark dark:text-dark-heading">
                             {pageMode === "category" ? "Subcategorias" : "Categorias"}
                         </h3>
                         <div className="space-y-2">
@@ -155,7 +155,7 @@ export function ExplorarFilterSidebar({
                                 return (
                                     <label
                                         key={cat.name}
-                                        className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-50 transition-colors"
+                                        className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-dark-border/30 transition-colors"
                                     >
                                         <Checkbox
                                             checked={isSelected}
@@ -168,7 +168,7 @@ export function ExplorarFilterSidebar({
                                                 className="h-5 w-5 object-contain"
                                             />
                                         )}
-                                        <span className="text-sm font-medium text-brand-dark truncate">
+                                        <span className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate">
                                             {cat.name}
                                         </span>
                                     </label>
@@ -182,7 +182,7 @@ export function ExplorarFilterSidebar({
                 {filterConfig.showPrice !== false && (
                     <section>
                         <Separator className="my-6" />
-                        <h3 className="mb-3 text-sm font-bold text-brand-dark">Preço</h3>
+                        <h3 className="mb-3 text-sm font-bold text-brand-dark dark:text-dark-heading">Preço</h3>
                         <div className="grid grid-cols-2 gap-2">
                             <MoneyInput
                                 value={minPrice}
@@ -217,12 +217,12 @@ export function ExplorarFilterSidebar({
                 {filterConfig.showPromo !== false && (
                     <section>
                         <Separator className="my-6" />
-                        <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-50 transition-colors">
+                        <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-dark-border/30 transition-colors">
                             <Checkbox
                                 checked={promoOn}
                                 onChange={onPromoToggle}
                             />
-                            <span className="text-sm font-medium text-brand-dark">Em promoção</span>
+                            <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">Em promoção</span>
                         </label>
                     </section>
                 )}

@@ -123,7 +123,7 @@ export default function GoalDetailPage({
     }
   }
 
-  if (isLoading || !goal) {
+  if (isLoading && !goal) {
     return <ERPDetailLoading key="loading-goal" />
   }
 

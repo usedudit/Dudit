@@ -171,7 +171,7 @@ export function ReviewButton({
                           </button>
                         ))}
                       </div>
-                      <span className="text-sm font-medium text-brand-inactive-text">
+                      <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">
                         {itemRating === 5
                           ? "Excelente!"
                           : itemRating === 4
@@ -232,7 +232,7 @@ export function ReviewButton({
                             {item.products?.name || item.services?.name || item.product_name}
                           </h4>
                           {item.product_variants?.variant_name && (
-                            <div className="text-xs text-brand-inactive-text mt-0.5">
+                            <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
                               {item.product_variants.variant_name}
                             </div>
                           )}

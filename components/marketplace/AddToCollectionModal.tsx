@@ -97,7 +97,7 @@ export function AddToCollectionModal({ isOpen, onClose, itemType, itemId }: AddT
             <div className="w-6 h-6 border-2 border-brand-green border-t-transparent rounded-full animate-spin" />
           </div>
         ) : collections.length === 0 ? (
-          <div className="text-center py-8 text-brand-inactive-text">
+          <div className="text-center py-8 text-brand-inactive-text dark:text-dark-body">
             <p>Você ainda não tem nenhuma coleção.</p>
             <Button
               variant="default"
@@ -124,7 +124,7 @@ export function AddToCollectionModal({ isOpen, onClose, itemType, itemId }: AddT
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-medium text-brand-dark dark:text-dark-heading">{collection.name}</p>
-                    <p className="text-xs text-brand-inactive-text">{collection.items_count} itens</p>
+                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">{collection.items_count} itens</p>
                   </div>
                   {actionId === collection.id ? (
                     <div className="w-5 h-5 border-2 border-brand-green border-t-transparent rounded-full animate-spin" />
