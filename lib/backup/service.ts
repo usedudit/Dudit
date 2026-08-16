@@ -3,7 +3,7 @@ import "server-only"
 import { spawn } from "node:child_process"
 import { createCipheriv, randomBytes } from "node:crypto"
 import { createGzip } from "node:zlib"
-import { PassThrough, Writable } from "node:stream"
+import { PassThrough, Transform, Writable } from "node:stream"
 import {
   DeleteObjectsCommand,
   ListObjectsV2Command,
@@ -217,7 +217,6 @@ function createEncryptedDumpStream(config: DatabaseBackupConfig, createdAt: Date
         callback(new Error("Backup output stream was closed"))
         return
       }
-      dumpBytes += chunk.length
       sizeBytes += chunk.length
       if (output.write(chunk)) {
         callback()
@@ -245,7 +244,14 @@ function createEncryptedDumpStream(config: DatabaseBackupConfig, createdAt: Date
   cipher.on("error", () => fail(new Error("Database backup encryption failed")))
   sink.on("error", () => fail(new Error("Database backup stream failed")))
 
-  child.stdout?.pipe(gzip).pipe(cipher).pipe(sink)
+  const dumpCounter = new Transform({
+    transform(chunk: Buffer, _encoding, callback) {
+      dumpBytes += chunk.length
+      callback(null, chunk)
+    },
+  })
+
+  child.stdout?.pipe(dumpCounter).pipe(gzip).pipe(cipher).pipe(sink)
 
   const timeout = setTimeout(() => fail(new Error("Database backup timed out")), config.timeoutMs)
   timeout.unref?.()
