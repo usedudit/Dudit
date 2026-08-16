@@ -227,7 +227,11 @@ function createEncryptedDumpStream(config: DatabaseBackupConfig, createdAt: Date
     },
   })
 
-  child.on("error", (error) => fail(new Error(`Unable to start pg_dump: ${error.name}`)))
+  child.on("error", (error: NodeJS.ErrnoException) => {
+    const code = error.code || error.name
+    const message = error.message ? `: ${error.message}` : ""
+    fail(new Error(`Unable to start pg_dump: ${code}${message}`))
+  })
   child.on("close", (code) => {
     childExitCode = code
     finalize()
