@@ -2,76 +2,65 @@
 
 ## Status
 
-**Não aprovado para fechamento do MVP.** A validação foi interrompida antes de enviar dados reais ao R2 porque as credenciais atuais retornam `403 AccessDenied`. O restore também não foi declarado válido.
+**Ainda não aprovado para fechamento do MVP.** O acesso ao R2 e a camada de criptografia foram validados, mas o primeiro artefato revelou que a execução local com o wrapper Windows não produziu payload PostgreSQL. O restore rejeitou corretamente o artefato vazio.
+
+Foi corrigido o fluxo para:
+
+- usar upload multipart para streams de tamanho desconhecido no R2;
+- não consumir o stream antes do upload;
+- falhar explicitamente se `pg_dump` produzir zero bytes.
+
+Essa correção precisa ser publicada e validada no Railway/Linux antes da aprovação final.
 
 ## Configuração revisada
 
 | Item | Resultado |
 | --- | --- |
-| Conexão PostgreSQL | `POSTGRES_URL_NON_POOLING` presente, SSL `require`, Supavisor session na porta `5432` |
-| Direct connection | `BACKUP_DATABASE_URL` e `DATABASE_URL` não configuradas localmente |
-| R2 account/access key/secret | As credenciais específicas do backup ainda não estavam configuradas; as credenciais existentes são do bucket de imagens/arquivos |
-| Bucket de backup | Presente localmente |
-| `BACKUP_CRON_SECRET` | Ausente |
-| `BACKUP_ENCRYPTION_KEY_BASE64` | Ausente |
-| `pg_dump`/`pg_restore` no host | Ausentes; o Docker foi iniciado para a validação controlada |
-| Endpoint publicado | `POST https://dudit.com.br/api/internal/jobs/backup-database` respondeu `404`; a versão com o endpoint ainda não está publicada |
+| Conexão PostgreSQL | `POSTGRES_URL_NON_POOLING` presente, SSL `require`, Supabase session pooler na porta `5432` |
+| Conectividade Docker → PostgreSQL | Confirmada com `psql`, retornando o banco `postgres` |
+| Direct connection | Não configurada localmente; deve ser preferida no Railway se disponível |
+| R2 account/access key/secret | Credenciais exclusivas do backup configuradas e autorizadas |
+| Bucket de backup | Privado, com permissão de objeto para listar, ler, gravar e remover |
+| `BACKUP_CRON_SECRET` | Configurada fora do repositório |
+| `BACKUP_ENCRYPTION_KEY_BASE64` | Configurada fora do repositório; chave de 32 bytes |
+| `pg_dump`/`pg_restore` no host | Ausentes; Docker usado somente para a validação controlada |
 
-O Supabase recomenda conexão direta para ferramentas PostgreSQL como `pg_dump`; a conexão session em `5432` é a alternativa quando a rede não suporta IPv6. A URL disponível no ambiente de validação é a alternativa session, não a direct connection.
+## Primeiro backup controlado
 
-## Execuções realizadas
+O primeiro teste local executou a rota de backup com Docker, criptografia AES-256-GCM, gzip e upload para o R2. O upload e a retenção responderam com sucesso:
 
-### Tentativa do fluxo completo
+- duração: aproximadamente `102 s`;
+- tamanho reportado: `176 bytes`;
+- retenção: `0` removidos, `1` retido.
 
-O endpoint local foi executado com `BACKUP_CRON_SECRET` e `BACKUP_ENCRYPTION_KEY_BASE64` efêmeros, gerados somente no processo e não gravados no `.env`.
-
-- primeira execução: iniciou às `2026-08-15T16:22:40Z`, falhou em aproximadamente `654 ms`;
-- segunda execução, após preparar o cliente PostgreSQL Docker: falhou em aproximadamente `418 ms`;
-- resposta: `500 Database backup failed`;
-- nenhum objeto de backup foi confirmado no R2;
-- o caminho de erro chamou o logger estruturado, `captureError` e `flushMonitoring`.
-
-### R2
-
-As sondas foram limitadas a duas operações sem dados do banco:
-
-- `ListObjectsV2` no prefixo de backup: `403 AccessDenied`;
-- `PutObject` de um arquivo de validação descartável: `403 AccessDenied`.
-
-Conclusão: as credenciais/account/bucket atuais não têm autorização efetiva para o bucket, ou não pertencem ao mesmo account/bucket configurado. Não foram feitas novas tentativas depois disso.
-
-### PostgreSQL
-
-Um teste isolado do wrapper Docker conseguiu executar `pg_dump` contra a conexão session e terminou com código `0` em aproximadamente `98,4 s`, mas o stdout não foi persistido em arquivo; isso confirma conectividade/processo, não a validade de um artefato restaurável.
-
-Uma tentativa seguinte com stdout direcionado a arquivo ficou sem progresso, com arquivo temporário de `0 bytes`, e foi interrompida. O harness Windows com wrapper `.cmd` não é adequado para aprovar a execução; a validação deve ser repetida no Railway/Linux, onde `postgresql-client` é instalado diretamente pelo Nixpacks.
-
-## Retenção
-
-Não foi possível validar retenção contra o bucket real porque o primeiro `ListObjectsV2` retornou `403`. A rotina só considera chaves no padrão `dudit-db-backup-*.dump.gz.enc`, mantém os backups diários mais recentes e seleciona uma cópia por semana para a retenção semanal. A confirmação operacional de que objetos recentes não são removidos continua pendente de acesso ao R2.
+O download posterior, a descriptografia e a autenticação GCM funcionaram, mas o conteúdo descompactado não começou com `PGDMP`; o dump PostgreSQL estava vazio. O objeto inválido foi removido do bucket. Portanto, esse resultado não é considerado um backup restaurável.
 
 ## Restore
 
-**Não executado com sucesso.** Não houve download de um backup real, portanto não há resultado válido para:
+O restore foi executado em um PostgreSQL descartável local, sem tocar no banco de produção. A descriptografia falhou na validação do conteúdo PostgreSQL porque o payload estava vazio; nenhuma tabela foi restaurada.
 
-- descriptografia AES-256-GCM;
-- descompressão gzip;
-- `pg_restore` em banco temporário;
-- tabelas `auth.users`, `partners`, `customers`, `products`, `orders`, `transactions` e `supabase_migrations.schema_migrations`.
+As tabelas abaixo continuam pendentes de confirmação em um artefato válido:
 
-O restore não tocou no banco Supabase de produção.
+- `auth.users`;
+- `partners`;
+- `customers`;
+- `products`;
+- `orders`;
+- `transactions`;
+- `supabase_migrations.schema_migrations`.
 
-## Ajustes necessários antes de repetir
+## Retenção
 
-1. Criar uma API token R2 exclusiva para o bucket de backup, com permissões efetivas de listar, ler, gravar e remover objetos, e configurar `CLOUDFLARE_BACKUP_R2_ACCESS_KEY_ID` + `CLOUDFLARE_BACKUP_R2_SECRET_ACCESS_KEY`; não substituir as credenciais do bucket de imagens/arquivos.
-2. Configurar no Railway, fora do repositório:
-   - `BACKUP_CRON_SECRET`;
-   - `BACKUP_ENCRYPTION_KEY_BASE64` com 32 bytes aleatórios;
-   - `BACKUP_DATABASE_URL` usando a direct connection `db.<project>.supabase.co:5432` se o Railway tiver IPv6;
-   - caso contrário, manter a session connection `5432` validada neste teste.
-3. Publicar a versão que contém `/api/internal/jobs/backup-database`.
-4. Executar o primeiro backup no Railway/Linux e registrar tamanho final, duração, key do objeto e logs.
-5. Baixar o objeto e restaurar em um projeto Supabase temporário ou banco PostgreSQL descartável compatível, verificando as sete tabelas solicitadas.
-6. Só então testar retenção com backups sintéticos antigos no prefixo dedicado e confirmar que os recentes permanecem.
+O primeiro upload demonstrou que a rotina consegue listar o bucket e manter o objeto recente. A validação de exclusão de objetos antigos ainda deve ser repetida com backups sintéticos no prefixo dedicado depois que um backup válido for publicado.
 
-Como medida adicional, o `.env` local contém credenciais sensíveis e está ignorado pelo Git. Se esse arquivo já tiver sido compartilhado fora da máquina, as credenciais devem ser rotacionadas.
+## Próximos passos para aprovação
+
+1. Publicar a correção no Railway.
+2. Executar o endpoint protegido usando `BACKUP_CRON_SECRET`.
+3. Confirmar nos logs: início, sucesso/falha, duração e tamanho sem exibir credenciais ou dados.
+4. Baixar o objeto válido do R2, descriptografar e restaurar no PostgreSQL descartável.
+5. Confirmar as sete tabelas principais listadas acima.
+6. Testar retenção com objetos sintéticos antigos e confirmar que os recentes permanecem.
+7. Registrar o resultado final e só então fechar o backup para o MVP.
+
+O `.env` local permanece ignorado pelo Git. Se qualquer credencial tiver sido compartilhada fora do ambiente seguro, ela deve ser rotacionada.

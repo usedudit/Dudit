@@ -7,10 +7,10 @@ import { PassThrough, Writable } from "node:stream"
 import {
   DeleteObjectsCommand,
   ListObjectsV2Command,
-  PutObjectCommand,
   S3Client,
   type _Object,
 } from "@aws-sdk/client-s3"
+import { Upload } from "@aws-sdk/lib-storage"
 import { BACKUP_ALGORITHM, BACKUP_AUTH_TAG_BYTES, createBackupFileName, createBackupHeader, parseBackupTimestamp } from "./format"
 
 const DEFAULT_RETENTION_DAILY = 30
@@ -136,6 +136,7 @@ function createR2BackupClient(config: DatabaseBackupConfig): S3Client {
   return new S3Client({
     region: "auto",
     maxAttempts: 1,
+    requestChecksumCalculation: "WHEN_REQUIRED",
     credentials: {
       accessKeyId: config.backupR2AccessKeyId,
       secretAccessKey: config.backupR2SecretAccessKey,
@@ -144,8 +145,14 @@ function createR2BackupClient(config: DatabaseBackupConfig): S3Client {
   })
 }
 
-function createEncryptedDumpStream(config: DatabaseBackupConfig, createdAt: Date): PassThrough {
+type EncryptedDumpStream = {
+  stream: PassThrough
+  getSizeBytes: () => number
+}
+
+function createEncryptedDumpStream(config: DatabaseBackupConfig, createdAt: Date): EncryptedDumpStream {
   const output = new PassThrough()
+  let sizeBytes = 0
   const iv = randomBytes(12)
   const header = createBackupHeader(iv, createdAt)
   const { safeConnectionString, password, sslMode } = parseDatabaseUrl(config.databaseUrl)
@@ -167,7 +174,9 @@ function createEncryptedDumpStream(config: DatabaseBackupConfig, createdAt: Date
   let childExitCode: number | null = null
   let cipherFinished = false
   let finalized = false
+  let dumpBytes = 0
 
+  sizeBytes += header.length
   output.write(header)
 
   // pg_dump can emit relation names and other database details on stderr.
@@ -188,7 +197,13 @@ function createEncryptedDumpStream(config: DatabaseBackupConfig, createdAt: Date
       output.destroy(new Error(`pg_dump failed with exit code ${childExitCode}`))
       return
     }
-    output.end(cipher.getAuthTag())
+    if (dumpBytes === 0) {
+      output.destroy(new Error("pg_dump produced an empty dump"))
+      return
+    }
+    const authTag = cipher.getAuthTag()
+    sizeBytes += authTag.length
+    output.end(authTag)
   }
 
   const sink = new Writable({
@@ -197,6 +212,8 @@ function createEncryptedDumpStream(config: DatabaseBackupConfig, createdAt: Date
         callback(new Error("Backup output stream was closed"))
         return
       }
+      dumpBytes += chunk.length
+      sizeBytes += chunk.length
       if (output.write(chunk)) {
         callback()
       } else {
@@ -228,7 +245,10 @@ function createEncryptedDumpStream(config: DatabaseBackupConfig, createdAt: Date
     if (childExitCode === null && !child.killed) child.kill("SIGKILL")
   })
 
-  return output
+  return {
+    stream: output,
+    getSizeBytes: () => sizeBytes,
+  }
 }
 
 async function listBackupObjects(client: S3Client, config: DatabaseBackupConfig): Promise<_Object[]> {
@@ -295,30 +315,33 @@ export async function runDatabaseBackup(): Promise<DatabaseBackupResult> {
   const fileName = createBackupFileName(createdAt)
   const key = `${config.prefix}${fileName}`
   const client = createR2BackupClient(config)
-  const stream = createEncryptedDumpStream(config, createdAt)
-  let sizeBytes = 0
-  stream.on("data", (chunk: Buffer) => {
-    sizeBytes += chunk.length
-  })
+  const encryptedDump = createEncryptedDumpStream(config, createdAt)
+  const stream = encryptedDump.stream
 
   try {
-    await client.send(new PutObjectCommand({
-      Bucket: config.r2Bucket,
-      Key: key,
-      Body: stream,
-      ContentType: "application/octet-stream",
-      ContentDisposition: `attachment; filename="${fileName}"`,
-      Metadata: {
-        purpose: "dudit-postgresql-backup",
-        encryption: BACKUP_ALGORITHM,
+    await new Upload({
+      client,
+      queueSize: 1,
+      partSize: 8 * 1024 * 1024,
+      leavePartsOnError: false,
+      params: {
+        Bucket: config.r2Bucket,
+        Key: key,
+        Body: stream,
+        ContentType: "application/octet-stream",
+        ContentDisposition: `attachment; filename="${fileName}"`,
+        Metadata: {
+          purpose: "dudit-postgresql-backup",
+          encryption: BACKUP_ALGORITHM,
+        },
       },
-    }))
+    }).done()
 
     const retention = await applyRetention(client, config)
     return {
       key,
       fileName,
-      sizeBytes,
+      sizeBytes: encryptedDump.getSizeBytes(),
       durationMs: Date.now() - startedAt,
       retentionDeleted: retention.deleted,
       retentionRetained: retention.retained,
