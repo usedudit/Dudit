@@ -11,7 +11,11 @@
         "mkdir -p /opt/postgresql/lib && cp -a /usr/lib/postgresql/17 /opt/postgresql/ && cp -a /usr/lib/x86_64-linux-gnu/libpq.so.5* /opt/postgresql/lib/"
       ],
       "deployOutputs": [
-        "/opt/postgresql"
+        {
+          "include": [
+            "/opt/postgresql"
+          ]
+        }
       ]
     }
   },
