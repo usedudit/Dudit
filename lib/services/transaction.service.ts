@@ -472,6 +472,10 @@ export async function createTransactionFromOrder(
     orderData: OrderDataForTransaction,
 ): Promise<void> {
     try {
+        const { getPartnerCapabilities } = await import("@/lib/services/partner-capabilities")
+        const capabilities = await getPartnerCapabilities(orderData.partner_id, { storeId: orderData.store_id })
+        if (!capabilities.hasFinancial) return
+
         const now = new Date().toISOString()
         const paymentDate = orderData.payment_date || now
         const entries = buildEntries(orderData)
@@ -650,6 +654,10 @@ export async function syncReceivableForOrder(
     }
 ): Promise<void> {
     try {
+        const { getPartnerCapabilities } = await import("@/lib/services/partner-capabilities")
+        const capabilities = await getPartnerCapabilities(orderData.partner_id, { storeId: orderData.store_id })
+        if (!capabilities.hasFinancial) return
+
         const total = Math.max(0, Number(orderData.total_amount || 0))
         const paid = Math.max(0, Number(orderData.paid_amount || 0))
         const unpaidBalance = Math.max(0, Math.round((total - paid) * 100) / 100)
@@ -822,6 +830,10 @@ export async function cancelPendingSettlementsForOrder(params: {
     actorUserId?: string | null
 }): Promise<{ cancelled: number }> {
     try {
+        const { getPartnerCapabilities } = await import("@/lib/services/partner-capabilities")
+        const capabilities = await getPartnerCapabilities(params.partnerId)
+        if (!capabilities.hasFinancial) return { cancelled: 0 }
+
         const { supabase } = params
         const settlements = await findOrderSettlements(params)
         const pending = settlements.filter(

@@ -374,7 +374,6 @@ const SYSTEM_RESOURCE_ROUTE_MAP: Record<string, SystemResourceId> = {
   "/erp/pdv": "pos",
   "/erp/devolucoes": "returns",
   "/erp/logistica": "deliveries",
-  "/erp/metas": "goals",
   // ── Produtos
   "/erp/produtos": "products",
   "/erp/movimentacao-estoque": "stockMovements",
@@ -396,12 +395,12 @@ const SYSTEM_RESOURCE_ROUTE_MAP: Record<string, SystemResourceId> = {
   // ── Desempenho
   "/erp/relatorios": "reports",
   "/erp/produtividade": "productivity",
-  "/erp/produtividade/metas": "productivity",
-  "/erp/produtividade/comissoes": "productivity",
+  "/erp/metas": "productivity",
+  "/erp/comissoes": "productivity",
   // ── Marketing
   "/erp/cupons": "coupons",
   "/erp/promocoes": "campaigns",
-  "/erp/marketing/videos": "communityVideos",
+  "/erp/videos": "communityVideos",
 }
 
 /**

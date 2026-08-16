@@ -32,6 +32,7 @@ import type { PaymentBreakdownEntry } from "@/lib/payments/financial-engine"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 import { resolveDeliverySettingsRow } from "@/app/actions/shared/delivery"
 import { buildNotificationContent } from "@/lib/notifications/templates"
+import { getPartnerCapabilities } from "@/lib/services/partner-capabilities"
 
 export type ERPItemPayload = {
     productId?: string | null
@@ -1604,15 +1605,15 @@ async function resolveOrderPreparationEstimate(params: {
 
 export async function createERPOrderAction(data: ERPOrderPayload) {
     await requireRateLimit(RateLimitCategory.ORDER_CREATE)
-
     const user = await requireUser()
     if (!user) return { error: "Não autenticado" }
 
     const partnerId = data.partnerId
     await requirePermission(partnerId, "orders", "create")
+    const capabilities = await getPartnerCapabilities(partnerId, { storeId: data.storeId })
 
     // Normalize empty finance account to null (avoids `invalid input syntax for type uuid: ""`)
-    data.financeAccountId = data.financeAccountId?.trim() ? data.financeAccountId.trim() : null
+    data.financeAccountId = capabilities.hasFinancial && data.financeAccountId?.trim() ? data.financeAccountId.trim() : null
 
     // Validate discount permission if a discount is being applied
     if (data.discountValue > 0 || data.couponCode) {
@@ -1633,27 +1634,27 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     try {
         customerId = await resolvePartnerCustomerId(supabase, partnerId, data.customerId)
     } catch (error: any) {
-        return { error: error?.message || "Cliente invÃ¡lido para este parceiro." }
+        return { error: error?.message || "Cliente inválido para este parceiro." }
     }
     const sanitizedItemsResult = sanitizeERPItems(data.items)
     if ("error" in sanitizedItemsResult) return { error: sanitizedItemsResult.error }
     const sanitizedItems = sanitizedItemsResult.items
-    const financeAccountPromise = data.financeAccountId ? supabase
+    const financeAccountPromise = (capabilities.hasFinancial && data.financeAccountId) ? supabase
         .from("finance_accounts")
         .select("id")
         .eq("id", data.financeAccountId)
         .eq("partner_id", partnerId)
         .limit(1)
         .maybeSingle() : Promise.resolve({ data: null })
-    const stockValidationError = await validateERPItemsStock({
+    const stockValidationError = capabilities.hasStockMovements ? await validateERPItemsStock({
         supabase,
         partnerId,
         items: sanitizedItems,
-    })
+    }) : null
     if (stockValidationError) return { error: stockValidationError }
     const sanitizedPaymentBreakdown = sanitizePaymentBreakdown(data.paymentBreakdown)
     const { data: financeAccount } = await financeAccountPromise
-    if (data.financeAccountId && !financeAccount?.id) {
+    if (capabilities.hasFinancial && data.financeAccountId && !financeAccount?.id) {
         return { error: "Conta de recebimento inválida para esta venda." }
     }
 
@@ -1671,7 +1672,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     })
     const deliveryRowPromise = resolveDeliverySettingsRow(supabase, partnerId, data.storeId)
     const sellerCommissionPromise = (async () => {
-        if (!user.id) return 0
+        if (!user.id || !capabilities.hasProductivity) return 0
         const { calculateCommission } = await import("@/lib/services/commission.service")
         const { data: sellerCommissions } = await supabase
             .from("employee_commissions")
@@ -1689,10 +1690,10 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         })
     })()
 
-    let couponIdToSave: string | null = data.couponId || null
-    let couponDiscountAmount = Math.max(0, Number(data.couponDiscountAmount || 0))
+    let couponIdToSave: string | null = capabilities.hasCoupons ? (data.couponId || null) : null
+    let couponDiscountAmount = capabilities.hasCoupons ? Math.max(0, Number(data.couponDiscountAmount || 0)) : 0
     let couponPricingData: import("@/lib/services/pricing-engine").PricingCoupon | null = null
-    if (data.couponCode?.trim()) {
+    if (capabilities.hasCoupons && data.couponCode?.trim()) {
         const couponValidation = await validateCoupon({
             partnerId,
             code: data.couponCode,
@@ -1705,7 +1706,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         couponIdToSave = couponValidation.couponId || null
         couponDiscountAmount = Number(couponValidation.discountAmount || 0)
         couponPricingData = couponValidation.pricingCoupon || null
-    } else if (couponIdToSave) {
+    } else if (capabilities.hasCoupons && couponIdToSave) {
         // Re-validate existing coupon by ID
         const couponValidation = await validateCouponById(couponIdToSave, {
             partnerId,
@@ -1726,8 +1727,8 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
 
     // ── Server-side pricing recalculation ────────────────────────────────
     const { listActivePromotionsForMarketplaceAction, filterRawPromotionsByGiftStock, buildGiftOrderItems } = await import("@/app/actions/shared/promotions")
-    const rawPromotions = await listActivePromotionsForMarketplaceAction(partnerId, customerId)
-    const filteredPromotions = await filterRawPromotionsByGiftStock(rawPromotions, supabase)
+    const rawPromotions = capabilities.hasCampaigns ? await listActivePromotionsForMarketplaceAction(partnerId, customerId) : []
+    const filteredPromotions = (capabilities.hasCampaigns && rawPromotions.length > 0) ? await filterRawPromotionsByGiftStock(rawPromotions, supabase) : []
 
     const pricingResult = calculateOrderPricing({
         items: sanitizedItems.map((item) => ({
@@ -1743,7 +1744,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     })
 
     const giftIds = pricingResult.appliedGiftProductIds || []
-    const giftItems = await buildGiftOrderItems(supabase, giftIds, filteredPromotions)
+    const giftItems = (capabilities.hasCampaigns && giftIds.length > 0) ? await buildGiftOrderItems(supabase, giftIds, filteredPromotions) : []
 
     // Override client-sent values with server-computed ones
     couponDiscountAmount = pricingResult.couponDiscountAmount
@@ -2007,50 +2008,52 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
             }))
     ]
 
-    const reserveResult = await reserveOrderInventory({
-        client: supabase,
-        partnerId,
-        orderId: order.id,
-        items: stockItems,
-        storeId: data.storeId,
-    })
-
-    if ("error" in reserveResult) {
-        await supabase.from("order_items").delete().eq("order_id", order.id)
-        await supabase.from("orders").delete().eq("id", order.id)
-        return { error: reserveResult.error }
-    }
-
-    if (shouldDeductInventory(data.deliveryStatus) || paymentState.situation === 'paid' || paymentState.situation === 'partially_paid') {
-        const finalizeResult = await finalizeOrderInventory({
+    if (capabilities.hasStockMovements && stockItems.length > 0) {
+        const reserveResult = await reserveOrderInventory({
             client: supabase,
             partnerId,
             orderId: order.id,
-            createdBy: user.id,
-            reason: "Venda de Produtos",
-            notes: sanitizeNotes(data.notes) || undefined,
             items: stockItems,
             storeId: data.storeId,
         })
 
-        if ("error" in finalizeResult) {
-            await releaseOrderInventory({
+        if ("error" in reserveResult) {
+            await supabase.from("order_items").delete().eq("order_id", order.id)
+            await supabase.from("orders").delete().eq("id", order.id)
+            return { error: reserveResult.error }
+        }
+
+        if (shouldDeductInventory(data.deliveryStatus) || paymentState.situation === 'paid' || paymentState.situation === 'partially_paid') {
+            const finalizeResult = await finalizeOrderInventory({
                 client: supabase,
                 partnerId,
                 orderId: order.id,
+                createdBy: user.id,
+                reason: "Venda de Produtos",
+                notes: sanitizeNotes(data.notes) || undefined,
                 items: stockItems,
                 storeId: data.storeId,
             })
-            await supabase.from("order_items").delete().eq("order_id", order.id)
-            await supabase.from("orders").delete().eq("id", order.id)
-            return { error: finalizeResult.error }
-        }
 
-        await supabase
-            .from("orders")
-            .update({ inventory_deducted: true })
-            .eq("id", order.id)
-            .eq("partner_id", partnerId)
+            if ("error" in finalizeResult) {
+                await releaseOrderInventory({
+                    client: supabase,
+                    partnerId,
+                    orderId: order.id,
+                    items: stockItems,
+                    storeId: data.storeId,
+                })
+                await supabase.from("order_items").delete().eq("order_id", order.id)
+                await supabase.from("orders").delete().eq("id", order.id)
+                return { error: finalizeResult.error }
+            }
+
+            await supabase
+                .from("orders")
+                .update({ inventory_deducted: true })
+                .eq("id", order.id)
+                .eq("partner_id", partnerId)
+        }
     }
 
     await logAuditEvent({
@@ -2080,7 +2083,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
 
     await increment_usage_counter(partnerId, "orders_month_count")
 
-    if (couponIdToSave) {
+    if (capabilities.hasCoupons && couponIdToSave) {
         const adminClient = createAdminClient()
         await adminClient.from("coupon_usages").upsert(
             {
@@ -2092,7 +2095,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         )
     }
 
-    if (paymentState.paidAmount > 0.009) {
+    if (capabilities.hasFinancial && paymentState.paidAmount > 0.009) {
         const finalBreakdown = (adjustedPaymentBreakdown && adjustedPaymentBreakdown.length > 0)
             ? adjustedPaymentBreakdown
             : [{
@@ -2121,7 +2124,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     // A newly created paid order cannot have an existing receivable to sync;
     // avoid an extra read in the hot path. Keep it for partial/unpaid orders
     // and callers that explicitly provide an existing order id.
-    if (paymentState.situation !== "paid" || data.id) {
+    if (capabilities.hasFinancial && (paymentState.situation !== "paid" || data.id)) {
         const { syncReceivableForOrder } = await import("@/lib/services/transaction.service")
         await syncReceivableForOrder(supabase, {
             order_number: order.order_number,
@@ -2144,7 +2147,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         const fulfillmentPromise = data.salesChannel === "Presencial"
             ? Promise.resolve()
             : fulfillMarketplaceOrderIfNeeded(supabase, order.id)
-        const sellerSideEffectsPromise = data.skipPostPaymentSellerSideEffects
+        const sellerSideEffectsPromise = (data.skipPostPaymentSellerSideEffects || !capabilities.hasProductivity)
             ? Promise.resolve()
             : createSellerCommissionForPaidOrder({
                 supabase,
@@ -2162,29 +2165,38 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         ])
     }
 
-    // Sync payment status to linked appointments
+    // Sync payment status to linked appointments and service orders
     if (paymentState.situation === "paid" || paymentState.situation === "partially_paid" || paymentState.situation === "pending") {
-        await Promise.all([
-            supabase
-                .from("appointments")
-                .update({ payment_status: paymentState.situation })
-                .eq("marketplace_order_id", order.id)
-                .eq("partner_id", partnerId),
-            supabase
-                .from("service_orders")
-                .update({ payment_status: paymentState.situation })
-                .eq("order_id", order.id)
-                .eq("partner_id", partnerId),
-        ])
+        const syncPromises: Promise<any>[] = []
+        if (capabilities.hasAppointments) {
+            syncPromises.push(
+                supabase
+                    .from("appointments")
+                    .update({ payment_status: paymentState.situation })
+                    .eq("marketplace_order_id", order.id)
+                    .eq("partner_id", partnerId)
+            )
+        }
+        if (capabilities.hasServiceOrders) {
+            syncPromises.push(
+                supabase
+                    .from("service_orders")
+                    .update({ payment_status: paymentState.situation })
+                    .eq("order_id", order.id)
+                    .eq("partner_id", partnerId)
+            )
+        }
+        if (syncPromises.length > 0) {
+            await Promise.all(syncPromises)
+        }
     }
 
     if (!data.skipPostCreateRevalidation) {
         await Promise.all([
-            invalidateInventoryItems(partnerId, stockItems),
+            capabilities.hasStockMovements ? invalidateInventoryItems(partnerId, stockItems) : Promise.resolve(),
             revalidateOrders(partnerId),
         ])
     }
-
     import("@/lib/services/notification-automation.service")
         .then(({ onOrderStatusChanged }) =>
             onOrderStatusChanged(
@@ -2507,11 +2519,12 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     if (!csrfValidation.valid) return { error: csrfValidation.error || "Token CSRF inválido" }
 
     const supabase = createAdminClient()
+    const capabilities = await getPartnerCapabilities(data.partnerId, { storeId: data.storeId })
     let customerId: string | null
     try {
         customerId = await resolvePartnerCustomerId(supabase, data.partnerId, data.customerId)
     } catch (error: any) {
-        return { error: error?.message || "Cliente invÃ¡lido para este parceiro." }
+        return { error: error?.message || "Cliente inválido para este parceiro." }
     }
     const sanitizedItemsResult = sanitizeERPItems(data.items)
     if ("error" in sanitizedItemsResult) return { error: sanitizedItemsResult.error }
@@ -2612,11 +2625,11 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     }
 
     // ── Coupon validation and promotions fetch for updates ─────────────────────────────────────
-    let couponIdToSave: string | null = data.couponId || null
-    let couponDiscountAmount = Math.max(0, Number(data.couponDiscountAmount || 0))
+    let couponIdToSave: string | null = capabilities.hasCoupons ? (data.couponId || null) : null
+    let couponDiscountAmount = capabilities.hasCoupons ? Math.max(0, Number(data.couponDiscountAmount || 0)) : 0
     let couponPricingData: import("@/lib/services/pricing-engine").PricingCoupon | null = null
 
-    if (data.couponCode?.trim()) {
+    if (capabilities.hasCoupons && data.couponCode?.trim()) {
         const couponValidation = await validateCoupon({
             partnerId: data.partnerId,
             code: data.couponCode,
@@ -2633,7 +2646,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             couponIdToSave = null
             couponDiscountAmount = 0
         }
-    } else if (couponIdToSave) {
+    } else if (capabilities.hasCoupons && couponIdToSave) {
         const couponValidation = await validateCouponById(couponIdToSave, {
             partnerId: data.partnerId,
             customerId,
@@ -2651,8 +2664,8 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     }
 
     const { listActivePromotionsForMarketplaceAction, filterRawPromotionsByGiftStock, buildGiftOrderItems } = await import("@/app/actions/shared/promotions")
-    const rawPromotions = await listActivePromotionsForMarketplaceAction(data.partnerId, customerId)
-    const filteredPromotions = await filterRawPromotionsByGiftStock(rawPromotions, supabase)
+    const rawPromotions = capabilities.hasCampaigns ? await listActivePromotionsForMarketplaceAction(data.partnerId, customerId) : []
+    const filteredPromotions = (capabilities.hasCampaigns && rawPromotions.length > 0) ? await filterRawPromotionsByGiftStock(rawPromotions, supabase) : []
 
     const updatePricingResult = calculateOrderPricing({
         items: sanitizedItems.map((item) => ({
@@ -2668,7 +2681,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     })
 
     const giftIds = updatePricingResult.appliedGiftProductIds || []
-    const giftItems = await buildGiftOrderItems(supabase, giftIds, filteredPromotions)
+    const giftItems = (capabilities.hasCampaigns && giftIds.length > 0) ? await buildGiftOrderItems(supabase, giftIds, filteredPromotions) : []
 
     const nextItemsForDelta = [
         ...sanitizedItems,
@@ -2688,21 +2701,21 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             quantity: item.quantity,
         }))
         : nextItemsForDelta
-    const stockValidationError = await validateERPItemsStock({
+    const stockValidationError = capabilities.hasStockMovements ? await validateERPItemsStock({
         supabase,
         partnerId: data.partnerId,
         items: stockItemsToValidate,
-    })
+    }) : null
     if (stockValidationError) return { error: stockValidationError }
     const sanitizedPaymentBreakdown = sanitizePaymentBreakdown(data.paymentBreakdown)
-    const { data: financeAccount } = data.financeAccountId ? await supabase
+    const { data: financeAccount } = (capabilities.hasFinancial && data.financeAccountId) ? await supabase
         .from("finance_accounts")
         .select("id")
         .eq("id", data.financeAccountId)
         .eq("partner_id", data.partnerId)
         .limit(1)
         .maybeSingle() : { data: null }
-    if (data.financeAccountId && !financeAccount?.id) {
+    if (capabilities.hasFinancial && data.financeAccountId && !financeAccount?.id) {
         return { error: "Conta de recebimento inválida para esta venda." }
     }
 
@@ -3313,6 +3326,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
         payload.actionType === "cancel" ? "cancel" : "edit"
     )
     const supabase = createAdminClient()
+    const capabilities = await getPartnerCapabilities(payload.partnerId)
 
     const { data: currentOrders } = await supabase
         .from("orders")
@@ -3345,7 +3359,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                     .filter((id: any): id is string => Boolean(id)),
             ),
         )
-        if (creatorUserIds.length > 0) {
+        if (capabilities.hasProductivity && creatorUserIds.length > 0) {
             const { data: partnerUsersRows } = await supabase
                 .from("partner_users")
                 .select("id, user_id")
@@ -3370,6 +3384,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                 })
 
                 const shouldRestoreStockWithMovement = Boolean(
+                    capabilities.hasStockMovements &&
                     payload.restoreStock && (
                         order.inventory_deducted ||
                         shouldDeductInventory(order.delivery_status || null)
@@ -3405,61 +3420,68 @@ export async function updateOrdersStatusInBatchAction(payload: {
                     storeId: order.store_id,
                 })
 
-                await syncCancelledOrderAppointmentsAndTransactions(supabase, order.id)
-                const { syncReceivableForOrder, cancelPendingSettlementsForOrder } = await import("@/lib/services/transaction.service")
-                await syncReceivableForOrder(supabase, {
-                    order_number: order.order_number || order.id,
-                    partner_id: payload.partnerId,
-                    total_amount: 0,
-                    paid_amount: 0,
-                    situation: "cancelled",
-                })
-                // Ledger Fase 2: venda cancelada não tem mais obrigação de
-                // recebimento futuro - cancela settlements pendentes (sempre,
-                // independente do refund automático). Idempotente.
-                await cancelPendingSettlementsForOrder({
-                    supabase,
-                    partnerId: payload.partnerId,
-                    orderId: order.id,
-                    orderNumber: order.order_number || order.id,
-                    reason: payload.cancelReason?.trim() || "Cancelamento de pedido",
-                    reconcileKey: `order-cancel:${order.id}`,
-                    actorUserId: user.id,
-                })
+                if (capabilities.hasAppointments || capabilities.hasFinancial) {
+                    await syncCancelledOrderAppointmentsAndTransactions(supabase, order.id)
+                }
 
-                if (stockWasRestoredOnCancel) {
-                    const restoreResult = await createOrderStockMovement({
+                if (capabilities.hasFinancial) {
+                    const { syncReceivableForOrder, cancelPendingSettlementsForOrder } = await import("@/lib/services/transaction.service")
+                    await syncReceivableForOrder(supabase, {
+                        order_number: order.order_number || order.id,
+                        partner_id: payload.partnerId,
+                        total_amount: 0,
+                        paid_amount: 0,
+                        situation: "cancelled",
+                    })
+                    // Ledger Fase 2: venda cancelada não tem mais obrigação de
+                    // recebimento futuro - cancela settlements pendentes (sempre,
+                    // independente do refund automático). Idempotente.
+                    await cancelPendingSettlementsForOrder({
                         supabase,
                         partnerId: payload.partnerId,
                         orderId: order.id,
-                        createdBy: user.id,
-                        type: "in",
-                        reason: "Cancelamento de pedido",
-                        notes: nextNotes || undefined,
-                        items: order.order_items || [],
-                        storeId: order.store_id,
+                        orderNumber: order.order_number || order.id,
+                        reason: payload.cancelReason?.trim() || "Cancelamento de pedido",
+                        reconcileKey: `order-cancel:${order.id}`,
+                        actorUserId: user.id,
                     })
+                }
 
-                    if ("error" in restoreResult) {
-                        console.error("[orders_cancel_stock] failed_to_restore_stock_movement", { orderId: order.id, orderNumber: order.order_number, partnerId: payload.partnerId, restoreStock: payload.restoreStock, inventoryDeducted: order.inventory_deducted, deliveryStatus: order.delivery_status, error: restoreResult.error })
-                        processingWarnings.push(`Pedido ${order.order_number || order.id}: cancelado, mas não foi possível restaurar estoque (${restoreResult.error})`)
-                    }
-                } else if (!order.inventory_deducted) {
-                    const releaseResult = await releaseOrderInventory({
-                        client: supabase,
-                        partnerId: payload.partnerId,
-                        orderId: order.id,
-                        items: order.order_items || [],
-                        storeId: order.store_id,
-                    })
+                if (capabilities.hasStockMovements) {
+                    if (stockWasRestoredOnCancel) {
+                        const restoreResult = await createOrderStockMovement({
+                            supabase,
+                            partnerId: payload.partnerId,
+                            orderId: order.id,
+                            createdBy: user.id,
+                            type: "in",
+                            reason: "Cancelamento de pedido",
+                            notes: nextNotes || undefined,
+                            items: order.order_items || [],
+                            storeId: order.store_id,
+                        })
 
-                    if ("error" in releaseResult) {
-                        console.error("[orders_cancel_stock] failed_to_release_stock_reservation", { orderId: order.id, orderNumber: order.order_number, partnerId: payload.partnerId, error: releaseResult.error })
-                        processingWarnings.push(`Pedido ${order.order_number || order.id}: cancelado, mas não foi possível liberar reserva de estoque (${releaseResult.error})`)
+                        if ("error" in restoreResult) {
+                            console.error("[orders_cancel_stock] failed_to_restore_stock_movement", { orderId: order.id, orderNumber: order.order_number, partnerId: payload.partnerId, restoreStock: payload.restoreStock, inventoryDeducted: order.inventory_deducted, deliveryStatus: order.delivery_status, error: restoreResult.error })
+                            processingWarnings.push(`Pedido ${order.order_number || order.id}: cancelado, mas não foi possível restaurar estoque (${restoreResult.error})`)
+                        }
+                    } else if (!order.inventory_deducted) {
+                        const releaseResult = await releaseOrderInventory({
+                            client: supabase,
+                            partnerId: payload.partnerId,
+                            orderId: order.id,
+                            items: order.order_items || [],
+                            storeId: order.store_id,
+                        })
+
+                        if ("error" in releaseResult) {
+                            console.error("[orders_cancel_stock] failed_to_release_stock_reservation", { orderId: order.id, orderNumber: order.order_number, partnerId: payload.partnerId, error: releaseResult.error })
+                            processingWarnings.push(`Pedido ${order.order_number || order.id}: cancelado, mas não foi possível liberar reserva de estoque (${releaseResult.error})`)
+                        }
                     }
                 }
 
-                if (payload.generateAutomaticRefund) {
+                if (capabilities.hasFinancial && payload.generateAutomaticRefund) {
                     const refundAmount = Math.max(0, Number(order.paid_amount || 0))
                     if (refundAmount > 0.009) {
                         const refundResult = await createRefundTransactionForCancelledOrderSafe({
@@ -3487,7 +3509,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                 const sellerPartnerUserId = order.created_by
                     ? sellerPartnerUserIdMap.get(String(order.created_by)) ?? null
                     : null
-                if (sellerPartnerUserId) {
+                if (capabilities.hasProductivity && sellerPartnerUserId) {
                     await reverseCommissionForEntity({
                         supabase,
                         partnerId: payload.partnerId,
@@ -3500,7 +3522,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                     })
                 }
 
-                if (order.created_by) {
+                if (capabilities.hasGoals && order.created_by) {
                     await reverseSaleFromGoals({
                         supabase,
                         partnerId: payload.partnerId,
@@ -3752,7 +3774,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
             if (error) return { error: error.message }
             paymentProcessedCount += 1
 
-            if (paymentState.paidAmount > (order.paid_amount || 0) + 0.009 && paymentState.situation === "paid") {
+            if (capabilities.hasFinancial && paymentState.paidAmount > (order.paid_amount || 0) + 0.009 && paymentState.situation === "paid") {
                 const oldBreakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : []
                 const newBreakdown = payload.paymentBreakdown || (
                     paymentState.situation === "paid"
@@ -3777,32 +3799,36 @@ export async function updateOrdersStatusInBatchAction(payload: {
 
             if (order.situation !== "paid" && paymentState.situation === "paid") {
                 await fulfillMarketplaceOrderIfNeeded(supabase, order.id)
-                await createSellerCommissionForPaidOrder({
-                    supabase,
-                    partnerId: payload.partnerId,
-                    orderId: order.id,
-                    sellerUserId: order.created_by || null,
-                    saleAmount: Number(order.total_amount || 0),
-                    accountId: order.finance_account_id || null,
-                    createdByUserId: user.id,
-                    storeId: order.store_id || null,
-                })
+                if (capabilities.hasProductivity) {
+                    await createSellerCommissionForPaidOrder({
+                        supabase,
+                        partnerId: payload.partnerId,
+                        orderId: order.id,
+                        sellerUserId: order.created_by || null,
+                        saleAmount: Number(order.total_amount || 0),
+                        accountId: order.finance_account_id || null,
+                        createdByUserId: user.id,
+                        storeId: order.store_id || null,
+                    })
+                }
             }
 
-            const { syncReceivableForOrder } = await import("@/lib/services/transaction.service")
-            await syncReceivableForOrder(supabase, {
-                order_number: order.order_number || order.id,
-                partner_id: payload.partnerId,
-                store_id: order.store_id || null,
-                total_amount: Number(order.total_amount || 0),
-                paid_amount: Number(paymentState.paidAmount || 0),
-                situation: paymentState.situation,
-                payment_method: nextPaymentMethod || order.payment_method,
-                customer_id: order.customer_id || order.buyer_id || null,
-                customer_name: order.customer_name,
-                finance_account_id: order.finance_account_id,
-                order_source: order.order_source || "manual",
-            })
+            if (capabilities.hasFinancial) {
+                const { syncReceivableForOrder } = await import("@/lib/services/transaction.service")
+                await syncReceivableForOrder(supabase, {
+                    order_number: order.order_number || order.id,
+                    partner_id: payload.partnerId,
+                    store_id: order.store_id || null,
+                    total_amount: Number(order.total_amount || 0),
+                    paid_amount: Number(paymentState.paidAmount || 0),
+                    situation: paymentState.situation,
+                    payment_method: nextPaymentMethod || order.payment_method,
+                    customer_id: order.customer_id || order.buyer_id || null,
+                    customer_name: order.customer_name,
+                    finance_account_id: order.finance_account_id,
+                    order_source: order.order_source || "manual",
+                })
+            }
         }
         if (paymentProcessedCount === 0) {
             return { error: "Nenhum pedido elegível para alteração de pagamento." }
@@ -3836,11 +3862,11 @@ export async function updateOrdersStatusInBatchAction(payload: {
             eligibleDeliveryOrders.push(order)
         }
 
-        const finalizeDeliveryOrders = eligibleDeliveryOrders.filter(
+        const finalizeDeliveryOrders = capabilities.hasStockMovements ? eligibleDeliveryOrders.filter(
             (order) => !order.inventory_deducted && shouldDeductInventory(payload.statusValue),
-        )
+        ) : []
         const simpleDeliveryOrders = eligibleDeliveryOrders.filter(
-            (order) => !(!order.inventory_deducted && shouldDeductInventory(payload.statusValue)),
+            (order) => !(!order.inventory_deducted && capabilities.hasStockMovements && shouldDeductInventory(payload.statusValue)),
         )
 
         // Pedidos com efeito colateral: finaliza estoque e atualiza individualmente (marca inventory_deducted).

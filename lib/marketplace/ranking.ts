@@ -134,3 +134,34 @@ export function applySellerDiversity<T extends RankableItem>(items: T[], maxCons
 export function sortByTrendingScore<T extends Parameters<typeof calcTrendingScore>[0]>(items: T[]): T[] {
   return [...items].sort((a, b) => calcTrendingScore(b) - calcTrendingScore(a))
 }
+
+/**
+ * Score calculation for items inside a vendor's storefront.
+ * Combines database marketplace_score with client-side trending signals,
+ * featured/highlighted boost, and promotional boost.
+ */
+export function calcVendorItemScore(item: any): number {
+  if (!item) return 0
+  const dbScore = Number(item.marketplace_score || 0)
+  const trending = calcTrendingScore(item)
+  const isFeatured = (item.is_featured || item.is_highlighted || item.highlight_service) ? 0.3 : 0
+  const hasPromo = (item.promotional_price || item.is_on_promotion) ? 0.1 : 0
+
+  return Math.max(dbScore, trending) + isFeatured + hasPromo
+}
+
+/**
+ * Sorts products or services for a vendor storefront according to marketplace criteria:
+ * 1. Marketplace / Trending Score + Featured/Promo boost
+ * 2. Tie-break by creation date (newest first)
+ */
+export function sortByVendorRelevance<T extends { created_at?: string }>(items: T[]): T[] {
+  return [...items].sort((a, b) => {
+    const scoreA = calcVendorItemScore(a)
+    const scoreB = calcVendorItemScore(b)
+    const diff = scoreB - scoreA
+    if (Math.abs(diff) > 0.0001) return diff
+    return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+  })
+}
+

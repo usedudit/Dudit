@@ -154,18 +154,26 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                 <FadeIn key="Dados Gerais">
 
                     {caps?.bannerMessage && !props.isReadOnly && (
-                        <><InfoCard title="Atenção" message={caps.bannerMessage} color="orange" className="mb-6" /><div className="flex flex-wrap gap-2">
-                            {caps.showReopenCta && props.onReopenQuote && (
-                                <Button type="button" variant="outline" className="h-9 text-xs" onClick={props.onReopenQuote}>
-                                    Reabrir como rascunho
-                                </Button>
-                            )}
-                            {caps.showDuplicateCta && props.onDuplicateQuote && (
-                                <Button type="button" variant="outline" className="h-9 text-xs" onClick={props.onDuplicateQuote}>
-                                    Duplicar orçamento
-                                </Button>
-                            )}
-                        </div></>
+                        <InfoCard
+                            title="Atenção"
+                            message={caps.bannerMessage}
+                            color="orange"
+                            className="mb-6"
+                            rightElement={
+                                <div className="flex items-center gap-2">
+                                    {caps.showReopenCta && props.onReopenQuote && (
+                                        <Button variant="link" className="p-0 h-auto" onClick={props.onReopenQuote}>
+                                            Reabrir como rascunho
+                                        </Button>
+                                    )}
+                                    {caps.showDuplicateCta && props.onDuplicateQuote && (
+                                        <Button variant="link" className="p-0 h-auto" onClick={props.onDuplicateQuote}>
+                                            Duplicar orçamento
+                                        </Button>
+                                    )}
+                                </div>
+                            }
+                        />
                     )}
 
                     {/* Customer Selection - Mobile/Tablet only */}
@@ -580,44 +588,46 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                         )}
                     </FormSection>
 
-                    {/* 2. CUSTOMER SECTION */}
-                    <FormSection title="Cliente" hasSeparator>
-                        {props.selectedCustomer ? (
-                            <div className="flex items-center justify-between p-4 rounded-xl bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border">
-                                <div className="flex gap-4 items-center">
-                                    <div className="relative">
-                                        <UserProfileImage
-                                            fullName={props.selectedCustomer.name || "Cliente"}
-                                            imageUrl={props.selectedCustomer.image_url || props.selectedCustomer.avatar_url || props.selectedCustomer.avatar}
-                                            className="w-12 h-12 text-lg border border-white dark:border-dark-border"
-                                        />
+                    {/* 2. CUSTOMER SECTION (Desktop only - mobile/tablet uses top ListItem) */}
+                    <div className="hidden lg:block">
+                        <FormSection title="Cliente" hasSeparator>
+                            {props.selectedCustomer ? (
+                                <div className="flex items-center justify-between p-4 rounded-xl bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border">
+                                    <div className="flex gap-4 items-center">
+                                        <div className="relative">
+                                            <UserProfileImage
+                                                fullName={props.selectedCustomer.name || "Cliente"}
+                                                imageUrl={props.selectedCustomer.image_url || props.selectedCustomer.avatar_url || props.selectedCustomer.avatar}
+                                                className="w-12 h-12 text-lg border border-white dark:border-dark-border"
+                                            />
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight">{props.selectedCustomer.name}</h4>
+                                            <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
+                                                {props.selectedCustomer.email}
+                                            </span>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <h4 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight">{props.selectedCustomer.name}</h4>
-                                        <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
-                                            {props.selectedCustomer.email}
-                                        </span>
-                                    </div>
+                                    {!customerLocked && (
+                                        <Button variant="outlinered" onClick={() => props.setSelectedCustomer(null)}>
+                                            Remover
+                                        </Button>
+                                    )}
                                 </div>
-                                {!customerLocked && (
-                                    <Button variant="outlinered" onClick={() => props.setSelectedCustomer(null)}>
-                                        Remover
-                                    </Button>
-                                )}
-                            </div>
-                        ) : (
-                            <IconPlaceholder
-                                icon={UserIcon}
-                                title={QUOTE_DEFAULT_CUSTOMER_LABEL}
-                                subtitle={props.isReadOnly ? "Nenhum cliente cadastrado vinculado; exibição usa o nome padrão." : "Sem cliente cadastrado - a proposta usa o nome padrão. Selecione um cliente para vincular dados de contato."}
-                                itemButton={!customerLocked ? {
-                                    text: "Selecionar Cliente",
-                                    action: () => props.setIsCustomerSheetOpen(true),
-                                    variant: "outline"
-                                } : undefined}
-                            />
-                        )}
-                    </FormSection>
+                            ) : (
+                                <IconPlaceholder
+                                    icon={UserIcon}
+                                    title={QUOTE_DEFAULT_CUSTOMER_LABEL}
+                                    subtitle={props.isReadOnly ? "Nenhum cliente cadastrado vinculado; exibição usa o nome padrão." : "Sem cliente cadastrado - a proposta usa o nome padrão. Selecione um cliente para vincular dados de contato."}
+                                    itemButton={!customerLocked ? {
+                                        text: "Selecionar Cliente",
+                                        action: () => props.setIsCustomerSheetOpen(true),
+                                        variant: "outline"
+                                    } : undefined}
+                                />
+                            )}
+                        </FormSection>
+                    </div>
 
                     {/* 3. SETTINGS SECTION */}
                     <FormSection title="Configurações" hasSeparator>

@@ -31,7 +31,7 @@ export function ExplorarHeaderSection({
                     </div>
                 )}
                 <div className="flex-1">
-                    <h1 className="text-2xl lg:text-3xl font-bold text-brand-dark">
+                    <h1 className="text-lg lg:text-2xl font-medium text-brand-dark mb-1">
                         {title}
                     </h1>
                     <p className="text-sm font-medium text-brand-inactive-text mt-1">

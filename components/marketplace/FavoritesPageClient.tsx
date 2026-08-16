@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
-import { motion, AnimatePresence } from "framer-motion"
 import { SearchIcon, ChevronDownIcon } from "@/lib/icons"
 import { useSupabase } from "@/providers/supabase-provider"
 import { useFavorites } from "@/providers/favorites-provider"
@@ -14,6 +13,8 @@ import { useRouter } from "next/navigation"
 interface FavoritesPageClientProps {
     userProfile: any
     cartCount: number
+    initialItems?: any[]
+    initialCounts?: { total: number; produtos: number; servicos: number }
 }
 
 type TabType = "todos" | "produtos" | "servicos"
@@ -32,22 +33,29 @@ const SORT_OPTIONS: { value: SortType; label: string }[] = [
     { value: "nome_az", label: "Nome (A-Z)" },
 ]
 
-export function FavoritesPageClient({ userProfile, cartCount }: FavoritesPageClientProps) {
+export function FavoritesPageClient({
+    userProfile,
+    cartCount,
+    initialItems,
+    initialCounts
+}: FavoritesPageClientProps) {
     const { user } = useSupabase()
     const router = useRouter()
-    const { count: contextCount } = useFavorites()
+    const { favoriteKeys, isLoaded: isFavoritesLoaded } = useFavorites()
+    const userId = user?.id
 
     const [activeTab, setActiveTab] = useState<TabType>("todos")
     const [sortBy, setSortBy] = useState<SortType>("recentes")
     const [searchInput, setSearchInput] = useState("")
     const [searchQuery, setSearchQuery] = useState("")
-    const [items, setItems] = useState<any[]>([])
-    const [isLoading, setIsLoading] = useState(true)
-    const [counts, setCounts] = useState({ total: 0, produtos: 0, servicos: 0 })
+    const [items, setItems] = useState<any[]>(initialItems ?? [])
+    const [isLoading, setIsLoading] = useState(!initialItems)
+    const [counts, setCounts] = useState(
+        initialCounts ?? { total: 0, produtos: 0, servicos: 0 }
+    )
     const [isSortModalOpen, setIsSortModalOpen] = useState(false)
     const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-    const hasLoadedOnce = useRef(false)
-    const lastContextCountRef = useRef(contextCount)
+    const hasLoadedOnce = useRef(!!initialItems)
 
     // Redirect unauthenticated users
     useEffect(() => {
@@ -57,9 +65,11 @@ export function FavoritesPageClient({ userProfile, cartCount }: FavoritesPageCli
     }, [user, router])
 
     // Fetch favorites
-    const fetchFavorites = useCallback(async () => {
-        if (!user) return
-        setIsLoading(true)
+    const fetchFavorites = useCallback(async (silent = false) => {
+        if (!userId) return
+        if (!silent && !hasLoadedOnce.current) {
+            setIsLoading(true)
+        }
         try {
             const favResult = await getUserFavoritesAction({ type: "todos" })
 
@@ -75,19 +85,33 @@ export function FavoritesPageClient({ userProfile, cartCount }: FavoritesPageCli
         } finally {
             setIsLoading(false)
         }
-    }, [user])
+    }, [userId])
 
+    // Initial fetch if SSR data was not provided
     useEffect(() => {
-        fetchFavorites()
-    }, [fetchFavorites])
-
-    // Sync with provider count changes (but ignore initial load from 0)
-    useEffect(() => {
-        if (hasLoadedOnce.current && contextCount !== lastContextCountRef.current) {
-            lastContextCountRef.current = contextCount
+        if (!hasLoadedOnce.current && userId) {
             fetchFavorites()
         }
-    }, [contextCount, fetchFavorites])
+    }, [userId, fetchFavorites])
+
+    // When an item is unfavorited from favoriteKeys, remove it immediately from items without reloading
+    useEffect(() => {
+        if (!isFavoritesLoaded || !hasLoadedOnce.current) return
+        setItems((prevItems) => {
+            const updated = prevItems.filter((item) => favoriteKeys.has(`${item.itemType}:${item.id}`))
+            if (updated.length !== prevItems.length) {
+                const prodCount = updated.filter((i) => i.itemType === "produto").length
+                const servCount = updated.filter((i) => i.itemType === "servico").length
+                setCounts({
+                    total: updated.length,
+                    produtos: prodCount,
+                    servicos: servCount,
+                })
+                return updated
+            }
+            return prevItems
+        })
+    }, [favoriteKeys, isFavoritesLoaded])
 
     // Filter and sort items
     const filteredItems = useMemo(() => {
@@ -152,98 +176,89 @@ export function FavoritesPageClient({ userProfile, cartCount }: FavoritesPageCli
     return (
         <>
             <div className="flex-1 flex flex-col container mx-auto px-4 max-w-[1400px] w-full pt-6 md:pt-10 pb-20 mt-[78px] lg:mt-[108px] relative overflow-hidden">
-                <AnimatePresence mode="wait">
-                    {/* Header */}
-                    <div className="hidden lg:block items-center mb-8">
-                        <div>
-                            <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">Favoritos {counts.total > 0 && (<span className="text-brand-inactive-text font-bold text-base lg:text-lg ml-2">({counts.total})</span>)}</h1>
-                            <p className="text-md text-brand-inactive-text mt-1">Seus produtos e serviços salvos em um só lugar</p>
-                        </div>
+                {/* Header */}
+                <div className="hidden lg:block items-center mb-8">
+                    <div>
+                        <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
+                            Favoritos {counts.total > 0 && (<span className="text-brand-inactive-text font-bold text-base lg:text-lg ml-2">({counts.total})</span>)}
+                        </h1>
+                        <p className="text-md text-brand-inactive-text mt-1">Seus produtos e serviços salvos em um só lugar</p>
                     </div>
+                </div>
 
-                    {/* Tabs */}
-                    <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)}>
-                        <TabsList className="bg-transparent px-0 md:px-0 mb-6">
-                            {TAB_OPTIONS.map((tab) => (
-                                <TabsTrigger
-                                    key={tab.value}
-                                    value={tab.value}
-                                    badge={<span className="ml-1 text-xs text-brand-inactive-text">({tabCount(tab.value)})</span>}
-                                >
-                                    {tab.label}
-                                </TabsTrigger>
-                            ))}
-                        </TabsList>
-                    </Tabs>
-
-                    {/* Search & Sort Bar */}
-                    {counts.total > 0 && (
-                        <div className="flex items-center gap-3 mb-6">
-                            {/* Search */}
-                            <div className="relative flex-1 max-w-md">
-                                <Input
-                                    label=""
-                                    name="searchQuery"
-                                    placeholder="Buscar nos favoritos..."
-                                    value={searchInput}
-                                    onChange={(e) => handleSearchChange(e.target.value)}
-                                    prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
-                                    className="mb-0"
-                                    variant="full-rounded"
-                                />
-                            </div>
-
-                            {/* Sort */}
-                            <Button
-                                onClick={() => setIsSortModalOpen(true)}
-                                variant="outline"
-                                className="flex items-center gap-2 w-fit"
-                                rightIcon={<ChevronDownIcon size={14} />}
+                {/* Tabs */}
+                <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)}>
+                    <TabsList className="bg-transparent px-0 md:px-0 mb-6">
+                        {TAB_OPTIONS.map((tab) => (
+                            <TabsTrigger
+                                key={tab.value}
+                                value={tab.value}
+                                badge={<span className="ml-1 text-xs text-brand-inactive-text">({tabCount(tab.value)})</span>}
                             >
-                                {SORT_OPTIONS.find((s) => s.value === sortBy)?.label}
-                            </Button>
+                                {tab.label}
+                            </TabsTrigger>
+                        ))}
+                    </TabsList>
+                </Tabs>
+
+                {/* Search & Sort Bar */}
+                {counts.total > 0 && (
+                    <div className="flex items-center gap-3 mb-6">
+                        {/* Search */}
+                        <div className="relative flex-1 max-w-md">
+                            <Input
+                                label=""
+                                name="searchQuery"
+                                placeholder="Buscar nos favoritos..."
+                                value={searchInput}
+                                onChange={(e) => handleSearchChange(e.target.value)}
+                                prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
+                                className="mb-0"
+                                variant="full-rounded"
+                            />
+                        </div>
+
+                        {/* Sort */}
+                        <Button
+                            onClick={() => setIsSortModalOpen(true)}
+                            variant="outline"
+                            className="flex items-center gap-2 w-fit"
+                            rightIcon={<ChevronDownIcon size={14} />}
+                        >
+                            {SORT_OPTIONS.find((s) => s.value === sortBy)?.label}
+                        </Button>
+                    </div>
+                )}
+
+                {/* Content */}
+                <div>
+                    {isLoading ? (
+                        <FavoritesSkeleton />
+                    ) : filteredItems.length === 0 ? (
+                        <FavoritesEmpty
+                            hasSearch={!!searchQuery.trim()}
+                            activeTab={activeTab}
+                            totalCount={counts.total}
+                        />
+                    ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4 lg:gap-6">
+                            {filteredItems.map((item) => (
+                                <ItemCard
+                                    key={`${item.itemType}-${item.id}`}
+                                    product={item}
+                                    locationContext={userProfile?.city && userProfile?.state ? { scope: "city", city: userProfile.city, state: userProfile.state } : null}
+                                    className="w-full"
+                                />
+                            ))}
                         </div>
                     )}
-
-                    {/* Content */}
-                    <AnimatePresence mode="wait">
-                        <motion.div
-                            key={`${activeTab}-${isLoading}`}
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: 0.2 }}
-                        >
-                            {isLoading ? (
-                                <FavoritesSkeleton />
-                            ) : filteredItems.length === 0 ? (
-                                <FavoritesEmpty
-                                    hasSearch={!!searchQuery.trim()}
-                                    activeTab={activeTab}
-                                    totalCount={counts.total}
-                                />
-                            ) : (
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4 lg:gap-6">
-                                    {filteredItems.map((item) => (
-                                        <ItemCard
-                                            key={`${item.itemType}-${item.id}`}
-                                            product={item}
-                                            locationContext={userProfile?.city && userProfile?.state ? { scope: "city", city: userProfile.city, state: userProfile.state } : null}
-                                            className="w-full"
-                                        />
-                                    ))}
-                                </div>
-                            )}
-                        </motion.div>
-                    </AnimatePresence>
-                </AnimatePresence >
-            </div >
+                </div>
+            </div>
 
             {/* Sort Modal */}
-            < DefaultModal
+            <DefaultModal
                 isOpen={isSortModalOpen}
-                onClose={() => setIsSortModalOpen(false)
-                }
+                onClose={() => setIsSortModalOpen(false)}
                 title="Ordenar por"
                 maxWidth="md"
             >
@@ -262,7 +277,7 @@ export function FavoritesPageClient({ userProfile, cartCount }: FavoritesPageCli
                         />
                     ))}
                 </div>
-            </DefaultModal >
+            </DefaultModal>
         </>
     )
 }

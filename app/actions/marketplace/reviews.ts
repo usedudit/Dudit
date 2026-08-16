@@ -1,6 +1,5 @@
 "use server"
 
-import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { createAdminClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 
@@ -9,7 +8,7 @@ import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 
 async function checkFraudulentReview(
-  supabase: any,
+  adminSupabase: any,
   userId: string,
   partnerId: string,
   productId: string | null,
@@ -19,8 +18,6 @@ async function checkFraudulentReview(
   console.log(`[REVIEW CHECK] User: ${userId}, Partner: ${partnerId}, Product: ${productId}, Service: ${serviceId}`)
 
   // 1. Verificar se o usuário é o próprio dono do parceiro
-  const { createAdminClient } = await import("@/lib/supabase/server")
-  const adminSupabase = createAdminClient()
   const { data: partner } = await adminSupabase.from("partners").select("user_id").eq("id", partnerId).single()
 
   if (partner && partner.user_id === userId) {
@@ -31,7 +28,7 @@ async function checkFraudulentReview(
   let orders = null;
 
   if (productId) {
-    let query = supabase
+    let query = adminSupabase
       .from("orders")
       .select("id, order_items!inner(product_id)")
       .eq("buyer_id", userId)
@@ -51,7 +48,7 @@ async function checkFraudulentReview(
     }
     orders = data;
   } else if (serviceId) {
-    let query = supabase
+    let query = adminSupabase
       .from("orders")
       .select("id, order_items!inner(service_id)")
       .eq("buyer_id", userId)
@@ -114,7 +111,7 @@ async function checkFraudulentReview(
     const allHighRatings = userReviews.every((r: any) => r.rating >= 4)
     if (allHighRatings) {
       // Registrar atividade suspeita
-      await supabase.from("fraud_checks").insert({
+      await adminSupabase.from("fraud_checks").insert({
         user_id: userId,
         action_type: "suspicious_multiple_high_ratings",
         related_user_id: partner?.user_id || null,
@@ -130,7 +127,7 @@ async function checkFraudulentReview(
   const thirtyDaysAgo = new Date()
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
 
-  const { data: recentOrders } = await supabase
+  const { data: recentOrders } = await adminSupabase
     .from("orders")
     .select("id, created_at")
     .eq("buyer_id", userId)
@@ -138,7 +135,7 @@ async function checkFraudulentReview(
 
   if (recentOrders && recentOrders.length >= 5) {
     // Registrar atividade suspeita
-    await supabase.from("fraud_checks").insert({
+    await adminSupabase.from("fraud_checks").insert({
       user_id: userId,
       action_type: "high_frequency_orders",
       metadata: {
@@ -151,57 +148,59 @@ async function checkFraudulentReview(
   return { isSuspicious: false }
 }
 
-async function updateProductRating(supabase: any, productId: string) {
-  const { data: reviews } = await supabase
+async function updateProductRating(adminSupabase: any, productId: string) {
+  const { data: reviews } = await adminSupabase
     .from("reviews")
     .select("rating")
     .eq("product_id", productId)
     .not("rating", "is", null)
 
   if (!reviews || reviews.length === 0) {
+    await adminSupabase.from("products").update({ rating: 0 }).eq("id", productId)
     return
   }
 
   const averageRating = reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / reviews.length
 
-  await supabase.from("products").update({ rating: averageRating }).eq("id", productId)
+  await adminSupabase.from("products").update({ rating: averageRating }).eq("id", productId)
 }
 
-async function updateServiceRating(supabase: any, serviceId: string) {
-  const { data: reviews } = await supabase
+async function updateServiceRating(adminSupabase: any, serviceId: string) {
+  const { data: reviews } = await adminSupabase
     .from("reviews")
     .select("rating")
     .eq("service_id", serviceId)
     .not("rating", "is", null)
 
   if (!reviews || reviews.length === 0) {
+    await adminSupabase.from("services").update({ rating: 0 }).eq("id", serviceId)
     return
   }
 
   const averageRating = reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / reviews.length
 
-  await supabase.from("services").update({ rating: averageRating }).eq("id", serviceId)
+  await adminSupabase.from("services").update({ rating: averageRating }).eq("id", serviceId)
 }
 
-async function updateStoreRating(supabase: any, storeId: string) {
-  const { data: reviews } = await supabase
+async function updateStoreRating(adminSupabase: any, storeId: string) {
+  const { data: reviews } = await adminSupabase
     .from("reviews")
     .select("rating")
     .eq("store_id", storeId)
     .not("rating", "is", null)
 
   if (!reviews || reviews.length < 3) {
-    await supabase.from("stores").update({ rating: 0 }).eq("id", storeId)
+    await adminSupabase.from("stores").update({ rating: 0 }).eq("id", storeId)
     return
   }
 
   const averageRating = reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / reviews.length
-  await supabase.from("stores").update({ rating: averageRating }).eq("id", storeId)
+  await adminSupabase.from("stores").update({ rating: averageRating }).eq("id", storeId)
 }
 
-async function updatePartnerRating(supabase: any, partnerId: string) {
+async function updatePartnerRating(adminSupabase: any, partnerId: string) {
   // Get all reviews directly for this partner (both product and service reviews)
-  const { data: reviews, error } = await supabase
+  const { data: reviews, error } = await adminSupabase
     .from("reviews")
     .select("rating")
     .eq("partner_id", partnerId)
@@ -214,13 +213,13 @@ async function updatePartnerRating(supabase: any, partnerId: string) {
 
   if (!reviews || reviews.length === 0) {
     // If no reviews, set store rating to 0
-    await supabase.from("stores").update({ rating: 0 }).eq("partner_id", partnerId)
+    await adminSupabase.from("stores").update({ rating: 0 }).eq("partner_id", partnerId)
     return
   }
 
   const averageRating = reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / reviews.length
 
-  await supabase.from("stores").update({ rating: averageRating }).eq("partner_id", partnerId)
+  await adminSupabase.from("stores").update({ rating: averageRating }).eq("partner_id", partnerId)
 }
 
 export async function createReviewAction(data: {
@@ -243,19 +242,23 @@ export async function createReviewAction(data: {
     return { error: csrfValidation.error || "Token CSRF inválido" }
   }
 
-  const supabase = await getSupabaseServerClient()
-
   // SECURITY: Use server-verified user identity instead of client-provided userId
   const currentUser = await requireUser()
   const userId = currentUser.id
 
-  const fraudCheck = await checkFraudulentReview(supabase, userId, data.partnerId, data.productId, data.serviceId, data.storeId)
+  if (!data.rating || typeof data.rating !== "number" || data.rating < 1 || data.rating > 5) {
+    return { error: "Avaliação deve ter nota entre 1 e 5" }
+  }
+
+  const adminSupabase = createAdminClient()
+
+  const fraudCheck = await checkFraudulentReview(adminSupabase, userId, data.partnerId, data.productId, data.serviceId, data.storeId)
 
   if (fraudCheck.isSuspicious) {
     return { error: fraudCheck.reason || "Não foi possível criar a avaliação" }
   }
 
-  const { error } = await supabase.from("reviews").insert({
+  const { error } = await adminSupabase.from("reviews").insert({
     order_id: data.orderId,
     user_id: userId,
     partner_id: data.partnerId,
@@ -267,18 +270,19 @@ export async function createReviewAction(data: {
   })
 
   if (error) {
+    console.error("[Reviews] Error inserting review:", error.message)
     return { error: error.message }
   }
 
   if (data.productId) {
-    await updateProductRating(supabase, data.productId)
+    await updateProductRating(adminSupabase, data.productId)
   }
   if (data.serviceId) {
-    await updateServiceRating(supabase, data.serviceId)
+    await updateServiceRating(adminSupabase, data.serviceId)
   }
-  await updatePartnerRating(supabase, data.partnerId)
+  await updatePartnerRating(adminSupabase, data.partnerId)
   if (data.storeId) {
-    await updateStoreRating(supabase, data.storeId)
+    await updateStoreRating(adminSupabase, data.storeId)
   }
 
   // Invalidate partner cache tags to ensure seller page shows real-time stats
@@ -321,11 +325,15 @@ export async function updateReviewAction(reviewId: string, data: {
     return { error: csrfValidation.error || "Token CSRF inválido" }
   }
 
-  const supabase = await getSupabaseServerClient()
   const user = await requireUser()
+  const adminSupabase = createAdminClient()
+
+  if (!data.rating || typeof data.rating !== "number" || data.rating < 1 || data.rating > 5) {
+    return { error: "Avaliação deve ter nota entre 1 e 5" }
+  }
 
   // Verify user owns this review
-  const { data: review } = await supabase
+  const { data: review } = await adminSupabase
     .from("reviews")
     .select("user_id, partner_id, store_id, product_id, service_id")
     .eq("id", reviewId)
@@ -335,7 +343,7 @@ export async function updateReviewAction(reviewId: string, data: {
     return { error: "Você não tem permissão para editar esta avaliação" }
   }
 
-  const { error } = await supabase
+  const { error } = await adminSupabase
     .from("reviews")
     .update({
       rating: data.rating,
@@ -343,84 +351,21 @@ export async function updateReviewAction(reviewId: string, data: {
       updated_at: new Date().toISOString(),
     })
     .eq("id", reviewId)
+    .eq("user_id", user.id)
 
   if (error) {
     return { error: error.message }
   }
 
   if (review.product_id) {
-    await updateProductRating(supabase, review.product_id)
+    await updateProductRating(adminSupabase, review.product_id)
   }
   if (review.service_id) {
-    await updateServiceRating(supabase, review.service_id)
+    await updateServiceRating(adminSupabase, review.service_id)
   }
-  await updatePartnerRating(supabase, review.partner_id)
+  await updatePartnerRating(adminSupabase, review.partner_id)
   if (review.store_id) {
-    await updateStoreRating(supabase, review.store_id)
-  }
-
-  // Invalidate cache tags
-  try {
-    const { revalidatePartnerProfile } = await import("@/lib/utils/revalidation")
-    await revalidatePartnerProfile(review.partner_id)
-    const { revalidateTag } = await import("next/cache")
-    revalidateTag("partner-reviews", "max")
-    revalidateTag(`partner-${review.partner_id}`, "max")
-  } catch (revalError) {
-    console.error("[Reviews] Failed to revalidate partner details:", revalError)
-  }
-
-  revalidatePath("/marketplace")
-  revalidatePath("/pedidos")
-  if (review.product_id) {
-    revalidatePath(`/marketplace/products/${review.product_id}`)
-  }
-
-  return { success: true }
-}
-
-export async function deleteReviewAction(reviewId: string, csrf_token?: string) {
-  await requireRateLimit(RateLimitCategory.ERP_GENERAL)
-
-  // Validate CSRF token
-  const { requireCSRF } = await import("@/lib/security/csrf-action-wrapper")
-  const csrfValidation = await requireCSRF(csrf_token)
-  if (!csrfValidation.valid) {
-    return { error: csrfValidation.error || "Token CSRF inválido" }
-  }
-
-  const supabase = await getSupabaseServerClient()
-  const user = await requireUser()
-
-  // Verify user owns this review
-  const { data: review } = await supabase
-    .from("reviews")
-    .select("user_id, partner_id, store_id, product_id, service_id")
-    .eq("id", reviewId)
-    .single()
-
-  if (!review || review.user_id !== user.id) {
-    return { error: "Você não tem permissão para deletar esta avaliação" }
-  }
-
-  const { error } = await supabase
-    .from("reviews")
-    .delete()
-    .eq("id", reviewId)
-
-  if (error) {
-    return { error: error.message }
-  }
-
-  if (review.product_id) {
-    await updateProductRating(supabase, review.product_id)
-  }
-  if (review.service_id) {
-    await updateServiceRating(supabase, review.service_id)
-  }
-  await updatePartnerRating(supabase, review.partner_id)
-  if (review.store_id) {
-    await updateStoreRating(supabase, review.store_id)
+    await updateStoreRating(adminSupabase, review.store_id)
   }
 
   // Invalidate cache tags
@@ -448,25 +393,92 @@ export async function deleteReviewAction(reviewId: string, csrf_token?: string) 
   return { success: true }
 }
 
+export async function deleteReviewAction(reviewId: string, csrf_token?: string) {
+  await requireRateLimit(RateLimitCategory.ERP_GENERAL)
 
+  // Validate CSRF token
+  const { requireCSRF } = await import("@/lib/security/csrf-action-wrapper")
+  const csrfValidation = await requireCSRF(csrf_token)
+  if (!csrfValidation.valid) {
+    return { error: csrfValidation.error || "Token CSRF inválido" }
+  }
+
+  const user = await requireUser()
+  const adminSupabase = createAdminClient()
+
+  // Verify user owns this review
+  const { data: review } = await adminSupabase
+    .from("reviews")
+    .select("user_id, partner_id, store_id, product_id, service_id")
+    .eq("id", reviewId)
+    .single()
+
+  if (!review || review.user_id !== user.id) {
+    return { error: "Você não tem permissão para deletar esta avaliação" }
+  }
+
+  const { error } = await adminSupabase
+    .from("reviews")
+    .delete()
+    .eq("id", reviewId)
+    .eq("user_id", user.id)
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  if (review.product_id) {
+    await updateProductRating(adminSupabase, review.product_id)
+  }
+  if (review.service_id) {
+    await updateServiceRating(adminSupabase, review.service_id)
+  }
+  await updatePartnerRating(adminSupabase, review.partner_id)
+  if (review.store_id) {
+    await updateStoreRating(adminSupabase, review.store_id)
+  }
+
+  // Invalidate cache tags
+  try {
+    const { revalidatePartnerProfile } = await import("@/lib/utils/revalidation")
+    await revalidatePartnerProfile(review.partner_id)
+    const { revalidateTag } = await import("next/cache")
+    revalidateTag("partner-reviews", "max")
+    revalidateTag(`partner-${review.partner_id}`, "max")
+    if (review.store_id) {
+      revalidateTag(`store-${review.store_id}`, "max")
+      revalidateTag("store-reviews", "max")
+      revalidateTag("store-stats", "max")
+    }
+  } catch (revalError) {
+    console.error("[Reviews] Failed to revalidate partner details:", revalError)
+  }
+
+  revalidatePath("/marketplace")
+  revalidatePath("/pedidos")
+  if (review.product_id) {
+    revalidatePath(`/marketplace/products/${review.product_id}`)
+  }
+
+  return { success: true }
+}
 
 // SECURITY FIX (MED-04): userId derived from session, not client parameter
 export async function canUserReviewProduct(productId: string): Promise<boolean> {
-  const supabase = await getSupabaseServerClient()
   const adminSupabase = createAdminClient()
   const user = await requireUser()
   if (!user) return false
   const userId = user.id
 
   // Check if user has purchased this product with paid order
-  const { data: orders } = await supabase
+  const { data: orders } = await adminSupabase
     .from("orders")
     .select(`
       id,
       order_items!inner(product_id)
     `)
     .eq("buyer_id", userId)
-    .eq("situation", "paid")
+    .in("situation", ["paid", "shipped", "delivered"])
     .eq("order_items.product_id", productId)
 
   if (!orders || orders.length === 0) {
@@ -485,7 +497,6 @@ export async function canUserReviewProduct(productId: string): Promise<boolean> 
 }
 
 export async function getProductReviews(productId: string) {
-  const supabase = await getSupabaseServerClient()
   const adminSupabase = createAdminClient()
 
   const { data: reviewsData, error } = await adminSupabase
@@ -503,7 +514,7 @@ export async function getProductReviews(productId: string) {
   const profilesMap = new Map<string, { full_name: string; profile_image_url: string | null }>()
 
   if (userIds.length > 0) {
-    const { data: profilesData } = await supabase
+    const { data: profilesData } = await adminSupabase
       .from("user_profiles")
       .select("user_id, full_name")
       .in("user_id", userIds)
@@ -525,7 +536,6 @@ export async function getProductReviews(productId: string) {
 }
 
 export async function getPartnerReviews(partnerId: string, storeId?: string | null) {
-  const supabase = await getSupabaseServerClient()
   const adminSupabase = createAdminClient()
 
   let query = adminSupabase
@@ -554,7 +564,7 @@ export async function getPartnerReviews(partnerId: string, storeId?: string | nu
   const profilesMap = new Map<string, { full_name: string; profile_image_url: string | null }>()
 
   if (userIds.length > 0) {
-    const { data: profilesData } = await supabase
+    const { data: profilesData } = await adminSupabase
       .from("user_profiles")
       .select("user_id, full_name")
       .in("user_id", userIds)
@@ -573,7 +583,7 @@ export async function getPartnerReviews(partnerId: string, storeId?: string | nu
   let orderItemsMap = new Map<string, { quantity: number | null; variant_name: string | null; variant_options: any }>()
 
   if (orderIds.length > 0) {
-    const { data: itemsData } = await supabase
+    const { data: itemsData } = await adminSupabase
       .from("order_items")
       .select(`
         id, order_id, quantity, product_id, service_id,
@@ -610,7 +620,6 @@ export async function getPartnerReviews(partnerId: string, storeId?: string | nu
 }
 
 export async function getBuyerReviewsAction() {
-  const supabase = await getSupabaseServerClient()
   const adminSupabase = createAdminClient()
   const user = await requireUser()
 
@@ -620,7 +629,8 @@ export async function getBuyerReviewsAction() {
       *,
       products(id, name, images, video_thumbnail),
       services(id, name, images),
-      partners(id),\r\n      stores(id, name, logo_url, addresses!store_id!left(city, state))
+      partners(id),
+      stores(id, name, logo_url, addresses!store_id!left(city, state))
     `)
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })

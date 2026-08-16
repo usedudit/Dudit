@@ -301,7 +301,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                         sku: fetchedProduct.sku || "",
                         gtin: fetchedProduct.gtin || null,
                         price: fetchedProduct.price || 0,
-                        stock: fetchedProduct.stock_quantity || 0,
+                        stock: fetchedProduct.stock_available ?? fetchedProduct.stock_quantity ?? 0,
                         image: fetchedProduct.images?.[0] || null,
                         has_variants: !!(fetchedProduct.product_variants && fetchedProduct.product_variants.length > 0),
                         variants: fetchedProduct.product_variants?.map((v: any) => ({
@@ -309,8 +309,8 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                             name: v.variant_name,
                             sku: v.sku,
                             price: fetchedProduct.price + (v.price_adjustment || 0),
-                            stock: v.stock_available || 0,
-                            image: null
+                            stock: v.stock_available ?? v.stock_quantity ?? 0,
+                            image: typeof v.variant_options === 'object' && v.variant_options ? v.variant_options.image || null : null
                         }))
                     };
                     if (bucketItem.has_variants) {

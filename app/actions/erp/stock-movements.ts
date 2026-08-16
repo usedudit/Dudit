@@ -156,38 +156,96 @@ export async function createBatchStockMovementAction(data: {
 
         if (data.type === 'out') {
             const productIds = Array.from(new Set(data.items.map((item) => item.productId)))
+            const variantIds = Array.from(
+                new Set(data.items.map((item) => item.variantId).filter((id): id is string => Boolean(id)))
+            )
+
             const { data: products, error: productsError } = await supabase
                 .from("products")
-                .select("id, name, stock_quantity")
+                .select("id, name, stock_quantity, stock_available")
                 .eq("partner_id", partnerId)
                 .in("id", productIds)
 
             if (productsError) {
-                console.error("createBatchStockMovementAction stock validation error:", productsError)
+                console.error("createBatchStockMovementAction stock validation error (products):", productsError)
                 return errorResponse("Não foi possível validar o estoque disponível")
             }
 
-            const stockMap = new Map<string, { name: string; stock: number }>((products || []).map((product: any) => [
+            const productMap = new Map<string, { name: string; stock: number }>((products || []).map((product: any) => [
                 product.id,
                 {
                     name: product.name || "Produto",
-                    stock: Number(product.stock_quantity || 0),
+                    stock: Number(product.stock_available ?? product.stock_quantity ?? 0),
                 },
             ]))
 
-            const requestedMap = new Map<string, number>()
-            for (const item of data.items) {
-                requestedMap.set(item.productId, (requestedMap.get(item.productId) || 0) + Number(item.quantity || 0))
-            }
+            const variantMap = new Map<string, { name: string; stock: number; productId: string }>()
+            if (variantIds.length > 0) {
+                const { data: variants, error: variantsError } = await supabase
+                    .from("product_variants")
+                    .select("id, product_id, variant_name, stock_quantity, stock_available")
+                    .in("id", variantIds)
 
-            for (const [productId, quantity] of requestedMap.entries()) {
-                const stockInfo = stockMap.get(productId)
-                if (!stockInfo) {
-                    return errorResponse("Um dos produtos da movimentação não foi encontrado")
+                if (variantsError) {
+                    console.error("createBatchStockMovementAction stock validation error (variants):", variantsError)
+                    return errorResponse("Não foi possível validar o estoque disponível das variações")
                 }
 
-                if (quantity > stockInfo.stock) {
-                    return errorResponse(`A quantidade de "${stockInfo.name}" está maior que o estoque disponível`)
+                for (const variant of variants || []) {
+                    variantMap.set(variant.id, {
+                        name: variant.variant_name || "Variação",
+                        stock: Number(variant.stock_available ?? variant.stock_quantity ?? 0),
+                        productId: variant.product_id,
+                    })
+                }
+            }
+
+            const requestedMap = new Map<string, {
+                quantity: number
+                productId: string
+                variantId?: string | null
+                displayName: string
+            }>()
+
+            for (const item of data.items) {
+                const key = item.variantId ? `variant:${item.variantId}` : `product:${item.productId}`
+                const existing = requestedMap.get(key)
+                if (existing) {
+                    existing.quantity += Number(item.quantity || 0)
+                    continue
+                }
+
+                const productInfo = productMap.get(item.productId)
+                const variantInfo = item.variantId ? variantMap.get(item.variantId) : null
+                const displayName = variantInfo
+                    ? `${productInfo?.name || "Produto"} - ${variantInfo.name}`
+                    : (productInfo?.name || "Produto")
+
+                requestedMap.set(key, {
+                    quantity: Number(item.quantity || 0),
+                    productId: item.productId,
+                    variantId: item.variantId || null,
+                    displayName,
+                })
+            }
+
+            for (const request of requestedMap.values()) {
+                if (request.variantId) {
+                    const variantInfo = variantMap.get(request.variantId)
+                    if (!variantInfo) {
+                        return errorResponse("Uma das variações da movimentação não foi encontrada")
+                    }
+                    if (request.quantity > variantInfo.stock) {
+                        return errorResponse(`A quantidade de "${request.displayName}" está maior que o estoque disponível`)
+                    }
+                } else {
+                    const productInfo = productMap.get(request.productId)
+                    if (!productInfo) {
+                        return errorResponse("Um dos produtos da movimentação não foi encontrado")
+                    }
+                    if (request.quantity > productInfo.stock) {
+                        return errorResponse(`A quantidade de "${productInfo.name}" está maior que o estoque disponível`)
+                    }
                 }
             }
         }
@@ -276,7 +334,14 @@ export async function getStockMovementDetails(id: string) {
                     name,
                     sku,
                     images,
+                    unit,
                     category:product_categories!category_id(name)
+                ),
+                product_variants (
+                    id,
+                    variant_name,
+                    sku,
+                    variant_options
                 )
             `)
             .eq("movement_id", id)
@@ -319,19 +384,32 @@ export async function getStockMovementDetails(id: string) {
             timeZone: 'America/Sao_Paulo'
         });
 
-        const items = (itemsData || []).map((item: any) => ({
-            id: item.id,
-            product: {
-                name: item.products?.name || 'Produto Excluído',
-                sku: item.products?.sku || 'N/A',
-                image: (item.products?.images && item.products.images.length > 0) ? item.products.images[0] : null,
-                category: item.products?.category?.name || 'Sem Categoria',
-                previousStock: item.previous_quantity || 0,
-                currentStock: item.new_quantity || 0,
-            },
-            quantity: Math.abs(item.quantity),
-            type: item.quantity > 0 ? 'in' : 'out',
-        }))
+        const items = (itemsData || []).map((item: any) => {
+            const variantObj = item.product_variants
+            const variantName = variantObj?.variant_name
+            const productName = item.products?.name || 'Produto Excluído'
+            const fullDisplayName = variantName ? `${productName} - ${variantName}` : productName
+            const fullSku = variantObj?.sku || item.products?.sku || 'N/A'
+            const variantImage = typeof variantObj?.variant_options === 'object' && variantObj?.variant_options
+                ? variantObj.variant_options.image || null
+                : null
+            const itemImage = variantImage || (item.products?.images && item.products.images.length > 0 ? item.products.images[0] : null)
+
+            return {
+                id: item.id,
+                product: {
+                    name: fullDisplayName,
+                    sku: fullSku,
+                    image: itemImage,
+                    category: item.products?.category?.name || 'Sem Categoria',
+                    unit: item.products?.unit || null,
+                    previousStock: item.previous_quantity || 0,
+                    currentStock: item.new_quantity || 0,
+                },
+                quantity: Math.abs(item.quantity),
+                type: item.quantity > 0 ? 'in' : 'out',
+            }
+        })
 
         const totalQuantity = items.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0)
 

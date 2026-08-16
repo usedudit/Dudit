@@ -4,17 +4,59 @@ import { geocodeAddress } from "@/lib/services/location.service"
 
 export const runtime = "edge"
 
+const STREET_TYPE_PREFIXES = /^(r\.|rua|av\.|avenida|tv\.|travessa|al\.|alameda|rod\.|rodovia|estrada|estr\.|praca|praça|pc\.|pç\.|largo|lg\.|quadra|qd\.|bloco|bl\.|setor|st\.|vila|vl\.|parque|pq\.|jardim|jd\.)$/i
+
 function cleanAddressLogradouro(rawLogradouro: string) {
-  let cleanLogradouro = rawLogradouro || ""
+  let cleanLogradouro = (rawLogradouro || "").trim()
   let parsedNumber = ""
-  const commaIndex = cleanLogradouro.lastIndexOf(",")
-  if (commaIndex !== -1) {
-    const afterComma = cleanLogradouro.substring(commaIndex + 1).trim()
-    if (/^(\d+|s\/n)/i.test(afterComma)) {
-      cleanLogradouro = cleanLogradouro.substring(0, commaIndex).trim()
-      parsedNumber = afterComma.split(" - ")[0].trim()
+
+  if (!cleanLogradouro) return { cleanLogradouro: "", parsedNumber: "" }
+
+  // 1. Remove standard Correios range or side descriptors from logradouro (e.g., ' - de 100 a 200', ' - lado ímpar', ' - até...')
+  const rangeMatch = cleanLogradouro.match(/^(.+?)\s*-\s*(?:de\s+\d+|até\s+\d+|lado\s+(?:par|ímpar)|unidade).*$/i)
+  if (rangeMatch) {
+    cleanLogradouro = rangeMatch[1].trim()
+  }
+
+  // 2. Comma with number/sn after it: e.g. 'Praça da Sé, 108' or 'Av Paulista, 1000 - Sala 1' or 'Praça da Sé, nº 108'
+  const commaMatch = cleanLogradouro.match(/^(.+?),\s*(?:n[º°.]*|no\.?|num(?:ero)?\.?)?\s*(\d+[a-zA-Z]?|s\/n)\b/i)
+  if (commaMatch) {
+    const streetPart = commaMatch[1].trim()
+    const numPart = commaMatch[2].trim()
+    if (!STREET_TYPE_PREFIXES.test(streetPart)) {
+      return {
+        cleanLogradouro: streetPart,
+        parsedNumber: numPart,
+      }
     }
   }
+
+  // 3. Explicit prefix like ' nº 108', ' n° 108', ' num 108', ' no. 108'
+  const numPrefixMatch = cleanLogradouro.match(/^(.+?)\s+(?:n[º°.]+|no\.|num(?:ero)?\.?)\s*(\d+[a-zA-Z]?|s\/n)\b/i)
+  if (numPrefixMatch) {
+    const streetPart = numPrefixMatch[1].trim()
+    const numPart = numPrefixMatch[2].trim()
+    if (!STREET_TYPE_PREFIXES.test(streetPart)) {
+      return {
+        cleanLogradouro: streetPart,
+        parsedNumber: numPart,
+      }
+    }
+  }
+
+  // 4. Number at the end of the logradouro: e.g. 'Praça da Sé 108' or 'Rua 25 de Março 100' or 'Praça da Sé 108 - Bloco B'
+  const endNumMatch = cleanLogradouro.match(/^(.+?)\s+(\d+[a-zA-Z]?|s\/n)(?:\s*-\s*.*)?$/i)
+  if (endNumMatch) {
+    const streetPart = endNumMatch[1].trim()
+    const numPart = endNumMatch[2].trim()
+    if (!STREET_TYPE_PREFIXES.test(streetPart)) {
+      return {
+        cleanLogradouro: streetPart,
+        parsedNumber: numPart,
+      }
+    }
+  }
+
   return { cleanLogradouro, parsedNumber }
 }
 
@@ -41,7 +83,16 @@ export async function GET(request: NextRequest) {
       const viaCepData = await response.json()
 
       if (!viaCepData.erro) {
-        const { cleanLogradouro, parsedNumber } = cleanAddressLogradouro(viaCepData.logradouro || "")
+        let { cleanLogradouro, parsedNumber } = cleanAddressLogradouro(viaCepData.logradouro || "")
+        let cleanComplemento = viaCepData.complemento || ""
+
+        if (!parsedNumber && cleanComplemento) {
+          const compMatch = cleanComplemento.trim().match(/^(?:(?:n[º°.]*|no\.?|num(?:ero)?\.?)\s*)?(\d+[a-zA-Z]?|s\/n)$/i)
+          if (compMatch) {
+            parsedNumber = compMatch[1].trim()
+            cleanComplemento = ""
+          }
+        }
 
         let latitude: number | null = null
         let longitude: number | null = null
@@ -71,7 +122,7 @@ export async function GET(request: NextRequest) {
           cep: viaCepData.cep || formattedCep,
           logradouro: cleanLogradouro,
           numero: parsedNumber,
-          complemento: viaCepData.complemento || "",
+          complemento: cleanComplemento,
           bairro: viaCepData.bairro || "",
           localidade: viaCepData.localidade || "",
           uf: viaCepData.uf || "",

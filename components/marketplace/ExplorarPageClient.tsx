@@ -1477,30 +1477,6 @@ export function ExplorarPageClient({
                             />
                         )}
 
-                        {/* Sponsored Ad Banner */}
-                        {exploreAds.length > 0 && (
-                            <div className="mb-6 rounded-lg overflow-hidden bg-gradient-to-r from-gray-100 to-gray-50 aspect-[16/5] lg:max-w-[900px]">
-                                <div className="w-full h-full flex items-center justify-center cursor-pointer">
-                                    {exploreAds[0]?.image_url ? (
-                                        <img
-                                            src={exploreAds[0].image_url}
-                                            alt="Patrocinado"
-                                            className="w-full h-full object-cover"
-                                            onClick={() => {
-                                                if (exploreAds[0]?.destination_url) {
-                                                    window.open(exploreAds[0].destination_url, "_blank")
-                                                }
-                                            }}
-                                        />
-                                    ) : (
-                                        <div className="text-center text-brand-inactive-text">
-                                            <p className="text-sm font-bold">Anúncio Patrocinado</p>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
                         <div
                             key={`${currentType}-${selectedCategories.join(",")}-${selectedCitySlug}-${isLoading || (isFetching && !isFetchingNextPage)}`}
                             style={{ animation: 'fadeIn 0.2s ease-out' }}

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { XIcon } from "@/lib/icons"
-import { Button, CepInput, CustomerCard, Checkbox, MoneyInput, Input, Tabs, TabsContent, TabsList, TabsTrigger, NumberInputWithCheckbox, StateComboBox, InfoCard, Badge } from "@/components/reusable"
+import { Button, CepInput, CustomerCard, Checkbox, MoneyInput, Input, Tabs, TabsContent, TabsList, TabsTrigger, NumberInputWithCheckbox, StateComboBox, InfoCard } from "@/components/reusable"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
@@ -108,7 +108,16 @@ export default function POSShippingSheet({
         setNeighborhood(customerDetails.address.neighborhood || "")
         setCity(customerDetails.address.city || "")
         setState(customerDetails.address.state || "")
-    }, [customerDetails?.id])
+    }, [
+        customerDetails?.id,
+        customerDetails?.address?.zipCode,
+        customerDetails?.address?.street,
+        customerDetails?.address?.number,
+        customerDetails?.address?.complement,
+        customerDetails?.address?.neighborhood,
+        customerDetails?.address?.city,
+        customerDetails?.address?.state,
+    ])
 
     const isDirty =
         zipCode !== (customerDetails?.address?.zipCode || "") ||
@@ -215,12 +224,6 @@ export default function POSShippingSheet({
                         message={outsideRadiusWarning}
                     />
                 )}
-                {deliveryError && (
-                    <InfoCard
-                        color="red"
-                        message={deliveryError}
-                    />
-                )}
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
                     <TabsList className="w-full">
                         <TabsTrigger value="cliente">Cliente</TabsTrigger>
@@ -275,11 +278,9 @@ export default function POSShippingSheet({
                                     <span className="font-bold text-brand-dark dark:text-dark-heading">R$ {Number((breakdown as any)?.timeAdjustmentTotal || 0).toFixed(2)}</span>
                                 </div>
 
-                                <div className="mt-2 border-t border-brand-border pt-2 dark:border-dark-border flex justify-between items-center">
-                                    <div className="flex justify-between items-center text-sm">
-                                        <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Taxa do envio</span>
-                                        <span className="font-bold text-brand-dark dark:text-dark-heading">R$ {feeToDisplay.toFixed(2)}</span>
-                                    </div>
+                                <div className="flex justify-between items-center text-sm mt-2 pt-2 border-t border-brand-border dark:border-dark-border">
+                                    <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Taxa do envio</span>
+                                    <span className="font-bold text-brand-dark dark:text-dark-heading">R$ {feeToDisplay.toFixed(2)}</span>
                                     {isSubsidized && (
                                         <p className="text-xs text-brand-orange">Subsidiado pela loja</p>
                                     )}
@@ -305,7 +306,7 @@ export default function POSShippingSheet({
                                         suffix={(
                                             <label className="flex items-center gap-1 text-xs text-brand-dark dark:text-dark-heading cursor-pointer">
                                                 <Checkbox checked={shippingFree} onChange={() => setShippingFree((prev) => !prev)} name="shippingFree" />
-                                                Sem custo (subsidiado)
+                                                Sem custo
                                             </label>
                                         )}
                                     />
@@ -365,8 +366,15 @@ export default function POSShippingSheet({
                         setNeighborhood(addr.neighborhood || "")
                         setCity(addr.city || "")
                         setState(addr.state || "")
-                        setNumber(addr.number || "")
-                        setNoNumber(addr.number === "S/N")
+                        if (addr.number) {
+                            if (addr.number === "S/N") {
+                                setNoNumber(true)
+                                setNumber("")
+                            } else {
+                                setNoNumber(false)
+                                setNumber(addr.number)
+                            }
+                        }
                     }} />
                     <Input label="Rua/Avenida" name="shippingStreet" placeholder="Rua, Avenida, etc." value={street} onChange={(e) => setStreet(e.target.value)} />
                     <NumberInputWithCheckbox

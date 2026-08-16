@@ -154,7 +154,7 @@ const Header: React.FC<HeaderProps> = ({
 
     const { setDirection } = useTransitionDirection()
     const isHome = useMemo(() => currentView === "home" || pathname === "/", [currentView, pathname])
-    const showDeliveryInfo = useMemo(() => isHome || ["/perfil", "/pedidos", "/cart"].includes(pathname) || pathname.startsWith("/explorar"), [isHome, pathname])
+    const showDeliveryInfo = useMemo(() => isHome || ["/perfil", "/pedidos", "/sacola"].includes(pathname) || pathname.startsWith("/explorar"), [isHome, pathname])
 
     const [searchValue, setSearchValue] = useState("")
     const [suggestionBucket, setSuggestionBucket] = useState<{ label: string; type: string }[]>([])
@@ -715,7 +715,7 @@ const Header: React.FC<HeaderProps> = ({
                                     {user && (
                                         <NotificationBell variant="marketplace" className="shrink-0" />
                                     )}
-                                    <Link href="/cart" prefetch={false} className="shrink-0 relative text-white px-1 flex items-center justify-center cursor-pointer">
+                                    <Link href="/sacola" prefetch={false} className="shrink-0 relative text-white px-1 flex items-center justify-center cursor-pointer">
                                         <ShoppingBagIcon size={24} strokeWidth={2} />
                                         {cartCount > 0 && (
                                             <span className="absolute -top-1.5 -right-1.5 bg-brand-orange text-white text-[10px] font-bold h-4 w-4 rounded-full flex items-center justify-center border border-brand-dark">
@@ -1007,7 +1007,7 @@ const Header: React.FC<HeaderProps> = ({
                             <span className="text-[13px] font-medium hidden xl:block">Pedidos</span>
                         </Link>
 
-                        <Link href="/cart" prefetch={false} className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity text-white">
+                        <Link href="/sacola" prefetch={false} className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity text-white">
                             <div className="relative">
                                 <ShoppingBagIcon size={20} />
                                 {cartCount > 0 && (

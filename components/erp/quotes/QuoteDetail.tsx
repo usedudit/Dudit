@@ -12,7 +12,7 @@ import {
     ClockIcon,
     CheckCircleIcon,
 } from '@/lib/icons';
-import { Button, Badge, ActionsDropdown, ThreeDotsLoader, FormDropdown, AlertModal, DefaultModal, FormSection, Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/reusable';
+import { Button, Badge, ActionsDropdown, ThreeDotsLoader, FormDropdown, AlertModal, DefaultModal, FormSection, Tabs, TabsList, TabsTrigger, TabsContent, ListItem } from '@/components/reusable';
 import { getQuoteDetailsAction, updateQuoteStatusAction, deleteQuoteAction, convertQuoteToOrderAction, getQuoteHistoryAction, getPartnerAddressAction, regenerateQuoteApprovalCodeAction } from '@/app/actions/erp/quotes';
 import { useCSRFToken } from "@/hooks/use-csrf-token"
 import { QuoteHistoryTab } from "./QuoteHistoryTab"
@@ -33,6 +33,8 @@ import QuotePreview from './QuotePreview';
 import QuotePrintModal from './QuotePrintModal';
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url";
 import { ShareModal } from "@/components/marketplace/ShareModal";
+import { UserProfileImage } from '@/lib/utils/UserProfileImage';
+import BottomSheet from '@/components/BottomSheet';
 
 interface QuoteDetailProps {
     quoteId: string;
@@ -178,6 +180,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
     }, [partnerId, storeId]);
 
     const [activeTab, setActiveTab] = useState('Dados Gerais');
+    const [isCustomerSheetOpen, setIsCustomerSheetOpen] = useState(false);
     const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
     const [showPrintModal, setShowPrintModal] = useState(false);
 
@@ -450,7 +453,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
             <FadeIn>
                 <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
                     <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
-                        <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
+                        <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto custom-scrollbar w-full relative pb-20 md:pb-0">
 
                             {/* Sticky Header */}
                             <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
@@ -558,7 +561,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                                                                     'text-blue-700 dark:text-blue-300'
                                                                 }`}>
                                                                 {quote.converted
-                                                                    ? "Este orçamento já gerou um pedido no ERP. Use o botão abaixo para abrir a venda."
+                                                                    ? "Este orçamento já gerou um pedido. Use o botão abaixo para abrir a venda."
                                                                     : quote.status === 'approved' ? 'Esta proposta foi aprovada e já pode ser convertida em pedido.' :
                                                                         quote.status === 'rejected' ? 'Esta proposta foi recusada pelo cliente.' :
                                                                             quote.status === 'draft' ? 'Esta proposta está em rascunho e aguarda revisão.' :
@@ -566,24 +569,23 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                                                                     quote.status === 'cancelled' ? 'Esta proposta foi cancelada.' :
                                                                                         'Esta proposta foi enviada ao cliente e aguarda resposta.'}
                                                             </p>
-                                                            {quote.converted && quote.converted_order_id && (
-                                                                <Button
-                                                                    variant="outline"
-                                                                    className="mt-3 h-[36px] text-xs"
-                                                                    onClick={() => router.push(`/erp/pedidos/${quote.converted_order_id}`)}
-                                                                >
-                                                                    Abrir pedido <ArrowRightIcon size={14} className="ml-1" />
-                                                                </Button>
-                                                            )}
                                                         </div>
                                                         {canConvertToOrder && (
                                                             <Button
-                                                                variant="default"
-                                                                className="bg-blue-600 hover:bg-blue-700 text-white border-none h-[38px] text-xs px-6 shrink-0"
+                                                                className="bg-blue-600 hover:bg-blue-700 text-white h-12 shrink-0"
                                                                 disabled={isConverting}
                                                                 onClick={handleConvertClick}
                                                             >
                                                                 {isConverting ? "Convertendo…" : "Converter em Pedido"} <ArrowRightIcon size={14} className="ml-1" />
+                                                            </Button>
+                                                        )}
+                                                        {quote.converted && quote.converted_order_id && (
+                                                            <Button
+                                                                variant="outline"
+                                                                className="mt-3 h-12"
+                                                                onClick={() => router.push(`/erp/pedidos/${quote.converted_order_id}`)}
+                                                            >
+                                                                Abrir pedido <ArrowRightIcon size={14} className="ml-1" />
                                                             </Button>
                                                         )}
                                                     </div>
@@ -623,6 +625,28 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                                     </div>
                                                 </div>
                                             </div>
+
+                                            {/* Customer - Mobile/Tablet only */}
+                                            {quote.customers && (
+                                                <div className="xl:hidden mb-8">
+                                                    <FormSection title="" hasSeparator={false} className="mt-0">
+                                                        <ListItem
+                                                            left={
+                                                                <UserProfileImage
+                                                                    fullName={quote.customers.name || "Cliente"}
+                                                                    imageUrl={quote.customers.image_url || quote.customers.avatar_url || quote.customers.avatar}
+                                                                    className="w-10 h-10 text-base"
+                                                                />
+                                                            }
+                                                            title={quote.customers.name || "Consumidor Final"}
+                                                            description={quote.customers.email || "Sem e-mail cadastrado"}
+                                                            className="border-0 bg-transparent px-0 hover:bg-transparent"
+                                                            showChevron={true}
+                                                            onClick={() => setIsCustomerSheetOpen(true)}
+                                                        />
+                                                    </FormSection>
+                                                </div>
+                                            )}
 
                                             {/* Items List */}
                                             <FormSection hasSeparator title="Itens do Orçamento" className='mb-8'>
@@ -677,9 +701,11 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                         {/* RIGHT COLUMN - SIDEBAR */}
                                         <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
                                             {quote.customers && (
-                                                <CustomerCard
-                                                    customer={quote.customers}
-                                                />
+                                                <div className="hidden xl:block">
+                                                    <CustomerCard
+                                                        customer={quote.customers}
+                                                    />
+                                                </div>
                                             )}
 
                                             {/* Link de Aprovação do Cliente */}
@@ -968,6 +994,21 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                             shareMessage={`Confira a proposta comercial de ${partnerName}`}
                             label="Link do orçamento"
                         />
+
+                        {quote.customers && (
+                            <BottomSheet
+                                isOpen={isCustomerSheetOpen}
+                                onClose={() => setIsCustomerSheetOpen(false)}
+                                title="Detalhes do Cliente"
+                            >
+                                <div className="pt-2">
+                                    <CustomerCard
+                                        chrome="minimal"
+                                        customer={quote.customers}
+                                    />
+                                </div>
+                            </BottomSheet>
+                        )}
                     </Tabs>
                 </div>
             </FadeIn>

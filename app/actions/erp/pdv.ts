@@ -28,6 +28,7 @@ import { resolveDeliverySettingsRow } from "@/app/actions/shared/delivery"
 import { resolvePaymentMethodsForStore } from "@/lib/data/payment-methods"
 import { listStoreProducts } from "@/lib/store-products"
 import { listStoreServices } from "@/lib/store-services"
+import { getPartnerCapabilities } from "@/lib/services/partner-capabilities"
 
 type DraftItemInput = {
     productId?: string | null
@@ -394,7 +395,7 @@ async function syncPosSaleToOrders(params: {
             ? "partially_paid"
             : "pending"
 
-const productIds = Array.from(
+    const productIds = Array.from(
         new Set((saleItems || []).map((item: any) => item.product_id).filter(Boolean))
     ) as string[]
     // Current strategy: use stores.opening_hours when storeId is provided (multi-store),
@@ -1019,6 +1020,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
             .eq("partner_id", input.partnerId)
             .maybeSingle()
         if (existingOrder) {
+
             return { success: true as const, data: { saleId: existingOrder.id, saleNumber: existingOrder.order_number, orderId: existingOrder.id } }
         }
     }
@@ -1042,432 +1044,574 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
         await requirePermission(input.partnerId, "pdv", "can_apply_discount")
     }
 
-    // Start this independent check before validating the finance account so
-    // the two database calls overlap.
-    const activeSessionPromise = getActiveCashSessionAction(input.partnerId, input.storeId)
+    const capabilities = await getPartnerCapabilities(input.partnerId, { storeId: input.storeId })
 
-    // Validate finance account
-    if (input.financeAccountId) {
-        const { data: acc } = await supabase
-            .from("finance_accounts")
-            .select("id")
-            .eq("id", input.financeAccountId)
-            .eq("partner_id", input.partnerId)
-            .eq("is_active", true)
-            .maybeSingle()
-        if (!acc?.id) return { success: false as const, error: "Conta financeira inválida ou inativa." }
-    }
+        // Start this independent check before validating the finance account so
+        // the two database calls overlap.
+        const activeSessionPromise = capabilities.hasFinancial
+            ? getActiveCashSessionAction(input.partnerId, input.storeId)
+            : Promise.resolve({ success: true as const, data: null })
 
-    // Require open cash session
-    const activeSessionResult = await activeSessionPromise
-    if (!activeSessionResult.success) {
-        return { success: false as const, error: "Não foi possível validar o caixa aberto." }
-    }
-    if (!activeSessionResult.data?.id) {
-        return { success: false as const, error: "Abra um caixa para finalizar vendas no PDV." }
-    }
+        // Validate finance account
+        if (capabilities.hasFinancial && input.financeAccountId) {
+            const { data: acc } = await supabase
+                .from("finance_accounts")
+                .select("id")
+                .eq("id", input.financeAccountId)
+                .eq("partner_id", input.partnerId)
+                .eq("is_active", true)
+                .maybeSingle()
+            if (!acc?.id) return { success: false as const, error: "Conta financeira inválida ou inativa." }
+        }
 
-    // Build payment breakdown
-    const resolvedBreakdown: Array<{
-        method: string
-        amount: number
-        amountReceived: number
-        paymentMethodId: string | null
-        payment_method_id: string | null
-        installmentNumber?: number
-    }> = []
-    for (const entry of input.paymentBreakdown || []) {
-        const amount = safeMoney(Number(entry.amount || 0))
-        if (amount <= 0) continue
-        const paymentMethodId = entry.paymentMethodId || null
-        if (!paymentMethodId) {
-            return {
-                success: false as const,
-                error: `Método de pagamento inválido no PDV (${String(entry.method || "não informado")}). Selecione um método ativo e tente novamente.`,
+        // Require open cash session only if financial module is enabled
+        const activeSessionResult = await activeSessionPromise
+        if (capabilities.hasFinancial) {
+            if (!activeSessionResult.success) {
+                return { success: false as const, error: "Não foi possível validar o caixa aberto." }
+            }
+            if (!activeSessionResult.data?.id) {
+                return { success: false as const, error: "Abra um caixa para finalizar vendas no PDV." }
             }
         }
-        const methodLabel = String(entry.method || input.paymentMethod || "PDV").trim() || "PDV"
-        resolvedBreakdown.push({
-            method: methodLabel,
-            amount,
-            amountReceived: (entry as any).amountReceived != null && !isNaN(Number((entry as any).amountReceived))
-                ? safeMoney(Number((entry as any).amountReceived))
-                : amount,
-            paymentMethodId,
-            payment_method_id: paymentMethodId,
-            installmentNumber: Math.max(1, Math.floor(Number(entry.installmentNumber || 1))),
-        })
-    }
 
-    let breakdownForOrder = resolvedBreakdown
-    const paymentAwarePromise = resolvePosFinalTotalWithPaymentMethod({
-        supabase,
-        partnerId: input.partnerId,
-        storeId: input.storeId,
-        preSaleId: input.preSaleId,
-        baseTotal: Math.max(0, Number(preSaleDraft.total_amount || 0)),
-        paymentBreakdown: resolvedBreakdown,
-    })
-    const customerNamePromise = preSaleDraft.customer_id
-        ? supabase
-            .from("customers")
-            .select("name")
-            .eq("id", preSaleDraft.customer_id)
-            .eq("partner_id", input.partnerId)
-            .maybeSingle()
-        : Promise.resolve({ data: null })
-    const [paymentAware, customerNameResult] = await Promise.all([paymentAwarePromise, customerNamePromise])
-    if (paymentAware && paymentAware.ok && (paymentAware.adjustedBreakdown || []).length > 0) {
-        breakdownForOrder = paymentAware.adjustedBreakdown.map((row: any) => ({
-            method: row.method,
-            amount: safeMoney(Number(row.amount || 0)),
-            amountReceived: safeMoney(Number(row.amountReceived ?? row.amount ?? 0)),
-            adjustmentType: row.adjustmentType || 'none',
-            adjustmentPercent: Math.max(0, Number(row.adjustmentPercent || 0)),
-            adjustmentAmount: Math.max(0, Number(row.adjustmentAmount || 0)),
-            effectiveAmount: safeMoney(Number(row.effectiveAmount ?? row.amount ?? 0)),
-            netAmount: safeMoney(Number(row.netAmount ?? row.effectiveAmount ?? row.amount ?? 0)),
-            feeBearer: row.feeBearer || null,
-            paymentMethodDiscountAmount: Math.max(0, Number(row.paymentMethodDiscountAmount || 0)),
-            interestAmount: Math.max(0, Number(row.interestAmount || 0)),
-            feeAmount: Math.max(0, Number(row.feeAmount || 0)),
-            fixedFeeAmount: Math.max(0, Number(row.fixedFeeAmount || 0)),
-            paymentMethodId: row.paymentMethodId || null,
-            payment_method_id: row.paymentMethodId || null,
-            installmentNumber: Math.max(1, Math.floor(Number(row.installmentNumber || 1))),
-        }))
-    }
-
-    const totalPaidAmount = breakdownForOrder.length > 0
-        ? safeMoney(breakdownForOrder.reduce((acc, row) => acc + Number((row as any).amountReceived ?? row.amount ?? 0), 0))
-        : paidAmount
-
-    const totalSaleTarget = safeMoney(Number(preSaleDraft.total_amount || 0))
-    const isUnderpaid = totalPaidAmount < totalSaleTarget - 0.005
-    const derivedPaymentStatus: 'paid' | 'partially_paid' | 'unpaid' =
-        totalPaidAmount <= 0.005
-            ? 'unpaid'
-            : isUnderpaid
-                ? 'partially_paid'
-                : 'paid'
-
-    // Customer name lookup if customer_id is provided
-    const customerName: string | undefined = customerNameResult.data?.name?.trim() || undefined
-
-    const hasShipping = Number(preSaleDraft.shipping_fee || 0) > 0
-    let finalDeliveryStatus: 'delivered' | 'preparing' | 'pickup_available' = hasShipping ? 'preparing' : 'delivered'
-    if (input.isPendingDelivery) {
-        finalDeliveryStatus = hasShipping ? 'preparing' : 'pickup_available'
-    }
-
-    // Map draft items to ERPItemPayload
-    const draftItemsList = Array.isArray(preSaleDraft.items) ? preSaleDraft.items : []
-    const erpItems: import("./orders").ERPItemPayload[] = draftItemsList.map((item: any, index: number) => {
-        const isService = Boolean(item.service_id || item.serviceId || item.line_type === 'service_booking' || item.line_type === 'service')
-        return {
-            productId: isService ? undefined : (item.product_id || item.productId || undefined),
-            serviceId: item.service_id || item.serviceId || (isService ? (item.product_id || item.productId) : undefined),
-            lineType: item.line_type || item.lineType || (isService ? 'service_booking' : 'product'),
-            variantId: item.variant_id || item.variantId || undefined,
-            unitPrice: safeMoney(Number(item.unit_price ?? item.price ?? 0)),
-            quantity: Math.max(1, Math.floor(Number(item.quantity ?? item.qty ?? 1))),
-            sortOrder: index,
-            allowSellWithoutStock: Boolean(item.allow_sell_without_stock || item.allowSellWithoutStock),
-        }
-    })
-
-    const { createERPOrderAction } = await import("./orders")
-    const orderResult = await createERPOrderAction({
-        id: !input.preSaleId ? input.checkoutId || undefined : undefined,
-        partnerId: input.partnerId,
-        storeId: input.storeId || undefined,
-        customerId: preSaleDraft.customer_id || undefined,
-        customerName: customerName || "Consumidor final",
-        salesChannel: "Presencial",
-        deliveryMethod: hasShipping ? "delivery" : "pickup",
-        deliveryStatus: finalDeliveryStatus,
-paymentStatus: derivedPaymentStatus,
-        paidAmount: totalPaidAmount,
-        totalAmount: totalSaleTarget,
-        paymentMethod: input.paymentMethod || "PDV",
-        paymentBreakdown: breakdownForOrder as any,
-        financeAccountId: input.financeAccountId || null,
-        items: erpItems,
-        subtotal: safeMoney(Number(preSaleDraft.subtotal || 0)),
-        discountValue: safeMoney(Number(preSaleDraft.discount_amount || 0)),
-        discountType: "fixed",
-        couponCode: preSaleDraft.coupon_code || undefined,
-        couponId: preSaleDraft.coupon_id || undefined,
-        couponDiscountAmount: safeMoney(Number(preSaleDraft.coupon_discount_amount || 0)),
-        shippingCost: safeMoney(Number(preSaleDraft.shipping_fee || 0)),
-        additionalCosts: safeMoney(Number(preSaleDraft.other_costs || 0)),
-        deliveryBreakdown: preSaleDraft.delivery_breakdown || null,
-        notes: preSaleDraft.notes || undefined,
-        skipCSRF: true,
-        sellerPartnerUserId: input.sellerId || null,
-        skipPostPaymentSellerSideEffects: true,
-        skipPostCreateRevalidation: true,
-    })
-
-    if (orderResult.error || !orderResult.orderId) {
-        return { success: false as const, error: orderResult.error || "Falha ao criar pedido no PDV." }
-    }
-
-    const orderId = orderResult.orderId
-    const orderNumber = orderResult.orderNumber || orderId
-
-    // Mark pre_sale as completed. It is independent from cash, commission and
-    // goals now that the order id exists, so start it without blocking them.
-    const preSaleCompletionPromise = input.preSaleId
-        ? supabase
-            .from("pre_sales")
-            .update({
-                status: "completed",
-                order_id: orderId,
-                updated_at: new Date().toISOString(),
+        // Build payment breakdown
+        const resolvedBreakdown: Array<{
+            method: string
+            amount: number
+            amountReceived: number
+            paymentMethodId: string | null
+            payment_method_id: string | null
+            installmentNumber?: number
+        }> = []
+        for (const entry of input.paymentBreakdown || []) {
+            const amount = safeMoney(Number(entry.amount || 0))
+            if (amount <= 0) continue
+            const paymentMethodId = entry.paymentMethodId || null
+            if (!paymentMethodId) {
+                return {
+                    success: false as const,
+                    error: `Método de pagamento inválido no PDV (${String(entry.method || "não informado")}). Selecione um método ativo e tente novamente.`,
+                }
+            }
+            const methodLabel = String(entry.method || input.paymentMethod || "PDV").trim() || "PDV"
+            resolvedBreakdown.push({
+                method: methodLabel,
+                amount,
+                amountReceived: (entry as any).amountReceived != null && !isNaN(Number((entry as any).amountReceived))
+                    ? safeMoney(Number((entry as any).amountReceived))
+                    : amount,
+                paymentMethodId,
+                payment_method_id: paymentMethodId,
+                installmentNumber: Math.max(1, Math.floor(Number(entry.installmentNumber || 1))),
             })
-            .eq("id", input.preSaleId)
-            .eq("partner_id", input.partnerId)
-        : Promise.resolve()
-
-    // These post-sale side effects are independent after the order exists.
-    // Start them together so the slowest one, rather than their sum, determines
-    // the remaining time shown by the PDV.
-    const cashMovementsPromise = activeSessionResult.data?.id
-        ? Promise.all(
-            breakdownForOrder
-                .filter((entry) => {
-                    const method = String(entry.method || "").toLowerCase().trim()
-                    return method.includes("dinheiro") || method.includes("cash")
-                })
-                .map((entry) => supabase.from("cash_movements").insert({
-                    partner_id: input.partnerId,
-                    store_id: input.storeId || null,
-                    cash_session_id: activeSessionResult.data!.id,
-                    type: "sale",
-                    description: `Venda PDV ${orderNumber}`,
-                    amount: entry.amount,
-                    user_id: user.id,
-                    order_id: orderId,
-                }))
-        )
-        : Promise.resolve()
-
-    // Seller commission
-    const sellerPartnerUserId = input.sellerId || null
-    const sellerCommissionPromise = sellerPartnerUserId
-        ? createCommissionExpenseForEntity({
-            supabase,
-            partnerId: input.partnerId,
-            storeId: input.storeId || null,
-            partnerUserId: sellerPartnerUserId,
-            role: "seller",
-            saleAmount: totalPaidAmount,
-            entityType: "sale",
-            entityId: orderId,
-            accountId: input.financeAccountId || null,
-            createdByUserId: user.id,
-        })
-        : Promise.resolve()
-
-    // Goals tracking
-    const goalsPromise = user.id
-        ? applySaleToGoals({
-            supabase,
-            partnerId: input.partnerId,
-            sellerUserId: user.id,
-            saleAmount: totalPaidAmount,
-            createdByUserId: user.id,
-            accountId: input.financeAccountId || null,
-        })
-        : Promise.resolve()
-
-    // Record coupon usage if coupon was applied
-    const couponUsagePromise = preSaleDraft.coupon_id && orderId
-        ? supabase.from("coupon_usages").upsert(
-            {
-                coupon_id: preSaleDraft.coupon_id,
-                customer_id: preSaleDraft.customer_id || null,
-                order_id: orderId,
-            },
-            { onConflict: "coupon_id,order_id", ignoreDuplicates: true }
-        )
-        : Promise.resolve()
-
-    // Invalidate product & order caches
-    const productIds = new Set<string>(
-        erpItems.map((item) => item.productId).filter(Boolean) as string[]
-    )
-    const productCachePromise = Promise.all(
-        Array.from(productIds).map((productId) =>
-            invalidateProductCache(productId, input.partnerId, "update", { silent: true })
-        )
-    )
-
-    const revalidationPromise = Promise.all([
-        revalidateOrders(input.partnerId),
-        revalidateTransactions(input.partnerId),
-        revalidateStockMovements(input.partnerId),
-    ])
-
-    await Promise.all([
-        cashMovementsPromise,
-        sellerCommissionPromise,
-        goalsPromise,
-        preSaleCompletionPromise,
-        couponUsagePromise,
-        productCachePromise,
-        revalidationPromise,
-    ])
-
-    return { success: true as const, data: { saleId: orderId, saleNumber: orderNumber, orderId } }
-}
-
-export async function createPOSQuickProductAction(input: {
-    partnerId: string
-    name: string
-    price: number
-    stockQuantity: number
-    storeId?: string | null
-}) {
-    await requireUser()
-    await requirePermission(input.partnerId, "products", "create")
-
-    const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
-    if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
-
-    const name = String(input.name || "").trim()
-    const price = safeMoney(Number(input.price || 0))
-    const stockQuantity = Math.max(0, Math.floor(Number(input.stockQuantity || 0)))
-
-    if (!name) return { success: false as const, error: "Informe o nome do produto." }
-    if (price < 0) return { success: false as const, error: "Preço inválido." }
-    if (stockQuantity < 0) return { success: false as const, error: "Estoque inválido." }
-
-    const supabase = createAdminClient()
-
-    // Resolve store for the product: use explicit storeId or fall back to first store
-    let targetStoreId = input.storeId || null
-    if (!targetStoreId) {
-        const { data: store } = await supabase
-            .from("stores")
-            .select("id")
-            .eq("partner_id", input.partnerId)
-            .order("created_at", { ascending: true })
-            .limit(1)
-            .maybeSingle()
-        targetStoreId = store?.id || null
-    }
-
-    if (!targetStoreId) {
-        return { success: false as const, error: "Nenhuma loja encontrada para cadastrar o produto." }
-    }
-
-    // Validate user has access to the target store
-    if (targetStoreId) {
-        const { userHasStoreAccess } = await import("@/lib/store-members")
-        const hasAccess = await userHasStoreAccess(input.partnerId, targetStoreId)
-        if (!hasAccess) {
-            return { success: false as const, error: "Você não tem acesso a esta loja." }
         }
-    }
 
-    const skuBase = generateSKUBase(name)
-    const sku = `${skuBase}-${Date.now().toString().slice(-5)}`
-
-    const { data: product, error } = await supabase
-        .from("products")
-        .insert({
-            partner_id: input.partnerId,
-            store_id: targetStoreId,
-            name,
-            sku,
-            price,
-            stock_quantity: stockQuantity,
-            is_active: true,
-            allow_sell_without_stock: false,
-        })
-        .select("id, name, category, sku, price, stock_available, allow_sell_without_stock, images, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
-        .single()
-
-    if (error) return { success: false as const, error: error.message }
-
-    return { success: true as const, data: product }
-}
-
-export async function createPOSCustomerQuickAction(input: {
-    partnerId: string
-    name: string
-    email?: string
-    phone?: string
-    cpf?: string
-    address?: {
-        zipCode?: string
-        street?: string
-        number?: string
-        complement?: string
-        neighborhood?: string
-        city?: string
-        state?: string
-    }
-}) {
-    await requireUser()
-    await requirePermission(input.partnerId, "customers", "create")
-
-    const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
-    if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
-
-    const name = sanitizeInput(String(input.name || ""), 150).trim()
-    const email = String(input.email || "").trim().toLowerCase()
-    const phone = String(input.phone || "").trim()
-    const cpfDigits = String(input.cpf || "").replace(/\D/g, "")
-
-    if (!name) return { success: false as const, error: "Informe o nome do cliente." }
-
-    // Check for existing customer before creating
-    if (email || cpfDigits) {
-        const { findExistingCustomer } = await import("@/lib/services/marketplace-customer")
-        const match = await findExistingCustomer({
+        let breakdownForOrder = resolvedBreakdown
+        const paymentAwarePromise = resolvePosFinalTotalWithPaymentMethod({
+            supabase,
             partnerId: input.partnerId,
-            email: email || null,
-            cpf: cpfDigits || null,
+            storeId: input.storeId,
+            preSaleId: input.preSaleId,
+            baseTotal: Math.max(0, Number(preSaleDraft.total_amount || 0)),
+            paymentBreakdown: resolvedBreakdown,
         })
-        if (match) {
+        const customerNamePromise = preSaleDraft.customer_id
+            ? supabase
+                .from("customers")
+                .select("name")
+                .eq("id", preSaleDraft.customer_id)
+                .eq("partner_id", input.partnerId)
+                .maybeSingle()
+            : Promise.resolve({ data: null })
+        const [paymentAware, customerNameResult] = await Promise.all([paymentAwarePromise, customerNamePromise])
+        if (paymentAware && paymentAware.ok && (paymentAware.adjustedBreakdown || []).length > 0) {
+            breakdownForOrder = paymentAware.adjustedBreakdown.map((row: any) => ({
+                method: row.method,
+                amount: safeMoney(Number(row.amount || 0)),
+                amountReceived: safeMoney(Number(row.amountReceived ?? row.amount ?? 0)),
+                adjustmentType: row.adjustmentType || 'none',
+                adjustmentPercent: Math.max(0, Number(row.adjustmentPercent || 0)),
+                adjustmentAmount: Math.max(0, Number(row.adjustmentAmount || 0)),
+                effectiveAmount: safeMoney(Number(row.effectiveAmount ?? row.amount ?? 0)),
+                netAmount: safeMoney(Number(row.netAmount ?? row.effectiveAmount ?? row.amount ?? 0)),
+                feeBearer: row.feeBearer || null,
+                paymentMethodDiscountAmount: Math.max(0, Number(row.paymentMethodDiscountAmount || 0)),
+                interestAmount: Math.max(0, Number(row.interestAmount || 0)),
+                feeAmount: Math.max(0, Number(row.feeAmount || 0)),
+                fixedFeeAmount: Math.max(0, Number(row.fixedFeeAmount || 0)),
+                paymentMethodId: row.paymentMethodId || null,
+                payment_method_id: row.paymentMethodId || null,
+                installmentNumber: Math.max(1, Math.floor(Number(row.installmentNumber || 1))),
+            }))
+        }
+
+        const totalPaidAmount = breakdownForOrder.length > 0
+            ? safeMoney(breakdownForOrder.reduce((acc, row) => acc + Number((row as any).amountReceived ?? row.amount ?? 0), 0))
+            : paidAmount
+
+        const totalSaleTarget = safeMoney(Number(preSaleDraft.total_amount || 0))
+        const isUnderpaid = totalPaidAmount < totalSaleTarget - 0.005
+        const derivedPaymentStatus: 'paid' | 'partially_paid' | 'unpaid' =
+            totalPaidAmount <= 0.005
+                ? 'unpaid'
+                : isUnderpaid
+                    ? 'partially_paid'
+                    : 'paid'
+
+        // Customer name lookup if customer_id is provided
+        const customerName: string | undefined = customerNameResult.data?.name?.trim() || undefined
+
+        const hasShipping = Number(preSaleDraft.shipping_fee || 0) > 0
+        let finalDeliveryStatus: 'delivered' | 'preparing' | 'pickup_available' = hasShipping ? 'preparing' : 'delivered'
+        if (input.isPendingDelivery) {
+            finalDeliveryStatus = hasShipping ? 'preparing' : 'pickup_available'
+        }
+
+        // Map draft items to ERPItemPayload
+        const draftItemsList = Array.isArray(preSaleDraft.items) ? preSaleDraft.items : []
+        const erpItems: import("./orders").ERPItemPayload[] = draftItemsList.map((item: any, index: number) => {
+            const isService = Boolean(item.service_id || item.serviceId || item.line_type === 'service_booking' || item.line_type === 'service')
             return {
-                success: false as const,
-                error: `Já existe cliente com este ${match.matchBy === "email" ? "e-mail" : "CPF"}: "${match.customer.name}".`,
-                existingCustomerId: match.customer.id,
+                productId: isService ? undefined : (item.product_id || item.productId || undefined),
+                serviceId: item.service_id || item.serviceId || (isService ? (item.product_id || item.productId) : undefined),
+                lineType: item.line_type || item.lineType || (isService ? 'service_booking' : 'product'),
+                variantId: item.variant_id || item.variantId || undefined,
+                unitPrice: safeMoney(Number(item.unit_price ?? item.price ?? 0)),
+                quantity: Math.max(1, Math.floor(Number(item.quantity ?? item.qty ?? 1))),
+                sortOrder: index,
+                allowSellWithoutStock: Boolean(item.allow_sell_without_stock || item.allowSellWithoutStock),
+            }
+        })
+
+        const { createERPOrderAction } = await import("./orders")
+        const orderResult = await createERPOrderAction({
+            id: !input.preSaleId ? input.checkoutId || undefined : undefined,
+            partnerId: input.partnerId,
+            storeId: input.storeId || undefined,
+            customerId: preSaleDraft.customer_id || undefined,
+            customerName: customerName || "Consumidor final",
+            salesChannel: "Presencial",
+            deliveryMethod: hasShipping ? "delivery" : "pickup",
+            deliveryStatus: finalDeliveryStatus,
+            paymentStatus: derivedPaymentStatus,
+            paidAmount: totalPaidAmount,
+            totalAmount: totalSaleTarget,
+            paymentMethod: input.paymentMethod || "PDV",
+            paymentBreakdown: breakdownForOrder as any,
+            financeAccountId: input.financeAccountId || null,
+            items: erpItems,
+            subtotal: safeMoney(Number(preSaleDraft.subtotal || 0)),
+            discountValue: safeMoney(Number(preSaleDraft.discount_amount || 0)),
+            discountType: "fixed",
+            couponCode: preSaleDraft.coupon_code || undefined,
+            couponId: preSaleDraft.coupon_id || undefined,
+            couponDiscountAmount: safeMoney(Number(preSaleDraft.coupon_discount_amount || 0)),
+            shippingCost: safeMoney(Number(preSaleDraft.shipping_fee || 0)),
+            additionalCosts: safeMoney(Number(preSaleDraft.other_costs || 0)),
+            deliveryBreakdown: preSaleDraft.delivery_breakdown || null,
+            notes: preSaleDraft.notes || undefined,
+            skipCSRF: true,
+            sellerPartnerUserId: input.sellerId || null,
+            skipPostPaymentSellerSideEffects: true,
+            skipPostCreateRevalidation: true,
+        })
+
+        if (orderResult.error || !orderResult.orderId) {
+            return { success: false as const, error: orderResult.error || "Falha ao criar pedido no PDV." }
+        }
+
+        const orderId = orderResult.orderId
+        const orderNumber = orderResult.orderNumber || orderId
+
+        // Mark pre_sale as completed. It is independent from cash, commission and
+        // goals now that the order id exists, so start it without blocking them.
+        const preSaleCompletionPromise = input.preSaleId
+            ? supabase
+                .from("pre_sales")
+                .update({
+                    status: "completed",
+                    order_id: orderId,
+                    updated_at: new Date().toISOString(),
+                })
+                .eq("id", input.preSaleId)
+                .eq("partner_id", input.partnerId)
+            : Promise.resolve()
+
+        // These post-sale side effects are independent after the order exists.
+        // Start them together so the slowest one, rather than their sum, determines
+        // the remaining time shown by the PDV.
+        const cashMovementsPromise = capabilities.hasFinancial && activeSessionResult.data?.id
+            ? Promise.all(
+                breakdownForOrder
+                    .filter((entry) => {
+                        const method = String(entry.method || "").toLowerCase().trim()
+                        return method.includes("dinheiro") || method.includes("cash")
+                    })
+                    .map((entry) => supabase.from("cash_movements").insert({
+                        partner_id: input.partnerId,
+                        store_id: input.storeId || null,
+                        cash_session_id: activeSessionResult.data!.id,
+                        type: "sale",
+                        description: `Venda PDV ${orderNumber}`,
+                        amount: entry.amount,
+                        user_id: user.id,
+                        order_id: orderId,
+                    }))
+            )
+            : Promise.resolve()
+
+        // Seller commission
+        const sellerPartnerUserId = input.sellerId || null
+        const sellerCommissionPromise = capabilities.hasProductivity && sellerPartnerUserId
+            ? createCommissionExpenseForEntity({
+                supabase,
+                partnerId: input.partnerId,
+                storeId: input.storeId || null,
+                partnerUserId: sellerPartnerUserId,
+                role: "seller",
+                saleAmount: totalPaidAmount,
+                entityType: "sale",
+                entityId: orderId,
+                accountId: input.financeAccountId || null,
+                createdByUserId: user.id,
+            })
+            : Promise.resolve()
+
+        // Goals tracking
+        const goalsPromise = capabilities.hasGoals && user.id
+            ? applySaleToGoals({
+                supabase,
+                partnerId: input.partnerId,
+                sellerUserId: user.id,
+                saleAmount: totalPaidAmount,
+                createdByUserId: user.id,
+                accountId: input.financeAccountId || null,
+            })
+            : Promise.resolve()
+
+        // Record coupon usage if coupon was applied
+        const couponUsagePromise = capabilities.hasCoupons && preSaleDraft.coupon_id && orderId
+            ? supabase.from("coupon_usages").upsert(
+                {
+                    coupon_id: preSaleDraft.coupon_id,
+                    customer_id: preSaleDraft.customer_id || null,
+                    order_id: orderId,
+                },
+                { onConflict: "coupon_id,order_id", ignoreDuplicates: true }
+            )
+            : Promise.resolve()
+
+        // Invalidate product & order caches
+        const productIds = new Set<string>(
+            erpItems.map((item) => item.productId).filter(Boolean) as string[]
+        )
+        const productCachePromise = Promise.all(
+            Array.from(productIds).map((productId) =>
+                invalidateProductCache(productId, input.partnerId, "update", { silent: true })
+            )
+        )
+
+        const revalidationPromise = Promise.all([
+            revalidateOrders(input.partnerId),
+            revalidateTransactions(input.partnerId),
+            revalidateStockMovements(input.partnerId),
+        ])
+
+        await Promise.all([
+            cashMovementsPromise,
+            sellerCommissionPromise,
+            goalsPromise,
+            preSaleCompletionPromise,
+            couponUsagePromise,
+            productCachePromise,
+            revalidationPromise,
+        ])
+
+        return { success: true as const, data: { saleId: orderId, saleNumber: orderNumber, orderId } }
+    }
+
+    export async function createPOSQuickProductAction(input: {
+        partnerId: string
+        name: string
+        price: number
+        stockQuantity: number
+        storeId?: string | null
+    }) {
+        await requireUser()
+        await requirePermission(input.partnerId, "products", "create")
+
+        const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+        if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
+
+        const name = String(input.name || "").trim()
+        const price = safeMoney(Number(input.price || 0))
+        const stockQuantity = Math.max(0, Math.floor(Number(input.stockQuantity || 0)))
+
+        if (!name) return { success: false as const, error: "Informe o nome do produto." }
+        if (price < 0) return { success: false as const, error: "Preço inválido." }
+        if (stockQuantity < 0) return { success: false as const, error: "Estoque inválido." }
+
+        const supabase = createAdminClient()
+
+        // Resolve store for the product: use explicit storeId or fall back to first store
+        let targetStoreId = input.storeId || null
+        if (!targetStoreId) {
+            const { data: store } = await supabase
+                .from("stores")
+                .select("id")
+                .eq("partner_id", input.partnerId)
+                .order("created_at", { ascending: true })
+                .limit(1)
+                .maybeSingle()
+            targetStoreId = store?.id || null
+        }
+
+        if (!targetStoreId) {
+            return { success: false as const, error: "Nenhuma loja encontrada para cadastrar o produto." }
+        }
+
+        // Validate user has access to the target store
+        if (targetStoreId) {
+            const { userHasStoreAccess } = await import("@/lib/store-members")
+            const hasAccess = await userHasStoreAccess(input.partnerId, targetStoreId)
+            if (!hasAccess) {
+                return { success: false as const, error: "Você não tem acesso a esta loja." }
             }
         }
+
+        const skuBase = generateSKUBase(name)
+        const sku = `${skuBase}-${Date.now().toString().slice(-5)}`
+
+        const { data: product, error } = await supabase
+            .from("products")
+            .insert({
+                partner_id: input.partnerId,
+                store_id: targetStoreId,
+                name,
+                sku,
+                price,
+                stock_quantity: stockQuantity,
+                is_active: true,
+                allow_sell_without_stock: false,
+            })
+            .select("id, name, category, sku, price, stock_available, allow_sell_without_stock, images, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
+            .single()
+
+        if (error) return { success: false as const, error: error.message }
+
+        return { success: true as const, data: product }
     }
 
-    const supabase = createAdminClient()
-    let encryptedCpf: string | null = null
-    if (cpfDigits) {
-        const { encryptCPF } = await import("@/lib/crypto")
-        encryptedCpf = await encryptCPF(cpfDigits)
+    export async function createPOSCustomerQuickAction(input: {
+        partnerId: string
+        name: string
+        email?: string
+        phone?: string
+        cpf?: string
+        address?: {
+            zipCode?: string
+            street?: string
+            number?: string
+            complement?: string
+            neighborhood?: string
+            city?: string
+            state?: string
+        }
+    }) {
+        await requireUser()
+        await requirePermission(input.partnerId, "customers", "create")
+
+        const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+        if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
+
+        const name = sanitizeInput(String(input.name || ""), 150).trim()
+        const email = String(input.email || "").trim().toLowerCase()
+        const phone = String(input.phone || "").trim()
+        const cpfDigits = String(input.cpf || "").replace(/\D/g, "")
+
+        if (!name) return { success: false as const, error: "Informe o nome do cliente." }
+
+        // Check for existing customer before creating
+        if (email || cpfDigits) {
+            const { findExistingCustomer } = await import("@/lib/services/marketplace-customer")
+            const match = await findExistingCustomer({
+                partnerId: input.partnerId,
+                email: email || null,
+                cpf: cpfDigits || null,
+            })
+            if (match) {
+                return {
+                    success: false as const,
+                    error: `Já existe cliente com este ${match.matchBy === "email" ? "e-mail" : "CPF"}: "${match.customer.name}".`,
+                    existingCustomerId: match.customer.id,
+                }
+            }
+        }
+
+        const supabase = createAdminClient()
+        let encryptedCpf: string | null = null
+        if (cpfDigits) {
+            const { encryptCPF } = await import("@/lib/crypto")
+            encryptedCpf = await encryptCPF(cpfDigits)
+        }
+
+        const { data: customer, error } = await supabase
+            .from("customers")
+            .insert({
+                partner_id: input.partnerId,
+                name,
+                email: email || null,
+                phone: phone || null,
+                person_type: "pf",
+                cpf: encryptedCpf,
+                status: "ativo",
+            })
+            .select("id, name, email, phone")
+            .single()
+
+        if (error) return { success: false as const, error: error.message }
+
+        const address = input.address || {}
+        const hasAddress = !!(address.street || address.city || address.zipCode)
+        if (hasAddress) {
+            await supabase.from("addresses").insert({
+                customer_id: customer.id,
+                address_type: "primary",
+                zip_code: address.zipCode || null,
+                street: address.street || null,
+                number: address.number || null,
+                complement: address.complement || null,
+                neighborhood: address.neighborhood || null,
+                city: address.city || null,
+                state: address.state || null,
+                country: "BR",
+                is_default: true,
+            })
+        }
+
+        return {
+            success: true as const,
+            data: {
+                id: customer.id,
+                name: customer.name,
+                email: customer.email || null,
+                phone: customer.phone || null,
+                cpf: cpfDigits || null,
+                address: hasAddress ? {
+                    zipCode: address.zipCode || "",
+                    street: address.street || "",
+                    number: address.number || "",
+                    complement: address.complement || "",
+                    neighborhood: address.neighborhood || "",
+                    city: address.city || "",
+                    state: address.state || "",
+                } : null,
+            },
+        }
     }
 
-    const { data: customer, error } = await supabase
-        .from("customers")
-        .insert({
-            partner_id: input.partnerId,
-            name,
-            email: email || null,
-            phone: phone || null,
-            person_type: "pf",
-            cpf: encryptedCpf,
-            status: "ativo",
-        })
-        .select("id, name, email, phone")
-        .single()
+    export async function getPOSCustomerDetailsAction(input: {
+        partnerId: string
+        customerId: string
+    }) {
+        await requireUser()
+        await requirePermission(input.partnerId, "customers", "view")
 
-    if (error) return { success: false as const, error: error.message }
+        const supabase = createAdminClient()
+        const [{ data: customer, error: customerError }, { data: address }] = await Promise.all([
+            supabase
+                .from("customers")
+                .select("id, name, email, phone, cpf, image_url, store_credit")
+                .eq("partner_id", input.partnerId)
+                .eq("id", input.customerId)
+                .single(),
+            supabase
+                .from("addresses")
+                .select("zip_code, street, number, complement, neighborhood, city, state, country")
+                .eq("customer_id", input.customerId)
+                .eq("address_type", "primary")
+                .limit(1)
+                .maybeSingle(),
+        ])
 
-    const address = input.address || {}
-    const hasAddress = !!(address.street || address.city || address.zipCode)
-    if (hasAddress) {
-        await supabase.from("addresses").insert({
+        if (customerError || !customer) {
+            return { success: false as const, error: customerError?.message || "Cliente não encontrado." }
+        }
+
+        let plainCpf: string | null = null
+        if (customer.cpf) {
+            try {
+                const { decryptCPF } = await import("@/lib/crypto")
+                plainCpf = await decryptCPF(customer.cpf)
+            } catch {
+                plainCpf = null
+            }
+        }
+
+        return {
+            success: true as const,
+            data: {
+                id: customer.id,
+                name: customer.name,
+                email: customer.email || null,
+                phone: customer.phone || null,
+                cpf: plainCpf,
+                image_url: customer.image_url || null,
+                store_credit: Math.max(0, Number((customer as any).store_credit || 0)),
+                address: address ? {
+                    zipCode: address.zip_code || "",
+                    street: address.street || "",
+                    number: address.number || "",
+                    complement: address.complement || "",
+                    neighborhood: address.neighborhood || "",
+                    city: address.city || "",
+                    state: address.state || "",
+                    country: address.country || "BR",
+                } : null,
+            },
+        }
+    }
+
+    export async function createPOSCustomerAddressAction(input: {
+        partnerId: string
+        customerId: string
+        address: {
+            zipCode?: string
+            street?: string
+            number?: string
+            complement?: string
+            neighborhood?: string
+            city?: string
+            state?: string
+        }
+    }) {
+        await requireUser()
+        await requirePermission(input.partnerId, "customers", "edit")
+
+        const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+        if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
+
+        const supabase = createAdminClient()
+
+        const { data: customer, error: customerError } = await supabase
+            .from("customers")
+            .select("id")
+            .eq("partner_id", input.partnerId)
+            .eq("id", input.customerId)
+            .maybeSingle()
+
+        if (customerError || !customer?.id) {
+            return { success: false as const, error: customerError?.message || "Cliente não encontrado." }
+        }
+
+        const address = input.address || {}
+        const hasAddress = !!(address.street || address.city || address.zipCode)
+        if (!hasAddress) {
+            return { success: false as const, error: "Informe um endereço válido." }
+        }
+
+        const basePayload = {
             customer_id: customer.id,
             address_type: "primary",
             zip_code: address.zipCode || null,
@@ -1479,295 +1623,159 @@ export async function createPOSCustomerQuickAction(input: {
             state: address.state || null,
             country: "BR",
             is_default: true,
-        })
-    }
+        }
 
-    return {
-        success: true as const,
-        data: {
-            id: customer.id,
-            name: customer.name,
-            email: customer.email || null,
-            phone: customer.phone || null,
-            cpf: cpfDigits || null,
-            address: hasAddress ? {
-                zipCode: address.zipCode || "",
-                street: address.street || "",
-                number: address.number || "",
-                complement: address.complement || "",
-                neighborhood: address.neighborhood || "",
-                city: address.city || "",
-                state: address.state || "",
-            } : null,
-        },
-    }
-}
-
-export async function getPOSCustomerDetailsAction(input: {
-    partnerId: string
-    customerId: string
-}) {
-    await requireUser()
-    await requirePermission(input.partnerId, "customers", "view")
-
-    const supabase = createAdminClient()
-    const [{ data: customer, error: customerError }, { data: address }] = await Promise.all([
-        supabase
-            .from("customers")
-            .select("id, name, email, phone, cpf, image_url, store_credit")
-            .eq("partner_id", input.partnerId)
-            .eq("id", input.customerId)
-            .single(),
-        supabase
+        const { data: existingPrimary } = await supabase
             .from("addresses")
-            .select("zip_code, street, number, complement, neighborhood, city, state, country")
-            .eq("customer_id", input.customerId)
+            .select("id")
+            .eq("customer_id", customer.id)
             .eq("address_type", "primary")
             .limit(1)
-            .maybeSingle(),
-    ])
+            .maybeSingle()
 
-    if (customerError || !customer) {
-        return { success: false as const, error: customerError?.message || "Cliente não encontrado." }
-    }
+        if (existingPrimary?.id) {
+            const { error } = await supabase
+                .from("addresses")
+                .update(basePayload)
+                .eq("id", existingPrimary.id)
+                .eq("customer_id", customer.id)
 
-    let plainCpf: string | null = null
-    if (customer.cpf) {
-        try {
-            const { decryptCPF } = await import("@/lib/crypto")
-            plainCpf = await decryptCPF(customer.cpf)
-        } catch {
-            plainCpf = null
+            if (error) return { success: false as const, error: error.message }
+        } else {
+            const { error } = await supabase.from("addresses").insert(basePayload)
+            if (error) return { success: false as const, error: error.message }
+        }
+
+        return {
+            success: true as const,
+            data: {
+                address: {
+                    zipCode: address.zipCode || "",
+                    street: address.street || "",
+                    number: address.number || "",
+                    complement: address.complement || "",
+                    neighborhood: address.neighborhood || "",
+                    city: address.city || "",
+                    state: address.state || "",
+                    country: "BR",
+                },
+            },
         }
     }
 
-    return {
-        success: true as const,
-        data: {
-            id: customer.id,
-            name: customer.name,
-            email: customer.email || null,
-            phone: customer.phone || null,
-            cpf: plainCpf,
-            image_url: customer.image_url || null,
-            store_credit: Math.max(0, Number((customer as any).store_credit || 0)),
-            address: address ? {
-                zipCode: address.zip_code || "",
-                street: address.street || "",
-                number: address.number || "",
-                complement: address.complement || "",
-                neighborhood: address.neighborhood || "",
-                city: address.city || "",
-                state: address.state || "",
-                country: address.country || "BR",
-            } : null,
-        },
-    }
-}
+    // ============================================================================
+    // POS COUPON ACTIONS
+    // ============================================================================
 
-export async function createPOSCustomerAddressAction(input: {
-    partnerId: string
-    customerId: string
-    address: {
-        zipCode?: string
-        street?: string
-        number?: string
-        complement?: string
-        neighborhood?: string
-        city?: string
-        state?: string
-    }
-}) {
-    await requireUser()
-    await requirePermission(input.partnerId, "customers", "edit")
+    export async function applyCouponToPreSaleAction(input: {
+        partnerId: string
+        preSaleId: string
+        couponCode: string
+        customerId?: string | null
+        subtotal: number
+        shippingCost?: number
+        items?: Array<{ productId?: string | null; serviceId?: string | null }>
+    }) {
+        await requireUser()
+        await requirePermission(input.partnerId, "pdv", "can_apply_discount")
 
-    const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
-    if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
+        const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+        if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
 
-    const supabase = createAdminClient()
+        const result = await validateCoupon({
+            partnerId: input.partnerId,
+            code: input.couponCode,
+            customerId: input.customerId,
+            subtotal: input.subtotal,
+            shippingCost: input.shippingCost,
+            items: input.items,
+        })
 
-    const { data: customer, error: customerError } = await supabase
-        .from("customers")
-        .select("id")
-        .eq("partner_id", input.partnerId)
-        .eq("id", input.customerId)
-        .maybeSingle()
+        if (!result.valid) {
+            return { success: false as const, error: result.errorMessage || "Cupom inválido." }
+        }
 
-    if (customerError || !customer?.id) {
-        return { success: false as const, error: customerError?.message || "Cliente não encontrado." }
-    }
-
-    const address = input.address || {}
-    const hasAddress = !!(address.street || address.city || address.zipCode)
-    if (!hasAddress) {
-        return { success: false as const, error: "Informe um endereço válido." }
-    }
-
-    const basePayload = {
-        customer_id: customer.id,
-        address_type: "primary",
-        zip_code: address.zipCode || null,
-        street: address.street || null,
-        number: address.number || null,
-        complement: address.complement || null,
-        neighborhood: address.neighborhood || null,
-        city: address.city || null,
-        state: address.state || null,
-        country: "BR",
-        is_default: true,
-    }
-
-    const { data: existingPrimary } = await supabase
-        .from("addresses")
-        .select("id")
-        .eq("customer_id", customer.id)
-        .eq("address_type", "primary")
-        .limit(1)
-        .maybeSingle()
-
-    if (existingPrimary?.id) {
+        const supabase = createAdminClient()
         const { error } = await supabase
-            .from("addresses")
-            .update(basePayload)
-            .eq("id", existingPrimary.id)
-            .eq("customer_id", customer.id)
+            .from("pre_sales")
+            .update({
+                coupon_id: result.couponId || null,
+                coupon_code: result.couponCode || input.couponCode.trim().toUpperCase(),
+                coupon_discount_amount: safeMoney(result.discountAmount),
+                updated_at: new Date().toISOString(),
+            })
+            .eq("id", input.preSaleId)
+            .eq("partner_id", input.partnerId)
+            .eq("status", "draft")
 
         if (error) return { success: false as const, error: error.message }
-    } else {
-        const { error } = await supabase.from("addresses").insert(basePayload)
-        if (error) return { success: false as const, error: error.message }
-    }
 
-    return {
-        success: true as const,
-        data: {
-            address: {
-                zipCode: address.zipCode || "",
-                street: address.street || "",
-                number: address.number || "",
-                complement: address.complement || "",
-                neighborhood: address.neighborhood || "",
-                city: address.city || "",
-                state: address.state || "",
-                country: "BR",
+        return {
+            success: true as const,
+            data: {
+                couponId: result.couponId || null,
+                couponCode: result.couponCode || input.couponCode.trim().toUpperCase(),
+                discountAmount: result.discountAmount,
+                pricingCoupon: result.pricingCoupon || null,
+                freeShipping: result.freeShipping || false,
             },
-        },
-    }
-}
-
-// ============================================================================
-// POS COUPON ACTIONS
-// ============================================================================
-
-export async function applyCouponToPreSaleAction(input: {
-    partnerId: string
-    preSaleId: string
-    couponCode: string
-    customerId?: string | null
-    subtotal: number
-    shippingCost?: number
-    items?: Array<{ productId?: string | null; serviceId?: string | null }>
-}) {
-    await requireUser()
-    await requirePermission(input.partnerId, "pdv", "can_apply_discount")
-
-    const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
-    if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
-
-    const result = await validateCoupon({
-        partnerId: input.partnerId,
-        code: input.couponCode,
-        customerId: input.customerId,
-        subtotal: input.subtotal,
-        shippingCost: input.shippingCost,
-        items: input.items,
-    })
-
-    if (!result.valid) {
-        return { success: false as const, error: result.errorMessage || "Cupom inválido." }
+        }
     }
 
-    const supabase = createAdminClient()
-    const { error } = await supabase
-        .from("pre_sales")
-        .update({
-            coupon_id: result.couponId || null,
-            coupon_code: result.couponCode || input.couponCode.trim().toUpperCase(),
-            coupon_discount_amount: safeMoney(result.discountAmount),
-            updated_at: new Date().toISOString(),
+    export async function removeCouponFromPreSaleAction(input: {
+        partnerId: string
+        preSaleId: string
+    }) {
+        await requireUser()
+        await requirePermission(input.partnerId, "pdv", "can_apply_discount")
+
+        const supabase = createAdminClient()
+        const { error } = await supabase
+            .from("pre_sales")
+            .update({
+                coupon_id: null,
+                coupon_code: null,
+                coupon_discount_amount: 0,
+                updated_at: new Date().toISOString(),
+            })
+            .eq("id", input.preSaleId)
+            .eq("partner_id", input.partnerId)
+            .eq("status", "draft")
+
+        if (error) return { success: false as const, error: error.message }
+        return { success: true as const }
+    }
+
+    export async function findAutomaticCouponForPOSAction(input: {
+        partnerId: string
+        customerId?: string | null
+        subtotal: number
+        shippingCost?: number
+        items?: Array<{ productId?: string | null; serviceId?: string | null }>
+    }) {
+        await requireUser()
+        await requirePermission(input.partnerId, "pdv", "can_apply_discount")
+
+        const result = await findBestAutomaticCoupon({
+            partnerId: input.partnerId,
+            customerId: input.customerId,
+            subtotal: input.subtotal,
+            shippingCost: input.shippingCost,
+            items: input.items,
         })
-        .eq("id", input.preSaleId)
-        .eq("partner_id", input.partnerId)
-        .eq("status", "draft")
 
-    if (error) return { success: false as const, error: error.message }
+        if (!result.valid) {
+            return { success: false as const }
+        }
 
-    return {
-        success: true as const,
-        data: {
-            couponId: result.couponId || null,
-            couponCode: result.couponCode || input.couponCode.trim().toUpperCase(),
-            discountAmount: result.discountAmount,
-            pricingCoupon: result.pricingCoupon || null,
-            freeShipping: result.freeShipping || false,
-        },
+        return {
+            success: true as const,
+            data: {
+                couponId: result.couponId || null,
+                couponCode: result.couponCode || null,
+                discountAmount: result.discountAmount,
+                pricingCoupon: result.pricingCoupon || null,
+                freeShipping: result.freeShipping || false,
+            },
+        }
     }
-}
-
-export async function removeCouponFromPreSaleAction(input: {
-    partnerId: string
-    preSaleId: string
-}) {
-    await requireUser()
-    await requirePermission(input.partnerId, "pdv", "can_apply_discount")
-
-    const supabase = createAdminClient()
-    const { error } = await supabase
-        .from("pre_sales")
-        .update({
-            coupon_id: null,
-            coupon_code: null,
-            coupon_discount_amount: 0,
-            updated_at: new Date().toISOString(),
-        })
-        .eq("id", input.preSaleId)
-        .eq("partner_id", input.partnerId)
-        .eq("status", "draft")
-
-    if (error) return { success: false as const, error: error.message }
-    return { success: true as const }
-}
-
-export async function findAutomaticCouponForPOSAction(input: {
-    partnerId: string
-    customerId?: string | null
-    subtotal: number
-    shippingCost?: number
-    items?: Array<{ productId?: string | null; serviceId?: string | null }>
-}) {
-    await requireUser()
-    await requirePermission(input.partnerId, "pdv", "can_apply_discount")
-
-    const result = await findBestAutomaticCoupon({
-        partnerId: input.partnerId,
-        customerId: input.customerId,
-        subtotal: input.subtotal,
-        shippingCost: input.shippingCost,
-        items: input.items,
-    })
-
-    if (!result.valid) {
-        return { success: false as const }
-    }
-
-    return {
-        success: true as const,
-        data: {
-            couponId: result.couponId || null,
-            couponCode: result.couponCode || null,
-            discountAmount: result.discountAmount,
-            pricingCoupon: result.pricingCoupon || null,
-            freeShipping: result.freeShipping || false,
-        },
-    }
-}

@@ -141,7 +141,7 @@ export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
     cadastros_marketing: { key: "cadastros_marketing", path: "/erp/cadastros-marketing", label: "Cadastros", category: "Marketing" },
     recurring_plans: { key: "recurring_plans", path: "/erp/recorrentes/planos", label: "Planos Recorrentes", category: "Marketing" },
     recurring_subscriptions: { key: "recurring_subscriptions", path: "/erp/recorrentes/assinaturas", label: "Assinaturas", category: "Marketing" },
-    community_videos: { key: "community_videos", path: "/erp/marketing/videos", label: "Vídeos da Comunidade", category: "Marketing" },
+    community_videos: { key: "community_videos", path: "/erp/videos", label: "Vídeos da Comunidade", category: "Marketing" },
     colecoes: { key: "colecoes", path: "/erp/marketing/colecoes", label: "Coleções", category: "Marketing" },
 
     // ── Lojas e Filiais
@@ -177,9 +177,9 @@ export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
 
     // ── Produtividade
     productivity_overview: { key: "productivity_overview", path: "/erp/produtividade", label: "Visão Geral", category: "Produtividade" },
-    productivity_goals: { key: "productivity_goals", path: "/erp/produtividade/metas", label: "Metas", category: "Produtividade" },
+    productivity_goals: { key: "productivity_goals", path: "/erp/metas", label: "Metas", category: "Produtividade" },
     productivity_commissions: {
-        key: "productivity_commissions", path: "/erp/produtividade/comissoes", label: "Comissões", category: "Produtividade",
+        key: "productivity_commissions", path: "/erp/comissoes", label: "Comissões", category: "Produtividade",
         specificPermissions: ["can_pay_commission"],
     },
 }

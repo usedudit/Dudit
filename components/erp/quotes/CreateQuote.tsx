@@ -737,16 +737,11 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                 `Orçamento ${quoteCode}`.trim();
 
     useEffect(() => {
-        const isMobile = window.innerWidth < 768;
-        if (isMobile) {
-            setHeaderOverride(null);
-        } else {
-            setHeaderOverride({
-                title: pageTitle,
-                onBack: handleBack,
-                isSubPage: true
-            });
-        }
+        setHeaderOverride({
+            title: pageTitle,
+            onBack: handleBack,
+            isSubPage: true
+        });
         return () => setHeaderOverride(null);
     }, [pageTitle, handleBack, setHeaderOverride]);
 
@@ -1126,7 +1121,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                                 </div>
 
                                 <div
-                                    className="flex-1 overflow-y-auto no-scrollbar relative"
+                                    className="flex-1 overflow-y-auto custom-scrollbar relative"
                                     ref={scrollContainerRef}
                                     onScroll={handleScroll}
                                 >
@@ -1208,7 +1203,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                             </div>
 
                             {/* RIGHT SIDE / BELOW - PREVIEW */}
-                            <div className={`w-full lg:w-1/2 bg-brand-gray dark:bg-dark-border/20 overflow-auto no-scrollbar ${activeTab === 'Visualização' ? 'flex flex-col flex-1 h-full lg:min-h-0' : 'hidden lg:flex flex-col'}`}>
+                            <div className={`w-full lg:w-1/2 bg-brand-gray dark:bg-dark-border/20 overflow-auto custom-scrollbar ${activeTab === 'Visualização' ? 'flex flex-col flex-1 h-full lg:min-h-0' : 'hidden lg:flex flex-col'}`}>
                                 <TabsContent value="Visualização" className="m-0 p-0 h-full flex flex-col focus-visible:outline-none" forceMount>
                                     <FadeIn key={activeTab === 'Visualização' ? 'preview' : 'preview-desktop'} className="flex flex-col flex-1 h-full">
                                         <QuotePreview

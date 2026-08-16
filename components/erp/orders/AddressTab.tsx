@@ -122,7 +122,15 @@ export const AddressTab: React.FC<AddressTabProps> = ({
                                         setNeighborhood(data.neighborhood)
                                         setCity(data.city)
                                         setUf(data.state || "SP")
-                                        setNoNumber(data.number === "S/N")
+                                        if (data.number) {
+                                            if (data.number === "S/N") {
+                                                setNoNumber(true)
+                                                setNumber("")
+                                            } else {
+                                                setNoNumber(false)
+                                                setNumber(data.number)
+                                            }
+                                        }
                                     }}
                                     disabled={isAddressLocked}
                                 />

@@ -14,6 +14,7 @@ const PUBLIC_SERVICE_SELECT = `
     video_thumbnail, video_duration, video_provider_id, service_type,
     warranty, buffer_minutes, marketplace_category_id, fulfillment_modes,
     payment_requirement, show_price_in_store, promotional_price,
+    marketplace_score, views_count, bookings_last_30_days, favorites_count, highlight_service,
     created_at,
     category:service_categories!category_id(name),
     subcategory:service_categories!subcategory_id(name)
@@ -81,6 +82,7 @@ export async function listStoreServices(
         .from("services")
         .select(options?.publicOnly ? PUBLIC_SERVICE_SELECT : ERP_SERVICE_SELECT)
         .eq("partner_id", partnerId)
+        .order("marketplace_score", { ascending: false, nullsFirst: false })
         .order("created_at", { ascending: false })
         .range(offset, offset + limit - 1)
 

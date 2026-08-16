@@ -38,6 +38,10 @@ export async function createCommissionExpenseForEntity(params: {
   accountId?: string | null
   createdByUserId?: string | null
 }) {
+  const { getPartnerCapabilities } = await import("@/lib/services/partner-capabilities")
+  const capabilities = await getPartnerCapabilities(params.partnerId, { storeId: params.storeId })
+  if (!capabilities.hasProductivity || !capabilities.hasFinancial) return { success: true as const, amount: 0 }
+
   const config = await getCommissionConfig({
     supabase: params.supabase,
     partnerId: params.partnerId,
@@ -123,6 +127,10 @@ export async function reverseCommissionForEntity(params: {
   accountId?: string | null
   createdByUserId?: string | null
 }) {
+  const { getPartnerCapabilities } = await import("@/lib/services/partner-capabilities")
+  const capabilities = await getPartnerCapabilities(params.partnerId, { storeId: params.storeId })
+  if (!capabilities.hasProductivity || !capabilities.hasFinancial) return { success: true as const }
+
   const referenceNote = `commission:${params.entityType}:${params.entityId}:${params.partnerUserId}`
   const { data: original } = await params.supabase
     .from("transactions")

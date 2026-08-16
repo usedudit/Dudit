@@ -2662,51 +2662,51 @@ export function CheckoutPageClient() {
                                                                 )}
                                                                 {renderChangeSection()}
                                                                 {selectedStorefrontMethod?.cardBrand && (
-                                                            <div className="mt-4">
-                                                                <span className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Bandeiras aceitas</span>
-                                                                <div className="flex flex-wrap gap-2">
-                                                                    {selectedStorefrontMethod.cardBrand.split(/[;,]/).map(b => {
-                                                                        const brand = AVAILABLE_BRANDS.find(ab => ab.id === b.trim())
-                                                                        if (!brand) return null
-                                                                        return (
-                                                                            <div key={brand.id} className="flex items-center gap-2 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border px-3 py-1.5 rounded-lg">
-                                                                                <img src={brand.image} alt={brand.name} className="w-5 h-5 object-contain opacity-90" />
-                                                                                <span className="text-xs font-medium text-brand-dark dark:text-dark-heading">{brand.name}</span>
-                                                                            </div>
-                                                                        )
-                                                                    })}
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                        {shouldShowInstallments && (
-                                                            <div className="mt-6">
-                                                                <FormDropdown
-                                                                    label="Parcelas"
-                                                                    value={String(formData.installments)}
-                                                                    setValue={(value) => setFormData((prev) => ({ ...prev, installments: Number(value) }))}
-                                                                    options={
-                                                                        paymentPreview?.installmentOptions ? paymentPreview.installmentOptions.map(opt => ({
-                                                                            value: String(opt.installments),
-                                                                            label: formatCheckoutInstallmentOptionLabel(opt)
-                                                                        })) : Array.from({ length: Number(paymentPreview?.maxInstallments || 1) }, (_, index) => {
-                                                                            const installmentNumber = index + 1
-                                                                            const installmentAmount = paymentPreview?.installmentAmounts?.[index]
-                                                                            return {
-                                                                                value: String(installmentNumber),
-                                                                                label: `${installmentNumber}x${installmentAmount ? ` de ${formatCurrency(installmentAmount)}` : ""}`
+                                                                    <div className="mt-4">
+                                                                        <span className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Bandeiras aceitas</span>
+                                                                        <div className="flex flex-wrap gap-2">
+                                                                            {selectedStorefrontMethod.cardBrand.split(/[;,]/).map(b => {
+                                                                                const brand = AVAILABLE_BRANDS.find(ab => ab.id === b.trim())
+                                                                                if (!brand) return null
+                                                                                return (
+                                                                                    <div key={brand.id} className="flex items-center gap-2 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border px-3 py-1.5 rounded-lg">
+                                                                                        <img src={brand.image} alt={brand.name} className="w-5 h-5 object-contain opacity-90" />
+                                                                                        <span className="text-xs font-medium text-brand-dark dark:text-dark-heading">{brand.name}</span>
+                                                                                    </div>
+                                                                                )
+                                                                            })}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                                {shouldShowInstallments && (
+                                                                    <div className="mt-6">
+                                                                        <FormDropdown
+                                                                            label="Parcelas"
+                                                                            value={String(formData.installments)}
+                                                                            setValue={(value) => setFormData((prev) => ({ ...prev, installments: Number(value) }))}
+                                                                            options={
+                                                                                paymentPreview?.installmentOptions ? paymentPreview.installmentOptions.map(opt => ({
+                                                                                    value: String(opt.installments),
+                                                                                    label: formatCheckoutInstallmentOptionLabel(opt)
+                                                                                })) : Array.from({ length: Number(paymentPreview?.maxInstallments || 1) }, (_, index) => {
+                                                                                    const installmentNumber = index + 1
+                                                                                    const installmentAmount = paymentPreview?.installmentAmounts?.[index]
+                                                                                    return {
+                                                                                        value: String(installmentNumber),
+                                                                                        label: `${installmentNumber}x${installmentAmount ? ` de ${formatCurrency(installmentAmount)}` : ""}`
+                                                                                    }
+                                                                                })
                                                                             }
-                                                                        })
-                                                                    }
-                                                                />
-                                                            </div>
+                                                                        />
+                                                                    </div>
+                                                                )}
+                                                            </>
                                                         )}
-                                                    </>
+                                                    </motion.div>
                                                 )}
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
-                                </>
-                            ) : (
+                                            </AnimatePresence>
+                                        </>
+                                    ) : (
                                         <>
                                             <div className="flex gap-3 mb-6">
                                                 <div className="w-1 rounded-full bg-brand-border dark:bg-dark-border shrink-0" />
@@ -3278,9 +3278,6 @@ export function CheckoutPageClient() {
                 }
             >
                 <div className="space-y-4">
-                    <p className="text-xs text-brand-inactive-text">
-                        Adicione instruções especiais para a preparação ou entrega do seu pedido.
-                    </p>
                     <FormTextarea
                         label=""
                         placeholder="Ex: Tocar interfone, embalar para presente, detalhes da entrega..."

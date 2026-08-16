@@ -59,8 +59,8 @@ const navItems: NavItem[] = [
         href: "/erp/produtividade",
         submenu: [
             { label: "Visão Geral", href: "/erp/produtividade" },
-            { label: "Metas", href: "/erp/produtividade/metas" },
-            { label: "Comissões", href: "/erp/produtividade/comissoes" },
+            { label: "Metas", href: "/erp/metas" },
+            { label: "Comissões", href: "/erp/comissoes" },
             { label: "Estatísticas", href: "/erp/relatorios" },
         ],
     },
@@ -111,7 +111,7 @@ const navItems: NavItem[] = [
         submenu: [
             { label: "Cupons de Desconto", href: "/erp/cupons" },
             { label: "Campanhas e Promoções", href: "/erp/promocoes" },
-            { label: "Vídeos da Comunidade", href: "/erp/marketing/videos" },
+            { label: "Vídeos da Comunidade", href: "/erp/videos" },
         ],
     },
     {
@@ -144,15 +144,14 @@ const PLAN_GATED_MINIMUM: Record<string, "crescer" | "escalar"> = {
     "/erp/cupons": "crescer",
     "/erp/promocoes": "escalar",
     "/erp/produtividade": "escalar",
-    "/erp/produtividade/metas": "escalar",
-    "/erp/produtividade/comissoes": "crescer",
-    "/erp/metas": "crescer",
+    "/erp/metas": "escalar",
+    "/erp/comissoes": "crescer",
     "/erp/ordens-de-servico": "crescer",
     "/erp/devolucoes": "crescer",
     "/erp/fornecedores": "crescer",
     "/erp/importacao-xml": "crescer",
     "/erp/movimentacao-estoque": "crescer",
-    "/erp/marketing/videos": "crescer",
+    "/erp/videos": "crescer",
 }
 
 function ErpPlanGatedNavItem({
@@ -357,7 +356,7 @@ export function ERPSidebar() {
                         if (item.label === "Marketing") {
                             if (sub.href === "/erp/cupons") return couponsResourceActive
                             if (sub.href === "/erp/promocoes") return campaignsResourceActive
-                            if (sub.href === "/erp/marketing/videos") return communityVideosResourceActive
+                            if (sub.href === "/erp/videos") return communityVideosResourceActive
                             return marketingResourceActive
                         }
                         if (item.label === "Desempenho") {

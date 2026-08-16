@@ -80,6 +80,7 @@ export async function listStoreProducts(
             location:storage_locations!location_id(name)
         `)
         .eq("partner_id", partnerId)
+        .order("marketplace_score", { ascending: false, nullsFirst: false })
         .order("created_at", { ascending: false })
         .range(offset, offset + limit - 1)
 

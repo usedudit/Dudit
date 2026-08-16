@@ -32,6 +32,7 @@ import ImageCropperModal from "@/components/ImageCropperModal"
 import { updatePartnerAction } from "@/app/actions/marketplace/partners"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { PromotionType, DiscountType } from "@/lib/types/promotion"
+import { sortByVendorRelevance } from "@/lib/marketplace/ranking"
 
 interface VendorPageClientProps {
     partner: any
@@ -758,15 +759,20 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
             const name = normalizeCategory(item.category)
             map.set(name, [...(map.get(name) || []), item])
         })
-        return Array.from(map.entries()).map(([name, items]) => ({ name, id: categoryId(name), items }))
+        return Array.from(map.entries()).map(([name, items]) => ({
+            name,
+            id: categoryId(name),
+            items: sortByVendorRelevance(items),
+        }))
     }, [filteredItems])
 
     const featuredItems = useMemo(() => {
         if (activeContext === "Planos") return []
         const highlightedProducts = products.filter(item => item.is_featured || item.is_highlighted)
         const highlightedServices = services.filter(item => item.highlight_service || item.is_featured || item.is_highlighted)
-        return (activeContext === "Produtos" ? highlightedProducts : highlightedServices)
+        const filtered = (activeContext === "Produtos" ? highlightedProducts : highlightedServices)
             .filter(item => !searchValue.trim() || item.name?.toLowerCase().includes(searchValue.trim().toLowerCase()))
+        return sortByVendorRelevance(filtered)
     }, [products, services, activeContext, searchValue])
 
     const allTabs = useMemo(() => [
@@ -965,7 +971,9 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
             case "preco_menor": sorted.sort((a, b) => (a.promotional_price || a.price || 0) - (b.promotional_price || b.price || 0)); break
             case "preco_maior": sorted.sort((a, b) => (b.promotional_price || b.price || 0) - (a.promotional_price || a.price || 0)); break
             case "recentes": sorted.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()); break
-            default: break
+            case "relevancia":
+            default:
+                return sortByVendorRelevance(sorted)
         }
         return sorted
     }, [categoryItems, categoryPromoOn, categorySelectedBrands, categoryMinPrice, categoryMaxPrice, categorySortBy])
@@ -1490,7 +1498,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                             <span className="text-[13px] font-medium text-brand-inactive-text leading-tight mt-1">{formatJoinDate(partner.createdAt)}</span>
                         </div>
                     </div>
-                    <div className="sticky top-0 z-40 bg-white border-b border-brand-border mb-4">
+                    <div className="sticky top-0 z-40 bg-white border-b border-brand-border my-4">
                         <Tabs value={mobileModalTab} onValueChange={(v) => setMobileModalTab(v as any)}>
                             <TabsList className="justify-center gap-6 bg-transparent">
                                 <TabsTrigger value="reviews" className="text-[15px] pb-3">Avaliações</TabsTrigger>

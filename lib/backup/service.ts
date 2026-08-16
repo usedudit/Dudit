@@ -175,13 +175,17 @@ function createEncryptedDumpStream(config: DatabaseBackupConfig, createdAt: Date
   let cipherFinished = false
   let finalized = false
   let dumpBytes = 0
+  const stderrChunks: Buffer[] = []
 
   sizeBytes += header.length
   output.write(header)
 
   // pg_dump can emit relation names and other database details on stderr.
   // Drain it to avoid blocking, but never forward it to application logs.
-  child.stderr?.on("data", () => undefined)
+  child.stderr?.on("data", (chunk: Buffer) => {
+    const currentSize = stderrChunks.reduce((total, value) => total + value.length, 0)
+    if (currentSize < 4096) stderrChunks.push(chunk.subarray(0, 4096 - currentSize))
+  })
 
   const fail = (error: Error) => {
     if (finalized) return
@@ -194,7 +198,8 @@ function createEncryptedDumpStream(config: DatabaseBackupConfig, createdAt: Date
     if (finalized || !cipherFinished || childExitCode === null) return
     finalized = true
     if (childExitCode !== 0) {
-      output.destroy(new Error(`pg_dump failed with exit code ${childExitCode}`))
+      const stderr = Buffer.concat(stderrChunks).toString("utf8").replace(/\s+/g, " ").trim().slice(0, 1000)
+      output.destroy(new Error(`pg_dump failed with exit code ${childExitCode}${stderr ? `: ${stderr}` : ""}`))
       return
     }
     if (dumpBytes === 0) {

@@ -27,6 +27,7 @@ import {
 import { resolveCheckoutCartLinesFresh } from "@/lib/cache/checkout-cache"
 import { fulfillMarketplaceOrder } from "@/lib/services/marketplace-checkout-fulfillment"
 import { captureError, addMonitoringBreadcrumb } from "@/lib/monitoring/sentry"
+import { getPartnerCapabilities } from "@/lib/services/partner-capabilities"
 
 export type MarketplaceCheckoutPricingSnapshot = {
   subtotal: number
@@ -701,6 +702,7 @@ export async function checkoutCartAction(
   if (!resolved.success) return { error: resolved.error }
 
   const { lines: resolvedLines, partnerId, hasProducts, hasDeliveryLines } = resolved
+  const capabilities = await getPartnerCapabilities(partnerId, { storeId })
   addMonitoringBreadcrumb({
     domain: "checkout",
     message: "started",
@@ -991,17 +993,20 @@ export async function checkoutCartAction(
     }
   }
 
-  const financeAccountId = (bestMethod as any)?.default_finance_account_id || await resolveMarketplaceOrderFinanceAccountId(
-    adminClient,
-    partnerId,
-    Boolean(useMercadoPago),
-  )
+  let financeAccountId: string | null = null
+  if (capabilities.hasFinancial) {
+    financeAccountId = (bestMethod as any)?.default_finance_account_id || await resolveMarketplaceOrderFinanceAccountId(
+      adminClient,
+      partnerId,
+      Boolean(useMercadoPago),
+    )
 
-  if (!financeAccountId) {
-    return {
-      error: useMercadoPago
-        ? "Esta loja não possui conta Mercado Pago cadastrada no financeiro. Configure em Financeiro > Contas."
-        : "Esta loja não possui conta bancária ou caixa ativa para registrar o pedido. Configure em Financeiro > Contas.",
+    if (!financeAccountId) {
+      return {
+        error: useMercadoPago
+          ? "Esta loja não possui conta Mercado Pago cadastrada no financeiro. Configure em Financeiro > Contas."
+          : "Esta loja não possui conta bancária ou caixa ativa para registrar o pedido. Configure em Financeiro > Contas.",
+      }
     }
   }
 
@@ -1287,26 +1292,28 @@ export async function checkoutCartAction(
       })),
   ]
 
-  const reserveResult = await reserveOrderInventory({
-    client: adminClient,
-    partnerId,
-    orderId: order.id,
-    items: reserveItems,
-  })
-
-  if ("error" in reserveResult) {
-    captureError(new Error(reserveResult.error), {
-      module: "stock",
-      action: "reserve_order_inventory",
-      userId: user.id,
+  if (capabilities.hasStockMovements) {
+    const reserveResult = await reserveOrderInventory({
+      client: adminClient,
       partnerId,
-      storeId: targetStoreId,
-      entityId: order.id,
-      metadata: { itemCount: reserveItems.length },
+      orderId: order.id,
+      items: reserveItems,
     })
-    await supabase.from("order_items").delete().eq("order_id", order.id)
-    await supabase.from("orders").delete().eq("id", order.id)
-    return { error: reserveResult.error }
+
+    if ("error" in reserveResult) {
+      captureError(new Error(reserveResult.error), {
+        module: "stock",
+        action: "reserve_order_inventory",
+        userId: user.id,
+        partnerId,
+        storeId: targetStoreId,
+        entityId: order.id,
+        metadata: { itemCount: reserveItems.length },
+      })
+      await supabase.from("order_items").delete().eq("order_id", order.id)
+      await supabase.from("orders").delete().eq("id", order.id)
+      return { error: reserveResult.error }
+    }
   }
 
   // SECURITY FIX (MED-02): Scope cart deletion to current user
@@ -1317,7 +1324,7 @@ export async function checkoutCartAction(
     await fulfillMarketplaceOrder(adminClient, order.id, { force: true })
   }
 
-  if (couponIdToSave) {
+  if (capabilities.hasCoupons && couponIdToSave) {
     await adminClient.from("coupon_usages").upsert(
       {
         coupon_id: couponIdToSave,
@@ -1328,7 +1335,7 @@ export async function checkoutCartAction(
     )
   }
 
-  if (pricingResult.appliedPromotionIds && pricingResult.appliedPromotionIds.length > 0) {
+  if (capabilities.hasCampaigns && pricingResult.appliedPromotionIds && pricingResult.appliedPromotionIds.length > 0) {
     await adminClient.from("promotion_usages").insert(
       pricingResult.appliedPromotionIds.map(promoId => ({
         promotion_id: promoId,

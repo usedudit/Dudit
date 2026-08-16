@@ -189,13 +189,13 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
                                 <div className="hidden md:flex items-start justify-between">
                                     <div className="flex flex-col gap-1 overflow-hidden min-w-0">
                                         <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                                            <span>{movementTitle}</span>
                                             <Badge
                                                 variant={isIn ? "green" : "red"}
                                                 className="whitespace-nowrap scale-90 shrink-0"
                                             >
                                                 {isIn ? "Entrada" : "Saída"}
                                             </Badge>
-                                            <span>{movementTitle}</span>
                                         </h1>
 
                                         <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>

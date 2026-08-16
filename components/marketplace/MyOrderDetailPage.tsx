@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { ChevronRightIcon, CreditCardIcon, XIcon, CheckCircleIcon, ClockIcon, AlertCircleIcon, MoneyIcon } from '@/lib/icons';
+import { ChevronRightIcon, CreditCardIcon, XIcon, CheckCircleIcon, ClockIcon, AlertCircleIcon, MoneyIcon, WhatsappIcon } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button, Spinner, FormSection, ListItem, Tabs, TabsList, TabsTrigger, TabsContent, Input, FormDropdown, Checkbox, Badge, DefaultModal, QuantitySelector, ThreeDotsLoader, IconPlaceholder, Tooltip, InfoCard } from '@/components/reusable';
 import ProductImagesSection from '@/components/erp/product/ProductImagesSection';
@@ -23,7 +23,7 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/ui/use-toast';
 import { formatCurrency, formatDate, formatFullDate, formatTime, formatQuantityWithUnit, formatUnitPriceWithUnit, isStoreDeleted } from '@/lib/utils';
 import { ReportReturnModal } from '@/components/marketplace/ReportReturnModal';
-import { canReportReturnToDudit, getEligibilityLabel, getSlaStatusLabel } from '@/lib/returns/policy';
+import { canReportReturnToDudit } from '@/lib/returns/policy';
 import { getReturnStatusLabel } from '@/lib/returns/types';
 
 interface MyOrderDetailPageProps {
@@ -57,7 +57,7 @@ const getFulfillmentModeLabel = (mode?: string | null) => {
     }
 };
 
-const getReturnRequestStatusConfig = (request: any) => {
+const getReturnRequestStatusConfig = (request: any): { title: string; description: string; color: "orange" | "green" | "gray" | "blue" | "red" | "yellow" | "purple" } => {
     const status = request.status;
     const isCancellation = request.request_type === "cancellation";
     const typeLabel = isCancellation ? "Cancelamento" : request.request_type === "return" ? "Devolução" : "Troca/Devolução";
@@ -67,52 +67,45 @@ const getReturnRequestStatusConfig = (request: any) => {
             return {
                 title: `${typeLabel} em análise`,
                 description: `Sua solicitação de ${typeLabel.toLowerCase()} foi enviada e está pendente de revisão pelo vendedor.`,
-                color: "bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-900/50 text-amber-800 dark:text-amber-300",
-                icon: ClockIcon
+                color: "orange",
             };
         case "UNDER_ANALYSIS":
             return {
                 title: `${typeLabel} sob análise`,
                 description: `O vendedor está analisando as informações e evidências enviadas.`,
-                color: "bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-900/50 text-amber-800 dark:text-amber-300",
-                icon: ClockIcon
+                color: "orange",
             };
         case "APPROVED":
             return {
                 title: `${typeLabel} aprovado(a)!`,
                 description: `O vendedor aceitou sua solicitação. Resolução: ${request.approved_resolution === "refund" ? "Reembolso" : request.approved_resolution === "store_credit" ? "Vale-compra" : "Troca"}.`,
-                color: "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-900/50 text-emerald-800 dark:text-emerald-300",
-                icon: CheckCircleIcon
+                color: "green",
             };
         case "REJECTED":
             return {
                 title: `${typeLabel} recusado(a)`,
-                description: `A solicitação foi recusada pelo vendedor. Observação: ${request.seller_notes || "Sem observações informadas."}`,
-                color: "bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-900/50 text-red-800 dark:text-red-300",
-                icon: XIcon
+                description: `A solicitação foi recusada pelo vendedor.`,
+                color: "red",
             };
         case "WAITING_CUSTOMER":
             return {
                 title: `Aguardando você`,
-                description: `O vendedor precisa de mais informações ou ações de sua parte. Verifique as observações.`,
-                color: "bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-900/50 text-blue-800 dark:text-blue-300",
-                icon: AlertCircleIcon
+                description: `O vendedor precisa de mais informações ou ações de sua parte.`,
+                color: "blue",
             };
         case "WAITING_ITEM_RETURN":
             return {
                 title: `Aguardando devolução do produto`,
                 description: `Por favor, envie o produto de volta conforme as orientações do vendedor.`,
-                color: "bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-900/50 text-blue-800 dark:text-blue-300",
-                icon: ClockIcon
+                color: "blue",
             };
         case "PROCESSING":
             return {
                 title: `Processando devolução`,
                 description: `O vendedor recebeu o produto e está processando o reembolso/troca.`,
-                color: "bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-900/50 text-blue-800 dark:text-blue-300",
-                icon: ClockIcon
+                color: "blue",
             };
-        case "RESOLVED":
+        case "RESOLVED": {
             let resMsg = `A solicitação de ${typeLabel.toLowerCase()} foi concluída com sucesso.`;
             if (request.refund_amount > 0) {
                 resMsg += ` Valor reembolsado: ${formatCurrency(request.refund_amount)}.`;
@@ -123,29 +116,26 @@ const getReturnRequestStatusConfig = (request: any) => {
             return {
                 title: `${typeLabel} concluído(a)`,
                 description: resMsg,
-                color: "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-900/50 text-emerald-800 dark:text-emerald-300",
-                icon: CheckCircleIcon
+                color: "green",
             };
+        }
         case "EXPIRED":
             return {
                 title: `Solicitação expirada`,
                 description: `O prazo para esta solicitação expirou.`,
-                color: "bg-gray-50 border-gray-200 dark:bg-gray-950/20 dark:border-gray-900/50 text-gray-800 dark:text-gray-300",
-                icon: XIcon
+                color: "gray",
             };
         case "ESCALATED":
             return {
                 title: `Em disputa/Moderação`,
                 description: `A solicitação foi escalada para a mediação da Dudit.`,
-                color: "bg-purple-50 border-purple-200 dark:bg-purple-950/20 dark:border-purple-900/50 text-purple-800 dark:text-purple-300",
-                icon: AlertCircleIcon
+                color: "purple",
             };
         default:
             return {
                 title: `Status: ${status}`,
                 description: `Sua solicitação está em status: ${status}`,
-                color: "bg-gray-50 border-gray-200 dark:bg-gray-950/20 dark:border-gray-900/50 text-gray-800 dark:text-gray-300",
-                icon: ClockIcon
+                color: "gray",
             };
     }
 };
@@ -325,79 +315,6 @@ const getClientTimelineSteps = (order: any) => {
     return steps;
 };
 
-const ShippingDetailsModal = ({ isOpen, onClose, order }: { isOpen: boolean; onClose: () => void; order: any }) => {
-    if (!isOpen) return null;
-    const deliveryTypeStr = order.delivery_type === "delivery" ? "Delivery" : "Retirada no local";
-    const steps = getClientTimelineSteps(order);
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="bg-white dark:bg-dark-surface w-full max-w-lg rounded-2xl shadow-xl overflow-hidden"
-            >
-                <div className="flex items-center justify-between px-6 py-4 border-b border-brand-border dark:border-dark-border">
-                    <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading">Detalhe do envio</h3>
-                    <button onClick={onClose} className="text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading">
-                        <XIcon size={24} />
-                    </button>
-                </div>
-                <div className="p-6 max-h-[80vh] overflow-y-auto custom-scrollbar">
-                    <div className="mb-8">
-                        <div className="flex items-center gap-2 mb-6">
-                            <h2 className="text-lg font-bold text-brand-dark dark:text-dark-heading">{deliveryTypeStr}</h2>
-                        </div>
-                        <div className="relative pl-2 space-y-8">
-                            <div className="absolute left-[11px] top-2 bottom-2 w-0.5 bg-gray-200 dark:bg-zinc-700"></div>
-                            {steps.map((step, idx) => (
-                                <div key={idx} className="relative flex gap-4">
-                                    <div className={`w-6 h-6 rounded-full ${step.active ? "bg-brand-dark dark:bg-white" : "bg-gray-200 dark:bg-zinc-700"} border-4 border-white dark:border-dark-surface z-10 shrink-0`}></div>
-                                    <div>
-                                        <div className={`text-sm ${step.active ? "font-bold text-brand-dark dark:text-dark-heading" : "text-brand-inactive-text"}`}>
-                                            {step.label}
-                                        </div>
-                                        {step.active && step.date && (
-                                            <div className="text-xs text-brand-inactive-text mt-1">{step.date} às {step.time}</div>
-                                        )}
-                                        {step.subLabel && (
-                                            <div className="text-xs text-brand-inactive-text mt-1 font-normal ml-1">
-                                                {Array.isArray(step.subLabel) ? (
-                                                    <ul className="list-disc pl-4 space-y-0.5">
-                                                        {step.subLabel.map((sl, slIdx) => (
-                                                            <li key={slIdx}>{sl}</li>
-                                                        ))}
-                                                    </ul>
-                                                ) : (
-                                                    <p>{step.subLabel}</p>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                    <div className="border-t border-brand-border dark:border-dark-border pt-6">
-                        <h4 className="font-bold text-brand-dark dark:text-dark-heading mb-4">Dados da entrega</h4>
-                        <div className="text-sm text-brand-inactive-text space-y-1">
-                            {order.delivery_type === "delivery" ? (
-                                <>
-                                    <p className="font-medium text-brand-dark dark:text-dark-heading whitespace-pre-line">{order.delivery_address || 'Endereço não informado'}</p>
-                                    <p className="mt-2">Recebedor: {order.customer_name || 'Usuário Dudit'}</p>
-                                </>
-                            ) : (
-                                <p className="font-medium text-brand-dark dark:text-dark-heading">Retirada diretamente com a loja parceira ({(() => { const s = Array.isArray(order.stores) ? order.stores[0] : order.stores; return s?.name || order.partners?.name || order.partners?.store_name || "Loja Parceira"; })()}).</p>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            </motion.div>
-        </div>
-    );
-};
-
 export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => {
     const router = useRouter();
     const { toast } = useToast();
@@ -422,6 +339,15 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const [returnEvidence, setReturnEvidence] = useState<(string | File)[]>([]);
     const [isBottomSummaryOpen, setIsBottomSummaryOpen] = useState(false);
     const [isConfirming, setIsConfirming] = useState(false);
+    const [sellerReturnCapabilities, setSellerReturnCapabilities] = useState<{
+        hasReturnsModule: boolean;
+        phone: string | null;
+        loaded: boolean;
+    }>({
+        hasReturnsModule: true,
+        phone: null,
+        loaded: false,
+    });
     const evidenceUploader = useR2Upload({
         endpoint: "/api/r2/returns-evidence",
         allowedTypes: ["image/jpeg", "image/png", "image/webp", "application/pdf"],
@@ -468,16 +394,23 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const [loadingAttachments, setLoadingAttachments] = useState(false);
     const [storePolicy, setStorePolicy] = useState<any>(null);
 
-    // Fetch store policy if not present in order snapshot
+    // Fetch store policy and seller return capabilities (plan & module)
     useEffect(() => {
-        if (!order?.partner_id || order.return_policy_snapshot || storePolicy) return;
+        if (!order?.partner_id) return;
         getPartnerReturnPolicyPublicAction(order.partner_id)
             .then((res) => {
-                if (res?.success && res?.data?.policy) {
-                    setStorePolicy(res.data.policy);
+                if (res?.success && res?.data) {
+                    if (res.data.policy && !storePolicy && !order.return_policy_snapshot) {
+                        setStorePolicy(res.data.policy);
+                    }
+                    setSellerReturnCapabilities({
+                        hasReturnsModule: res.data.hasReturnsModule ?? false,
+                        phone: res.data.phone || null,
+                        loaded: true,
+                    });
                 }
             })
-            .catch((err) => console.error("[MyOrderDetailPage] Error loading store policy:", err));
+            .catch((err) => console.error("[MyOrderDetailPage] Error loading store policy/capabilities:", err));
     }, [order?.partner_id, order?.return_policy_snapshot, storePolicy]);
 
     // Lazy load attachments only when the attachments tab is active
@@ -952,21 +885,110 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const submitReturnRequest = async () => {
         const productItems = Object.entries(returnItems)
             .filter(([, quantity]) => Number(quantity) > 0)
-            .map(([orderItemId, quantity]) => ({
-                order_item_id: orderItemId,
-                quantity: Number(quantity),
-                reason: returnReason,
-                condition: returnConditions[orderItemId] || "opened"
-            }));
+            .map(([orderItemId, quantity]) => {
+                const item = order.order_items?.find((i: any) => i.id === orderItemId);
+                return {
+                    order_item_id: orderItemId,
+                    name: item?.products?.name || item?.product_name || "Produto",
+                    quantity: Number(quantity),
+                    reason: returnReason,
+                    condition: returnConditions[orderItemId] || "opened"
+                };
+            });
 
         const serviceItems = Object.entries(returnServiceItems)
             .filter(([, checked]) => checked)
-            .map(([orderItemId]) => ({ order_item_id: orderItemId, quantity: 1, reason: returnReason }));
+            .map(([orderItemId]) => {
+                const item = order.order_items?.find((i: any) => i.id === orderItemId);
+                return {
+                    order_item_id: orderItemId,
+                    name: item?.services?.name || item?.product_name || "Serviço",
+                    quantity: 1,
+                    reason: returnReason,
+                    condition: "opened" as const
+                };
+            });
 
         const allItems = [...productItems, ...serviceItems];
 
         if (allItems.length === 0) {
             toast({ title: "Selecione ao menos um item", variant: "destructive" });
+            return;
+        }
+
+        // WhatsApp fallback flow when seller doesn't have the returns module or is on free plan
+        if (!sellerReturnCapabilities.hasReturnsModule) {
+            const rawPhone = sellerReturnCapabilities.phone || store?.phone || order.partners?.phone || "";
+            const cleanPhone = rawPhone.replace(/\D/g, "");
+            if (!cleanPhone) {
+                toast({
+                    title: "Telefone não disponível",
+                    description: "O vendedor não possui um telefone de contato cadastrado para WhatsApp.",
+                    variant: "destructive",
+                });
+                return;
+            }
+
+            const phoneWithCountry = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
+            const resolutionLabel = returnResolution === "exchange" ? "Troca" : returnResolution === "store_credit" ? "Vale-compra" : "Devolução / Reembolso";
+            const reasonLabels: Record<string, string> = {
+                wrong_item: "Item errado",
+                defective: "Item com defeito",
+                damaged: "Item danificado",
+                different_from_description: "Diferente da descrição",
+                missing_parts: "Faltam partes",
+                arrived_late: "Chegou atrasado",
+                changed_mind: "Mudou de ideia",
+                other: "Outro",
+            };
+            const conditionLabels: Record<string, string> = {
+                opened: "Aberto",
+                sealed: "Lacrado",
+                damaged: "Danificado",
+            };
+
+            const lines: string[] = [
+                `*Solicitação de ${resolutionLabel}* 📦`,
+                "",
+                `Olá! Gostaria de solicitar ${resolutionLabel.toLowerCase()} para itens do meu pedido realizado na Dudit.`,
+                "",
+                `*📋 Dados do Pedido:*`,
+                `• *Pedido:* #${orderNumber}`,
+                `• *Cliente:* ${order.customer_name || 'Cliente'}`,
+                `• *Data:* ${dateStrFull}`,
+                "",
+                `*🎯 Resolução desejada:* ${resolutionLabel}`,
+                `*📌 Motivo:* ${reasonLabels[returnReason] || returnReason}`,
+                "",
+                `*📦 Itens para ${resolutionLabel.toLowerCase()}:*`,
+            ];
+
+            productItems.forEach((p) => {
+                const cond = conditionLabels[p.condition] || p.condition;
+                lines.push(`• ${p.name} (x${p.quantity}) - Condição: ${cond}`);
+            });
+
+            serviceItems.forEach((s) => {
+                lines.push(`• ${s.name} (Serviço)`);
+            });
+
+            if (returnMessage.trim()) {
+                lines.push("");
+                lines.push(`*💬 Mensagem / Observações:*`);
+                lines.push(`"${returnMessage.trim()}"`);
+            }
+
+            lines.push("");
+            lines.push(`📸 _Obs: Caso haja fotos ou vídeos do ocorrido, enviarei em seguida aqui na conversa._`);
+
+            const whatsappUrl = `https://wa.me/${phoneWithCountry}?text=${encodeURIComponent(lines.join("\n"))}`;
+            window.open(whatsappUrl, "_blank");
+
+            toast({
+                title: "Redirecionando para o WhatsApp",
+                description: "Abrindo o WhatsApp do vendedor para prosseguir com sua solicitação.",
+            });
+            setIsReturnModalOpen(false);
             return;
         }
 
@@ -994,7 +1016,12 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                 resolution: returnResolution,
                 reason: returnReason,
                 message: returnMessage,
-                items: allItems,
+                items: allItems.map((item) => ({
+                    order_item_id: item.order_item_id,
+                    quantity: item.quantity,
+                    reason: item.reason,
+                    condition: item.condition || "opened",
+                })),
                 evidence: uploadedEvidence,
                 idempotencyKey: `marketplace:${order.id}:${Date.now()}`,
             });
@@ -1145,54 +1172,44 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
     const renderReturnRequestCard = () => {
         if (!activeReturnRequest || !returnStatusCfg) return null;
+        const canReport = canReportReturnToDudit({
+            status: activeReturnRequest.status,
+            slaStatus: activeReturnRequest.sla_status,
+            reportedToDuditAt: activeReturnRequest.reported_to_dudit_at,
+        });
+
         return (
-            <div className={`p-6 rounded-2xl border ${returnStatusCfg.color} flex items-start gap-4 shadow-none`}>
-                <div className="w-10 h-10 rounded-full bg-current/10 flex items-center justify-center shrink-0 font-bold">
-                    <returnStatusCfg.icon className="w-5 h-5" />
-                </div>
-                <div className="flex-1">
-                    <h4 className="font-bold text-base lg:text-lg leading-snug">{returnStatusCfg.title}</h4>
-                    <p className="text-sm mt-1.5 opacity-90 leading-relaxed">{returnStatusCfg.description}</p>
-                    {activeReturnRequest.seller_notes && (
-                        <div className="mt-4 pt-3 border-t border-current/20 text-sm">
-                            <span className="font-bold">Observações do vendedor:</span> {activeReturnRequest.seller_notes}
-                        </div>
-                    )}
-                    <div className="mt-4 pt-3 border-t border-current/20 text-sm space-y-1">
-                        {activeReturnRequest.eligibility_status && (
-                            <div><span className="font-bold">Elegibilidade:</span> {getEligibilityLabel(activeReturnRequest.eligibility_status)}</div>
+            <InfoCard
+                title={returnStatusCfg.title}
+                color={returnStatusCfg.color}
+                message={
+                    <span className="space-y-1 block">
+                        <span>{returnStatusCfg.description}</span>
+                        {activeReturnRequest.seller_notes && (
+                            <span className="block mt-1 font-medium">
+                                Observações do vendedor: {activeReturnRequest.seller_notes}
+                            </span>
                         )}
-                        {activeReturnRequest.sla_status && (
-                            <div><span className="font-bold">SLA:</span> {getSlaStatusLabel(activeReturnRequest.sla_status)}
-                                {activeReturnRequest.sla_due_at && ` - prazo ${formatDate(activeReturnRequest.sla_due_at)}`}
-                            </div>
+                        {activeReturnRequest.reported_to_dudit_at && (
+                            <span className="block mt-1 text-xs opacity-80">
+                                Reporte enviado à Dudit em {formatDate(activeReturnRequest.reported_to_dudit_at)}.
+                            </span>
                         )}
-                        {(activeReturnRequest.policy_snapshot || order.return_policy_snapshot) && (
-                            <div className="text-xs opacity-80 mt-2">
-                                Política aplicada: prazo comercial de{' '}
-                                {(activeReturnRequest.policy_snapshot || order.return_policy_snapshot)?.commercial?.commercial_deadline_days ?? 30} dias
-                                (snapshot da venda)
-                            </div>
-                        )}
-                    </div>
-                    {canReportReturnToDudit({
-                        status: activeReturnRequest.status,
-                        slaStatus: activeReturnRequest.sla_status,
-                        reportedToDuditAt: activeReturnRequest.reported_to_dudit_at,
-                    }) && (
-                            <Button
-                                variant="outline"
-                                className="mt-4 w-full sm:w-auto"
-                                onClick={() => setReportReturnOpen(true)}
-                            >
-                                Reportar à Dudit
-                            </Button>
-                        )}
-                    {activeReturnRequest.reported_to_dudit_at && (
-                        <p className="text-xs mt-2 opacity-80">Reporte enviado em {formatDate(activeReturnRequest.reported_to_dudit_at)}</p>
-                    )}
-                </div>
-            </div>
+                    </span>
+                }
+                rightElement={
+                    canReport ? (
+                        <Button
+                            variant="link"
+                            size="sm"
+                            className="p-0 h-auto whitespace-nowrap"
+                            onClick={() => setReportReturnOpen(true)}
+                        >
+                            Reportar à Dudit
+                        </Button>
+                    ) : undefined
+                }
+            />
         );
     };
 
@@ -1523,8 +1540,6 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                             </div>
                                             {/* Mobile/Tablet Actions / Buttons */}
                                             <div className="block lg:hidden space-y-4 pt-4">
-                                                {renderFulfillmentButtons()}
-
                                                 {canCancelOrder && (
                                                     <Button
                                                         variant="outlinered"
@@ -1541,10 +1556,10 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                 )}
 
                                                 {!canCancelOrder && !showReturnRequestButton && order.situation !== "cancelled" && !hasActiveReturn && (
-                                                    <div className="rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/60 dark:bg-dark-border/30 p-4 text-sm text-brand-inactive-text dark:text-dark-body text-center">
-                                                        Este pedido já está sendo processado. Assim que sair para entrega, você poderá solicitar devolução, troca ou reembolso.
-                                                    </div>
+                                                    <InfoCard message="Este pedido já está sendo processado. Assim que sair para entrega, você poderá solicitar devolução, troca ou reembolso." color="gray" />
                                                 )}
+
+                                                {renderFulfillmentButtons()}
 
                                                 {showReturnRequestButton && (
                                                     <>
@@ -1592,8 +1607,6 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
                                     {/* Desktop Actions / Buttons */}
                                     <div className="space-y-4 pt-4">
-                                        {renderFulfillmentButtons()}
-
                                         {canCancelOrder && (
                                             <Button
                                                 variant="outlinered"
@@ -1610,10 +1623,10 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                         )}
 
                                         {!canCancelOrder && !showReturnRequestButton && order.situation !== "cancelled" && !hasActiveReturn && (
-                                            <div className="rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/60 dark:bg-dark-border/30 p-4 text-sm text-brand-inactive-text dark:text-dark-body text-center">
-                                                Este pedido já está sendo processado. Assim que sair para entrega, você poderá solicitar devolução, troca ou reembolso.
-                                            </div>
+                                            <InfoCard message="Este pedido já está sendo processado. Assim que sair para entrega, você poderá solicitar devolução, troca ou reembolso." color="gray" />
                                         )}
+
+                                        {renderFulfillmentButtons()}
 
                                         {showReturnRequestButton && (
                                             <>
@@ -1691,12 +1704,6 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                     </Tabs>
                 </div>
 
-                <AnimatePresence>
-                    {isShippingModalOpen && (
-                        <ShippingDetailsModal isOpen={isShippingModalOpen} onClose={() => setIsShippingModalOpen(false)} order={order} />
-                    )}
-                </AnimatePresence>
-
                 {pixData && (
                     <PaymentWrapper
                         open={showPixModal}
@@ -1762,9 +1769,19 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                     footer={
                         <div className="flex justify-end gap-3 w-full">
                             <Button variant="outline" onClick={() => setIsReturnModalOpen(false)} disabled={isSubmittingReturn}>Cancelar</Button>
-                            <Button onClick={submitReturnRequest} disabled={isSubmittingReturn}>
-                                {isSubmittingReturn ? "Enviando..." : "Enviar solicitação"}
-                            </Button>
+                            {!sellerReturnCapabilities.hasReturnsModule ? (
+                                <Button
+                                    onClick={submitReturnRequest}
+                                    className="bg-[#25D366] hover:bg-[#1EBE5D] text-white font-bold flex items-center gap-2 border-0 shadow-sm"
+                                >
+                                    <WhatsappIcon size={18} className="fill-white" />
+                                    Continuar no WhatsApp
+                                </Button>
+                            ) : (
+                                <Button onClick={submitReturnRequest} disabled={isSubmittingReturn}>
+                                    {isSubmittingReturn ? "Enviando..." : "Enviar solicitação"}
+                                </Button>
+                            )}
                         </div>
                     }
                 >
@@ -1916,19 +1933,27 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                             showCharacterCount
                         />
 
-                        <div className="space-y-3">
-                            <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading">Evidências</h4>
-                            <div className="max-w-full overflow-x-auto">
-                                <ProductImagesSection
-                                    images={returnEvidence}
-                                    onImageUpload={handleEvidenceUpload}
-                                    onRemoveImage={handleRemoveEvidence}
-                                    onSetPrimaryImage={() => { }}
-                                    isEditing={true}
-                                />
+                        {!sellerReturnCapabilities.hasReturnsModule ? (
+                            <InfoCard
+                                color="blue"
+                                title="Fotos e evidências"
+                                message="Esta loja realiza o atendimento de trocas e devoluções diretamente pelo WhatsApp. Se você possuir fotos ou vídeos do item, poderá enviá-los diretamente na conversa com o vendedor logo após abrir o aplicativo."
+                            />
+                        ) : (
+                            <div className="space-y-3">
+                                <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading">Evidências</h4>
+                                <div className="max-w-full overflow-x-auto">
+                                    <ProductImagesSection
+                                        images={returnEvidence}
+                                        onImageUpload={handleEvidenceUpload}
+                                        onRemoveImage={handleRemoveEvidence}
+                                        onSetPrimaryImage={() => { }}
+                                        isEditing={true}
+                                    />
+                                </div>
+                                <p className="text-xs text-brand-inactive-text font-medium">{returnEvidence.length}/5 arquivos</p>
                             </div>
-                            <p className="text-xs text-brand-inactive-text font-medium">{returnEvidence.length}/5 arquivos</p>
-                        </div>
+                        )}
                     </div>
                 </DefaultModal>
 

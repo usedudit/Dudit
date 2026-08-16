@@ -2062,7 +2062,7 @@ export const AppointmentSheet = ({
                                         <div className="rounded-xl border border-brand-border dark:border-dark-border p-3">
                                             <p className="text-brand-inactive-text dark:text-dark-body font-semibold mb-1">Venda</p>
                                             {displayOrderNumber ? (
-                                                <Button variant="link" onClick={handleViewSale}>
+                                                <Button variant="link" className="text-sm" onClick={handleViewSale}>
                                                     #{displayOrderNumber}
                                                 </Button>
                                             ) : (

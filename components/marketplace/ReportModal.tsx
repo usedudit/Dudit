@@ -105,15 +105,6 @@ export function ReportModal({
             maxWidth="md"
         >
             <div className="flex flex-col relative">
-                {/* Close X Button - Desktop Only */}
-                <button
-                    onClick={onClose}
-                    className="absolute top-3 right-3 z-10 w-10 h-10 rounded-full bg-black/5 hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/20 flex items-center justify-center text-brand-dark dark:text-dark-heading transition-colors hidden md:flex"
-                    title="Fechar"
-                >
-                    <XIcon size={18} />
-                </button>
-
                 {/* Header with Dual Squares */}
                 <div className="h-[200px] rounded-2xl flex items-end justify-center mb-8 relative overflow-hidden bg-[#eaf7f0]">
                     <img

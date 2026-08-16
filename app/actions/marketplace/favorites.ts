@@ -214,7 +214,7 @@ export async function getUserFavoritesAction(params?: {
                             stock_available, stock_quantity,
                             category_id, category:product_categories!category_id(name),
                             partners(id),
-                            stores!inner(id, name, description, logo_url, banner_url, phone, is_showcase_active, addresses!store_id!left(city, state)),
+                            stores!inner(id, name, description, logo_url, banner_url, phone, is_showcase_active, addresses!store_id!left(city, state, neighborhood)),
                             product_variants(variant_options, price_adjustment, is_active),
                             show_price_in_store
                         `)
@@ -230,7 +230,7 @@ export async function getUserFavoritesAction(params?: {
                         .select(`
                             id, name, price, images, rating, is_active, billing_unit, price_type,
                             partners(id),
-                            stores!inner(id, name, description, logo_url, banner_url, phone, is_showcase_active, addresses!store_id!left(city, state)),
+                            stores!inner(id, name, description, logo_url, banner_url, phone, is_showcase_active, addresses!store_id!left(city, state, neighborhood)),
                             show_price_in_store
                         `)
                         .in("id", serviceIds)
@@ -262,6 +262,7 @@ export async function getUserFavoritesAction(params?: {
                 const storeImage = rawStore?.logo_url || rawPartner?.store_image_url
                 const storeCity = rawStore?.addresses?.[0]?.city || rawPartner?.addresses?.[0]?.city || null
                 const storeState = rawStore?.addresses?.[0]?.state || rawPartner?.addresses?.[0]?.state || null
+                const storeNeighborhood = rawStore?.addresses?.[0]?.neighborhood || rawPartner?.addresses?.[0]?.neighborhood || null
                 const partner = rawPartner
                     ? {
                         ...rawPartner,
@@ -271,6 +272,7 @@ export async function getUserFavoritesAction(params?: {
                         store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
                         city: storeCity,
                         state: storeState,
+                        neighborhood: storeNeighborhood,
                     }
                     : null
 
@@ -315,6 +317,7 @@ export async function getUserFavoritesAction(params?: {
                 const storeImage = rawStore?.logo_url || rawPartner?.store_image_url
                 const storeCity = rawStore?.addresses?.[0]?.city || rawPartner?.addresses?.[0]?.city || null
                 const storeState = rawStore?.addresses?.[0]?.state || rawPartner?.addresses?.[0]?.state || null
+                const storeNeighborhood = rawStore?.addresses?.[0]?.neighborhood || rawPartner?.addresses?.[0]?.neighborhood || null
                 const partner = rawPartner
                     ? {
                         ...rawPartner,
@@ -324,6 +327,7 @@ export async function getUserFavoritesAction(params?: {
                         store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
                         city: storeCity,
                         state: storeState,
+                        neighborhood: storeNeighborhood,
                     }
                     : null
 

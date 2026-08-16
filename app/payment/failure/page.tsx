@@ -43,7 +43,7 @@ export default async function PaymentFailurePage({
 
           <div className="flex gap-3 justify-center pt-4">
             <Button asChild>
-              <Link href="/cart" prefetch={false}>Voltar à Sacola</Link>
+              <Link href="/sacola" prefetch={false}>Voltar à Sacola</Link>
             </Button>
             <Button asChild variant="outline">
               <Link href="/marketplace" prefetch={false}>Continuar Comprando</Link>

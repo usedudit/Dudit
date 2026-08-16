@@ -28,6 +28,9 @@ import {
     getOrderSubtotalOriginal,
 } from "@/lib/returns/calculations"
 import { captureError, addMonitoringBreadcrumb } from "@/lib/monitoring/sentry"
+import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
+import { normalizeBusinessInfo } from "@/lib/business-info"
+import { isSystemResourceActive } from "@/lib/system-resources"
 
 // ─── Segurança: Constantes de Reembolso ────────────────────────────────────
 
@@ -651,6 +654,18 @@ export async function createMarketplaceReturnRequestAction(input: Omit<z.infer<t
             throw new Error("Não é permitido criar solicitação para pedidos não pagos.")
         }
 
+        // Check partner plan and returns module capability
+        const plan = await getPartnerPlan(order.partner_id)
+        const [{ data: partnerRow }, { data: storeRow }] = await Promise.all([
+            supabase.from("partners").select("business_info").eq("id", order.partner_id).maybeSingle(),
+            supabase.from("stores").select("business_info").eq("partner_id", order.partner_id).order("is_headquarters", { ascending: false }).limit(1).maybeSingle(),
+        ])
+        const businessInfo = normalizeBusinessInfo(storeRow?.business_info || partnerRow?.business_info)
+        const hasReturnsModule = hasMinimumPlan(plan?.slug || "free", "crescer") && isSystemResourceActive(businessInfo, "returns")
+        if (!hasReturnsModule) {
+            throw new Error("Esta loja gerencia trocas e devoluções diretamente via WhatsApp.")
+        }
+
         // Fetch order items to validate item types for exchange
         const { data: orderItems, error: itemsError } = await supabase
             .from("order_items")
@@ -658,8 +673,6 @@ export async function createMarketplaceReturnRequestAction(input: Omit<z.infer<t
             .eq("order_id", base.orderId)
 
         if (itemsError || !orderItems) throw new Error("Erro ao buscar itens do pedido")
-
-        // Validate quantities on the server-side
         const remainingQuantities = await getReturnableQuantities(base.orderId)
         for (const item of base.items) {
             const maxQty = remainingQuantities[item.order_item_id] ?? 0
@@ -748,7 +761,7 @@ export async function createMarketplaceReturnRequestAction(input: Omit<z.infer<t
                 await createNotificationsForUsers(teamUserIds, (userId) => ({
                     userId,
                     type: "order_refunded",
-                    title: "Nova solicitação de devolução",
+                    title: "🔄️ Nova solicitação de devolução",
                     message: `O cliente solicitou devolução/troca para o pedido #${orderNum}.`,
                     entityType: "order",
                     entityId: order.id,

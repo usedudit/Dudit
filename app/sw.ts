@@ -62,7 +62,7 @@ const UNCACHEABLE_PREFIXES = [
   "/api",
   "/auth",
   "/ddt-admin",
-  "/cart",
+  "/sacola",
   "/pedidos",
   "/perfil",
   "/checkout",

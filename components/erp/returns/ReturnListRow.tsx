@@ -24,7 +24,7 @@ function getAlignClass(align?: string) {
   return "text-left"
 }
 
-function getJustifyClass(align?: string) {
+const getJustifyClass = (align?: string) => {
   if (align === "center") return "justify-center"
   if (align === "right") return "justify-end"
   return "justify-start"
@@ -123,7 +123,7 @@ const ReturnListRow = React.memo(({ returnRequest, columns, onDetails, onEdit, o
       case "actions":
         return (
           <div className="flex justify-center action-btn" onClick={(e) => e.stopPropagation()}>
-            <ActionsDropdown 
+            <ActionsDropdown
               onPrint={() => onPrint?.(returnRequest)}
               onEdit={canManage && !["RESOLVED", "REJECTED", "EXPIRED"].includes(returnRequest.status) ? () => onEdit?.(returnRequest) : undefined}
             />

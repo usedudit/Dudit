@@ -1318,6 +1318,18 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             notifyError("Cupom removido por ser específico para um ou mais clientes.")
         }
         setSelectedCustomer(val)
+        if (val?.addresses?.[0]) {
+            const addr = val.addresses[0]
+            setCep(String(addr.zipCode || ""))
+            setStreet(String(addr.street || ""))
+            const isNoNum = addr.number === "S/N" || !String(addr.number || "").trim()
+            setNumber(isNoNum ? "" : String(addr.number || ""))
+            setNoNumber(isNoNum)
+            setComplement(String(addr.complement || ""))
+            setNeighborhood(String(addr.neighborhood || ""))
+            setCity(String(addr.city || ""))
+            setUf(String(addr.state || "SP"))
+        }
     }, [couponId, couponPricingData, notifyError])
 
     const handleApplyCoupon = async (directCode?: string) => {
@@ -1977,20 +1989,33 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                             })
                             setIsShippingSheetOpen(true)
                         }
+                        const primaryAddr = normalized?.addresses?.[0]
+                        if (primaryAddr) {
+                            setCep(String(primaryAddr.zipCode || ""))
+                            setStreet(String(primaryAddr.street || ""))
+                            const isNoNum = primaryAddr.number === "S/N" || !String(primaryAddr.number || "").trim()
+                            setNumber(isNoNum ? "" : String(primaryAddr.number || ""))
+                            setNoNumber(isNoNum)
+                            setComplement(String(primaryAddr.complement || ""))
+                            setNeighborhood(String(primaryAddr.neighborhood || ""))
+                            setCity(String(primaryAddr.city || ""))
+                            setUf(String(primaryAddr.state || "SP"))
+                        }
                         getPOSCustomerDetailsAction({ partnerId, customerId: customer.id }).then(res => {
                             if (!res.success || !res.data) return
                             setShippingCustomerDetails(res.data)
                             setSelectedCustomer(normalizeCustomerForCard(res.data))
-                            if (deliveryMethod === "delivery" && res.data?.address) {
+                            if (res.data?.address) {
                                 const addr = res.data.address
                                 setCep(String(addr.zipCode || ""))
                                 setStreet(String(addr.street || ""))
-                                setNumber(String(addr.number || ""))
+                                const isNoNum = addr.number === "S/N" || !String(addr.number || "").trim()
+                                setNumber(isNoNum ? "" : String(addr.number || ""))
+                                setNoNumber(isNoNum)
                                 setComplement(String(addr.complement || ""))
                                 setNeighborhood(String(addr.neighborhood || ""))
                                 setCity(String(addr.city || ""))
                                 setUf(String(addr.state || "SP"))
-                                setNoNumber(!String(addr.number || "").trim())
                             }
                         })
                     }}
@@ -2348,13 +2373,44 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                             throw new Error(result.error || "Não foi possível cadastrar o endereço.")
                         }
                         const details = await getPOSCustomerDetailsAction({ partnerId, customerId: payload.customerId })
-                        if (details.success && details.data) setShippingCustomerDetails(details.data)
+                        if (details.success && details.data) {
+                            setShippingCustomerDetails(details.data)
+                            setSelectedCustomer((prev: any) => normalizeCustomerForCard({ ...prev, ...details.data }))
+                        }
+
+                        // Sincroniza diretamente os campos de endereço na aba de endereço da venda
+                        if (payload.address) {
+                            setCep(payload.address.zipCode || "")
+                            setStreet(payload.address.street || "")
+                            const isNoNum = payload.address.number === "S/N" || !String(payload.address.number || "").trim()
+                            setNumber(isNoNum ? "" : payload.address.number || "")
+                            setNoNumber(isNoNum)
+                            setComplement(payload.address.complement || "")
+                            setNeighborhood(payload.address.neighborhood || "")
+                            setCity(payload.address.city || "")
+                            setUf(payload.address.state || "SP")
+                            setDeliveryMethod("delivery")
+                        }
+
                         notifySuccess("Endereço cadastrado com sucesso.")
                     }}
                     onApply={({ shippingFee: fee, isCustom, breakdown }: any) => {
                         setShippingFee(String(Math.max(0, Number(fee || 0))))
                         setIsCustomShipping(!!isCustom)
                         setDeliveryBreakdown(breakdown || null)
+                        setDeliveryMethod("delivery")
+                        if (shippingCustomerDetails?.address) {
+                            const addr = shippingCustomerDetails.address
+                            setCep(String(addr.zipCode || ""))
+                            setStreet(String(addr.street || ""))
+                            const isNoNum = addr.number === "S/N" || !String(addr.number || "").trim()
+                            setNumber(isNoNum ? "" : String(addr.number || ""))
+                            setNoNumber(isNoNum)
+                            setComplement(String(addr.complement || ""))
+                            setNeighborhood(String(addr.neighborhood || ""))
+                            setCity(String(addr.city || ""))
+                            setUf(String(addr.state || "SP"))
+                        }
                         setIsShippingSheetOpen(false)
                     }}
                 />

@@ -70,7 +70,7 @@ export async function middleware(request: NextRequest) {
   const isSystemPath =
     pathname === "/" ||
     PUBLIC_PATHS.filter(p => p !== "/").some(p => pathname.startsWith(p)) ||
-    ["/institucional", "/erp", "/account", "/auth", "/cart", "/perfil", "/pedidos", "/api", "/dashboard", "/payment", "/checkout", "/ddt-admin", "/vitrine", "/produto", "/assinaturas", "/colecoes", "/favoritos", "/select-erp"].some(p => pathname.startsWith(p));
+    ["/institucional", "/erp", "/account", "/auth", "/sacola", "/perfil", "/pedidos", "/api", "/dashboard", "/payment", "/checkout", "/ddt-admin", "/vitrine", "/produto", "/assinaturas", "/colecoes", "/favoritos", "/select-erp"].some(p => pathname.startsWith(p));
 
   // Apenas intercepta paths de 1 ou 2 segmentos que não são de sistema
   if (!isSystemPath && (segments.length === 1 || segments.length === 2)) {
@@ -386,7 +386,7 @@ export async function middleware(request: NextRequest) {
   // 4. CACHE-CONTROL HEADERS (Route-aware) - Must be set BEFORE auth block
   // Public marketplace pages: edge-cacheable with stale-while-revalidate
   // Private/auth pages: never cached
-  const PRIVATE_PREFIXES = ["/erp", "/account", "/auth", "/cart", "/perfil", "/pedidos", "/api", "/dashboard", "/payment", "/ddt-admin", "/assinaturas", "/colecoes", "/favoritos"]
+  const PRIVATE_PREFIXES = ["/erp", "/account", "/auth", "/sacola", "/perfil", "/pedidos", "/api", "/dashboard", "/payment", "/ddt-admin", "/assinaturas", "/colecoes", "/favoritos"]
   const PUBLIC_CACHEABLE_PATTERNS = ["/services", "/partners", "/produto"]
 
   const isPrivatePage = PRIVATE_PREFIXES.some(prefix => pathname.startsWith(prefix))
@@ -403,7 +403,7 @@ export async function middleware(request: NextRequest) {
   // 5. SUPABASE AUTH (ONLY for routes that need it)
   // CRITICAL: Skip auth for public cacheable pages to avoid Set-Cookie headers
   // that would prevent Cloudflare from caching the response.
-  const NEEDS_AUTH_CHECK = ["/erp", "/account", "/perfil", "/pedidos", "/auth/login", "/select-erp", "/ddt-admin", "/cart", "/banned", "/checkout"]
+  const NEEDS_AUTH_CHECK = ["/erp", "/account", "/perfil", "/pedidos", "/auth/login", "/select-erp", "/ddt-admin", "/sacola", "/banned", "/checkout"]
   const isPost = request.method === "POST"
   const needsAuthCheck = !isServerAction && (isPost || NEEDS_AUTH_CHECK.some(prefix => pathname === prefix || pathname.startsWith(prefix + "/")))
 
@@ -474,7 +474,7 @@ export async function middleware(request: NextRequest) {
           // Only query account_deletions if the flag cookie exists - avoids an unnecessary
           // DB call on every request for the 99.99% of users who never request deletion.
           const hasDeletionFlag = request.cookies.get("x-account-deleting")?.value === "true"
-          const needsUserDeletionCheck = hasDeletionFlag && (isProtected || pathname.startsWith("/cart") || pathname.startsWith("/checkout"))
+          const needsUserDeletionCheck = hasDeletionFlag && (isProtected || pathname.startsWith("/sacola") || pathname.startsWith("/checkout"))
           const needsPartnerDeletionCheck = hasDeletionFlag && needsPartnerCheck
 
           // Launch all queries in parallel

@@ -278,6 +278,10 @@ export async function applySaleToGoals(params: {
   createdByUserId?: string | null
   accountId?: string | null
 }) {
+  const { getPartnerCapabilities } = await import("@/lib/services/partner-capabilities")
+  const capabilities = await getPartnerCapabilities(params.partnerId)
+  if (!capabilities.hasGoals) return
+
   const amount = money(Math.max(0, Number(params.saleAmount || 0)))
   if (amount <= 0.009) return
   const goals = await getActiveGoalsForSeller({ ...params, activityType: "sales" })
@@ -460,6 +464,10 @@ export async function reverseSaleFromGoals(params: {
   createdByUserId?: string | null
   accountId?: string | null
 }) {
+  const { getPartnerCapabilities } = await import("@/lib/services/partner-capabilities")
+  const capabilities = await getPartnerCapabilities(params.partnerId)
+  if (!capabilities.hasGoals) return
+
   const amount = money(Math.max(0, Number(params.saleAmount || 0)))
   if (amount <= 0.009) return
   const goals = await getActiveGoalsForSeller({ ...params, activityType: "sales" })

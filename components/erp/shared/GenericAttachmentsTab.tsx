@@ -543,25 +543,18 @@ export function GenericAttachmentsTab({
 
     if (!advancedEnabled) {
         return (
-            <div className="flex flex-col items-center justify-center text-center py-12 px-6 bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border space-y-4">
-                <div className="w-14 h-14 rounded-full bg-brand-primary/10 flex items-center justify-center">
-                    <FileIcon className="w-7 h-7 text-brand-primary" />
-                </div>
-                <div className="max-w-md space-y-1.5">
-                    <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading">
-                        Aba de Anexos disponível nos planos Crescer e Escalar
-                    </h3>
-                    <p className="text-xs text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                        Você está no plano gratuito. Faça upgrade para o plano Crescer (até 5 imagens) ou Escalar (até 15 imagens) para liberar o gerenciamento de anexos.
-                    </p>
-                </div>
-                <Button
-                    type="button"
-                    onClick={() => openPlanUpgrade("crescer")}
-                    className="gap-2"
-                >
-                    <span>Fazer Upgrade de Plano</span>
-                </Button>
+            <div className="flex flex-col items-center justify-center text-center min-h-[400px] px-4">
+                <IconPlaceholder
+                    placeholderType="image"
+                    imageSrc="https://img.dudit.com.br/static/mascots/PlanoVender.png"
+                    imageAlt="Recurso bloqueado"
+                    title="Anexos"
+                    subtitle="Adição de anexos disponível nos planos Crescer e Escalar."
+                    itemButton={{
+                        text: "Fazer upgrade",
+                        action: () => openPlanUpgrade("crescer")
+                    }}
+                />
             </div>
         )
     }

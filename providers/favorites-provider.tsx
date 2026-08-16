@@ -60,21 +60,17 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
             }
         }
 
-        const id = setTimeout(() => {
-            getUserFavoriteIdsAction().then((result) => {
-                if (result.success) {
-                    const rawKeys = result.favorites.map((f) => makeKey(f.item_id, f.item_type))
-                    const keys = new Set(rawKeys)
-                    setFavoriteKeys(keys)
-                    if (typeof sessionStorage !== "undefined") {
-                        sessionStorage.setItem(cacheKey, JSON.stringify(rawKeys))
-                    }
+        getUserFavoriteIdsAction().then((result) => {
+            if (result.success) {
+                const rawKeys = result.favorites.map((f) => makeKey(f.item_id, f.item_type))
+                const keys = new Set(rawKeys)
+                setFavoriteKeys(keys)
+                if (typeof sessionStorage !== "undefined") {
+                    sessionStorage.setItem(cacheKey, JSON.stringify(rawKeys))
                 }
-                setIsLoaded(true)
-            })
-        }, 600)
-
-        return () => clearTimeout(id)
+            }
+            setIsLoaded(true)
+        })
     }, [user?.id])
 
     const isFavorited = useCallback(
