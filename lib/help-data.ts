@@ -1490,7 +1490,6 @@ Legenda: Inicie o cadastro de uma nova meta.
 - **Nome da meta** - Ex: "Meta de julho", "Desafio de vendas".
 - **Período** - **Semanal** (seg a domingo) ou **Mensal** (do dia 1 ao último dia do mês).
 - **Datas de início e fim** - Defina o intervalo da meta.
-- **Tipo de meta** - **Vendas** (valor de produtos), **Ordens de serviço** ou **Ambos**.
 
 **A quem se aplica:**
 - **Todos os vendedores** - A meta vale para a equipe toda, e o progresso é coletivo.

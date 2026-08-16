@@ -23,6 +23,7 @@ import FilterChip from "@/components/reusable/FilterChip"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import { useToast } from "@/hooks/use-toast"
 import { useMediaQuery } from "@/components/erp/hooks"
+import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
 import { useEntityPage } from "@/hooks/use-entity-page"
 import {
   listCampaignsAction,
@@ -503,25 +504,24 @@ export default function PromotionsPage({
     <>
       <AnimatePresence mode="wait">
         {entityState.isOpen && formMode ? (
-          isLoadingDetail ? (
-            <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
-              <ThreeDotsLoader />
-            </div>
+          (formMode !== 'add' && (isLoadingDetail || !formCampaign)) ? (
+            <ERPDetailLoading key="loading-promo" />
           ) : (
-            <PromotionFormPage
-              key="form"
-              partnerId={partnerId}
-              mode={formMode as any}
-              campaign={formCampaign}
-              scopeData={scopeData}
-              promotions={promotions}
-              storeId={storeId}
-              onBack={() => {
-                closeEntity()
-                afterMutation()
-                refreshPromotions()
-              }}
-            />
+            <FadeIn key="form" className="w-full h-full">
+              <PromotionFormPage
+                partnerId={partnerId}
+                mode={formMode as any}
+                campaign={formCampaign}
+                scopeData={scopeData}
+                promotions={promotions}
+                storeId={storeId}
+                onBack={() => {
+                  closeEntity()
+                  afterMutation()
+                  refreshPromotions()
+                }}
+              />
+            </FadeIn>
           )
         ) : (
           <FadeIn key="list" className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">

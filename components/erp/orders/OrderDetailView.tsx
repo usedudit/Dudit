@@ -28,6 +28,7 @@ import {
     Pagination,
     Tooltip
 } from "@/components/reusable"
+import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
 import { usePermissions } from "@/lib/permission-context"
 import { useSidebar } from "@/lib/sidebar-context"
 import { getOrderDetailsAction, getOrderHistoryAction } from "@/app/actions/erp/orders"
@@ -186,8 +187,9 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
-    const [order, setOrder] = useState<any>(initialOrder || null)
-    const [loading, setLoading] = useState(!initialOrder)
+    const isFullOrder = Boolean(initialOrder && (initialOrder.order_items || initialOrder.items) && !initialOrder.__partial)
+    const [order, setOrder] = useState<any>(isFullOrder ? initialOrder : null)
+    const [loading, setLoading] = useState(!isFullOrder)
     const [activeTab, setActiveTab] = useState("summary")
     const [historyEntries, setHistoryEntries] = useState<any[]>([])
     const [historyLoading, setHistoryLoading] = useState(false)
@@ -239,6 +241,10 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
         })
         return () => setHeaderOverride(null)
     }, [order?.order_number, handleBack, setHeaderOverride])
+
+    useEffect(() => {
+        setItemPage(1)
+    }, [order?.order_items?.length])
 
     const handleScroll = useCallback(() => {
         if (scrollContainerRef.current) {
@@ -331,9 +337,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
         loadHistory()
     }, [activeTab, historyLoaded, orderId, partnerId, notifyError])
 
-    if (loading) return <div className="flex h-[calc(100vh-65px)] w-full items-center justify-center">
-        <ThreeDotsLoader />
-    </div>
+    if (loading) return <ERPDetailLoading key="loading-order-view" />
 
     if (!order) return null
 
@@ -489,7 +493,6 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     });
     const totalItemPages = Math.ceil(sortedOrderItems.length / ITEMS_PER_PAGE)
     const paginatedItems = sortedOrderItems.slice((itemPage - 1) * ITEMS_PER_PAGE, itemPage * ITEMS_PER_PAGE)
-    useEffect(() => { setItemPage(1) }, [sortedOrderItems.length])
     const itemsLabel = itemCount === 1 ? "1 item" : `${itemCount} itens`
     const couponDiscountAmount = Math.max(0, Number(order.coupon_discount_amount || 0))
     const paymentMethodDiscountAmount = Math.max(0, Number(order.payment_method_discount_amount || 0))

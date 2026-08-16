@@ -182,6 +182,7 @@ export function useEntityPage<
         // Current entity
         currentEntity: currentEntityResult.data,
         isLoadingDetail: currentEntityResult.isLoading,
+        isDetailReady: !currentEntityResult.isLoading && !!currentEntityResult.data,
         isDetailStale: currentEntityResult.isStale,
 
         // Cache operations

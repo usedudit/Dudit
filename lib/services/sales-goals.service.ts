@@ -12,7 +12,6 @@ type GoalRow = {
   applies_to: "all" | "user"
   user_id: string | null
   assigned_user_ids?: string[] | null
-  goal_type?: "sales" | "service_orders" | "both"
   auto_launch_bonus?: boolean | null
   bonus_account_id?: string | null
   bonus_distribution?: string | null
@@ -155,19 +154,13 @@ async function getActiveGoalsForSeller(params: {
   
   const day = new Date(params.saleDateIso || new Date().toISOString()).toISOString().slice(0, 10)
   
-  let query = params.supabase
+  const query = params.supabase
     .from("sales_goals")
     .select("*")
     .eq("partner_id", params.partnerId)
     .lte("start_date", day)
     .gte("end_date", day)
     .or(`applies_to.eq.all,user_id.eq.${params.sellerUserId},assigned_user_ids.cs.{${params.sellerUserId}}`)
-
-  if (params.activityType === "sales") {
-    query = query.in("goal_type", ["sales", "both"])
-  } else if (params.activityType === "service_orders") {
-    query = query.in("goal_type", ["service_orders", "both"])
-  }
 
   const { data } = await query
   return (data || []) as GoalRow[]

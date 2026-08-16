@@ -7,6 +7,7 @@ import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery, usePickerBucket } from "@/components/erp/hooks"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
+import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import {
     fetchPartnerCustomersBucket,
     type PartnerCustomerBucketItem,
@@ -167,7 +168,7 @@ const SelectCustomerSheet = ({
 
     useEffect(() => {
         if (!isOpen) return
-        void pickerRef.current.loadBucket()
+        void pickerRef.current.loadBucket(pickerRef.current.isLoaded)
     }, [isOpen])
 
     useEffect(() => {
@@ -341,12 +342,11 @@ const SelectCustomerSheet = ({
                                                 {customer.name}
                                             </span>
                                         </div>
-                                        <p className="truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body">
-                                            ID #{customer.id ? customer.id.substring(0, 5).toUpperCase() : "-"}
-                                        </p>
-                                        <p className="truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body">
-                                            {customer.email || "Sem e-mail"}
-                                        </p>
+                                        {customer.phone ? (
+                                            <p className="truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body">
+                                                {formatBrazilPhone(customer.phone) || customer.phone}
+                                            </p>
+                                        ) : null}
                                     </div>
                                     <div className="flex shrink-0 items-center gap-2">
                                         {!selectedCustomerIds ? (
@@ -496,12 +496,29 @@ const SelectCustomerSheet = ({
                                 })
                                 if (!created) return
 
+                                const newCustomerItem: PartnerCustomerBucketItem = {
+                                    id: created.id,
+                                    name: created.name,
+                                    email: created.email ?? null,
+                                    phone: created.phone ?? null,
+                                    avatar_url: (created as any).image_url || (created as any).avatar_url || null,
+                                }
+                                picker.prependItem(newCustomerItem)
+
                                 setNewCustomerName("")
                                 setNewCustomerEmail("")
                                 setNewCustomerPhone("")
                                 setIsNewCustomerSheetOpen(false)
-                                onSelect(created)
-                                onClose()
+
+                                if (selectedCustomerIds) {
+                                    if (!selectedCustomerIds.includes(created.id)) {
+                                        onSelect(created)
+                                    }
+                                } else {
+                                    setTempSelectedCustomer(created)
+                                    onSelect(created)
+                                    onClose()
+                                }
                             } catch (error) {
                                 const errorMsg = error instanceof Error ? error.message : "Não foi possível criar o cliente."
                                 const lowerMsg = errorMsg.toLowerCase()

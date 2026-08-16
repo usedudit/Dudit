@@ -21,6 +21,7 @@ import QuotePageControls from "./QuotePageControls"
 import CreateQuote from "./CreateQuote"
 import QuoteDetail from "./QuoteDetail"
 import QuotePrintModal from "./QuotePrintModal"
+import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
 import { useNotification } from "@/hooks/use-notification"
 import { ShareModal } from "@/components/marketplace/ShareModal"
 import { useErpExport } from "@/hooks/use-erp-export"
@@ -565,33 +566,37 @@ export default function QuotesPage({
     return (
         <>
             <AnimatePresence mode="wait">
-                {entityState.isOpen && (isViewing || isEditing || isDuplicating) && isLoadingDetail ? (
-                    <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
-                        <ThreeDotsLoader />
-                    </div>
-                ) : isViewing && activeQuote ? (
-                    <FadeIn key="view-quote" className="w-full h-full">
-                        <QuoteDetail
-                            partnerId={partnerId}
-                            quoteId={activeQuote.id}
-                            onBack={closeEntity}
-                            onEditQuote={handleEditQuote}
-                            onDuplicateQuote={handleDuplicateQuote}
-                            initialQuote={activeQuote}
-                        />
-                    </FadeIn>
+                {entityState.isOpen && isViewing ? (
+                    (isLoadingDetail || !activeQuote) ? (
+                        <ERPDetailLoading key="loading-quote" />
+                    ) : (
+                        <FadeIn key="view-quote" className="w-full h-full">
+                            <QuoteDetail
+                                partnerId={partnerId}
+                                quoteId={activeQuote.id}
+                                onBack={closeEntity}
+                                onEditQuote={handleEditQuote}
+                                onDuplicateQuote={handleDuplicateQuote}
+                                initialQuote={activeQuote}
+                            />
+                        </FadeIn>
+                    )
                 ) : (isCreating || isEditing || isDuplicating) ? (
-                    <FadeIn key="create-quote" className="w-full h-full">
-                        <CreateQuote
-                            partnerId={partnerId}
-                            existingQuote={activeQuote}
-                            mode={isCreating ? 'create' : isEditing ? 'edit' : isDuplicating ? 'duplicate' : 'view'}
-                            onBack={() => {
-                                afterMutation(entityState.entityId || undefined)
-                                closeEntity()
-                            }}
-                        />
-                    </FadeIn>
+                    ((isEditing || isDuplicating) && (isLoadingDetail || !activeQuote)) ? (
+                        <ERPDetailLoading key="loading-quote-form" />
+                    ) : (
+                        <FadeIn key="create-quote" className="w-full h-full">
+                            <CreateQuote
+                                partnerId={partnerId}
+                                existingQuote={activeQuote}
+                                mode={isCreating ? 'create' : isEditing ? 'edit' : isDuplicating ? 'duplicate' : 'view'}
+                                onBack={() => {
+                                    afterMutation(entityState.entityId || undefined)
+                                    closeEntity()
+                                }}
+                            />
+                        </FadeIn>
+                    )
                 ) : (
                     <FadeIn
                         key="list"

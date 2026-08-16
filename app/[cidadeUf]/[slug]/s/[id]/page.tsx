@@ -7,7 +7,6 @@ import {
     getServiceStaffMembers,
     getServiceReviews,
 } from "@/app/actions/marketplace/services"
-import { getStoreBySlug } from "@/app/actions/marketplace/stores"
 import { getServiceUrl } from "@/lib/utils/url-generator"
 import { getCurrentUser } from "@/lib/auth/authorization"
 import { getUserSessionData } from "@/lib/data/user"
@@ -18,10 +17,8 @@ export const dynamic = 'force-dynamic'
 export const dynamicParams = true
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string; cidadeUf: string; id: string }> }): Promise<Metadata> {
-    const { id, slug } = await params
-    const store = slug ? await getStoreBySlug(slug) : null
-    const storeId = store?.id || null
-    const service = await getMarketplaceService(id, storeId)
+    const { id } = await params
+    const service = await getMarketplaceService(id)
 
     if (!service) {
         return { title: 'Serviço não encontrado' }
@@ -72,18 +69,16 @@ export default async function ServiceDetailsPage({
 }) {
     const { id, slug: currentSlug, cidadeUf: currentCidadeUf } = await params
 
-    const [store, user] = await Promise.all([
-        getStoreBySlug(currentSlug).catch(() => null),
+    const [user, service] = await Promise.all([
         getCurrentUser(),
+        getMarketplaceService(id),
     ])
-    const storeId = store?.id || null
-
-    const service = await getMarketplaceService(id, storeId)
 
     if (!service) {
         redirect("/")
     }
 
+    const storeId = service.store_id || null
     const sessionData = user ? await getUserSessionData(user.id) : null
     const userProfile = sessionData?.profile ? {
         full_name: sessionData.profile.full_name,

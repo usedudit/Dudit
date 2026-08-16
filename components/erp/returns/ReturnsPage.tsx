@@ -20,6 +20,7 @@ import ReturnGridCard from "./ReturnGridCard"
 import ReturnPrintModal from "./ReturnPrintModal"
 import CreateReturnPage from "./CreateReturnPage"
 import ReturnPageControls from "./ReturnPageControls"
+import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
 import type { ReturnRequest } from "./types"
 import { createReturnRequestAction, getReturnRequestsPageAction, processReturnRequestAction } from "@/app/actions/erp/returns"
 import { getReturnResolutionLabel } from "@/lib/returns/types"
@@ -446,26 +447,6 @@ export default function ReturnsPage({ partnerId, roleId, storeId, planGate }: Re
         })
     }, [exportData, partnerId, selectedStore?.id, debouncedSearch, activeTab, filters])
 
-    if (planGate) {
-        return (
-            <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
-                <div className="flex flex-col items-center justify-center text-center min-h-[400px] px-4">
-                    <IconPlaceholder
-                        placeholderType="image"
-                        imageSrc="https://img.dudit.com.br/static/mascots/Devolucoes.png"
-                        imageAlt="Recurso bloqueado"
-                        title="Trocas e Devoluções"
-                        subtitle="Gerencie trocas e devoluções de forma organizada. Disponível nos planos Crescer e Escalar."
-                        itemButton={{
-                            text: "Fazer upgrade",
-                            action: () => openPlanUpgrade(planGate.requiredPlanSlug)
-                        }}
-                    />
-                </div>
-            </FadeIn>
-        )
-    }
-
     const handleMpPaymentNotFoundConfirm = useCallback(async () => {
         if (!pendingProcessData) return
         setIsSaving(true)
@@ -487,24 +468,43 @@ export default function ReturnsPage({ partnerId, roleId, storeId, planGate }: Re
         }
     }, [pendingProcessData, queryClient, partnerId, closeEntity, toast])
 
+    if (planGate) {
+        return (
+            <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
+                <div className="flex flex-col items-center justify-center text-center min-h-[400px] px-4">
+                    <IconPlaceholder
+                        placeholderType="image"
+                        imageSrc="https://img.dudit.com.br/static/mascots/Devolucoes.png"
+                        imageAlt="Recurso bloqueado"
+                        title="Trocas e Devoluções"
+                        subtitle="Gerencie trocas e devoluções de forma organizada. Disponível nos planos Crescer e Escalar."
+                        itemButton={{
+                            text: "Fazer upgrade",
+                            action: () => openPlanUpgrade(planGate.requiredPlanSlug)
+                        }}
+                    />
+                </div>
+            </FadeIn>
+        )
+    }
+
     return (
         <>
             <AnimatePresence mode="wait">
                 {entityState.isOpen ? (
-                    isReturnsLoading ? (
-                        <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
-                            <ThreeDotsLoader />
-                        </div>
+                    (isReturnsLoading || (entityState.action !== "create" && !activeReturnRequest)) ? (
+                        <ERPDetailLoading key="loading-return" />
                     ) : (
-                        <CreateReturnPage
-                            key="form"
-                            partnerId={partnerId}
-                            mode={entityState.action as any}
-                            returnRequest={activeReturnRequest}
-                            onBack={closeEntity}
-                            onSave={handleSaveReturn}
-                            isSaving={isSaving}
-                        />
+                        <FadeIn key="form" className="w-full h-full">
+                            <CreateReturnPage
+                                partnerId={partnerId}
+                                mode={entityState.action as any}
+                                returnRequest={activeReturnRequest}
+                                onBack={closeEntity}
+                                onSave={handleSaveReturn}
+                                isSaving={isSaving}
+                            />
+                        </FadeIn>
                     )
                 ) : (
                     <FadeIn key="list" className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">

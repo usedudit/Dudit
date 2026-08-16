@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { sanitizeSearchTerm, resolveExportDateBounds } from "../filters"
 import { fetchAllPages } from "../paginate"
+import { resolveStandardPaymentMethod } from "@/lib/finance-utils"
 import {
   mapTransactionRow,
   TRANSACTION_EXPORT_ALL_COLUMNS,
@@ -72,8 +73,7 @@ export async function fetchTransactionsExport(
       const categories = (filters.category || []).filter(Boolean)
       if (categories.length > 0) query = query.in("category", categories)
 
-      const paymentTypes = (filters.paymentType || []).filter(Boolean)
-      if (paymentTypes.length > 0) query = query.in("payment_type", paymentTypes)
+      // Meio de pagamento é filtrado em JS após mapeamento (rótulos padrão vs. métodos customizados)
 
       const { startIso, endIso } = resolveExportDateBounds(filters.datePeriod)
       if (startIso) query = query.gte("created_at", startIso)
@@ -104,7 +104,13 @@ export async function fetchTransactionsExport(
     },
   })
 
-  const rows = rawRows.map((r) => mapTransactionRow(r, includeAllColumns))
+  let rows = rawRows.map((r) => mapTransactionRow(r, includeAllColumns))
+
+  const paymentFilters = (filters.paymentType || []).filter(Boolean)
+  if (paymentFilters.length > 0) {
+    rows = rows.filter((row) => paymentFilters.includes(resolveStandardPaymentMethod(String((row as any).paymentType || ""))))
+  }
+
   const columns = includeAllColumns ? TRANSACTION_EXPORT_ALL_COLUMNS : TRANSACTION_EXPORT_COLUMNS
   return { columns, rows, rowCount: rows.length }
 }

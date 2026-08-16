@@ -13,6 +13,7 @@ import {
     CheckCircleIcon,
 } from '@/lib/icons';
 import { Button, Badge, ActionsDropdown, ThreeDotsLoader, FormDropdown, AlertModal, DefaultModal, FormSection, Tabs, TabsList, TabsTrigger, TabsContent, ListItem } from '@/components/reusable';
+import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading";
 import { getQuoteDetailsAction, updateQuoteStatusAction, deleteQuoteAction, convertQuoteToOrderAction, getQuoteHistoryAction, getPartnerAddressAction, regenerateQuoteApprovalCodeAction } from '@/app/actions/erp/quotes';
 import { useCSRFToken } from "@/hooks/use-csrf-token"
 import { QuoteHistoryTab } from "./QuoteHistoryTab"
@@ -97,8 +98,9 @@ const QuoteItem = ({ image, name, sku, qty, price, total, unit }: any) => (
 const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote, initialQuote }: QuoteDetailProps) => {
     const [isScrolled, setIsScrolled] = useState(false);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
-    const [quote, setQuote] = useState<any>(initialQuote || null);
-    const [loading, setLoading] = useState(!initialQuote);
+    const isFullQuote = Boolean(initialQuote && (initialQuote.items || initialQuote.quote_items) && !initialQuote.__partial);
+    const [quote, setQuote] = useState<any>(isFullQuote ? initialQuote : null);
+    const [loading, setLoading] = useState(!isFullQuote);
     const [isLoadingQuoteItems, setIsLoadingQuoteItems] = useState(Boolean(initialQuote));
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
     const [isRegeneratingCode, setIsRegeneratingCode] = useState(false);
@@ -385,11 +387,17 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
         return () => setHeaderOverride(null);
     }, [pageTitle, onBack, setHeaderOverride]);
 
-    if (loading) return <div className="flex h-[calc(100vh-65px)] w-full items-center justify-center">
-        <ThreeDotsLoader />
-    </div>
+    const mappedPreviewItems = useMemo(() => {
+        if (!quote?.items) return [];
+        return quote.items.map((item: any) => ({
+            name: item.custom_name || item.products?.name || "Produto sem nome",
+            qty: item.quantity,
+            price: Number(item.unit_price),
+            sku: item.products?.sku || "N/A"
+        }));
+    }, [quote?.items]);
 
-    if (!quote) return null;
+    if (loading || !quote) return <ERPDetailLoading key="loading-quote-view" />;
 
     const statusInfo = getStatusInfo(quote.status);
     const subtotal = Number(quote.subtotal || 0);
@@ -437,16 +445,6 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
         (quote.status === "approved" || quote.status === "sent")
         && !quote.converted
         && quote.status !== "expired";
-
-    const mappedPreviewItems = useMemo(() => {
-        if (!quote?.items) return [];
-        return quote.items.map((item: any) => ({
-            name: item.custom_name || item.products?.name || "Produto sem nome",
-            qty: item.quantity,
-            price: Number(item.unit_price),
-            sku: item.products?.sku || "N/A"
-        }));
-    }, [quote?.items]);
 
     return (
         <>

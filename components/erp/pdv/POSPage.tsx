@@ -1171,16 +1171,16 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                         searchInput.select()
                     }
                     break
-                case "F4":
+                case "F3":
                     e.preventDefault()
                     setCustomerSelectIntent("default")
                     setIsSelectCustomerOpen(true)
                     break
-                case "F5":
+                case "F4":
                     e.preventDefault()
                     setIsSelectSellerOpen(true)
                     break
-                case "F6":
+                case "F5":
                     e.preventDefault()
                     if (cart.length > 0) {
                         handleOpenPaymentModal()
@@ -1592,8 +1592,6 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                                 hasBothProductsAndServices={hasBothProductsAndServices}
                                 onOpenTypeFilterModal={() => setIsTypeFilterModalOpen(true)}
                             />
-
-
 
                             <AnimatePresence mode="wait">
                                 <FadeIn key={`${selectedCategory}-${debouncedSearch}`} className={`mt-2 grid grid-cols-2 gap-3 overflow-y-auto pr-1 pb-24 md:grid-cols-4 xl:grid-cols-5 xl:pb-6 2xl:grid-cols-6 ${desktopScrollClass}`}>
@@ -2488,15 +2486,15 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                                     </div>
                                     <div className="flex items-center justify-between pb-4 border-b border-brand-border dark:border-dark-border">
                                         <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">Selecionar Cliente</span>
-                                        <kbd className="px-2.5 py-2 rounded-lg bg-white border border-brand-border text-xs font-bold dark:bg-dark-border dark:border-dark-border dark:text-dark-heading">F4</kbd>
+                                        <kbd className="px-2.5 py-2 rounded-lg bg-white border border-brand-border text-xs font-bold dark:bg-dark-border dark:border-dark-border dark:text-dark-heading">F3</kbd>
                                     </div>
                                     <div className="flex items-center justify-between pb-4 border-b border-brand-border dark:border-dark-border">
                                         <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">Selecionar Vendedor</span>
-                                        <kbd className="px-2.5 py-2 rounded-lg bg-white border border-brand-border text-xs font-bold dark:bg-dark-border dark:border-dark-border dark:text-dark-heading">F5</kbd>
+                                        <kbd className="px-2.5 py-2 rounded-lg bg-white border border-brand-border text-xs font-bold dark:bg-dark-border dark:border-dark-border dark:text-dark-heading">F4</kbd>
                                     </div>
-                                    <div className="flex items-center justify-between pb-4 border-b border-brand-border dark:border-dark-border">
+                                    <div className="flex items-center justify-between pb-4">
                                         <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">Finalizar Venda (Pagamento)</span>
-                                        <kbd className="px-2.5 py-2 rounded-lg bg-white border border-brand-border text-xs font-bold dark:bg-dark-border dark:border-dark-border dark:text-dark-heading">F6</kbd>
+                                        <kbd className="px-2.5 py-2 rounded-lg bg-white border border-brand-border text-xs font-bold dark:bg-dark-border dark:border-dark-border dark:text-dark-heading">F5</kbd>
                                     </div>
                                 </div>
                             </div>

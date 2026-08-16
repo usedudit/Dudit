@@ -1,21 +1,20 @@
 "use client"
 
 import type React from "react"
-import { useMemo } from "react"
-import { Input, FormDropdown, Checkbox, MoneyInput, Combobox, InfoCard, FormSection, Spinner } from "@/components/reusable"
+import { useMemo, useEffect, useState } from "react"
+import { Input, FormDropdown, Checkbox, MoneyInput, Combobox, InfoCard, FormSection, Spinner, Button, ListItem } from "@/components/reusable"
 import { SalePriceCalculator } from "@/components/reusable/SalePriceCalculator"
 import { FulfillmentModesEditor } from "@/components/erp/shared/FulfillmentModesEditor"
 import type { FulfillmentMode } from "@/lib/commerce/capabilities"
 import FormTextarea from "@/components/reusable/FormTextarea"
 import { formatCurrency } from "@/lib/utils"
-import { PlusIcon, DiceIcon, Package, CheckCircleIcon, EditIcon, SparklesIcon } from "@/lib/icons"
+import { PlusIcon, DiceIcon, Package, CheckCircleIcon, EditIcon, SparklesIcon, ClockIcon } from "@/lib/icons"
 import { planStarIconForTarget, usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import ProductImagesSection from "@/components/erp/product/ProductImagesSection"
 import { RichTextEditor } from "@/components/reusable"
 import MarketplaceCategoryModal from "@/components/erp/product/MarketplaceCategoryModal"
 import { getCategoryPathClient } from "@/lib/data/marketplace-categories-client"
-import { MarketplaceMetricsReadOnly } from "@/components/erp/marketplace/MarketplaceMetricsReadOnly"
-import { useEffect, useState } from "react"
+import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 
 const FormCombobox = ({
     label, value, onChange, options, disabled, width = "w-full", actionItem
@@ -97,6 +96,276 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
     const isFree = serviceData.price_type === 'free'
     const showPrice = serviceData.show_price_in_store ?? true
 
+    const categoryName = useMemo(() => {
+        return categories.find(c => c.value === serviceData.category_id)?.label || serviceData.category || "-"
+    }, [categories, serviceData.category_id, serviceData.category])
+
+    const subcategoryName = useMemo(() => {
+        return subCategories.find(c => c.value === serviceData.subcategory_id)?.label || serviceData.subcategory || "-"
+    }, [subCategories, serviceData.subcategory_id, serviceData.subcategory])
+
+    const getImageSrc = (img: string | File) => {
+        if (typeof img === 'string') {
+            if (img.startsWith("data:") || img.startsWith("blob:")) return img
+            return getR2ImageUrl(img) || "https://img.dudit.com.br/static/Placeholder.png"
+        }
+        return "https://img.dudit.com.br/static/Placeholder.png"
+    }
+
+    const billingUnitLabel = useMemo(() => {
+        switch (serviceData.billing_unit) {
+            case 'per_hour': return 'Por Hora'
+            case 'per_day': return 'Por Dia'
+            case 'per_week': return 'Por Semana'
+            case 'per_month': return 'Por Mês'
+            case 'per_year': return 'Por Ano'
+            default: return 'Por Serviço'
+        }
+    }, [serviceData.billing_unit])
+
+    const priceTypeLabel = useMemo(() => {
+        switch (serviceData.price_type) {
+            case 'starting_at': return 'A partir de'
+            case 'free': return 'Gratuito'
+            default: return 'Preço Fixo'
+        }
+    }, [serviceData.price_type])
+
+    // ─── MODO DETALHES (READ-ONLY) ───────────────────────────────────────────
+    if (!isEditing) {
+        const modes = (serviceData.fulfillment_modes || ["on_site"]) as FulfillmentMode[]
+
+        return (
+            <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
+                {/* ESQUERDA (Principal) */}
+                <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
+                    {/* Imagens do Serviço no Topo */}
+                    <div className="mb-8">
+                        <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-thin">
+                            {images && images.length > 0 ? (
+                                images.map((img, index) => (
+                                    <div
+                                        key={index}
+                                        className="relative shrink-0 w-28 h-28 md:w-32 md:h-32 rounded-2xl bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border overflow-hidden group shadow-xs"
+                                    >
+                                        <img
+                                            src={getImageSrc(img)}
+                                            alt={`${serviceData.name || "Serviço"} ${index + 1}`}
+                                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                        />
+                                        {index === 0 && (
+                                            <div className="absolute top-2 left-2 bg-brand-dark/80 text-white text-[10px] font-bold px-2 py-0.5 rounded-md shadow-xs backdrop-blur-xs">
+                                                Principal
+                                            </div>
+                                        )}
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="w-28 h-28 md:w-32 md:h-32 rounded-2xl bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border flex items-center justify-center text-xs text-brand-inactive-text">
+                                    Sem imagens
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Informações Básicas */}
+                    <FormSection title="Informações Básicas" className="mb-8">
+                        <div className="space-y-6">
+                            <div>
+                                <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium block mb-1">Nome do Serviço</span>
+                                <h1 className="text-xl md:text-2xl font-bold text-brand-dark dark:text-dark-heading">
+                                    {serviceData.name || "-"}
+                                </h1>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
+                                <div>
+                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium block mb-1">Status</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className={`inline-block w-2.5 h-2.5 rounded-full ${serviceData.is_active ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                            {serviceData.is_active ? "Ativo" : "Inativo"}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium block mb-1">Exibir na Vitrine</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className={`inline-block w-2.5 h-2.5 rounded-full ${serviceData.show_in_marketplace !== false ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                            {serviceData.show_in_marketplace !== false ? "Sim" : "Não"}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium block mb-2">Formas de Atendimento</span>
+                                <div className="flex flex-wrap gap-2">
+                                    {modes.includes("on_site") && (
+                                        <span className="px-3 py-1.5 rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/40 dark:bg-dark-border/40 text-xs font-semibold text-brand-dark dark:text-dark-heading">
+                                            No estabelecimento
+                                        </span>
+                                    )}
+                                    {modes.includes("customer_location") && (
+                                        <span className="px-3 py-1.5 rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/40 dark:bg-dark-border/40 text-xs font-semibold text-brand-dark dark:text-dark-heading">
+                                            No local do cliente
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </FormSection>
+
+                    {/* Preço e Cobrança */}
+                    <FormSection hasSeparator title="Preço e Cobrança">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-2">
+                            <div className="p-4 rounded-2xl bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border">
+                                <span className="text-xs font-semibold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body block mb-1">
+                                    {serviceData.price_type === 'starting_at' ? "Preço Base" : "Preço de Venda"}
+                                </span>
+                                <div className="text-xl md:text-2xl font-bold text-brand-dark dark:text-dark-heading">
+                                    {isFree ? "Gratuito" : showPrice ? formatCurrency(serviceData.price || 0) : "Sob consulta"}
+                                </div>
+                                {!isFree && showPrice && Number(serviceData.cost_price) > 0 && (
+                                    <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mt-1 block">
+                                        Margem: {margin}% ({formatCurrency(profit)})
+                                    </span>
+                                )}
+                            </div>
+
+                            {!isFree && !isQuickMode && (
+                                <div className="p-4 rounded-2xl bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border">
+                                    <span className="text-xs font-semibold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body block mb-1">
+                                        Custo do Serviço
+                                    </span>
+                                    <div className="text-xl md:text-2xl font-bold text-brand-dark dark:text-dark-heading">
+                                        {formatCurrency(serviceData.cost_price || 0)}
+                                    </div>
+                                </div>
+                            )}
+
+                            {!isFree && (
+                                <div className="p-4 rounded-2xl bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border">
+                                    <span className="text-xs font-semibold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body block mb-1">
+                                        Preço Promocional
+                                    </span>
+                                    <div className="text-xl md:text-2xl font-bold text-brand-dark dark:text-dark-heading">
+                                        {serviceData.promotional_price ? formatCurrency(serviceData.promotional_price) : "-"}
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="p-4 rounded-2xl bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border">
+                                <span className="text-xs font-semibold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body block mb-1">
+                                    Modelo de Preço
+                                </span>
+                                <div className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-1">
+                                    {priceTypeLabel}
+                                </div>
+                            </div>
+
+                            {!isQuickMode && (
+                                <div className="p-4 rounded-2xl bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border">
+                                    <span className="text-xs font-semibold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body block mb-1">
+                                        Unidade de Cobrança
+                                    </span>
+                                    <div className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-1">
+                                        {billingUnitLabel}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {!showPrice && !isFree && (
+                            <div className="mt-4">
+                                <InfoCard
+                                    color="orange"
+                                    message="O serviço está configurado para exibir 'Valor sob consulta' na sua vitrine online."
+                                />
+                            </div>
+                        )}
+
+                        {isQuickMode && serviceData.description && (
+                            <div className="mt-8">
+                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">Descrição</h3>
+                                <div
+                                    className="rich-text-content text-sm text-brand-dark dark:text-dark-heading"
+                                    dangerouslySetInnerHTML={{ __html: serviceData.description }}
+                                />
+                            </div>
+                        )}
+                    </FormSection>
+
+                    {/* Duração e Agendamento */}
+                    {(!serviceData.billing_unit || serviceData.billing_unit === 'per_service') && (
+                        <FormSection hasSeparator title="Duração e agendamento">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <ListItem
+                                    icon={ClockIcon}
+                                    title="Duração do Serviço"
+                                    description={serviceData.duration_minutes ? `${serviceData.duration_minutes} minutos` : "Não informada"}
+                                    className="p-4 cursor-default"
+                                />
+                                {!isQuickMode && (
+                                    <ListItem
+                                        icon={ClockIcon}
+                                        title="Tempo de Buffer (Intervalo)"
+                                        description={serviceData.buffer_minutes ? `${serviceData.buffer_minutes} minutos` : "Nenhum buffer cadastrado"}
+                                        className="p-4 cursor-default"
+                                    />
+                                )}
+                            </div>
+                        </FormSection>
+                    )}
+                </div>
+
+                {/* DIREITA (SidebarCard) */}
+                <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
+                    <SidebarCard hasTopStrip>
+                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Organização</h3>
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
+                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Código (SKU)</span>
+                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{serviceData.sku || "-"}</span>
+                            </div>
+
+                            <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
+                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Categoria</span>
+                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{categoryName}</span>
+                            </div>
+
+                            <div className="flex justify-between items-center py-2">
+                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Subcategoria</span>
+                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{subcategoryName}</span>
+                            </div>
+                        </div>
+                    </SidebarCard>
+
+                    {isQuickMode && officialCategoryPath && (
+                        <SidebarCard>
+                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-3 mt-1">Categoria oficial</h3>
+                            <div className="p-4 rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/30 dark:bg-dark-border/30 text-sm font-medium text-brand-dark dark:text-dark-heading">
+                                {officialCategoryPath}
+                            </div>
+                        </SidebarCard>
+                    )}
+
+                    {!isQuickMode && serviceData.notes && (
+                        <SidebarCard>
+                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-3 mt-1">Observações Internas</h3>
+                            <p className="text-sm text-brand-dark dark:text-dark-heading whitespace-pre-wrap leading-relaxed">
+                                {serviceData.notes}
+                            </p>
+                        </SidebarCard>
+                    )}
+                </div>
+            </div>
+        )
+    }
+
+    // ─── MODO EDIÇÃO / CRIAÇÃO ────────────────────────────────────────────────
     return (
         <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
             {/* ESQUERDA (Principal) */}
@@ -408,8 +677,6 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                         )}
                     </div>
                 </SidebarCard>
-
-
 
                 {isQuickMode && (
                     <SidebarCard>

@@ -112,7 +112,7 @@ export async function syncToExploreRedis({
             show_price_in_store
           `)
           .eq("id", id)
-          .single()
+          .maybeSingle()
 
         if (!dbData) {
           console.warn(`[RedisSync] Produto ${id} não encontrado no DB. Removendo do Redis.`)
@@ -168,7 +168,7 @@ export async function syncToExploreRedis({
             show_price_in_store
           `)
           .eq("id", id)
-          .single()
+          .maybeSingle()
 
         if (!dbData) {
           return await removeFromExploreRedis(id, type, silent, throwOnError)
@@ -202,7 +202,7 @@ export async function syncToExploreRedis({
             partners!inner(id, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), reviews(count))
           `)
           .eq("id", id)
-          .single()
+          .maybeSingle()
 
         if (!dbData || !isExploreStorePublic(dbData)) {
           return await removeFromExploreRedis(id, type, silent, throwOnError)

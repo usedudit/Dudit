@@ -192,7 +192,7 @@ export default withSentryConfig(withSerwist(nextConfig), {
 
   org: "dudit-p3",
 
-  project: "javascript-nextjs",
+  project: "dudit",
 
   // Only print logs for uploading source maps in CI
   silent: !process.env.CI,

@@ -1925,7 +1925,10 @@ export const AppointmentSheet = ({
                                                     <UserProfileImage fullName={client.name || "Cliente"} imageUrl={client.avatar_url || client.avatar} className="w-8 h-8 shrink-0 text-[10px]" />
                                                     <div className="flex flex-col min-w-0">
                                                         <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{client.name}</span>
-                                                        <span className="text-xs text-brand-inactive-text truncate">{client.email || formatBrazilPhone(client.phone || "") || 'Cliente'}</span>                                                    </div>
+                                                        {client.phone ? (
+                                                            <span className="text-xs text-brand-inactive-text truncate">{formatBrazilPhone(client.phone) || client.phone}</span>
+                                                        ) : null}
+                                                    </div>
                                                 </div>
                                                 {isSelected && <CheckIcon size={18} className="text-brand-green shrink-0" />}
                                             </div>

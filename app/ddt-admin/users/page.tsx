@@ -1,14 +1,19 @@
 import { AdminHeader } from "@/components/admin/admin-header"
 import UserEnforcementList from "@/components/admin/users/UserEnforcementList"
-import { getUsers } from "@/app/actions/admin/enforcement"
+import { getUsers, getAdminUserStats } from "@/app/actions/admin/enforcement"
+
+export const dynamic = "force-dynamic"
 
 export default async function UsersPage() {
-    const initialData = await getUsers(null, 20)
+    const [initialData, initialStats] = await Promise.all([
+        getUsers(null, 50),
+        getAdminUserStats(),
+    ])
 
     return (
         <>
-            <AdminHeader pageTitle="Usuários e Punições" />
-            <UserEnforcementList initialData={initialData} />
+            <AdminHeader pageTitle="Usuários" />
+            <UserEnforcementList initialData={initialData} initialStats={initialStats} />
         </>
     )
 }

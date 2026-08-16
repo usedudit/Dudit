@@ -19,6 +19,7 @@ import ExportSelectionModal from "@/components/erp/export/ExportSelectionModal"
 import ExportColumnSelectionModal from "@/components/erp/export/ExportColumnSelectionModal"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
+import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
 
 // Actions
 import {
@@ -684,27 +685,26 @@ export default function ServicesPage({
         <>
             <AnimatePresence mode="wait">
                 {entityState.isOpen && formMode ? (
-                    isLoadingDetail ? (
-                        <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
-                            <ThreeDotsLoader />
-                        </div>
+                    (formMode !== 'add' && (isLoadingDetail || !formService)) ? (
+                        <ERPDetailLoading key="loading-service" />
                     ) : (
-                        <AddServicePage
-                            key="form"
-                            mode={formMode as any}
-                            setMode={(m) => {
-                                // Map AddServicePage mode changes to URL updates
-                                if (m === 'edit' && entityState.entityId) openEntity('edit', entityState.entityId)
-                                else if (m === 'details' && entityState.entityId) openEntity('view', entityState.entityId)
-                            }}
-                            service={formService}
-                            onBack={closeEntity}
-                            partnerId={partnerId}
-                            partner={partner}
-                            storeId={selectedStore?.id}
-                            isLoadingDetails={isLoadingDetail}
-                            onClose={handleFormClose}
-                        />
+                        <FadeIn key="form" className="w-full h-full">
+                            <AddServicePage
+                                mode={formMode as any}
+                                setMode={(m) => {
+                                    // Map AddServicePage mode changes to URL updates
+                                    if (m === 'edit' && entityState.entityId) openEntity('edit', entityState.entityId)
+                                    else if (m === 'details' && entityState.entityId) openEntity('view', entityState.entityId)
+                                }}
+                                service={formService}
+                                onBack={closeEntity}
+                                partnerId={partnerId}
+                                partner={partner}
+                                storeId={selectedStore?.id}
+                                isLoadingDetails={isLoadingDetail}
+                                onClose={handleFormClose}
+                            />
+                        </FadeIn>
                     )
                 ) : (
                     <FadeIn
@@ -956,9 +956,9 @@ export default function ServicesPage({
                 isOpen={confirmations.delete}
                 onClose={() => setConfirmations(p => ({ ...p, delete: false }))}
                 onConfirm={confirmDelete}
-                title="Arquivar Serviço"
-                description="O item será arquivado e deixará de aparecer nos locais públicos e listagens, mas continuará disponível para preservar o histórico."
-                confirmText="Arquivar"
+                title="Excluir Serviço"
+                description="O item será excluído permanentemente."
+                confirmText="Excluir"
                 cancelText="Cancelar"
                 variant="danger"
             />
@@ -967,9 +967,9 @@ export default function ServicesPage({
                 isOpen={confirmations.bulkDelete}
                 onClose={() => setConfirmations(p => ({ ...p, bulkDelete: false }))}
                 onConfirm={() => confirmBulk("delete")}
-                title="Arquivar Serviços"
-                description={`Os ${selection.ids.size} serviços selecionados serão arquivados e deixarão de aparecer nos locais públicos e listagens, mas continuarão disponíveis para preservar o histórico.`}
-                confirmText="Arquivar"
+                title="Excluir Serviços"
+                description={`Os ${selection.ids.size} serviços selecionados serão excluídos permanentemente.`}
+                confirmText="Excluir"
                 cancelText="Cancelar"
                 variant="danger"
             />

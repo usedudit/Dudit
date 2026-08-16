@@ -37,12 +37,14 @@ async function _getPartnerProfile(partnerId: string) {
     `)
     .eq("id", partnerId)
     .eq("is_active", true)
-    .single()
+    .maybeSingle()
 
-  if (error || !data) {
-    if (error) console.error(`[Partner] Profile fetch error for ${partnerId}:`, error.message)
+  if (error) {
+    console.error(`[Partner] Profile fetch error for ${partnerId}:`, error.message)
     return null
   }
+
+  if (!data) return null
 
   const { data: store } = await supabase
     .from("stores")

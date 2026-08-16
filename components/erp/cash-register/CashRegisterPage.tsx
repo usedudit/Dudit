@@ -3,6 +3,7 @@
 import { useMemo, useState, useRef, useEffect, useCallback } from "react"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { AnimatePresence } from "framer-motion"
+import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
 import {
     Button,
     DefaultModal,
@@ -558,13 +559,18 @@ export default function CashRegisterPage({
         <>
             <AnimatePresence mode="wait">
                 {isViewing && activeViewId ? (
-                    <CashSessionDetailPage
-                        key="detail"
-                        partnerId={partnerId}
-                        details={detailedSession}
-                        isLoading={isDetailLoading}
-                        onBack={() => close()}
-                    />
+                    (isDetailLoading || !detailedSession) ? (
+                        <ERPDetailLoading key="loading-cash-detail" />
+                    ) : (
+                        <FadeIn key="detail" className="w-full h-full">
+                            <CashSessionDetailPage
+                                partnerId={partnerId}
+                                details={detailedSession}
+                                isLoading={isDetailLoading}
+                                onBack={() => close()}
+                            />
+                        </FadeIn>
+                    )
                 ) : (
                     <FadeIn
                         key="list"

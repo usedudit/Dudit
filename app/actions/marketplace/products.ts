@@ -59,11 +59,17 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
     query = query.eq("store_id", storeId)
   }
 
-  const { data, error } = await query.single()
+  const { data, error } = await query.maybeSingle()
 
-  if (error || !data) {
-    if (error) console.error(`[Product] Fetch error for ${id}:`, error.message)
-    console.warn(`[MarketplaceTrace] produto:${id} ausente na query PDP`)
+  if (error) {
+    console.error(`[Product] Fetch error for ${id}:`, error.message)
+    return null
+  }
+
+  if (!data) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(`[MarketplaceTrace] produto:${id} ausente na query PDP`)
+    }
     return null
   }
 
@@ -71,7 +77,9 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
   if (storeId) {
     const resolvedProduct = await resolveProduct(id, storeId)
     if (!resolvedProduct) {
-      console.warn(`[MarketplaceTrace] produto:${id} rejeitado pelo resolver (store:${storeId})`)
+      if (process.env.NODE_ENV !== "production") {
+        console.warn(`[MarketplaceTrace] produto:${id} rejeitado pelo resolver (store:${storeId})`)
+      }
       return null
     }
     // Override resolved fields from the resolver

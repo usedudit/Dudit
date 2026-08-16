@@ -20,6 +20,7 @@ import { getNextPlanTarget, isPlanLimitReachedError } from "@/lib/subscription/l
 import { useErpExport } from "@/hooks/use-erp-export"
 import ExportSelectionModal from "@/components/erp/export/ExportSelectionModal"
 import ExportColumnSelectionModal from "@/components/erp/export/ExportColumnSelectionModal"
+import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
 
 // Actions
 import {
@@ -891,31 +892,30 @@ export default function ProductsPage({
         <>
             <AnimatePresence mode="wait">
                 {entityState.isOpen && formMode ? (
-                    isLoadingDetail ? (
-                        <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
-                            <ThreeDotsLoader />
-                        </div>
+                    (formMode !== 'add' && (isLoadingDetail || !formProduct)) ? (
+                        <ERPDetailLoading key="loading-product" />
                     ) : (
-                        <AddProductPage
-                            key="form"
-                            mode={formMode as any}
-                            setMode={(m) => {
-                                // Map AddProductPage mode changes to URL updates
-                                if (m === 'edit' && entityState.entityId) openEntity('edit', entityState.entityId)
-                                else if (m === 'details' && entityState.entityId) openEntity('view', entityState.entityId)
-                            }}
-                            product={formProduct}
-                            onBack={closeEntity}
-                            onClose={closeEntity}
-                            onSave={handleSaveProduct}
-                            isSaving={isSaving}
-                            suppliers={suppliers}
-                            unidadesMedida={UNIDADES_MEDIDA}
-                            partnerId={partnerId}
-                            partner={partner}
-                            storeId={selectedStore?.id || ""}
-                            isLoadingDetails={isLoadingDetail}
-                        />
+                        <FadeIn key="form" className="w-full h-full">
+                            <AddProductPage
+                                mode={formMode as any}
+                                setMode={(m) => {
+                                    // Map AddProductPage mode changes to URL updates
+                                    if (m === 'edit' && entityState.entityId) openEntity('edit', entityState.entityId)
+                                    else if (m === 'details' && entityState.entityId) openEntity('view', entityState.entityId)
+                                }}
+                                product={formProduct}
+                                onBack={closeEntity}
+                                onClose={closeEntity}
+                                onSave={handleSaveProduct}
+                                isSaving={isSaving}
+                                suppliers={suppliers}
+                                unidadesMedida={UNIDADES_MEDIDA}
+                                partnerId={partnerId}
+                                partner={partner}
+                                storeId={selectedStore?.id || ""}
+                                isLoadingDetails={isLoadingDetail}
+                            />
+                        </FadeIn>
                     )
                 ) : (
                     <FadeIn
@@ -1236,9 +1236,9 @@ export default function ProductsPage({
                 isOpen={confirmations.delete}
                 onClose={() => setConfirmations((p) => ({ ...p, delete: false }))}
                 onConfirm={confirmDelete}
-                title="Arquivar Produto"
-                message="O item será arquivado e deixará de aparecer nos locais públicos e listagens, mas continuará disponível para preservar o histórico."
-                confirmText="Arquivar"
+                title="Excluir Produto"
+                message="O item será excluído permanentemente."
+                confirmText="Excluir"
                 icon={<TrashIcon />}
                 variant="danger"
             />
@@ -1246,9 +1246,9 @@ export default function ProductsPage({
                 isOpen={confirmations.bulkDelete}
                 onClose={() => setConfirmations((p) => ({ ...p, bulkDelete: false }))}
                 onConfirm={() => confirmBulk("delete")}
-                title="Arquivar Produtos"
-                message={`Os ${selection.ids.size} produtos selecionados serão arquivados e deixarão de aparecer nos locais públicos e listagens, mas continuarão disponíveis para preservar o histórico.`}
-                confirmText="Arquivar"
+                title="Excluir Produtos"
+                message={`Os ${selection.ids.size} produtos selecionados serão excluídos permanentemente.`}
+                confirmText="Excluir"
                 variant="danger"
             />
 

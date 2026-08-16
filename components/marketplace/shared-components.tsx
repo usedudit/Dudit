@@ -29,14 +29,14 @@ const HOME_CATEGORIES = [
 export const HeroBanner: React.FC<{ height?: number }> = ({ height = 300 }) => {
     return (
         <section className="mt-6 mb-12 px-4 lg:px-0 group flex justify-center w-full">
-            <div className="relative w-full rounded-xl overflow-hidden cursor-pointer select-none transition-all duration-300 bg-gray-100 aspect-[16/9] sm:aspect-[2.1/1] md:aspect-[2.2/1] lg:aspect-[2.5/1]">
+            <div className="relative w-full max-w-[1400px] rounded-xl lg:rounded-2xl overflow-hidden cursor-pointer select-none transition-all duration-300 bg-gray-100 aspect-[2.65/1] md:aspect-auto md:h-[300px]">
                 <img
                     src="https://img.dudit.com.br/cdn-cgi/image/width=1400,format=auto,quality=85/static/banners/Banner-1.png"
                     srcSet="https://img.dudit.com.br/cdn-cgi/image/width=750,format=auto,quality=80/static/banners/Banner-1.png 750w, https://img.dudit.com.br/cdn-cgi/image/width=1400,format=auto,quality=85/static/banners/Banner-1.png 1400w"
                     sizes="(max-width: 768px) 100vw, 1400px"
                     alt="Dudit"
                     width={1400}
-                    height={560}
+                    height={528}
                     className="w-full h-full object-cover object-center transition-transform duration-500"
                     fetchPriority="high"
                     decoding="async"
@@ -72,7 +72,7 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
     const fallbackBanner = hasPartnerLogo
         ? getRandomDefaultBanner()
         : getBannerUrlByColor(getAvatarColor(storeName))
-    const bannerImage = bannerUrl ? getR2ImageUrl(bannerUrl, "medium") : fallbackBanner
+    const bannerImage = bannerUrl ? getR2ImageUrl(bannerUrl, "large") : fallbackBanner
     const city = partner.city || vitrine.city || ""
     const state = partner.state || vitrine.state || ""
     const category = vitrine.category || partner.category || (typeof partner.category === "string" ? partner.category : null)
@@ -86,7 +86,7 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
             prefetch={false}
             className={`flex flex-col group cursor-pointer active:scale-[0.98] transition-all duration-300 ${className}`}
         >
-            <div className="relative w-full aspect-[16/7] rounded-[16px] overflow-hidden bg-gray-100 mb-3 shrink-0">
+            <div className="relative w-full aspect-[2.65/1] rounded-[16px] overflow-hidden bg-gray-100 mb-3 shrink-0">
                 <img
                     src={bannerImage}
                     alt={storeName}

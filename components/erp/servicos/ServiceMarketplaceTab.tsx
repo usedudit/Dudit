@@ -1,11 +1,20 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Input, FormDropdown, Checkbox, Button, Accordion, IconPlaceholder, RichTextEditor, TagsInput, FormSection } from "@/components/reusable"
-import { PlusIcon, XIcon, StoreIcon, ArrowUpDownIcon, TrashIcon } from "@/lib/icons"
+import { Input, FormDropdown, Checkbox, Button, Accordion, IconPlaceholder, RichTextEditor, TagsInput, FormSection, Badge } from "@/components/reusable"
+import { PlusIcon, XIcon, StoreIcon, ArrowUpDownIcon, TrashIcon, Package, CheckCircleIcon, EditIcon, ChevronDownIcon } from "@/lib/icons"
 import ProductVideoSection from "@/components/erp/product/ProductVideoSection"
+import MarketplaceCategoryModal from "@/components/erp/product/MarketplaceCategoryModal"
+import { getCategoryPathClient } from "@/lib/data/marketplace-categories-client"
+
+const SidebarCard = ({ children, className = "", hasTopStrip = false }: { children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
+    <div className={`bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
+        {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
+        {children}
+    </div>
+)
 
 interface ServiceMarketplaceTabProps {
     serviceData: any
@@ -20,6 +29,20 @@ interface ServiceMarketplaceTabProps {
 export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
     serviceData, handleInputChange, isEditing, itemId, video, onVideoChange, videoPlanBlocked = false
 }) => {
+    const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
+    const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
+    const [categoryPath, setCategoryPath] = useState("")
+
+    useEffect(() => {
+        const fetchPath = async () => {
+            if (serviceData?.marketplace_category_id) {
+                const path = await getCategoryPathClient(serviceData.marketplace_category_id)
+                if (path) setCategoryPath(path)
+            }
+        }
+        fetchPath()
+    }, [serviceData?.marketplace_category_id])
+
     // --- Helper para simular evento nativo ---
     const manualChange = (name: string, value: any) => {
         handleInputChange({
@@ -32,7 +55,7 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
 
     // --- Lógica dos Atributos (Ficha Técnica) ---
     const addAttribute = () => {
-        if (technicalDetails.length >= 25) return;
+        if (technicalDetails.length >= 25) return
         const newAttributes = [...technicalDetails, { id: Date.now(), name: "", value: "" }]
         manualChange("technical_details", newAttributes)
     }
@@ -49,6 +72,156 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
         manualChange("technical_details", newAttributes)
     }
 
+    const serviceTypeLabel = (() => {
+        switch (serviceData?.service_type) {
+            case 'online': return 'Online (Remoto)'
+            case 'hybrid': return 'Híbrido'
+            default: return 'Presencial'
+        }
+    })()
+
+    // ─── MODO DETALHES (READ-ONLY) ───────────────────────────────────────────
+    if (!isEditing) {
+        return (
+            <div className="grid grid-cols-12 gap-y-8 md:gap-y-0 animate-fade-in">
+                {/* --- COLUNA ESQUERDA (Principal) --- */}
+                <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
+                    {/* Descrição */}
+                    <FormSection title="Descrição">
+                        <div className={`relative ${!isDescriptionExpanded ? "max-h-[160px] overflow-hidden" : ""}`}>
+                            {serviceData?.description ? (
+                                <div
+                                    className="rich-text-content text-sm md:text-base text-brand-dark dark:text-dark-heading leading-relaxed"
+                                    dangerouslySetInnerHTML={{ __html: serviceData.description }}
+                                />
+                            ) : (
+                                <p className="text-sm text-brand-inactive-text dark:text-dark-body">Sem descrição cadastrada.</p>
+                            )}
+                            {!isDescriptionExpanded && (serviceData?.description?.length || 0) > 250 && (
+                                <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-white dark:from-dark-surface to-transparent pointer-events-none" />
+                            )}
+                        </div>
+                        {(serviceData?.description?.length || 0) > 250 && (
+                            <button
+                                type="button"
+                                onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+                                className="flex items-center gap-1 text-brand-primary dark:text-brand-primary font-bold text-sm mt-3 hover:underline cursor-pointer"
+                            >
+                                {isDescriptionExpanded ? "Ver menos descrição" : "Ver mais descrição"}
+                                <ChevronDownIcon size={16} className={`transition-transform duration-200 ${isDescriptionExpanded ? "rotate-180" : ""}`} />
+                            </button>
+                        )}
+                    </FormSection>
+
+                    {/* Especificações */}
+                    <FormSection hasSeparator title="Especificações">
+                        {technicalDetails.length > 0 ? (
+                            <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden shadow-xs">
+                                {technicalDetails.map((spec: any, i: number) => (
+                                    <div
+                                        key={i}
+                                        className={`flex justify-between items-center px-5 py-3.5 ${
+                                            i % 2 === 0
+                                                ? "bg-brand-gray dark:bg-dark-border/30"
+                                                : "bg-white dark:bg-dark-surface"
+                                        } ${i < technicalDetails.length - 1 ? "border-b border-brand-border dark:border-dark-border" : ""}`}
+                                    >
+                                        <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
+                                            {spec.name || spec.label || ""}
+                                        </span>
+                                        <span className="text-sm text-brand-dark dark:text-dark-heading font-semibold text-right">
+                                            {spec.value || ""}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">Nenhuma especificação cadastrada.</p>
+                        )}
+                    </FormSection>
+
+                    {/* Vídeo */}
+                    <FormSection hasSeparator title="Vídeo">
+                        <ProductVideoSection
+                            itemType="service"
+                            itemId={itemId}
+                            video={video}
+                            onChange={onVideoChange}
+                            isEditing={false}
+                            videoPlanBlocked={videoPlanBlocked}
+                        />
+                    </FormSection>
+                </div>
+
+                {/* --- COLUNA DIREITA (Sidebar) --- */}
+                <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
+                    <SidebarCard hasTopStrip>
+                        <h3 className="text-lg font-bold mb-6 mt-2 text-brand-dark dark:text-dark-heading">Configurações</h3>
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
+                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Destacar Serviço</span>
+                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                    {serviceData?.highlight_service ? "Sim" : "Não"}
+                                </span>
+                            </div>
+                            <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
+                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Tipo de Serviço</span>
+                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                    {serviceTypeLabel}
+                                </span>
+                            </div>
+                            <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
+                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Garantia</span>
+                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                    {serviceData?.warranty_value ? `${serviceData.warranty_value} ${serviceData.warranty_period || "Meses"}` : serviceData?.warranty || "Sem garantia"}
+                                </span>
+                            </div>
+                            <div className="flex justify-between items-center py-2">
+                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Intervalo para retorno</span>
+                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                    {serviceData?.recurrence_interval_value ? `${serviceData.recurrence_interval_value} ${serviceData.recurrence_interval_unit || "Meses"}` : "Não definido"}
+                                </span>
+                            </div>
+                        </div>
+                    </SidebarCard>
+
+                    {categoryPath && (
+                        <SidebarCard>
+                            <div className="flex items-center justify-between mb-3">
+                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
+                                    <Package className="w-5 h-5 text-brand-green" />
+                                    Categoria Oficial
+                                </h3>
+                                <span className="text-xs font-medium bg-green-100 text-green-800 dark:bg-green-950/50 dark:text-green-300 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                    <CheckCircleIcon className="w-3 h-3" /> Categorizado
+                                </span>
+                            </div>
+                            <p className="text-sm text-brand-dark dark:text-dark-heading font-medium">
+                                {categoryPath}
+                            </p>
+                        </SidebarCard>
+                    )}
+
+                    <SidebarCard>
+                        <h3 className="text-lg font-bold mb-3 text-brand-dark dark:text-dark-heading">Tags e Buscas</h3>
+                        {tags && tags.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                                {tags.map((tag: string, i: number) => (
+                                    <Badge key={i} variant="gray" icon={null} className="px-3 py-1 text-xs font-medium">
+                                        {tag}
+                                    </Badge>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">Nenhuma tag cadastrada.</p>
+                        )}
+                    </SidebarCard>
+                </div>
+            </div>
+        )
+    }
+
+    // ─── MODO EDIÇÃO / CRIAÇÃO ────────────────────────────────────────────────
     return (
         <div className="grid grid-cols-12 gap-y-8 md:gap-y-0 animate-fade-in">
             {/* --- COLUNA ESQUERDA (Principal) --- */}
@@ -210,8 +383,6 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
                             width="w-full"
                         />
 
-                        {/* Garantia is a string input in the current implementation, but user said "igual é la pra aba de marketplace de cadastrar novo produto". Let's match product's warranty fields. I'll need to store warranty_value and warranty_period in serviceData. Or just use the existing warranty field for now, but formatted nicely? No, user explicitly said "igual de produtos". Let's add warranty_value and warranty_period inputs, saving to a single JSON or just multiple fields. Wait, the schema has `warranty` text. Let's assume warranty holds a string like "X Meses". For now, we will bind to warranty_value and warranty_period, but how do we save it?
-                        Actually, `services` table has `warranty (text)`. I'll just use the text field but present it as two inputs, or just one text input like before. But the user said "igual é la pra produtos". Let's see how Product does it. It uses `warranty_value` and `warranty_period`. We can just store them as `warranty_value` and `warranty_period` in the serviceData object, and map them to `warranty` on save, or let the backend save them into the `warranty` field if it's text. Let's just use the two fields and we can concat them on submit or backend. */}
                         <div className="grid grid-cols-2 gap-4">
                             <Input
                                 label="Garantia"
@@ -283,6 +454,6 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
                     />
                 </div>
             </div>
-        </div >
+        </div>
     )
 }

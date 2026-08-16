@@ -481,22 +481,58 @@ function applyUrgencyBadges(sections: HomeSection[], ctx: DiscoverCtx) {
     }
 }
 
-// ─── Shared Request-Scoped Product Pool ────────────────────────────────────
+// ─── Shared Request-Scoped Product, Service and Store Pools ───────────────
 
 const getSharedHomeProductsPool = cache(async (allIdsKey: string, allIds: string[]): Promise<RawProduct[]> => {
     if (allIds.length === 0) return []
     const supabase = getAdminClient()
     const { data, error } = await supabase
         .from("products")
-        .select(`${BASE_FIELDS}, ${STATS_FIELDS}, condition, created_at, category_id, ${PARTNER_JOIN}`)
+        .select(`${BASE_FIELDS}, ${STATS_FIELDS}, marketplace_score, condition, created_at, category_id, ${PARTNER_JOIN}`)
         .eq("is_active", true)
         .eq("show_in_marketplace", true)
         .in("partner_id", allIds)
         .order("created_at", { ascending: false })
-        .limit(120)
+        .limit(150)
 
     if (error || !data) return []
     return data as RawProduct[]
+})
+
+const getSharedHomeServicesPool = cache(async (allIdsKey: string, allIds: string[]): Promise<any[]> => {
+    if (allIds.length === 0) return []
+    const supabase = getAdminClient()
+    const { data, error } = await supabase
+        .from("services")
+        .select(`id, name, price, images, rating, created_at, marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)), ${PARTNER_JOIN}`)
+        .eq("is_active", true)
+        .eq("show_in_marketplace", true)
+        .in("partner_id", allIds)
+        .order("created_at", { ascending: false })
+        .limit(60)
+
+    if (error || !data) return []
+    return data as any[]
+})
+
+const getSharedHomeStoresPool = cache(async (allIdsKey: string, allIds: string[]): Promise<any[]> => {
+    if (allIds.length === 0) return []
+    const supabase = getAdminClient()
+    const { data, error } = await supabase
+        .from("stores")
+        .select(`
+            id, name, description, logo_url, banner_url,
+            phone, rating, is_showcase_active, partner_id,
+            addresses!store_id!left(city, state, neighborhood, latitude, longitude),
+            partners!inner(id, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), reviews(count))
+        `)
+        .eq("is_active", true)
+        .in("partner_id", allIds)
+        .order("rating", { ascending: false, nulls: "last" })
+        .limit(30)
+
+    if (error || !data) return []
+    return data as any[]
 })
 
 // ─── SECTION FETCHERS ───────────────────────────────────────────────────────
@@ -790,30 +826,16 @@ async function fetchNearby(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
 // ─── 4. 🆕 Recém anunciados (produtos + serviços) ───────────────────────────
 
 async function fetchRecent(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
-    const supabase = getAdminClient()
     const allIds = [...tiers.allIds]
     if (allIds.length === 0) {
         dLog(`[Discover] SKIP recent reason=no_partners`)
         return null
     }
 
-    const [products, servResult] = await Promise.all([
+    const [products, services] = await Promise.all([
         getSharedHomeProductsPool(allIds.join(","), allIds),
-        supabase
-            .from("services")
-            .select(`id, name, price, images, rating, created_at, ${PARTNER_JOIN}`)
-            .eq("is_active", true)
-            .eq("show_in_marketplace", true)
-            .in("partner_id", allIds)
-            .order("created_at", { ascending: false })
-            .limit(30),
+        getSharedHomeServicesPool(allIds.join(","), allIds),
     ])
-
-    if (servResult.error) {
-        dError(`[DISCOVER][RECENT] Services Error:`, servResult.error, `city=${ctx.city} state=${ctx.state}`)
-    }
-
-    const services = (servResult.data || []) as any[]
 
     if (products.length === 0 && services.length === 0) {
         dLog(`[Discover] SKIP recent reason=no_items`)
@@ -1108,35 +1130,21 @@ async function fetchPersonalized(tiers: PartnerTiers, ctx: DiscoverCtx): Promise
 // ─── 7. ⭐ Mais vendidos ─────────────────────────────────────────────────────
 
 async function fetchBestSellers(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
-    const supabase = getAdminClient()
     const allIds = [...tiers.allIds]
     if (allIds.length === 0) {
         dLog(`[Discover] SKIP bestSellers reason=no_partners`)
         return null
     }
 
-    let { data, error } = await supabase
-        .from("products")
-        .select(`${BASE_FIELDS}, sales_last_30_days, ${PARTNER_JOIN}`)
-        .eq("is_active", true)
-        .eq("show_in_marketplace", true)
-        .gt("sales_last_30_days", 0)
-        .in("partner_id", allIds)
-        .order("sales_last_30_days", { ascending: false, nulls: "last" })
-        .limit(60)
+    const pool = await getSharedHomeProductsPool(allIds.join(","), allIds)
+    const withSales = pool.filter(p => (p.sales_last_30_days ?? 0) > 0)
 
-    if (error) {
-        dError(`[DISCOVER][BEST_SELLERS] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
-        dLog(`[Discover] SKIP bestSellers reason=error`)
+    if (withSales.length === 0) {
+        dLog(`[Discover] SKIP bestSellers reason=no_products_with_sales`)
         return null
     }
 
-    if (!data || data.length === 0) {
-        dLog(`[Discover] SKIP bestSellers reason=no_products`)
-        return null
-    }
-
-    const tagged = applyTierSort(data as RawProduct[], tiers, item => {
+    const tagged = applyTierSort(withSales, tiers, item => {
         return (item as RawProduct).sales_last_30_days ?? 0
     })
 
@@ -1165,35 +1173,21 @@ async function fetchBestSellers(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<
 // ─── 8. 🏆 Melhor avaliados ──────────────────────────────────────────────────
 
 async function fetchTopRated(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
-    const supabase = getAdminClient()
     const allIds = [...tiers.allIds]
     if (allIds.length === 0) {
         dLog(`[Discover] SKIP topRated reason=no_partners`)
         return null
     }
 
-    let { data, error } = await supabase
-        .from("products")
-        .select(`${BASE_FIELDS}, ${PARTNER_JOIN}`)
-        .eq("is_active", true)
-        .eq("show_in_marketplace", true)
-        .gt("rating", 0)
-        .in("partner_id", allIds)
-        .order("rating", { ascending: false, nulls: "last" })
-        .limit(60)
+    const pool = await getSharedHomeProductsPool(allIds.join(","), allIds)
+    const withRating = pool.filter(p => (p.rating ?? 0) > 0)
 
-    if (error) {
-        dError(`[DISCOVER][TOP_RATED] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
-        dLog(`[Discover] SKIP topRated reason=error`)
+    if (withRating.length === 0) {
+        dLog(`[Discover] SKIP topRated reason=no_products_with_rating`)
         return null
     }
 
-    if (!data || data.length === 0) {
-        dLog(`[Discover] SKIP topRated reason=no_products`)
-        return null
-    }
-
-    const tagged = applyTierSort(data as RawProduct[], tiers, item => {
+    const tagged = applyTierSort(withRating, tiers, item => {
         return (item as RawProduct).rating ?? 0
     })
 
@@ -1225,29 +1219,15 @@ async function fetchTopRated(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
 // ─── 9. 🎯 Promoções especiais ───────────────────────────────────────────────
 
 async function fetchPromos(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
-    const supabase = getAdminClient()
     const allIds = [...tiers.allIds]
     if (allIds.length === 0) {
         dLog(`[Discover] SKIP promos reason=no_partners`)
         return null
     }
 
-    let { data, error } = await supabase
-        .from("products")
-        .select(`${BASE_FIELDS}, ${PARTNER_JOIN}`)
-        .eq("is_active", true)
-        .eq("show_in_marketplace", true)
-        .in("partner_id", allIds)
-        .not("promotional_price", "is", null)
-        .limit(80)
+    const pool = await getSharedHomeProductsPool(allIds.join(","), allIds)
 
-    if (error) {
-        dError(`[DISCOVER][PROMOS] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
-        dLog(`[Discover] SKIP promos reason=error`)
-        return null
-    }
-
-    const discounted = (data || []).filter((item: any) => {
+    const discounted = pool.filter((item: any) => {
         const origPrice = Number(item.price) > 0
             ? Number(item.price)
             : Number(extractFirstVariantFallback(item.product_variants).fallback_variant_price || 0)
@@ -1305,34 +1285,19 @@ async function fetchPromos(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
 // ─── 10. 💬 Mais visualizados ────────────────────────────────────────────────
 
 async function fetchMostViewed(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
-    const supabase = getAdminClient()
     const allIds = [...tiers.allIds]
     if (allIds.length === 0) {
         dLog(`[Discover] SKIP mostViewed reason=no_partners`)
         return null
     }
 
-    let { data, error } = await supabase
-        .from("products")
-        .select(`${BASE_FIELDS}, views_last_30_days, ${PARTNER_JOIN}`)
-        .eq("is_active", true)
-        .eq("show_in_marketplace", true)
-        .in("partner_id", allIds)
-        .order("views_last_30_days", { ascending: false, nulls: "last" })
-        .limit(60)
-
-    if (error) {
-        dError(`[DISCOVER][MOST_VIEWED] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
-        dLog(`[Discover] SKIP mostViewed reason=error`)
-        return null
-    }
-
-    if (!data || data.length === 0) {
+    const pool = await getSharedHomeProductsPool(allIds.join(","), allIds)
+    if (pool.length === 0) {
         dLog(`[Discover] SKIP mostViewed reason=no_products`)
         return null
     }
 
-    const tagged = applyTierSort(data as RawProduct[], tiers, item => {
+    const tagged = applyTierSort(pool, tiers, item => {
         return (item as RawProduct).views_last_30_days ?? 0
     })
 
@@ -1361,29 +1326,14 @@ async function fetchMostViewed(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
 // ─── 11. 🧰 Serviços (com ou sem coordenadas) ───────────────────────────────
 
 async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
-    const supabase = getAdminClient()
     const allIds = [...tiers.allIds]
     if (allIds.length === 0) {
         dLog(`[Discover] SKIP services reason=no_partners`)
         return null
     }
 
-    let { data, error } = await supabase
-        .from("services")
-        .select(`id, name, price, images, rating, marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)), ${PARTNER_JOIN}`)
-        .eq("is_active", true)
-        .eq("show_in_marketplace", true)
-        .in("partner_id", allIds)
-        .order("rating", { ascending: false, nulls: "last" })
-        .limit(60)
-
-    if (error) {
-        dError(`[DISCOVER][SERVICES] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
-        dLog(`[Discover] SKIP services reason=error`)
-        return null
-    }
-
-    if (!data || data.length === 0) {
+    const data = await getSharedHomeServicesPool(allIds.join(","), allIds)
+    if (data.length === 0) {
         dLog(`[Discover] SKIP services reason=no_products`)
         return null
     }
@@ -1466,31 +1416,13 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
 // ─── 12. 🛍️ Vitrines (sempre obrigatória se houver parceiros) ─────────────
 
 async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
-    const supabase = getAdminClient()
     const allIds = [...tiers.allIds]
     if (allIds.length === 0) {
         dLog(`[Discover] SKIP topVitrines reason=no_partners`)
         return null
     }
 
-    let { data, error } = await supabase
-        .from("stores")
-        .select(`
-            id, name, description, logo_url, banner_url,
-            phone, rating, is_showcase_active, partner_id,
-            addresses!store_id!left(city, state, neighborhood, latitude, longitude),
-            partners!inner(id, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), reviews(count))
-        `)
-        .eq("is_active", true)
-        .in("partner_id", allIds)
-        .order("rating", { ascending: false, nulls: "last" })
-        .limit(30)
-
-    if (error) {
-        dError(`[DISCOVER][VITRINES] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
-        dLog(`[Discover] SKIP topVitrines reason=error`)
-        return null
-    }
+    const data = await getSharedHomeStoresPool(allIds.join(","), allIds)
 
     if (!data || data.length === 0) {
         dLog(`[Discover] SKIP topVitrines reason=no_data`)
@@ -1572,34 +1504,19 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
 // ─── 13a. Produtos populares (fallback) ─────────────────────────────────────
 
 async function fetchPopular(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
-    const supabase = getAdminClient()
     const allIds = [...tiers.allIds]
     if (allIds.length === 0) {
         dLog(`[Discover] SKIP popular reason=no_partners`)
         return null
     }
 
-    let { data, error } = await supabase
-        .from("products")
-        .select(`${BASE_FIELDS}, marketplace_score, ${PARTNER_JOIN}`)
-        .eq("is_active", true)
-        .eq("show_in_marketplace", true)
-        .in("partner_id", allIds)
-        .order("marketplace_score", { ascending: false, nulls: "last" })
-        .limit(60)
-
-    if (error) {
-        dError(`[DISCOVER][POPULAR] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
-        dLog(`[Discover] SKIP popular reason=error`)
-        return null
-    }
-
-    if (!data || data.length === 0) {
+    const pool = await getSharedHomeProductsPool(allIds.join(","), allIds)
+    if (pool.length === 0) {
         dLog(`[Discover] SKIP popular reason=no_products`)
         return null
     }
 
-    const tagged = applyTierSort(data as RawProduct[], tiers, item => {
+    const tagged = applyTierSort(pool, tiers, item => {
         return (item as any).marketplace_score ?? 0
     })
 
@@ -1628,33 +1545,19 @@ async function fetchPopular(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Home
 // ─── 13b. Último recurso: qualquer produto (sem ranking) ──────────────────────
 
 async function fetchAllProducts(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
-    const supabase = getAdminClient()
     const allIds = [...tiers.allIds]
     if (allIds.length === 0) {
         dLog(`[Discover] SKIP allProducts reason=no_partners`)
         return null
     }
 
-    let { data, error } = await supabase
-        .from("products")
-        .select(`${BASE_FIELDS}, created_at, ${PARTNER_JOIN}`)
-        .eq("is_active", true)
-        .eq("show_in_marketplace", true)
-        .in("partner_id", allIds)
-        .limit(60)
-
-    if (error) {
-        dError(`[DISCOVER][ALL_PRODUCTS] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
-        dLog(`[Discover] SKIP allProducts reason=error`)
-        return null
-    }
-
-    if (!data || data.length === 0) {
+    const pool = await getSharedHomeProductsPool(allIds.join(","), allIds)
+    if (pool.length === 0) {
         dLog(`[Discover] SKIP allProducts reason=no_products`)
         return null
     }
 
-    const tagged = applyTierSort(data as RawProduct[], tiers, item => {
+    const tagged = applyTierSort(pool, tiers, item => {
         const r = item as RawProduct
         return r.created_at ? new Date(r.created_at).getTime() : 0
     })
@@ -1960,7 +1863,7 @@ const getSharedHomeSections = (
     async () => getHomeSectionsUncached({ ...ctx, userId: null }),
     [`discover:home:shared:${scope}:${citySlug}:${stateOnly ? "state" : "city"}:${lat}:${lng}`],
     {
-        revalidate: 60, // Cache for 60 seconds
+        revalidate: 300, // Cache for 5 minutes (was 60s)
         tags: [TAGS.marketplace, TAGS.products(), "services", "campaigns", TAGS.advertisements],
     }
 )

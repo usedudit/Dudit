@@ -103,10 +103,7 @@ Marque o pedido como **Falha na entrega**. Você pode reagendar e incluí-lo em 
 ## Metas
 
 **O que conta para a meta?**
-O valor total dos pedidos e vendas com status **Pago** ou **Parcialmente pago**.
-
-**Consigo ter metas para serviços e produtos separadamente?**
-Sim. Ao criar a meta, você escolhe o tipo: **Vendas**, **Ordens de serviço** ou **Ambos**.
+O valor total dos pedidos e vendas com status **Pago** ou **Parcialmente pago**. Ordens de serviço que virarem venda também contam.
 
 **O bônus é pago automaticamente?**
 Se você ativar o **lançamento automático**, sim. Caso contrário, o bônus é apenas informativo e você faz o pagamento por fora.

@@ -23,6 +23,7 @@ import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 
 // Specific Page components
 import NewRecurringPlanPage from "./NewRecurringPlanPage"
+import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
 import PlanPageControls from "./PlanPageControls"
 import PlanGridCard from "./PlanGridCard"
 import PlanListRow from "./PlanListRow"
@@ -327,21 +328,20 @@ export default function RecurringPlansPage({
         <>
             <AnimatePresence mode="wait">
                 {entityState.isOpen && (isViewing || isEditing || isCreating) ? (
-                    isLoadingDetail ? (
-                        <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
-                            <ThreeDotsLoader />
-                        </div>
+                    ((isViewing || isEditing) && (isLoadingDetail || !selectedPlan)) ? (
+                        <ERPDetailLoading key="loading-plan" />
                     ) : (
-                        <NewRecurringPlanPage
-                            key="form"
-                            partnerId={partnerId}
-                            plan={selectedPlan}
-                            onBack={() => closeEntity()}
-                            onSuccess={() => {
-                                afterMutation()
-                                closeEntity()
-                            }}
-                        />
+                        <FadeIn key="form" className="w-full h-full">
+                            <NewRecurringPlanPage
+                                partnerId={partnerId}
+                                plan={selectedPlan}
+                                onBack={() => closeEntity()}
+                                onSuccess={() => {
+                                    afterMutation()
+                                    closeEntity()
+                                }}
+                            />
+                        </FadeIn>
                     )
                 ) : (
                     <FadeIn

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { usePathname } from "next/navigation"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
-import { ShoppingCartIcon, SettingsIcon, XIcon, ChevronRightIcon, ChevronDownIcon, HomeIcon, StoreIcon, Package, MegaphoneIcon, MoneyIcon, Users, GridIcon, ChartIcon, WrenchIcon } from "@/lib/icons"
+import { ShoppingCartIcon, SettingsIcon, XIcon, ChevronRightIcon, ChevronDownIcon, HomeIcon, Package, MegaphoneIcon, MoneyIcon, Users, GridIcon, ChartIcon, WrenchIcon } from "@/lib/icons"
 import * as TooltipPrimitive from "@radix-ui/react-tooltip"
 import { motion, AnimatePresence } from "framer-motion"
 import { usePermissions } from "@/lib/permission-context"
@@ -115,15 +115,6 @@ const navItems: NavItem[] = [
         ],
     },
     {
-        icon: StoreIcon,
-        label: "Minha Vitrine",
-        submenu: [
-            { label: "Personalizar Perfil", href: "/" },
-            { label: "Avaliações e Reputação", href: "/" },
-            { label: "QR Code e Compartilhar", href: "/" },
-        ],
-    },
-    {
         icon: SettingsIcon,
         label: "Configurações",
         href: "/erp/configuracoes",
@@ -230,9 +221,6 @@ function ErpPlanGatedNavItem({
 
 export function ERPSidebar() {
     const pathname = usePathname()
-    if (pathname === "/erp/pdv") {
-        return null
-    }
     const { isExpanded, toggleSidebar, isMobileOpen, setIsMobileOpen, sidebarCard } = useSidebar()
     const isCollapsed = !isExpanded
     const { canAccessPath: canAccess, businessInfo: contextBusinessInfo, planSlug } = usePermissions()
@@ -443,7 +431,7 @@ export function ERPSidebar() {
         }, 150) // 150ms de tolerância
     }
 
-    if (!isMounted) return null
+    if (!isMounted || pathname === "/erp/pdv") return null
 
     // Cores Forçadas do Dark Mode
     const activeClasses = "bg-brand-green/10 text-brand-green font-medium"

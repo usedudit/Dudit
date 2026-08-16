@@ -16,6 +16,34 @@ import { adminAuditLog } from "@/lib/admin/audit"
 import { AdminActionType } from "@/lib/admin/types"
 import type { SubscriptionEntry, CursorPaginatedResult } from "@/lib/admin/types"
 
+export interface AdminSubscriptionStats {
+    total: number
+    connected: number
+    disconnected: number
+    suspended: number
+}
+
+export async function getAdminSubscriptionStats(): Promise<AdminSubscriptionStats> {
+    await requireAdmin("admin")
+    await requireRateLimit(RateLimitCategory.ADMIN_READ)
+
+    const supabase = await getSupabaseServerClient()
+
+    const [totalRes, connectedRes, disconnectedRes, suspendedRes] = await Promise.all([
+        supabase.from("partners").select("id", { count: "exact", head: true }),
+        supabase.from("partners").select("id", { count: "exact", head: true }).not("mp_user_id", "is", null),
+        supabase.from("partners").select("id", { count: "exact", head: true }).is("mp_user_id", null),
+        supabase.from("partners").select("id", { count: "exact", head: true }).not("suspended_at", "is", null),
+    ])
+
+    return {
+        total: totalRes.count || 0,
+        connected: connectedRes.count || 0,
+        disconnected: disconnectedRes.count || 0,
+        suspended: suspendedRes.count || 0,
+    }
+}
+
 // ─── Get Subscriptions ──────────────────────────────────────────────────────
 
 export async function getSubscriptions(

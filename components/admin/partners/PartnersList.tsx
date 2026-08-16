@@ -1,15 +1,14 @@
 "use client"
 
-import { useState, useTransition, useRef, useMemo, useEffect } from "react"
-import { Button, Badge, Input, IconPlaceholder, ThreeDotsLoader } from "@/components/reusable"
-import AlertModal from "@/components/reusable/AlertModal"
-import DefaultModal from "@/components/reusable/DefaultModal"
-import StepUpModal from "@/components/admin/StepUpModal"
+import { useState, useTransition, useMemo, useEffect, useCallback } from "react"
+import { Button, Badge, IconPlaceholder, ThreeDotsLoader, Pagination } from "@/components/reusable"
 import PartnerListRow from "./PartnerListRow"
 import PartnersPageControls from "./PartnersPageControls"
+import AdminPartnerDetailView from "./AdminPartnerDetailView"
+import DestructiveActionModal from "@/components/admin/DestructiveActionModal"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { AnimatePresence } from "framer-motion"
-import { StoreIcon, ClockIcon, UserIcon, ShieldIcon, XIcon } from "@/lib/icons"
+import { StoreIcon, ExportFileIcon } from "@/lib/icons"
 import type { EnforcementPartner, CursorPaginatedResult } from "@/lib/admin/types"
 import {
     getPartners,
@@ -19,63 +18,31 @@ import {
     unsuspendStore,
     disableTenantAccess,
     enableTenantAccess,
+    getAdminPartnerStats,
+    type AdminPartnerStats,
 } from "@/app/actions/admin/enforcement"
-import BottomSheet from "@/components/BottomSheet"
-import Portal from "@/components/Portal"
 import { useMediaQuery } from "@/components/erp/hooks"
-import { useEntityPage } from "@/hooks/use-entity-page"
+import { formatDate } from "@/lib/utils"
 import { toast } from "@/hooks/use-notification"
-
-
-// ─── Duration selector ──────────────────────────────────────────────────────
-
-function DurationSelect({ value, onChange }: { value: number | null; onChange: (v: number | null) => void }) {
-    return (
-        <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-brand-dark dark:text-dark-body">Duração</label>
-            <select
-                value={value === null ? "permanent" : String(value)}
-                onChange={e => {
-                    const val = e.target.value
-                    onChange(val === "permanent" ? null : parseInt(val))
-                }}
-                className="w-full h-[42px] px-4 rounded-lg border border-brand-border dark:border-dark-border bg-brand-gray dark:bg-dark-border/30 text-sm text-brand-dark dark:text-dark-heading focus:outline-none focus:border-brand-dark dark:focus:border-dark-body focus:bg-white dark:focus:bg-dark-surface transition-colors"
-            >
-                <option value="7">7 dias</option>
-                <option value="14">14 dias</option>
-                <option value="30">30 dias</option>
-                <option value="90">90 dias</option>
-                <option value="365">1 ano</option>
-                <option value="permanent">Permanente</option>
-            </select>
-        </div>
-    )
-}
-
-// ─── Main Component ─────────────────────────────────────────────────────────
 
 interface PartnersListProps {
     initialData: CursorPaginatedResult<EnforcementPartner>
+    initialStats?: AdminPartnerStats
 }
 
-const PartnersList = ({ initialData }: PartnersListProps) => {
+const PartnersList = ({ initialData, initialStats }: PartnersListProps) => {
     const isMobile = useMediaQuery("(max-width: 768px)")
-    const observerTarget = useRef<HTMLDivElement>(null)
     const [statusTab, setStatusTab] = useState("all")
-    const [disableTarget, setDisableTarget] = useState<EnforcementPartner | null>(null)
-    const [enableTarget, setEnableTarget] = useState<EnforcementPartner | null>(null)
-    const [suspendTarget, setSuspendTarget] = useState<EnforcementPartner | null>(null)
-    const [unsuspendTarget, setUnsuspendTarget] = useState<EnforcementPartner | null>(null)
+    const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null)
+    const [isPending, startTransition] = useTransition()
+
+    // Modals
     const [suspendStoreTarget, setSuspendStoreTarget] = useState<EnforcementPartner | null>(null)
     const [unsuspendStoreTarget, setUnsuspendStoreTarget] = useState<EnforcementPartner | null>(null)
-    const [suspendPartnerFromStoreTarget, setSuspendPartnerFromStoreTarget] = useState<EnforcementPartner | null>(null)
-    const [disableReason, setDisableReason] = useState("")
-    const [disableDuration, setDisableDuration] = useState<number | null>(30)
-    const [disableConfirmed, setDisableConfirmed] = useState(false)
-    const [showStepUp, setShowStepUp] = useState(false)
-    const [pendingStepUpAction, setPendingStepUpAction] = useState<"disable" | "suspend" | "suspendStore" | null>(null)
-    const [detailPartner, setDetailPartner] = useState<EnforcementPartner | null>(null)
-    const [isPending, startTransition] = useTransition()
+    const [disableERPTarget, setDisableERPTarget] = useState<EnforcementPartner | null>(null)
+
+    // Stats
+    const [stats, setStats] = useState<AdminPartnerStats | undefined>(initialStats)
 
     // Search state
     const [search, setSearch] = useState("")
@@ -85,190 +52,163 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
         return () => clearTimeout(t)
     }, [search])
 
-    // ─── Entity Page ──────────────────────────────────────────────────────────
-    const entityPage = useEntityPage<EnforcementPartner, any, string>({
-        entityType: 'admin-partners',
-        partnerId: 'admin',
-        queryKey: ['admin', 'partners', statusTab, debouncedSearch],
-        initialItems: (debouncedSearch === "" && statusTab === "all") ? initialData.data : [],
-        initialNextCursor: (debouncedSearch === "" && statusTab === "all") ? initialData.nextCursor : null,
-        initialHasMore: (debouncedSearch === "" && statusTab === "all") ? initialData.hasMore : true,
-        fetchPageFn: async ({ cursor }) => {
-            const res = await getPartners(cursor, 40, debouncedSearch, statusTab)
-            return { items: res.data, nextCursor: res.nextCursor, hasMore: res.hasMore }
-        },
-        dedupeKey: (p) => p.id + p.type,
-        getDetailFn: async () => null,
-    })
-
-    const {
-        items: rawPartners, hasNextPage, isFetchingNextPage, isListLoading, fetchNextPage, afterMutation,
-    } = entityPage
-
-    // Pagination
+    // Data State
+    const [partners, setPartners] = useState<EnforcementPartner[]>(initialData.data || [])
+    const [isLoading, setIsLoading] = useState(false)
     const [page, setPage] = useState(1)
-    const itemsPerPage = 8
-    const totalPages = Math.ceil(rawPartners.length / itemsPerPage)
-    const paginatedItems = useMemo(() => {
-        const start = (page - 1) * itemsPerPage
-        return rawPartners.slice(start, start + itemsPerPage)
-    }, [rawPartners, page])
+    const itemsPerPage = 12
 
-    // Reset page when filters change
-    useMemo(() => { setPage(1) }, [debouncedSearch, statusTab])
-
-    const handleDisableERP = () => {
-        if (!disableTarget) return
-        if (!disableReason.trim() || disableReason.trim().length < 5) return
-        if (!disableConfirmed) return
-        setPendingStepUpAction("disable")
-        setShowStepUp(true)
-    }
-
-    const handleEnableERP = () => {
-        if (!enableTarget) return
+    const fetchPartners = useCallback(() => {
+        setIsLoading(true)
         startTransition(async () => {
-            const result = await enableTenantAccess(enableTarget.id, "Reabilitado pelo admin")
-            if (result.success) {
-                toast.success("Acesso ERP reabilitado com sucesso!")
-                setEnableTarget(null)
-                afterMutation(enableTarget.id)
-            } else {
-                toast.error(result.error || "Erro ao habilitar ERP")
+            try {
+                const [res, statsRes] = await Promise.all([
+                    getPartners(null, 100, debouncedSearch, statusTab === "all" ? undefined : statusTab),
+                    getAdminPartnerStats(),
+                ])
+                setPartners(res.data || [])
+                setStats(statsRes)
+            } catch (err) {
+                console.error("Failed to fetch admin partners:", err)
+                toast.error("Erro ao carregar parceiros")
+            } finally {
+                setIsLoading(false)
             }
         })
-    }
+    }, [statusTab, debouncedSearch])
 
-    const handleSuspend = () => {
-        if (!suspendTarget) return
-        setPendingStepUpAction("suspend")
-        setShowStepUp(true)
-    }
+    useEffect(() => {
+        fetchPartners()
+        setPage(1)
+    }, [fetchPartners])
 
-    const handleSuspendStore = () => {
+    const handleConfirmSuspendStore = (reason: string) => {
         if (!suspendStoreTarget) return
-        setPendingStepUpAction("suspendStore")
-        setShowStepUp(true)
-    }
-
-    const handleSuspendPartnerFromStore = (store: EnforcementPartner) => {
-        const partnerId = store.partner_id || store.id
-        const target: EnforcementPartner = {
-            ...store,
-            id: partnerId,
-            type: "partner",
-        }
-        setSuspendTarget(target)
-        setPendingStepUpAction("suspend")
-        setShowStepUp(true)
-    }
-
-    const handleStepUpAuthenticated = (token: string) => {
-        setShowStepUp(false)
-
-        if (pendingStepUpAction === "disable" && disableTarget) {
-            startTransition(async () => {
-                const result = await disableTenantAccess(disableTarget.id, disableReason, disableDuration, token)
-                if (result.success) {
-                    toast.success("Acesso ERP desabilitado com sucesso!")
-                    setDisableTarget(null)
-                    setDisableReason("")
-                    setDisableDuration(30)
-                    setDisableConfirmed(false)
-                    afterMutation(disableTarget.id)
-                } else {
-                    toast.error(result.error || "Erro ao desabilitar ERP")
-                }
-            })
-        } else if (pendingStepUpAction === "suspend" && suspendTarget) {
-            startTransition(async () => {
-                const result = await suspendPartner(suspendTarget.id, "Suspenso pelo admin", token)
-                if (result.success) {
-                    toast.success("Parceiro suspenso com sucesso!")
-                    setSuspendTarget(null)
-                    afterMutation(suspendTarget.id)
-                } else {
-                    toast.error(result.error || "Erro ao suspender parceiro")
-                }
-            })
-        } else if (pendingStepUpAction === "suspendStore" && suspendStoreTarget) {
-            startTransition(async () => {
-                const result = await suspendStore(suspendStoreTarget.id, "Suspenso pelo admin", token)
-                if (result.success) {
+        startTransition(async () => {
+            try {
+                const res = await suspendStore(suspendStoreTarget.id, reason)
+                if (res.success) {
                     toast.success("Loja suspensa com sucesso!")
                     setSuspendStoreTarget(null)
-                    afterMutation(suspendStoreTarget.id)
+                    fetchPartners()
                 } else {
-                    toast.error(result.error || "Erro ao suspender loja")
+                    toast.error(res.error || "Erro ao suspender loja")
                 }
-            })
-        }
-        setPendingStepUpAction(null)
-    }
-
-    const handleUnsuspend = () => {
-        if (!unsuspendTarget) return
-        startTransition(async () => {
-            const result = await unsuspendPartner(unsuspendTarget.id, "Reativado pelo admin")
-            if (result.success) {
-                toast.success("Parceiro reativado com sucesso!")
-                setUnsuspendTarget(null)
-                afterMutation(unsuspendTarget.id)
-            } else {
-                toast.error(result.error || "Erro ao reativar parceiro")
+            } catch (err: any) {
+                toast.error(err.message || "Erro inesperado")
             }
         })
     }
 
-    const handleUnsuspendStore = () => {
+    const handleConfirmUnsuspendStore = (reason: string) => {
         if (!unsuspendStoreTarget) return
         startTransition(async () => {
-            const result = await unsuspendStore(unsuspendStoreTarget.id, "Reativado pelo admin")
-            if (result.success) {
-                toast.success("Loja reativada com sucesso!")
-                setUnsuspendStoreTarget(null)
-                afterMutation(unsuspendStoreTarget.id)
-            } else {
-                toast.error(result.error || "Erro ao reativar loja")
+            try {
+                const res = await unsuspendStore(unsuspendStoreTarget.id, reason)
+                if (res.success) {
+                    toast.success("Loja reativada com sucesso!")
+                    setUnsuspendStoreTarget(null)
+                    fetchPartners()
+                } else {
+                    toast.error(res.error || "Erro ao reativar loja")
+                }
+            } catch (err: any) {
+                toast.error(err.message || "Erro inesperado")
             }
         })
+    }
+
+    const handleConfirmDisableERP = (reason: string) => {
+        if (!disableERPTarget) return
+        startTransition(async () => {
+            try {
+                const res = await disableTenantAccess(disableERPTarget.id, reason)
+                if (res.success) {
+                    toast.success("Acesso ao ERP desabilitado!")
+                    setDisableERPTarget(null)
+                    fetchPartners()
+                } else {
+                    toast.error(res.error || "Erro ao desabilitar ERP")
+                }
+            } catch (err: any) {
+                toast.error(err.message || "Erro inesperado")
+            }
+        })
+    }
+
+    // Pagination
+    const totalPages = Math.ceil(partners.length / itemsPerPage)
+    const paginatedItems = useMemo(() => {
+        const start = (page - 1) * itemsPerPage
+        return partners.slice(start, start + itemsPerPage)
+    }, [partners, page])
+
+    // If viewing detail of a specific partner / store
+    if (selectedStoreId) {
+        return (
+            <AdminPartnerDetailView
+                storeId={selectedStoreId}
+                onBack={() => setSelectedStoreId(null)}
+                onPartnerUpdated={fetchPartners}
+            />
+        )
     }
 
     return (
         <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
-            <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
+            <style>{`
+                .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; } 
+                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
+                .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; border: 2px solid #fff; }
+                .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border: 2px solid #1f2937; }
+                .dark .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+                .hide-scrollbar::-webkit-scrollbar { display: none; }
+                .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+            `}</style>
 
-                {/* Header Title/Subtitle (ERP Standard) */}
+            <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
+                {/* Desktop Header */}
                 <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
                     <div className="flex flex-col gap-2 pt-1">
                         <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
                             Parceiros e Lojas
                         </h1>
                         <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
-                            Gerencie o acesso ao ERP e o status de suspensão das lojas do marketplace.
+                            Monitore a atividade, risk score e acesso ao ERP dos vendedores do marketplace.
                         </p>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        <Button
+                            variant="outline"
+                            onClick={() => toast.success("Exportação iniciada em segundo plano")}
+                            leftIcon={<ExportFileIcon size={18} />}
+                        >
+                            Exportar
+                        </Button>
                     </div>
                 </div>
 
-                {/* Page Controls (Standardized) */}
+                {/* Page Controls */}
                 <PartnersPageControls
                     search={search}
                     setSearch={setSearch}
                     statusTab={statusTab}
                     setStatusTab={setStatusTab}
+                    tabCounts={stats}
                 />
 
                 {/* List Content */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-24 md:pb-6 relative">
                     <AnimatePresence mode="wait">
-                        {paginatedItems.length === 0 && !isListLoading ? (
-                            <FadeIn key="empty" className="w-full h-full flex items-center justify-center min-h-[500px]">
+                        {paginatedItems.length === 0 && !isLoading ? (
+                            <FadeIn key="empty" className="w-full h-full flex items-center justify-center min-h-[400px]">
                                 <IconPlaceholder
                                     placeholderType="image"
-                                    imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
-                                    imageAlt="Nenhum parceiro"
-                                    title="Nenhum parceiro encontrado"
-                                    subtitle={search ? "Tente ajustar sua busca." : "Nenhum parceiro cadastrado no sistema."}
+                                    imageSrc="https://img.dudit.com.br/static/mascots/SemLojas.png"
+                                    imageAlt="Nenhuma loja"
+                                    title="Nenhuma loja encontrada"
+                                    subtitle={search ? "Tente ajustar sua busca." : "Nenhuma loja cadastrada nesta categoria."}
                                     itemButton={search ? {
                                         text: "Limpar Busca",
                                         action: () => setSearch(""),
@@ -276,82 +216,61 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
                                     } : undefined}
                                 />
                             </FadeIn>
-                        ) : isListLoading ? (
-                            <FadeIn key="loading" className="flex items-center justify-center min-h-[500px]">
+                        ) : isLoading ? (
+                            <FadeIn key="loading" className="flex items-center justify-center min-h-[400px]">
                                 <ThreeDotsLoader />
                             </FadeIn>
                         ) : (
-                            <FadeIn key="list" className="w-full">
-                                {/* Mobile/Tablet View */}
+                            <FadeIn key="list" className="w-full space-y-4">
+                                {/* Mobile View (Cards) */}
                                 <div className="md:hidden flex flex-col w-full divide-y divide-brand-border dark:divide-dark-border">
                                     {paginatedItems.map((partner) => (
                                         <div
                                             key={partner.id + partner.type}
-                                            className="py-5 flex flex-col gap-3 cursor-pointer"
-                                            onClick={() => setDetailPartner(partner)}
+                                            className="py-4 flex flex-col gap-2.5 cursor-pointer active:bg-brand-gray/50 dark:active:bg-dark-border/20 transition-colors"
+                                            onClick={() => setSelectedStoreId(partner.id)}
                                         >
                                             <div className="flex justify-between items-start gap-2">
-                                                <div className="flex items-center gap-3 min-w-0">
-                                                    <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center shrink-0 border border-blue-100 dark:border-blue-900/30">
-                                                        <StoreIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                                                    </div>
-                                                    <div className="min-w-0 flex flex-col">
-                                                        <span className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
-                                                            {partner.store_name || partner.stores?.[0]?.name || "Loja"}
-                                                        </span>
-                                                        <span className="text-xs font-medium text-brand-inactive-text">
-                                                            {partner.type === "store" ? "Loja" : "Parceiro"} &middot; Dono: {partner.owner_name}
-                                                        </span>
-                                                    </div>
+                                                <div className="flex flex-col gap-0.5 min-w-0">
+                                                    <span className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">
+                                                        {partner.store_name || partner.stores?.[0]?.name || "Loja"}
+                                                    </span>
+                                                    <span className="text-xs text-brand-inactive-text truncate">
+                                                        {partner.owner_name || partner.id}
+                                                    </span>
                                                 </div>
-                                                {partner.risk_score > 0 && (
-                                                    <Badge variant={partner.risk_score >= 50 ? "red" : partner.risk_score >= 20 ? "orange" : "blue"}>
-                                                        Risk: {partner.risk_score}
-                                                    </Badge>
-                                                )}
-                                            </div>
-
-                                            <div className="flex items-center gap-2">
-                                                {partner.suspended_at ? (
-                                                    <Badge variant="orange">Suspensa</Badge>
-                                                ) : partner.is_active ? (
-                                                    <Badge variant="green">Ativa</Badge>
-                                                ) : (
-                                                    <Badge variant="gray">Inativa</Badge>
-                                                )}
-                                                <span className="text-xs text-brand-inactive-text ml-auto">
-                                                    {new Date(partner.created_at).toLocaleDateString("pt-BR")}
-                                                </span>
-                                            </div>
-
-                                            <div className="flex items-center gap-2 mt-1">
-                                                <div className="flex gap-2 flex-1 action-btn" onClick={e => e.stopPropagation()}>
-                                                    {partner.suspended_at ? (
-                                                        <Button variant="outline" size="sm" onClick={() => setUnsuspendStoreTarget(partner)} className="flex-1 text-xs h-9">Reativar Loja</Button>
-                                                    ) : (
-                                                        <>
-                                                            <Button variant="outline" size="sm" onClick={() => setSuspendStoreTarget(partner)} className="flex-1 text-xs h-9">Desabilitar ERP</Button>
-                                                            <Button variant="outline" size="sm" onClick={() => handleSuspendPartnerFromStore(partner)} className="flex-1 text-xs h-9">Suspender Parceiro</Button>
-                                                        </>
+                                                <div className="flex items-center gap-1.5">
+                                                    {partner.risk_score > 0 && (
+                                                        <Badge variant={partner.risk_score >= 50 ? "red" : "orange"}>
+                                                            {partner.risk_score} pts
+                                                        </Badge>
                                                     )}
+                                                    <Badge variant={partner.suspended_at ? "red" : partner.is_active ? "green" : "gray"}>
+                                                        {partner.suspended_at ? "Suspensa" : partner.is_active ? "Ativa" : "Inativa"}
+                                                    </Badge>
                                                 </div>
+                                            </div>
+
+                                            <div className="flex items-center justify-between text-xs text-brand-inactive-text">
+                                                <span>Cadastrada em {formatDate(partner.created_at)}</span>
+                                                <span className="capitalize">{partner.type === "store" ? "Loja" : "Parceiro"}</span>
                                             </div>
                                         </div>
                                     ))}
                                 </div>
 
-                                {/* Desktop Table View */}
+                                {/* Desktop View: Table */}
                                 <div className="hidden md:block w-full overflow-hidden rounded-xl relative">
                                     <div className="overflow-x-auto pb-4 custom-scrollbar">
-                                        <table className="w-full text-left border-separate border-spacing-0 min-w-[1100px]">
+                                        <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
                                             <thead>
                                                 <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                    <th className="py-3 px-2 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight">Nome</th>
+                                                    <th className="py-3 px-2 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight">Loja / Parceiro</th>
                                                     <th className="py-3 px-2 w-24 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-tight text-center">Tipo</th>
-                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-tight">Dono</th>
-                                                    <th className="py-3 px-2 w-40 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-tight text-center">Data</th>
-                                                    <th className="py-3 px-2 w-32 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-tight text-center">Risco</th>
-                                                    <th className="py-3 px-2 w-32 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-tight text-center">Status</th>
+                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-tight">Proprietário</th>
+                                                    <th className="py-3 px-2 w-32 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-tight text-center">Cadastro</th>
+                                                    <th className="py-3 px-2 w-24 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-tight text-center">Risco</th>
+                                                    <th className="py-3 px-2 w-28 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-tight text-center">Status</th>
                                                     <th className="py-3 px-2 w-24 pr-6 rounded-r-lg bg-brand-gray dark:bg-dark-border/50 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">Ações</th>
                                                 </tr>
                                             </thead>
@@ -361,288 +280,85 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
                                                         key={partner.id + partner.type}
                                                         partner={partner}
                                                         isPending={isPending}
-                                                        onUnsuspend={setUnsuspendTarget}
-                                                        onSuspend={setSuspendTarget}
-                                                        onEnableERP={setEnableTarget}
-                                                        onDisableERP={setDisableTarget}
-                                                        onUnsuspendStore={setUnsuspendStoreTarget}
+                                                        onSuspend={setSuspendStoreTarget}
+                                                        onUnsuspend={setUnsuspendStoreTarget}
+                                                        onEnableERP={() => {}}
+                                                        onDisableERP={setDisableERPTarget}
                                                         onSuspendStore={setSuspendStoreTarget}
-                                                        onSuspendPartnerFromStore={handleSuspendPartnerFromStore}
-                                                        onView={setDetailPartner}
+                                                        onUnsuspendStore={setUnsuspendStoreTarget}
+                                                        onSuspendPartnerFromStore={setSuspendStoreTarget}
+                                                        onView={(p) => setSelectedStoreId(p.id)}
                                                     />
                                                 ))}
                                             </tbody>
                                         </table>
                                     </div>
                                 </div>
+
+                                {/* Pagination */}
+                                {totalPages > 1 && (
+                                    <div className="pt-4">
+                                        <Pagination
+                                            currentPage={page}
+                                            totalPages={totalPages}
+                                            onPageChange={setPage}
+                                        />
+                                    </div>
+                                )}
                             </FadeIn>
                         )}
                     </AnimatePresence>
                 </div>
             </div>
 
-
-            {/* Disable ERP Modal - DefaultModal with form */}
-            <DefaultModal
-                isOpen={!!disableTarget}
-                onClose={() => { setDisableTarget(null); setDisableReason(""); setDisableDuration(30); setDisableConfirmed(false) }}
-                title="Desabilitar acesso ERP"
-                maxWidth="md"
-                footer={
-                    <>
-                        <Button variant="outline" onClick={() => { setDisableTarget(null); setDisableReason(""); setDisableDuration(30); setDisableConfirmed(false) }}>
-                            Cancelar
-                        </Button>
-                        <Button
-                            variant="destructive"
-                            onClick={handleDisableERP}
-                            disabled={!disableConfirmed || !disableReason.trim() || disableReason.trim().length < 5 || isPending}
-                        >
-                            {isPending ? "Desabilitando..." : "Desabilitar ERP"}
-                        </Button>
-                    </>
-                }
-            >
-                <div className="flex flex-col gap-4">
-                    {disableTarget && (
-                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                            Desabilitar ERP de &quot;{disableTarget.store_name}&quot;.
-                        </p>
-                    )}
-
-                    <DurationSelect value={disableDuration} onChange={setDisableDuration} />
-
-                    <Input
-                        name="disable-reason"
-                        label="Motivo"
-                        placeholder="Motivo (mínimo 5 caracteres)..."
-                        value={disableReason}
-                        onChange={e => setDisableReason(e.target.value)}
-                        required
-                        multiline
-                        rows={3}
-                    />
-
-                    <label className="flex items-start gap-3 p-3 rounded-lg border border-red-200 dark:border-red-900/30 bg-red-50/50 dark:bg-red-900/10 cursor-pointer">
-                        <input type="checkbox" checked={disableConfirmed} onChange={e => setDisableConfirmed(e.target.checked)} className="mt-1 w-4 h-4 text-red-600 rounded" />
-                        <span className="text-sm text-red-800 dark:text-red-300 font-medium">
-                            Confirmo que entendo as consequências desta ação
-                        </span>
-                    </label>
-                </div>
-            </DefaultModal>
-
-            {/* Enable ERP - AlertModal */}
-            <AlertModal
-                isOpen={!!enableTarget}
-                onClose={() => setEnableTarget(null)}
-                onConfirm={handleEnableERP}
-                title="Habilitar acesso ERP"
-                message={`Restaurar acesso ERP de "${enableTarget?.store_name || ""}". O parceiro poderá acessar o ERP novamente.`}
-                confirmText="Habilitar ERP"
-                variant="warning"
-            />
-
-            {/* Suspend Partner - AlertModal */}
-            <AlertModal
-                isOpen={!!suspendTarget}
-                onClose={() => setSuspendTarget(null)}
-                onConfirm={handleSuspend}
-                title="Suspender parceiro"
-                message={`Suspender "${suspendTarget?.store_name || ""}" do marketplace. Produtos ficarão ocultos.`}
-                confirmText="Suspender"
-                variant="danger"
-            />
-
-            {/* Suspend Store - AlertModal */}
-            <AlertModal
+            {/* Modals de Ação */}
+            <DestructiveActionModal
                 isOpen={!!suspendStoreTarget}
                 onClose={() => setSuspendStoreTarget(null)}
-                onConfirm={handleSuspendStore}
-                title="Suspender loja"
-                message={`Suspender a loja "${suspendStoreTarget?.store_name || ""}" do marketplace. Produtos desta loja ficarão ocultos.`}
-                confirmText="Suspender Loja"
-                variant="danger"
+                onConfirm={handleConfirmSuspendStore}
+                title="Suspender Loja"
+                description="A loja perderá visibilidade no marketplace e os produtos ficarão pausados."
+                entityName={suspendStoreTarget?.store_name || suspendStoreTarget?.id || ""}
+                consequences={[
+                    "Ocultação imediata dos produtos do catálogo",
+                    "Bloqueio de novas compras para esta loja",
+                    "Registro no Audit Log",
+                ]}
+                confirmText="Confirmar Suspensão"
+                isPending={isPending}
             />
 
-            {/* Unsuspend Partner - AlertModal */}
-            <AlertModal
-                isOpen={!!unsuspendTarget}
-                onClose={() => setUnsuspendTarget(null)}
-                onConfirm={handleUnsuspend}
-                title="Reativar parceiro"
-                message={`Reativar "${unsuspendTarget?.store_name || ""}" no marketplace. Produtos voltarão a aparecer.`}
-                confirmText="Reativar"
-                variant="warning"
-            />
-
-            {/* Unsuspend Store - AlertModal */}
-            <AlertModal
+            <DestructiveActionModal
                 isOpen={!!unsuspendStoreTarget}
                 onClose={() => setUnsuspendStoreTarget(null)}
-                onConfirm={handleUnsuspendStore}
-                title="Reativar loja"
-                message={`Reativar a loja "${unsuspendStoreTarget?.store_name || ""}" no marketplace.`}
-                confirmText="Reativar Loja"
-                variant="warning"
+                onConfirm={handleConfirmUnsuspendStore}
+                title="Reativar Loja"
+                description="A loja voltará a ter visibilidade e receber pedidos no marketplace."
+                entityName={unsuspendStoreTarget?.store_name || unsuspendStoreTarget?.id || ""}
+                consequences={[
+                    "Reativação do catálogo de produtos",
+                    "Desbloqueio de vendas",
+                ]}
+                confirmText="Confirmar Reativação"
+                isPending={isPending}
             />
 
-            {/* Step-Up Auth Modal */}
-            <StepUpModal
-                isOpen={showStepUp}
-                onClose={() => { setShowStepUp(false); setPendingStepUpAction(null) }}
-                onAuthenticated={handleStepUpAuthenticated}
-            />
-
-            {/* Detail Sheet */}
-            <PartnerDetailsSheet
-                partner={detailPartner}
-                isOpen={!!detailPartner}
-                onClose={() => setDetailPartner(null)}
+            <DestructiveActionModal
+                isOpen={!!disableERPTarget}
+                onClose={() => setDisableERPTarget(null)}
+                onConfirm={handleConfirmDisableERP}
+                title="Desabilitar Acesso ERP"
+                description="O parceiro não conseguirá mais acessar o painel ERP do Dudit."
+                entityName={disableERPTarget?.store_name || disableERPTarget?.id || ""}
+                consequences={[
+                    "Bloqueio imediato do login no ERP",
+                    "Registro obrigatório no Audit Log",
+                ]}
+                confirmText="Desabilitar ERP"
+                isPending={isPending}
             />
         </FadeIn>
     )
 }
-
 export default PartnersList
 
-// ─── Detail Sheet Sub-component ──────────────────────────────────────────────
-
-interface PartnerDetailsSheetProps {
-    partner: EnforcementPartner | null
-    isOpen: boolean
-    onClose: () => void
-}
-
-function PartnerDetailsSheet({ partner, isOpen, onClose }: PartnerDetailsSheetProps) {
-    const isMobile = useMediaQuery("(max-width: 768px)")
-    const content = partner ? (
-        <div className="flex flex-col h-full bg-white dark:bg-dark-surface">
-            {/* Header */}
-            <header className="z-10 shrink-0 flex items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
-                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Detalhes</h2>
-                <Button variant="filled" onClick={onClose} size="icon">
-                    <XIcon className="w-5 h-5" />
-                </Button>
-            </header>
-
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-                {/* Store Info */}
-                <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center border border-blue-100 dark:border-blue-900/30">
-                        <StoreIcon className="w-8 h-8 text-blue-600 dark:text-blue-400" />
-                    </div>
-                    <div>
-                        <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading leading-tight">
-                            {partner.store_name || partner.stores?.[0]?.name || "Loja"}
-                        </h3>
-                        <Badge variant="blue">Loja</Badge>
-                        <div className="flex items-center gap-2 mt-1">
-                            <span className="text-[11px] font-bold text-brand-inactive-text">Score de Risco</span>
-                            <div className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${partner.risk_score > 70 ? "bg-red-100 text-red-700" : partner.risk_score > 30 ? "bg-orange-100 text-orange-700" : "bg-green-100 text-green-700"}`}>
-                                {partner.risk_score}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4">
-                    <div className="p-4 bg-brand-gray dark:bg-dark-border/30 rounded-2xl border border-brand-border dark:border-dark-border space-y-4">
-                        <div className="flex items-start gap-3">
-                            <UserIcon className="w-5 h-5 text-brand-inactive-text mt-0.5" />
-                            <div>
-                                <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body block">Proprietário</span>
-                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{partner.owner_name}</span>
-                                <span className="text-[10px] text-brand-inactive-text block opacity-70 break-all">{partner.owner_user_id}</span>
-                            </div>
-                        </div>
-
-                        <div className="flex items-start gap-3 pt-4 border-t border-brand-border/50 dark:border-dark-border/50">
-                            <ClockIcon className="w-5 h-5 text-brand-inactive-text mt-0.5" />
-                            <div>
-                                <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body block">Criado em</span>
-                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                    {new Date(partner.created_at).toLocaleDateString("pt-BR", { day: '2-digit', month: 'long', year: 'numeric' })}
-                                </span>
-                            </div>
-                        </div>
-
-                        <div className="flex items-start gap-3 pt-4 border-t border-brand-border/50 dark:border-dark-border/50">
-                            <ShieldIcon className="w-5 h-5 text-brand-inactive-text mt-0.5" />
-                            <div>
-                                <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body block">Status</span>
-                                <div className="flex flex-wrap gap-2 mt-1">
-                                    {partner.suspended_at ? <Badge variant="red">Suspensa</Badge> : partner.is_active ? <Badge variant="green">Ativa</Badge> : <Badge variant="gray">Inativa</Badge>}
-                                </div>
-                            </div>
-                        </div>
-
-                        {partner.stores && partner.stores.length > 0 && (
-                            <div className="flex items-start gap-3 pt-4 border-t border-brand-border/50 dark:border-dark-border/50">
-                                <StoreIcon className="w-5 h-5 text-brand-inactive-text mt-0.5" />
-                                <div className="flex-1">
-                                    <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body block">Todas as Lojas do Parceiro</span>
-                                    <div className="flex flex-col gap-2 mt-2">
-                                        {partner.stores.map((s) => (
-                                            <div key={s.id} className={`flex items-center justify-between p-2 rounded-lg bg-white dark:bg-dark-background border ${s.id === partner.id ? 'border-brand-primary ring-1 ring-brand-primary/20' : 'border-brand-border dark:border-dark-border'}`}>
-                                                <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">{s.name}</span>
-                                                {s.suspended_at ? (
-                                                    <Badge variant="orange">Suspensa</Badge>
-                                                ) : s.is_active ? (
-                                                    <Badge variant="green">Ativa</Badge>
-                                                ) : (
-                                                    <Badge variant="gray">Inativa</Badge>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                <div className="space-y-3">
-                    <h4 className="text-[13px] font-bold text-brand-inactive-text dark:text-dark-body">Identificação</h4>
-                    <div className="bg-brand-gray dark:bg-dark-background border border-brand-border dark:border-dark-border rounded-xl p-4">
-                        <div className="flex items-center justify-between">
-                            <span className="text-xs text-brand-inactive-text font-medium">ID da Loja</span>
-                            <code className="text-xs font-bold text-brand-dark dark:text-dark-heading">{partner.id}</code>
-                        </div>
-                        {partner.partner_id && (
-                            <div className="flex items-center justify-between mt-2 pt-2 border-t border-brand-border/50">
-                                <span className="text-xs text-brand-inactive-text font-medium">ID do Parceiro</span>
-                                <code className="text-xs font-bold text-brand-dark dark:text-dark-heading">{partner.partner_id}</code>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-        </div>
-    ) : null
-
-    if (isMobile) {
-        return (
-            <BottomSheet isOpen={isOpen} onClose={onClose}>
-                {content}
-            </BottomSheet>
-        )
-    }
-
-    return (
-        <Portal>
-            <div
-                className={`fixed inset-0 z-50 bg-black/50 transition-opacity ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
-                onClick={onClose}
-            >
-                <div
-                    className={`fixed right-4 top-4 bottom-4 w-96 md:w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    {content}
-                </div>
-            </div>
-        </Portal>
-    )
-}

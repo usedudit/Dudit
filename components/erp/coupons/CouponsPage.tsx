@@ -23,6 +23,7 @@ import CouponGridCard from "./CouponGridCard"
 import CouponListItem from "./CouponListRow"
 import CouponFormPage from "./CouponFormPage"
 import CouponDetailPage from "./CouponDetailPage"
+import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
 import {
     CouponFormState,
     CouponRelations,
@@ -766,37 +767,47 @@ export default function CouponsPage({
         <>
             <AnimatePresence mode="wait">
                 {wrapperMode === "create" || wrapperMode === "edit" ? (
-                    <CouponFormPage
-                        key="form"
-                        partnerId={partnerId}
-                        mode={wrapperMode}
-                        coupon={selectedCoupon}
-                        form={form}
-                        setForm={setForm}
-                        scopeData={scopeData}
-                        relations={relations}
-                        setSelectedProductIds={setSelectedProductIds}
-                        setSelectedServiceIds={setSelectedServiceIds}
-                        setSelectedCategoryIds={setSelectedCategoryIds}
-                        setSelectedCustomerIds={setSelectedCustomerIds}
-                        setSelectedStoreIds={setSelectedStoreIds}
-                        onBack={handleBackToList}
-                        onSave={saveCoupon}
-                        isSaving={isSaving}
-                        isLoadingScope={isLoadingScope || isLoadingRelations}
-                    />
-                ) : wrapperMode === "view" && selectedCoupon ? (
-                    <CouponDetailPage
-                        key="detail"
-                        coupon={selectedCoupon}
-                        relations={relations}
-                        onBack={handleBackToList}
-                        onEdit={openEdit}
-                        onDelete={handleDelete}
-                        onToggleStatus={handleToggleStatus}
-                        onShare={setSharingCoupon}
-                        isLoadingRelations={isLoadingRelations}
-                    />
+                    (wrapperMode === "edit" && (isLoadingScope || isLoadingRelations || !selectedCoupon)) ? (
+                        <ERPDetailLoading key="loading-coupon-form" />
+                    ) : (
+                        <FadeIn key="form" className="w-full h-full">
+                            <CouponFormPage
+                                partnerId={partnerId}
+                                mode={wrapperMode}
+                                coupon={selectedCoupon}
+                                form={form}
+                                setForm={setForm}
+                                scopeData={scopeData}
+                                relations={relations}
+                                setSelectedProductIds={setSelectedProductIds}
+                                setSelectedServiceIds={setSelectedServiceIds}
+                                setSelectedCategoryIds={setSelectedCategoryIds}
+                                setSelectedCustomerIds={setSelectedCustomerIds}
+                                setSelectedStoreIds={setSelectedStoreIds}
+                                onBack={handleBackToList}
+                                onSave={saveCoupon}
+                                isSaving={isSaving}
+                                isLoadingScope={isLoadingScope || isLoadingRelations}
+                            />
+                        </FadeIn>
+                    )
+                ) : wrapperMode === "view" ? (
+                    (isLoadingRelations || !selectedCoupon) ? (
+                        <ERPDetailLoading key="loading-coupon" />
+                    ) : (
+                        <FadeIn key="detail" className="w-full h-full">
+                            <CouponDetailPage
+                                coupon={selectedCoupon}
+                                relations={relations}
+                                onBack={handleBackToList}
+                                onEdit={openEdit}
+                                onDelete={handleDelete}
+                                onToggleStatus={handleToggleStatus}
+                                onShare={setSharingCoupon}
+                                isLoadingRelations={isLoadingRelations}
+                            />
+                        </FadeIn>
+                    )
                 ) : (
                     <FadeIn key="list">
                         <div className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">

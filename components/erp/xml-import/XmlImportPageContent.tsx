@@ -28,6 +28,7 @@ import ExportSelectionModal from "@/components/erp/export/ExportSelectionModal"
 import ExportColumnSelectionModal from "@/components/erp/export/ExportColumnSelectionModal"
 import { formatQuantityWithUnit } from "@/lib/utils/formatters"
 import { useEntityState } from "@/hooks/use-entity-state"
+import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
 
 type TabType = "all" | "pending" | "completed" | "failed"
 
@@ -515,17 +516,20 @@ export function XmlImportPageContent({ partnerId, initialImports, planGate }: Xm
                     isExporting={isExporting}
                 />
             )}
-            {isPreviewView && (
-                <ImportPreviewView
-                    key={previewKey}
-                    importId={previewImportId}
-                    partnerId={partnerId}
-                    storeId={storeId}
-                    onBack={handleBackFromPreview}
-                    onComplete={handleComplete}
-                    reimported={reimportedFlag}
-                />
-            )}
+            <AnimatePresence mode="wait">
+                {isPreviewView && (
+                    <FadeIn key={previewKey} className="w-full h-full">
+                        <ImportPreviewView
+                            importId={previewImportId}
+                            partnerId={partnerId}
+                            storeId={storeId}
+                            onBack={handleBackFromPreview}
+                            onComplete={handleComplete}
+                            reimported={reimportedFlag}
+                        />
+                    </FadeIn>
+                )}
+            </AnimatePresence>
 
             <ExportColumnSelectionModal
                 isOpen={columnSelectionModal.isOpen}
@@ -1123,7 +1127,7 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
     }
 
     if (loading) {
-        return <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full"><ThreeDotsLoader /></div>
+        return <ERPDetailLoading key="loading-xml-preview" />
     }
 
     if (!preview) {

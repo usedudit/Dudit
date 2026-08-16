@@ -20,6 +20,8 @@ import type {
 import { formatDate } from "@/lib/utils"
 import Pagination from "@/components/reusable/Pagination"
 
+import ModerationList from "./ModerationList"
+
 type SearchType = "product" | "service" | "recurring_plan" | "partner" | "review"
 
 const SEARCH_TYPES: { value: SearchType; label: string }[] = [
@@ -38,12 +40,12 @@ const RISK_LEVELS = [
     { value: "50", label: "50 - Muito Grave" },
 ]
 
-type ModerationTab = "manual" | "videos"
+type ModerationTab = "queue" | "videos" | "manual"
 
 const ITEMS_PER_PAGE = 12
 
 export function AdminModerationPanel() {
-    const [activeModerationTab, setActiveModerationTab] = useState<ModerationTab>("manual")
+    const [activeModerationTab, setActiveModerationTab] = useState<ModerationTab>("queue")
 
     const [searchId, setSearchId] = useState("")
     const [searchType, setSearchType] = useState<SearchType>("product")
@@ -164,18 +166,21 @@ export function AdminModerationPanel() {
                                     Painel de Moderação
                                 </h1>
                                 <p className="text-sm text-brand-inactive-text">
-                                    {activeModerationTab === "manual"
-                                        ? "Busque por ID para revisar, editar ou remover conteúdo"
-                                        : "Aprove ou rejeite vídeos da comunidade pendentes de moderação"}
+                                    {activeModerationTab === "queue"
+                                        ? "Revise produtos, serviços e perfis pendentes de aprovação no marketplace"
+                                        : activeModerationTab === "videos"
+                                            ? "Aprove ou rejeite vídeos da comunidade pendentes de moderação"
+                                            : "Busque por ID específico para revisar, editar ou remover conteúdo"}
                                 </p>
                             </div>
 
-                            {/* Tabs: Manual / Videos */}
+                            {/* Tabs: Queue / Videos / Manual */}
                             <div className="mb-4">
                                 <Tabs value={activeModerationTab} onValueChange={(v) => setActiveModerationTab(v as ModerationTab)}>
                                     <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
-                                        <TabsTrigger value="manual">Manual</TabsTrigger>
-                                        <TabsTrigger value="videos">Vídeos</TabsTrigger>
+                                        <TabsTrigger value="queue">Fila de Moderação</TabsTrigger>
+                                        <TabsTrigger value="videos">Vídeos da Comunidade</TabsTrigger>
+                                        <TabsTrigger value="manual">Busca por ID</TabsTrigger>
                                     </TabsList>
                                 </Tabs>
                             </div>
@@ -223,7 +228,11 @@ export function AdminModerationPanel() {
                     </div>
 
                     {/* Content Area */}
-                    {activeModerationTab === "manual" ? (
+                    {activeModerationTab === "queue" ? (
+                        <div className="w-full">
+                            <ModerationList />
+                        </div>
+                    ) : activeModerationTab === "manual" ? (
                         <div className="max-w-[1300px] mx-auto">
                             {/* Error State */}
                             {error && (

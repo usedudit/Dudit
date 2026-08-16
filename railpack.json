@@ -16,11 +16,19 @@
     }
   },
   "deploy": {
-    "aptPackages": ["..."],
-    "paths": ["/opt/postgresql/17/bin"],
+    "aptPackages": [
+      "...",
+      "chromium",
+      "fonts-liberation",
+      "fonts-noto-color-emoji"
+    ],
+    "paths": [
+      "/opt/postgresql/17/bin"
+    ],
     "variables": {
       "PG_DUMP_BINARY": "/opt/postgresql/17/bin/pg_dump",
-      "LD_LIBRARY_PATH": "/opt/postgresql/lib"
+      "LD_LIBRARY_PATH": "/opt/postgresql/lib",
+      "CHROMIUM_PATH": "/usr/bin/chromium"
     }
   }
 }

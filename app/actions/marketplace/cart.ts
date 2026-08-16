@@ -336,14 +336,14 @@ export async function addToCartAction(productId: string, quantity = 1, csrf_toke
       .select("id, product_id, products!inner(partner_id, partners!inner(user_id))")
       .eq("id", variantId)
     if (storeId) query = query.eq("products.store_id", storeId)
-    productPromise = query.single()
+    productPromise = query.maybeSingle()
   } else {
     let query = adminClient
       .from("products")
       .select("partner_id, partners!inner(user_id)")
       .eq("id", productId)
     if (storeId) query = query.eq("store_id", storeId)
-    productPromise = query.single()
+    productPromise = query.maybeSingle()
   }
 
   const [

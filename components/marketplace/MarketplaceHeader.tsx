@@ -772,7 +772,7 @@ const Header: React.FC<HeaderProps> = ({
 
                         <div className="py-2">
                             {([
-                                { label: "Seu Perfil", href: "/perfil" },
+                                { label: "Meu Perfil", href: "/perfil" },
                                 { label: "Meus Favoritos", href: "/favoritos" },
                                 { label: "Minhas Avaliações", href: "/perfil?tab=avaliacoes" },
                                 { label: "Minhas Coleções", href: "/colecoes" },
@@ -961,7 +961,7 @@ const Header: React.FC<HeaderProps> = ({
 
                                     <div className="py-2">
                                         {([
-                                            { label: "Seu Perfil", href: "/perfil" },
+                                            { label: "Meu Perfil", href: "/perfil" },
                                             { label: "Meus Favoritos", href: "/favoritos" },
                                             { label: "Minhas Avaliações", href: "/perfil?tab=avaliacoes" },
                                             { label: "Minhas Coleções", href: "/colecoes" },

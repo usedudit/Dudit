@@ -128,9 +128,11 @@ export function SupplierSelectorSheet({
                   />
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{supplier.name}</p>
-                    <p className="text-xs text-brand-inactive-text truncate">
-                      {supplier.email || formatBrazilPhone(supplier.phone || "") || supplier.cnpj || supplier.cpf || "Sem contato"}
-                    </p>
+                    {supplier.phone ? (
+                      <p className="text-xs text-brand-inactive-text truncate">
+                        {formatBrazilPhone(supplier.phone) || supplier.phone}
+                      </p>
+                    ) : null}
                   </div>
                   {isSelected && (
                     <div className="w-5 h-5 rounded-full bg-brand-green flex items-center justify-center">

@@ -586,7 +586,7 @@ function ImageLightbox({ isOpen, onClose, images, currentIndex, onNavigate }: {
 // ─── Main Component ─────────────────────────────────────────────────────────
 
 interface ModerationListProps {
-    initialData: CursorPaginatedResult<ModerationItem>
+    initialData?: CursorPaginatedResult<ModerationItem>
 }
 
 const ModerationList = ({ initialData }: ModerationListProps) => {
@@ -602,9 +602,9 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
         entityType: 'admin-moderation',
         partnerId: 'admin',
         queryKey: ['admin', 'moderation', statusFilter],
-        initialItems: statusFilter === 'all' ? initialData.data : [],
-        initialNextCursor: statusFilter === 'all' ? initialData.nextCursor : null,
-        initialHasMore: statusFilter === 'all' ? initialData.hasMore : true,
+        initialItems: (statusFilter === 'all' && initialData?.data) ? initialData.data : [],
+        initialNextCursor: (statusFilter === 'all' && initialData?.nextCursor) ? initialData.nextCursor : null,
+        initialHasMore: (statusFilter === 'all' && initialData) ? initialData.hasMore : true,
         fetchPageFn: async ({ cursor }) => {
             const result = await getModerationQueue(cursor, 50, statusFilter)
             return { items: result.data, nextCursor: result.nextCursor, hasMore: result.hasMore }

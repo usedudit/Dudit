@@ -12,6 +12,7 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { decryptCPF } from "@/lib/crypto"
 import { validateCPF, validateCNPJ, sanitizeInput } from "@/lib/input-validator"
 import { logAuditEvent } from "@/lib/services/timeline.service"
+import { getPartnerCapabilities } from "@/lib/services/partner-capabilities"
 import { enrichAddressData } from "@/lib/services/location.service"
 
 interface ImportPreview {
@@ -954,6 +955,7 @@ export async function confirmImportAction(
 
     const supabase = await getSupabaseServerClient()
     const user = await requireUser()
+    const capabilities = await getPartnerCapabilities(partnerId, { storeId })
 
     const { data: xmlImport, error: fetchErr } = await supabase
       .from("xml_imports")
@@ -1005,8 +1007,8 @@ export async function confirmImportAction(
       }
     }
 
-    // Criar contas a pagar apenas se a importação realmente deu certo (sem erros)
-    if (createPayables && !(result.errors?.length > 0) && xmlImport.total_value && xmlImport.supplier_id) {
+    // Criar contas a pagar apenas se o financeiro estiver ativo e a importação realmente deu certo (sem erros)
+    if (capabilities.hasFinancial && createPayables && !(result.errors?.length > 0) && xmlImport.total_value && xmlImport.supplier_id) {
       // Busca supplier para obter nome
       const { data: supplier } = await supabase
         .from("suppliers")

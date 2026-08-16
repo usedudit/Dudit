@@ -17,6 +17,37 @@ function sanitizeIlike(input: string): string {
     return input.replace(/[%_\\]/g, c => `\\${c}`)
 }
 
+export interface AuditLogStats {
+    total: number
+    user: number
+    partner: number
+    product: number
+    system: number
+}
+
+export async function getAuditLogStats(): Promise<AuditLogStats> {
+    await requireAdmin("moderator")
+    await requireRateLimit(RateLimitCategory.ADMIN_READ)
+
+    const admin = getAdminClient()
+
+    const [totalRes, userRes, partnerRes, prodRes, sysRes] = await Promise.all([
+        admin.from("admin_audit_logs").select("id", { count: "exact", head: true }),
+        admin.from("admin_audit_logs").select("id", { count: "exact", head: true }).eq("target_type", "user"),
+        admin.from("admin_audit_logs").select("id", { count: "exact", head: true }).eq("target_type", "partner"),
+        admin.from("admin_audit_logs").select("id", { count: "exact", head: true }).eq("target_type", "product"),
+        admin.from("admin_audit_logs").select("id", { count: "exact", head: true }).eq("target_type", "system"),
+    ])
+
+    return {
+        total: totalRes.count || 0,
+        user: userRes.count || 0,
+        partner: partnerRes.count || 0,
+        product: prodRes.count || 0,
+        system: sysRes.count || 0,
+    }
+}
+
 // ─── Shared Enrichment Logic ──────────────────────────────────────────────────
 
 async function enrichAuditLogs(admin: any, items: AuditLogRow[]) {

@@ -1,16 +1,14 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect, useRef } from "react"
+import { useState } from "react"
 import { useTheme } from "next-themes"
-import { MenuIcon, MoonIcon, LogoutIcon, ChevronDownIcon } from "@/lib/icons"
-import { Button } from "@/components/reusable"
+import { useRouter, usePathname } from "next/navigation"
+import { MenuIcon, MoonIcon, LogoutIcon, ChevronDownIcon, ChevronLeftIcon } from "@/lib/icons"
 import Dropdown, { DropdownItem } from "../reusable/Dropdown"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
-import { getUserInitials, getAvatarColor } from "@/lib/utils/UserProfileImage"
 import { ShieldAlert } from "lucide-react"
 import { NotificationBell } from "@/components/notifications/NotificationBell"
+import { useSidebar } from "@/lib/sidebar-context"
 
 const ChevronRight = ({ className }: { className?: string }) => (
     <svg
@@ -30,7 +28,9 @@ const ChevronRight = ({ className }: { className?: string }) => (
 interface AdminHeaderProps {
     sidebarOpen?: boolean
     setSidebarOpen?: (arg: boolean) => void
-    pageTitle: string
+    pageTitle?: string
+    backHref?: string
+    onBack?: () => void
     userProfile?: {
         fullName: string
         email: string
@@ -39,14 +39,45 @@ interface AdminHeaderProps {
     }
 }
 
-export function AdminHeader({ sidebarOpen, setSidebarOpen, pageTitle, userProfile }: AdminHeaderProps) {
+export function AdminHeader({
+    sidebarOpen,
+    setSidebarOpen,
+    pageTitle = "Administração",
+    backHref,
+    onBack,
+    userProfile,
+}: AdminHeaderProps) {
     const { theme, setTheme } = useTheme()
+    const router = useRouter()
+    const pathname = usePathname()
     const [isTransitioning, setIsTransitioning] = useState(false)
     const [userName] = useState(userProfile?.fullName || "Admin")
     const [userEmail] = useState(userProfile?.email || "")
     const [userInitials] = useState(userProfile?.initials || "A")
     const [avatarColor] = useState(userProfile?.avatarColor || "bg-red-600")
-    // supabase imported as singleton
+
+    // Try to safely access sidebar context
+    let sidebarContext: ReturnType<typeof useSidebar> | null = null
+    try {
+        sidebarContext = useSidebar()
+    } catch {
+        // Outside SidebarProvider fallback
+    }
+
+    const effectiveTitle = sidebarContext?.headerOverride?.title || pageTitle
+    const effectiveBackHref = sidebarContext?.headerOverride?.backHref || backHref
+    const effectiveOnBack = sidebarContext?.headerOverride?.onBack || onBack
+    const hasBack = Boolean(effectiveBackHref || effectiveOnBack)
+
+    const handleBackClick = () => {
+        if (effectiveOnBack) {
+            effectiveOnBack()
+        } else if (effectiveBackHref) {
+            router.push(effectiveBackHref)
+        } else {
+            router.back()
+        }
+    }
 
     const handleThemeButtonClick = (newTheme: string) => {
         if (isTransitioning) return
@@ -90,17 +121,32 @@ export function AdminHeader({ sidebarOpen, setSidebarOpen, pageTitle, userProfil
             <div className="px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-14 relative">
                     <div className="flex items-center gap-3">
-                        <button
-                            className="text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading xl:hidden"
-                            aria-controls="sidebar"
-                            aria-expanded={sidebarOpen}
-                            onClick={(e) => {
-                                e.stopPropagation()
-                                if (setSidebarOpen) setSidebarOpen(!sidebarOpen)
-                            }}
-                        >
-                            <MenuIcon className="w-6 h-6" />
-                        </button>
+                        {/* Mobile back or hamburger button */}
+                        {hasBack ? (
+                            <button
+                                onClick={handleBackClick}
+                                className="p-1 -ml-1 text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading xl:hidden flex items-center justify-center"
+                                aria-label="Voltar"
+                            >
+                                <ChevronLeftIcon className="w-6 h-6" />
+                            </button>
+                        ) : (
+                            <button
+                                className="text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading xl:hidden"
+                                aria-controls="sidebar"
+                                aria-expanded={sidebarOpen ?? sidebarContext?.isMobileOpen}
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    if (setSidebarOpen) {
+                                        setSidebarOpen(!sidebarOpen)
+                                    } else if (sidebarContext) {
+                                        sidebarContext.setIsMobileOpen(!sidebarContext.isMobileOpen)
+                                    }
+                                }}
+                            >
+                                <MenuIcon className="w-6 h-6" />
+                            </button>
+                        )}
 
                         {/* --- ÁREA DO BREADCRUMB --- */}
                         <div className="hidden xl:flex items-center gap-2">
@@ -118,15 +164,15 @@ export function AdminHeader({ sidebarOpen, setSidebarOpen, pageTitle, userProfil
 
                             {/* Título da Página */}
                             <h1 className="text-sm font-normal text-brand-inactive-text dark:text-dark-body px-1">
-                                {pageTitle}
+                                {effectiveTitle}
                             </h1>
                         </div>
                     </div>
 
                     {/* Mobile centered title */}
-                    <div className="absolute top-1/2 left-1/2 -translate-y-1/2 -translate-x-1/2 xl:hidden">
-                        <h1 className="text-lg sm:text-xl font-bold text-brand-dark dark:text-dark-heading whitespace-nowrap">
-                            {pageTitle}
+                    <div className="absolute top-1/2 left-1/2 -translate-y-1/2 -translate-x-1/2 xl:hidden max-w-[200px] truncate text-center">
+                        <h1 className="text-base sm:text-lg font-bold text-brand-dark dark:text-dark-heading truncate">
+                            {effectiveTitle}
                         </h1>
                     </div>
 
@@ -177,7 +223,7 @@ export function AdminHeader({ sidebarOpen, setSidebarOpen, pageTitle, userProfil
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                         <MoonIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
-                                        <span className="text-sm text-brand-dark dark:text-dark-heading">Dark mode</span>
+                                        <span className="text-sm text-brand-dark dark:text-dark-heading">Modo Escuro</span>
                                     </div>
                                     <button
                                         onClick={() => handleThemeButtonClick(theme === "dark" ? "light" : "dark")}

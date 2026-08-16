@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Portal from "@/components/Portal"
 import { XIcon, MoneyIcon, ClockIcon } from "@/lib/icons"
-import { Button, Tabs, TabsContent, TabsList, TabsTrigger, SkeletonLoader, ListItem, IconPlaceholder } from "@/components/reusable"
+import { Button, Tabs, TabsList, TabsTrigger, SkeletonLoader, ListItem, IconPlaceholder } from "@/components/reusable"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { formatCurrency } from "@/lib/utils"
 import { getSellerCommissionHistoryAction } from "@/app/actions/erp/produtividade"
@@ -67,7 +67,7 @@ function HistoryTab({ partnerUserId, partnerId }: { partnerUserId: string; partn
           </div>
           <div className="text-right shrink-0 ml-3">
             <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(h.amount)}</p>
-            <span className={`text-[11px] font-semibold ${h.status === "paid" ? "text-emerald-600" : "text-orange-600"}`}>
+            <span className={`text-[11px] font-semibold ${h.status === "paid" ? "text-brand-green" : "text-brand-orange"}`}>
               {h.status === "paid" ? "Pago" : "Pendente"}
             </span>
           </div>
@@ -85,8 +85,8 @@ export default function CommissionDetailView({ isOpen, seller, partnerId, onClos
   const rows = useMemo(() => {
     if (!sellerData) return []
     return [
-      { label: "Pendente", value: formatCurrency(sellerData.pendingAmount), color: "text-orange-600" },
-      { label: "Pago", value: formatCurrency(sellerData.paidAmount), color: "text-emerald-600" },
+      { label: "Pendente", value: formatCurrency(sellerData.pendingAmount), color: "text-brand-orange" },
+      { label: "Pago", value: formatCurrency(sellerData.paidAmount), color: "text-brand-green" },
       { label: "Bônus", value: formatCurrency(sellerData.bonusAmount), color: "text-purple-600" },
       { label: "Total Acumulado", value: formatCurrency(sellerData.totalAccumulated), color: "text-brand-dark dark:text-dark-heading" },
     ]
@@ -156,10 +156,10 @@ export default function CommissionDetailView({ isOpen, seller, partnerId, onClos
                   {rows.map((row) => (
                     <div
                       key={row.label}
-                      className="flex items-center justify-between px-4 py-3 rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface"
+                      className="flex items-center justify-between"
                     >
                       <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">{row.label}</span>
-                      <span className={`text-base font-extrabold ${row.color}`}>{row.value}</span>
+                      <span className={`text-sm font-bold ${row.color}`}>{row.value}</span>
                     </div>
                   ))}
                 </>

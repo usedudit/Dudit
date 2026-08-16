@@ -1,14 +1,19 @@
 import { AdminHeader } from "@/components/admin/admin-header"
 import PartnersList from "@/components/admin/partners/PartnersList"
-import { getPartners } from "@/app/actions/admin/enforcement"
+import { getPartners, getAdminPartnerStats } from "@/app/actions/admin/enforcement"
+
+export const dynamic = "force-dynamic"
 
 export default async function PartnersPage() {
-    const initialData = await getPartners(null, 20)
+    const [initialData, initialStats] = await Promise.all([
+        getPartners(null, 50),
+        getAdminPartnerStats(),
+    ])
 
     return (
         <>
             <AdminHeader pageTitle="Parceiros" />
-            <PartnersList initialData={initialData} />
+            <PartnersList initialData={initialData} initialStats={initialStats} />
         </>
     )
 }

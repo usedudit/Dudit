@@ -2,9 +2,9 @@
 
 import type React from "react"
 import { useState, useMemo, useEffect } from "react"
-import { Input, FormDropdown, Checkbox, Accordion, MoneyInput, InfoCard, FormSection, Button, Spinner } from "@/components/reusable"
+import { Input, FormDropdown, Checkbox, Accordion, MoneyInput, InfoCard, FormSection, Button, Spinner, ListItem } from "@/components/reusable"
 import { SalePriceCalculator } from "@/components/reusable/SalePriceCalculator"
-import { PlusIcon, DiceIcon, SparklesIcon } from "@/lib/icons"
+import { PlusIcon, DiceIcon, SparklesIcon, Package, AlertTriangleIcon, MapPinIcon, CheckCircleIcon } from "@/lib/icons"
 import ProductImagesSection from "./ProductImagesSection"
 import { Combobox } from "@/components/reusable"
 import MarketplaceCategoryModal from "./MarketplaceCategoryModal"
@@ -13,6 +13,8 @@ import { RichTextEditor } from "@/components/reusable"
 import { planStarIconForTarget, usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { useRouter } from "next/navigation"
 import QuickStockMovementSheet from "./QuickStockMovementSheet"
+import { formatCurrency } from "@/lib/utils"
+import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 
 const FormCombobox = ({
     label,
@@ -82,7 +84,6 @@ interface ProductGeneralTabProps {
     onGenerateDetails?: () => void
 }
 
-
 export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
     productData, handleInputChange, generateRandomCode, categories, subCategories, brands, locations, unidadesMedida, openAddItemModal, metadataPlanBlocked = false, isEditing, images, onImageUpload, onRemoveImage, onSetPrimaryImage, fieldErrors, onFieldChange, uploadingImages, blockedImages, isSaving, mode = "edit", isQuickMode = false, onGenerateBarcode, isGeneratingDetails = false, onGenerateDetails
 }) => {
@@ -97,7 +98,6 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
     }, [productData.price, productData.costPrice])
 
     const showPrice = productData.show_price_in_store ?? true
-
     const showInMarketplaceValue = productData.show_in_marketplace === undefined ? "true" : String(productData.show_in_marketplace)
 
     const hasVariants = (() => {
@@ -125,6 +125,315 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
         return () => { alive = false }
     }, [productData?.marketplace_category_id])
 
+    const categoryName = useMemo(() => {
+        return categories.find(c => c.value === productData.category_id)?.label || productData.category || "-"
+    }, [categories, productData.category_id, productData.category])
+
+    const subcategoryName = useMemo(() => {
+        return subCategories.find(c => c.value === productData.subcategory_id)?.label || productData.subcategory || "-"
+    }, [subCategories, productData.subcategory_id, productData.subcategory])
+
+    const brandName = useMemo(() => {
+        return brands.find(b => b.value === productData.brand_id)?.label || productData.brand || "-"
+    }, [brands, productData.brand_id, productData.brand])
+
+    const locationName = useMemo(() => {
+        return locations.find(l => l.value === productData.location_id)?.label || productData.localizacao || productData.location || "-"
+    }, [locations, productData.location_id, productData.localizacao, productData.location])
+
+    const getImageSrc = (img: string | File) => {
+        if (typeof img === 'string') {
+            if (img.startsWith("data:") || img.startsWith("blob:")) return img
+            return getR2ImageUrl(img) || "https://img.dudit.com.br/static/Placeholder.png"
+        }
+        return "https://img.dudit.com.br/static/Placeholder.png"
+    }
+
+    // ─── MODO DETALHES (READ-ONLY) ───────────────────────────────────────────
+    if (!isEditing) {
+        return (
+            <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
+                {/* ESQUERDA (Principal) */}
+                <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
+                    {/* Imagens do Produto no Topo */}
+                    <div className="mb-8">
+                        <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-thin">
+                            {images && images.length > 0 ? (
+                                images.map((img, index) => (
+                                    <div
+                                        key={index}
+                                        className="relative shrink-0 w-28 h-28 md:w-32 md:h-32 rounded-2xl bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border overflow-hidden group shadow-xs"
+                                    >
+                                        <img
+                                            src={getImageSrc(img)}
+                                            alt={`${productData.name || "Produto"} ${index + 1}`}
+                                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                        />
+                                        {index === 0 && (
+                                            <div className="absolute top-2 left-2 bg-brand-dark/80 text-white text-[10px] font-bold px-2 py-0.5 rounded-md shadow-xs backdrop-blur-xs">
+                                                Principal
+                                            </div>
+                                        )}
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="w-28 h-28 md:w-32 md:h-32 rounded-2xl bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border flex items-center justify-center text-xs text-brand-inactive-text">
+                                    Sem imagens
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Informações Básicas */}
+                    <FormSection title="Informações Básicas" className="mb-8">
+                        <div className="space-y-6">
+                            <div>
+                                <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium block mb-1">Nome do Produto</span>
+                                <h1 className="text-xl md:text-2xl font-bold text-brand-dark dark:text-dark-heading">
+                                    {productData.name || "-"}
+                                </h1>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
+                                <div>
+                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium block mb-1">Status</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className={`inline-block w-2.5 h-2.5 rounded-full ${productData.is_active ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                            {productData.is_active ? "Ativo" : "Inativo"}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium block mb-1">Exibir na Vitrine</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className={`inline-block w-2.5 h-2.5 rounded-full ${productData.show_in_marketplace !== false ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                            {productData.show_in_marketplace !== false ? "Sim" : "Não"}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </FormSection>
+
+                    {/* Preço */}
+                    <FormSection hasSeparator title={isQuickMode ? "Preço e Estoque" : "Preço"}>
+                        {hasVariants ? (
+                            <InfoCard
+                                color="blue"
+                                message="Este produto possui variações. Os preços individuais de cada variação podem ser configurados na aba Variações."
+                            />
+                        ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-2">
+                                <div className="p-4 rounded-2xl bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border">
+                                    <span className="text-xs font-semibold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body block mb-1">
+                                        Preço de Venda
+                                    </span>
+                                    <div className="text-xl md:text-2xl font-bold text-brand-dark dark:text-dark-heading">
+                                        {showPrice ? formatCurrency(productData.price || 0) : "Sob consulta"}
+                                    </div>
+                                    {showPrice && Number(productData.costPrice) > 0 && (
+                                        <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mt-1 block">
+                                            Margem: {margin}% ({formatCurrency(profit)})
+                                        </span>
+                                    )}
+                                </div>
+
+                                {!isQuickMode && (
+                                    <div className="p-4 rounded-2xl bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border">
+                                        <span className="text-xs font-semibold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body block mb-1">
+                                            Preço de Custo
+                                        </span>
+                                        <div className="text-xl md:text-2xl font-bold text-brand-dark dark:text-dark-heading">
+                                            {formatCurrency(productData.costPrice || 0)}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="p-4 rounded-2xl bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border">
+                                    <span className="text-xs font-semibold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body block mb-1">
+                                        Preço Promocional
+                                    </span>
+                                    <div className="text-xl md:text-2xl font-bold text-brand-dark dark:text-dark-heading">
+                                        {productData.promotional_price ? formatCurrency(productData.promotional_price) : "-"}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {!showPrice && !hasVariants && (
+                            <div className="mt-4">
+                                <InfoCard
+                                    color="orange"
+                                    message="O produto está configurado para exibir 'Valor sob consulta' na sua vitrine online."
+                                />
+                            </div>
+                        )}
+
+                        {isQuickMode && productData.description && (
+                            <div className="mt-8">
+                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">Descrição</h3>
+                                <div
+                                    className="rich-text-content text-sm text-brand-dark dark:text-dark-heading"
+                                    dangerouslySetInnerHTML={{ __html: productData.description }}
+                                />
+                            </div>
+                        )}
+                    </FormSection>
+
+                    {/* Estoque */}
+                    {!isQuickMode && (
+                        <FormSection hasSeparator title="Estoque">
+                            {hasVariants ? (
+                                <InfoCard
+                                    color="blue"
+                                    message="Este produto possui variações. O estoque de cada variação pode ser configurado na aba Variações."
+                                />
+                            ) : (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <ListItem
+                                        icon={Package}
+                                        title="Estoque Atual"
+                                        description={`${productData.stock || 0} ${productData.unidade || "UN"}`}
+                                        className="p-4 cursor-default"
+                                        right={
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                className="h-8 px-3 text-xs border border-brand-border hover:bg-brand-gray dark:border-dark-border dark:hover:bg-dark-border/50 text-brand-dark dark:text-dark-heading rounded-md font-medium"
+                                                onClick={() => setIsStockAdjustmentOpen(true)}
+                                            >
+                                                Ajustar
+                                            </Button>
+                                        }
+                                    />
+                                    <ListItem
+                                        icon={AlertTriangleIcon}
+                                        title="Estoque Mínimo"
+                                        description={`Mínimo: ${productData.minStock || 0} ${productData.unidade || "UN"}`}
+                                        className="p-4 cursor-default"
+                                    />
+                                    <ListItem
+                                        icon={MapPinIcon}
+                                        title="Localização"
+                                        description={locationName}
+                                        className="p-4 cursor-default"
+                                    />
+                                    <ListItem
+                                        icon={CheckCircleIcon}
+                                        title="Venda sem Estoque"
+                                        description={productData.allow_sell_without_stock ? "Permitida" : "Não permitida"}
+                                        className="p-4 cursor-default"
+                                    />
+                                </div>
+                            )}
+                        </FormSection>
+                    )}
+
+                    {/* Envio e Dimensões */}
+                    {!isQuickMode && (
+                        <FormSection hasSeparator title="Envio e Dimensões">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+                                <div>
+                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium block mb-1">Dimensões (L × A × P)</span>
+                                    <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                        {productData.width || 0} × {productData.height || 0} × {productData.length || 0} cm
+                                    </span>
+                                </div>
+                                <div>
+                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium block mb-1">Peso Líquido / Bruto</span>
+                                    <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                        {productData.weight_net || 0} kg / {productData.weight_gross || 0} kg
+                                    </span>
+                                </div>
+                                <div>
+                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium block mb-1">Prazo de Preparação</span>
+                                    <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                        {productData.preparation_days || 0} dias
+                                    </span>
+                                </div>
+                                <div>
+                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium block mb-1">Tipo de Embalagem</span>
+                                    <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                        {productData.packaging_type === "package" ? "Pacote / Caixa" : productData.packaging_type === "cilinder" ? "Cilindro / Rolo" : productData.packaging_type === "envelope" ? "Envelope" : "Pacote / Caixa"}
+                                    </span>
+                                </div>
+                            </div>
+                        </FormSection>
+                    )}
+                </div>
+
+                {/* DIREITA (SidebarCard) */}
+                <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
+                    <SidebarCard hasTopStrip>
+                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Organização</h3>
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
+                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Código (SKU)</span>
+                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{productData.sku || "-"}</span>
+                            </div>
+
+                            {!isQuickMode && (
+                                <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
+                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body">Código de Barras</span>
+                                    <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{productData.gtin || "-"}</span>
+                                </div>
+                            )}
+
+                            <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
+                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Categoria</span>
+                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{categoryName}</span>
+                            </div>
+
+                            <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
+                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Subcategoria</span>
+                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{subcategoryName}</span>
+                            </div>
+
+                            <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
+                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Marca</span>
+                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{brandName}</span>
+                            </div>
+
+                            <div className="flex justify-between items-center py-2">
+                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Unidade</span>
+                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{productData.unidade || "UN"}</span>
+                            </div>
+                        </div>
+                    </SidebarCard>
+
+                    {isQuickMode && officialCategoryPath && (
+                        <SidebarCard>
+                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-3 mt-1">Categoria oficial</h3>
+                            <div className="p-4 rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/30 dark:bg-dark-border/30 text-sm font-medium text-brand-dark dark:text-dark-heading">
+                                {officialCategoryPath}
+                            </div>
+                        </SidebarCard>
+                    )}
+                </div>
+
+                <QuickStockMovementSheet
+                    isOpen={isStockAdjustmentOpen}
+                    product={{
+                        id: productData.id,
+                        name: productData.name,
+                        sku: productData.sku,
+                        image: typeof images[0] === 'string' ? images[0] : (productData.images?.[0] || productData.image || null),
+                        stock: Number(productData.stock || 0)
+                    }}
+                    onClose={() => setIsStockAdjustmentOpen(false)}
+                    onSaveSuccess={(newStock) => {
+                        handleInputChange({ target: { name: "stock", value: newStock } })
+                        router.refresh()
+                    }}
+                />
+            </div>
+        )
+    }
+
+    // ─── MODO EDIÇÃO / CRIAÇÃO / DUPLICAÇÃO ──────────────────────────────────
     return (
         <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
             {/* ESQUERDA (Principal) */}
@@ -395,7 +704,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                     </FormSection>
                 )}
 
-                {/* ENVIO - Agora com estilo corrigido */}
+                {/* ENVIO */}
                 {!isQuickMode && (
                     <div className="mt-8">
                         <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>

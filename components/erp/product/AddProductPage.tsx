@@ -653,6 +653,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                 availability_value: Number(d.availability_value) || 0,
                 availability_unit: d.availability_unit || "Dias",
                 tags: d.tags || [],
+                isDuplicate: internalMode === "duplicate",
             }
 
             // Optional official category (allowed in all modes)

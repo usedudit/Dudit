@@ -869,14 +869,14 @@ export function PlanDetailsPageClient({
                             <div className="border-t border-brand-border pt-8 mb-10">
                                 <h3 className="text-xl font-medium text-brand-dark mb-5">Quem oferece?</h3>
                                 {(() => {
-                                    const sellerBannerImage = partner.banner_url ? getR2ImageUrl(partner.banner_url) : PLACEHOLDER
+                                    const sellerBannerImage = partner.banner_url ? getR2ImageUrl(partner.banner_url, "large") : PLACEHOLDER
                                     const sellerAvatarImage = partner.store_avatar && !partner.store_avatar.includes("Placeholder.png") ? getR2ImageUrl(partner.store_avatar) : null
 
                                     return (
                                         <div className="border border-brand-border rounded-2xl overflow-hidden bg-white">
                                             {/* Banner Link to Partner Profile */}
                                             <Link href={getStoreUrl(partner)} className="block group">
-                                                <div className="h-24 w-full relative bg-gray-100 overflow-hidden select-none">
+                                                <div className="aspect-[2.65/1] w-full relative bg-gray-100 overflow-hidden select-none">
                                                     <img src={sellerBannerImage} alt={`Banner de ${partner.store_name}`} className="w-full h-full object-cover" />
                                                     <div className="absolute inset-0" />
                                                 </div>

@@ -760,7 +760,7 @@ export async function getFinancialTransactionsAction(
                     if (t.category === "Vendas" && order) {
                         const src = String(order.order_source || "Manual").toLowerCase();
                         if (src === "presencial") return "PDV";
-                        if (src === "vitrine online") return "Site";
+                        if (src === "vitrine online") return "Vitrine online";
                         if (src === "assinatura") return "Assinatura";
                         if (src === "manual") return "Venda Manual";
                         return order.order_source || "Venda Manual";
@@ -3095,7 +3095,7 @@ export async function getTransactionDetailsAction(
             if (ord) {
                 const src = String((ord as any).order_source || "Manual").toLowerCase()
                 if (src === "presencial") originSource = "PDV"
-                else if (src === "vitrine online") originSource = "Site"
+                else if (src === "vitrine online") originSource = "Vitrine online"
                 else if (src === "assinatura") originSource = "Assinatura"
                 else if (src === "manual") originSource = "Venda Manual"
                 else originSource = (ord as any).order_source || "Venda Manual"

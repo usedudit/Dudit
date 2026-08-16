@@ -892,6 +892,10 @@ export async function reduceFutureSettlementsForRefund(params: {
     actorUserId?: string | null
 }): Promise<{ reduced: number; cancelled: number }> {
     try {
+        const { getPartnerCapabilities } = await import("@/lib/services/partner-capabilities")
+        const capabilities = await getPartnerCapabilities(params.partnerId)
+        if (!capabilities.hasFinancial) return { reduced: 0, cancelled: 0 }
+
         const { supabase } = params
         let remaining = round2(Math.max(0, Number(params.refundAmount || 0)))
         if (remaining < 0.009) return { reduced: 0, cancelled: 0 }

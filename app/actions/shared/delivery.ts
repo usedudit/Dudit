@@ -142,6 +142,10 @@ export async function upsertPartnerDeliveryConfigAction(input: {
     deliveryPayer: input.settings.deliveryPayer === "seller" ? "seller" : "customer",
   }
 
+  if (plan.slug === "free" && normalized.deliveryPayer === "seller") {
+    return { success: false as const, error: "A opção \"Quem paga a entrega\" está disponível nos planos Crescer e Escalar." }
+  }
+
   if (!normalized.isDeliveryEnabled && !normalized.isPickupEnabled) {
     return { success: false as const, error: "Você deve manter ativo pelo menos um método de entrega (Entrega ou Retirada)." }
   }

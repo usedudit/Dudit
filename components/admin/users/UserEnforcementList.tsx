@@ -1,69 +1,37 @@
 "use client"
 
-import { useState, useTransition, useRef, useCallback, useMemo, useEffect } from "react"
-import { Button, Badge, Input, IconPlaceholder, ThreeDotsLoader } from "@/components/reusable"
-import AlertModal from "@/components/reusable/AlertModal"
-import DefaultModal from "@/components/reusable/DefaultModal"
-import StepUpModal from "@/components/admin/StepUpModal"
+import { useState, useTransition, useMemo, useEffect, useCallback } from "react"
+import { Button, Badge, IconPlaceholder, ThreeDotsLoader, Pagination } from "@/components/reusable"
 import UserEnforcementListRow from "./UserEnforcementListRow"
 import UserEnforcementPageControls from "./UserEnforcementPageControls"
+import AdminUserDetailView from "./AdminUserDetailView"
+import DestructiveActionModal from "@/components/admin/DestructiveActionModal"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { AnimatePresence } from "framer-motion"
-import { UserIcon, ClockIcon, AlertTriangleIcon, CheckCircleIcon, MailIcon, StoreIcon, ShieldIcon, XIcon } from "@/lib/icons"
+import { UserIcon, StoreIcon, ExportFileIcon } from "@/lib/icons"
 import type { EnforcementUser, CursorPaginatedResult } from "@/lib/admin/types"
-import { getUsers, banUser, unbanUser } from "@/app/actions/admin/enforcement"
-import BottomSheet from "@/components/BottomSheet"
-import Portal from "@/components/Portal"
+import { getUsers, banUser, unbanUser, getAdminUserStats, type AdminUserStats } from "@/app/actions/admin/enforcement"
 import { useMediaQuery } from "@/components/erp/hooks"
-import { useEntityPage } from "@/hooks/use-entity-page"
-import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
+import { formatDate } from "@/lib/utils"
 import { toast } from "@/hooks/use-notification"
-
-// ─── Duration selector ──────────────────────────────────────────────────────
-
-function DurationSelect({ value, onChange }: { value: number | null; onChange: (v: number | null) => void }) {
-    return (
-        <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-brand-dark dark:text-dark-body">Duração do ban</label>
-            <select
-                value={value === null ? "permanent" : String(value)}
-                onChange={e => {
-                    const val = e.target.value
-                    onChange(val === "permanent" ? null : parseInt(val))
-                }}
-                className="w-full h-[42px] px-4 rounded-lg border border-brand-border dark:border-dark-border bg-brand-gray dark:bg-dark-border/30 text-sm text-brand-dark dark:text-dark-heading focus:outline-none focus:border-brand-dark dark:focus:border-dark-body focus:bg-white dark:focus:bg-dark-surface transition-colors"
-            >
-                <option value="1">1 dia</option>
-                <option value="3">3 dias</option>
-                <option value="7">7 dias</option>
-                <option value="14">14 dias</option>
-                <option value="30">30 dias</option>
-                <option value="90">90 dias</option>
-                <option value="permanent">Permanente</option>
-            </select>
-        </div>
-    )
-}
-
-
-// ─── Main Component ─────────────────────────────────────────────────────────
 
 interface UserEnforcementListProps {
     initialData: CursorPaginatedResult<EnforcementUser>
+    initialStats?: AdminUserStats
 }
 
-const UserEnforcementList = ({ initialData }: UserEnforcementListProps) => {
+const UserEnforcementList = ({ initialData, initialStats }: UserEnforcementListProps) => {
     const isMobile = useMediaQuery("(max-width: 768px)")
-    const observerTarget = useRef<HTMLDivElement>(null)
     const [statusTab, setStatusTab] = useState("all")
+    const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
+    const [isPending, startTransition] = useTransition()
+
+    // Modals
     const [banTarget, setBanTarget] = useState<EnforcementUser | null>(null)
     const [unbanTarget, setUnbanTarget] = useState<EnforcementUser | null>(null)
-    const [banReason, setBanReason] = useState("")
-    const [banDuration, setBanDuration] = useState<number | null>(7)
-    const [banConfirmed, setBanConfirmed] = useState(false)
-    const [showStepUp, setShowStepUp] = useState(false)
-    const [detailUser, setDetailUser] = useState<EnforcementUser | null>(null)
-    const [isPending, startTransition] = useTransition()
+
+    // Stats
+    const [stats, setStats] = useState<AdminUserStats | undefined>(initialStats)
 
     // Search state
     const [search, setSearch] = useState("")
@@ -73,116 +41,145 @@ const UserEnforcementList = ({ initialData }: UserEnforcementListProps) => {
         return () => clearTimeout(t)
     }, [search])
 
-    // ─── Entity Page ──────────────────────────────────────────────────────────
-    const entityPage = useEntityPage<EnforcementUser & { id: string }, any, string>({
-        entityType: 'admin-users',
-        partnerId: 'admin',
-        queryKey: ['admin', 'users', statusTab, debouncedSearch],
-        initialItems: (debouncedSearch === "" && statusTab === "all") ? initialData.data.map(u => ({ ...u, id: u.user_id })) : [],
-        initialNextCursor: (debouncedSearch === "" && statusTab === "all") ? initialData.nextCursor : null,
-        initialHasMore: (debouncedSearch === "" && statusTab === "all") ? initialData.hasMore : true,
-        fetchPageFn: async ({ cursor }) => {
-            const res = await getUsers(cursor, 40, debouncedSearch, statusTab)
-            return {
-                items: res.data.map(u => ({ ...u, id: u.user_id })),
-                nextCursor: res.nextCursor,
-                hasMore: res.hasMore
-            }
-        },
-        dedupeKey: (u) => u.user_id || u.id,
-        getDetailFn: async () => null,
-    })
-
-    const {
-        items: rawUsers, hasNextPage, isFetchingNextPage, isListLoading, fetchNextPage, afterMutation
-    } = entityPage
-
-    // Pagination
+    // Data State
+    const [users, setUsers] = useState<EnforcementUser[]>(initialData.data || [])
+    const [isLoading, setIsLoading] = useState(false)
     const [page, setPage] = useState(1)
-    const itemsPerPage = 8
-    const totalPages = Math.ceil(rawUsers.length / itemsPerPage)
-    const paginatedItems = useMemo(() => {
-        const start = (page - 1) * itemsPerPage
-        return rawUsers.slice(start, start + itemsPerPage)
-    }, [rawUsers, page])
+    const itemsPerPage = 12
 
-    // Reset page when filters change
-    useMemo(() => { setPage(1) }, [debouncedSearch, statusTab])
-
-    const handleBan = () => {
-        if (!banTarget) return
-        if (!banReason.trim() || banReason.trim().length < 5) return
-        if (!banConfirmed) return
-        setShowStepUp(true)
-    }
-
-    const handleBanWithToken = (token: string) => {
-        if (!banTarget) return
-        setShowStepUp(false)
+    const fetchUsers = useCallback(() => {
+        setIsLoading(true)
         startTransition(async () => {
-            const result = await banUser(banTarget.user_id, banReason, banDuration, token)
-            if (result.success) {
-                toast.success("Usuário banido com sucesso!")
-                setBanTarget(null)
-                setBanReason("")
-                setBanDuration(7)
-                setBanConfirmed(false)
-                afterMutation(banTarget.user_id)
-            } else {
-                toast.error(result.error || "Erro ao banir usuário")
+            try {
+                const [res, statsRes] = await Promise.all([
+                    getUsers(null, 100, debouncedSearch, statusTab === "all" ? undefined : statusTab),
+                    getAdminUserStats(),
+                ])
+                setUsers(res.data || [])
+                setStats(statsRes)
+            } catch (err) {
+                console.error("Failed to fetch admin users:", err)
+                toast.error("Erro ao carregar usuários")
+            } finally {
+                setIsLoading(false)
+            }
+        })
+    }, [statusTab, debouncedSearch])
+
+    useEffect(() => {
+        fetchUsers()
+        setPage(1)
+    }, [fetchUsers])
+
+    const handleConfirmBan = (reason: string) => {
+        if (!banTarget) return
+        startTransition(async () => {
+            try {
+                const res = await banUser(banTarget.user_id, reason)
+                if (res.success) {
+                    toast.success("Usuário banido com sucesso!")
+                    setBanTarget(null)
+                    fetchUsers()
+                } else {
+                    toast.error(res.error || "Erro ao banir usuário")
+                }
+            } catch (err: any) {
+                toast.error(err.message || "Erro inesperado")
             }
         })
     }
 
-    const handleUnban = () => {
+    const handleConfirmUnban = (reason: string) => {
         if (!unbanTarget) return
         startTransition(async () => {
-            const result = await unbanUser(unbanTarget.user_id, "Desbanido pelo admin")
-            if (result.success) {
-                toast.success("Usuário desbanido com sucesso!")
-                setUnbanTarget(null)
-                afterMutation(unbanTarget.user_id)
-            } else {
-                toast.error(result.error || "Erro ao desbanir usuário")
+            try {
+                const res = await unbanUser(unbanTarget.user_id, reason)
+                if (res.success) {
+                    toast.success("Usuário desbanido com sucesso!")
+                    setUnbanTarget(null)
+                    fetchUsers()
+                } else {
+                    toast.error(res.error || "Erro ao desbanir usuário")
+                }
+            } catch (err: any) {
+                toast.error(err.message || "Erro inesperado")
             }
         })
+    }
+
+    // Pagination
+    const totalPages = Math.ceil(users.length / itemsPerPage)
+    const paginatedItems = useMemo(() => {
+        const start = (page - 1) * itemsPerPage
+        return users.slice(start, start + itemsPerPage)
+    }, [users, page])
+
+    // If viewing detail of a specific user
+    if (selectedUserId) {
+        return (
+            <AdminUserDetailView
+                userId={selectedUserId}
+                onBack={() => setSelectedUserId(null)}
+                onUserUpdated={fetchUsers}
+            />
+        )
     }
 
     return (
         <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
-            <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
+            <style>{`
+                .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; } 
+                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
+                .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; border: 2px solid #fff; }
+                .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border: 2px solid #1f2937; }
+                .dark .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+                .hide-scrollbar::-webkit-scrollbar { display: none; }
+                .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+            `}</style>
 
-                {/* Header Title/Subtitle (ERP Standard) */}
+            <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
+                {/* Desktop Header */}
                 <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
                     <div className="flex flex-col gap-2 pt-1">
                         <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
-                            Controle de Usuários
+                            Usuários
                         </h1>
                         <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
-                            Monitore a atividade e gerencie bans de usuários em todo o ecossistema Dudit.
+                            Gerencie contas de consumidores e lojistas, permissões e punições.
                         </p>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        <Button
+                            variant="outline"
+                            onClick={() => toast.success("Exportação iniciada em segundo plano")}
+                            leftIcon={<ExportFileIcon size={18} />}
+                        >
+                            Exportar
+                        </Button>
                     </div>
                 </div>
 
-                {/* Page Controls (Standardized) */}
+                {/* Page Controls */}
                 <UserEnforcementPageControls
                     search={search}
                     setSearch={setSearch}
                     statusTab={statusTab}
                     setStatusTab={setStatusTab}
+                    tabCounts={stats}
                 />
 
                 {/* List Content */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-24 md:pb-6 relative">
                     <AnimatePresence mode="wait">
-                        {paginatedItems.length === 0 && !isListLoading ? (
-                            <FadeIn key="empty" className="w-full h-full flex items-center justify-center min-h-[500px]">
+                        {paginatedItems.length === 0 && !isLoading ? (
+                            <FadeIn key="empty" className="w-full h-full flex items-center justify-center min-h-[400px]">
                                 <IconPlaceholder
                                     placeholderType="image"
-                                    imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                                    imageSrc="https://img.dudit.com.br/static/mascots/SemUsuarios.png"
                                     imageAlt="Nenhum usuário"
                                     title="Nenhum usuário encontrado"
-                                    subtitle={search ? "Tente ajustar sua busca." : "Nenhum usuário cadastrado no sistema."}
+                                    subtitle={search ? "Tente ajustar sua busca." : "Nenhum usuário cadastrado nesta categoria."}
                                     itemButton={search ? {
                                         text: "Limpar Busca",
                                         action: () => setSearch(""),
@@ -190,70 +187,62 @@ const UserEnforcementList = ({ initialData }: UserEnforcementListProps) => {
                                     } : undefined}
                                 />
                             </FadeIn>
-                        ) : isListLoading ? (
-                            <FadeIn key="loading" className="flex items-center justify-center min-h-[500px]">
+                        ) : isLoading ? (
+                            <FadeIn key="loading" className="flex items-center justify-center min-h-[400px]">
                                 <ThreeDotsLoader />
                             </FadeIn>
                         ) : (
-                            <FadeIn key="list" className="w-full">
-                                {/* Mobile/Tablet View */}
+                            <FadeIn key="list" className="w-full space-y-4">
+                                {/* Mobile View (Cards) */}
                                 <div className="md:hidden flex flex-col w-full divide-y divide-brand-border dark:divide-dark-border">
                                     {paginatedItems.map((user) => (
                                         <div
                                             key={user.user_id}
-                                            className="py-5 flex flex-col gap-3 cursor-pointer"
-                                            onClick={() => setDetailUser(user)}
+                                            className="py-4 flex flex-col gap-2.5 cursor-pointer active:bg-brand-gray/50 dark:active:bg-dark-border/20 transition-colors"
+                                            onClick={() => setSelectedUserId(user.user_id)}
                                         >
                                             <div className="flex justify-between items-start gap-2">
-                                                <div className="flex items-center gap-3 min-w-0">
-                                                    <div className="w-10 h-10 rounded-full bg-brand-green/10 dark:bg-brand-green/5 flex items-center justify-center shrink-0 border border-brand-green/20 dark:border-brand-green/10">
-                                                        <span className="text-[13px] font-bold text-brand-green">
-                                                            {user.full_name ? user.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : "?"}
-                                                        </span>
-                                                    </div>
-                                                    <div className="min-w-0 flex flex-col">
-                                                        <span className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
-                                                            {user.full_name || "Sem nome"}
-                                                        </span>
-                                                        <span className="text-xs font-medium text-brand-inactive-text">
-                                                            {user.partner?.store_name || user.partner?.stores?.[0]?.name}
-                                                        </span>
-                                                    </div>
+                                                <div className="flex flex-col gap-0.5 min-w-0">
+                                                    <span className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">
+                                                        {user.full_name || "Sem nome"}
+                                                    </span>
+                                                    <span className="text-xs text-brand-inactive-text truncate">
+                                                        {user.email || user.user_id}
+                                                    </span>
                                                 </div>
-                                                {user.banned_at ? (
-                                                    <Badge variant="red">Banido</Badge>
-                                                ) : (
-                                                    <Badge variant="green">Ativo</Badge>
-                                                )}
+                                                <Badge variant={user.banned_at ? "red" : "green"}>
+                                                    {user.banned_at ? "Banido" : "Ativo"}
+                                                </Badge>
                                             </div>
 
-                                            <div className="flex items-center gap-2 mt-1">
-                                                <div className="flex gap-2 flex-1 action-btn" onClick={e => e.stopPropagation()}>
-                                                    {user.banned_at ? (
-                                                        <Button variant="outline" size="sm" onClick={() => setUnbanTarget(user)} className="flex-1 text-xs h-9">Desbanir</Button>
+                                            <div className="flex items-center justify-between text-xs text-brand-inactive-text">
+                                                <div className="flex items-center gap-1.5 min-w-0">
+                                                    {user.partner ? (
+                                                        <>
+                                                            <StoreIcon size={12} className="shrink-0" />
+                                                            <span className="truncate">{user.partner.store_name || "Parceiro"}</span>
+                                                        </>
                                                     ) : (
-                                                        <Button variant="outline" size="sm" onClick={() => setBanTarget(user)} className="flex-1 text-xs h-9">Banir</Button>
+                                                        <span>Consumidor</span>
                                                     )}
                                                 </div>
-                                                <span className="text-xs text-brand-inactive-text ml-auto">
-                                                    {new Date(user.created_at).toLocaleDateString("pt-BR")}
-                                                </span>
+                                                <span>{formatDate(user.created_at)}</span>
                                             </div>
                                         </div>
                                     ))}
                                 </div>
 
-                                {/* Desktop Table View */}
+                                {/* Desktop View: Table */}
                                 <div className="hidden md:block w-full overflow-hidden rounded-xl relative">
                                     <div className="overflow-x-auto pb-4 custom-scrollbar">
                                         <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
                                             <thead>
                                                 <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                    <th className="py-3 px-3 text-[13px] rounded-l-lg font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors text-left">Usuário</th>
-                                                    <th className="py-3 px-3 text-[13px] rounded-l-lg font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors text-left">Loja</th>
-                                                    <th className="py-3 px-3 text-[13px] rounded-l-lg font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors text-center">Data</th>
-                                                    <th className="py-3 px-3 text-[13px] rounded-l-lg font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors text-center">Status</th>
-                                                    <th className="py-3 px-3 text-[13px] rounded-l-lg font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors text-center">Ações</th>
+                                                    <th className="py-3 px-2 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight">Usuário</th>
+                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-tight">Loja / Parceiro</th>
+                                                    <th className="py-3 px-2 w-32 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-tight text-center">Cadastro</th>
+                                                    <th className="py-3 px-2 w-28 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-tight text-center">Status</th>
+                                                    <th className="py-3 px-2 w-24 pr-6 rounded-r-lg bg-brand-gray dark:bg-dark-border/50 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">Ações</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -262,220 +251,65 @@ const UserEnforcementList = ({ initialData }: UserEnforcementListProps) => {
                                                         key={user.user_id}
                                                         user={user}
                                                         isPending={isPending}
-                                                        onUnban={setUnbanTarget}
                                                         onBan={setBanTarget}
-                                                        onView={setDetailUser}
+                                                        onUnban={setUnbanTarget}
+                                                        onView={(u) => setSelectedUserId(u.user_id)}
                                                     />
                                                 ))}
                                             </tbody>
                                         </table>
                                     </div>
                                 </div>
+
+                                {/* Pagination */}
+                                {totalPages > 1 && (
+                                    <div className="pt-4">
+                                        <Pagination
+                                            currentPage={page}
+                                            totalPages={totalPages}
+                                            onPageChange={setPage}
+                                        />
+                                    </div>
+                                )}
                             </FadeIn>
                         )}
                     </AnimatePresence>
                 </div>
             </div>
 
-
-            {/* Ban Modal - uses DefaultModal with form */}
-            <DefaultModal
+            {/* Modals de Ação */}
+            <DestructiveActionModal
                 isOpen={!!banTarget}
-                onClose={() => { setBanTarget(null); setBanReason(""); setBanDuration(7); setBanConfirmed(false) }}
-                title="Banir usuário"
-                maxWidth="md"
-                footer={
-                    <>
-                        <Button variant="outline" onClick={() => { setBanTarget(null); setBanReason(""); setBanDuration(7); setBanConfirmed(false) }}>
-                            Cancelar
-                        </Button>
-                        <Button
-                            variant="destructive"
-                            onClick={handleBan}
-                            disabled={!banConfirmed || !banReason.trim() || banReason.trim().length < 5 || isPending}
-                        >
-                            {isPending ? "Banindo..." : "Banir usuário"}
-                        </Button>
-                    </>
-                }
-            >
-                <div className="flex flex-col gap-4">
-                    {banTarget && (
-                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                            Banir &quot;{banTarget.full_name}&quot; do sistema.
-                        </p>
-                    )}
+                onClose={() => setBanTarget(null)}
+                onConfirm={handleConfirmBan}
+                title="Banir Usuário"
+                description="O usuário perderá o acesso à plataforma e suas sessões ativas serão invalidadas."
+                entityName={banTarget?.full_name || banTarget?.email || banTarget?.user_id || ""}
+                consequences={[
+                    "Invalidação de tokens de autenticação",
+                    "Bloqueio de novos logins na plataforma",
+                    "Registro obrigatório no Audit Log",
+                ]}
+                confirmText="Confirmar Banimento"
+                isPending={isPending}
+            />
 
-                    <DurationSelect value={banDuration} onChange={setBanDuration} />
-
-                    <Input
-                        name="ban-reason"
-                        label="Motivo"
-                        placeholder="Motivo do ban (mínimo 5 caracteres)..."
-                        value={banReason}
-                        onChange={e => setBanReason(e.target.value)}
-                        required
-                        multiline
-                        rows={3}
-                    />
-
-                    <label className="flex items-start gap-3 p-3 rounded-lg border border-red-200 dark:border-red-900/30 bg-red-50/50 dark:bg-red-900/10 cursor-pointer">
-                        <input type="checkbox" checked={banConfirmed} onChange={e => setBanConfirmed(e.target.checked)} className="mt-1 w-4 h-4 text-red-600 rounded" />
-                        <span className="text-sm text-red-800 dark:text-red-300 font-medium">
-                            Confirmo que entendo as consequências desta ação
-                        </span>
-                    </label>
-                </div>
-            </DefaultModal>
-
-            {/* Unban Modal - uses AlertModal */}
-            <AlertModal
+            <DestructiveActionModal
                 isOpen={!!unbanTarget}
                 onClose={() => setUnbanTarget(null)}
-                onConfirm={handleUnban}
-                title="Desbanir usuário"
-                message={`Remover ban de "${unbanTarget?.full_name || ""}". O usuário poderá acessar o sistema novamente. Ação será registrada nos audit logs.`}
-                confirmText="Desbanir"
-                variant="warning"
-            />
-
-            {/* Step-Up Auth Modal */}
-            <StepUpModal
-                isOpen={showStepUp}
-                onClose={() => setShowStepUp(false)}
-                onAuthenticated={handleBanWithToken}
-            />
-
-            {/* Detail Sheet */}
-            <UserDetailsSheet
-                user={detailUser}
-                isOpen={!!detailUser}
-                onClose={() => setDetailUser(null)}
+                onConfirm={handleConfirmUnban}
+                title="Revogar Banimento"
+                description="O usuário recuperará o acesso e poderá efetuar login novamente."
+                entityName={unbanTarget?.full_name || unbanTarget?.email || unbanTarget?.user_id || ""}
+                consequences={[
+                    "Desbloqueio imediato da conta",
+                    "Registro obrigatório da justificativa no Audit Log",
+                ]}
+                confirmText="Confirmar Desbloqueio"
+                isPending={isPending}
             />
         </FadeIn>
     )
 }
-
 export default UserEnforcementList
 
-// ─── Detail Sheet Sub-component ──────────────────────────────────────────────
-
-interface UserDetailsSheetProps {
-    user: EnforcementUser | null
-    isOpen: boolean
-    onClose: () => void
-}
-
-function UserDetailsSheet({ user, isOpen, onClose }: UserDetailsSheetProps) {
-    const isMobile = useMediaQuery("(max-width: 768px)")
-    const content = user ? (
-        <div className="flex flex-col h-full bg-white dark:bg-dark-surface">
-            {/* Header */}
-            <header className="z-10 shrink-0 flex items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
-                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Detalhes do Usuário</h2>
-                <Button variant="filled" onClick={onClose} size="icon">
-                    <XIcon className="w-5 h-5" />
-                </Button>
-            </header>
-
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-                {/* Header Info */}
-                <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-full bg-brand-green/10 flex items-center justify-center border border-brand-green/20">
-                        <span className="text-xl font-bold text-brand-green">
-                            {user.full_name ? user.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : "?"}
-                        </span>
-                    </div>
-                    <div>
-                        <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading leading-tight">
-                            {user.full_name || "Sem nome"}
-                        </h3>
-                        <p className="text-sm text-brand-inactive-text mt-1">{user.email}</p>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4">
-                    <div className="p-4 bg-brand-gray dark:bg-dark-border/30 rounded-2xl border border-brand-border dark:border-dark-border space-y-4">
-                        <div className="flex items-start gap-3">
-                            <ClockIcon className="w-5 h-5 text-brand-inactive-text mt-0.5" />
-                            <div>
-                                <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body block">Membro desde</span>
-                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                    {new Date(user.created_at).toLocaleDateString("pt-BR", { day: '2-digit', month: 'long', year: 'numeric' })}
-                                </span>
-                            </div>
-                        </div>
-
-                        <div className="flex items-start gap-3 pt-4 border-t border-brand-border/50 dark:border-dark-border/50">
-                            <ShieldIcon className="w-5 h-5 text-brand-inactive-text mt-0.5" />
-                            <div>
-                                <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body block">Status Atual</span>
-                                {user.banned_at ? (
-                                    <div className="space-y-1">
-                                        <Badge variant="red">Banido</Badge>
-                                        <p className="text-xs text-red-600 font-medium mt-1">
-                                            Motivo: {user.banned_reason || "Não informado"}
-                                        </p>
-                                        {user.banned_until && (
-                                            <p className="text-[10px] text-brand-inactive-text">
-                                                Expira em: {new Date(user.banned_until).toLocaleDateString("pt-BR")}
-                                            </p>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <Badge variant="green">Ativo</Badge>
-                                )}
-                            </div>
-                        </div>
-
-                        {user.partner && (
-                            <div className="flex items-start gap-3 pt-4 border-t border-brand-border/50 dark:border-dark-border/50">
-                                <StoreIcon className="w-5 h-5 text-brand-inactive-text mt-0.5" />
-                                <div>
-                                    <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body block">Loja Vinculada</span>
-                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{user.partner.store_name}</span>
-                                    <span className="text-[10px] text-brand-inactive-text block opacity-70">ID: {user.partner.id}</span>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                <div className="space-y-3">
-                    <h4 className="text-[13px] font-bold text-brand-inactive-text dark:text-dark-body">Identificação</h4>
-                    <div className="bg-brand-gray dark:bg-dark-background border border-brand-border dark:border-dark-border rounded-xl p-4">
-                        <div className="flex items-center justify-between">
-                            <span className="text-xs text-brand-inactive-text font-medium">User ID</span>
-                            <code className="text-xs font-bold text-brand-dark dark:text-dark-heading">{user.user_id}</code>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    ) : null
-
-    if (isMobile) {
-        return (
-            <BottomSheet isOpen={isOpen} onClose={onClose}>
-                {content}
-            </BottomSheet>
-        )
-    }
-
-    return (
-        <Portal>
-            <div
-                className={`fixed inset-0 z-50 bg-black/50 transition-opacity ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
-                onClick={onClose}
-            >
-                <div
-                    className={`fixed right-4 top-4 bottom-4 w-96 md:w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    {content}
-                </div>
-            </div>
-        </Portal>
-    )
-}

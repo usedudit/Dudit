@@ -17,7 +17,7 @@ import { revalidatePath } from "next/cache"
 import { syncToExploreRedis, removeFromExploreRedis } from "@/lib/redis-sync"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import { EMPTY_VIDEO_METADATA, normalizeVideoMetadata } from "@/lib/video/shared"
-import { ALLOWED_VIDEO_MIME_TYPES, MAX_FILE_SIZE, MAX_VIDEO_FILE_SIZE } from "@/lib/r2/config"
+import { ALLOWED_VIDEO_MIME_TYPES, MAX_FILE_SIZE, MAX_VIDEO_FILE_SIZE, R2_PREFIXES } from "@/lib/r2/config"
 import { buildSoftDeletePayload, buildRestorePayload, buildArchivePayload, scopeActiveOnly, scopeArchivedOnly, scopeWithArchived } from "@/lib/supabase/query-helpers"
 import { checkLimit } from "@/lib/services/subscription.service"
 import { logAuditEvent } from "@/lib/services/timeline.service"
@@ -182,6 +182,27 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
             video_duration: data.video_duration || data.videoDuration || null,
             video_provider_id: data.video_provider_id || data.videoProviderId || null,
         })
+
+        // Duplicata: clona imagens e vídeos para arquivos independentes no R2,
+        // para que excluir a mídia do serviço original não afete as cópias.
+        if (data.isDuplicate) {
+            const { cloneMediaForDuplicate } = await import("@/lib/r2/server")
+            const cloned = await cloneMediaForDuplicate(
+                {
+                    images: data.images,
+                    video_type: videoMetadata.video_type,
+                    video_url: videoMetadata.video_url,
+                    video_thumbnail: videoMetadata.video_thumbnail,
+                },
+                user.id,
+                R2_PREFIXES.services,
+                { itemId: data.id }
+            )
+            data.images = cloned.images || []
+            videoMetadata.video_url = cloned.video_url
+            videoMetadata.video_thumbnail = cloned.video_thumbnail
+        }
+
         if (videoMetadata.video_type === "upload" && !data.id) throw new Error("ID do serviço é obrigatório para upload de vídeo")
         if (data.id) await assertUploadVideoOwnership(videoMetadata, user.id, data.id)
 
@@ -692,6 +713,15 @@ export async function duplicateServiceAction(serviceId: string) {
         serviceData.name = `${service.name} (Cópia)`
         serviceData.sku = generateSKUBase(`${service.name} Copy`)
 
+        // Clona imagens para arquivos independentes no R2
+        const { cloneMediaForDuplicate } = await import("@/lib/r2/server")
+        const cloned = await cloneMediaForDuplicate(
+            { images: service.images },
+            user.id,
+            R2_PREFIXES.services
+        )
+        serviceData.images = cloned.images || []
+
         let inserted: any = null
         let insertError: any = null
         for (let attempt = 0; attempt < 3; attempt++) {
@@ -713,6 +743,25 @@ export async function duplicateServiceAction(serviceId: string) {
         }
 
         if (insertError) return errorResponse(insertError.message)
+
+        // Vídeo enviado (upload): clona após o insert com key item-scoped
+        if (inserted?.id && service.video_type === "upload") {
+            const clonedVideo = await cloneMediaForDuplicate(
+                {
+                    video_url: service.video_url,
+                    video_thumbnail: service.video_thumbnail,
+                },
+                user.id,
+                R2_PREFIXES.services,
+                { itemId: inserted.id }
+            )
+            if (clonedVideo.video_url || clonedVideo.video_thumbnail) {
+                await supabase.from("services").update({
+                    video_url: clonedVideo.video_url,
+                    video_thumbnail: clonedVideo.video_thumbnail,
+                }).eq("id", inserted.id)
+            }
+        }
 
         if (inserted?.id) await syncToExploreRedis({ id: inserted.id, type: "servico", data: {}, silent: true })
         revalidatePath("/erp/servicos")

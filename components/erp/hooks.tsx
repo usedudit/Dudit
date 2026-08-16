@@ -259,8 +259,8 @@ export function usePickerBucket<T extends { id: string }>(
   const [searchQuery, setSearchQuery] = useState("")
   const [visibleCount, setVisibleCount] = useState(pageSize)
 
-  const loadBucket = useCallback(async () => {
-    if (isLoaded || isLoading) return
+  const loadBucket = useCallback(async (force = false) => {
+    if ((isLoaded && !force) || isLoading) return
     setIsLoading(true)
     try {
       const data = await loadFn()
@@ -272,6 +272,17 @@ export function usePickerBucket<T extends { id: string }>(
       setIsLoading(false)
     }
   }, [loadFn, isLoaded, isLoading])
+
+  const prependItem = useCallback((item: T) => {
+    setBucket((prev) => {
+      const filtered = prev.filter((i) => i.id !== item.id)
+      return [item, ...filtered]
+    })
+  }, [])
+
+  const updateBucket = useCallback((updater: (prev: T[]) => T[]) => {
+    setBucket(updater)
+  }, [])
 
   const baseFiltered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
@@ -298,6 +309,8 @@ export function usePickerBucket<T extends { id: string }>(
 
   return {
     loadBucket,
+    prependItem,
+    updateBucket,
     searchQuery,
     setSearchQuery,
     filtered,

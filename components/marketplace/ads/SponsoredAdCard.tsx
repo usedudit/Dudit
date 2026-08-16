@@ -27,7 +27,7 @@ export function SponsoredAdCard({ ad, variant = "banner", className = "" }: Spon
     if (variant === "compact") {
         return (
             <div className={`w-full flex flex-col ${className}`}>
-                <span className="text-[9px] font-semibold tracking-wider text-gray-400 uppercase mb-1 select-none">
+                <span className="text-[9px] font-semibold tracking-wider text-brand-inactive-text uppercase mb-1 select-none">
                     Publicidade
                 </span>
                 <button
@@ -38,7 +38,7 @@ export function SponsoredAdCard({ ad, variant = "banner", className = "" }: Spon
                     <img
                         src={ad.image_url}
                         alt={ad.title || "Publicidade"}
-                        className="w-full h-full object-cover object-center group-hover:scale-[1.01] transition-transform duration-300"
+                        className="w-full h-full object-cover object-center"
                         loading="lazy"
                     />
                 </button>
@@ -49,7 +49,7 @@ export function SponsoredAdCard({ ad, variant = "banner", className = "" }: Spon
     if (variant === "inline") {
         return (
             <div className={`w-full flex flex-col ${className}`}>
-                <span className="text-[10px] font-semibold tracking-wider text-gray-400 uppercase mb-1 select-none">
+                <span className="text-[10px] font-semibold tracking-wider text-brand-inactive-text uppercase mb-1 select-none">
                     Publicidade
                 </span>
                 <button
@@ -60,7 +60,7 @@ export function SponsoredAdCard({ ad, variant = "banner", className = "" }: Spon
                     <img
                         src={ad.image_url}
                         alt={ad.title || "Publicidade"}
-                        className="w-full h-full object-cover object-center group-hover:scale-[1.01] transition-transform duration-300"
+                        className="w-full h-full object-cover object-center"
                         loading="lazy"
                     />
                 </button>
@@ -71,7 +71,7 @@ export function SponsoredAdCard({ ad, variant = "banner", className = "" }: Spon
     // Default: "banner"
     return (
         <div className={`w-full flex flex-col ${className}`}>
-            <span className="text-[10px] font-semibold tracking-wider text-gray-400 uppercase mb-1.5 select-none">
+            <span className="text-[10px] font-semibold tracking-wider text-brand-inactive-text uppercase mb-1.5 select-none">
                 Publicidade
             </span>
             <button
@@ -82,7 +82,7 @@ export function SponsoredAdCard({ ad, variant = "banner", className = "" }: Spon
                 <img
                     src={ad.image_url}
                     alt={ad.title || "Publicidade"}
-                    className="w-full h-full object-cover object-center group-hover:scale-[1.01] transition-transform duration-300"
+                    className="w-full h-full object-cover object-center"
                     loading="lazy"
                 />
             </button>

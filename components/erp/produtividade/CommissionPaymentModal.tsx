@@ -3,10 +3,10 @@
 import { useState } from "react"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { Button } from "@/components/reusable/Button"
-import { FormCurrencyInput } from "@/components/reusable/FormCurrencyInput"
 import { recordCommissionPaymentAction, payPendingBonusAction } from "@/app/actions/erp/produtividade"
 import { formatCurrency } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
+import { MoneyInput } from "@/components/reusable"
 
 type Props = {
   isOpen: boolean
@@ -103,18 +103,17 @@ export default function CommissionPaymentModal({
           <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(maxAmount)}</span>
         </div>
 
-        <FormCurrencyInput
+        <MoneyInput
           label="Valor a pagar"
           value={amount}
           onChange={setAmount}
-          placeholder="0,00"
         />
         <div className="flex items-center gap-2">
-          <Button onClick={() => setAmount(maxAmount)} variant="outline" className="text-xs">
+          <Button onClick={() => setAmount(maxAmount)} variant="outline">
             Pagar valor total
           </Button>
           {maxAmount > 0 && (
-            <Button onClick={() => setAmount(maxAmount / 2)} variant="outline" className="text-xs">
+            <Button onClick={() => setAmount(maxAmount / 2)} variant="outline">
               50%
             </Button>
           )}

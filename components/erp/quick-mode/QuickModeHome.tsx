@@ -562,11 +562,9 @@ function PlanUpgradeCard({ planSlug, onUpgrade }: { planSlug: string; onUpgrade:
     const nextSlug = planSlug === "free" ? "crescer" : planSlug === "crescer" ? "escalar" : null;
     const [currentFeatureIdx, setCurrentFeatureIdx] = useState(0);
 
-    if (!nextSlug) return null;
-
-    const planFeatures = getHardcodedPlan(nextSlug).features;
-    const planName = getHardcodedPlan(nextSlug).name;
-    const mascotSrc = PLAN_UPGRADE_MASCOTS[nextSlug as "crescer" | "escalar"];
+    const planFeatures = nextSlug ? getHardcodedPlan(nextSlug).features : [];
+    const planName = nextSlug ? getHardcodedPlan(nextSlug).name : "";
+    const mascotSrc = nextSlug ? PLAN_UPGRADE_MASCOTS[nextSlug as "crescer" | "escalar"] : "";
 
     const descriptions: Record<string, string> = {
         crescer: "Aumente seu limite de catálogo para 100 itens, receba pagamentos via Mercado Pago e ative cupons promocionais para vender mais.",
@@ -580,6 +578,8 @@ function PlanUpgradeCard({ planSlug, onUpgrade }: { planSlug: string; onUpgrade:
         }, 30000);
         return () => clearInterval(interval);
     }, [planFeatures.length]);
+
+    if (!nextSlug) return null;
 
     return (
         <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 h-[280px] flex flex-row items-center gap-6">

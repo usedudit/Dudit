@@ -450,6 +450,7 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                 assigned_staff: serviceData.assigned_staff || { all: true, staff_ids: [] },
                 is_active: serviceData.is_active,
                 images: cleanedFinalImages,
+                isDuplicate: internalMode === "duplicate",
             }
 
             const dbPromise = internalMode === "edit" && (initialService?.id || serviceId)

@@ -2120,14 +2120,13 @@ export async function signPublicServiceOrderAction(
         return { success: false, error: updateErr.message || "Erro ao assinar ordem de serviço" }
       }
 
-      await admin.from("audit_logs").insert({
-        table_name: 'service_orders',
-        action: 'SIGNED',
-        partner_id: order.partner_id,
-        entity_type: 'service_order',
-        entity_id: order.id,
-        action_type: 'signed',
-        change_lines: ['OS assinada pelo cliente via portal público (autenticado por e-mail)'],
+      await logAuditEvent({
+        partnerId: order.partner_id,
+        actorUserId: loggedUser.id || null,
+        entityType: 'service_order',
+        entityId: order.id,
+        actionType: 'signed',
+        changeLines: ['OS assinada pelo cliente via portal público (autenticado por e-mail)'],
         source: 'system',
         metadata: {
           ipAddress: ip || null,

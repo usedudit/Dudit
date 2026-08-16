@@ -34,11 +34,14 @@ export async function logBillingAudit(
     try {
         const admin = getAdminClient()
         const { error } = await admin.from("audit_logs").insert({
-            table_name: "billing",
-            action,
+            entity_type: "billing",
+            action_type: action,
+            action: action.toUpperCase(),
             user_id: userId || null,
+            actor_user_id: userId || null,
             partner_id: partnerId,
             new_values: metadata,
+            metadata,
         })
         if (error) {
             console.error("[Billing Audit] Error logging audit:", error.message)

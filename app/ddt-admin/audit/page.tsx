@@ -1,14 +1,20 @@
 import { AdminHeader } from "@/components/admin/admin-header"
 import AuditLogList from "@/components/admin/audit/AuditLogList"
-import { getAuditLogs } from "@/app/actions/admin/audit-logs"
+import { getAuditLogs, getAuditLogStats } from "@/app/actions/admin/audit-logs"
+
+export const dynamic = "force-dynamic"
 
 export default async function AuditLogsPage() {
-    const initialData = await getAuditLogs(null, 20)
+    const [initialData, initialStats] = await Promise.all([
+        getAuditLogs(null, 50),
+        getAuditLogStats(),
+    ])
 
     return (
         <>
             <AdminHeader pageTitle="Audit Logs" />
-            <AuditLogList initialData={initialData} />
+            <AuditLogList initialData={initialData} initialStats={initialStats} />
         </>
     )
 }
+

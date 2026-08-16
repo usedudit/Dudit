@@ -23,54 +23,25 @@ export interface OrderHistoryEntryWithActor extends OrderHistoryEntry {
   actor_name: string
 }
 
-
-
 async function fetchOrderHistoryEntries(orderId: string, partnerId: string, limit: number): Promise<OrderHistoryEntryWithActor[]> {
   const supabase = getAdminClient()
   const cappedLimit = Math.min(Math.max(1, limit), MAX_MERGED_ENTRIES)
 
-  // TODO: LEGACY MODE
-  // This merge exists for backward compatibility.
-  // Future step: migrate all legacy history into audit_logs and remove old tables.
-  const [legacyResult, timelineResult] = await Promise.all([
-    supabase
-      .from("orders_history")
-      .select("id, order_id, partner_id, actor_user_id, entry_type, change_lines, created_at")
-      .eq("order_id", orderId)
-      .eq("partner_id", partnerId)
-      .order("created_at", { ascending: false })
-      .order("id", { ascending: false })
-      .limit(cappedLimit),
-    supabase
-      .from("audit_logs")
-      .select("id, partner_id, actor_user_id, action_type, change_lines, created_at, entity_id, metadata")
-      .eq("partner_id", partnerId)
-      .eq("entity_type", "order")
-      .eq("entity_id", orderId)
-      .order("created_at", { ascending: false })
-      .limit(cappedLimit),
-  ])
+  const { data: timelineResult, error: timelineError } = await supabase
+    .from("audit_logs")
+    .select("id, partner_id, actor_user_id, action_type, change_lines, created_at, entity_id, metadata")
+    .eq("partner_id", partnerId)
+    .eq("entity_type", "order")
+    .eq("entity_id", orderId)
+    .order("created_at", { ascending: false })
+    .limit(cappedLimit)
 
-  if (legacyResult.error) {
-    console.error("[orders_history] legacy fetch error:", legacyResult.error)
+  if (timelineError) {
+    console.error("[orders_history] timeline fetch error:", timelineError)
   }
-  if (timelineResult.error) {
-    console.error("[orders_history] timeline fetch error:", timelineResult.error)
-  }
-
-  // Normalize legacy entries
-  const legacyEntries: OrderHistoryEntry[] = (legacyResult.data || []).map((entry: any) => ({
-    id: entry.id,
-    order_id: entry.order_id,
-    partner_id: entry.partner_id,
-    actor_user_id: entry.actor_user_id,
-    entry_type: entry.entry_type,
-    change_lines: entry.change_lines,
-    created_at: entry.created_at,
-  }))
 
   // Normalize timeline entries (from audit_logs)
-  const timelineEntries: OrderHistoryEntry[] = (timelineResult.data || []).map((entry: any) => ({
+  const timelineEntries: OrderHistoryEntry[] = (timelineResult || []).map((entry: any) => ({
     id: `tl-${entry.id}`,
     order_id: entry.entity_id,
     partner_id: entry.partner_id,
@@ -81,8 +52,8 @@ async function fetchOrderHistoryEntries(orderId: string, partnerId: string, limi
     created_at: entry.created_at,
   }))
 
-  // Merge, sort by created_at DESC in memory, cap at limit
-  const merged = [...legacyEntries, ...timelineEntries]
+  // Sort by created_at DESC in memory, cap at limit
+  const merged = [...timelineEntries]
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .slice(0, cappedLimit)
 

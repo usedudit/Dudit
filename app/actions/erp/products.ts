@@ -25,7 +25,7 @@ import { invalidateProductCache } from "@/lib/cache/invalidation"
 import { checkLimit, canUseFeature, increment_usage_counter, decrement_usage_counter } from "@/lib/services/subscription.service"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import { EMPTY_VIDEO_METADATA, normalizeVideoMetadata, type VideoType } from "@/lib/video/shared"
-import { ALLOWED_VIDEO_MIME_TYPES, MAX_FILE_SIZE, MAX_VIDEO_FILE_SIZE } from "@/lib/r2/config"
+import { ALLOWED_VIDEO_MIME_TYPES, MAX_FILE_SIZE, MAX_VIDEO_FILE_SIZE, R2_PREFIXES } from "@/lib/r2/config"
 import { buildSoftDeletePayload, buildRestorePayload, buildArchivePayload, scopeActiveOnly, scopeArchivedOnly, scopeWithArchived } from "@/lib/supabase/query-helpers"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { headers } from "next/headers"
@@ -425,6 +425,8 @@ export async function createProductComprehensiveAction(data: {
     pending_variants?: Array<any>
     suppliers?: Array<any>
     pending_suppliers?: Array<any>
+    /** Marca que este create é uma duplicata: clona imagens/vídeos para arquivos independentes */
+    isDuplicate?: boolean
 }): Promise<ActionResponse<any>> {
     const actionStart = performance.now()
     try {
@@ -448,8 +450,26 @@ export async function createProductComprehensiveAction(data: {
         }
 
         // 3. Normalização e validação em memória de variantes e fornecedores (zero DB cost)
-        const rawVariants = data.pending_variants || data.variants || []
+        let rawVariants = data.pending_variants || data.variants || []
         const hasVariants = Array.isArray(rawVariants) && rawVariants.length > 0
+
+        // Duplicata: clona imagens das variantes para arquivos independentes no R2
+        if (data.isDuplicate && hasVariants) {
+            const { cloneMediaForDuplicate } = await import("@/lib/r2/server")
+            rawVariants = await Promise.all(
+                rawVariants.map(async (v: any) => {
+                    const variantImage = v.image || v.image_url || v.variant_options?.image || null
+                    if (!variantImage) return v
+                    const clonedVariant = await cloneMediaForDuplicate(
+                        { images: [variantImage] },
+                        _user.id,
+                        R2_PREFIXES.products
+                    )
+                    const newImage = clonedVariant.images?.[0] || null
+                    return { ...v, image: newImage, image_url: newImage, variant_options: { ...(v.variant_options || {}), image: newImage } }
+                })
+            )
+        }
 
         if (hasVariants) {
             if (rawVariants.length > 50) {
@@ -537,6 +557,27 @@ export async function createProductComprehensiveAction(data: {
             video_duration: data.videoDuration || null,
             video_provider_id: data.videoProviderId || null,
         })
+
+        // Duplicata: clona imagens e vídeos para arquivos independentes no R2,
+        // para que excluir a mídia do produto original não afete as cópias.
+        if (data.isDuplicate) {
+            const { cloneMediaForDuplicate } = await import("@/lib/r2/server")
+            const cloned = await cloneMediaForDuplicate(
+                {
+                    images: data.images,
+                    video_type: videoMetadata.video_type,
+                    video_url: videoMetadata.video_url,
+                    video_thumbnail: videoMetadata.video_thumbnail,
+                },
+                _user.id,
+                R2_PREFIXES.products,
+                { itemId: data.id }
+            )
+            data.images = cloned.images || []
+            videoMetadata.video_url = cloned.video_url
+            videoMetadata.video_thumbnail = cloned.video_thumbnail
+        }
+
         if (videoMetadata.video_type === "upload" && !data.id) throw new Error("ID do produto é obrigatório para upload de vídeo")
         if (data.id) await assertUploadVideoOwnership(videoMetadata, _user.id, "products", data.id)
 
@@ -2036,7 +2077,7 @@ export const toggleProductsStatusAction = async (productIds: string[], isActive:
 export async function duplicateProductsAction(productIds: string[]) {
     const actionStart = performance.now()
     try {
-        await verifyAuth()
+        const user = await verifyAuth()
         const supabase = await getSupabaseServerClient()
         const { data: products } = await supabase.from("products").select("*").in("id", productIds)
 
@@ -2044,15 +2085,24 @@ export async function duplicateProductsAction(productIds: string[]) {
         await requirePermission(products[0].partner_id, "products", "create")
 
         // SKU puro (zero queries) â€” unicidade pelo banco
-        const duplicated = products.map((p: any) => {
+        const { cloneMediaForDuplicate } = await import("@/lib/r2/server")
+        const duplicated = await Promise.all(products.map(async (p: any) => {
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
             const { id, created_at, updated_at, ...data } = p
+            const cloned = await cloneMediaForDuplicate(
+                {
+                    images: data.images,
+                },
+                user.id,
+                R2_PREFIXES.products
+            )
             return {
                 ...data,
+                images: cloned.images || [],
                 name: `${data.name} (Cópia)`,
                 sku: generateSKUBase(`${data.name} Copy`),
             }
-        })
+        }))
 
         // INSERT com retry em caso de SKU collision
         let inserted: any[] | null = null
@@ -2086,6 +2136,30 @@ export async function duplicateProductsAction(productIds: string[]) {
         }
 
         if (insertError) return { success: false, error: insertError.message }
+
+        // Vídeos enviados (upload) são clonados após o insert, usando a key
+        // item-scoped (users/{user}/products/{newId}.*) esperada pelas validações.
+        if (inserted?.length) {
+            const { cloneMediaForDuplicate } = await import("@/lib/r2/server")
+            await Promise.all(inserted.map(async (newRow: any, index: number) => {
+                const original = products[index]
+                if (original?.video_type !== "upload") return
+                const cloned = await cloneMediaForDuplicate(
+                    {
+                        video_url: original.video_url,
+                        video_thumbnail: original.video_thumbnail,
+                    },
+                    user.id,
+                    R2_PREFIXES.products,
+                    { itemId: newRow.id }
+                )
+                if (!cloned.video_url && !cloned.video_thumbnail) return
+                await supabase.from("products").update({
+                    video_url: cloned.video_url,
+                    video_thumbnail: cloned.video_thumbnail,
+                }).eq("id", newRow.id)
+            }))
+        }
 
         Promise.resolve().then(() => revalidateProducts(products[0].partner_id)).catch(console.error)
         return { success: true, count: inserted?.length || 0, products: inserted }

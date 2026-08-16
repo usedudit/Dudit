@@ -1,13 +1,13 @@
 "use client"
 
-import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
+import React, { useState, useMemo, useCallback, useRef } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { AnimatePresence } from "framer-motion"
 import { useMediaQuery } from "../hooks"
 import { useToast } from "@/hooks/use-toast"
 import { useEntityPage } from "@/hooks/use-entity-page"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
-import { Button, Checkbox, IconPlaceholder, ThreeDotsLoader, Input, SelectionBanner, Tabs, TabsList, TabsTrigger, DropdownItem } from "@/components/reusable"
+import { Button, Checkbox, IconPlaceholder, Input, SelectionBanner, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
 import FilterChip from "@/components/reusable/FilterChip"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
@@ -21,6 +21,7 @@ import ServiceOrderListRow from "./ServiceOrderListRow"
 import ServiceOrderGridCard from "./ServiceOrderGridCard"
 import ServiceOrderForm from "./ServiceOrderForm"
 import ServiceOrderDetail from "./ServiceOrderDetail"
+import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
 import {
   PlusIcon, WrenchIcon, SearchIcon, FilterIcon, TrashIcon,
   ListIcon, GridIcon, ArrowUpDownIcon, ClockIcon, CheckCircleIcon, BlockedIcon, ExportFileIcon,
@@ -41,19 +42,6 @@ import {
   updateServiceOrderStatusAction,
 } from "@/app/actions/erp/service-orders"
 import { SERVICE_ORDER_STATUS_META, type ServiceOrderStatus } from "@/lib/types/service-order"
-
-
-
-const STATUS_TRANSITIONS: Record<string, string[]> = {
-  aberta: ["aguardando_aprovacao", "cancelada"],
-  aguardando_aprovacao: ["aprovada", "cancelada"],
-  aprovada: ["em_andamento", "cancelada"],
-  em_andamento: ["aguardando_peca", "concluida", "cancelada"],
-  aguardando_peca: ["em_andamento", "cancelada"],
-  concluida: ["entregue"],
-  entregue: [],
-  cancelada: [],
-}
 
 const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; width: string }[] = [
   { id: "order_number", label: "Nº OS", align: "left", width: "150px" },
@@ -367,12 +355,12 @@ export default function ServiceOrdersPage({
       const meta = SERVICE_ORDER_STATUS_META[o.status as ServiceOrderStatus]
       return meta?.label || o.status
     }))]
-    
+
     // Only show total filter if there are orders with different totals
-    const hasMultipleTotals = (effectiveOrders || []).some((o: any, i, arr) => 
+    const hasMultipleTotals = (effectiveOrders || []).some((o: any, i, arr) =>
       i > 0 && Number(o.total_amount || 0) !== Number(arr[0].total_amount || 0)
     )
-    
+
     // Only show date filter if there are orders with expected_completion_date
     const hasDates = (effectiveOrders || []).some((o: any) => o.expected_completion_date)
 
@@ -479,10 +467,8 @@ export default function ServiceOrdersPage({
     <>
       <AnimatePresence mode="wait">
         {entityState.isOpen && (entityState.action === "create" || entityState.action === "edit") ? (
-          isLoadingDetail ? (
-            <FadeIn key="loading-form" className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
-              <ThreeDotsLoader />
-            </FadeIn>
+          (entityState.action === "edit" && (isLoadingDetail || !currentEntity)) ? (
+            <ERPDetailLoading key="loading-form" />
           ) : (
             <FadeIn key={entityState.action} className="w-full h-full bg-white dark:bg-dark-background">
               <ServiceOrderForm
@@ -497,11 +483,9 @@ export default function ServiceOrdersPage({
               />
             </FadeIn>
           )
-        ) : entityState.isOpen && entityState.action === "view" && currentEntity ? (
-          isLoadingDetail ? (
-            <FadeIn key="loading-detail" className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
-              <ThreeDotsLoader />
-            </FadeIn>
+        ) : entityState.isOpen && entityState.action === "view" ? (
+          (isLoadingDetail || !currentEntity) ? (
+            <ERPDetailLoading key="loading-detail" />
           ) : (
             <FadeIn key="detail" className="w-full h-full bg-white dark:bg-dark-background">
               <ServiceOrderDetail

@@ -2,6 +2,7 @@
 
 import React from "react"
 import { Button, Input, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
+import { TabCountBadge } from "@/components/reusable/TabCountBadge"
 import {
     SearchIcon,
     StoreIcon,
@@ -10,13 +11,15 @@ import {
     CheckCircleIcon,
     FilterIcon
 } from "@/lib/icons"
+import type { AdminPartnerStats } from "@/app/actions/admin/enforcement"
 
 interface PartnersPageControlsProps {
     search: string
     setSearch: (val: string) => void
     statusTab: string
     setStatusTab: (val: string) => void
-    hasData?: boolean
+    tabCounts?: AdminPartnerStats
+    onOpenFilter?: () => void
 }
 
 const PartnersPageControls = ({
@@ -24,56 +27,73 @@ const PartnersPageControls = ({
     setSearch,
     statusTab,
     setStatusTab,
-    hasData = true
+    tabCounts,
+    onOpenFilter,
 }: PartnersPageControlsProps) => {
-
-    const tabs = [
-        { value: "all", label: "Todos", icon: StoreIcon },
-        { value: "active", label: "Ativos", icon: CheckCircleIcon },
-        { value: "suspended", label: "Suspensos", icon: AlertTriangleIcon },
-        { value: "erp_disabled", label: "Sem ERP", icon: BlockedIcon },
-    ] as const
-
     return (
         <>
             {/* --- TABS --- */}
             <div className="mb-6 px-4 md:px-8">
                 <Tabs value={statusTab} onValueChange={setStatusTab}>
                     <TabsList className="px-0">
-                        {tabs.map((tab) => (
-                            <TabsTrigger
-                                key={tab.value}
-                                value={tab.value}
-                                icon={tab.icon}
-                            >
-                                {tab.label}
-                            </TabsTrigger>
-                        ))}
+                        <TabsTrigger
+                            value="all"
+                            icon={StoreIcon}
+                            badge={tabCounts && <TabCountBadge count={tabCounts.total} variant="gray" />}
+                        >
+                            Todos
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="active"
+                            icon={CheckCircleIcon}
+                            badge={tabCounts && <TabCountBadge count={tabCounts.active} variant="green" />}
+                        >
+                            Ativos
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="suspended"
+                            icon={AlertTriangleIcon}
+                            badge={tabCounts && <TabCountBadge count={tabCounts.suspended} variant="red" />}
+                        >
+                            Suspensos
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="high_risk"
+                            icon={BlockedIcon}
+                            badge={tabCounts && <TabCountBadge count={tabCounts.highRisk} variant="yellow" />}
+                        >
+                            Alto Risco
+                        </TabsTrigger>
                     </TabsList>
                 </Tabs>
             </div>
 
             {/* --- CONTROLS BAR --- */}
             <div className="flex flex-col sm:flex-row items-center gap-3 w-full px-4 md:px-8 mb-6">
-                <Input
-                    placeholder="Buscar lojas..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    variant="full-rounded"
-                    className="flex-1"
-                    prefix={<SearchIcon size={18} />}
-                />
+                <div className="w-full sm:w-96">
+                    <Input
+                        placeholder="Buscar por nome da loja ou parceiro..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        variant="full-rounded"
+                        className="h-[42px]"
+                        prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
+                    />
+                </div>
 
-                <Button
-                    variant="outline"
-                    className="w-full sm:w-auto h-11 px-6 rounded-full font-bold text-[14px] bg-white dark:bg-dark-surface"
-                    leftIcon={<FilterIcon size={16} />}
-                >
-                    Filtros
-                </Button>
+                {onOpenFilter && (
+                    <Button
+                        variant="outline"
+                        onClick={onOpenFilter}
+                        leftIcon={<FilterIcon size={18} />}
+                    >
+                        Filtros
+                    </Button>
+                )}
             </div>
         </>
     )
 }
 
 export default PartnersPageControls
+

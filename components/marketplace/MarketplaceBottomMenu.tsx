@@ -11,6 +11,51 @@ import BottomSheet from "@/components/BottomSheet"
 import { getUserInitials, getAvatarColor } from "@/lib/utils/UserProfileImage"
 import { useCollectionDetailMenu } from "@/lib/collection-detail-menu"
 
+function MenuItem({
+    label,
+    href,
+    icon: Icon,
+    onClick,
+    onClose
+}: {
+    label: string
+    href?: string
+    icon: any
+    onClick?: () => void
+    onClose?: () => void
+}) {
+    const content = (
+        <div className="flex items-center justify-between px-3 py-3.5 rounded-xl hover:bg-gray-50 dark:hover:bg-dark-border/20 cursor-pointer transition-all duration-200 group">
+            <div className="flex items-center">
+                <div className="w-9 h-9 rounded-xl bg-gray-50 dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-white mr-3 shrink-0 group-hover:scale-105 transition-transform duration-200">
+                    <Icon size={20} className="text-brand-dark dark:text-gray-200" />
+                </div>
+                <span className="text-[14px] font-semibold text-gray-700 dark:text-gray-200 group-hover:text-brand-green dark:group-hover:text-brand-green transition-colors">
+                    {label}
+                </span>
+            </div>
+            <ChevronRightIcon size={16} className="text-gray-400 dark:text-gray-600 group-hover:translate-x-0.5 transition-transform duration-200" />
+        </div>
+    )
+
+    if (href) {
+        return (
+            <Link href={href} prefetch={false} onClick={onClose}>
+                {content}
+            </Link>
+        )
+    }
+
+    return (
+        <div onClick={() => {
+            onClick?.()
+            onClose?.()
+        }}>
+            {content}
+        </div>
+    )
+}
+
 export function MarketplaceBottomMenu() {
     const pathname = usePathname()
     const { user, supabase } = useSupabase()
@@ -38,9 +83,6 @@ export function MarketplaceBottomMenu() {
         pathname.startsWith("/quote") ||
         pathname.startsWith("/print")
 
-
-    if (isExcluded) return null
-
     const homePath = citySlug ? `/${citySlug}` : "/"
 
     const isCollectionDetailOwner = !!collectionMenu?.isOwner && pathname?.startsWith("/colecoes/")
@@ -56,53 +98,12 @@ export function MarketplaceBottomMenu() {
         window.location.href = "/"
     }
 
-    const MenuItem = ({
-        label,
-        href,
-        icon: Icon,
-        onClick
-    }: {
-        label: string
-        href?: string
-        icon: any
-        onClick?: () => void
-    }) => {
-        const content = (
-            <div className="flex items-center justify-between px-3 py-3.5 rounded-xl hover:bg-gray-50 dark:hover:bg-dark-border/20 cursor-pointer transition-all duration-200 group">
-                <div className="flex items-center">
-                    <div className="w-9 h-9 rounded-xl bg-gray-50 dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-white mr-3 shrink-0 group-hover:scale-105 transition-transform duration-200">
-                        <Icon size={20} className="text-brand-dark dark:text-gray-200" />
-                    </div>
-                    <span className="text-[14px] font-semibold text-gray-700 dark:text-gray-200 group-hover:text-brand-green dark:group-hover:text-brand-green transition-colors">
-                        {label}
-                    </span>
-                </div>
-                <ChevronRightIcon size={16} className="text-gray-400 dark:text-gray-600 group-hover:translate-x-0.5 transition-transform duration-200" />
-            </div>
-        )
-
-        if (href) {
-            return (
-                <Link href={href} prefetch={false} onClick={() => setIsMenuOpen(false)}>
-                    {content}
-                </Link>
-            )
-        }
-
-        return (
-            <div onClick={() => {
-                onClick?.()
-                setIsMenuOpen(false)
-            }}>
-                {content}
-            </div>
-        )
-    }
-
     // Active tab checks
     const isHomeActive = pathname === "/" || pathname === `/${citySlug}`
     const isExploreActive = pathname.startsWith("/explorar")
     const isOrdersActive = pathname.startsWith("/pedidos")
+
+    if (isExcluded) return null
 
     return (
         <>
@@ -220,22 +221,25 @@ export function MarketplaceBottomMenu() {
                                 Minha atividade
                             </span>
                             <div className="space-y-1">
-                                <MenuItem label="Início" href="/" icon={HomeIcon} />
+                                <MenuItem label="Início" href="/" icon={HomeIcon} onClose={() => setIsMenuOpen(false)} />
                                 <MenuItem
                                     label="Central de Vendedores"
                                     href={user ? "/erp/trocar-erp" : "/auth/login?mode=partner"}
                                     icon={StoreIcon}
+                                    onClose={() => setIsMenuOpen(false)}
                                 />
-                                <MenuItem label="Central de Ajuda" href="/ajuda" icon={HelpCircleIcon} />
+                                <MenuItem label="Central de Ajuda" href="/ajuda" icon={HelpCircleIcon} onClose={() => setIsMenuOpen(false)} />
                                 <MenuItem
                                     label="Favoritos"
                                     href={user ? "/favoritos" : "/auth/login?next=/favoritos"}
                                     icon={HeartIcon}
+                                    onClose={() => setIsMenuOpen(false)}
                                 />
                                 <MenuItem
                                     label="Minhas opiniões"
                                     href={user ? "/perfil" : "/auth/login"}
                                     icon={StarIcon}
+                                    onClose={() => setIsMenuOpen(false)}
                                 />
                             </div>
                         </div>
@@ -246,10 +250,10 @@ export function MarketplaceBottomMenu() {
                                 Institucional
                             </span>
                             <div className="space-y-1">
-                                <MenuItem label="Sobre a Dudit" href="/institucional/sobre" icon={InfoIcon} />
-                                <MenuItem label="Nossos Planos" href="/institucional/planos" icon={MoneyIcon} />
-                                <MenuItem label="Termos e condições" href="/institucional/termos" icon={FileTextIcon} />
-                                <MenuItem label="Política de privacidade" href="/institucional/privacidade" icon={ShieldIcon} />
+                                <MenuItem label="Sobre a Dudit" href="/institucional/sobre" icon={InfoIcon} onClose={() => setIsMenuOpen(false)} />
+                                <MenuItem label="Nossos Planos" href="/institucional/planos" icon={MoneyIcon} onClose={() => setIsMenuOpen(false)} />
+                                <MenuItem label="Termos e condições" href="/institucional/termos" icon={FileTextIcon} onClose={() => setIsMenuOpen(false)} />
+                                <MenuItem label="Política de privacidade" href="/institucional/privacidade" icon={ShieldIcon} onClose={() => setIsMenuOpen(false)} />
                             </div>
                         </div>
 

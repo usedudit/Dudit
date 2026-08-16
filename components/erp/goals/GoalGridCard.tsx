@@ -4,7 +4,7 @@ import React from "react"
 import { motion } from "framer-motion"
 import { ActionsDropdown, Badge } from "@/components/reusable"
 import { TargetIcon } from "@/lib/icons"
-import { formatCurrency } from "@/lib/utils"
+import { formatCurrency, formatDate } from "@/lib/utils"
 
 type GoalRow = {
   id: string
@@ -13,7 +13,8 @@ type GoalRow = {
   start_date: string
   end_date: string
   target_amount: number
-  goal_type: "sales" | "service_orders" | "both"
+  bonus_type?: "fixed" | "percentage"
+  bonus_value?: number
   assigned_user_names?: string[]
   bonus_distribution?: string | null
   current_amount: number
@@ -27,12 +28,6 @@ interface GoalGridCardProps {
   onEdit: () => void
   onDuplicate: () => void
   onDelete: () => void
-}
-
-function goalTypeLabel(goalType: GoalRow["goal_type"]) {
-  if (goalType === "sales") return "Vendas"
-  if (goalType === "service_orders") return "Ordens de serviço"
-  return "Vendas e OS"
 }
 
 function statusVariant(status: GoalRow["status"]) {
@@ -73,7 +68,7 @@ const GoalGridCard = React.memo(function GoalGridCard({
               </Badge>
             </div>
             <p className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate">
-              {goal.period_type === "monthly" ? "Mensal" : "Semanal"} • {goal.start_date} até {goal.end_date}
+              {goal.period_type === "monthly" ? "Mensal" : "Semanal"} • {formatDate(goal.start_date)} até {formatDate(goal.end_date)}
             </p>
           </div>
         </div>
@@ -102,12 +97,18 @@ const GoalGridCard = React.memo(function GoalGridCard({
 
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
-              <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Tipo</span>
-              <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{goalTypeLabel(goal.goal_type)}</p>
-            </div>
-            <div className="text-right">
               <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Atual</span>
               <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(goal.current_amount || 0)}</p>
+            </div>
+            <div className="text-right">
+              <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Bônus</span>
+              <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                {goal.bonus_type === "fixed" || goal.bonus_type === "percentage"
+                  ? goal.bonus_type === "percentage"
+                    ? `${goal.bonus_value || 0}%`
+                    : formatCurrency(goal.bonus_value || 0)
+                  : "-"}
+              </p>
             </div>
           </div>
 

@@ -339,6 +339,17 @@ export default function CreateTransactionPage({
         [activeAccounts],
     )
 
+    const paymentMethodOptions = useMemo(() => {
+        const options = [...STANDARD_PAYMENT_METHODS]
+        const current = paymentMethodId || paymentType || ""
+        const matched = options.some((o) => o.value === current)
+        if (!matched && current) {
+            const pm = paymentMethods?.find((p) => p.id === current)
+            options.unshift({ value: current, label: pm?.name || paymentType || current })
+        }
+        return options
+    }, [paymentMethodId, paymentType, paymentMethods])
+
     const getAccountBalance = useCallback(
         (id?: string) => {
             if (!id) return 0
@@ -847,7 +858,7 @@ export default function CreateTransactionPage({
                     contact_id: cp.contactId,
                     customer_id: cp.customerId,
                     contact_type: cp.contactTypeResolved,
-                    payment_method_id: paymentMethodId,
+                    paymentMethodId: paymentMethodId || null,
                     start_date: startIso,
                     next_run_date: startIso,
                     end_date: recurrenceEndYmd.trim() ? toMiddayIsoFromYmd(recurrenceEndYmd.trim()) : null,
@@ -1613,33 +1624,6 @@ export default function CreateTransactionPage({
                             }}
                         />
                     )}
-                    {txKind === "adjustment" || txKind === "transfer" ? (
-                        <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                            O {txKind === "transfer" ? "lançamento" : "ajuste"} é efetivado ao salvar e atualiza o saldo da conta.
-                        </p>
-                    ) : isRecurringTemplateEdit ? (
-                        <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                            O pagamento de cada data é feito em A pagar/A receber («Marcar como pago»). Este formulário atualiza apenas o modelo da recorrência.
-                        </p>
-                    ) : (
-                        <div>
-                            <label className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">
-                                Situação
-                            </label>
-                            <div className="grid grid-cols-2 gap-2 mt-2">
-                                <Button variant={status === "paid" ? "default" : "outline"} onClick={() => setStatus("paid")} disabled={lockFinancialFields || isPaidTransaction}>
-                                    {paidLabel}
-                                </Button>
-                                <Button
-                                    variant={status === "pending" ? "default" : "outline"}
-                                    onClick={() => setStatus("pending")}
-                                    disabled={lockFinancialFields || isPaidTransaction}
-                                >
-                                    Pendente
-                                </Button>
-                            </div>
-                        </div>
-                    )}
 
                     {(isIncomeExpense || txKind === "refund" || txKind === "adjustment") && (
                         <FormCombobox
@@ -1658,7 +1642,7 @@ export default function CreateTransactionPage({
                         <>
                             <FormCombobox
                                 label="Forma de pagamento"
-                                options={paymentMethods && paymentMethods.length > 0 ? paymentMethods.map(pm => ({ value: pm.id, label: pm.name })) : STANDARD_PAYMENT_METHODS}
+                                options={paymentMethodOptions}
                                 value={paymentMethodId || paymentType || "Pix"}
                                 onChange={(v) => {
                                     setPaymentMethodId(v)
@@ -1688,6 +1672,34 @@ export default function CreateTransactionPage({
                             onChange={(d) => setPaymentDate(toYmd(d))}
                             disabled={status !== "paid"}
                         />
+                    )}
+
+                    {txKind === "adjustment" || txKind === "transfer" ? (
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                            O {txKind === "transfer" ? "lançamento" : "ajuste"} é efetivado ao salvar e atualiza o saldo da conta.
+                        </p>
+                    ) : isRecurringTemplateEdit ? (
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                            O pagamento de cada data é feito em A pagar/A receber («Marcar como pago»). Este formulário atualiza apenas o modelo da recorrência.
+                        </p>
+                    ) : (
+                        <div>
+                            <label className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate">
+                                Situação
+                            </label>
+                            <div className="grid grid-cols-2 gap-2 mt-2">
+                                <Button variant={status === "paid" ? "default" : "outline"} onClick={() => setStatus("paid")} disabled={lockFinancialFields || isPaidTransaction}>
+                                    {paidLabel}
+                                </Button>
+                                <Button
+                                    variant={status === "pending" ? "default" : "outline"}
+                                    onClick={() => setStatus("pending")}
+                                    disabled={lockFinancialFields || isPaidTransaction}
+                                >
+                                    Pendente
+                                </Button>
+                            </div>
+                        </div>
                     )}
                 </div>
             </SidebarCard>

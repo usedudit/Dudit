@@ -146,9 +146,7 @@ const POSHeader = memo(function POSHeader({
                                         className="w-10 h-10 text-xs"
                                     />
                                 ) : (
-                                    <div className="flex h-10 w-10 items-center justify-center rounded-full border border-brand-border bg-brand-gray text-brand-dark dark:border-dark-border dark:bg-dark-gray dark:text-dark-text">
-                                        <UserIcon size={18} />
-                                    </div>
+                                    <UserIcon className="w-4 h-4" />
                                 )}
                             </Button>
                             <Button
@@ -163,9 +161,7 @@ const POSHeader = memo(function POSHeader({
                                         className="w-10 h-10 text-xs"
                                     />
                                 ) : (
-                                    <div className="flex h-10 w-10 items-center justify-center rounded-full border border-brand-border bg-brand-gray text-brand-dark dark:border-dark-border dark:bg-dark-gray dark:text-dark-text">
-                                        <IdentityCardIcon size={18} />
-                                    </div>
+                                    <IdentityCardIcon className="w-4 h-4" />
                                 )}
                             </Button>
                         </>

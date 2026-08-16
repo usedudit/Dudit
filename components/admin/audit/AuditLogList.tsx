@@ -13,6 +13,7 @@ import Portal from "@/components/Portal"
 
 import { getAuditLogs } from "@/app/actions/admin/audit-logs"
 import type { AuditLogRow, CursorPaginatedResult } from "@/lib/admin/types"
+import type { AuditLogStats } from "@/app/actions/admin/audit-logs"
 import AuditLogListRow, { getActionBadge, TARGET_TYPE_LABELS, ACTION_TYPE_LABELS } from "./AuditLogListRow"
 import AuditLogPageControls from "./AuditLogPageControls"
 
@@ -23,6 +24,7 @@ import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 
 interface AuditLogListProps {
     initialData: CursorPaginatedResult<AuditLogRow>
+    initialStats?: AuditLogStats
 }
 
 interface FilterState {
@@ -33,9 +35,10 @@ const INITIAL_FILTERS: FilterState = {
     action: [],
 }
 
-const AuditLogList = ({ initialData }: AuditLogListProps) => {
+const AuditLogList = ({ initialData, initialStats }: AuditLogListProps) => {
     const isMobile = useMediaQuery("(max-width: 768px)")
     const observerTarget = useRef<HTMLDivElement>(null)
+    const [stats, setStats] = useState<AuditLogStats | undefined>(initialStats)
 
     // ─── Local State ──────────────────────────────────────────────────────────
     const [activeTab, setActiveTab] = useState<string>("all")
@@ -131,6 +134,7 @@ const AuditLogList = ({ initialData }: AuditLogListProps) => {
                         onOpenFilter={() => setModals({ filter: true })}
                         hasActiveFilters={hasActiveFilters}
                         hasData={hasLogs}
+                        stats={stats}
                     />
 
                     <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-24 md:pb-6 relative">

@@ -6,6 +6,7 @@ import {
   DeleteObjectCommand,
   HeadObjectCommand,
   GetObjectCommand,
+  CopyObjectCommand,
 } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 import { getR2ServerConfig, getR2PublicUrl } from "./r2-server-config"
@@ -243,6 +244,34 @@ export async function deleteFileFromR2(key: string) {
   }
 }
 
+/**
+ * Server-side copy of an object within the same bucket.
+ * Used to give duplicated products/services their own independent files,
+ * so deleting the original's image/video doesn't break the duplicates.
+ */
+export async function copyFileInR2(sourceKey: string, destinationKey: string): Promise<void> {
+  if (!sourceKey || sourceKey.includes("..") || sourceKey.startsWith("/")) {
+    throw new Error("Chave de origem inválida")
+  }
+  if (!destinationKey || destinationKey.includes("..") || destinationKey.startsWith("/")) {
+    throw new Error("Chave de destino inválida")
+  }
+
+  const serverConfig = getR2ServerConfig()
+  const client = createR2Client()
+  try {
+    await client.send(
+      new CopyObjectCommand({
+        Bucket: serverConfig.bucketName,
+        Key: destinationKey,
+        CopySource: `${serverConfig.bucketName}/${sourceKey}`,
+      })
+    )
+  } finally {
+    client.destroy()
+  }
+}
+
 export async function getFileMetadataFromR2(key: string) {
   if (!key || key.includes("..") || key.startsWith("/")) {
     throw new Error("Chave de arquivo inválida")
@@ -280,5 +309,78 @@ export function extractKeyFromR2Url(publicUrl: string): string {
     return urlObj.pathname.replace(/^\/+/, "")
   } catch {
     throw new Error("URL inválida")
+  }
+}
+
+export interface CloneMediaInput {
+  images?: string[] | null
+  video_type?: string | null
+  video_url?: string | null
+  video_thumbnail?: string | null
+}
+
+export interface CloneMediaOutput {
+  images: string[] | null
+  video_url: string | null
+  video_thumbnail: string | null
+}
+
+/**
+ * Copies stored media (R2-hosted images and uploaded videos) to fresh,
+ * user-owned keys so duplicated items don't share files with the original.
+ * External URLs (YouTube, Vimeo, third-party CDNs) are kept unchanged.
+ * Best-effort: if a copy fails, the original reference is kept.
+ *
+ * When `options.itemId` is provided, uploaded videos are cloned to the
+ * canonical item-scoped keys (`users/{userId}/{prefix}{itemId}.*` and
+ * `{itemId}-thumbnail.jpg`) expected by the video ownership checks.
+ */
+export async function cloneMediaForDuplicate(
+  input: CloneMediaInput,
+  userId: string,
+  prefix: string,
+  options?: { itemId?: string }
+): Promise<CloneMediaOutput> {
+  const itemId = options?.itemId
+
+  const cloneOne = async (
+    value: string | null | undefined,
+    mode: "image" | "video" | "thumbnail"
+  ): Promise<string | null> => {
+    if (!value || !value.trim()) return value || null
+    try {
+      const sourceKey = value.startsWith("http") ? extractKeyFromR2Url(value) : value
+      if (!sourceKey.startsWith("users/")) return value
+
+      const ext = sourceKey.match(/\.([a-zA-Z0-9]+)$/)?.[1] || (mode === "image" ? "jpg" : "mp4")
+      const destinationKey =
+        mode !== "image" && itemId
+          ? mode === "thumbnail"
+            ? `users/${userId}/${prefix}${itemId}-thumbnail.jpg`
+            : `users/${userId}/${prefix}${itemId}.${ext}`
+          : `users/${userId}/${prefix}${Date.now()}-${crypto.randomUUID()}.${ext}`
+
+      if (!validateKeyOwnership(destinationKey, userId)) return value
+
+      await copyFileInR2(sourceKey, destinationKey)
+      return `${getR2PublicUrl().replace(/\/+$/, "")}/${destinationKey}`
+    } catch (e) {
+      console.error("[cloneMediaForDuplicate] falha ao copiar mídia:", value, e)
+      return value
+    }
+  }
+
+  const [images, videoUrl, videoThumbnail] = await Promise.all([
+    input.images?.length
+      ? Promise.all(input.images.map((url) => cloneOne(url, "image")))
+      : Promise.resolve<(string | null)[] | null>(null),
+    cloneOne(input.video_url, "video"),
+    cloneOne(input.video_thumbnail, "thumbnail"),
+  ])
+
+  return {
+    images: images ? (images.filter((u): u is string => typeof u === "string") as string[]) : null,
+    video_url: videoUrl,
+    video_thumbnail: videoThumbnail,
   }
 }

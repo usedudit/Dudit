@@ -81,16 +81,30 @@ const navItems: NavItem[] = [
     },
 ]
 
+import { useSidebar } from "@/lib/sidebar-context"
+
 interface AdminSidebarProps {
     initialExpanded?: boolean
 }
 
 export function AdminSidebar({ initialExpanded = true }: AdminSidebarProps) {
     const pathname = usePathname()
-    const { isExpanded, toggleSidebar } = useSidebarState(initialExpanded)
+    const fallbackSidebar = useSidebarState(initialExpanded)
+
+    let sidebarContext: ReturnType<typeof useSidebar> | null = null
+    try {
+        sidebarContext = useSidebar()
+    } catch {
+        // Outside SidebarProvider
+    }
+
+    const isExpanded = sidebarContext ? sidebarContext.isExpanded : fallbackSidebar.isExpanded
+    const toggleSidebar = sidebarContext ? sidebarContext.toggleSidebar : fallbackSidebar.toggleSidebar
     const isCollapsed = !isExpanded
 
-    const [isMobileOpen, setIsMobileOpen] = useState(false)
+    const isMobileOpen = sidebarContext ? sidebarContext.isMobileOpen : false
+    const setIsMobileOpen = sidebarContext ? sidebarContext.setIsMobileOpen : () => {}
+
     const [isMounted, setIsMounted] = useState(false)
     const [openSubmenu, setOpenSubmenu] = useState<string | null>(null)
 

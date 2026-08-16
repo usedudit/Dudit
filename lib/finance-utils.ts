@@ -41,6 +41,42 @@ export const STANDARD_PAYMENT_METHODS = [
   { value: "Boleto", label: "Boleto" },
   { value: "TEF", label: "TEF" },
   { value: "Cheque", label: "Cheque" },
+  { value: "Vale-compra", label: "Vale-compra" },
   { value: "Outro", label: "Outro" },
 ]
+
+/**
+ * Mapeia um rótulo de meio de pagamento (nome do método / payment_type, com
+ * variações e composições tipo "Cartão de Crédito (Visa)") para o método
+ * padrão correspondente. Retorna "" quando não reconhecido.
+ */
+export function resolveStandardPaymentMethod(label: string | null | undefined): string {
+  const norm = (label || "").toLowerCase().trim()
+  if (!norm) return ""
+  if (
+    norm.includes("vale-compra") ||
+    norm.includes("vale_compra") ||
+    norm.includes("store_credit") ||
+    norm === "store-credit"
+  ) {
+    return "Vale-compra"
+  }
+  if (norm.includes("troca") || norm.includes("exchange")) return ""
+  if (norm.includes("pix")) return "Pix"
+  if (
+    norm.includes("dinheiro") ||
+    norm.includes("cash") ||
+    norm.includes("money") ||
+    norm.includes("espécie") ||
+    norm.includes("espece")
+  ) {
+    return "Dinheiro"
+  }
+  if (norm.includes("crédito") || norm.includes("credito") || norm.includes("credit")) return "Cartão de crédito"
+  if (norm.includes("débito") || norm.includes("debito") || norm.includes("debit")) return "Cartão de débito"
+  if (norm.includes("boleto")) return "Boleto"
+  if (norm.includes("tef")) return "TEF"
+  if (norm.includes("cheque") || norm.includes("check")) return "Cheque"
+  return ""
+}
 

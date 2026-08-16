@@ -19,7 +19,7 @@ O dump não altera schema, migrations nem o fluxo da aplicação. Ele é um back
 
 O Supabase recomenda que projetos Free façam exportações lógicas e mantenham cópias externas. Para `pg_dump`, a conexão direta é a opção indicada; em rede IPv4 sem acesso IPv6, use o pooler Supavisor em modo session na porta 5432. Não use o pooler transaction na porta 6543 para o dump.
 
-O endpoint usa runtime Node.js e o Railway instala `postgresql-client` via `nixpacks.toml`. Isso é adequado ao deploy atual do projeto, porque o cron apenas dispara uma execução e o processo Node pode manter o stream aberto durante o dump. Em uma hospedagem serverless com timeout rígido, mova a mesma rotina para um worker/serviço Railway dedicado.
+O endpoint usa runtime Node.js e o Railway instala os binários do PostgreSQL 17 via `railpack.json`. Isso é adequado ao deploy atual do projeto, porque o cron apenas dispara uma execução e o processo Node pode manter o stream aberto durante o dump. Em uma hospedagem serverless com timeout rígido, mova a mesma rotina para um worker/serviço Railway dedicado.
 
 ## Configuração
 

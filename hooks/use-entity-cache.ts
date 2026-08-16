@@ -185,12 +185,10 @@ export function useEntityCache<TListItem extends { id: string }, TDetail extends
                 }
             }
 
-            // Return cached data immediately (SWR pattern), or null if nothing cached
+            // Return cached data or null, with accurate isLoading status (true while fetching full detail)
             return {
                 data: entry?.data ?? null,
-                // isLoading only when NO data at all (not even partial).
-                // If partial data exists, show it immediately while background fetch completes.
-                isLoading: !entry,
+                isLoading: !entry || !!entry.partial,
                 isStale: !!entry?.partial || (!!entry && Date.now() - entry.timestamp >= staleTime),
             }
         },

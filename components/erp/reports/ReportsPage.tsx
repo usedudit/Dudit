@@ -17,6 +17,7 @@ import {
     MoneyIcon, Users, MegaphoneIcon, AwardIcon, ReturnIcon,
     ChartIcon, ShoppingBagIcon, TagIcon, TrendingUpIcon, CreditCardIcon,
     ListIcon, ClockIcon, CalendarIcon, TargetIcon, BoxIcon, ExportFileIcon,
+    AlertCircleIcon,
 } from "@/lib/icons"
 import { ReportTableCard, ReportRankingCard } from "./widgets"
 import type { ProductsDashboardData, ServicesDashboardData, FinancialDashboardData } from "@/lib/data/dashboard"
@@ -79,7 +80,7 @@ function useAvailableTabs(props: ReportsPageProps): TabDefinition[] {
     const resourcesList = activeResources || sells || ["products", "services"]
     const sellsProducts = resourcesList.includes("products")
     const sellsServices = resourcesList.includes("services")
-    return useMemo(() => REPORT_TABS.filter(tab => {
+    const tabs = useMemo(() => REPORT_TABS.filter(tab => {
         switch (tab.id) {
             case "produtos": case "vendas": case "marketing": return sellsProducts && productsData !== null
             case "servicos": return sellsServices && servicesData !== null
@@ -93,6 +94,7 @@ function useAvailableTabs(props: ReportsPageProps): TabDefinition[] {
             default: return true
         }
     }), [sellsProducts, sellsServices, productsData, servicesData, financialData, deliveryData, props.customerData, props.productivityData, props.returnsData, props.serviceOrdersData, props.subscriptionData])
+    return tabs
 }
 
 const INSIGHT_COLORS: Record<string, "green" | "red" | "orange" | "blue" | "gray" | "yellow" | "purple"> = {
@@ -156,13 +158,15 @@ export function ReportsPage(props: ReportsPageProps) {
 function SalesSection({ salesData, period }: { salesData: SalesReportData | null; period: Period }) {
     const router = useRouter()
     const { setExportHandler } = useDashboard()
-    if (!salesData) return <SectionPlaceholder title="Vendas" description="Ative o módulo de produtos para visualizar relatórios de vendas." />
 
-    const insights = useMemo(() => generateSalesInsights({
-        revenue: salesData.metrics.revenue, previousRevenue: 0,
-        orderCount: salesData.metrics.orderCount, previousOrderCount: 0,
-        ticketMedio: salesData.metrics.ticketMedio, previousTicketMedio: 0,
-    }), [salesData])
+    const insights = useMemo(() => {
+        if (!salesData) return []
+        return generateSalesInsights({
+            revenue: salesData.metrics.revenue, previousRevenue: 0,
+            orderCount: salesData.metrics.orderCount, previousOrderCount: 0,
+            ticketMedio: salesData.metrics.ticketMedio, previousTicketMedio: 0,
+        })
+    }, [salesData])
 
     const mappedInsights = useMemo(() => {
         return insights.map(ins => ({
@@ -171,14 +175,18 @@ function SalesSection({ salesData, period }: { salesData: SalesReportData | null
         }))
     }, [insights])
 
-    const kpis = useMemo(() => [
-        { title: "Receita", value: salesData.metrics.revenueFormatted, trend: salesData.metrics.revenueTrend },
-        { title: "Ticket Médio", value: salesData.metrics.ticketFormatted, trend: salesData.metrics.ticketTrend },
-        { title: "Pedidos", value: String(salesData.metrics.orderCount), trend: salesData.metrics.orderTrend },
-        { title: "Itens Vendidos", value: String(salesData.metrics.itemsSold), trend: "" },
-    ], [salesData])
+    const kpis = useMemo(() => {
+        if (!salesData) return []
+        return [
+            { title: "Receita", value: salesData.metrics.revenueFormatted, trend: salesData.metrics.revenueTrend },
+            { title: "Ticket Médio", value: salesData.metrics.ticketFormatted, trend: salesData.metrics.ticketTrend },
+            { title: "Pedidos", value: String(salesData.metrics.orderCount), trend: salesData.metrics.orderTrend },
+            { title: "Itens Vendidos", value: String(salesData.metrics.itemsSold), trend: "" },
+        ]
+    }, [salesData])
 
     const onExport = useCallback(async (fmt: "csv" | "xlsx") => {
+        if (!salesData) return
         const headers = ["Indicador", "Valor"]
         const rows = [["Receita", salesData.metrics.revenueFormatted], ["Pedidos", String(salesData.metrics.orderCount)]]
         if (fmt === "csv") exportCSV("relatorio-vendas", headers, rows)
@@ -186,6 +194,8 @@ function SalesSection({ salesData, period }: { salesData: SalesReportData | null
     }, [salesData])
 
     useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
+
+    if (!salesData) return <SectionPlaceholder title="Vendas" description="Ative o módulo de produtos para visualizar relatórios de vendas." />
 
     const evoData = salesData.evolution.map(e => ({ label: e.label, value: e.value, secondary: e.secondary }))
     const paymentLabels: Record<string, string> = { credit: "Crédito", debit: "Débito", cash: "Dinheiro", pix: "Pix", credit_card: "Cartão Crédito", debit_card: "Cartão Débito", money: "Dinheiro", transfer: "Transferência", boleto: "Boleto" }
@@ -266,18 +276,20 @@ function SalesSection({ salesData, period }: { salesData: SalesReportData | null
 // ─────────────────── 3. Produtos ───────────────────
 
 function ProductsSection({ productsData, stockValue, returnsData }: { productsData: ProductsDashboardData | null; stockValue: number; returnsData: ReturnsReportData | null }) {
-    if (!productsData) return <SectionPlaceholder title="Produtos" description="Ative o módulo de produtos." />
     const router = useRouter()
     const { setExportHandler } = useDashboard()
-    const insights = useMemo(() => generateProductsInsights({
-        totalProducts: Number(productsData.metrics.find((m: any) => m.title.includes("ativos"))?.value || 0),
-        outOfStock: Number(productsData.metrics.find((m: any) => m.title.includes("sem estoque"))?.value || 0),
-        lowStock: Number(productsData.metrics.find((m: any) => m.title.includes("baixo"))?.value || 0),
-        idleProductCount: (productsData.idleProducts || []).length,
-        topProductName: productsData.topProducts[0]?.title,
-        topProductSales: parseFloat(String(productsData.topProducts[0]?.value?.replace(" un.", "") || "0")),
-        topProductPreviousSales: 0,
-    }), [productsData])
+    const insights = useMemo(() => {
+        if (!productsData) return []
+        return generateProductsInsights({
+            totalProducts: Number(productsData.metrics.find((m: any) => m.title.includes("ativos"))?.value || 0),
+            outOfStock: Number(productsData.metrics.find((m: any) => m.title.includes("sem estoque"))?.value || 0),
+            lowStock: Number(productsData.metrics.find((m: any) => m.title.includes("baixo"))?.value || 0),
+            idleProductCount: (productsData.idleProducts || []).length,
+            topProductName: productsData.topProducts[0]?.title,
+            topProductSales: parseFloat(String(productsData.topProducts[0]?.value?.replace(" un.", "") || "0")),
+            topProductPreviousSales: 0,
+        })
+    }, [productsData])
 
     const mappedInsights = useMemo(() => {
         return insights.map(ins => ({
@@ -286,10 +298,24 @@ function ProductsSection({ productsData, stockValue, returnsData }: { productsDa
         }))
     }, [insights])
 
-    const kpis = useMemo(() => [
-        ...(stockValue > 0 ? [{ title: "Valor em Estoque", value: brl(stockValue), trend: "" }] : []),
-        ...productsData.metrics.slice(3, 6).map((m: any) => ({ title: m.title, value: m.value, trend: m.detail || "" })),
-    ], [stockValue, productsData])
+    const kpis = useMemo(() => {
+        if (!productsData) return []
+        return [
+            ...(stockValue > 0 ? [{ title: "Valor em Estoque", value: brl(stockValue), trend: "" }] : []),
+            ...productsData.metrics.slice(3, 6).map((m: any) => ({ title: m.title, value: m.value, trend: m.detail || "" })),
+        ]
+    }, [stockValue, productsData])
+
+    const onExport = useCallback(async (fmt: "csv" | "xlsx") => {
+        if (!productsData) return
+        const rows = kpis.map((m: any) => [m.title, m.value])
+        if (fmt === "csv") exportCSV("relatorio-produtos", ["Indicador", "Valor"], rows)
+        else await exportXLSX("relatorio-produtos", [{ name: "Produtos", headers: ["Indicador", "Valor"], rows }])
+    }, [kpis, productsData])
+
+    useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
+
+    if (!productsData) return <SectionPlaceholder title="Produtos" description="Ative o módulo de produtos." />
 
     const catData = (productsData.categorySales || []).map(c => ({ label: c.label, value: Number(c.value) }))
     const evoData = (productsData.salesEvolution || []).map(e => ({ label: e.label, value: Number(e.value), secondary: Number(e.secondary || 0) }))
@@ -311,14 +337,6 @@ function ProductsSection({ productsData, stockValue, returnsData }: { productsDa
         { label: "Valor Faturado", value: Math.max(vendidoTotal - devolvidoTotal, 0) },
     ]
 
-    const onExport = useCallback(async (fmt: "csv" | "xlsx") => {
-        const rows = kpis.map((m: any) => [m.title, m.value])
-        if (fmt === "csv") exportCSV("relatorio-produtos", ["Indicador", "Valor"], rows)
-        else await exportXLSX("relatorio-produtos", [{ name: "Produtos", headers: ["Indicador", "Valor"], rows }])
-    }, [kpis])
-
-    useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
-
     return (
         <div className="flex flex-col gap-6 animate-fade-in">
             <InsightsRegister insights={mappedInsights} />
@@ -338,69 +356,45 @@ function ProductsSection({ productsData, stockValue, returnsData }: { productsDa
                 </div>
                 <div className="lg:col-span-5">
                     <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
-                        <CardHeader icon={CreditCardIcon} title="Faturamento por Produtos" />
-                        <DashboardBarChart data={faturamentoData} colors={["#059669", "#ef4444", "#2563eb"]} showLegend />
+                        <CardHeader icon={ShoppingBagIcon} title="Vendas por Categoria" />
+                        <DashboardPieChart data={catData} totalValue={String(productsData.metrics.find((m: any) => m.title.includes("ativos"))?.value || 0)} totalLabel="Produtos" showLegend colors={CHART_COLORS_CATEGORY} />
                     </div>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-                <div className="lg:col-span-4">
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
-                        <CardHeader icon={TagIcon} title="Categorias mais Vendidas" />
-                        <div className="flex justify-center">
-                            <DashboardPieChart data={catData} innerRadius={60} outerRadius={80} className="h-[200px]" showLegend colors={CHART_COLORS_CATEGORY} />
-                        </div>
-                    </div>
-                </div>
-                <div className="lg:col-span-4">
+                <div className="lg:col-span-7">
                     <ReportRankingCard
-                        title="Produtos mais Vendidos"
-                        items={(productsData.topProducts || []).slice(0, 6).map((p: any) => ({ id: p.id, label: p.title, value: p.value }))}
+                        title="Mais Vendidos"
+                        items={productsData.topProducts.slice(0, 6).map(p => ({ id: p.id, label: p.title, value: p.value ?? 0, subtitle: p.subtitle ?? "" }))}
                         variant="compact"
                         icon={AwardIcon}
                     />
                 </div>
-                <div className="lg:col-span-4">
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
-                        <CardHeader icon={BoxIcon} title="Produtos sem Movimento" />
-                        {idleData.length > 0 ? (
-                            <div className="space-y-3">
-                                {idleData.slice(0, 6).map((item, i) => (
-                                    <div key={item.id} className="flex items-center gap-3">
-                                        <div className="w-7 h-7 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center shrink-0 text-xs font-bold text-brand-inactive-text">{i + 1}</div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-[13px] font-semibold text-brand-dark dark:text-dark-heading truncate">{item.label}</p>
-                                        </div>
-                                        <span className="text-[13px] font-bold text-brand-inactive-text shrink-0">{item.value}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <p className="text-sm text-brand-inactive-text text-center py-8">Todos os produtos tiveram movimento.</p>
-                        )}
-                    </div>
+                <div className="lg:col-span-5">
+                    <ReportRankingCard
+                        title="Produtos Parados"
+                        items={idleData.slice(0, 6)}
+                        variant="compact"
+                        icon={AlertCircleIcon}
+                    />
                 </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-                <div className="lg:col-span-8">
-                    <ReportTableCard
-                        title="Estoque Crítico"
-                        columns={[{ key: "title", header: "Produto" }, { key: "subtitle", header: "Categoria" }, { key: "value", header: "Estoque" }]}
-                        data={(productsData.criticalStock || []).map((s: any) => ({ id: s.id, title: s.title, subtitle: s.subtitle, value: s.value }))}
-                        onRowClick={() => router.push("/erp/produtos")}
-                        icon={PackageIcon}
-                    />
-                </div>
-                <div className="lg:col-span-4">
+                <div className="lg:col-span-6">
                     <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
-                        <CardHeader icon={PackageIcon} title="Produtos sem Estoque" />
-                        <p className="text-[32px] font-bold text-brand-red dark:text-dark-heading">
-                            {productsData.metrics.find((m: any) => m.title.includes("sem estoque"))?.value || "0"}
-                        </p>
-                        <p className="text-[13px] font-medium text-brand-inactive-text">precisam de reposição</p>
+                        <CardHeader icon={MoneyIcon} title="Faturamento vs Devoluções" />
+                        <DashboardBarChart data={faturamentoData} colors={["#059669", "#ef4444", "#0284c7"]} />
                     </div>
+                </div>
+                <div className="lg:col-span-6">
+                    <ReportRankingCard
+                        title="Menor Estoque"
+                        items={productsData.criticalStock.slice(0, 6).map(p => ({ id: p.id, label: p.title, value: p.value ?? 0, subtitle: p.subtitle ?? "" }))}
+                        variant="compact"
+                        icon={AlertCircleIcon}
+                    />
                 </div>
             </div>
         </div>
@@ -412,14 +406,16 @@ function ProductsSection({ productsData, stockValue, returnsData }: { productsDa
 function CustomersSection({ customerData, period }: { customerData: CustomerReportData | null; period: Period }) {
     const router = useRouter()
     const { setExportHandler } = useDashboard()
-    if (!customerData) return <SectionPlaceholder title="Clientes" description="Relatórios de clientes disponíveis com o plano Crescer." />
 
-    const insights = useMemo(() => generateCustomerInsights({
-        totalCustomers: customerData.totalCustomers, newCustomers: customerData.newCustomers, activeCustomers: customerData.activeCustomers,
-        avgTicket: customerData.avgTicket, previousAvgTicket: customerData.previousAvgTicket,
-        topCustomerName: customerData.topCustomers[0]?.label,
-        topCustomerRevenue: parseFloat(String(customerData.topCustomers[0]?.value || "0").replace(/[^\d,.-]/g, "").replace(",", ".")),
-    }), [customerData])
+    const insights = useMemo(() => {
+        if (!customerData) return []
+        return generateCustomerInsights({
+            totalCustomers: customerData.totalCustomers, newCustomers: customerData.newCustomers, activeCustomers: customerData.activeCustomers,
+            avgTicket: customerData.avgTicket, previousAvgTicket: customerData.previousAvgTicket,
+            topCustomerName: customerData.topCustomers[0]?.label,
+            topCustomerRevenue: parseFloat(String(customerData.topCustomers[0]?.value || "0").replace(/[^\d,.-]/g, "").replace(",", ".")),
+        })
+    }, [customerData])
 
     const mappedInsights = useMemo(() => {
         return insights.map(ins => ({
@@ -428,24 +424,30 @@ function CustomersSection({ customerData, period }: { customerData: CustomerRepo
         }))
     }, [insights])
 
-    const kpis = useMemo(() => [
-        { title: "Total", value: String(customerData.totalCustomers), trend: "" },
-        { title: "Ativos", value: String(customerData.activeCustomers), trend: "" },
-        { title: "Recorrentes", value: String(customerData.recurringCustomers), trend: "" },
-        { title: "Novos", value: String(customerData.newCustomers), trend: "" },
-        { title: "Inativos 90d", value: String(customerData.inactiveCustomers), trend: "" },
-        { title: "Ticket Médio", value: customerData.avgTicketFormatted, trend: "" },
-    ], [customerData])
-
-    const evoData = customerData.customerEvolution.map(d => ({ label: d.label, value: d.ativos, secondary: d.novos }))
+    const kpis = useMemo(() => {
+        if (!customerData) return []
+        return [
+            { title: "Total", value: String(customerData.totalCustomers), trend: "" },
+            { title: "Ativos", value: String(customerData.activeCustomers), trend: "" },
+            { title: "Recorrentes", value: String(customerData.recurringCustomers), trend: "" },
+            { title: "Novos", value: String(customerData.newCustomers), trend: "" },
+            { title: "Inativos 90d", value: String(customerData.inactiveCustomers), trend: "" },
+            { title: "Ticket Médio", value: customerData.avgTicketFormatted, trend: "" },
+        ]
+    }, [customerData])
 
     const onExport = useCallback(async (fmt: "csv" | "xlsx") => {
+        if (!customerData) return
         const rows = [["Total", String(customerData.totalCustomers)], ["Ativos", String(customerData.activeCustomers)]]
         if (fmt === "csv") exportCSV("relatorio-clientes", ["Indicador", "Valor"], rows)
         else await exportXLSX("relatorio-clientes", [{ name: "Clientes", headers: ["Indicador", "Valor"], rows }])
     }, [customerData])
 
     useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
+
+    if (!customerData) return <SectionPlaceholder title="Clientes" description="Relatórios de clientes disponíveis com o plano Crescer." />
+
+    const evoData = customerData.customerEvolution.map(d => ({ label: d.label, value: d.ativos, secondary: d.novos }))
 
     return (
         <div className="flex flex-col gap-6 animate-fade-in">
@@ -513,12 +515,15 @@ function CustomersSection({ customerData, period }: { customerData: CustomerRepo
 function DeliveriesSection({ deliveryData }: { deliveryData: DeliveryReportData | null }) {
     const router = useRouter()
     const { setExportHandler } = useDashboard()
-    if (!deliveryData) return <SectionPlaceholder title="Entregas" description="Sem dados de entregas." />
-    const insights = useMemo(() => generateDeliveryInsights({
-        totalDeliveries: deliveryData.metrics.total, lateCount: deliveryData.metrics.late,
-        avgTimeMinutes: deliveryData.metrics.avgTimeMinutes, previousAvgTimeMinutes: deliveryData.metrics.previousAvgTimeMinutes,
-        onTimeRate: deliveryData.metrics.onTimeRate,
-    }), [deliveryData])
+
+    const insights = useMemo(() => {
+        if (!deliveryData) return []
+        return generateDeliveryInsights({
+            totalDeliveries: deliveryData.metrics.total, lateCount: deliveryData.metrics.late,
+            avgTimeMinutes: deliveryData.metrics.avgTimeMinutes, previousAvgTimeMinutes: deliveryData.metrics.previousAvgTimeMinutes,
+            onTimeRate: deliveryData.metrics.onTimeRate,
+        })
+    }, [deliveryData])
 
     const mappedInsights = useMemo(() => {
         return insights.map(ins => ({
@@ -527,23 +532,29 @@ function DeliveriesSection({ deliveryData }: { deliveryData: DeliveryReportData 
         }))
     }, [insights])
 
-    const kpis = useMemo(() => [
-        { title: "Total", value: String(deliveryData.metrics.total), trend: "" },
-        { title: "Pendentes", value: String(deliveryData.metrics.pending), trend: "" },
-        { title: "Atrasadas", value: String(deliveryData.metrics.late), trend: "" },
-        { title: "No Prazo", value: `${deliveryData.metrics.onTimeRate}%`, trend: "" },
-    ], [deliveryData])
-
-    const evoData = deliveryData.evolution.map(e => ({ label: e.label, value: e.value, secondary: e.secondary }))
-    const statusData = deliveryData.byStatus.map(s => ({ label: s.label, value: s.value }))
+    const kpis = useMemo(() => {
+        if (!deliveryData) return []
+        return [
+            { title: "Total", value: String(deliveryData.metrics.total), trend: "" },
+            { title: "Pendentes", value: String(deliveryData.metrics.pending), trend: "" },
+            { title: "Atrasadas", value: String(deliveryData.metrics.late), trend: "" },
+            { title: "No Prazo", value: `${deliveryData.metrics.onTimeRate}%`, trend: "" },
+        ]
+    }, [deliveryData])
 
     const onExport = useCallback(async (fmt: "csv" | "xlsx") => {
+        if (!deliveryData) return
         const rows = [["Total", String(deliveryData.metrics.total)], ["No Prazo", `${deliveryData.metrics.onTimeRate}%`]]
         if (fmt === "csv") exportCSV("relatorio-entregas", ["Indicador", "Valor"], rows)
         else await exportXLSX("relatorio-entregas", [{ name: "Entregas", headers: ["Indicador", "Valor"], rows }])
     }, [deliveryData])
 
     useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
+
+    if (!deliveryData) return <SectionPlaceholder title="Entregas" description="Sem dados de entregas." />
+
+    const evoData = deliveryData.evolution.map(e => ({ label: e.label, value: e.value, secondary: e.secondary }))
+    const statusData = deliveryData.byStatus.map(s => ({ label: s.label, value: s.value }))
 
     return (
         <div className="flex flex-col gap-6 animate-fade-in">
@@ -618,27 +629,32 @@ function DeliveriesSection({ deliveryData }: { deliveryData: DeliveryReportData 
 function ServiceOrdersSection({ serviceOrdersData }: { serviceOrdersData: ServiceOrderReportData | null }) {
     const router = useRouter()
     const { setExportHandler } = useDashboard()
-    if (!serviceOrdersData) return <SectionPlaceholder title="Ordens de Serviço" description="Sem dados de ordens de serviço." />
 
-    const kpis = useMemo(() => [
-        { title: "Total OS", value: String(serviceOrdersData.metrics.total), trend: "" },
-        { title: "Abertas", value: String(serviceOrdersData.metrics.open), trend: "" },
-        { title: "Em Andamento", value: String(serviceOrdersData.metrics.inProgress), trend: "" },
-        { title: "Concluídas", value: String(serviceOrdersData.metrics.completed), trend: "" },
-        { title: "Canceladas", value: String(serviceOrdersData.metrics.cancelled), trend: "" },
-        { title: "Receita", value: serviceOrdersData.metrics.totalRevenueFormatted, trend: "" },
-    ], [serviceOrdersData])
-
-    const evoData = serviceOrdersData.evolution.map(e => ({ label: e.label, value: e.value, secondary: e.secondary }))
-    const statusData = serviceOrdersData.byStatus.map(s => ({ label: s.label, value: s.value }))
+    const kpis = useMemo(() => {
+        if (!serviceOrdersData) return []
+        return [
+            { title: "Total OS", value: String(serviceOrdersData.metrics.total), trend: "" },
+            { title: "Abertas", value: String(serviceOrdersData.metrics.open), trend: "" },
+            { title: "Em Andamento", value: String(serviceOrdersData.metrics.inProgress), trend: "" },
+            { title: "Concluídas", value: String(serviceOrdersData.metrics.completed), trend: "" },
+            { title: "Canceladas", value: String(serviceOrdersData.metrics.cancelled), trend: "" },
+            { title: "Receita", value: serviceOrdersData.metrics.totalRevenueFormatted, trend: "" },
+        ]
+    }, [serviceOrdersData])
 
     const onExport = useCallback(async (fmt: "csv" | "xlsx") => {
+        if (!serviceOrdersData) return
         const rows = [["Total", String(serviceOrdersData.metrics.total)], ["Receita", serviceOrdersData.metrics.totalRevenueFormatted]]
         if (fmt === "csv") exportCSV("ordens-servico", ["Indicador", "Valor"], rows)
         else await exportXLSX("ordens-servico", [{ name: "Ordens de Serviço", headers: ["Indicador", "Valor"], rows }])
     }, [serviceOrdersData])
 
     useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
+
+    if (!serviceOrdersData) return <SectionPlaceholder title="Ordens de Serviço" description="Sem dados de ordens de serviço." />
+
+    const evoData = serviceOrdersData.evolution.map(e => ({ label: e.label, value: e.value, secondary: e.secondary }))
+    const statusData = serviceOrdersData.byStatus.map(s => ({ label: s.label, value: s.value }))
 
     return (
         <div className="flex flex-col gap-6 animate-fade-in">
@@ -693,13 +709,15 @@ function ServiceOrdersSection({ serviceOrdersData }: { serviceOrdersData: Servic
 function ReturnsSection({ returnsData }: { returnsData: ReturnsReportData | null }) {
     const router = useRouter()
     const { setExportHandler } = useDashboard()
-    if (!returnsData) return <SectionPlaceholder title="Trocas e Devoluções" description="Relatórios de devoluções disponíveis com o plano Crescer." />
 
-    const insights = useMemo(() => generateReturnsInsights({
-        returnRate: returnsData.returnRate, previousReturnRate: returnsData.previousReturnRate,
-        totalRefunded: returnsData.totalRefunded, topReason: returnsData.byReason[0]?.label,
-        returnCount: returnsData.returnCount,
-    }), [returnsData])
+    const insights = useMemo(() => {
+        if (!returnsData) return []
+        return generateReturnsInsights({
+            returnRate: returnsData.returnRate, previousReturnRate: returnsData.previousReturnRate,
+            totalRefunded: returnsData.totalRefunded, topReason: returnsData.byReason[0]?.label,
+            returnCount: returnsData.returnCount,
+        })
+    }, [returnsData])
 
     const mappedInsights = useMemo(() => {
         return insights.map(ins => ({
@@ -708,22 +726,28 @@ function ReturnsSection({ returnsData }: { returnsData: ReturnsReportData | null
         }))
     }, [insights])
 
-    const kpis = useMemo(() => [
-        { title: "Total Devoluções", value: String(returnsData.returnCount), trend: "" },
-        { title: "Taxa Devolução", value: `${returnsData.returnRate}%`, trend: "" },
-        { title: "Reembolsado", value: returnsData.totalRefundedFormatted, trend: "" },
-    ], [returnsData])
-
-    const reasonData = returnsData.byReason.map(r => ({ label: r.label, value: r.value }))
-    const statusData = returnsData.byStatus.map(s => ({ label: s.label, value: s.value }))
+    const kpis = useMemo(() => {
+        if (!returnsData) return []
+        return [
+            { title: "Total Devoluções", value: String(returnsData.returnCount), trend: "" },
+            { title: "Taxa Devolução", value: `${returnsData.returnRate}%`, trend: "" },
+            { title: "Reembolsado", value: returnsData.totalRefundedFormatted, trend: "" },
+        ]
+    }, [returnsData])
 
     const onExport = useCallback(async (fmt: "csv" | "xlsx") => {
+        if (!returnsData) return
         const rows = [["Total", String(returnsData.returnCount)], ["Taxa", `${returnsData.returnRate}%`]]
         if (fmt === "csv") exportCSV("relatorio-trocas", ["Indicador", "Valor"], rows)
         else await exportXLSX("relatorio-trocas", [{ name: "Trocas", headers: ["Indicador", "Valor"], rows }])
     }, [returnsData])
 
     useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
+
+    if (!returnsData) return <SectionPlaceholder title="Trocas e Devoluções" description="Relatórios de devoluções disponíveis com o plano Crescer." />
+
+    const reasonData = returnsData.byReason.map(r => ({ label: r.label, value: r.value }))
+    const statusData = returnsData.byStatus.map(s => ({ label: s.label, value: s.value }))
 
     return (
         <div className="flex flex-col gap-6 animate-fade-in">
@@ -786,13 +810,15 @@ function ReturnsSection({ returnsData }: { returnsData: ReturnsReportData | null
 function MarketingSection({ marketingData }: { marketingData: MarketingReportData | null }) {
     const router = useRouter()
     const { setExportHandler } = useDashboard()
-    if (!marketingData) return <SectionPlaceholder title="Marketing" description="Ative o módulo de vendas para visualizar relatórios de marketing." />
 
-    const insights = useMemo(() => generateMarketingInsights({
-        totalCoupons: marketingData.couponStats.total, couponUsageRate: marketingData.couponStats.usageRate,
-        revenueBySource: Object.fromEntries(marketingData.revenueBySource.map(s => [s.label, s.value])),
-        topSource: marketingData.topSource, topSourcePercent: marketingData.topSourcePercent,
-    }), [marketingData])
+    const insights = useMemo(() => {
+        if (!marketingData) return []
+        return generateMarketingInsights({
+            totalCoupons: marketingData.couponStats.total, couponUsageRate: marketingData.couponStats.usageRate,
+            revenueBySource: Object.fromEntries(marketingData.revenueBySource.map(s => [s.label, s.value])),
+            topSource: marketingData.topSource, topSourcePercent: marketingData.topSourcePercent,
+        })
+    }, [marketingData])
 
     const mappedInsights = useMemo(() => {
         return insights.map(ins => ({
@@ -801,24 +827,30 @@ function MarketingSection({ marketingData }: { marketingData: MarketingReportDat
         }))
     }, [insights])
 
-    const kpis = useMemo(() => [
-        { title: "Faturamento", value: marketingData.totalRevenueFormatted, trend: "" },
-        { title: "Top Canal", value: marketingData.topSource, trend: `${marketingData.topSourcePercent}% do total` },
-        { title: "Cupons", value: String(marketingData.couponStats.total), trend: "" },
-        { title: "Uso Cupons", value: `${marketingData.couponStats.usageRate}%`, trend: "" },
-        ...(marketingData.campaigns.length > 0 ? [{ title: "Campanhas", value: String(marketingData.campaigns.filter(c => c.isActive).length), trend: `de ${marketingData.campaigns.length}` }] : []),
-    ], [marketingData])
-
-    const sourceData = marketingData.revenueBySource.map(s => ({ label: s.label, value: s.value }))
-    const evoData = marketingData.evolution.map(d => ({ label: d.label, value: d.online + d.presencial + d.outros }))
+    const kpis = useMemo(() => {
+        if (!marketingData) return []
+        return [
+            { title: "Faturamento", value: marketingData.totalRevenueFormatted, trend: "" },
+            { title: "Top Canal", value: marketingData.topSource, trend: `${marketingData.topSourcePercent}% do total` },
+            { title: "Cupons", value: String(marketingData.couponStats.total), trend: "" },
+            { title: "Uso Cupons", value: `${marketingData.couponStats.usageRate}%`, trend: "" },
+            ...(marketingData.campaigns.length > 0 ? [{ title: "Campanhas", value: String(marketingData.campaigns.filter(c => c.isActive).length), trend: `de ${marketingData.campaigns.length}` }] : []),
+        ]
+    }, [marketingData])
 
     const onExport = useCallback(async (fmt: "csv" | "xlsx") => {
+        if (!marketingData) return
         const rows = [["Faturamento", marketingData.totalRevenueFormatted], ["Top Canal", marketingData.topSource]]
         if (fmt === "csv") exportCSV("relatorio-marketing", ["Indicador", "Valor"], rows)
         else await exportXLSX("relatorio-marketing", [{ name: "Marketing", headers: ["Indicador", "Valor"], rows }])
     }, [marketingData])
 
     useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
+
+    if (!marketingData) return <SectionPlaceholder title="Marketing" description="Ative o módulo de vendas para visualizar relatórios de marketing." />
+
+    const sourceData = marketingData.revenueBySource.map(s => ({ label: s.label, value: s.value }))
+    const evoData = marketingData.evolution.map(d => ({ label: d.label, value: d.online + d.presencial + d.outros }))
 
     return (
         <div className="flex flex-col gap-6 animate-fade-in">
@@ -887,12 +919,14 @@ function MarketingSection({ marketingData }: { marketingData: MarketingReportDat
 function ProductivitySection({ productivityData, goalData }: { productivityData: ProductivityReportData | null; goalData: GoalReportData | null }) {
     const router = useRouter()
     const { setExportHandler } = useDashboard()
-    if (!productivityData) return <SectionPlaceholder title="Produtividade" description="Ative o módulo de serviços." />
 
-    const insights = useMemo(() => generateProductivityInsights({
-        topStaffName: productivityData.staffRanking[0]?.label, topStaffRevenue: productivityData.staffRanking[0]?.revenue,
-        staffCount: productivityData.staffRanking.length, totalRevenue: productivityData.metrics.totalRevenue,
-    }), [productivityData])
+    const insights = useMemo(() => {
+        if (!productivityData) return []
+        return generateProductivityInsights({
+            topStaffName: productivityData.staffRanking[0]?.label, topStaffRevenue: productivityData.staffRanking[0]?.revenue,
+            staffCount: productivityData.staffRanking.length, totalRevenue: productivityData.metrics.totalRevenue,
+        })
+    }, [productivityData])
 
     const mappedInsights = useMemo(() => {
         return insights.map(ins => ({
@@ -901,24 +935,30 @@ function ProductivitySection({ productivityData, goalData }: { productivityData:
         }))
     }, [insights])
 
-    const kpis = useMemo(() => [
-        { title: "Atendimentos", value: String(productivityData.metrics.totalAppointments), trend: "" },
-        { title: "Receita", value: productivityData.metrics.totalRevenueFormatted, trend: "" },
-        { title: "Ticket Médio", value: brl(productivityData.metrics.avgTicketPerStaff), trend: "" },
-        { title: "Tempo Médio", value: `${productivityData.metrics.avgDuration}min`, trend: "" },
-        { title: "Comparecimento", value: `${productivityData.metrics.attendanceRate}%`, trend: "" },
-        ...(goalData && goalData.totalCount > 0 ? [{ title: "Metas", value: `${goalData.achievedCount}/${goalData.totalCount}`, trend: `${goalData.overallProgress}%` }] : []),
-    ], [productivityData, goalData])
-
-    const evoData = productivityData.dailyEvolution.map(d => ({ label: d.label, value: d.atendimentos, secondary: d.receita }))
+    const kpis = useMemo(() => {
+        if (!productivityData) return []
+        return [
+            { title: "Atendimentos", value: String(productivityData.metrics.totalAppointments), trend: "" },
+            { title: "Receita", value: productivityData.metrics.totalRevenueFormatted, trend: "" },
+            { title: "Ticket Médio", value: brl(productivityData.metrics.avgTicketPerStaff), trend: "" },
+            { title: "Tempo Médio", value: `${productivityData.metrics.avgDuration}min`, trend: "" },
+            { title: "Comparecimento", value: `${productivityData.metrics.attendanceRate}%`, trend: "" },
+            ...(goalData && goalData.totalCount > 0 ? [{ title: "Metas", value: `${goalData.achievedCount}/${goalData.totalCount}`, trend: `${goalData.overallProgress}%` }] : []),
+        ]
+    }, [productivityData, goalData])
 
     const onExport = useCallback(async (fmt: "csv" | "xlsx") => {
+        if (!productivityData) return
         const rows = [["Atendimentos", String(productivityData.metrics.totalAppointments)], ["Receita", productivityData.metrics.totalRevenueFormatted]]
         if (fmt === "csv") exportCSV("relatorio-produtividade", ["Indicador", "Valor"], rows)
         else await exportXLSX("relatorio-produtividade", [{ name: "Produtividade", headers: ["Indicador", "Valor"], rows }])
     }, [productivityData])
 
     useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
+
+    if (!productivityData) return <SectionPlaceholder title="Produtividade" description="Ative o módulo de serviços." />
+
+    const evoData = productivityData.dailyEvolution.map(d => ({ label: d.label, value: d.atendimentos, secondary: d.receita }))
 
     return (
         <div className="flex flex-col gap-6 animate-fade-in">
@@ -1213,31 +1253,29 @@ function SubscriptionSection({ subscriptionData }: { subscriptionData: Subscript
     const router = useRouter()
     const { setExportHandler } = useDashboard()
 
-    if (!subscriptionData) {
-        return (
-            <SectionPlaceholder
-                title="Assinaturas Recorrentes"
-                description="Dados e métricas de assinaturas recorrentes indisponíveis."
-            />
-        )
-    }
+    const kpis = useMemo(() => {
+        if (!subscriptionData) return []
+        return [
+            { title: "MRR (Ativo)", value: brl(subscriptionData.mrr), trend: "" },
+            { title: "ARR (Anualizado)", value: brl(subscriptionData.arr), trend: "" },
+            { title: "LTV Médio", value: brl(subscriptionData.ltv), trend: "" },
+            { title: "Taxa de Renovação", value: `${subscriptionData.renewalRate.toFixed(1)}%`, trend: "" },
+            { title: "Churn (30 dias)", value: `${subscriptionData.churnRate.toFixed(1)}%`, trend: "" },
+        ]
+    }, [subscriptionData])
 
-    const kpis = useMemo(() => [
-        { title: "MRR (Ativo)", value: brl(subscriptionData.mrr), trend: "" },
-        { title: "ARR (Anualizado)", value: brl(subscriptionData.arr), trend: "" },
-        { title: "LTV Médio", value: brl(subscriptionData.ltv), trend: "" },
-        { title: "Taxa de Renovação", value: `${subscriptionData.renewalRate.toFixed(1)}%`, trend: "" },
-        { title: "Churn (30 dias)", value: `${subscriptionData.churnRate.toFixed(1)}%`, trend: "" },
-    ], [subscriptionData])
-
-    const statusMetrics = useMemo(() => [
-        { title: "Assinaturas Ativas", value: String(subscriptionData.activeCount), color: "text-brand-green" },
-        { title: "Em Pausa", value: String(subscriptionData.pausedCount), color: "text-brand-orange" },
-        { title: "Aguardando Reposição", value: String(subscriptionData.delinquentCount), color: "text-brand-red" },
-        { title: "Canceladas (Total)", value: String(subscriptionData.cancelledCount), color: "text-brand-inactive-text" },
-    ], [subscriptionData])
+    const statusMetrics = useMemo(() => {
+        if (!subscriptionData) return []
+        return [
+            { title: "Assinaturas Ativas", value: String(subscriptionData.activeCount), color: "text-brand-green" },
+            { title: "Em Pausa", value: String(subscriptionData.pausedCount), color: "text-brand-orange" },
+            { title: "Aguardando Reposição", value: String(subscriptionData.delinquentCount), color: "text-brand-red" },
+            { title: "Canceladas (Total)", value: String(subscriptionData.cancelledCount), color: "text-brand-inactive-text" },
+        ]
+    }, [subscriptionData])
 
     const onExport = useCallback(async (fmt: "csv" | "xlsx") => {
+        if (!subscriptionData) return
         const rows = [
             ["MRR Ativo", brl(subscriptionData.mrr)],
             ["ARR Anualizado", brl(subscriptionData.arr)],
@@ -1260,6 +1298,15 @@ function SubscriptionSection({ subscriptionData }: { subscriptionData: Subscript
         setExportHandler(onExport)
         return () => setExportHandler(null)
     }, [onExport, setExportHandler])
+
+    if (!subscriptionData) {
+        return (
+            <SectionPlaceholder
+                title="Assinaturas Recorrentes"
+                description="Dados e métricas de assinaturas recorrentes indisponíveis."
+            />
+        )
+    }
 
     return (
         <div className="flex flex-col gap-6 animate-fade-in">

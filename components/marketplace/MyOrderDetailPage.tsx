@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { ChevronRightIcon, CreditCardIcon, XIcon, CheckCircleIcon, ClockIcon, AlertCircleIcon, MoneyIcon, WhatsappIcon } from '@/lib/icons';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Button, Spinner, FormSection, ListItem, Tabs, TabsList, TabsTrigger, TabsContent, Input, FormDropdown, Checkbox, Badge, DefaultModal, QuantitySelector, ThreeDotsLoader, IconPlaceholder, Tooltip, InfoCard } from '@/components/reusable';
 import ProductImagesSection from '@/components/erp/product/ProductImagesSection';
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
@@ -535,39 +535,15 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
         return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
     });
 
-    if (!order) return null;
-
-    const orderNumber = order.order_number || order.id.slice(0, 8).toUpperCase();
-    const dateStrFull = formatFullDate(order.created_at);
-    const dateStrTime = formatTime(order.created_at);
-    const statusConfig = getStatusConfig(order.situation);
-    const store = Array.isArray(order.stores) ? order.stores[0] : order.stores
-    const storeImage = store?.logo_url
-        ? getR2ImageUrl(store.logo_url)
-        : "https://img.dudit.com.br/static/Placeholder.png";
-
-    const isDelivery = order.delivery_type === "delivery";
-    const sellerName = store?.name || order.partners?.name || order.partners?.store_name || "Loja Parceira";
-    const totalAmount = Number(order.total_amount);
-
-    const orderItems = order.order_items || [];
+    const orderItems = order?.order_items || [];
     const hasOnlyServices = orderItems.length > 0 && orderItems.every((item: any) => item.service_id || item.line_type === "service_booking");
-    const hasAnyService = orderItems.some((item: any) => item.service_id || item.line_type === "service_booking");
-    const hasProducts = orderItems.some((item: any) => !item.service_id && !item.recurring_plan_id && item.line_type !== "service_booking" && item.line_type !== "subscription");
-    const hasMixedItems = hasAnyService && hasProducts;
-    const storeDeleted = isStoreDeleted(order);
-    const isCancelled = order.situation === "cancelled";
-    const canCancelOrder = canRequestOrderCancellation(order) && !hasActiveReturn;
-    const canRequestResolution = canRequestPostFulfillmentResolution(order);
-    const isPaidOrPartiallyPaid = ["paid", "partially_paid"].includes(order.situation);
-    const showReturnRequestButton = isPaidOrPartiallyPaid && !canRequestOrderCancellation(order) && !isCancelled && hasReturnableItems && !storeDeleted;
-    const policyCommercial = (activeReturnRequest?.policy_snapshot || order.return_policy_snapshot)?.commercial;
+    const policyCommercial = (activeReturnRequest?.policy_snapshot || order?.return_policy_snapshot)?.commercial;
     const acceptsStoreCredit = policyCommercial ? (policyCommercial.accepts_store_credit ?? true) : (storePolicy ? (storePolicy.acceptsStoreCredit ?? true) : true);
     const acceptsSizeExchange = policyCommercial ? (policyCommercial.accepts_size_exchange ?? true) : (storePolicy ? (storePolicy.acceptsSizeExchange ?? true) : true);
     const acceptsColorExchange = policyCommercial ? (policyCommercial.accepts_color_exchange ?? true) : (storePolicy ? (storePolicy.acceptsColorExchange ?? true) : true);
     const acceptsAnyExchange = acceptsSizeExchange || acceptsColorExchange;
 
-    const showExchangeOption = !hasOnlyServices && order.delivery_status === "delivered" && acceptsAnyExchange;
+    const showExchangeOption = !hasOnlyServices && order?.delivery_status === "delivered" && acceptsAnyExchange;
     const showStoreCreditOption = acceptsStoreCredit;
 
     const resolutionOptions = useMemo(() => {
@@ -587,6 +563,31 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
             setReturnResolution(resolutionOptions[0].value);
         }
     }, [resolutionOptions, returnResolution]);
+
+    if (!order) return null;
+
+    const orderNumber = order.order_number || order.id.slice(0, 8).toUpperCase();
+    const dateStrFull = formatFullDate(order.created_at);
+    const dateStrTime = formatTime(order.created_at);
+    const statusConfig = getStatusConfig(order.situation);
+    const store = Array.isArray(order.stores) ? order.stores[0] : order.stores
+    const storeImage = store?.logo_url
+        ? getR2ImageUrl(store.logo_url)
+        : "https://img.dudit.com.br/static/Placeholder.png";
+
+    const isDelivery = order.delivery_type === "delivery";
+    const sellerName = store?.name || order.partners?.name || order.partners?.store_name || "Loja Parceira";
+    const totalAmount = Number(order.total_amount);
+
+    const hasAnyService = orderItems.some((item: any) => item.service_id || item.line_type === "service_booking");
+    const hasProducts = orderItems.some((item: any) => !item.service_id && !item.recurring_plan_id && item.line_type !== "service_booking" && item.line_type !== "subscription");
+    const hasMixedItems = hasAnyService && hasProducts;
+    const storeDeleted = isStoreDeleted(order);
+    const isCancelled = order.situation === "cancelled";
+    const canCancelOrder = canRequestOrderCancellation(order) && !hasActiveReturn;
+    const canRequestResolution = canRequestPostFulfillmentResolution(order);
+    const isPaidOrPartiallyPaid = ["paid", "partially_paid"].includes(order.situation);
+    const showReturnRequestButton = isPaidOrPartiallyPaid && !canRequestOrderCancellation(order) && !isCancelled && hasReturnableItems && !storeDeleted;
 
     const returnButtonLabel = order.delivery_status === "delivered"
         ? (showExchangeOption ? "Solicitar troca ou devolução" : "Solicitar devolução")

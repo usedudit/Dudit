@@ -133,9 +133,9 @@ export function EditProductWrapper({ product, suppliers, partnerId, onDuplicate 
                 <AlertModal
                     onClose={() => setShowDeleteModal(false)}
                     onConfirm={handleConfirmDelete}
-                    title="Arquivar produto?"
-                    message="O item será arquivado e deixará de aparecer nos locais públicos e listagens, mas continuará disponível para preservar o histórico."
-                    confirmText={isDeleting ? "Arquivando..." : "Arquivar"}
+                    title="Excluir produto?"
+                    message="O item será excluído permanentemente."
+                    confirmText={isDeleting ? "Excluindo..." : "Excluir"}
                     icon={<TrashIcon />}
                     isDestructive
                     disabled={isDeleting}

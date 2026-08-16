@@ -18,6 +18,7 @@ import SupplierGridCard from "./SupplierGridCard"
 import SupplierPageControls from "./SupplierPageControls"
 import SupplierDetailPage from "./SupplierDetailPage"
 import NewSupplierPage from "./NewSupplierPage"
+import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
 import { deleteSuppliersInBatchAction, toggleSuppliersStatusAction } from "@/app/actions/erp/suppliers"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { formatCurrency, formatDate } from "@/lib/utils"
@@ -398,30 +399,36 @@ export default function SuppliersPage({
     return (
         <>
             <AnimatePresence mode="wait">
-                {entityState.isOpen && (isViewing || isEditingEntity) && isLoadingDetail ? (
-                    <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
-                        <ThreeDotsLoader />
-                    </div>
+                {entityState.isOpen && isViewing ? (
+                    (isLoadingDetail || !selectedSupplier) ? (
+                        <ERPDetailLoading key="loading-supplier" />
+                    ) : (
+                        <FadeIn key="details" className="w-full h-full">
+                            <SupplierDetailPage
+                                supplier={selectedSupplier}
+                                onBack={() => closeEntity()}
+                                onEdit={handleEditSupplier}
+                            />
+                        </FadeIn>
+                    )
                 ) : (isCreatingEntity || isEditingEntity) ? (
-                    <NewSupplierPage
-                        key="form"
-                        partnerId={partnerId}
-                        supplierId={entityState.entityId || undefined}
-                        onBack={() => closeEntity()}
-                        onSuccess={(msg) => {
-                            toast({ title: "Sucesso", description: msg })
-                            afterMutation()
-                            closeEntity()
-                        }}
-                        onError={(msg) => toast({ title: "Erro", description: msg, variant: "destructive" })}
-                    />
-                ) : isViewing && selectedSupplier ? (
-                    <SupplierDetailPage
-                        key="details"
-                        supplier={selectedSupplier}
-                        onBack={() => closeEntity()}
-                        onEdit={handleEditSupplier}
-                    />
+                    (isEditingEntity && (isLoadingDetail || !selectedSupplier)) ? (
+                        <ERPDetailLoading key="loading-supplier-form" />
+                    ) : (
+                        <FadeIn key="form" className="w-full h-full">
+                            <NewSupplierPage
+                                partnerId={partnerId}
+                                supplierId={entityState.entityId || undefined}
+                                onBack={() => closeEntity()}
+                                onSuccess={(msg) => {
+                                    toast({ title: "Sucesso", description: msg })
+                                    afterMutation()
+                                    closeEntity()
+                                }}
+                                onError={(msg) => toast({ title: "Erro", description: msg, variant: "destructive" })}
+                            />
+                        </FadeIn>
+                    )
                 ) : (
                     <FadeIn
                         key="list"

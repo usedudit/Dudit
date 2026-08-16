@@ -14,6 +14,7 @@ import { errorResponse, successResponse } from "@/lib/utils/action-helpers"
 import { revalidateOrders, revalidateOrderHistory, revalidateStockMovements, revalidateTransactions, revalidateEntityTimeline } from "@/lib/utils/revalidation"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
+import { getPartnerCapabilities } from "@/lib/services/partner-capabilities"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { syncCancelledOrderAppointmentsAndTransactions } from "@/lib/services/sync-cancellation"
 import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
@@ -21,7 +22,6 @@ import type { ReturnRequestListItem } from "@/lib/returns/types"
 import { getReturnableQuantities } from "@/lib/returns/returnable-quantities"
 import {
     canRequestOrderCancellation,
-    canRequestPostFulfillmentResolution,
     extractMercadoPagoPaidAmount,
     getLineSubtotal,
     getOrderAmountPaid,
@@ -977,6 +977,8 @@ export async function processReturnRequestAction(input: unknown) {
         if (requestError || !request) throw new Error("Solicitação nao encontrada")
         if (["RESOLVED", "REJECTED", "EXPIRED"].includes(request.status)) throw new Error("Solicitação bloqueada")
 
+        const capabilities = await getPartnerCapabilities(request.partner_id, { storeId: request.store_id || (request as any).orders?.store_id })
+
         // Map buyer user UUID to ERP customers table ID to avoid foreign key violations on transactions
         const buyerId = (request as any).orders?.buyer_id || (request as any).customer_id
         let erpCustomerId: string | null = null
@@ -1137,7 +1139,7 @@ export async function processReturnRequestAction(input: unknown) {
             }))
         }
 
-        if (returnToStockItems.length > 0) {
+        if (capabilities.hasStockMovements && returnToStockItems.length > 0) {
             const { data: existingMovement } = await supabase
                 .from("stock_movements")
                 .select("id")
@@ -1218,7 +1220,7 @@ export async function processReturnRequestAction(input: unknown) {
         // solicitação é aprovada/resolvida. Não cria transações novas - só
         // cancela/reduz settlements pending (parcelas já quitadas são cobertas
         // pelo refund existente). Idempotente por reconcileKey.
-        if (data.nextStatus === "APPROVED" || data.nextStatus === "RESOLVED") {
+        if (capabilities.hasFinancial && (data.nextStatus === "APPROVED" || data.nextStatus === "RESOLVED")) {
             const { cancelPendingSettlementsForOrder, reduceFutureSettlementsForRefund } =
                 await import("@/lib/services/transaction.service")
             const orderId = request.order_id
@@ -1291,8 +1293,8 @@ export async function processReturnRequestAction(input: unknown) {
         })
 
         await revalidateReturns(data.partnerId, request.order_id, data.requestId)
-        if (data.returnToInventory || returnToStockItems.length > 0) await revalidateStockMovements(data.partnerId)
-        if (data.refundAmount > 0 || data.storeCreditAmount > 0 || toNumber(result?.exchange_shortfall_amount) > 0 || toNumber(result?.exchange_surplus_amount) > 0) await revalidateTransactions(data.partnerId)
+        if (capabilities.hasStockMovements && (data.returnToInventory || returnToStockItems.length > 0)) await revalidateStockMovements(data.partnerId)
+        if (capabilities.hasFinancial && (data.refundAmount > 0 || data.storeCreditAmount > 0 || toNumber(result?.exchange_shortfall_amount) > 0 || toNumber(result?.exchange_surplus_amount) > 0)) await revalidateTransactions(data.partnerId)
 
         if (buyerId && data.nextStatus) {
             try {
@@ -1833,16 +1835,13 @@ export async function retryMercadoPagoRefundAction(partnerId: string, refundId: 
             throw new Error(res.error || "Erro ao processar reembolso no Mercado Pago.")
         }
 
-        await supabase.from("audit_logs").insert({
-            table_name: "return_requests",
-            action: "REFUND_RETRIED",
-            partner_id: partnerId,
-            user_id: user.id,
-            actor_user_id: user.id,
-            entity_type: "return_request",
-            entity_id: requestId,
-            action_type: "refund_retried",
-            change_lines: [`Processamento manual de reembolso no Mercado Pago aprovado (ID MP: ${res.mpRefundId}).`],
+        await logAuditEvent({
+            partnerId,
+            actorUserId: user.id,
+            entityType: "return_request",
+            entityId: requestId,
+            actionType: "refund_retried",
+            changeLines: [`Processamento manual de reembolso no Mercado Pago aprovado (ID MP: ${res.mpRefundId}).`],
             metadata: { refundId, mpRefundId: res.mpRefundId },
             source: "erp"
         })
@@ -1981,16 +1980,13 @@ export async function saveReturnEvidenceAction(
 
         if (error) throw error
 
-        await admin.from("audit_logs").insert({
-            table_name: "return_requests",
-            action: "EVIDENCE_UPLOADED",
-            partner_id: partnerId,
-            user_id: user.id,
-            actor_user_id: user.id,
-            entity_type: "return_request",
-            entity_id: returnRequestId,
-            action_type: "evidence_uploaded",
-            change_lines: [`Evidência adicionada: ${fileName}`],
+        await logAuditEvent({
+            partnerId,
+            actorUserId: user.id,
+            entityType: "return_request",
+            entityId: returnRequestId,
+            actionType: "evidence_uploaded",
+            changeLines: [`Evidência adicionada: ${fileName}`],
             metadata: { file_name: fileName, file_size: fileSize, file_key: fileKey },
             source: "user"
         })
@@ -2030,16 +2026,13 @@ export async function deleteReturnEvidenceAction(
 
         await admin.from("return_evidence").delete().eq("id", evidenceId)
 
-        await admin.from("audit_logs").insert({
-            table_name: "return_requests",
-            action: "EVIDENCE_DELETED",
-            partner_id: partnerId,
-            user_id: user.id,
-            actor_user_id: user.id,
-            entity_type: "return_request",
-            entity_id: returnRequestId,
-            action_type: "evidence_deleted",
-            change_lines: [`Evidência removida: ${evidence.file_name || "Documento"}`],
+        await logAuditEvent({
+            partnerId,
+            actorUserId: user.id,
+            entityType: "return_request",
+            entityId: returnRequestId,
+            actionType: "evidence_deleted",
+            changeLines: [`Evidência removida: ${evidence.file_name || "Documento"}`],
             metadata: { file_name: evidence.file_name, file_key: evidence.file_key },
             source: "user"
         })

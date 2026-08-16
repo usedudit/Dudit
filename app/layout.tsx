@@ -14,6 +14,7 @@ import { PreventSamePageNavigation } from "@/components/PreventSamePageNavigatio
 import { PWAUpdatePrompt } from "@/components/pwa/PWAUpdatePrompt"
 import { MarketplaceBottomMenu } from "@/components/marketplace/MarketplaceBottomMenu"
 import { TimezoneProvider } from "@/lib/date"
+import { ThemeProvider } from "@/components/theme-provider"
 import Script from "next/script"
 
 const plusJakartaSans = Plus_Jakarta_Sans({
@@ -215,7 +216,7 @@ export default async function RootLayout({
     const user = await getCurrentUser()
 
     return (
-        <html lang="pt-BR" className={`${plusJakartaSans.variable} ${libreBarcode.variable}`}>
+        <html lang="pt-BR" suppressHydrationWarning className={`${plusJakartaSans.variable} ${libreBarcode.variable}`}>
             <head>
                 <script
                     type="application/ld+json"
@@ -226,23 +227,25 @@ export default async function RootLayout({
             </head>
 
             <body className="font-sans">
-                <SupabaseProvider initialUser={user} initialSessionData={null}>
-                    <QueryProvider>
-                        <PreventSamePageNavigation />
-                        <NotificationProvider>
-                            <FavoritesProvider>
-                                <TransitionProvider>
-                                    <TimezoneProvider>
-                                        {children}
-                                    </TimezoneProvider>
-                                </TransitionProvider>
-                            </FavoritesProvider>
-                        </NotificationProvider>
-                        <PWAUpdatePrompt />
-                        <PushNotificationManager />
-                        <MarketplaceBottomMenu />
-                    </QueryProvider>
-                </SupabaseProvider>
+                <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+                    <SupabaseProvider initialUser={user} initialSessionData={null}>
+                        <QueryProvider>
+                            <PreventSamePageNavigation />
+                            <NotificationProvider>
+                                <FavoritesProvider>
+                                    <TransitionProvider>
+                                        <TimezoneProvider>
+                                            {children}
+                                        </TimezoneProvider>
+                                    </TransitionProvider>
+                                </FavoritesProvider>
+                            </NotificationProvider>
+                            <PWAUpdatePrompt />
+                            <PushNotificationManager />
+                            <MarketplaceBottomMenu />
+                        </QueryProvider>
+                    </SupabaseProvider>
+                </ThemeProvider>
 
                 <Script
                     src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8357337871781593"

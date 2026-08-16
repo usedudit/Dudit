@@ -1455,7 +1455,7 @@ export function ServiceDetailsPageClient({
             {/* Store (Reputation & Levels Card) */}
             <div className="mb-8 mt-4">
                 {(() => {
-                    const sellerBannerImage = partner.banner_url ? getR2ImageUrl(partner.banner_url) : "https://img.dudit.com.br/static/Placeholder.png";
+                    const sellerBannerImage = partner.banner_url ? getR2ImageUrl(partner.banner_url, "large") : "https://img.dudit.com.br/static/Placeholder.png";
                     const sellerAvatarImage = partner.store_avatar && !partner.store_avatar.includes("Placeholder.png") ? getR2ImageUrl(partner.store_avatar) : null;
 
                     return (
@@ -1463,7 +1463,7 @@ export function ServiceDetailsPageClient({
                             {/* Top clickable block linking to partner profile */}
                             <Link href={getStoreUrl(partner)} className="block group">
                                 {/* Banner */}
-                                <div className="h-20 w-full relative bg-gray-100 overflow-hidden select-none">
+                                <div className="aspect-[2.65/1] w-full relative bg-gray-100 overflow-hidden select-none">
                                     <img src={sellerBannerImage} alt={`Banner de ${partner.store_name}`} className="w-full h-full object-cover" />
                                     <div className="absolute inset-0" />
                                 </div>

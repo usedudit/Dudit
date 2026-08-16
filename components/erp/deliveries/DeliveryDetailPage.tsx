@@ -7,6 +7,7 @@ import AlertModal from "@/components/reusable/AlertModal"
 import Input from "@/components/reusable/Input"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
 import { ChevronLeftIcon, ClockArrowUpIcon, ClockCheckIcon, EstimateTimeIcon, RouteIcon, XIcon } from "@/lib/icons"
 import { getERPDeliveryDetailsAction, getDeliveryRoutePointsAction, updateERPSingleOrderDeliveryStatusAction } from "@/app/actions/erp/deliveries"
 import { formatCurrency, formatDateTime, formatDate, formatQuantityWithUnit, formatUnitPriceWithUnit } from "@/lib/utils"
@@ -229,9 +230,7 @@ export default function DeliveryDetailPage({
         }
     }
 
-    if (loading) return <div className="flex h-[calc(100vh-65px)] w-full items-center justify-center">
-        <ThreeDotsLoader />
-    </div>
+    if (loading) return <ERPDetailLoading key="loading-delivery-detail" />
 
     if (!delivery) {
         return (

@@ -22,6 +22,7 @@ import CustomerGridCard from "./CustomerGridCard"
 import CustomerPageControls from "./CustomerPageControls"
 import CustomerDetailPage from "./CustomerDetailPage"
 import NewCustomerPage from "./NewCustomerPage"
+import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
 import { deleteCustomersInBatchAction, toggleCustomersStatusAction, archiveCustomerAction, unarchiveCustomerAction } from "@/app/actions/erp/customers"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { formatCurrency, formatDate } from "@/lib/utils"
@@ -510,31 +511,37 @@ export default function CustomersPage({
     return (
         <>
             <AnimatePresence mode="wait">
-                {entityState.isOpen && isViewing && isLoadingDetail ? (
-                    <div key="loading" className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
-                        <ThreeDotsLoader />
-                    </div>
+                {entityState.isOpen && isViewing ? (
+                    (isLoadingDetail || !selectedCustomer) ? (
+                        <ERPDetailLoading key="loading-customer" />
+                    ) : (
+                        <FadeIn key="details" className="w-full h-full">
+                            <CustomerDetailPage
+                                customer={selectedCustomer}
+                                onBack={() => closeEntity()}
+                                onEdit={handleEditCustomer}
+                            />
+                        </FadeIn>
+                    )
                 ) : (isCreatingEntity || isEditingEntity) ? (
-                    <NewCustomerPage
-                        key="form"
-                        partnerId={partnerId}
-                        customerId={entityState.entityId || undefined}
-                        initialData={isEditingEntity ? currentEntity : undefined}
-                        onBack={() => closeEntity()}
-                        onSuccess={(msg) => {
-                            toast({ title: "Sucesso", description: msg })
-                            afterMutation()
-                            closeEntity()
-                        }}
-                        onError={(msg) => toast({ title: "Erro", description: msg, variant: "destructive" })}
-                    />
-                ) : isViewing && selectedCustomer ? (
-                    <CustomerDetailPage
-                        key="details"
-                        customer={selectedCustomer}
-                        onBack={() => closeEntity()}
-                        onEdit={handleEditCustomer}
-                    />
+                    (isEditingEntity && isLoadingDetail) ? (
+                        <ERPDetailLoading key="loading-customer-edit" />
+                    ) : (
+                        <FadeIn key="form" className="w-full h-full">
+                            <NewCustomerPage
+                                partnerId={partnerId}
+                                customerId={entityState.entityId || undefined}
+                                initialData={isEditingEntity ? currentEntity : undefined}
+                                onBack={() => closeEntity()}
+                                onSuccess={(msg) => {
+                                    toast({ title: "Sucesso", description: msg })
+                                    afterMutation()
+                                    closeEntity()
+                                }}
+                                onError={(msg) => toast({ title: "Erro", description: msg, variant: "destructive" })}
+                            />
+                        </FadeIn>
+                    )
                 ) : (
                     <FadeIn
                         key="list"

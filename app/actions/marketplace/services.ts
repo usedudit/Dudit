@@ -64,8 +64,12 @@ async function _getMarketplaceService(serviceId: string, storeId?: string | null
 
   const { data, error } = await query.maybeSingle()
 
-  if (error || !data) {
-    console.error("[Service] Fetch error:", error?.message)
+  if (error) {
+    console.error(`[Service] Fetch error for ${serviceId}:`, error.message)
+    return null
+  }
+
+  if (!data) {
     return null
   }
 

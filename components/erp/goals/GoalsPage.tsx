@@ -1,15 +1,18 @@
 "use client"
 
-import React, { useEffect, useMemo, useState } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
-import { AlertModal, Badge, IconPlaceholder, Pagination, Button, ThreeDotsLoader } from "@/components/reusable"
+import React, { useEffect, useMemo, useState, useCallback } from "react"
+import { AlertModal, IconPlaceholder, Pagination, Button, ThreeDotsLoader } from "@/components/reusable"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import GoalsPageControls from "./GoalsPageControls"
 import GoalGridCard from "./GoalGridCard"
+import GoalListRow from "./GoalListRow"
+import RankingListRow from "./RankingListRow"
+import RankingGridCard from "./RankingGridCard"
 import GoalFormPage from "./GoalFormPage"
 import GoalDetailPage from "./GoalDetailPage"
+import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
 import { useEntityState } from "@/hooks/use-entity-state"
 import {
     deleteSalesGoalAction,
@@ -21,7 +24,7 @@ import {
 } from "@/app/actions/erp/goals"
 import { formatCurrency } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
-import { PlusIcon, MoneyIcon, TagIcon, AwardIcon, TargetIcon, Users } from "@/lib/icons"
+import { PlusIcon, ArrowUpDownIcon } from "@/lib/icons"
 import { BarChart, Bar, XAxis, YAxis, Tooltip as ChartTooltip, ResponsiveContainer, Cell, PieChart, Pie, CartesianGrid } from "recharts"
 
 type Tab = "Metas" | "Ranking"
@@ -37,7 +40,6 @@ type GoalRow = {
     bonus_value: number
     applies_to: "all" | "user"
     user_id: string | null
-    goal_type: "sales" | "service_orders" | "both"
     scope_user_name?: string | null
     assigned_user_names?: string[]
     current_amount: number
@@ -61,8 +63,51 @@ type Summary = {
     achieved_goals: number
 }
 
+type SortConfig = {
+    key: string
+    direction: "asc" | "desc"
+}
+
 const GOALS_PAGE_SIZE = 8
 const RANKING_PAGE_SIZE = 8
+
+const GOAL_COLUMNS = [
+    { id: "name", label: "Meta", align: "left" as const, width: "38%" },
+    { id: "period", label: "Recorrência", align: "center" as const },
+    { id: "target", label: "Meta R$", align: "right" as const },
+    { id: "current", label: "Realizado", align: "right" as const },
+    { id: "progress", label: "Progresso", align: "left" as const },
+    { id: "status", label: "Status", align: "center" as const },
+    { id: "actions", label: "", align: "center" as const, width: "70px" },
+]
+
+const RANKING_COLUMNS = [
+    { id: "position", label: "Posição", align: "center" as const, width: "90px" },
+    { id: "seller", label: "Vendedor", align: "left" as const },
+    { id: "total", label: "Total vendido", align: "right" as const },
+    { id: "progress", label: "Atingimento", align: "left" as const },
+]
+
+function useMediaQuery(query: string) {
+    const [matches, setMatches] = useState(false)
+
+    useEffect(() => {
+        const mql = window.matchMedia(query)
+        const onChange = () => setMatches(mql.matches)
+        onChange()
+        mql.addEventListener("change", onChange)
+        return () => mql.removeEventListener("change", onChange)
+    }, [query])
+
+    return matches
+}
+
+function compareValues(a: any, b: any, key: string) {
+    const va = a[key]
+    const vb = b[key]
+    if (typeof va === "number" && typeof vb === "number") return va - vb
+    return String(va ?? "").localeCompare(String(vb ?? ""), "pt-BR")
+}
 
 export default function GoalsPage(props: {
     partnerId: string
@@ -105,17 +150,23 @@ export default function GoalsPage(props: {
     const [rankingEndDate, setRankingEndDate] = useState("")
     const [goalsPage, setGoalsPage] = useState(1)
     const [rankingPage, setRankingPage] = useState(1)
+    const [viewMode, setViewMode] = useState<"list" | "grid">("grid")
+    const [goalSort, setGoalSort] = useState<SortConfig>({ key: "name", direction: "asc" })
+    const [rankingSort, setRankingSort] = useState<SortConfig>({ key: "position", direction: "asc" })
     const [deletingId, setDeletingId] = useState<string | null>(null)
     const [goalToDelete, setGoalToDelete] = useState<GoalRow | null>(null)
+
+    const isMobile = useMediaQuery("(max-width: 767px)")
+    const isXl = useMediaQuery("(min-width: 1280px)")
+
+    const effectiveViewMode = isMobile ? "grid" : viewMode
 
     const [filters, setFilters] = useState<{
         status: string[]
         periodType: string[]
-        goalType: string[]
     }>({
         status: [],
         periodType: [],
-        goalType: [],
     })
 
     // Synchronize state when props change
@@ -217,12 +268,6 @@ export default function GoalsPage(props: {
                 type: "checkbox-list",
                 options: ["Mensal", "Semanal"],
             },
-            {
-                id: "goalType",
-                title: "Tipo de Meta",
-                type: "checkbox-list",
-                options: ["Apenas vendas", "Apenas ordens de serviço", "Vendas e OS"],
-            },
         ]
     }, [])
 
@@ -230,7 +275,6 @@ export default function GoalsPage(props: {
         return (
             filters.status.length > 0 ||
             filters.periodType.length > 0 ||
-            filters.goalType.length > 0 ||
             search.trim().length > 0
         )
     }, [filters, search])
@@ -257,34 +301,43 @@ export default function GoalsPage(props: {
             })
         }
 
-        // 4. Tipo de meta (goal_type) filter
-        if (filters.goalType.length > 0) {
-            result = result.filter((goal) => {
-                const label =
-                    goal.goal_type === "sales"
-                        ? "Apenas vendas"
-                        : goal.goal_type === "service_orders"
-                            ? "Apenas ordens de serviço"
-                            : "Vendas e OS"
-                return filters.goalType.includes(label)
-            })
+        // 4. Sort
+        const sorted = [...result].sort((a, b) => {
+            const cmp = compareValues(a, b, goalSort.key)
+            return goalSort.direction === "asc" ? cmp : -cmp
+        })
+
+        return sorted
+    }, [goals, search, filters, goalSort])
+
+    const filteredRanking = useMemo(() => {
+        let result = ranking
+
+        const term = search.trim().toLowerCase()
+        if (term) {
+            result = result.filter((row) => row.seller_name.toLowerCase().includes(term))
         }
 
-        return result
-    }, [goals, search, filters])
+        const sorted = [...result].sort((a, b) => {
+            const cmp = compareValues(a, b, rankingSort.key)
+            return rankingSort.direction === "asc" ? cmp : -cmp
+        })
+
+        return sorted
+    }, [ranking, search, rankingSort])
 
     const totalGoalPages = Math.max(1, Math.ceil(filteredGoals.length / GOALS_PAGE_SIZE))
     const paginatedGoals = filteredGoals.slice((goalsPage - 1) * GOALS_PAGE_SIZE, goalsPage * GOALS_PAGE_SIZE)
-    const totalRankingPages = Math.max(1, Math.ceil(ranking.length / RANKING_PAGE_SIZE))
-    const paginatedRanking = ranking.slice((rankingPage - 1) * RANKING_PAGE_SIZE, rankingPage * RANKING_PAGE_SIZE)
+    const totalRankingPages = Math.max(1, Math.ceil(filteredRanking.length / RANKING_PAGE_SIZE))
+    const paginatedRanking = filteredRanking.slice((rankingPage - 1) * RANKING_PAGE_SIZE, rankingPage * RANKING_PAGE_SIZE)
 
     useEffect(() => {
         setGoalsPage(1)
-    }, [search, filters])
+    }, [search, filters, goalSort])
 
     useEffect(() => {
         setRankingPage(1)
-    }, [ranking, rankingPeriodMode, rankingStartDate, rankingEndDate])
+    }, [ranking, rankingPeriodMode, rankingStartDate, rankingEndDate, search, rankingSort])
 
     useEffect(() => {
         if (goalsPage > totalGoalPages) setGoalsPage(totalGoalPages)
@@ -293,6 +346,25 @@ export default function GoalsPage(props: {
     useEffect(() => {
         if (rankingPage > totalRankingPages) setRankingPage(totalRankingPages)
     }, [rankingPage, totalRankingPages])
+
+    const handleGoalSort = useCallback((key: string) => {
+        setGoalSort((prev) => ({
+            key,
+            direction: prev?.key === key && prev.direction === "asc" ? "desc" : "asc",
+        }))
+    }, [])
+
+    const handleRankingSort = useCallback((key: string) => {
+        setRankingSort((prev) => ({
+            key,
+            direction: prev?.key === key && prev.direction === "asc" ? "desc" : "asc",
+        }))
+    }, [])
+
+    const handleGoalDetails = useCallback((goal: GoalRow) => open("view", goal.id), [open])
+    const handleGoalEdit = useCallback((goal: GoalRow) => open("edit", goal.id), [open])
+    const handleGoalDuplicate = useCallback((goal: GoalRow) => open("duplicate", goal.id), [open])
+    const handleGoalDelete = useCallback((goal: GoalRow) => setGoalToDelete(goal), [])
 
     const removeGoal = async (goalId: string) => {
         setDeletingId(goalId)
@@ -309,43 +381,100 @@ export default function GoalsPage(props: {
         toast({ title: "Sucesso", description: "Meta excluída." })
     }
 
+    const renderGoalsTableHeader = () => (
+        <tr className="bg-brand-gray dark:bg-dark-border/50">
+            {GOAL_COLUMNS.map((col, idx) => {
+                const isSortable = col.id !== "actions"
+                const isSorted = goalSort?.key === col.id
+                return (
+                    <th
+                        key={col.id}
+                        className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${idx === GOAL_COLUMNS.length - 1 ? "rounded-r-lg" : ""} ${isSortable ? "cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors" : ""}`}
+                        style={{ width: col.width }}
+                        onClick={() => {
+                            if (isSortable) handleGoalSort(col.id)
+                        }}
+                    >
+                        <div className={`relative flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
+                            <span>{col.label}</span>
+                            {isSortable && (
+                                <div className={`flex items-center ${col.align === "center" ? "absolute -right-5" : "ml-1.5"}`}>
+                                    <ArrowUpDownIcon
+                                        size={14}
+                                        className={`transition-all duration-200 ${isSorted ? "text-brand-dark dark:text-dark-heading opacity-100 block" : "text-brand-inactive-text hidden group-hover:block opacity-40"} ${isSorted && goalSort.direction === "desc" ? "rotate-180" : ""}`}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    </th>
+                )
+            })}
+        </tr>
+    )
+
+    const renderRankingTableHeader = () => (
+        <tr className="bg-brand-gray dark:bg-dark-border/50">
+            {RANKING_COLUMNS.map((col, idx) => {
+                const isSorted = rankingSort?.key === col.id
+                return (
+                    <th
+                        key={col.id}
+                        className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${idx === RANKING_COLUMNS.length - 1 ? "rounded-r-lg" : ""} cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors`}
+                        style={{ width: col.width }}
+                        onClick={() => handleRankingSort(col.id)}
+                    >
+                        <div className={`relative flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
+                            <span>{col.label}</span>
+                            <div className={`flex items-center ${col.align === "center" ? "absolute -right-5" : "ml-1.5"}`}>
+                                <ArrowUpDownIcon
+                                    size={14}
+                                    className={`transition-all duration-200 ${isSorted ? "text-brand-dark dark:text-dark-heading opacity-100 block" : "text-brand-inactive-text hidden group-hover:block opacity-40"} ${isSorted && rankingSort.direction === "desc" ? "rotate-180" : ""}`}
+                                />
+                            </div>
+                        </div>
+                    </th>
+                )
+            })}
+        </tr>
+    )
+
     // Render Detail Page if viewing
     if (isViewing && viewId) {
         return (
-            <GoalDetailPage
-                partnerId={props.partnerId}
-                goalId={viewId}
-                initialGoalData={goals.find((g) => g.id === viewId)}
-                onBack={() => close()}
-                onEdit={(id) => open("edit", id)}
-                onDuplicate={(id) => open("duplicate", id)}
-                onSuccessMutation={() => refreshData()}
-            />
+            <FadeIn key={`goal-detail-${viewId}`} className="w-full h-full">
+                <GoalDetailPage
+                    partnerId={props.partnerId}
+                    goalId={viewId}
+                    initialGoalData={goals.find((g) => g.id === viewId)}
+                    onBack={() => close()}
+                    onEdit={(id) => open("edit", id)}
+                    onDuplicate={(id) => open("duplicate", id)}
+                    onSuccessMutation={() => refreshData()}
+                />
+            </FadeIn>
         )
     }
 
     // Render Form Page instead of the list if formMode URL parameter is active
     if (formMode) {
         if (isLoadingFormOptions || ((formMode === "edit" || formMode === "duplicate") && !editingGoal)) {
-            return (
-                <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
-                    <ThreeDotsLoader />
-                </div>
-            )
+            return <ERPDetailLoading key="loading-goal-form" />
         }
 
         return (
-            <GoalFormPage
-                partnerId={props.partnerId}
-                mode={formMode}
-                sellers={props.sellers}
-                accounts={formAccounts || []}
-                initialGoal={editingGoal}
-                onBack={() => {
-                    close()
-                    refreshData()
-                }}
-            />
+            <FadeIn key={`goal-form-${formMode}`} className="w-full h-full">
+                <GoalFormPage
+                    partnerId={props.partnerId}
+                    mode={formMode}
+                    sellers={props.sellers}
+                    accounts={formAccounts || []}
+                    initialGoal={editingGoal}
+                    onBack={() => {
+                        close()
+                        refreshData()
+                    }}
+                />
+            </FadeIn>
         )
     }
 
@@ -398,6 +527,8 @@ export default function GoalsPage(props: {
                     onOpenFilter={() => setIsFilterSheetOpen(true)}
                     filters={filters}
                     setFilters={setFilters}
+                    viewMode={viewMode}
+                    onViewModeChange={setViewMode}
                     hasActiveFilters={hasActiveFilters}
                     rankingPeriodMode={rankingPeriodMode}
                     onRankingPeriodModeChange={setRankingPeriodMode}
@@ -423,7 +554,7 @@ export default function GoalsPage(props: {
                                         itemButton={{ text: "Nova meta", action: () => open("create") }}
                                     />
                                 </div>
-                            ) : (
+                            ) : effectiveViewMode === "grid" ? (
                                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pb-4">
                                     {paginatedGoals.map((goal) => (
                                         <GoalGridCard
@@ -436,6 +567,29 @@ export default function GoalsPage(props: {
                                         />
                                     ))}
                                 </div>
+                            ) : (
+                                <div className="w-full overflow-hidden rounded-xl relative">
+                                    <div className="overflow-x-auto pb-4 custom-scrollbar">
+                                        <table className="w-full text-left border-separate border-spacing-0 min-w-[900px]">
+                                            <thead>
+                                                {renderGoalsTableHeader()}
+                                            </thead>
+                                            <tbody>
+                                                {paginatedGoals.map((goal) => (
+                                                    <GoalListRow
+                                                        key={goal.id}
+                                                        goal={goal}
+                                                        columns={GOAL_COLUMNS}
+                                                        onDetails={handleGoalDetails}
+                                                        onEdit={handleGoalEdit}
+                                                        onDuplicate={handleGoalDuplicate}
+                                                        onDelete={handleGoalDelete}
+                                                    />
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
                             )}
 
                             {filteredGoals.length > 0 && (
@@ -446,7 +600,11 @@ export default function GoalsPage(props: {
 
                     {activeTab === "Ranking" && (
                         <div className="space-y-4">
-                            {ranking.length === 0 && !rankingLoading ? (
+                            {rankingLoading ? (
+                                <div className="min-h-[320px] flex items-center justify-center">
+                                    <ThreeDotsLoader />
+                                </div>
+                            ) : filteredRanking.length === 0 ? (
                                 <div className="min-h-[320px] flex items-center justify-center">
                                     <IconPlaceholder
                                         placeholderType="image"
@@ -457,57 +615,41 @@ export default function GoalsPage(props: {
                                     />
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-1 gap-3">
-                                    {paginatedRanking.map((row) => {
-                                        const medal = row.position === 1 ? "🥇" : row.position === 2 ? "🥈" : row.position === 3 ? "🥉" : ""
-                                        const isTop3 = row.position <= 3
-
-                                        return (
-                                            <div
-                                                key={row.user_id}
-                                                className={`rounded-2xl border ${isTop3
-                                                    ? "border-brand-green bg-brand-green/5"
-                                                    : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface"
-                                                    } p-5 flex items-center justify-between gap-4 transition-all hover:shadow-sm`}
-                                            >
-                                                <div className="flex items-center gap-4">
-                                                    <div
-                                                        className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg ${isTop3 ? "bg-brand-green text-white" : "bg-brand-gray text-brand-dark"
-                                                            }`}
-                                                    >
-                                                        {row.position}
-                                                    </div>
-                                                    <div>
-                                                        <p className="font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2 text-lg">
-                                                            {row.seller_name} {medal}
-                                                        </p>
-                                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                                                            Total vendido:{" "}
-                                                            <span className="font-semibold text-brand-dark dark:text-dark-heading">
-                                                                {formatCurrency(row.total_amount)}
-                                                            </span>
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className="text-xs text-brand-inactive-text mb-1 font-medium">Atingimento da meta</p>
-                                                    <Badge variant={isTop3 ? "green" : "gray"} className="text-sm px-3 py-1">
-                                                        {row.progress_percent}%
-                                                    </Badge>
-                                                </div>
+                                <>
+                                    {isXl ? (
+                                        <div className="w-full overflow-hidden rounded-xl relative">
+                                            <div className="overflow-x-auto pb-4 custom-scrollbar">
+                                                <table className="w-full text-left border-separate border-spacing-0 min-w-[700px]">
+                                                    <thead>
+                                                        {renderRankingTableHeader()}
+                                                    </thead>
+                                                    <tbody>
+                                                        {paginatedRanking.map((row) => (
+                                                            <RankingListRow
+                                                                key={row.user_id}
+                                                                row={row}
+                                                                columns={RANKING_COLUMNS}
+                                                            />
+                                                        ))}
+                                                    </tbody>
+                                                </table>
                                             </div>
-                                        )
-                                    })}
-                                </div>
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-1 gap-3">
+                                            {paginatedRanking.map((row) => (
+                                                <RankingGridCard key={row.user_id} row={row} />
+                                            ))}
+                                        </div>
+                                    )}
+                                </>
                             )}
 
-                            {ranking.length > 0 && (
+                            {filteredRanking.length > 0 && (
                                 <Pagination currentPage={rankingPage} totalPages={totalRankingPages} onPageChange={setRankingPage} />
                             )}
                         </div>
                     )}
-
-
                 </div>
             </div>
 
@@ -517,7 +659,7 @@ export default function GoalsPage(props: {
                 sections={filterSections}
                 filters={filters}
                 setFilters={setFilters}
-                onClear={() => setFilters({ status: [], periodType: [], goalType: [] })}
+                onClear={() => setFilters({ status: [], periodType: [] })}
             />
 
             <AlertModal

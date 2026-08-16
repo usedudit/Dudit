@@ -20,6 +20,7 @@ import TransactionGridCard from "./TransactionGridCard"
 import CreateTransactionPage, { type CategoryItem, type AccountItem } from "./CreateTransactionPage"
 import TransactionDetailView from "./TransactionDetailView"
 import InstallmentParcelsTable, { type InstallmentParcelRow } from "./InstallmentParcelsTable"
+import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
 import type { ERPTransaction, FinancialTransactionCursor, TransactionTab } from "@/lib/services/transactions.types"
 import type { RecurringOccurrence } from "@/app/actions/erp/recurring-transactions"
 import { markRecurringOccurrenceAsPaidAction, recordRegularTransactionPaymentAction } from "@/app/actions/erp/transactions"
@@ -30,7 +31,7 @@ import { getFinancialTransactionsAction, getTransactionDetailsAction, type Trans
 import { cancelPendingTransactionAction } from "@/app/actions/erp/transactions"
 import { getPaymentMethodsAction } from "@/app/actions/erp/payment-methods"
 import { GenericAttachmentsTab } from "../shared/GenericAttachmentsTab"
-import { STANDARD_PAYMENT_METHODS } from "@/lib/finance-utils"
+import { STANDARD_PAYMENT_METHODS, resolveStandardPaymentMethod } from "@/lib/finance-utils"
 import { sanitizeUUID } from "@/lib/security/input-sanitizer"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { useSidebar } from "@/lib/sidebar-context"
@@ -372,16 +373,10 @@ export default function TransactionsPage({
         return () => clearTimeout(timer)
     }, [search])
 
-    const paymentTypeOptions = useMemo(() => {
-        const s = new Set<string>()
-        for (const t of loadedTransactions) {
-            if (t.paymentType) s.add(t.paymentType)
-        }
-        for (const o of recurringOccurrences) {
-            if (o.paymentDisplay) s.add(o.paymentDisplay)
-        }
-        return Array.from(s).sort((a, b) => a.localeCompare(b, "pt-BR"))
-    }, [loadedTransactions, recurringOccurrences])
+    const paymentTypeOptions = useMemo(
+        () => STANDARD_PAYMENT_METHODS.map((o) => o.value),
+        [],
+    )
 
     const statusFilterOptions = useMemo(() => {
         const s = new Set(loadedTransactions.map((item) => item.status))
@@ -505,7 +500,7 @@ export default function TransactionsPage({
 
             const matchesStatus = filters.status.length === 0 || filters.status.includes(item.status)
             const matchesCategory = filters.category.length === 0 || filters.category.includes(item.category)
-            const matchesPayment = filters.paymentType.length === 0 || filters.paymentType.includes(item.paymentType)
+            const matchesPayment = filters.paymentType.length === 0 || filters.paymentType.includes(resolveStandardPaymentMethod(item.paymentType))
             const ymd = transactionFilterYmd(item, activeTab)
             const matchesDate = !dateBoundsActive || ymdInBounds(ymd, startYmd, endYmd)
             const matchesRecurring =
@@ -978,6 +973,21 @@ export default function TransactionsPage({
     }, [closeEntity])
 
     const { setHeaderOverride } = useSidebar()
+
+    useEffect(() => {
+        if (!(isViewing && entityState.entityType === "installment" && entityState.entityId)) return
+        if (installmentDetail || installmentDetailLoading) return
+        setInstallmentDetailLoading(true)
+        void (async () => {
+            const res = await getInstallmentGroupDetailsAction({
+                partnerId,
+                installmentGroupId: entityState.entityId as string,
+            })
+            if (res.success) setInstallmentDetail(res.data)
+            else notifyError(res.error || "Erro ao carregar parcelado")
+            setInstallmentDetailLoading(false)
+        })()
+    }, [isViewing, entityState.entityType, entityState.entityId, installmentDetail, installmentDetailLoading, partnerId, notifyError])
 
     useEffect(() => {
         if (!(isViewing && entityState.entityType === "installment")) return
@@ -1527,12 +1537,8 @@ export default function TransactionsPage({
     }
 
     if (entityState.isOpen && entityState.action === "view" && entityState.entityId && !entityState.entityType) {
-        if (isLoadingDetail) {
-            return (
-                <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
-                    <ThreeDotsLoader />
-                </div>
-            )
+        if (isLoadingDetail || !currentEntity) {
+            return <ERPDetailLoading key="loading-tx-detail" />
         }
         return (
             <motion.div
@@ -1939,6 +1945,9 @@ export default function TransactionsPage({
     }
 
     if (isViewing && entityState.entityType === "installment") {
+        if (installmentDetailLoading || !installmentDetail) {
+            return <ERPDetailLoading key="loading-installment-detail" />
+        }
         const representativeTxId = installmentDetail?.installments?.[0]?.id || entityState.entityId
         return (
             <FadeIn>
@@ -2126,11 +2135,7 @@ export default function TransactionsPage({
 
     if (isFormOpen) {
         if (entityState.action === "edit" && isLoadingDetail && entityState.entityType !== "recurring") {
-            return (
-                <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
-                    <ThreeDotsLoader />
-                </div>
-            )
+            return <ERPDetailLoading key="loading-tx-edit" />
         }
         return (
             <motion.div

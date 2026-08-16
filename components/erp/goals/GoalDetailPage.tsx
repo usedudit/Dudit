@@ -6,6 +6,7 @@ import { Badge, Button, ActionsDropdown, ThreeDotsLoader, AlertModal } from "@/c
 import { ChevronLeftIcon, TargetIcon, Users, MoneyIcon, AwardIcon, CheckCircleIcon, CalendarIcon } from "@/lib/icons"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
 import { useSidebar } from "@/lib/sidebar-context"
 import { deleteSalesGoalAction, getSalesGoalByIdAction } from "@/app/actions/erp/goals"
 import { useToast } from "@/hooks/use-toast"
@@ -18,12 +19,6 @@ interface GoalDetailPageProps {
   onEdit: (goalId: string) => void
   onDuplicate: (goalId: string) => void
   onSuccessMutation?: () => void
-}
-
-function goalTypeLabel(goalType: string) {
-  if (goalType === "sales") return "Apenas Vendas"
-  if (goalType === "service_orders") return "Apenas Ordens de Serviço"
-  return "Vendas e Ordens de Serviço"
 }
 
 function statusVariant(status: string) {
@@ -44,8 +39,8 @@ export default function GoalDetailPage({
   const { toast } = useToast()
   const { setHeaderOverride, setSidebarCard } = useSidebar()
 
-  const [goal, setGoal] = useState<any | null>(initialGoalData || null)
-  const [isLoading, setIsLoading] = useState(!initialGoalData)
+  const [goal, setGoal] = useState<any | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
   const [isDeleting, setIsDeleting] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
 
@@ -129,11 +124,7 @@ export default function GoalDetailPage({
   }
 
   if (isLoading || !goal) {
-    return (
-      <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
-        <ThreeDotsLoader />
-      </div>
-    )
+    return <ERPDetailLoading key="loading-goal" />
   }
 
   const progressPercent = goal.progress_percent || 0
@@ -290,11 +281,6 @@ export default function GoalDetailPage({
 
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between items-center py-1">
-                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Tipo de Meta</span>
-                    <span className="font-bold text-brand-dark dark:text-dark-heading">{goalTypeLabel(goal.goal_type)}</span>
-                  </div>
-
-                  <div className="flex justify-between items-center py-1 border-t border-brand-border/40 dark:border-dark-border/40">
                     <span className="text-brand-inactive-text dark:text-dark-body font-medium">Recorrência</span>
                     <span className="font-bold text-brand-dark dark:text-dark-heading">
                       {goal.period_type === "monthly" ? "Mensal" : "Semanal"}

@@ -1,4 +1,3 @@
-import { cache } from "react"
 import { redirect } from "next/navigation"
 import type { Metadata } from 'next'
 import { ProductDetailsPageClient } from "@/components/marketplace/ProductDetailsPage"
@@ -8,15 +7,11 @@ import {
   getProductVariants,
   getProductReviews,
 } from "@/app/actions/marketplace/products"
-import { getStoreBySlug } from "@/app/actions/marketplace/stores"
 import { getProductUrl } from "@/lib/utils/url-generator"
 import { formatCurrency } from "@/lib/utils";
 import { getCurrentUser } from "@/lib/auth/authorization"
 import { getUserSessionData } from "@/lib/data/user"
 import { getSponsoredAdsForSlot } from "@/app/actions/marketplace/ads"
-
-// React cache() deduplicates getStoreBySlug between generateMetadata and page render
-const getStoreBySlugCached = cache(getStoreBySlug)
 
 import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
 
@@ -24,10 +19,8 @@ export const dynamic = 'force-dynamic'
 export const dynamicParams = true
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string; cidadeUf: string; id: string }> }): Promise<Metadata> {
-  const { id, slug } = await params
-  const store = slug ? await getStoreBySlugCached(slug) : null
-  const storeId = store?.id || null
-  const product = await getMarketplaceProduct(id, storeId)
+  const { id } = await params
+  const product = await getMarketplaceProduct(id)
 
   if (!product) {
     return { title: 'Produto não encontrado | Dudit' }
@@ -83,17 +76,18 @@ export default async function ProductDetailsPage({
 }) {
   const { id, slug: currentSlug, cidadeUf: currentCidadeUf } = await params
 
-  const [store, user] = await Promise.all([
-    getStoreBySlugCached(currentSlug).catch(() => null),
+  // Parallelize product + user session data fetch
+  const [user, product] = await Promise.all([
     getCurrentUser(),
+    getMarketplaceProduct(id),
   ])
-  const storeId = store?.id || null
 
-  // Parallelize product + session data (independent once we have storeId)
-  const [product, sessionData] = await Promise.all([
-    getMarketplaceProduct(id, storeId),
-    user ? getUserSessionData(user.id) : Promise.resolve(null),
-  ])
+  if (!product) {
+    redirect("/")
+  }
+
+  const sessionData = user ? await getUserSessionData(user.id) : null
+  const storeId = product.store_id || null
 
   const userProfile = sessionData?.profile ? {
     full_name: sessionData.profile.full_name,
@@ -104,10 +98,6 @@ export default async function ProductDetailsPage({
     state: sessionData.profile.state,
   } : null
   const cartCount = sessionData?.cartCount || 0
-
-  if (!product) {
-    redirect("/")
-  }
 
   // --- MÁGICA DE SEO (Canonical Redirect) ---
   const correctUrl = getProductUrl(product)

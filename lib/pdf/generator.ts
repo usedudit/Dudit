@@ -11,35 +11,55 @@ export async function generatePdf(url: string, nextCookies: any[]): Promise<Buff
 
     const isProd = process.env.NODE_ENV === "production" || !!process.env.RAILWAY_ENVIRONMENT
 
+    const fs = await import("fs")
+
     if (isProd) {
-        let executablePath = process.env.CHROMIUM_PATH || ""
+        let executablePath = ""
+
+        if (process.env.CHROMIUM_PATH && fs.existsSync(process.env.CHROMIUM_PATH)) {
+            executablePath = process.env.CHROMIUM_PATH
+        }
 
         if (!executablePath) {
-            try {
-                executablePath = execSync("which chromium")
-                    .toString()
-                    .trim()
-            } catch { }
-
-            if (!executablePath) {
-                try {
-                    executablePath = execSync("which chromium-browser")
-                        .toString()
-                        .trim()
-                } catch { }
-            }
-
-            if (!executablePath) {
-                try {
-                    executablePath = execSync("which google-chrome")
-                        .toString()
-                        .trim()
-                } catch { }
+            const linuxCandidates = [
+                "/usr/bin/chromium",
+                "/usr/bin/chromium-browser",
+                "/usr/bin/google-chrome-stable",
+                "/usr/bin/google-chrome",
+            ]
+            for (const candidate of linuxCandidates) {
+                if (fs.existsSync(candidate)) {
+                    executablePath = candidate
+                    break
+                }
             }
         }
 
         if (!executablePath) {
-            throw new Error("Chromium não encontrado no PATH.")
+            const commands = ["which chromium", "which chromium-browser", "which google-chrome", "which google-chrome-stable"]
+            for (const cmd of commands) {
+                try {
+                    const result = execSync(cmd).toString().trim()
+                    if (result && fs.existsSync(result)) {
+                        executablePath = result
+                        break
+                    }
+                } catch { }
+            }
+        }
+
+        // Fallback to @sparticuz/chromium if installed
+        if (!executablePath) {
+            try {
+                const sparticuzChromium = (await import("@sparticuz/chromium")).default
+                executablePath = await sparticuzChromium.executablePath()
+            } catch { }
+        }
+
+        if (!executablePath) {
+            throw new Error(
+                "Chromium não encontrado no servidor. Verifique se o pacote 'chromium' está configurado no railpack.json ou na variável RAILPACK_DEPLOY_APT_PACKAGES."
+            )
         }
 
         browser = (await puppeteer.launch({
@@ -51,26 +71,43 @@ export async function generatePdf(url: string, nextCookies: any[]): Promise<Buff
                 "--disable-dev-shm-usage",
                 "--disable-gpu",
                 "--font-render-hinting=none",
-                "--single-process",
+                "--no-zygote",
             ],
             protocolTimeout: 60000,
         })) as unknown as Browser
     } else {
-        // Local Windows environment browser fallback
-        const fs = await import("fs")
-        const paths = [
-            "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-            "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
-            "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
-            "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
-        ]
-
+        // Local environment browser fallback (Windows / macOS / Linux)
         let executablePath = ""
-        for (const p of paths) {
-            if (fs.existsSync(p)) {
-                executablePath = p
-                break
+
+        if (process.env.CHROMIUM_PATH && fs.existsSync(process.env.CHROMIUM_PATH)) {
+            executablePath = process.env.CHROMIUM_PATH
+        }
+
+        if (!executablePath) {
+            const paths = [
+                "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+                "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+                "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
+                "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+                "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+                "/usr/bin/google-chrome",
+                "/usr/bin/chromium",
+                "/usr/bin/chromium-browser",
+            ]
+
+            for (const p of paths) {
+                if (fs.existsSync(p)) {
+                    executablePath = p
+                    break
+                }
             }
+        }
+
+        if (!executablePath) {
+            try {
+                const sparticuzChromium = (await import("@sparticuz/chromium")).default
+                executablePath = await sparticuzChromium.executablePath()
+            } catch { }
         }
 
         if (!executablePath) {

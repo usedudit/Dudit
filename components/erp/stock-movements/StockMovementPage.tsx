@@ -17,6 +17,7 @@ import FloatingActionBar from "@/components/reusable/FloatingActionBar";
 import CreateStockMovement from './CreateStockMovement';
 import StockMovementDetailPage from './StockMovementDetailPage';
 import StockMovementPageControls from './StockMovementPageControls';
+import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading";
 import StockMovementListItem from './StockMovementListRow';
 import StockMovementGridCard from './StockMovementGridCard';
 import { undoStockMovementAction, undoBatchStockMovementsAction, getStockMovementDetails, getERPStockMovementsPageAction, type ERPStockMovementListCursor } from '@/app/actions/erp/stock-movements';
@@ -433,24 +434,24 @@ const StockMovementPageContent = ({ partnerId, storeId, movements: initialMoveme
     return (
         <AnimatePresence mode="wait">
             {isCreatingEntity ? (
-                <CreateStockMovement
-                    key="create"
-                    onBack={closeEntity}
-                    onSuccess={() => { afterMutation(); closeEntity(); }}
-                />
-            ) : isViewing && entityState.entityId ? (
-                isLoadingDetail ? (
-                    <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
-                        <ThreeDotsLoader />
-                    </div>
-                ) : (
-                    <StockMovementDetailPage
-                        key="detail"
-                        movement={currentEntity || formattedMovements.find(m => m.id === entityState.entityId) || null}
-                        isLoading={isLoadingDetail}
+                <FadeIn key="create" className="w-full h-full">
+                    <CreateStockMovement
                         onBack={closeEntity}
-                        partnerId={partnerId}
+                        onSuccess={() => { afterMutation(); closeEntity(); }}
                     />
+                </FadeIn>
+            ) : isViewing && entityState.entityId ? (
+                (isLoadingDetail || !currentEntity) ? (
+                    <ERPDetailLoading key="loading-stock-detail" />
+                ) : (
+                    <FadeIn key="detail" className="w-full h-full">
+                        <StockMovementDetailPage
+                            movement={currentEntity || formattedMovements.find(m => m.id === entityState.entityId) || null}
+                            isLoading={isLoadingDetail}
+                            onBack={closeEntity}
+                            partnerId={partnerId}
+                        />
+                    </FadeIn>
                 )
             ) : (
                 <FadeIn

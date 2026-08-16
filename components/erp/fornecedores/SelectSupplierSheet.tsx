@@ -7,6 +7,7 @@ import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery, usePickerBucket } from "@/components/erp/hooks"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
+import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import {
     fetchPartnerSuppliersBucket,
     type PartnerSupplierBucketItem,
@@ -168,7 +169,7 @@ const SelectSupplierSheet = ({
 
     useEffect(() => {
         if (!isOpen) return
-        void pickerRef.current.loadBucket()
+        void pickerRef.current.loadBucket(pickerRef.current.isLoaded)
     }, [isOpen])
 
     useEffect(() => {
@@ -342,12 +343,11 @@ const SelectSupplierSheet = ({
                                                 {supplier.name}
                                             </span>
                                         </div>
-                                        <p className="truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body">
-                                            ID #{supplier.id ? supplier.id.substring(0, 5).toUpperCase() : "-"}
-                                        </p>
-                                        <p className="truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body">
-                                            {supplier.email || "Sem e-mail"}
-                                        </p>
+                                        {supplier.phone ? (
+                                            <p className="truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body">
+                                                {formatBrazilPhone(supplier.phone) || supplier.phone}
+                                            </p>
+                                        ) : null}
                                     </div>
                                     <div className="flex shrink-0 items-center gap-2">
                                         {!selectedSupplierIds ? (
@@ -497,12 +497,30 @@ const SelectSupplierSheet = ({
                                 })
                                 if (!created) return
 
+                                const newSupplierItem: PartnerSupplierBucketItem = {
+                                    id: created.id,
+                                    name: created.name,
+                                    email: created.email ?? null,
+                                    phone: created.phone ?? null,
+                                    cnpj: (created as any).cnpj ?? null,
+                                    avatar_url: (created as any).image_url || (created as any).avatar_url || null,
+                                }
+                                picker.prependItem(newSupplierItem)
+
                                 setNewSupplierName("")
                                 setNewSupplierEmail("")
                                 setNewSupplierPhone("")
                                 setIsNewSupplierSheetOpen(false)
-                                onSelect(created)
-                                onClose()
+
+                                if (selectedSupplierIds) {
+                                    if (!selectedSupplierIds.includes(created.id)) {
+                                        onSelect(created)
+                                    }
+                                } else {
+                                    setTempSelectedSupplier(created)
+                                    onSelect(created)
+                                    onClose()
+                                }
                             } catch (error) {
                                 const errorMsg = error instanceof Error ? error.message : "Não foi possível criar o fornecedor."
                                 const lowerMsg = errorMsg.toLowerCase()

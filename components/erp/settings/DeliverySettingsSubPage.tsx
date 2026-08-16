@@ -88,6 +88,14 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
 
     const isFree = planSlug === "free"
 
+    const handlePayerSelect = useCallback((payer: "customer" | "seller") => {
+        if (isFree) {
+            openPlanUpgrade("crescer")
+            return
+        }
+        setSettings(s => ({ ...s, deliveryPayer: payer }))
+    }, [isFree, openPlanUpgrade])
+
     async function reload() {
         setLoading(true)
         const res = await getPartnerDeliveryConfigAction(partnerId, storeId)
@@ -476,27 +484,32 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
 
                             {/* Mobile/Tablet - Quem paga a entrega como FormSection */}
                             <div className="lg:hidden">
-                                <FormSection title="Quem paga a entrega">
+                                <FormSection title={
+                                    <span className="inline-flex items-center gap-2">
+                                        Quem paga a entrega
+                                        {isFree && <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />}
+                                    </span>
+                                }>
                                     <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body -mt-4">Define se a taxa de entrega é repassada ao cliente ou absorvida pela loja</p>
                                     <div className="flex gap-2">
                                         <button
                                             type="button"
-                                            onClick={() => setSettings(s => ({ ...s, deliveryPayer: "customer" }))}
+                                            onClick={() => handlePayerSelect("customer")}
                                             className={`flex-1 px-3 py-2 text-sm font-bold rounded-lg border-2 transition-all ${settings.deliveryPayer === "customer"
                                                 ? "border-brand-dark dark:border-dark-heading bg-brand-dark/5 dark:bg-dark-border/30 text-brand-dark dark:text-dark-heading"
                                                 : "border-brand-border dark:border-dark-border text-brand-inactive-text dark:text-dark-body hover:border-brand-dark/30"
-                                                }`}
+                                                } ${isFree ? "opacity-50" : ""}`}
                                         >
                                             Cliente
                                             <div className="text-[10px] font-normal opacity-70 mt-0.5">Repassa ao cliente</div>
                                         </button>
                                         <button
                                             type="button"
-                                            onClick={() => setSettings(s => ({ ...s, deliveryPayer: "seller" }))}
+                                            onClick={() => handlePayerSelect("seller")}
                                             className={`flex-1 px-3 py-2 text-sm font-bold rounded-lg border-2 transition-all ${settings.deliveryPayer === "seller"
                                                 ? "border-brand-dark dark:border-dark-heading bg-brand-dark/5 dark:bg-dark-border/30 text-brand-dark dark:text-dark-heading"
                                                 : "border-brand-border dark:border-dark-border text-brand-inactive-text dark:text-dark-body hover:border-brand-dark/30"
-                                                }`}
+                                                } ${isFree ? "opacity-50" : ""}`}
                                         >
                                             Vendedor
                                             <div className="text-[10px] font-normal opacity-70 mt-0.5">Subsídio da loja</div>
@@ -510,27 +523,30 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
                         <div className="hidden lg:block col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border space-y-6">
                             <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden">
                                 <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />
-                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4 mt-2">Quem paga a entrega</h3>
+                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4 mt-2 inline-flex items-center gap-2">
+                                        Quem paga a entrega
+                                        {isFree && <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />}
+                                    </h3>
                                 <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed mb-4">Define se a taxa de entrega é repassada ao cliente ou absorvida pela loja</p>
                                 <div className="flex gap-2">
                                     <button
                                         type="button"
-                                        onClick={() => setSettings(s => ({ ...s, deliveryPayer: "customer" }))}
+                                        onClick={() => handlePayerSelect("customer")}
                                         className={`flex-1 px-3 py-2 text-sm font-bold rounded-lg border-2 transition-all ${settings.deliveryPayer === "customer"
                                             ? "border-brand-dark dark:border-dark-heading bg-brand-dark/5 dark:bg-dark-border/30 text-brand-dark dark:text-dark-heading"
                                             : "border-brand-border dark:border-dark-border text-brand-inactive-text dark:text-dark-body hover:border-brand-dark/30"
-                                            }`}
+                                            } ${isFree ? "opacity-50" : ""}`}
                                     >
                                         Cliente
                                         <div className="text-[10px] font-normal opacity-70 mt-0.5">Repassa ao cliente</div>
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => setSettings(s => ({ ...s, deliveryPayer: "seller" }))}
+                                        onClick={() => handlePayerSelect("seller")}
                                         className={`flex-1 px-3 py-2 text-sm font-bold rounded-lg border-2 transition-all ${settings.deliveryPayer === "seller"
                                             ? "border-brand-dark dark:border-dark-heading bg-brand-dark/5 dark:bg-dark-border/30 text-brand-dark dark:text-dark-heading"
                                             : "border-brand-border dark:border-dark-border text-brand-inactive-text dark:text-dark-body hover:border-brand-dark/30"
-                                            }`}
+                                            } ${isFree ? "opacity-50" : ""}`}
                                     >
                                         Vendedor
                                         <div className="text-[10px] font-normal opacity-70 mt-0.5">Subsídio da loja</div>

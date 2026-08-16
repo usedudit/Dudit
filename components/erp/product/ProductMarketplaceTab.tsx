@@ -2,13 +2,18 @@
 
 import React, { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Input, FormDropdown, RichTextEditor, TagsInput, Button, Accordion, IconPlaceholder, FormSection } from "@/components/reusable"
-import { TrashIcon, PlusIcon, Package, ArrowUpDownIcon, EditIcon, CheckCircleIcon } from "@/lib/icons"
+import { Input, FormDropdown, RichTextEditor, TagsInput, Button, Accordion, IconPlaceholder, FormSection, Badge } from "@/components/reusable"
+import { TrashIcon, PlusIcon, Package, ArrowUpDownIcon, EditIcon, CheckCircleIcon, ChevronDownIcon } from "@/lib/icons"
 import MarketplaceCategoryModal from "./MarketplaceCategoryModal"
 import { getCategoryPathClient } from "@/lib/data/marketplace-categories-client"
 import ProductVideoSection from "./ProductVideoSection"
-import { FulfillmentModesEditor } from "@/components/erp/shared/FulfillmentModesEditor"
-import type { FulfillmentMode } from "@/lib/commerce/capabilities"
+
+const SidebarCard = ({ children, className = "", hasTopStrip = false }: { children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
+    <div className={`bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
+        {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
+        {children}
+    </div>
+)
 
 interface ProductMarketplaceTabProps {
     productData: any
@@ -32,6 +37,7 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
     // --- Estados da Categoria Oficial ---
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
     const [categoryPath, setCategoryPath] = useState("")
+    const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
 
     // --- Carregar Caminho da Categoria (Ex: Casa > Decoração) ---
     useEffect(() => {
@@ -58,13 +64,12 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
     }
 
     // --- Helpers de Arrays (Segurança) ---
-    // --- Helpers de Arrays (Segurança) ---
     const attributes = Array.isArray(productData?.attributes) ? productData.attributes : []
     const tags = Array.isArray(productData?.tags) ? productData.tags : []
 
     // --- Lógica dos Atributos ---
     const addAttribute = () => {
-        if (attributes.length >= 25) return;
+        if (attributes.length >= 25) return
         const newAttributes = [...attributes, { id: Date.now(), name: "", value: "" }]
         manualChange("attributes", newAttributes)
     }
@@ -83,13 +88,167 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
 
     const isDigital = productData?.productType === "Digital"
 
+    // ─── MODO DETALHES (READ-ONLY) ───────────────────────────────────────────
+    if (!isEditing) {
+        return (
+            <div className="grid grid-cols-12 gap-y-8 md:gap-y-0 animate-fade-in">
+                {/* --- COLUNA ESQUERDA (Principal) --- */}
+                <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
+                    {/* Descrição */}
+                    <FormSection title="Descrição">
+                        <div className={`relative ${!isDescriptionExpanded ? "max-h-[160px] overflow-hidden" : ""}`}>
+                            {productData?.description ? (
+                                <div
+                                    className="rich-text-content text-sm md:text-base text-brand-dark dark:text-dark-heading leading-relaxed"
+                                    dangerouslySetInnerHTML={{ __html: productData.description }}
+                                />
+                            ) : (
+                                <p className="text-sm text-brand-inactive-text dark:text-dark-body">Sem descrição cadastrada.</p>
+                            )}
+                            {!isDescriptionExpanded && (productData?.description?.length || 0) > 250 && (
+                                <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-white dark:from-dark-surface to-transparent pointer-events-none" />
+                            )}
+                        </div>
+                        {(productData?.description?.length || 0) > 250 && (
+                            <button
+                                type="button"
+                                onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+                                className="flex items-center gap-1 text-brand-primary dark:text-brand-primary font-bold text-sm mt-3 hover:underline cursor-pointer"
+                            >
+                                {isDescriptionExpanded ? "Ver menos descrição" : "Ver mais descrição"}
+                                <ChevronDownIcon size={16} className={`transition-transform duration-200 ${isDescriptionExpanded ? "rotate-180" : ""}`} />
+                            </button>
+                        )}
+                    </FormSection>
+
+                    {/* Especificações */}
+                    <FormSection hasSeparator title="Especificações">
+                        {attributes.length > 0 ? (
+                            <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden shadow-xs">
+                                {attributes.map((spec: any, i: number) => (
+                                    <div
+                                        key={i}
+                                        className={`flex justify-between items-center px-5 py-3.5 ${
+                                            i % 2 === 0
+                                                ? "bg-brand-gray dark:bg-dark-border/30"
+                                                : "bg-white dark:bg-dark-surface"
+                                        } ${i < attributes.length - 1 ? "border-b border-brand-border dark:border-dark-border" : ""}`}
+                                    >
+                                        <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
+                                            {spec.name || spec.label || ""}
+                                        </span>
+                                        <span className="text-sm text-brand-dark dark:text-dark-heading font-semibold text-right">
+                                            {spec.value || ""}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">Nenhuma especificação cadastrada.</p>
+                        )}
+                    </FormSection>
+
+                    {/* Vídeo */}
+                    <FormSection hasSeparator title="Vídeo">
+                        <ProductVideoSection
+                            itemType="product"
+                            itemId={itemId}
+                            video={video}
+                            onChange={onVideoChange}
+                            isEditing={false}
+                            videoPlanBlocked={videoPlanBlocked}
+                        />
+                    </FormSection>
+                </div>
+
+                {/* --- COLUNA DIREITA (Sidebar) --- */}
+                <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
+                    <SidebarCard hasTopStrip>
+                        <h3 className="text-lg font-bold mb-6 mt-2 text-brand-dark dark:text-dark-heading">Configurações</h3>
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
+                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Destacar Produto</span>
+                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                    {productData?.is_highlighted ? "Sim" : "Não"}
+                                </span>
+                            </div>
+                            <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
+                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Tipo de Produto</span>
+                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                    {productData?.productType || "Físico"}
+                                </span>
+                            </div>
+                            {isDigital ? (
+                                <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
+                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body">Formato de Entrega</span>
+                                    <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                        {productData?.digital_format || "Download"}
+                                    </span>
+                                </div>
+                            ) : (
+                                <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
+                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body">Condição</span>
+                                    <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                        {productData?.condicao || productData?.condition || "Novo"}
+                                    </span>
+                                </div>
+                            )}
+                            <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
+                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Disponibilidade</span>
+                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                    {productData?.availability_value ? `${productData.availability_value} ${productData.availability_unit || "Dias"}` : "Imediata"}
+                                </span>
+                            </div>
+                            <div className="flex justify-between items-center py-2">
+                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Garantia</span>
+                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                    {productData?.warranty_value ? `${productData.warranty_value} ${productData.warranty_period || "Meses"}` : "Sem garantia"}
+                                </span>
+                            </div>
+                        </div>
+                    </SidebarCard>
+
+                    <SidebarCard>
+                        <div className="flex items-center justify-between mb-3">
+                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
+                                <Package className="w-5 h-5 text-brand-green" />
+                                Categoria Oficial
+                            </h3>
+                            {categoryPath && (
+                                <span className="text-xs font-medium bg-green-100 text-green-800 dark:bg-green-950/50 dark:text-green-300 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                    <CheckCircleIcon className="w-3 h-3" /> Categorizado
+                                </span>
+                            )}
+                        </div>
+                        <p className="text-sm text-brand-dark dark:text-dark-heading font-medium">
+                            {categoryPath || "Nenhuma categoria oficial selecionada."}
+                        </p>
+                    </SidebarCard>
+
+                    <SidebarCard>
+                        <h3 className="text-lg font-bold mb-3 text-brand-dark dark:text-dark-heading">Palavras-chave de busca</h3>
+                        {tags && tags.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                                {tags.map((tag: string, i: number) => (
+                                    <Badge key={i} variant="gray" icon={null} className="px-3 py-1 text-xs font-medium">
+                                        {tag}
+                                    </Badge>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">Nenhuma tag cadastrada.</p>
+                        )}
+                    </SidebarCard>
+                </div>
+            </div>
+        )
+    }
+
+    // ─── MODO EDIÇÃO / CRIAÇÃO ────────────────────────────────────────────────
     return (
         <div className="grid grid-cols-12 gap-y-8 md:gap-y-0 animate-fade-in">
-
             {/* --- COLUNA ESQUERDA (Principal) --- */}
             <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
-
-                {/* Dados Básicos (Movido para o topo da esquerda) */}
                 <FormSection title="Dados básicos">
                     <div className="space-y-6">
                         <RichTextEditor
@@ -100,18 +259,6 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                         />
                     </div>
                 </FormSection>
-
-                {/*
-                    {!isDigital && (
-                        <FulfillmentModesEditor
-                            label="Formas de entrega (vitrine)"
-                            allowedModes={["delivery", "pickup"]}
-                            value={(productData?.fulfillment_modes || ["delivery", "pickup"]) as FulfillmentMode[]}
-                            onChange={(modes) => manualChange("fulfillment_modes", modes)}
-                            disabled={!isEditing}
-                        />
-                    )}
-                </FormSection> */}
 
                 {/* --- FICHA TÉCNICA (ATRIBUTOS) --- */}
                 <div className="mt-8 mb-8">
@@ -395,8 +542,7 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                 {/* --- DESKTOP (>= lg): CARDS NA SIDEBAR --- */}
                 <div className="hidden lg:block">
                     {/* Card de Configurações */}
-                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
-                        <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>
+                    <SidebarCard hasTopStrip>
                         <h3 className="text-lg font-bold mb-6 mt-2 text-brand-dark dark:text-dark-heading">Configurações</h3>
 
                         <div className="space-y-5">
@@ -503,10 +649,10 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                                 />
                             </div>
                         </div>
-                    </div>
+                    </SidebarCard>
 
                     {/* Card de Categoria Oficial */}
-                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border shadow-sm mb-6">
+                    <SidebarCard>
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
                                 <Package className="w-5 h-5 text-brand-green" />
@@ -545,10 +691,10 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                                 {categoryPath ? <EditIcon className="w-4 h-4" /> : <PlusIcon className="w-5 h-5" />}
                             </div>
                         </div>
-                    </div>
+                    </SidebarCard>
 
                     {/* Card de Tags */}
-                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
+                    <SidebarCard>
                         <h3 className="text-lg font-bold mb-2 text-brand-dark dark:text-dark-heading">Palavras-chave de busca</h3>
                         <p className="text-sm text-brand-inactive-text mb-4">
                             Adicione termos relacionados para ajudar clientes a encontrarem este produto no marketplace.
@@ -559,7 +705,7 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                             disabled={!isEditing}
                             placeholder="Adicionar tag..."
                         />
-                    </div>
+                    </SidebarCard>
                 </div>
 
                 <MarketplaceCategoryModal
@@ -568,6 +714,6 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                     onSelect={handleCategorySelect}
                 />
             </div>
-        </div >
+        </div>
     )
 }

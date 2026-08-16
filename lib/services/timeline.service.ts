@@ -7,7 +7,7 @@ import { TAGS } from "@/lib/utils/revalidation-tags"
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-export type ActionType = 
+export type ActionType =
   | "created" | "updated" | "deleted" | "paid" | "received" | "cancelled"
   | "refunded" | "installment_paid" | "settled" | "recurring_created"
   | "recurring_updated" | "recurring_cancelled" | "cash_opened"
@@ -41,20 +41,6 @@ export interface UserTimelineEntry {
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
-const DEFAULT_ACTION_MESSAGES: Record<string, string> = {
-  created: "criou o registro.",
-  updated: "atualizou informações.",
-  paid: "marcou como pago.",
-  received: "marcou como recebido.",
-  cancelled: "cancelou.",
-  refunded: "realizou reembolso.",
-  settled: "quitou valores pendentes.",
-  opened: "abriu.",
-  closed: "fechou.",
-  movement: "registrou movimentação.",
-  default: "realizou uma ação."
-}
-
 const DEFAULT_TIMELINE_LIMIT = 30
 const MAX_TIMELINE_LIMIT = 100
 
@@ -68,10 +54,9 @@ interface LogAuditEventInput {
   actionType: ActionType | string
   changeLines: string[]
   metadata?: Record<string, unknown> | null
-  source?: "system" | "webhook" | "manual" | "marketplace" | "erp"
+  source?: "system" | "webhook" | "manual" | "marketplace" | "erp" | "user"
   storeId?: string | null
   storeName?: string | null
-  partnerName?: string | null
   actorName?: string | null
   actorEmail?: string | null
 }
@@ -121,13 +106,35 @@ function resolveDefaultLine(actionType: string): string {
  */
 export async function logAuditEvent(input: LogAuditEventInput): Promise<void> {
   try {
-    const supabase = getAdminClient()
-
     // Normalize actionType to snake_case (never allow dots)
     const actionType = String(input.actionType || "unknown")
       .toLowerCase()
       .replace(/\./g, "_")
       .replace(/[^a-z0-9_]/g, "")
+
+    const isCriticalPlatformAction =
+      actionType.includes("subscription_") ||
+      actionType.includes("billing_") ||
+      actionType.includes("plan_") ||
+      actionType.includes("upgrade") ||
+      actionType.includes("downgrade") ||
+      ["billing", "subscription", "admin"].includes(String(input.entityType || "").toLowerCase())
+
+    // Skip routine audit logging for partners on the Free plan
+    if (input.partnerId && !isCriticalPlatformAction) {
+      try {
+        const { getPartnerPlan } = await import("@/lib/services/subscription.service")
+        const { hasMinimumPlan } = await import("@/lib/subscription/plan-tier")
+        const plan = await getPartnerPlan(input.partnerId)
+        if (!hasMinimumPlan(plan?.slug || "free", "crescer")) {
+          return // Free plan partners do not store routine activity logs
+        }
+      } catch (planErr) {
+        console.warn("[timeline] Failed to resolve partner plan for audit log, proceeding:", planErr)
+      }
+    }
+
+    const supabase = getAdminClient()
 
     let changeLines = sanitizeChangeLines(input.changeLines || [])
     if (changeLines.every((l) => l.toLowerCase() === "nenhuma alteração relevante.")) {
@@ -173,12 +180,9 @@ export async function logAuditEvent(input: LogAuditEventInput): Promise<void> {
     }
 
     const legacyAction = actionType.toUpperCase()
-    const legacyTableName = String(input.entityType || "system").trim() || "system"
     const nowIso = new Date().toISOString()
 
     const fullPayload: Record<string, unknown> = {
-      // Legacy columns (required in older schemas)
-      table_name: legacyTableName,
       action: legacyAction,
       old_values: null,
       new_values: {
@@ -192,7 +196,6 @@ export async function logAuditEvent(input: LogAuditEventInput): Promise<void> {
         created_at: nowIso,
       },
       user_id: input.actorUserId || null,
-      // Timeline columns (new schema)
       partner_id: input.partnerId || null,
       actor_user_id: input.actorUserId || null,
       entity_type: input.entityType || null,
@@ -203,7 +206,6 @@ export async function logAuditEvent(input: LogAuditEventInput): Promise<void> {
       source: input.source || "system",
       store_id: input.storeId || null,
       store_name: input.storeName || null,
-      partner_name: input.partnerName || null,
       actor_name: input.actorName || null,
       actor_email: input.actorEmail || null,
     }
@@ -407,7 +409,7 @@ export function formatTimelineEntry(entry: UserTimelineEntry | AdminTimelineEntr
       dateStyle: "short",
       timeStyle: "short",
     }).format(new Date(entry.created_at))
-  } catch (e) {}
+  } catch (e) { }
 
   return {
     ...entry,
