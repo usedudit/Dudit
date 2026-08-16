@@ -160,7 +160,7 @@ function createEncryptedDumpStream(config: DatabaseBackupConfig, createdAt: Date
   const gzip = createGzip({ level: 9 })
   const child = spawn(
     config.pgDumpBinary,
-    ["--format=custom", "--no-owner", "--no-acl", "--no-password", "--file=-", "--dbname", safeConnectionString],
+    ["--format=custom", "--no-owner", "--no-acl", "--no-password", "--dbname", safeConnectionString],
     {
       env: {
         ...process.env,
