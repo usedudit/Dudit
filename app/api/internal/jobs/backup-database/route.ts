@@ -12,6 +12,18 @@ export const maxDuration = 3600
 const JOB_NAME = "backup-database"
 const LOCK_TTL_SECONDS = 60 * 60
 
+function sanitizeBackupError(error: unknown): string {
+  const raw = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+  const sanitized = raw
+    .replace(/(postgres(?:ql)?:\/\/)[^@\s]+@/gi, "$1[redacted]@")
+    .replace(/((?:password|secret|token|authorization|access[_-]?key)(?:["'\s:=]+))[^\s,}\]]+/gi, "$1[redacted]")
+    .replace(/\b[A-Za-z0-9+/]{40,}={0,2}\b/g, "[redacted]")
+    .replace(/\s+/g, " ")
+    .trim()
+
+  return (sanitized || "Unknown backup error").slice(0, 300)
+}
+
 export async function POST(req: Request) {
   const startedAt = Date.now()
   const authError = validateBackupCronRequest(req)
@@ -59,12 +71,13 @@ export async function POST(req: Request) {
   } catch (error) {
     const durationMs = Date.now() - startedAt
     const errorType = error instanceof Error ? error.name : "UnknownError"
-    cronLogger.error(JOB_NAME, "Database backup failed", { durationMs, errorType })
-    captureError(new Error("Database backup failed"), {
+    const errorMessage = sanitizeBackupError(error)
+    cronLogger.error(JOB_NAME, "Database backup failed", { durationMs, errorType, errorMessage })
+    captureError(new Error(errorMessage), {
       module: "database-backup",
       action: "run",
       route: "/api/internal/jobs/backup-database",
-      metadata: { duration_ms: durationMs, error_type: errorType },
+      metadata: { duration_ms: durationMs, error_type: errorType, error_message: errorMessage },
     })
     await flushMonitoring(3000)
     return NextResponse.json({ success: false, error: "Database backup failed" }, { status: 500 })
