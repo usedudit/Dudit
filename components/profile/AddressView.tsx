@@ -57,6 +57,7 @@ interface AddressViewProps {
 const emptyForm = {
     zipCode: "", street: "", number: "", complement: "",
     neighborhood: "", city: "", state: "", addressType: "casa", noNumber: false,
+    latitude: null as number | null, longitude: null as number | null,
 }
 
 export const AddressView = ({
@@ -86,6 +87,8 @@ export const AddressView = ({
             state: addr.state || "",
             addressType: addr.address_type || "casa",
             noNumber: isNoNumber,
+            latitude: addr.latitude ?? null,
+            longitude: addr.longitude ?? null,
         })
         setEditingId(addr.id)
     }
@@ -123,6 +126,8 @@ export const AddressView = ({
                     neighborhood, city, state,
                     isDefault: addresses.length === 0,
                     addressType,
+                    latitude: form.latitude ?? null,
+                    longitude: form.longitude ?? null,
                     csrf_token: token,
                 })
                 if (result.error) {
@@ -142,6 +147,8 @@ export const AddressView = ({
                     complement: form.complement,
                     neighborhood, city, state,
                     addressType,
+                    latitude: form.latitude ?? null,
+                    longitude: form.longitude ?? null,
                     csrf_token: token,
                 })
                 if (result.error) {
@@ -210,7 +217,7 @@ export const AddressView = ({
                         onClick={() => setForm(f => ({ ...f, addressType: opt.value }))}
                         className={`px-4 py-1.5 rounded-full text-[13px] font-medium border transition-all ${form.addressType === opt.value
                             ? "bg-brand-green text-white border-brand-green"
-                            : "bg-white text-brand-inactive-text border-gray-200 hover:border-gray-300"
+                            : "bg-white text-brand-inactive-text dark:bg-dark-surface dark:text-dark-body border-gray-200 dark:border-dark-border hover:border-gray-300 dark:hover:border-dark-border/60"
                             }`}
                     >
                         {opt.label}
@@ -231,6 +238,8 @@ export const AddressView = ({
                         neighborhood: addr.neighborhood || f.neighborhood,
                         city: addr.city || f.city,
                         state: addr.state || f.state,
+                        latitude: addr.latitude ?? f.latitude,
+                        longitude: addr.longitude ?? f.longitude,
                     }))
                 }}
             />
@@ -307,7 +316,7 @@ export const AddressView = ({
                                         trigger={
                                             <button
                                                 type="button"
-                                                className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-dark-border text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-dark-border text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
                                             >
                                                 <ThreeDotsIcon size={18} />
                                             </button>
@@ -319,12 +328,12 @@ export const AddressView = ({
                                     >
                                         {!addr.is_default && (
                                             <DropdownItem onClick={() => handleSetDefault(addr.id)}>
-                                                <CheckCircleIcon size={14} className="text-brand-inactive-text mr-1" />
+                                                <CheckCircleIcon size={14} className="text-brand-inactive-text dark:text-dark-body mr-1" />
                                                 Tornar padrão
                                             </DropdownItem>
                                         )}
                                         <DropdownItem onClick={() => startEdit(addr)}>
-                                            <EditIcon size={14} className="text-brand-inactive-text mr-1" />
+                                            <EditIcon size={14} className="text-brand-inactive-text dark:text-dark-body mr-1" />
                                             Editar
                                         </DropdownItem>
                                         <DropdownItem
@@ -340,7 +349,7 @@ export const AddressView = ({
 
                             {/* Body: Address Details and Map Image */}
                             <div className="flex items-start justify-between gap-4">
-                                <div className="flex-1 min-w-0 text-[13px] text-brand-inactive-text leading-relaxed">
+                                <div className="flex-1 min-w-0 text-[13px] text-brand-inactive-text dark:text-dark-body leading-relaxed">
                                     <p>
                                         {addr.street && addr.number ? `${addr.street}, ${addr.number}` : addr.street}
                                         {addr.complement && ` - ${addr.complement}`}

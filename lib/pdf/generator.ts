@@ -72,6 +72,8 @@ export async function generatePdf(url: string, nextCookies: any[]): Promise<Buff
                 "--disable-gpu",
                 "--font-render-hinting=none",
                 "--no-zygote",
+                "--ignore-certificate-errors",
+                "--allow-running-insecure-content",
             ],
             protocolTimeout: 60000,
         })) as unknown as Browser
@@ -120,26 +122,43 @@ export async function generatePdf(url: string, nextCookies: any[]): Promise<Buff
         browser = (await puppeteer.launch({
             executablePath,
             headless: true,
-            args: ["--no-sandbox", "--disable-setuid-sandbox"],
+            args: [
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--ignore-certificate-errors",
+                "--allow-running-insecure-content",
+            ],
         })) as unknown as Browser
     }
 
     try {
         const page = await browser.newPage()
         const urlObj = new URL(url)
-        const domain = urlObj.hostname
 
-        // Apply session cookies to authenticate the puppeteer browser request
-        const puppeteerCookies = nextCookies.map((cookie) => ({
-            name: cookie.name,
-            value: cookie.value,
-            domain: domain,
-            path: "/",
-            secure: urlObj.protocol === "https:",
-            httpOnly: true,
-        }))
+        // Forward raw Cookie header directly to ensure all requests made by Chromium include session authentication
+        if (Array.isArray(nextCookies) && nextCookies.length > 0) {
+            const cookieHeader = nextCookies.map((c) => `${c.name}=${c.value}`).join("; ")
+            if (cookieHeader) {
+                await page.setExtraHTTPHeaders({
+                    Cookie: cookieHeader,
+                })
+            }
 
-        await page.setCookie(...puppeteerCookies)
+            // Also set cookies explicitly for the target origin
+            const puppeteerCookies = nextCookies.map((cookie) => ({
+                name: cookie.name,
+                value: cookie.value,
+                url: urlObj.origin,
+                domain: urlObj.hostname,
+                path: "/",
+                secure: urlObj.protocol === "https:",
+                httpOnly: false,
+            }))
+
+            try {
+                await page.setCookie(...puppeteerCookies)
+            } catch { }
+        }
 
         // Standard A4 rendering dimensions (794px width at 96 DPI)
         await page.setViewport({
@@ -150,7 +169,7 @@ export async function generatePdf(url: string, nextCookies: any[]): Promise<Buff
 
         // Open internal print URL
         await page.goto(url, {
-            waitUntil: ["networkidle0", "load", "domcontentloaded"],
+            waitUntil: ["domcontentloaded", "networkidle2"],
             timeout: 30000,
         })
 

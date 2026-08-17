@@ -126,7 +126,7 @@ export function ReviewsView({ navigate }: ReviewsViewProps) {
                     <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
                         Minhas avaliações
                     </h1>
-                    <p className="text-md text-brand-inactive-text mt-1">
+                    <p className="text-md text-brand-inactive-text dark:text-dark-body mt-1">
                         Veja e gerencie as avaliações que você enviou para produtos e serviços.
                     </p>
                 </div>
@@ -213,7 +213,7 @@ export function ReviewsView({ navigate }: ReviewsViewProps) {
                                             </h4>
                                         )}
 
-                                        <p className="text-xs text-brand-inactive-text mt-0.5">
+                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
                                             Vendido por: <span className="font-semibold text-brand-dark dark:text-dark-heading">{review.partners?.stores?.[0]?.name || review.partners?.store_name || "Loja Parceira"}</span>
                                         </p>
 
@@ -241,7 +241,7 @@ export function ReviewsView({ navigate }: ReviewsViewProps) {
                                             </div>
                                         )}
 
-                                        <p className="text-[11px] text-brand-inactive-text mt-3">
+                                        <p className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-3">
                                             Avaliado em {formatFullDate(review.created_at)}
                                         </p>
                                     </div>
@@ -297,7 +297,7 @@ export function ReviewsView({ navigate }: ReviewsViewProps) {
                                 </button>
                             ))}
                         </div>
-                        <span className="text-sm font-medium text-brand-inactive-text">
+                        <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">
                             {editRating === 5 ? "Excelente!" : editRating === 4 ? "Muito bom" : editRating === 3 ? "Bom" : editRating === 2 ? "Regular" : "Ruim"}
                         </span>
                     </div>

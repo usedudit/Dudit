@@ -33,6 +33,7 @@ import { updatePartnerAction } from "@/app/actions/marketplace/partners"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { PromotionType, DiscountType } from "@/lib/types/promotion"
 import { sortByVendorRelevance } from "@/lib/marketplace/ranking"
+import { buildVendorLocationPopupHtml } from "@/lib/map/mapbox-popup"
 
 interface VendorPageClientProps {
     partner: any
@@ -285,9 +286,25 @@ const MapboxMap = ({ lat, lng, name, address, isActive }: { lat?: number; lng?: 
                     setMapError(e?.error?.message || e?.message || "Falha ao carregar o mapa.")
                 })
                 mapRef.current = map
-                const marker = new mapboxgl.Marker({ color: "#059669" }).setLngLat([lng, lat]).addTo(mapRef.current)
+
+                // Custom styled pin
+                const el = document.createElement("div")
+                el.className = "flex items-center justify-center rounded-full w-8 h-8 bg-brand-green text-white shadow-sm border-2 border-white dark:border-dark-surface cursor-pointer"
+                el.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/></svg>
+                `
+
+                const marker = new mapboxgl.Marker({ element: el, anchor: "center" }).setLngLat([lng, lat]).addTo(mapRef.current)
                 if (name || address) {
-                    marker.setPopup(new mapboxgl.Popup({ offset: 35, closeButton: false }).setHTML(`<div style="padding:4px;font-family:system-ui,sans-serif"><strong>${name}</strong><p style="margin:2px 0 0;font-size:12px;color:#4B5563">${address || ""}</p></div>`))
+                    marker.setPopup(
+                        new mapboxgl.Popup({ offset: 20, closeButton: true, maxWidth: "270px" })
+                            .setHTML(buildVendorLocationPopupHtml({
+                                name: name || "Loja Parceira",
+                                address: address || "",
+                                latitude: Number(lat),
+                                longitude: Number(lng),
+                            }))
+                    )
                 }
             } catch {
                 setIsMapping(false)

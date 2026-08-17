@@ -18,6 +18,7 @@ import {
 import { applyQuotePreviewTheme } from "@/lib/quotes/quote-preview-theme"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { downloadPdf } from "@/lib/pdf/download"
+import { toast } from "@/hooks/use-notification"
 import SaleReceiptThermalPreview from "./SaleReceiptThermalPreview"
 import SaleReceiptA4Preview from "./SaleReceiptA4Preview"
 
@@ -39,6 +40,7 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, orderId }: Sale
     const [showAcknowledgment, setShowAcknowledgment] = useState(true)
     const [data, setData] = useState<SaleReceiptData | null>(null)
     const [loading, setLoading] = useState(false)
+    const [isDownloading, setIsDownloading] = useState(false)
 
     useEffect(() => {
         if (isOpen) {
@@ -116,6 +118,25 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, orderId }: Sale
         return () => { cancelled = true }
     }, [isOpen, orderId, selectedStore?.partner_id, selectedStore?.logo_url, selectedStore?.image_url])
 
+    const handleDownloadPdf = useCallback(async () => {
+        if (!orderId || isDownloading) return
+        setIsDownloading(true)
+        const params = new URLSearchParams({
+            format,
+            footerMessage,
+            showAcknowledgment: String(showAcknowledgment),
+        })
+        try {
+            await downloadPdf(`/api/pdf/recibo/${orderId}?${params.toString()}`, `recibo-${orderId}.pdf`)
+            onClose()
+        } catch (error: any) {
+            console.error("[SaleReceiptPrintModal] Error downloading PDF:", error)
+            toast.error("Erro ao gerar PDF", error?.message || "Não foi possível gerar o PDF. Tente novamente.")
+        } finally {
+            setIsDownloading(false)
+        }
+    }, [orderId, format, footerMessage, showAcknowledgment, isDownloading, onClose])
+
     const handlePrint = useCallback(() => {
         if (!orderId) return
         const params = new URLSearchParams({
@@ -124,28 +145,12 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, orderId }: Sale
             showAcknowledgment: String(showAcknowledgment),
         })
         if (isMobile) {
-            downloadPdf(`/api/pdf/recibo/${orderId}?${params.toString()}`, `recibo-${orderId}.pdf`)
-                .catch(() => window.open(`/print/recibo/${orderId}?${params.toString()}`, "_blank"))
-            onClose()
+            handleDownloadPdf()
             return
         }
         window.open(`/print/recibo/${orderId}?${params.toString()}`, "_blank")
         onClose()
-    }, [orderId, format, footerMessage, showAcknowledgment, onClose, isMobile])
-
-    const handleDownloadPdf = useCallback(() => {
-        if (!orderId) return
-        const params = new URLSearchParams({
-            format,
-            footerMessage,
-            showAcknowledgment: String(showAcknowledgment),
-        })
-        downloadPdf(`/api/pdf/recibo/${orderId}?${params.toString()}`, `recibo-${orderId}.pdf`)
-            .catch(() => {
-                window.open(`/print/recibo/${orderId}?${params.toString()}`, "_blank")
-            })
-        onClose()
-    }, [orderId, format, footerMessage, showAcknowledgment, onClose])
+    }, [orderId, format, footerMessage, showAcknowledgment, onClose, isMobile, handleDownloadPdf])
 
     const formatOptions = useMemo(
         () => [
@@ -257,8 +262,14 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, orderId }: Sale
                                         <Button className="flex-1 h-12" onClick={handlePrint} leftIcon={<PrinterIcon size={18} />}>
                                             Imprimir
                                         </Button>
-                                        <Button variant="outline" className="flex-1 h-12" onClick={handleDownloadPdf} leftIcon={<DownloadIcon size={18} />}>
-                                            {format === "a4" ? "Salvar PDF" : "Salvar PDF"}
+                                        <Button
+                                            variant="outline"
+                                            className="flex-1 h-12"
+                                            onClick={handleDownloadPdf}
+                                            disabled={isDownloading}
+                                            leftIcon={<DownloadIcon size={18} />}
+                                        >
+                                            {isDownloading ? "Gerando PDF..." : "Salvar PDF"}
                                         </Button>
                                     </div>
                                 </div>
@@ -268,8 +279,14 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, orderId }: Sale
                                     <Button className="flex-1 h-12" onClick={handlePrint} leftIcon={<PrinterIcon size={18} />}>
                                         Imprimir
                                     </Button>
-                                    <Button variant="outline" className="flex-1 h-12" onClick={handleDownloadPdf} leftIcon={<DownloadIcon size={18} />}>
-                                        PDF
+                                    <Button
+                                        variant="outline"
+                                        className="flex-1 h-12"
+                                        onClick={handleDownloadPdf}
+                                        disabled={isDownloading}
+                                        leftIcon={<DownloadIcon size={18} />}
+                                    >
+                                        {isDownloading ? "Gerando..." : "PDF"}
                                     </Button>
                                 </div>
                             </div>

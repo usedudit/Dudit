@@ -19,6 +19,7 @@ import {
     ThreeDotsLoader,
     InfoCard,
     CustomerCard,
+    CustomerMobileBar,
     Tabs,
     TabsContent,
     TabsList,
@@ -43,7 +44,6 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 import { useStore } from "@/lib/store-context"
 import { parseAddressString } from "./CreateOrder"
-import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import BottomSheet from "@/components/BottomSheet"
 import SaleReceiptPrintModal from "@/components/erp/orders/receipt/SaleReceiptPrintModal"
 import { getOrderFinancialBreakdownAction } from "@/app/actions/erp/order-financial-breakdown"
@@ -195,7 +195,6 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const [historyLoading, setHistoryLoading] = useState(false)
     const [historyLoaded, setHistoryLoaded] = useState(false)
     const [deliverySummary, setDeliverySummary] = useState<any | null>(null)
-    const [isCustomerSheetOpen, setIsCustomerSheetOpen] = useState(false)
     const [isStepsSheetOpen, setIsStepsSheetOpen] = useState(false)
     const [printModalOrderId, setPrintModalOrderId] = useState<string | null>(null)
     const [showFinancialBreakdown, setShowFinancialBreakdown] = useState(false)
@@ -720,7 +719,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                 <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
 
                                     {/* Back button - desktop only */}
-                                    <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                                    <div className={`absolute -left-12 top-7 h-full hidden lg:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
                                         <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
                                             <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                         </Button>
@@ -776,8 +775,8 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                     <TabsContent value="summary" className="mt-0">
                                         <FadeIn key="summary">
                                             {/* Desktop View */}
-                                            <div className="hidden xl:grid grid-cols-12 gap-y-8 md:gap-y-0 relative">
-                                                <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
+                                            <div className="hidden lg:grid grid-cols-12 gap-y-8 md:gap-y-0 relative">
+                                                <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
                                                     <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden mb-8">
                                                         <div className="bg-brand-gray dark:bg-dark-border/50 p-6 border-b border-brand-border dark:border-dark-border">
                                                             <div className="flex justify-between items-center">
@@ -837,7 +836,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                         </div>
                                                     </div>
 
-                                                    <FormSection title="Itens do Pedido" hasSeparator className="mb-8">
+                                                    <FormSection title="Itens do Pedido" hasSeparator>
                                                         <div className="space-y-4">
                                                             {paginatedItems.map((item: any) => {
                                                                 const isService = !!item.service_id || item.line_type === "service_booking" || item.line_type === "service" || Boolean(item.services) || item.products?.type === "service" || (!item.product_id && !item.variant_id);
@@ -1170,7 +1169,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                     )}
                                                 </div>
 
-                                                <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
+                                                <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 space-y-6 border-0 lg:border-l border-brand-border dark:border-dark-border">
                                                     {hasPendingPayment && (
                                                         <InfoCard
                                                             title="Valor ainda em aberto"
@@ -1285,9 +1284,9 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                             </div>
 
                                             {/* Mobile/Tablet View */}
-                                            <div className="xl:hidden space-y-6">
+                                            <div className="lg:hidden space-y-6">
                                                 {/* 1. Steps (Timeline) */}
-                                                <FormSection title="" hasSeparator={false} className="mt-0">
+                                                <FormSection title="" className="mt-0">
                                                     {(() => {
                                                         const activeSteps = timelineSteps.filter(s => s.active);
                                                         const currentStep = activeSteps[activeSteps.length - 1] || timelineSteps[0];
@@ -1316,7 +1315,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
                                                 {/* 2. Observação */}
                                                 {(cleanNotes || cancelNote) && (
-                                                    <FormSection title="" hasSeparator={false} className="mt-0">
+                                                    <FormSection title="" className="mt-0">
                                                         <InfoCard
                                                             title="Observações do Pedido"
                                                             message={[cleanNotes, cancelNote].filter(Boolean).join("\n")}
@@ -1328,27 +1327,16 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                 {(() => {
                                                     const customerObj = order.customers || (order.customer_name ? { name: order.customer_name, email: order.buyer_email || null, phone: null } : null);
                                                     return customerObj ? (
-                                                        <FormSection title="" hasSeparator={false} className="mt-0">
-                                                            <ListItem
-                                                                left={
-                                                                    <UserProfileImage
-                                                                        fullName={customerObj.name || "Cliente"}
-                                                                        imageUrl={customerObj.image_url || customerObj.avatar_url || customerObj.avatar}
-                                                                        className="w-10 h-10 text-base"
-                                                                    />
-                                                                }
-                                                                title={customerObj.name || "Consumidor Final"}
-                                                                description={customerObj.email || "Sem e-mail cadastrado"}
-                                                                className="border-0 bg-transparent px-0 hover:bg-transparent"
-                                                                showChevron={true}
-                                                                onClick={() => setIsCustomerSheetOpen(true)}
-                                                            />
-                                                        </FormSection>
+                                                        <CustomerMobileBar
+                                                            customer={customerObj}
+                                                            address={order.customers?.addresses?.find((a: any) => a.address_type === "primary" || a.is_default) || order.customers?.addresses?.[0] || (order.delivery_address ? parseAddressString(order.delivery_address) : null)}
+                                                            billingAddress={order.customers?.addresses?.find((a: any) => a.address_type === "billing")}
+                                                        />
                                                     ) : null;
                                                 })()}
 
                                                 {/* 4. Itens do Pedido */}
-                                                <FormSection title="Itens do Pedido" hasSeparator={false} className="mb-8">
+                                                <FormSection title="Itens do Pedido" className="mb-8">
                                                     <div className="space-y-4">
                                                         {paginatedItems.map((item: any) => {
                                                             const isService = !!item.service_id || item.line_type === "service_booking" || item.line_type === "service" || Boolean(item.services) || item.products?.type === "service" || (!item.product_id && !item.variant_id);
@@ -1471,7 +1459,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                             {financialLoading ? "Carregando..." : showFinancialBreakdown ? "Ocultar lucro líquido" : "Ver lucro líquido"}
                                                         </button>
                                                     }
-                                                    hasSeparator={true} className="mt-0">
+                                                    hasSeparator className="mt-0">
                                                     <div className="space-y-3">
                                                         <PaymentRow
                                                             label="Método de Pagamento"
@@ -1649,21 +1637,6 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                     </Button>}
                 />
             </div>
-
-            <BottomSheet
-                isOpen={isCustomerSheetOpen}
-                onClose={() => setIsCustomerSheetOpen(false)}
-                title="Detalhes do Cliente"
-            >
-                <div className="pt-2">
-                    <CustomerCard
-                        chrome="minimal"
-                        customer={order.customers || (order.customer_name ? { name: order.customer_name, email: order.buyer_email || null, phone: null } : null)}
-                        address={order.customers?.addresses?.find((a: any) => a.address_type === "primary" || a.is_default) || order.customers?.addresses?.[0] || (order.delivery_address ? parseAddressString(order.delivery_address) : null)}
-                        billingAddress={order.customers?.addresses?.find((a: any) => a.address_type === "billing")}
-                    />
-                </div>
-            </BottomSheet>
 
             <BottomSheet
                 isOpen={isStepsSheetOpen}

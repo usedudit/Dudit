@@ -114,6 +114,8 @@ export async function createAddressAction(data: {
   municipioCodigoIbge?: string
   addressType?: string
   isDefault?: boolean
+  latitude?: number | null
+  longitude?: number | null
   csrf_token?: string
 }) {
   await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -145,8 +147,8 @@ export async function createAddressAction(data: {
     address_type: data.addressType || "primary",
     is_default: data.isDefault || false,
     municipio_codigo_ibge: data.municipioCodigoIbge || (data as any).ibge || null,
-    latitude: (data as any).latitude ?? null,
-    longitude: (data as any).longitude ?? null,
+    latitude: data.latitude ?? null,
+    longitude: data.longitude ?? null,
   }
 
   const insertData: any = await enrichAddressData(baseData)
@@ -231,6 +233,8 @@ export async function updateAddressAction(data: {
   country?: string
   addressType?: string
   isDefault?: boolean
+  latitude?: number | null
+  longitude?: number | null
   csrf_token?: string
 }) {
   await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -261,7 +265,8 @@ export async function updateAddressAction(data: {
     state: data.state ?? existingAddress?.state,
     country: data.country ?? existingAddress?.country ?? "BR",
     municipio_codigo_ibge: (data as any).municipioCodigoIbge ?? (data as any).ibge ?? existingAddress?.municipio_codigo_ibge,
-    latitude: (data as any).latitude ?? existingAddress?.latitude,
+    latitude: data.latitude ?? existingAddress?.latitude,
+    longitude: data.longitude ?? existingAddress?.longitude,
   }
 
   const enriched = await enrichAddressData(combinedPayload)

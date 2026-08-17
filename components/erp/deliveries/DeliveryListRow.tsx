@@ -12,6 +12,7 @@ interface DeliveryListItemProps {
   delivery: any
   columns: Array<{ id: string; align?: "left" | "center" | "right" }>
   onDetails: (delivery: any) => void
+  onEdit?: (delivery: any) => void
   onQuickStatusChange?: (deliveryId: string, status: string) => void
 }
 
@@ -27,8 +28,9 @@ function getJustifyClass(align?: string) {
   return "justify-start"
 }
 
-const DeliveryListItem = React.memo(({ delivery, columns, onDetails, onQuickStatusChange }: DeliveryListItemProps) => {
+const DeliveryListItem = React.memo(({ delivery, columns, onDetails, onEdit, onQuickStatusChange }: DeliveryListItemProps) => {
   const statusMeta = getDeliveryStatusMeta(delivery.status)
+  const canEdit = ["pending", "not_sent", "preparing"].includes(delivery.status)
 
   const renderCell = (id: string) => {
     switch (id) {
@@ -76,7 +78,12 @@ const DeliveryListItem = React.memo(({ delivery, columns, onDetails, onQuickStat
       case "actions":
         return (
           <div className="flex justify-center action-btn" onClick={(e) => e.stopPropagation()}>
-            <ActionsDropdown onEdit={() => onDetails(delivery)}>
+            <ActionsDropdown
+              onView={() => onDetails(delivery)}
+              onEdit={canEdit && onEdit ? () => onEdit(delivery) : undefined}
+              onCancel={delivery.status !== "cancelled" ? () => onQuickStatusChange?.(delivery.id, "cancelled") : undefined}
+              cancelLabel="Cancelar entrega"
+            >
               <DropdownItem onClick={() => onQuickStatusChange?.(delivery.id, delivery.status)}>Alterar Status de Entrega</DropdownItem>
             </ActionsDropdown>
           </div>

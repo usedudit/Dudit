@@ -5,7 +5,7 @@ import { Input } from "../Input"
 
 type EmailInputProps = React.ComponentProps<typeof Input>
 
-const EMAIL_PATTERN = "[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}"
+const EMAIL_PATTERN = "[a-z0-9._%+\\-]+@[a-z0-9.\\-]+\\.[a-z]{2,}"
 const EMAIL_ERROR_MESSAGE = "Informe um e-mail valido, como nome@exemplo.com."
 
 export function EmailInput({ onChange, value, ...props }: EmailInputProps) {

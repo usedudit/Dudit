@@ -1486,6 +1486,8 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
             neighborhood: string
             city: string
             state: string
+            latitude?: number | null
+            longitude?: number | null
         }
     }) => {
         const result = await createPOSCustomerAddressAction({

@@ -10,6 +10,7 @@ import { getReturnRequestDetailsAction } from "@/app/actions/erp/returns"
 import { getPartnerReceiptHeaderAction } from "@/app/actions/erp/receipt"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { downloadPdf } from "@/lib/pdf/download"
+import { toast } from "@/hooks/use-notification"
 import type { SaleReceiptPartnerHeader } from "@/lib/sales/sale-receipt"
 import ReturnReceiptThermalPreview from "./ReturnReceiptThermalPreview"
 import ReturnReceiptA4Preview from "./ReturnReceiptA4Preview"
@@ -32,6 +33,7 @@ export default function ReturnPrintModal({ isOpen, onClose, returnId, partnerId,
     const [isAnimating, setIsAnimating] = useState(false)
     const [activeTab, setActiveTab] = useState("Opções")
     const [format, setFormat] = useState<Format>("thermal")
+    const [isDownloading, setIsDownloading] = useState(false)
     const [returnRequest, setReturnRequest] = useState<any>(null)
     const [partnerHeader, setPartnerHeader] = useState<SaleReceiptPartnerHeader>({
         fantasyName: "",
@@ -85,26 +87,29 @@ export default function ReturnPrintModal({ isOpen, onClose, returnId, partnerId,
 
     const handlePrint = useCallback(() => {
         if (!returnId) return
-        const params = new URLSearchParams({ format })
         if (isMobile) {
-            downloadPdf(`/api/pdf/troca/${returnId}?${params.toString()}`, `troca-${returnId}.pdf`)
-                .catch(() => window.open(`/print/troca/${returnId}?${params.toString()}`, "_blank"))
-            onClose()
+            handleDownloadPdf()
             return
         }
+        const params = new URLSearchParams({ format })
         window.open(`/print/troca/${returnId}?${params.toString()}`, "_blank")
         onClose()
     }, [returnId, format, onClose, isMobile])
 
-    const handleDownloadPdf = useCallback(() => {
-        if (!returnId) return
+    const handleDownloadPdf = useCallback(async () => {
+        if (!returnId || isDownloading) return
+        setIsDownloading(true)
         const params = new URLSearchParams({ format })
-        downloadPdf(`/api/pdf/troca/${returnId}?${params.toString()}`, `troca-${returnId}.pdf`)
-            .catch(() => {
-                window.open(`/print/troca/${returnId}?${params.toString()}`, "_blank")
-            })
-        onClose()
-    }, [returnId, format, onClose])
+        try {
+            await downloadPdf(`/api/pdf/troca/${returnId}?${params.toString()}`, `troca-${returnId}.pdf`)
+            onClose()
+        } catch (error: any) {
+            console.error("[ReturnPrintModal] Error downloading PDF:", error)
+            toast.error("Erro ao gerar PDF", error?.message || "Não foi possível gerar o PDF. Tente novamente.")
+        } finally {
+            setIsDownloading(false)
+        }
+    }, [returnId, format, isDownloading, onClose])
 
     const partnerName = selectedStore?.name || partnerHeader.fantasyName || "Estabelecimento"
     const partnerAvatar = selectedStore?.logo_url || selectedStore?.image_url
@@ -191,8 +196,14 @@ export default function ReturnPrintModal({ isOpen, onClose, returnId, partnerId,
                                         <Button className="flex-1 h-12" onClick={handlePrint} leftIcon={<PrinterIcon size={18} />}>
                                             Imprimir
                                         </Button>
-                                        <Button variant="outline" className="flex-1 h-12" onClick={handleDownloadPdf} leftIcon={<DownloadIcon size={18} />}>
-                                            Salvar PDF
+                                        <Button
+                                            variant="outline"
+                                            className="flex-1 h-12"
+                                            onClick={handleDownloadPdf}
+                                            disabled={isDownloading}
+                                            leftIcon={<DownloadIcon size={18} />}
+                                        >
+                                            {isDownloading ? "Gerando PDF..." : "Salvar PDF"}
                                         </Button>
                                     </div>
                                 </div>
@@ -202,8 +213,14 @@ export default function ReturnPrintModal({ isOpen, onClose, returnId, partnerId,
                                     <Button className="flex-1 h-12" onClick={handlePrint} leftIcon={<PrinterIcon size={18} />}>
                                         Imprimir
                                     </Button>
-                                    <Button variant="outline" className="flex-1 h-12" onClick={handleDownloadPdf} leftIcon={<DownloadIcon size={18} />}>
-                                        PDF
+                                    <Button
+                                        variant="outline"
+                                        className="flex-1 h-12"
+                                        onClick={handleDownloadPdf}
+                                        disabled={isDownloading}
+                                        leftIcon={<DownloadIcon size={18} />}
+                                    >
+                                        {isDownloading ? "Gerando..." : "PDF"}
                                     </Button>
                                 </div>
                             </div>

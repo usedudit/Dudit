@@ -512,7 +512,7 @@ export default function CustomersPage({
         <>
             <AnimatePresence mode="wait">
                 {entityState.isOpen && isViewing ? (
-                    (isLoadingDetail && !selectedCustomer) ? (
+                    (isLoadingDetail || !selectedCustomer) ? (
                         <ERPDetailLoading key="loading-customer" />
                     ) : (
                         <FadeIn key="details" className="w-full h-full">
@@ -524,7 +524,7 @@ export default function CustomersPage({
                         </FadeIn>
                     )
                 ) : (isCreatingEntity || isEditingEntity) ? (
-                    (isEditingEntity && isLoadingDetail && !currentEntity) ? (
+                    (isEditingEntity && (isLoadingDetail || !currentEntity)) ? (
                         <ERPDetailLoading key="loading-customer-edit" />
                     ) : (
                         <FadeIn key="form" className="w-full h-full">

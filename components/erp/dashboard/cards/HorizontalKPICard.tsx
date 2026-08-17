@@ -8,6 +8,7 @@ interface KPIItem {
     title: string
     value: string | number
     trend?: string
+    subtext?: string
     icon?: React.ComponentType<{ size?: number; className?: string }>
     iconBg?: string
     iconColor?: string
@@ -20,6 +21,8 @@ interface HorizontalKPICardProps {
 
 export function HorizontalKPICard({ items, className }: HorizontalKPICardProps) {
     const defaultIcons = [MoneyIcon, ShoppingCartIcon, Users, CreditCardIcon]
+
+    const columns = items.length >= 5 ? "lg:grid-cols-5" : "lg:grid-cols-4"
 
     const parseTrend = (trendStr?: string) => {
         if (!trendStr) return { percent: "↑ 0 %", isPositive: true, change: "0%", vsText: "período anterior" }
@@ -40,8 +43,8 @@ export function HorizontalKPICard({ items, className }: HorizontalKPICardProps) 
     }
 
     return (
-        <div className={cn("bg-white dark:bg-dark-surface rounded-[24px] border border-brand-border dark:border-dark-border grid grid-cols-1 lg:grid-cols-4 divide-y lg:divide-y-0 lg:divide-x divide-brand-border dark:divide-dark-border w-full", className)}>
-            {items.slice(0, 4).map((item, i) => {
+        <div className={cn("bg-white dark:bg-dark-surface rounded-[24px] border border-brand-border dark:border-dark-border grid grid-cols-1 lg:grid-cols-4 divide-y lg:divide-y-0 lg:divide-x divide-brand-border dark:divide-dark-border w-full", columns, className)}>
+            {items.slice(0, 5).map((item, i) => {
                 const CardIcon = item.icon || defaultIcons[i % defaultIcons.length]
                 const { percent, isPositive, change, vsText } = parseTrend(item.trend)
                 const iconBg = item.iconBg || "bg-brand-green-light dark:bg-dark-border/40"
@@ -76,6 +79,11 @@ export function HorizontalKPICard({ items, className }: HorizontalKPICardProps) 
                                 </span>
                             )}
                         </div>
+                        {item.subtext && (
+                            <div className="mt-3 text-[12px] font-semibold text-brand-inactive-text dark:text-dark-body">
+                                {item.subtext}
+                            </div>
+                        )}
                     </div>
                 )
             })}

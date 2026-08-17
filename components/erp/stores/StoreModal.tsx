@@ -61,6 +61,8 @@ export function StoreModal({ isOpen, onClose, partnerId, store, onSaved }: Store
     city: "",
     state: "",
     noNumber: false,
+    latitude: null as number | null,
+    longitude: null as number | null,
   })
 
   // --- Opening Hours State (Exact BusinessHoursSelector pattern) ---
@@ -95,6 +97,8 @@ export function StoreModal({ isOpen, onClose, partnerId, store, onSaved }: Store
           city: store.city || addr.city || "",
           state: store.state || addr.state || "",
           noNumber: effNumber === "S/N",
+          latitude: store.latitude ?? addr.latitude ?? null,
+          longitude: store.longitude ?? addr.longitude ?? null,
         })
 
         const effHours = store.opening_hours || {}
@@ -115,6 +119,8 @@ export function StoreModal({ isOpen, onClose, partnerId, store, onSaved }: Store
           city: "",
           state: "",
           noNumber: false,
+          latitude: null,
+          longitude: null,
         })
         setHours(normalizeOpeningHours({}))
       }
@@ -197,6 +203,8 @@ export function StoreModal({ isOpen, onClose, partnerId, store, onSaved }: Store
         state: addresses.state.trim() || undefined,
         complement: addresses.complement.trim() || undefined,
         opening_hours: hours as any,
+        latitude: addresses.latitude ?? null,
+        longitude: addresses.longitude ?? null,
       }
 
       if (isEdit) {
@@ -336,6 +344,8 @@ export function StoreModal({ isOpen, onClose, partnerId, store, onSaved }: Store
                         city: data.city || prev.city,
                         state: data.state || prev.state,
                         noNumber: data.number === "S/N",
+                        latitude: typeof data.latitude === "number" ? data.latitude : prev.latitude,
+                        longitude: typeof data.longitude === "number" ? data.longitude : prev.longitude,
                       }))
                     }}
                   />

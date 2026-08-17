@@ -18,6 +18,7 @@ import {
     IconPlaceholder,
     SelectionBanner,
     DatePicker,
+    FormSection,
 } from "@/components/reusable"
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import { ChevronLeftIcon, SaveIcon, TrashIcon, PlusIcon, ArrowUpDownIcon, BoxIcon, ClockIcon, SearchIcon } from "@/lib/icons"
@@ -58,11 +59,19 @@ const REQUIRED_FIELDS = [
     { field: "startDate", tab: "general" },
 ]
 
-const SidebarCard = ({ children, className = "", hasTopStrip = false }: { children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
-    <div className={`bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
-        {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
-        {children}
-    </div>
+const SidebarCard = ({ title, children, className = "", hasTopStrip = false }: { title?: React.ReactNode; children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
+    <>
+        {/* Desktop: card */}
+        <div className={`hidden lg:block bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
+            {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
+            {title ? <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">{title}</h3> : null}
+            {children}
+        </div>
+        {/* Mobile/Tablet: FormSection */}
+        <FormSection title={title} hasSeparator className="lg:hidden">
+            {children}
+        </FormSection>
+    </>
 )
 
 export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
@@ -633,8 +642,7 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
 
                                         {/* Right Sidebar Column */}
                                         <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
-                                            <SidebarCard hasTopStrip>
-                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Regra de Recorrência</h3>
+                                            <SidebarCard hasTopStrip title="Regra de Recorrência">
                                                 <div className="space-y-5">
                                                     <FormDropdown
                                                         label="Frequência"
@@ -686,8 +694,7 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                                                 </div>
                                             </SidebarCard>
 
-                                            <SidebarCard>
-                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Cobrança e Créditos</h3>
+                                            <SidebarCard title="Cobrança e Créditos">
                                                 <div className="space-y-5">
                                                     <FormDropdown
                                                         label="Modo de Cobrança"

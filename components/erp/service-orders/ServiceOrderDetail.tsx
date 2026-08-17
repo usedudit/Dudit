@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { ShareModal } from "@/components/marketplace/ShareModal"
-import { Button, Badge, Tabs, TabsList, TabsTrigger, TabsContent, ThreeDotsLoader, ActionsDropdown, DropdownItem, FormSection, ListItem, IconPlaceholder, AlertModal, FormDropdown } from "@/components/reusable"
+import { Button, Badge, Tabs, TabsList, TabsTrigger, TabsContent, ThreeDotsLoader, ActionsDropdown, DropdownItem, FormSection, ListItem, IconPlaceholder, AlertModal, FormDropdown, CustomerMobileBar } from "@/components/reusable"
 import CustomerCard from "@/components/reusable/CustomerCard"
 import { ChevronLeftIcon, WrenchIcon, UserIcon, CalendarIcon, FileIcon, CheckCircleIcon, ClockIcon, EditIcon, PackageIcon } from "@/lib/icons"
 import { formatCurrency, formatDate } from "@/lib/utils"
@@ -45,11 +45,19 @@ const PRIORITY_META: Record<string, { label: string; variant: "gray" | "green" |
     urgente: { label: "Urgente", variant: "red" },
 }
 
-const SidebarCard = ({ children, className = "", hasTopStrip = false }: { children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
-    <div className={`bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
-        {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
-        {children}
-    </div>
+const SidebarCard = ({ title, children, className = "", hasTopStrip = false }: { title?: React.ReactNode; children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
+    <>
+        {/* Desktop: card */}
+        <div className={`hidden lg:block bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
+            {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
+            {title ? <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">{title}</h3> : null}
+            {children}
+        </div>
+        {/* Mobile/Tablet: FormSection */}
+        <FormSection title={title} hasSeparator className="lg:hidden">
+            {children}
+        </FormSection>
+    </>
 )
 
 interface ServiceOrderDetailProps {
@@ -304,7 +312,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                             <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
 
                                 {/* Back button - desktop only */}
-                                <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                                <div className={`absolute -left-12 top-7 h-full hidden lg:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
                                     <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
                                         <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                     </Button>
@@ -370,8 +378,12 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                             <Tabs value={activeTab} onValueChange={setActiveTab}>
                                 <TabsContent value="summary">
                                     <FadeIn key="summary">
-                                        <div className="grid grid-cols-12 gap-y-8 xl:gap-y-0 relative">
-                                            <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12 space-y-6">
+                                        <div className="grid grid-cols-12 gap-y-8 lg:gap-y-0 relative">
+                                            <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-6">
+                                                {/* Cliente - Mobile/Tablet only */}
+                                                <div className="lg:hidden">
+                                                    <CustomerMobileBar customer={order.customer_snapshot} showMap={false} />
+                                                </div>
                                                 <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden mb-8">
                                                     <div className="bg-brand-gray dark:bg-dark-border/50 p-6 border-b border-brand-border dark:border-dark-border">
                                                         <div className="flex justify-between items-center">
@@ -565,12 +577,11 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                             </div>
 
                                             {/* Right Sidebar Column with vertical border-l (col-span-4) */}
-                                            <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
+                                            <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 space-y-6 border-0 lg:border-l border-brand-border dark:border-dark-border">
 
                                                 {/* Venda Vinculada Card */}
                                                 {order.sale && (
-                                                    <SidebarCard>
-                                                        <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading mb-4 mt-2">Venda Vinculada</h3>
+                                                    <SidebarCard title="Venda Vinculada">
                                                         <div className="space-y-3">
                                                             <div className="flex justify-between items-center text-[13px]">
                                                                 <span className="text-brand-inactive-text">Venda</span>
@@ -610,8 +621,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
 
                                                 {/* Timing Info Card */}
                                                 {order.created_at && (
-                                                    <SidebarCard>
-                                                        <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading mb-4 mt-2">Tempo</h3>
+                                                    <SidebarCard title="Tempo">
                                                         <div className="space-y-3">
                                                             <div className="flex justify-between items-center text-[13px]">
                                                                 <span className="text-brand-inactive-text">Abertura</span>
@@ -683,15 +693,16 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                 )}
 
                                                 {/* Customer Info Card */}
-                                                <CustomerCard
-                                                    customer={order.customer_snapshot}
-                                                    showMap={false}
-                                                />
+                                                <div className="hidden lg:block">
+                                                    <CustomerCard
+                                                        customer={order.customer_snapshot}
+                                                        showMap={false}
+                                                    />
+                                                </div>
 
                                                 {/* Online Signature Link & Code Card */}
                                                 {hasMinimumPlan(planSlug, "crescer") ? (
-                                                    <SidebarCard hasTopStrip>
-                                                        <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading mb-3 mt-1">Assinatura Online</h3>
+                                                    <SidebarCard hasTopStrip title="Assinatura Online">
                                                         <p className="text-xs text-brand-inactive-text mb-4">Compartilhe o link da OS para o cliente visualizar e assinar online.</p>
 
                                                         <div className="space-y-3">
@@ -728,10 +739,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                         </div>
                                                     </SidebarCard>
                                                 ) : (
-                                                    <SidebarCard>
-                                                        <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                                                            Link de Assinatura Online
-                                                        </h3>
+                                                    <SidebarCard title="Link de Assinatura Online">
                                                         <div className="flex flex-col items-center text-center py-4">
                                                             <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading mb-1">Disponível no plano Crescer</p>
                                                             <p className="text-xs text-brand-inactive-text mb-4">Compartilhe a OS online e receba a assinatura do cliente em tempo real.</p>
@@ -744,8 +752,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
 
                                                 {/* Client Signature Card where Totals used to be */}
                                                 {order.signature_image_key ? (
-                                                    <SidebarCard hasTopStrip>
-                                                        <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading mb-4 mt-2">Assinatura do Cliente</h3>
+                                                    <SidebarCard hasTopStrip title="Assinatura do Cliente">
                                                         <div className="flex flex-col items-center">
                                                             <img
                                                                 src={buildImageUrl(order.signature_image_key)}
@@ -759,8 +766,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                     </SidebarCard>
                                                 ) : (
                                                     order.status !== "cancelada" && order.status !== "entregue" && (
-                                                        <SidebarCard hasTopStrip>
-                                                            <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading mb-4 mt-2">Assinatura do Cliente</h3>
+                                                        <SidebarCard hasTopStrip title="Assinatura do Cliente">
                                                             <div className="flex flex-col items-center justify-center p-4 border border-dashed border-brand-border dark:border-dark-border rounded-xl">
                                                                 <p className="text-sm text-brand-inactive-text text-center mb-4">A ordem de serviço ainda não foi assinada pelo cliente.</p>
                                                                 <Button variant="outline" size="sm" onClick={() => {

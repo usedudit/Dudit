@@ -673,7 +673,7 @@ Diferença final: ${formatCurrency(details.totals.difference)}`} color={details.
                                         </FormSection>
                                     ) : null}
 
-                                    <FormSection title="Resumo calculado" hasSeparator className="mb-8">
+                                    <FormSection title="Resumo calculado" hasSeparator>
                                         {groupedRows.length > 0 ? (
                                             groupedRows.map((row: any) => {
                                                 const lowerLabel = row.label?.toLowerCase() || ""

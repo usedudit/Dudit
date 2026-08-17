@@ -15,7 +15,27 @@ export default async function PainelPage() {
         redirect("/erp/trocar-erp")
     }
 
-    const { partnerId, businessInfo } = context
+    const { partnerId, roleId, businessInfo } = context
+
+    if (roleId === "delivery") {
+        return (
+            <div className="flex items-center justify-center min-h-[calc(100vh-140px)] p-4 text-center">
+                <FadeIn>
+                    <IconPlaceholder
+                        placeholderType="image"
+                        imageSrc="https://img.dudit.com.br/static/mascots/QRDino.png"
+                        imageAlt="Área do Entregador"
+                        title="Área do Entregador"
+                        subtitle="Acesse a seção de entregas para acompanhar suas rotas e entregas em tempo real."
+                        itemButton={{
+                            text: "Acessar Entregas",
+                            action: "/erp/logistica"
+                        }}
+                    />
+                </FadeIn>
+            </div>
+        )
+    }
 
     if (businessInfo?.mode !== "quick") {
         redirect("/erp/inicio")

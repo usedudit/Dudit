@@ -49,11 +49,19 @@ const FormCombobox = ({
     </div>
 )
 
-const SidebarCard = ({ children, className = "", hasTopStrip = false }: { children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
-    <div className={`bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
-        {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
-        {children}
-    </div>
+const SidebarCard = ({ title, children, className = "", hasTopStrip = false }: { title?: React.ReactNode; children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
+    <>
+        {/* Desktop: card */}
+        <div className={`hidden lg:block bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
+            {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
+            {title ? <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">{title}</h3> : null}
+            {children}
+        </div>
+        {/* Mobile/Tablet: FormSection */}
+        <FormSection title={title} hasSeparator className="lg:hidden">
+            {children}
+        </FormSection>
+    </>
 )
 
 interface ProductGeneralTabProps {
@@ -188,7 +196,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                     <FormSection title="Informações Básicas" className="mb-8">
                         <div className="space-y-6">
                             <div>
-                                <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium block mb-1">Nome do Produto</span>
+                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Nome do Produto</span>
                                 <h1 className="text-xl md:text-2xl font-bold text-brand-dark dark:text-dark-heading">
                                     {productData.name || "-"}
                                 </h1>
@@ -196,7 +204,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
                                 <div>
-                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium block mb-1">Status</span>
+                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body">Status</span>
                                     <div className="flex items-center gap-2">
                                         <span className={`inline-block w-2.5 h-2.5 rounded-full ${productData.is_active ? 'bg-emerald-500' : 'bg-gray-400'}`} />
                                         <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
@@ -206,7 +214,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                 </div>
 
                                 <div>
-                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium block mb-1">Exibir na Vitrine</span>
+                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body">Exibir na Vitrine</span>
                                     <div className="flex items-center gap-2">
                                         <span className={`inline-block w-2.5 h-2.5 rounded-full ${productData.show_in_marketplace !== false ? 'bg-emerald-500' : 'bg-gray-400'}`} />
                                         <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
@@ -337,25 +345,25 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                         <FormSection hasSeparator title="Envio e Dimensões">
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
                                 <div>
-                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium block mb-1">Dimensões (L × A × P)</span>
+                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body">Dimensões (L × A × P)</span>
                                     <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
                                         {productData.width || 0} × {productData.height || 0} × {productData.length || 0} cm
                                     </span>
                                 </div>
                                 <div>
-                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium block mb-1">Peso Líquido / Bruto</span>
+                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body">Peso Líquido / Bruto</span>
                                     <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
                                         {productData.weight_net || 0} kg / {productData.weight_gross || 0} kg
                                     </span>
                                 </div>
                                 <div>
-                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium block mb-1">Prazo de Preparação</span>
+                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body">Prazo de Preparação</span>
                                     <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
                                         {productData.preparation_days || 0} dias
                                     </span>
                                 </div>
                                 <div>
-                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium block mb-1">Tipo de Embalagem</span>
+                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body">Tipo de Embalagem</span>
                                     <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
                                         {productData.packaging_type === "package" ? "Pacote / Caixa" : productData.packaging_type === "cilinder" ? "Cilindro / Rolo" : productData.packaging_type === "envelope" ? "Envelope" : "Pacote / Caixa"}
                                     </span>
@@ -367,8 +375,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
 
                 {/* DIREITA (SidebarCard) */}
                 <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
-                    <SidebarCard hasTopStrip>
-                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Organização</h3>
+                    <SidebarCard hasTopStrip title="Organização">
                         <div className="space-y-4">
                             <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
                                 <span className="text-sm text-brand-inactive-text dark:text-dark-body">Código (SKU)</span>
@@ -405,8 +412,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                     </SidebarCard>
 
                     {isQuickMode && officialCategoryPath && (
-                        <SidebarCard>
-                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-3 mt-1">Categoria oficial</h3>
+                        <SidebarCard title="Categoria oficial">
                             <div className="p-4 rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/30 dark:bg-dark-border/30 text-sm font-medium text-brand-dark dark:text-dark-heading">
                                 {officialCategoryPath}
                             </div>
@@ -900,8 +906,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
 
                 {/* Desktop: SidebarCard */}
                 <div className="hidden lg:block">
-                    <SidebarCard hasTopStrip>
-                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Organização</h3>
+                    <SidebarCard hasTopStrip title="Organização">
                         <div className="space-y-5">
                             {!hasVariants && (
                                 <Input
@@ -1012,8 +1017,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                     </SidebarCard>
 
                     {isQuickMode && (
-                        <SidebarCard>
-                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-3 mt-1">Categoria oficial</h3>
+                        <SidebarCard title="Categoria oficial">
                             <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-4">
                                 Selecione a categoria oficial do seu produto.
                             </p>

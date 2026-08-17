@@ -3,7 +3,7 @@ import { cache } from "react"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { hasMinimumPlan, type PlanTierSlug } from "@/lib/subscription/plan-tier"
-import { normalizeBusinessInfo } from "@/lib/business-info"
+import { normalizeBusinessInfo, DEFAULT_BUSINESS_INFO } from "@/lib/business-info"
 import { isSystemResourceActive, type SystemResourceId } from "@/lib/system-resources"
 
 export interface PartnerCapabilities {
@@ -39,13 +39,21 @@ export const getPartnerCapabilities = cache(async (
 ): Promise<PartnerCapabilities> => {
   const admin = getAdminClient()
 
-  // 1. Resolve plan and business_info concurrently if businessInfo is not provided
+  // 1. Resolve plan and business_info
   let businessInfo = options?.businessInfo ? normalizeBusinessInfo(options.businessInfo) : null
 
   const planPromise = getPartnerPlan(partnerId)
 
   if (!businessInfo) {
-    if (options?.storeId) {
+    const { data: partner } = await admin
+      .from("partners")
+      .select("business_info")
+      .eq("id", partnerId)
+      .maybeSingle()
+
+    if (partner?.business_info) {
+      businessInfo = normalizeBusinessInfo(partner.business_info)
+    } else if (options?.storeId) {
       const { data: store } = await admin
         .from("stores")
         .select("business_info")
@@ -57,22 +65,13 @@ export const getPartnerCapabilities = cache(async (
         businessInfo = normalizeBusinessInfo(store.business_info)
       }
     }
-
-    if (!businessInfo) {
-      const { data: partner } = await admin
-        .from("partners")
-        .select("business_info")
-        .eq("id", partnerId)
-        .maybeSingle()
-
-      businessInfo = normalizeBusinessInfo(partner?.business_info)
-    }
   }
 
   const plan = await planPromise
   const planSlug = plan?.slug || "free"
 
-  const checkResource = (resourceId: SystemResourceId) => isSystemResourceActive(businessInfo!, resourceId)
+  const safeInfo = businessInfo || DEFAULT_BUSINESS_INFO
+  const checkResource = (resourceId: SystemResourceId) => isSystemResourceActive(safeInfo, resourceId)
 
   const hasProducts = checkResource("products")
   const hasServices = checkResource("services")

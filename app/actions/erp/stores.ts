@@ -130,6 +130,8 @@ interface CreateStoreInput {
     city?: string
     state?: string
     noNumber?: boolean
+    latitude?: number | null
+    longitude?: number | null
 }
 
 export async function createStoreAction(input: CreateStoreInput): Promise<ActionResponse<{ id: string }>> {
@@ -190,6 +192,8 @@ export async function createStoreAction(input: CreateStoreInput): Promise<Action
                     city: input.city || null,
                     state: input.state || null,
                     country: "BR",
+                    latitude: input.latitude ?? null,
+                    longitude: input.longitude ?? null,
                     store_id: data.id,
                 })
                 .select("id")
@@ -254,6 +258,8 @@ interface UpdateStoreInput {
     neighborhood?: string
     noNumber?: boolean
     municipioCodigoIbge?: string | null
+    latitude?: number | null
+    longitude?: number | null
 }
 
 export async function updateStoreAction(input: UpdateStoreInput): Promise<ActionResponse<void>> {
@@ -339,6 +345,8 @@ export async function updateStoreAction(input: UpdateStoreInput): Promise<Action
                 country: "BR",
                 store_id: input.storeId,
                 municipio_codigo_ibge: input.municipioCodigoIbge ?? null,
+                latitude: input.latitude ?? null,
+                longitude: input.longitude ?? null,
             }
 
             const { data: addrByStore } = await admin

@@ -9,6 +9,8 @@ import {
     ReturnIcon,
     AlertTriangleIcon,
     ShieldIcon,
+    EditIcon,
+    ClockIcon,
 } from "@/lib/icons"
 import {
     Button,
@@ -21,15 +23,18 @@ import {
     FormSection,
     IconPlaceholder,
     ListItem,
+    AlertModal,
+    DefaultModal,
+    Input,
 } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils"
 import { getPaymentStatusMeta } from "@/lib/orders/status"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
-import { getAdminUserDetail, banUser, unbanUser } from "@/app/actions/admin/enforcement"
-import DestructiveActionModal from "@/components/admin/DestructiveActionModal"
+import { getAdminUserDetail, banUser, unbanUser, updateUserRiskScore } from "@/app/actions/admin/enforcement"
 import Link from "next/link"
 import { toast } from "@/hooks/use-notification"
+import { useSidebar } from "@/lib/sidebar-context"
 
 const formatProviderLabel = (raw?: string | null) => {
     const r = String(raw || "").trim().toLowerCase()
@@ -78,19 +83,6 @@ const formatRequestTypeLabel = (raw?: string | null): string => {
     return r ? r.charAt(0).toUpperCase() + r.slice(1) : "Devolução"
 }
 
-const getReturnStatusBadgeVariant = (raw?: string | null) => {
-    const s = String(raw || "").toUpperCase()
-    if (["APPROVED", "COMPLETED", "RESOLVED"].includes(s)) return "green" as const
-    if (["REJECTED", "EXPIRED", "ESCALATED", "CANCELLED", "CANCELED"].includes(s)) return "red" as const
-    return "orange" as const
-}
-
-const getOrderStatusBadgeVariant = (situation?: string | null) => {
-    if (situation === "paid") return "green" as const
-    if (situation === "cancelled") return "red" as const
-    return "orange" as const
-}
-
 interface AdminUserDetailViewProps {
     userId: string
     initialData?: any
@@ -114,26 +106,53 @@ export function AdminUserDetailView({
     // Modals
     const [banModalOpen, setBanModalOpen] = useState(false)
     const [unbanModalOpen, setUnbanModalOpen] = useState(false)
+    const [riskModalOpen, setRiskModalOpen] = useState(false)
+    const [newRiskScore, setNewRiskScore] = useState<string>("")
+    const [riskReason, setRiskReason] = useState("")
+
+    // Header override for mobile back button
+    let sidebarContext: ReturnType<typeof useSidebar> | null = null
+    try {
+        sidebarContext = useSidebar()
+    } catch { }
+
+    const setHeaderOverride = sidebarContext?.setHeaderOverride
 
     const handleScroll = useCallback(() => {
         setIsScrolled((scrollRef.current?.scrollTop || 0) > 20)
     }, [])
 
-    const loadDetail = async () => {
+    const loadDetail = useCallback(async () => {
         try {
             const data = await getAdminUserDetail(userId)
-            if (data) setDetail(data)
+            if (data) {
+                setDetail(data)
+                setNewRiskScore(String(data.profile?.risk_score || 0))
+            }
         } catch (err) {
             console.error("Error fetching user detail:", err)
             toast.error("Erro ao carregar dados do usuário")
         } finally {
             setIsLoading(false)
         }
-    }
+    }, [userId])
 
     useEffect(() => {
         loadDetail()
-    }, [userId])
+    }, [loadDetail])
+
+    const profile = detail?.profile
+    const userName = profile?.full_name || "Usuário"
+
+    useEffect(() => {
+        if (!setHeaderOverride) return
+        setHeaderOverride({
+            title: userName,
+            onBack,
+            isSubPage: true,
+        })
+        return () => setHeaderOverride(null)
+    }, [userName, onBack, setHeaderOverride])
 
     if (isLoading && !detail) {
         return (
@@ -151,7 +170,7 @@ export function AdminUserDetailView({
                     containerSize="w-16 h-16 mb-2"
                     iconSize="w-6 h-6"
                     title="Usuário não encontrado"
-                    subtitle="O usuário pode ter sido removido ou o link está incorreto."
+                    subtitle="A conta pode ter sido removida ou o identificador é inválido."
                     itemButton={{
                         text: "Voltar para lista",
                         action: onBack,
@@ -162,14 +181,13 @@ export function AdminUserDetailView({
         )
     }
 
-    const { profile, authUser, partner, orders, returns, auditEvents } = detail
+    const { authUser, partner, orders, returns, auditEvents } = detail
     const isBanned = !!profile.banned_at
-    const stores = partner?.stores || []
 
-    const handleConfirmBan = (reason: string) => {
+    const handleConfirmBan = () => {
         startTransition(async () => {
             try {
-                const res = await banUser(userId, reason)
+                const res = await banUser(userId, "Banimento manual via detalhes de usuário")
                 if (res.success) {
                     toast.success("Usuário banido com sucesso")
                     setBanModalOpen(false)
@@ -184,17 +202,42 @@ export function AdminUserDetailView({
         })
     }
 
-    const handleConfirmUnban = (reason: string) => {
+    const handleConfirmUnban = () => {
         startTransition(async () => {
             try {
-                const res = await unbanUser(userId, reason)
+                const res = await unbanUser(userId, "Desbanimento via detalhes de usuário")
                 if (res.success) {
-                    toast.success("Banimento revogado com sucesso")
+                    toast.success("Acesso do usuário restabelecido com sucesso")
                     setUnbanModalOpen(false)
                     loadDetail()
                     onUserUpdated?.()
                 } else {
                     toast.error(res.error || "Erro ao desbanir usuário")
+                }
+            } catch (err: any) {
+                toast.error(err.message || "Erro inesperado")
+            }
+        })
+    }
+
+    const handleSaveRiskScore = () => {
+        const scoreNum = parseInt(newRiskScore, 10)
+        if (isNaN(scoreNum) || scoreNum < 0 || scoreNum > 100) {
+            toast.error("Insira uma pontuação válida entre 0 e 100")
+            return
+        }
+
+        startTransition(async () => {
+            try {
+                const res = await updateUserRiskScore(userId, scoreNum, riskReason)
+                if (res.success) {
+                    toast.success("Score de risco do usuário atualizado!")
+                    setRiskModalOpen(false)
+                    setRiskReason("")
+                    loadDetail()
+                    onUserUpdated?.()
+                } else {
+                    toast.error(res.error || "Erro ao atualizar score de risco")
                 }
             } catch (err: any) {
                 toast.error(err.message || "Erro inesperado")
@@ -224,29 +267,40 @@ export function AdminUserDetailView({
                                     <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
                                         <div className="flex flex-col gap-1 overflow-hidden min-w-0">
                                             <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
-                                                <span className="hidden md:inline truncate">{profile.full_name || "Usuário sem nome"}</span>
+                                                <span className="hidden md:inline truncate">{profile.full_name || "Usuário"}</span>
                                                 <Badge variant={isBanned ? "red" : "green"}>
                                                     {isBanned ? "Banido" : "Ativo"}
                                                 </Badge>
-                                                {partner && (
-                                                    <Badge variant="blue">Lojista / Parceiro</Badge>
-                                                )}
+                                                <Badge variant={(profile.risk_score || 0) >= 50 ? "red" : (profile.risk_score || 0) >= 25 ? "orange" : "gray"}>
+                                                    Risco: {profile.risk_score || 0} pts
+                                                </Badge>
                                             </h1>
 
                                             <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
-                                                {authUser?.email || profile.phone || "Sem e-mail cadastrado"} • Cadastrado em {formatDate(profile.created_at)}
+                                                ID: {profile.user_id} • E-mail: {authUser?.email || "Sem e-mail registrado"}
                                             </div>
                                         </div>
 
                                         {/* Desktop action buttons */}
                                         <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
+                                            <Button
+                                                variant="outline"
+                                                onClick={() => {
+                                                    setNewRiskScore(String(profile.risk_score || 0))
+                                                    setRiskModalOpen(true)
+                                                }}
+                                                leftIcon={<EditIcon size={16} />}
+                                            >
+                                                Score de Risco
+                                            </Button>
+
                                             {isBanned ? (
                                                 <Button
                                                     variant="outline"
                                                     onClick={() => setUnbanModalOpen(true)}
                                                     className="text-brand-green border-brand-green/30 hover:bg-brand-green/10"
                                                 >
-                                                    Revogar Banimento
+                                                    Desbanir Usuário
                                                 </Button>
                                             ) : (
                                                 <Button
@@ -259,39 +313,13 @@ export function AdminUserDetailView({
                                         </div>
                                     </div>
 
-                                    {/* Title row - mobile */}
-                                    <div className="md:hidden flex items-center gap-2 py-3">
-                                        <Button variant="filled" onClick={onBack} className="w-9 h-9 p-0 flex items-center justify-center shrink-0">
-                                            <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                        </Button>
-                                        <UserProfileImage
-                                            fullName={profile.full_name || "Usuário"}
-                                            imageUrl={profile.avatar_url}
-                                            className="w-11 h-11 text-base shrink-0"
-                                        />
-                                        <div className="flex flex-col gap-1 min-w-0">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <h1 className="text-lg font-bold text-brand-dark dark:text-dark-heading truncate">
-                                                    {profile.full_name || "Usuário sem nome"}
-                                                </h1>
-                                                <Badge variant={isBanned ? "red" : "green"}>
-                                                    {isBanned ? "Banido" : "Ativo"}
-                                                </Badge>
-                                            </div>
-                                            <span className="text-xs text-brand-inactive-text truncate">
-                                                {authUser?.email || profile.phone || "Sem e-mail cadastrado"}
-                                            </span>
-                                        </div>
-                                    </div>
-
                                     {/* Tabs */}
                                     <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
                                         <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
-                                            <TabsTrigger value="profile">Perfil & Documentos</TabsTrigger>
-                                            <TabsTrigger value="partner">Lojas & Parceiro ({stores.length})</TabsTrigger>
-                                            <TabsTrigger value="orders">Pedidos ({orders.length})</TabsTrigger>
+                                            <TabsTrigger value="profile">Perfil & Cadastro</TabsTrigger>
+                                            <TabsTrigger value="orders">Compras ({orders.length})</TabsTrigger>
                                             <TabsTrigger value="returns">Devoluções ({returns.length})</TabsTrigger>
-                                            <TabsTrigger value="audit">Auditoria & Punições ({auditEvents.length})</TabsTrigger>
+                                            <TabsTrigger value="audit">Auditoria ({auditEvents.length})</TabsTrigger>
                                         </TabsList>
                                     </div>
                                 </div>
@@ -300,32 +328,27 @@ export function AdminUserDetailView({
                             {/* Content */}
                             <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
                                 <Tabs value={activeTab} onValueChange={setActiveTab}>
+                                    {/* Aba 1: Perfil */}
                                     <TabsContent value="profile" className="mt-0">
                                         <FadeIn key="profile">
-                                            {/* Banner de Banimento se ativo */}
                                             {isBanned && (
                                                 <div className="p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 rounded-2xl flex items-start gap-3 mb-8">
                                                     <AlertTriangleIcon className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
                                                     <div className="flex-1 min-w-0">
                                                         <h3 className="text-sm font-bold text-red-950 dark:text-red-300">
-                                                            Conta Banida da Plataforma
+                                                            Usuário Bloqueado / Banido
                                                         </h3>
                                                         <p className="text-xs text-red-900/80 dark:text-red-400/80 mt-0.5">
-                                                            Motivo registrado: {profile.banned_reason || "Sem justificativa informada."}
+                                                            Motivo: {profile.banned_reason || "Sem motivo informado."} • Banido em: {formatDate(profile.banned_at)}
                                                         </p>
-                                                        {profile.banned_at && (
-                                                            <p className="text-[11px] text-red-800 dark:text-red-400 mt-1">
-                                                                Banido em {formatDateTime(profile.banned_at)} {profile.banned_until ? `até ${formatDate(profile.banned_until)}` : "(Permanente)"}
-                                                            </p>
-                                                        )}
                                                     </div>
                                                 </div>
                                             )}
 
                                             <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
                                                 {/* Coluna principal */}
-                                                <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
-                                                    <FormSection title="Informações de Cadastro" hasSeparator>
+                                                <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12 space-y-6">
+                                                    <FormSection title="Dados Pessoais & Conta" hasSeparator>
                                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                                                             <div>
                                                                 <span className="text-xs font-semibold text-brand-inactive-text block">Nome Completo</span>
@@ -334,7 +357,7 @@ export function AdminUserDetailView({
                                                                 </span>
                                                             </div>
                                                             <div>
-                                                                <span className="text-xs font-semibold text-brand-inactive-text block">E-mail (Auth)</span>
+                                                                <span className="text-xs font-semibold text-brand-inactive-text block">E-mail de Login</span>
                                                                 <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5 block">
                                                                     {authUser?.email || "Sem e-mail"}
                                                                 </span>
@@ -352,100 +375,75 @@ export function AdminUserDetailView({
                                                                 </span>
                                                             </div>
                                                             <div>
-                                                                <span className="text-xs font-semibold text-brand-inactive-text block">Data de Nascimento</span>
+                                                                <span className="text-xs font-semibold text-brand-inactive-text block">Provedor de Login</span>
                                                                 <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5 block">
-                                                                    {profile.birth_date ? formatDate(profile.birth_date) : "Não informada"}
+                                                                    {formatProviderLabel(authUser?.app_metadata?.provider)}
                                                                 </span>
                                                             </div>
                                                             <div>
-                                                                <span className="text-xs font-semibold text-brand-inactive-text block">ID do Usuário</span>
-                                                                <span className="font-mono text-xs text-brand-inactive-text mt-0.5 block break-all">
-                                                                    {userId}
+                                                                <span className="text-xs font-semibold text-brand-inactive-text block">Data de Cadastro</span>
+                                                                <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5 block">
+                                                                    {formatDate(profile.created_at)}
                                                                 </span>
                                                             </div>
                                                         </div>
                                                     </FormSection>
+
+                                                    {/* Lojas vinculadas */}
+                                                    {partner && partner.stores && partner.stores.length > 0 && (
+                                                        <FormSection title={`Lojas Vinculadas como Parceiro (${partner.stores.length})`} hasSeparator>
+                                                            <div className="space-y-3">
+                                                                {partner.stores.map((s: any) => (
+                                                                    <ListItem
+                                                                        key={s.id}
+                                                                        icon={StoreIcon}
+                                                                        title={s.name}
+                                                                        description={`Score de Risco: ${s.risk_score || 0} pts • ${s.is_active ? "Ativa" : "Suspensa"}`}
+                                                                        right={
+                                                                            <Link
+                                                                                href={`/ddt-admin/partners?view=${s.id}`}
+                                                                                className="text-xs font-bold text-brand-green hover:underline"
+                                                                            >
+                                                                                Ver Loja →
+                                                                            </Link>
+                                                                        }
+                                                                    />
+                                                                ))}
+                                                            </div>
+                                                        </FormSection>
+                                                    )}
                                                 </div>
 
                                                 {/* Sidebar */}
-                                                <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-0 xl:border-l border-brand-border dark:border-dark-border">
-                                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
-                                                        <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>
+                                                <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-0 xl:border-l border-brand-border dark:border-dark-border space-y-6">
+                                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden transition-colors">
                                                         <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">
-                                                            Segurança & Acessos
+                                                            Score de Risco do Usuário
                                                         </h3>
-                                                        <div className="space-y-3 text-sm">
-                                                            <div className="flex justify-between gap-2">
-                                                                <span className="text-brand-inactive-text">Último Login</span>
-                                                                <span className="font-bold text-brand-dark dark:text-dark-heading text-right">
-                                                                    {authUser?.last_sign_in_at ? formatDateTime(authUser.last_sign_in_at) : "Nunca"}
-                                                                </span>
-                                                            </div>
-                                                            <div className="flex justify-between items-center gap-2">
-                                                                <span className="text-brand-inactive-text">E-mail Confirmado</span>
-                                                                <Badge variant={authUser?.email_confirmed_at ? "green" : "orange"}>
-                                                                    {authUser?.email_confirmed_at ? "Confirmado" : "Pendente"}
-                                                                </Badge>
-                                                            </div>
-                                                            <div className="flex justify-between gap-2">
-                                                                <span className="text-brand-inactive-text">Provedor Auth</span>
-                                                                <span className="font-bold text-brand-dark dark:text-dark-heading text-right">
-                                                                    {formatProviderLabel(authUser?.app_metadata?.provider)}
-                                                                </span>
-                                                            </div>
+                                                        <div className="flex justify-between items-center text-sm">
+                                                            <span className="text-brand-inactive-text">Pontuação Atual</span>
+                                                            <Badge variant={(profile.risk_score || 0) >= 50 ? "red" : (profile.risk_score || 0) >= 25 ? "orange" : "gray"}>
+                                                                {profile.risk_score || 0} pts
+                                                            </Badge>
                                                         </div>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => {
+                                                                setNewRiskScore(String(profile.risk_score || 0))
+                                                                setRiskModalOpen(true)
+                                                            }}
+                                                            className="w-full mt-4 text-xs"
+                                                        >
+                                                            Ajustar Score
+                                                        </Button>
                                                     </div>
                                                 </div>
                                             </div>
                                         </FadeIn>
                                     </TabsContent>
 
-                                    <TabsContent value="partner" className="mt-0">
-                                        <FadeIn key="partner">
-                                            {!partner ? (
-                                                <div className="py-6">
-                                                    <IconPlaceholder
-                                                        icon={StoreIcon}
-                                                        containerSize="w-16 h-16 mb-2"
-                                                        iconSize="w-6 h-6"
-                                                        title="Sem cadastro de parceiro"
-                                                        subtitle="Este usuário não possui cadastro de parceiro/lojista."
-                                                    />
-                                                </div>
-                                            ) : (
-                                                <FormSection title={`Lojas Vinculadas (${stores.length})`} hasSeparator>
-                                                    {stores.length === 0 ? (
-                                                        <IconPlaceholder
-                                                            icon={StoreIcon}
-                                                            containerSize="w-14 h-14 mb-2"
-                                                            iconSize="w-6 h-6"
-                                                            title="Nenhuma loja vinculada"
-                                                        />
-                                                    ) : (
-                                                        <div className="space-y-4">
-                                                            {stores.map((s: any) => (
-                                                                <ListItem
-                                                                    key={s.id}
-                                                                    icon={StoreIcon}
-                                                                    title={s.name}
-                                                                    description={`Risco: ${s.risk_score || 0} pts`}
-                                                                    right={
-                                                                        <Link
-                                                                            href={`/ddt-admin/partners?search=${s.name}`}
-                                                                            className="text-xs font-bold text-brand-green hover:underline shrink-0"
-                                                                        >
-                                                                            Gerenciar loja →
-                                                                        </Link>
-                                                                    }
-                                                                />
-                                                            ))}
-                                                        </div>
-                                                    )}
-                                                </FormSection>
-                                            )}
-                                        </FadeIn>
-                                    </TabsContent>
-
+                                    {/* Aba 2: Compras */}
                                     <TabsContent value="orders" className="mt-0">
                                         <FadeIn key="orders">
                                             <FormSection title={`Histórico de Compras (${orders.length})`} hasSeparator>
@@ -454,25 +452,28 @@ export function AdminUserDetailView({
                                                         icon={ShoppingCartIcon}
                                                         containerSize="w-14 h-14 mb-2"
                                                         iconSize="w-6 h-6"
-                                                        title="Nenhum pedido realizado"
-                                                        subtitle="Este usuário ainda não realizou compras."
+                                                        title="Nenhuma compra realizada"
+                                                        subtitle="Este usuário ainda não fez pedidos na plataforma."
                                                     />
                                                 ) : (
-                                                    <div className="space-y-4">
+                                                    <div className="space-y-3">
                                                         {orders.map((o: any) => (
                                                             <ListItem
                                                                 key={o.id}
                                                                 icon={ShoppingCartIcon}
-                                                                title={`#${o.order_number || o.id.slice(0, 8)}`}
-                                                                description={o.stores?.name || undefined}
+                                                                title={`Pedido #${o.order_number || o.id.slice(0, 8)} • ${o.stores?.name || "Marketplace"}`}
+                                                                description={`${formatDate(o.created_at)} • Total: ${formatCurrency(Number(o.total_amount || 0))}`}
                                                                 right={
-                                                                    <div className="flex items-center gap-3 shrink-0">
-                                                                        <span className="font-bold text-sm text-brand-green">
-                                                                            {formatCurrency(Number(o.total_amount || 0))}
-                                                                        </span>
-                                                                        <Badge variant={getOrderStatusBadgeVariant(o.situation)}>
-                                                                            {getPaymentStatusMeta(o.situation).label}
+                                                                    <div className="flex items-center gap-3">
+                                                                        <Badge variant={o.situation === "paid" ? "green" : o.situation === "cancelled" ? "red" : "orange"}>
+                                                                            {o.situation === "paid" ? "Pago" : o.situation === "cancelled" ? "Cancelado" : "Pendente"}
                                                                         </Badge>
+                                                                        <Link
+                                                                            href={`/ddt-admin/orders?view=${o.id}`}
+                                                                            className="text-xs font-bold text-brand-green hover:underline"
+                                                                        >
+                                                                            Ver Pedido →
+                                                                        </Link>
                                                                     </div>
                                                                 }
                                                             />
@@ -483,29 +484,38 @@ export function AdminUserDetailView({
                                         </FadeIn>
                                     </TabsContent>
 
+                                    {/* Aba 3: Devoluções */}
                                     <TabsContent value="returns" className="mt-0">
                                         <FadeIn key="returns">
-                                            <FormSection title={`Trocas e Devoluções Solicitadas (${returns.length})`} hasSeparator>
+                                            <FormSection title={`Histórico de Trocas & Devoluções (${returns.length})`} hasSeparator>
                                                 {returns.length === 0 ? (
                                                     <IconPlaceholder
                                                         icon={ReturnIcon}
                                                         containerSize="w-14 h-14 mb-2"
                                                         iconSize="w-6 h-6"
-                                                        title="Nenhuma troca ou devolução solicitada"
-                                                        subtitle="Este usuário ainda não possui solicitações de pós-venda."
+                                                        title="Nenhuma devolução registrada"
+                                                        subtitle="O usuário não abriu contestações ou solicitações de troca."
                                                     />
                                                 ) : (
-                                                    <div className="space-y-4">
+                                                    <div className="space-y-3">
                                                         {returns.map((r: any) => (
                                                             <ListItem
                                                                 key={r.id}
                                                                 icon={ReturnIcon}
-                                                                title={`#${r.id.slice(0, 8)}`}
-                                                                description={formatRequestTypeLabel(r.request_type)}
+                                                                title={`Solicitação #${r.id.slice(0, 8)} • ${formatRequestTypeLabel(r.request_type)}`}
+                                                                description={`${formatDate(r.created_at)} • Valor: ${formatCurrency(Number(r.refund_amount || 0))}`}
                                                                 right={
-                                                                    <Badge variant={getReturnStatusBadgeVariant(r.status)}>
-                                                                        {formatReturnStatusLabel(r.status)}
-                                                                    </Badge>
+                                                                    <div className="flex items-center gap-3">
+                                                                        <Badge variant={r.status === "approved" || r.status === "completed" ? "green" : r.status === "rejected" ? "red" : "orange"}>
+                                                                            {formatReturnStatusLabel(r.status)}
+                                                                        </Badge>
+                                                                        <Link
+                                                                            href={`/ddt-admin/returns?view=${r.id}`}
+                                                                            className="text-xs font-bold text-brand-green hover:underline"
+                                                                        >
+                                                                            Ver Devolução →
+                                                                        </Link>
+                                                                    </div>
                                                                 }
                                                             />
                                                         ))}
@@ -515,26 +525,36 @@ export function AdminUserDetailView({
                                         </FadeIn>
                                     </TabsContent>
 
+                                    {/* Aba 4: Auditoria */}
                                     <TabsContent value="audit" className="mt-0">
                                         <FadeIn key="audit">
-                                            <FormSection title="Registros de Auditoria & Punições" hasSeparator>
+                                            <FormSection title={`Logs de Auditoria (${auditEvents.length})`} hasSeparator>
                                                 {auditEvents.length === 0 ? (
                                                     <IconPlaceholder
-                                                        icon={ShieldIcon}
+                                                        icon={ClockIcon}
                                                         containerSize="w-14 h-14 mb-2"
                                                         iconSize="w-6 h-6"
                                                         title="Nenhum evento registrado"
-                                                        subtitle="Não há eventos de auditoria ou punições para este usuário."
+                                                        subtitle="Não há ações administrativas registradas para este usuário."
                                                     />
                                                 ) : (
                                                     <div className="space-y-3">
                                                         {auditEvents.map((ev: any) => (
-                                                            <div key={ev.id} className="p-3 bg-brand-gray dark:bg-dark-border/30 rounded-xl flex justify-between items-center text-sm">
-                                                                <div>
-                                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">{ev.action_type}</span>
-                                                                    <p className="text-xs text-brand-inactive-text mt-0.5">{ev.reason || "Sem justificativa"}</p>
+                                                            <div
+                                                                key={ev.id}
+                                                                className="p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                                                            >
+                                                                <div className="flex flex-col">
+                                                                    <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">
+                                                                        {ev.action_type || "Ação Administrativa"}
+                                                                    </span>
+                                                                    <span className="text-xs text-brand-inactive-text">
+                                                                        {ev.details?.reason || JSON.stringify(ev.details || {})}
+                                                                    </span>
                                                                 </div>
-                                                                <span className="text-xs text-brand-inactive-text">{formatDateTime(ev.created_at)}</span>
+                                                                <span className="text-xs text-brand-inactive-text shrink-0">
+                                                                    {formatDateTime(ev.created_at)}
+                                                                </span>
                                                             </div>
                                                         ))}
                                                     </div>
@@ -554,52 +574,97 @@ export function AdminUserDetailView({
                 {isBanned ? (
                     <Button
                         variant="outline"
-                        className="flex-1 text-brand-green border-brand-green/30 hover:bg-brand-green/10"
                         onClick={() => setUnbanModalOpen(true)}
+                        className="flex-1 text-brand-green border-brand-green/30"
                     >
-                        Revogar Banimento
+                        Desbanir
                     </Button>
                 ) : (
                     <Button
                         variant="destructive"
-                        className="flex-1"
                         onClick={() => setBanModalOpen(true)}
+                        className="flex-1"
                     >
-                        Banir Usuário
+                        Banir
                     </Button>
                 )}
+                <Button
+                    variant="outline"
+                    onClick={() => {
+                        setNewRiskScore(String(profile.risk_score || 0))
+                        setRiskModalOpen(true)
+                    }}
+                    className="flex-1"
+                >
+                    Score de Risco
+                </Button>
             </div>
 
-            {/* Modals de Ação */}
-            <DestructiveActionModal
+            {/* Modal: Ajustar Score de Risco */}
+            <DefaultModal
+                isOpen={riskModalOpen}
+                onClose={() => setRiskModalOpen(false)}
+                title="Ajustar Score de Risco do Usuário"
+            >
+                <div className="space-y-4 pt-2">
+                    <div>
+                        <label className="block text-xs font-semibold text-brand-dark dark:text-dark-heading mb-1">
+                            Pontuação de Risco (0 - 100)
+                        </label>
+                        <Input
+                            type="number"
+                            min={0}
+                            max={100}
+                            value={newRiskScore}
+                            onChange={(e) => setNewRiskScore(e.target.value)}
+                            placeholder="Ex: 10"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-semibold text-brand-dark dark:text-dark-heading mb-1">
+                            Motivo do Ajuste (Obrigatório para Auditoria)
+                        </label>
+                        <textarea
+                            value={riskReason}
+                            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setRiskReason(e.target.value)}
+                            placeholder="Descreva o motivo do ajuste..."
+                            rows={3}
+                            className="w-full px-3 py-2 text-sm rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading placeholder:text-brand-inactive-text focus:outline-none focus:ring-2 focus:ring-brand-green/20"
+                        />
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-3 border-t border-brand-border dark:border-dark-border">
+                        <Button variant="outline" onClick={() => setRiskModalOpen(false)}>
+                            Cancelar
+                        </Button>
+                        <Button onClick={handleSaveRiskScore} disabled={isPending}>
+                            Salvar Alteração
+                        </Button>
+                    </div>
+                </div>
+            </DefaultModal>
+
+            {/* Modal: Banir Usuário */}
+            <AlertModal
                 isOpen={banModalOpen}
                 onClose={() => setBanModalOpen(false)}
                 onConfirm={handleConfirmBan}
                 title="Banir Usuário"
-                description="O usuário perderá o acesso à plataforma e suas sessões ativas serão invalidadas."
-                entityName={profile.full_name || authUser?.email || userId}
-                consequences={[
-                    "Invalidação de tokens de autenticação",
-                    "Bloqueio de novos logins na plataforma",
-                    "Registro obrigatório no Audit Log",
-                ]}
-                confirmText="Confirmar Banimento"
-                isPending={isPending}
+                description={`Tem certeza que deseja banir ${profile.full_name || authUser?.email}? O usuário perderá acesso imediato à plataforma.`}
+                confirmText="Banir Usuário"
+                variant="danger"
             />
 
-            <DestructiveActionModal
+            {/* Modal: Desbanir Usuário */}
+            <AlertModal
                 isOpen={unbanModalOpen}
                 onClose={() => setUnbanModalOpen(false)}
                 onConfirm={handleConfirmUnban}
-                title="Revogar Banimento"
-                description="O usuário recuperará o acesso e poderá efetuar login novamente."
-                entityName={profile.full_name || authUser?.email || userId}
-                consequences={[
-                    "Desbloqueio imediato da conta",
-                    "Registro obrigatório da justificativa no Audit Log",
-                ]}
-                confirmText="Confirmar Desbloqueio"
-                isPending={isPending}
+                title="Desbanir Usuário"
+                description={`Deseja restabelecer o acesso de ${profile.full_name || authUser?.email}?`}
+                confirmText="Desbanir Usuário"
+                variant="success"
             />
         </>
     )

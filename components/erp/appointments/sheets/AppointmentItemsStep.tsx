@@ -18,6 +18,7 @@ interface ItemEntry {
     sku?: string | null
     stock?: number
     minStock?: number
+    isManual?: boolean
 }
 
 interface AppointmentItemsStepProps {
@@ -33,23 +34,27 @@ function resolveResourcesFromServices(services: any[]): ItemEntry[] {
     for (const svc of services) {
         const svcResources = svc.resources || []
         for (const res of svcResources) {
-            const key = res.product_id || `manual-${res.name}-${svc.id}`
+            const isManual = Boolean(res.isManual || !res.product_id)
+            const key = !isManual && res.product_id
+                ? (res.variant_id ? `${res.product_id}-${res.variant_id}` : res.product_id)
+                : `manual-${res.name}-${svc.id}`
             if (seen.has(key)) {
                 const existing = seen.get(key)!
                 existing.quantity += Number(res.quantity || 1)
             } else {
                 seen.set(key, {
                     key,
-                    productId: res.product_id || null,
-                    variantId: res.variant_id || null,
+                    productId: isManual ? null : (res.product_id || null),
+                    variantId: isManual ? null : (res.variant_id || null),
                     serviceId: svc.id || null,
                     name: res.name,
                     quantity: Number(res.quantity || 1),
                     usageType: res.usage_type || 'consumed',
                     serviceName: svc.name,
-                    image: res.image || res.product?.image || res.product?.images?.[0] || null,
-                    sku: res.sku || null,
-                    stock: res.stock,
+                    image: isManual ? null : (res.image || res.product?.image || res.product?.images?.[0] || null),
+                    sku: isManual ? null : (res.sku || null),
+                    stock: isManual ? undefined : res.stock,
+                    isManual,
                 })
             }
         }
@@ -59,9 +64,9 @@ function resolveResourcesFromServices(services: any[]): ItemEntry[] {
 }
 
 const usageTypeLabels: Record<string, { label: string; color: string }> = {
-    consumed: { label: 'Consumido', color: 'text-red-600 bg-red-50 dark:bg-red-900/10 border-red-100' },
-    returnable: { label: 'Retornável', color: 'text-blue-600 bg-blue-50 dark:bg-blue-900/10 border-blue-100' },
-    reference: { label: 'Referência', color: 'text-gray-500 bg-gray-50 dark:bg-gray-800 border-gray-200' },
+    consumed: { label: 'Consumido', color: 'text-red-600 bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/30' },
+    returnable: { label: 'Retornável', color: 'text-blue-600 bg-blue-50 dark:bg-blue-900/10 border-blue-100 dark:border-blue-900/30' },
+    reference: { label: 'Referência', color: 'text-gray-500 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-dark-border' },
 }
 
 export function AppointmentItemsStep({ items, onItemsChange, services, partnerPlan }: AppointmentItemsStepProps) {
@@ -92,6 +97,7 @@ export function AppointmentItemsStep({ items, onItemsChange, services, partnerPl
     }
 
     const isAdvancedPlan = partnerPlan === 'crescer' || partnerPlan === 'escalar'
+    const hasTrackedStockItems = items.some(item => Boolean(item.productId))
 
     return (
         <motion.div
@@ -107,7 +113,7 @@ export function AppointmentItemsStep({ items, onItemsChange, services, partnerPl
                 </h3>
                 <p className="text-brand-inactive-text dark:text-dark-body text-sm mb-6">
                     Ajuste a quantidade de cada item para este agendamento.
-                    {isAdvancedPlan && (
+                    {isAdvancedPlan && hasTrackedStockItems && (
                         <span className="ml-2 text-xs text-blue-600 bg-blue-50 dark:bg-blue-900/10 px-2 py-0.5 rounded">
                             Estoque verificado antes de confirmar
                         </span>
@@ -119,11 +125,12 @@ export function AppointmentItemsStep({ items, onItemsChange, services, partnerPl
                 {items.map((item) => {
                     const typeInfo = usageTypeLabels[item.usageType] || usageTypeLabels.reference
                     const isConsumed = item.usageType === 'consumed'
+                    const hasProductStock = Boolean(item.productId)
                     const currentStock = item.stock ?? 0
                     const projectedStock = currentStock - item.quantity
                     const minStock = item.minStock ?? 0
-                    const willGoNegative = isConsumed && projectedStock < 0
-                    const willGoBelowMin = isConsumed && minStock > 0 && projectedStock < minStock
+                    const willGoNegative = hasProductStock && isConsumed && projectedStock < 0
+                    const willGoBelowMin = hasProductStock && isConsumed && minStock > 0 && projectedStock < minStock
 
                     const itemImg = item.image || (item as any).product?.image || (item as any).product?.images?.[0]
                     return (
@@ -150,8 +157,13 @@ export function AppointmentItemsStep({ items, onItemsChange, services, partnerPl
                                     <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${typeInfo.color}`}>
                                         {typeInfo.label}
                                     </span>
+                                    {!hasProductStock && (
+                                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full border text-brand-inactive-text bg-brand-gray/50 dark:bg-dark-border/40 border-brand-border dark:border-dark-border">
+                                            Item manual
+                                        </span>
+                                    )}
                                 </div>
-                                {isConsumed && (
+                                {isConsumed && hasProductStock && (
                                     <div className="flex items-center gap-2 mt-2 flex-wrap">
                                         {item.stock === undefined ? (
                                             <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full border text-gray-400 bg-gray-50 dark:bg-gray-800 border-gray-200">
@@ -160,10 +172,10 @@ export function AppointmentItemsStep({ items, onItemsChange, services, partnerPl
                                         ) : (
                                             <>
                                                 <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full border ${
-                                                    willGoNegative ? 'text-red-600 bg-red-50 border-red-100' :
-                                                    willGoBelowMin ? 'text-amber-600 bg-amber-50 border-amber-100' :
-                                                    projectedStock <= minStock && minStock > 0 ? 'text-amber-600 bg-amber-50 border-amber-100' :
-                                                    'text-emerald-600 bg-emerald-50 border-emerald-100'
+                                                    willGoNegative ? 'text-red-600 bg-red-50 border-red-100 dark:bg-red-900/20 dark:border-red-800/40 dark:text-red-400' :
+                                                    willGoBelowMin ? 'text-amber-600 bg-amber-50 border-amber-100 dark:bg-amber-900/20 dark:border-amber-800/40 dark:text-amber-400' :
+                                                    projectedStock <= minStock && minStock > 0 ? 'text-amber-600 bg-amber-50 border-amber-100 dark:bg-amber-900/20 dark:border-amber-800/40 dark:text-amber-400' :
+                                                    'text-emerald-600 bg-emerald-50 border-emerald-100 dark:bg-emerald-900/20 dark:border-emerald-800/40 dark:text-emerald-400'
                                                 }`}>
                                                     {willGoNegative ? (
                                                         <>
@@ -180,7 +192,7 @@ export function AppointmentItemsStep({ items, onItemsChange, services, partnerPl
                                                     )}
                                                 </span>
                                                 {Boolean(item.productId) && item.stock !== undefined && item.stock <= 0 && (
-                                                    <span className="flex items-center gap-1 text-[10px] text-amber-600 font-medium">
+                                                    <span className="flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 font-medium">
                                                         <AlertTriangleIcon size={10} />
                                                         Sem estoque disponível
                                                     </span>

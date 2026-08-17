@@ -100,7 +100,7 @@ export const AddressTab: React.FC<AddressTabProps> = ({
         <FadeIn>
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                 <div className="lg:col-span-8 flex flex-col gap-8">
-                    <FormSection title="Endereço de Entrega" hasSeparator={false}>
+                    <FormSection title="Endereço de Entrega">
                         {isPaidOrder ? (
                             <div className="space-y-4 rounded-2xl border border-brand-border p-6 dark:border-dark-border bg-white dark:bg-dark-surface">
                                 <InfoRow label="CEP" value={cep || "-"} />

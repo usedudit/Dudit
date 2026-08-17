@@ -9,6 +9,7 @@ import { CheckCircleIcon, ColumnsIcon, BlockedIcon, PlusIcon } from "@/lib/icons
 interface DeliveryKanbanBoardProps {
     deliveries: any[]
     onDetails: (deliveryId: string) => void
+    onEdit?: (deliveryId: string) => void
     onQuickStatusChange?: (deliveryId: string, status: string) => void
     activeTab?: "active" | "closed"
 }
@@ -16,6 +17,7 @@ interface DeliveryKanbanBoardProps {
 export default function DeliveryKanbanBoard({
     deliveries,
     onDetails,
+    onEdit,
     onQuickStatusChange,
     activeTab = "active",
 }: DeliveryKanbanBoardProps) {
@@ -160,6 +162,7 @@ export default function DeliveryKanbanBoard({
                                                     key={delivery.id}
                                                     delivery={delivery}
                                                     onDetails={() => onDetails(delivery.id)}
+                                                    onEdit={onEdit ? () => onEdit(delivery.id) : undefined}
                                                     onQuickStatusChange={onQuickStatusChange}
                                                 />
                                             ))
@@ -196,6 +199,7 @@ export default function DeliveryKanbanBoard({
                                             key={delivery.id}
                                             delivery={delivery}
                                             onDetails={() => onDetails(delivery.id)}
+                                            onEdit={onEdit ? () => onEdit(delivery.id) : undefined}
                                             onQuickStatusChange={onQuickStatusChange}
                                         />
                                     ))}

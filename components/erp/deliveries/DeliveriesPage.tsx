@@ -6,17 +6,12 @@ import { useEntityState } from "@/hooks/use-entity-state"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button, IconPlaceholder, AlertModal, FormDropdown, Input, SkeletonLoader } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
-import Pagination from "@/components/reusable/Pagination"
-import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
-import { ExportFileIcon, PlusIcon, ArrowUpDownIcon, SparklesIcon, MapPinIcon } from "@/lib/icons"
-
+import { ExportFileIcon, PlusIcon, SparklesIcon, MapPinIcon } from "@/lib/icons"
 import { useInfiniteList } from "@/hooks/use-infinite-list"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { getERPDeliveriesPageAction, type ERPDeliveryListCursor, updateERPDeliveryStatusAction, getERPDeliveryPlanAccessAction, getSmartDeliverySuggestionsAction } from "@/app/actions/erp/deliveries"
 import { getDeliveryStatusMeta } from "@/lib/orders/status"
 import DeliveryPageControls from "./DeliveryPageControls"
-import DeliveryListItem from "./DeliveryListRow"
-import DeliveryGridCard from "./DeliveryGridCard"
 import DeliveryKanbanBoard from "./DeliveryKanbanBoard"
 import CreateDeliveryPage from "./CreateDeliveryPage"
 import DeliveryDetailPage from "./DeliveryDetailPage"
@@ -74,8 +69,10 @@ export default function DeliveriesPage({
 
     const { state: entityState, open: openEntity, close: closeEntity } = useEntityState()
     const isCreatingEntity = entityState.isOpen && entityState.action === "create"
-    const selectedDeliveryId = entityState.isOpen && (entityState.action === "view" || entityState.action === "edit") ? entityState.entityId : null
-    const wrapper = isCreatingEntity ? "create" : selectedDeliveryId ? "detail" : "list"
+    const isEditingEntity = entityState.isOpen && entityState.action === "edit"
+    const selectedDeliveryId = entityState.isOpen && entityState.action === "view" ? entityState.entityId : null
+    const editDeliveryId = isEditingEntity ? entityState.entityId : null
+    const wrapper = isCreatingEntity ? "create" : isEditingEntity ? "edit" : selectedDeliveryId ? "detail" : "list"
 
     const [createPrefillOrderIds, setCreatePrefillOrderIds] = useState<string[] | null>(null)
 
@@ -225,8 +222,10 @@ export default function DeliveriesPage({
         let active = 0
         let closed = 0
         for (const raw of items || []) {
+            const links = Array.isArray(raw.delivery_orders) ? raw.delivery_orders : []
+            if (links.length === 0) continue
             const effectiveStatus = statusOverrides[raw.id] || raw.status || "not_sent"
-            const isClosed = ["delivered", "cancelled", "delivery_failed"].includes(effectiveStatus)
+            const isClosed = ["cancelled", "delivery_failed"].includes(effectiveStatus)
             if (isClosed) closed++
             else active++
         }
@@ -238,6 +237,7 @@ export default function DeliveriesPage({
         const nowMs = Date.now()
         let list = (items || []).map((raw: any) => {
             const links = Array.isArray(raw.delivery_orders) ? raw.delivery_orders : []
+            if (links.length === 0) return null
             const firstLink = [...links].sort((a: any, b: any) => Number(a.position || 9999) - Number(b.position || 9999))[0]
             const order = firstLink?.orders || {}
             const deliveryPersonName = raw.partner_users?.user_profiles?.full_name || null
@@ -280,15 +280,15 @@ export default function DeliveriesPage({
                 deliveryTimingLabel: estimatedArrivalAt ? (isLate ? "Atrasada" : "No prazo") : "",
                 deliveryTimingDetail: estimatedArrivalAt && !isLate && !isClosed ? remainingLabel : "",
             }
-        })
+        }).filter(Boolean)
 
         list = list.filter((d: any) => {
             const matchSearch = !term || d.orderDisplayId.toLowerCase().includes(term) || d.customerName.toLowerCase().includes(term)
             const statusLabel = getDeliveryStatusMeta(d.status).label
             const matchStatus = filters.status.length === 0 || filters.status.includes(statusLabel)
 
-            const isClosed = ["delivered", "cancelled", "delivery_failed"].includes(d.status)
-            const matchTab = activeTab === "closed" ? isClosed : !isClosed
+            const isClosedTab = ["cancelled", "delivery_failed"].includes(d.status)
+            const matchTab = activeTab === "closed" ? isClosedTab : !isClosedTab
 
             return matchSearch && matchStatus && matchTab
         })
@@ -398,18 +398,25 @@ export default function DeliveriesPage({
 
     return (
         <AnimatePresence mode="wait">
-            {wrapper === "create" ? (
-                <FadeIn key="create" className="w-full h-full">
+            {wrapper === "create" || wrapper === "edit" ? (
+                <FadeIn key={wrapper} className="w-full h-full">
                     <CreateDeliveryPage
                         partnerId={partnerId}
+                        editDeliveryId={editDeliveryId || undefined}
                         onBack={() => { setCreatePrefillOrderIds(null); closeEntity() }}
                         onSuccess={() => { setCreatePrefillOrderIds(null); closeEntity() }}
                         initialOrderIds={createPrefillOrderIds || undefined}
                     />
                 </FadeIn>
-             ) : wrapper === "detail" && selectedDeliveryId ? (
+            ) : wrapper === "detail" && selectedDeliveryId ? (
                 <FadeIn key="detail" className="w-full h-full">
-                    <DeliveryDetailPage deliveryId={selectedDeliveryId} partnerId={partnerId} onBack={() => closeEntity()} planSlug={planSlug} />
+                    <DeliveryDetailPage
+                        deliveryId={selectedDeliveryId}
+                        partnerId={partnerId}
+                        onBack={() => closeEntity()}
+                        onEdit={(id) => openEntity("edit", id)}
+                        planSlug={planSlug}
+                    />
                 </FadeIn>
             ) : (
                 <FadeIn key="list" className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
@@ -485,6 +492,7 @@ export default function DeliveriesPage({
                                             deliveries={mapped}
                                             activeTab={activeTab}
                                             onDetails={(id) => openEntity("view", id)}
+                                            onEdit={(id) => openEntity("edit", id)}
                                             onQuickStatusChange={handleQuickStatusChange}
                                         />
                                     </FadeIn>

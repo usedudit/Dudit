@@ -495,11 +495,19 @@ export default function PromotionFormPage({
 
     const totalCustomerPages = Math.ceil(filteredSelectedCustomers.length / 5)
 
-    const SidebarCard = ({ children, className = "", hasTopStrip = false }: { children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
-        <div className={`bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
-            {hasTopStrip && <div className="absolute top-0 left-0 w-full h-[3px] bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
-            {children}
-        </div>
+    const SidebarCard = ({ title, children, className = "", hasTopStrip = false }: { title?: React.ReactNode; children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
+        <>
+            {/* Desktop: card */}
+            <div className={`hidden lg:block bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
+                {hasTopStrip && <div className="absolute top-0 left-0 w-full h-[3px] bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
+                {title ? <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">{title}</h3> : null}
+                {children}
+            </div>
+            {/* Mobile/Tablet: FormSection */}
+            <FormSection title={title} hasSeparator className="lg:hidden">
+                {children}
+            </FormSection>
+        </>
     )
 
     // Render list for selected products
@@ -1194,8 +1202,7 @@ export default function PromotionFormPage({
 
                                             {/* Right Column */}
                                             <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
-                                                <SidebarCard hasTopStrip>
-                                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Duração da Campanha</h3>
+                                                <SidebarCard hasTopStrip title="Duração da Campanha">
                                                     <div className="space-y-5">
                                                         <DatePicker
                                                             label="Início da Vigência"
@@ -1442,8 +1449,7 @@ export default function PromotionFormPage({
 
                                                     {/* Right Column: Rule limits and status */}
                                                     <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
-                                                        <SidebarCard hasTopStrip={true}>
-                                                            <h3 className="text-[15px] font-bold text-brand-dark dark:text-dark-heading mb-5">Limitações</h3>
+                                                        <SidebarCard hasTopStrip title="Limitações">
                                                             <div className="space-y-4">
                                                                 <Input
                                                                     label="Prioridade de Execução"

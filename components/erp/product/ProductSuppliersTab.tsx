@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Checkbox, Button, IconPlaceholder, Input, Spinner } from "@/components/reusable"
+import { Checkbox, Button, IconPlaceholder, Input, Spinner, FormSection } from "@/components/reusable"
 import { PlusIcon, TrashIcon, TagIcon, EditIcon, CheckIcon, XIcon, Package, ClockIcon } from "@/lib/icons"
 import {
     getProductSuppliersAction,
@@ -34,11 +34,19 @@ interface ColumnDef {
     width?: string
 }
 
-const SidebarCard = ({ children, className = "", hasTopStrip = false }: { children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
-    <div className={`bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
-        {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
-        {children}
-    </div>
+const SidebarCard = ({ title, children, className = "", hasTopStrip = false }: { title?: React.ReactNode; children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
+    <>
+        {/* Desktop: card */}
+        <div className={`hidden lg:block bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
+            {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
+            {title ? <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">{title}</h3> : null}
+            {children}
+        </div>
+        {/* Mobile/Tablet: FormSection */}
+        <FormSection title={title} hasSeparator className="lg:hidden">
+            {children}
+        </FormSection>
+    </>
 )
 
 const getJustifyClass = (align?: string) => {
@@ -309,7 +317,7 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
     onSavePendingSuppliers,
 }) => {
     const { error: notifyError, success: notifySuccess } = useNotification()
-    const isTablet = useMediaQuery("(max-width: 1279px)")
+    const isTablet = useMediaQuery("(max-width: 1023px)")
     const productId = productData?.id
     const partnerId = propPartnerId || productData?.partner_id || ""
 
@@ -552,8 +560,7 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
             {!isTablet && selectedSupplier && (
                 <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-0 xl:border-l border-brand-border dark:border-dark-border">
                     {/* Última Compra */}
-                    <SidebarCard>
-                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading uppercase tracking-wide mb-4">Última Compra</h3>
+                    <SidebarCard title="Última Compra">
                         <div className="flex items-center gap-3 pb-3 border-b border-brand-border dark:border-dark-border">
                             <div className="w-10 h-10 rounded-full bg-brand-green/10 flex items-center justify-center">
                                 <Package size={18} className="text-brand-green" />
@@ -594,8 +601,7 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
                     </SidebarCard>
 
                     {/* Histórico de Custos */}
-                    <SidebarCard>
-                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading uppercase tracking-wide mb-4">Histórico de Custos</h3>
+                    <SidebarCard title="Histórico de Custos">
                         {costHistoryLoading ? (
                             <div className="flex justify-center py-4"><Spinner size={20} /></div>
                         ) : costHistory.length === 0 ? (
@@ -625,8 +631,7 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
                     </SidebarCard>
 
                     {/* Compras Recentes */}
-                    <SidebarCard>
-                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading uppercase tracking-wide mb-4">Compras Recentes</h3>
+                    <SidebarCard title="Compras Recentes">
                         {purchasesLoading ? (
                             <div className="flex justify-center py-4"><Spinner size={20} /></div>
                         ) : purchases.length === 0 ? (

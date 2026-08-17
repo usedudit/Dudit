@@ -54,9 +54,9 @@ export const DisplayRow = ({
         </div>
         <div className="flex-1">
             <p className="text-base font-semibold text-brand-dark dark:text-dark-heading">
-                {value || <span className="text-brand-inactive-text">Não informado</span>}
+                {value || <span className="text-brand-inactive-text dark:text-dark-body">Não informado</span>}
             </p>
-            <p className="text-sm text-brand-inactive-text">{description}</p>
+            <p className="text-sm text-brand-inactive-text dark:text-dark-body">{description}</p>
         </div>
         <Button type="button" variant="outline" onClick={onEdit}>Alterar</Button>
     </div>
@@ -106,7 +106,7 @@ export const PageHeader = ({
             </div>
             <div>
                 <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">{title}</h1>
-                <p className="text-md text-brand-inactive-text mt-1">{subtitle}</p>
+                <p className="text-md text-brand-inactive-text dark:text-dark-body mt-1">{subtitle}</p>
             </div>
         </div>
     )
@@ -134,7 +134,7 @@ export const ProfileCard = ({
             <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading truncate">{title}</h3>
             <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-tight truncate">{description}</p>
         </div>
-        <ChevronRightIcon className="text-brand-inactive-text group-hover:text-brand-dark dark:group-hover:text-dark-heading transition-colors" />
+        <ChevronRightIcon className="text-brand-inactive-text dark:text-dark-body group-hover:text-brand-dark dark:group-hover:text-dark-heading transition-colors" />
     </div>
 )
 

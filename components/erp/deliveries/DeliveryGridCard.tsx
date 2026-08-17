@@ -10,11 +10,14 @@ import { getDeliveryStatusMeta, getDeliveryStatusIcon } from "@/lib/orders/statu
 interface DeliveryGridCardProps {
   delivery: any
   onDetails: () => void
+  onEdit?: () => void
   onQuickStatusChange?: (deliveryId: string, status: string) => void
 }
 
-const DeliveryGridCard = React.memo(({ delivery, onDetails, onQuickStatusChange }: DeliveryGridCardProps) => {
+const DeliveryGridCard = React.memo(({ delivery, onDetails, onEdit, onQuickStatusChange }: DeliveryGridCardProps) => {
   const statusMeta = getDeliveryStatusMeta(delivery.status)
+  const canEdit = ["pending", "not_sent", "preparing"].includes(delivery.status)
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -55,7 +58,12 @@ const DeliveryGridCard = React.memo(({ delivery, onDetails, onQuickStatusChange 
           ) : null}
         </div>
         <div onClick={(e) => e.stopPropagation()}>
-          <ActionsDropdown onEdit={onDetails}>
+          <ActionsDropdown
+            onView={onDetails}
+            onEdit={canEdit && onEdit ? onEdit : undefined}
+            onCancel={delivery.status !== "cancelled" ? () => onQuickStatusChange?.(delivery.id, "cancelled") : undefined}
+            cancelLabel="Cancelar entrega"
+          >
             <DropdownItem onClick={() => onQuickStatusChange?.(delivery.id, delivery.status)}>Alterar Status de Entrega</DropdownItem>
           </ActionsDropdown>
         </div>

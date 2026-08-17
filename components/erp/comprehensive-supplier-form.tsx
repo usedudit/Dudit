@@ -63,8 +63,10 @@ export function ComprehensiveSupplierForm({ partnerId, supplier }: Comprehensive
     complement: supplier?.complement || "",
     neighborhood: supplier?.neighborhood || "",
     city: supplier?.city || "",
-    state: supplier?.state || "",
+state: supplier?.state || "",
     municipioCodigoIbge: supplier?.municipio_codigo_ibge || "",
+    latitude: supplier?.latitude ?? null,
+    longitude: supplier?.longitude ?? null,
   })
 
   const initialSnapshot = useMemo(() => JSON.stringify({
@@ -175,6 +177,8 @@ export function ComprehensiveSupplierForm({ partnerId, supplier }: Comprehensive
           city: formData.city,
           state: formData.state,
           municipioCodigoIbge: formData.personType === "pj" ? formData.municipioCodigoIbge : undefined,
+          latitude: formData.latitude ?? null,
+          longitude: formData.longitude ?? null,
         }
         : {
           supplierId: undefined,
@@ -200,6 +204,8 @@ export function ComprehensiveSupplierForm({ partnerId, supplier }: Comprehensive
           city: formData.city,
           state: formData.state,
           municipioCodigoIbge: formData.personType === "pj" ? formData.municipioCodigoIbge : undefined,
+          latitude: formData.latitude ?? null,
+          longitude: formData.longitude ?? null,
         }
 
       const result = await action(payload)
@@ -349,6 +355,8 @@ export function ComprehensiveSupplierForm({ partnerId, supplier }: Comprehensive
                       city: data.city || prev.city,
                       state: data.state || prev.state,
                       municipioCodigoIbge: data.ibge || prev.municipioCodigoIbge,
+                      latitude: typeof data.latitude === "number" ? data.latitude : prev.latitude,
+                      longitude: typeof data.longitude === "number" ? data.longitude : prev.longitude,
                     }))
                   }}
                 />

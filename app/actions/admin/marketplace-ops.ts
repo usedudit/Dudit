@@ -5,8 +5,6 @@ import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { getAdminClient } from "@/lib/supabase/admin"
 import type { CursorPaginatedResult } from "@/lib/admin/types"
-import { adminAuditLog } from "@/lib/admin/audit"
-import { AdminActionType } from "@/lib/admin/types"
 
 function sanitizeIlike(input: string): string {
     return input.replace(/[%_\\]/g, c => `\\${c}`)
@@ -76,21 +74,14 @@ export async function getAdminMarketplaceOrders(
             delivery_type,
             payment_method,
             payment_provider,
-            payment_breakdown,
             total_amount,
             paid_amount,
             amount_paid,
-            subtotal_original,
-            discount_total,
-            shipping_total,
             order_source,
-            exchange_parent_order_id,
-            exchange_return_request_id,
-            notes,
             created_at,
-            stores!left(id, name, person_type, logo_url, phone),
-            order_items(id, product_id, product_name, product_price, quantity, subtotal, net_item_value, product_variants(id, variant_name), products(id, sku, images)),
-            return_requests!order_id(id, request_type, status, resolution_type, refund_amount, store_credit_amount, source, created_at)
+            stores!left(id, name, logo_url, phone),
+            order_items(id, product_name, quantity),
+            return_requests!order_id(id, status)
         `)
 
     if (filters?.search && filters.search.trim().length > 0) {
@@ -181,7 +172,7 @@ export async function getAdminMarketplaceOrderDetail(orderId: string): Promise<a
             .select("user_id, full_name, avatar_url, phone, cpf, birth_date")
             .eq("user_id", order.buyer_id)
             .maybeSingle()
-        
+
         // Get buyer email from auth
         try {
             const { data: authUser } = await admin.auth.admin.getUserById(order.buyer_id)

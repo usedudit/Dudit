@@ -14,6 +14,7 @@ import {
     TabsList,
     TabsTrigger,
     CustomerCard,
+    CustomerMobileBar,
     FormTextarea,
     Badge,
     Checkbox,
@@ -828,7 +829,7 @@ export default function CreateReturnPage({
                             <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
 
                                 {/* Back button - desktop only */}
-                                <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                                <div className={`absolute -left-12 top-7 h-full hidden lg:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
                                     <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
                                         <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                     </Button>
@@ -890,6 +891,20 @@ export default function CreateReturnPage({
                                 <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
                                     <TabsContent value="general" className="mt-0">
                                         <FadeIn key="general" className="space-y-8">
+                                            {/* Cliente - Mobile/Tablet only */}
+                                            {selectedOrder && (
+                                                <div className="lg:hidden">
+                                                    <CustomerMobileBar
+                                                        customer={selectedOrder.customer || {
+                                                            name: selectedOrder.customer_name || selectedOrder.customer?.name || "Cliente",
+                                                            email: selectedOrder.customer?.email || "",
+                                                            phone: selectedOrder.customer?.phone || "",
+                                                        }}
+                                                        address={customerAddress}
+                                                        showMap={false}
+                                                    />
+                                                </div>
+                                            )}
                                             {/* Search / Order Selection */}
                                             <FormSection title="Pedido Origem">
                                                 <div className="space-y-4">
@@ -1923,19 +1938,21 @@ export default function CreateReturnPage({
                                 {/* Customer details right column (Sticky Customer Card) */}
                                 <div className="col-span-12 lg:col-span-4 border-l-0 lg:border-l border-brand-border dark:border-dark-border pl-0 lg:pl-12">
                                     <div className="sticky top-6">
-                                        {selectedOrder ? (
-                                            <CustomerCard
-                                                customer={selectedOrder.customer || {
-                                                    name: selectedOrder.customer_name || selectedOrder.customer?.name || "Cliente",
-                                                    email: selectedOrder.customer?.email || "",
-                                                    phone: selectedOrder.customer?.phone || "",
-                                                }}
-                                                address={customerAddress}
-                                                showMap={true}
-                                            />
-                                        ) : (
-                                            <InfoCard color="gray" title="Sem Pedido Selecionado" message="Selecione um pedido para visualizar os dados do cliente e o mapa de entrega aqui." />
-                                        )}
+                                        <div className="hidden lg:block">
+                                            {selectedOrder ? (
+                                                <CustomerCard
+                                                    customer={selectedOrder.customer || {
+                                                        name: selectedOrder.customer_name || selectedOrder.customer?.name || "Cliente",
+                                                        email: selectedOrder.customer?.email || "",
+                                                        phone: selectedOrder.customer?.phone || "",
+                                                    }}
+                                                    address={customerAddress}
+                                                    showMap={true}
+                                                />
+                                            ) : (
+                                                <InfoCard color="gray" title="Sem Pedido Selecionado" message="Selecione um pedido para visualizar os dados do cliente e o mapa de entrega aqui." />
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             </div>

@@ -68,7 +68,7 @@ export function PixQrDisplayModal({
                 <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading text-center mb-2">
                     Agora é só pagar com Pix
                 </h1>
-                <p className="text-md text-brand-inactive-text text-center max-w-md mb-4">
+                <p className="text-md text-brand-inactive-text dark:text-dark-body text-center max-w-md mb-4">
                     É rapidinho: escaneie o QR Code ou copie o código Pix e pague pelo app do seu banco.
                 </p>
 
@@ -83,14 +83,14 @@ export function PixQrDisplayModal({
 
                 {/* Amount Display */}
                 <div className="mt-4 flex flex-col items-center">
-                    <span className="text-2xl font-bold text-brand-dark">{formatCurrency(amount)}</span>
+                    <span className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(amount)}</span>
                 </div>
 
                 {/* Separator */}
                 <div className="w-full max-w-md">
                     <div className="flex items-center gap-4 mb-6">
                         <Separator className="flex-1" />
-                        <span className="text-xs text-brand-inactive-text">ou copie manualmente</span>
+                        <span className="text-xs text-brand-inactive-text dark:text-dark-body">ou copie manualmente</span>
                         <Separator className="flex-1" />
                     </div>
                 </div>

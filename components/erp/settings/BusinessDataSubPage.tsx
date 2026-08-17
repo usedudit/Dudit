@@ -140,6 +140,8 @@ export const BusinessDataSubPage = ({
                     state: addr.state || "",
                     noNumber: addr.number === "S/N",
                     ibge: addr.municipio_codigo_ibge || "",
+                    latitude: addr.latitude ?? null,
+                    longitude: addr.longitude ?? null,
                 })
             }
         }
@@ -165,6 +167,8 @@ export const BusinessDataSubPage = ({
         state: effectiveState,
         noNumber: effectiveNumber === "S/N",
         ibge: store?.addresses?.[0]?.municipio_codigo_ibge || "",
+        latitude: store?.addresses?.[0]?.latitude ?? null,
+        longitude: store?.addresses?.[0]?.longitude ?? null,
     })
 
     const [fiscalInfo, setFiscalInfo] = useState({
@@ -320,6 +324,8 @@ export const BusinessDataSubPage = ({
                         state: addresses.state,
                         noNumber: addresses.noNumber,
                         municipioCodigoIbge: addresses.ibge || undefined,
+                        latitude: addresses.latitude ?? null,
+                        longitude: addresses.longitude ?? null,
                         person_type: generalInfo.personType as "pf" | "pj",
                         cnpj: generalInfo.personType === "pj" ? (generalInfo.cnpj || null) : null,
                         cpf: generalInfo.personType === "pf" ? (generalInfo.cnpj || null) : null,
@@ -495,7 +501,7 @@ export const BusinessDataSubPage = ({
                                             </FormSection>
 
                                             {/* Dados Tributários */}
-                                            <FormSection hasSeparator title="Dados tributários" className="mb-8">
+                                            <FormSection hasSeparator title="Dados tributários">
                                                 <div className="space-y-6">
                                                     <div>
                                                         <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Tipo de pessoa</label>
@@ -688,6 +694,8 @@ export const BusinessDataSubPage = ({
                                                                 state: data.state || prev.state,
                                                                 noNumber: data.number === "S/N",
                                                                 ibge: data.ibge || prev.ibge,
+                                                                latitude: typeof data.latitude === "number" ? data.latitude : prev.latitude,
+                                                                longitude: typeof data.longitude === "number" ? data.longitude : prev.longitude,
                                                             }))
                                                             setFieldErrors(prev => {
                                                                 const n = new Set(prev)

@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { FadeIn } from "@/components/animations/FadeIn"
 import {
     Input, Button, FormDropdown, Combobox,
-    CustomerCard, IconPlaceholder, DatePicker, Pagination,
+    CustomerCard, CustomerMobileBar, IconPlaceholder, DatePicker, Pagination,
     ThreeDotsLoader,
     MoneyInput,
     InfoCard,
@@ -14,7 +14,6 @@ import {
     Badge,
     Tooltip,
 } from "@/components/reusable"
-import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import {
     SearchIcon, PlusIcon, TagIcon, TrashIcon,
     CheckCircleIcon, EditIcon, UserIcon,
@@ -224,7 +223,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
     return (
         <FadeIn>
             {/* Desktop View */}
-            <div className="hidden xl:grid grid-cols-12 gap-y-8 md:gap-y-0">
+            <div className="hidden lg:grid grid-cols-12 gap-y-8 md:gap-y-0">
                 <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
                     {isPaidOrder ? (
                         <section className="space-y-6">
@@ -381,22 +380,22 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                                 <div className="flex flex-col text-left flex-1 min-w-0">
                                                                     {item.isEditing ? (
                                                                         <div className="mb-0">
-<Input
-                                                                            name={`item-name-${index}`}
-                                                                            value={item.name}
-                                                                            disabled={isMarketplaceLocked}
-                                                                            onChange={(e: any) => {
-                                                                                updateItemField(index, 'name', e.target.value);
-                                                                                if (nameErrors[index]) {
-                                                                                    setNameErrors(prev => ({ ...prev, [index]: false }));
-                                                                                }
-                                                                            }}
-                                                                            placeholder="Nome do produto..."
-                                                                            error={hasNameError}
-                                                                            errorMessage="Nome obrigatório"
-                                                                            className="mb-0"
-                                                                            maxLength={150}
-                                                                        />
+                                                                            <Input
+                                                                                name={`item-name-${index}`}
+                                                                                value={item.name}
+                                                                                disabled={isMarketplaceLocked}
+                                                                                onChange={(e: any) => {
+                                                                                    updateItemField(index, 'name', e.target.value);
+                                                                                    if (nameErrors[index]) {
+                                                                                        setNameErrors(prev => ({ ...prev, [index]: false }));
+                                                                                    }
+                                                                                }}
+                                                                                placeholder="Nome do produto..."
+                                                                                error={hasNameError}
+                                                                                errorMessage="Nome obrigatório"
+                                                                                className="mb-0"
+                                                                                maxLength={150}
+                                                                            />
                                                                         </div>
                                                                     ) : (
                                                                         <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate max-w-[250px]">
@@ -998,48 +997,27 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
             </div>
 
             {/* Mobile/Tablet View */}
-            <div className="xl:hidden space-y-6">
+            <div className="lg:hidden space-y-6">
                 {/* 1. Cliente */}
-                <FormSection title="" hasSeparator={false} className="mt-0">
-                    {selectedCustomer ? (
-                        <ListItem
-                            left={
-                                <UserProfileImage
-                                    fullName={selectedCustomer.name || "Cliente"}
-                                    imageUrl={selectedCustomer.image_url || selectedCustomer.avatar_url || selectedCustomer.avatar}
-                                    className="w-10 h-10 text-base"
-                                />
-                            }
-                            title={selectedCustomer.name}
-                            description={selectedCustomer.email || "Sem e-mail cadastrado"}
-                            className="border-0 bg-transparent px-0 hover:bg-transparent"
-                            showChevron={true}
-                            onClick={isMarketplaceLocked ? undefined : () => setIsCustomerSheetOpen(true)}
-                        />
-                    ) : (
-                        <ListItem
-                            left={
-                                <div className="w-10 h-10 rounded-full bg-brand-slate dark:bg-dark-border/50 flex items-center justify-center border border-brand-border dark:border-dark-border shrink-0">
-                                    <UserIcon size={20} className="text-brand-dark dark:text-dark-heading" />
-                                </div>
-                            }
-                            title="Nenhum cliente selecionado"
-                            description="Clique para selecionar um cliente"
-                            className="border-0 bg-transparent px-0 hover:bg-transparent"
-                            showChevron={true}
-                            onClick={isMarketplaceLocked ? undefined : () => setIsCustomerSheetOpen(true)}
-                        />
-                    )}
-                </FormSection>
+                {!isQuickMode && (
+                    <CustomerMobileBar
+                        customer={selectedCustomer}
+                        address={selectedCustomer?.addresses?.find((a: any) => a.address_type === "primary" || a.is_default) || selectedCustomer?.addresses?.[0]}
+                        billingAddress={selectedCustomer?.addresses?.find((a: any) => a.address_type === "billing")}
+                        onSelect={() => setIsCustomerSheetOpen(true)}
+                        onRemove={() => setSelectedCustomer(null)}
+                        disabled={isMarketplaceLocked}
+                    />
+                )}
 
                 {isPaidOrder && (
-                    <FormSection title="" hasSeparator={false} className="mt-0">
+                    <FormSection title="" className="mt-0">
                         <InfoCard color="orange" title="Edição Restrita (Pedido Pago)" message="Como o pedido já está pago, não é possível editar itens, valores, cliente ou formas de pagamento. Apenas observações podem ser atualizadas." />
                     </FormSection>
                 )}
 
                 {/* 2. Itens do Pedido */}
-                <FormSection title="Itens do Pedido" hasSeparator={false}>
+                <FormSection title="Itens do Pedido">
                     {isPaidOrder ? (
                         <div className="space-y-4">
                             {items.map((item: any, idx: number) => (
@@ -1322,7 +1300,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                 </FormSection>
 
                 {/* 3. Configurações do Pedido (Mobile) */}
-                <FormSection title="Configurações do Pedido" hasSeparator={false}>
+                <FormSection title="Configurações do Pedido">
                     {isPaidOrder ? (
                         <div className="space-y-4 text-left">
                             <PaymentRow label="Data do Pedido" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatDateString(orderDate)}</span>} />

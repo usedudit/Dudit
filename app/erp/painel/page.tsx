@@ -7,6 +7,7 @@ import { GlobalPeriodFilter } from "@/components/erp/GlobalPeriodFilter"
 import { DashboardProvider } from "@/components/erp/dashboard/DashboardContext"
 import { getAllUserPartnerAccess, getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { checkPermission } from "@/lib/permissions/access"
+import { IconPlaceholder } from "@/components/reusable"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import type { Period, CompareMode } from "@/lib/period-types"
 
@@ -29,6 +30,31 @@ export default async function ERPDashboardPage(props: { searchParams?: Promise<{
     if (!context) return <AccessDenied />
 
     const partnerId = context.partnerId
+    const roleId = context.roleId
+
+    if (roleId === "delivery") {
+        return (
+            <>
+                <ERPPageHeader title="Início" />
+                <div className="flex items-center justify-center min-h-[calc(100vh-140px)] p-4 text-center">
+                    <FadeIn>
+                        <IconPlaceholder
+                            placeholderType="image"
+                            imageSrc="https://img.dudit.com.br/static/mascots/QRDino.png"
+                            imageAlt="Área do Entregador"
+                            title="Área do Entregador"
+                            subtitle="Acesse a seção de entregas para acompanhar suas rotas e entregas em tempo real."
+                            itemButton={{
+                                text: "Acessar Entregas",
+                                action: "/erp/logistica"
+                            }}
+                        />
+                    </FadeIn>
+                </div>
+            </>
+        )
+    }
+
     const { allowed } = await checkPermission(partnerId, "dashboard", "view")
     if (!allowed) return <AccessDenied />
 

@@ -29,6 +29,7 @@ import { resolvePaymentMethodsForStore } from "@/lib/data/payment-methods"
 import { listStoreProducts } from "@/lib/store-products"
 import { listStoreServices } from "@/lib/store-services"
 import { getPartnerCapabilities } from "@/lib/services/partner-capabilities"
+import { enrichAddressData } from "@/lib/services/location.service"
 
 type DraftItemInput = {
     productId?: string | null
@@ -1584,6 +1585,8 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
             neighborhood?: string
             city?: string
             state?: string
+            latitude?: number | null
+            longitude?: number | null
         }
     }) {
         await requireUser()
@@ -1611,7 +1614,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
             return { success: false as const, error: "Informe um endereço válido." }
         }
 
-        const basePayload = {
+        const enrichedPayload = await enrichAddressData({
             customer_id: customer.id,
             address_type: "primary",
             zip_code: address.zipCode || null,
@@ -1623,7 +1626,9 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
             state: address.state || null,
             country: "BR",
             is_default: true,
-        }
+            latitude: address.latitude ?? undefined,
+            longitude: address.longitude ?? undefined,
+        })
 
         const { data: existingPrimary } = await supabase
             .from("addresses")
@@ -1636,13 +1641,13 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
         if (existingPrimary?.id) {
             const { error } = await supabase
                 .from("addresses")
-                .update(basePayload)
+                .update(enrichedPayload)
                 .eq("id", existingPrimary.id)
                 .eq("customer_id", customer.id)
 
             if (error) return { success: false as const, error: error.message }
         } else {
-            const { error } = await supabase.from("addresses").insert(basePayload)
+            const { error } = await supabase.from("addresses").insert(enrichedPayload)
             if (error) return { success: false as const, error: error.message }
         }
 

@@ -21,7 +21,7 @@ export function PaymentMethodIndicator({
 }) {
     if (!label) return <span className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body truncate">Não informado</span>
     
-    const parts = label.split(",")
+    const parts = splitPaymentMethodLabels(label)
         .map(p => p.trim())
         .filter(Boolean)
         .map(p => formatPaymentMethodLabel(p, null))
@@ -41,6 +41,25 @@ export function PaymentMethodIndicator({
     }
     
     return <PaymentMethodIndicatorKeyed part={parts[0] || label} simplify={simplify} />
+}
+
+function splitPaymentMethodLabels(label: string): string[] {
+    const parts: string[] = []
+    let current = ""
+    let depth = 0
+    for (const char of label) {
+        if (char === "(") depth += 1
+        else if (char === ")") depth = Math.max(0, depth - 1)
+
+        if (char === "," && depth === 0) {
+            parts.push(current)
+            current = ""
+        } else {
+            current += char
+        }
+    }
+    parts.push(current)
+    return parts
 }
 
 function PaymentMethodIndicatorKeyed({ part, simplify = false }: { part: string; simplify?: boolean }) {

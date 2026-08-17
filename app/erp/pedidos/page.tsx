@@ -13,6 +13,10 @@ export default async function OrdersPageServer() {
   const context = await getCurrentPartnerContext()
   if (!context) return <AccessDenied />
 
+  if (context.roleId === "delivery") {
+    return <AccessDenied />
+  }
+
   const partnerId = context.partnerId
   const storeId = context.activeStoreId
 

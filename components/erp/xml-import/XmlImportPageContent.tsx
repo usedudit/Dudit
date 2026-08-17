@@ -979,11 +979,19 @@ function XmlUploadForm({ partnerId, storeId, onSuccess, onCancel }: { partnerId:
 
 // ─── SidebarCard ────────────────────────────────────────────────────────────
 
-const SidebarCard = ({ children, hasTopStrip = true }: { children: React.ReactNode; hasTopStrip?: boolean }) => (
-    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden">
-        {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />}
-        {children}
-    </div>
+const SidebarCard = ({ title, children, hasTopStrip = true }: { title?: React.ReactNode; children: React.ReactNode; hasTopStrip?: boolean }) => (
+    <>
+        {/* Desktop: card */}
+        <div className="hidden lg:block bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden">
+            {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />}
+            {title ? <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">{title}</h3> : null}
+            {children}
+        </div>
+        {/* Mobile/Tablet: FormSection */}
+        <FormSection title={title} hasSeparator className="lg:hidden">
+            {children}
+        </FormSection>
+    </>
 )
 
 // ─── Import Preview View ────────────────────────────────────────────────────
@@ -1405,9 +1413,8 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
 
                                         <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-l-0 xl:border-l border-brand-border dark:border-dark-border space-y-6">
                                             {/* Desktop: SidebarCard with summary */}
-                                            <div className="hidden xl:block">
-                                                <SidebarCard>
-                                                    <h3 className="font-bold text-brand-dark dark:text-dark-heading mb-4">Resumo</h3>
+                                            <div>
+                                                <SidebarCard title="Resumo">
                                                     <div className="space-y-3 text-sm">
                                                         {/* Itens */}
                                                         <div className="flex items-center justify-between gap-3">

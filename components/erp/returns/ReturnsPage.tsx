@@ -492,7 +492,7 @@ export default function ReturnsPage({ partnerId, roleId, storeId, planGate }: Re
         <>
             <AnimatePresence mode="wait">
                 {entityState.isOpen ? (
-                    (isReturnsLoading && !activeReturnRequest && entityState.action !== "create") ? (
+                    (entityState.action !== "create" && (isReturnsLoading || !activeReturnRequest)) ? (
                         <ERPDetailLoading key="loading-return" />
                     ) : (
                         <FadeIn key="form" className="w-full h-full">

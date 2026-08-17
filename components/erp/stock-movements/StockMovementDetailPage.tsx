@@ -441,7 +441,7 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
                                             </div >
 
                                             {/* Detalhes da Movimentação - BELOW Resumo da Operação */}
-                                            <FormSection title="Detalhes da Movimentação" hasSeparator={false} className="mt-0" >
+                                            <FormSection title="Detalhes da Movimentação" className="mt-0" >
                                                 <div className="space-y-4">
                                                     <ListItem
                                                         title="Motivo"

@@ -186,10 +186,18 @@ const FormCombobox = ({
     )
 }
 
-const SidebarCard = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => (
-    <div className={`p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface/50 ${className}`}>
-        {children}
-    </div>
+const SidebarCard = ({ title, children, className = "" }: { title?: React.ReactNode; children: React.ReactNode; className?: string }) => (
+    <>
+        {/* Desktop: card */}
+        <div className={`hidden lg:block p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface/50 ${className}`}>
+            {title ? <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4 mt-2">{title}</h3> : null}
+            {children}
+        </div>
+        {/* Mobile/Tablet: FormSection */}
+        <FormSection title={title} hasSeparator className="lg:hidden">
+            {children}
+        </FormSection>
+    </>
 )
 
 export default function CreateTransactionPage({
@@ -1601,10 +1609,7 @@ export default function CreateTransactionPage({
 
     const renderRightColumn = () => (
         <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
-            <SidebarCard>
-                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4 mt-2">
-                    {txKind === "transfer" ? "Status" : txKind === "adjustment" ? "Status e conta" : "Status e conta"}
-                </h3>
+            <SidebarCard title={txKind === "transfer" ? "Status" : txKind === "adjustment" ? "Status e conta" : "Status e conta"}>
                 <div className="space-y-4">
                     {isIncomeExpense && !isRecurringTemplateEdit && !isEditMode && (
                         <FormDropdown
@@ -1705,8 +1710,7 @@ export default function CreateTransactionPage({
             </SidebarCard>
 
             {needsContactPanel && (
-                <SidebarCard>
-                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4 mt-2">Contato</h3>
+                <SidebarCard title="Contato">
                     <FormDropdown
                         label="Tipo de contato"
                         options={[

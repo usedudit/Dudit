@@ -3,6 +3,18 @@
 @theme {
   --font-sans: var(--font-sans), 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
   --font-barcode: var(--font-barcode), 'Libre Barcode 128 Text', monospace;
+
+  --animate-shimmer: shimmer 1.5s infinite;
+
+  @keyframes shimmer {
+    0% {
+      transform: translateX(-100%);
+    }
+
+    100% {
+      transform: translateX(100%);
+    }
+  }
 }
 
 /* Removed @import "tw-animate-css" that was causing empty utility errors */
@@ -1080,3 +1092,266 @@ select:disabled,
 .dark .rich-text-editor td {
   border-color: #374151;
 }
+
+/* ==========================================================================
+   DUDIT MAPBOX POPUPS & CARDS
+   ========================================================================== */
+
+.mapboxgl-popup {
+  z-index: 50;
+  max-width: 270px !important;
+}
+
+.mapboxgl-popup-content {
+  padding: 0 !important;
+  background: #ffffff !important;
+  border-radius: 12px !important;
+  border: 1px solid #ebebeb !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+  font-family: var(--font-sans), 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif !important;
+  overflow: hidden !important;
+}
+
+.dark .mapboxgl-popup-content {
+  background: #18181b !important;
+  border-color: #24252b !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
+  color: #f0f0f0 !important;
+}
+
+/* Tip (triangle) */
+.mapboxgl-popup-anchor-top .mapboxgl-popup-tip {
+  border-bottom-color: #ffffff !important;
+}
+.mapboxgl-popup-anchor-bottom .mapboxgl-popup-tip {
+  border-top-color: #ffffff !important;
+}
+.mapboxgl-popup-anchor-left .mapboxgl-popup-tip {
+  border-right-color: #ffffff !important;
+}
+.mapboxgl-popup-anchor-right .mapboxgl-popup-tip {
+  border-left-color: #ffffff !important;
+}
+
+.dark .mapboxgl-popup-anchor-top .mapboxgl-popup-tip {
+  border-bottom-color: #18181b !important;
+}
+.dark .mapboxgl-popup-anchor-bottom .mapboxgl-popup-tip {
+  border-top-color: #18181b !important;
+}
+.dark .mapboxgl-popup-anchor-left .mapboxgl-popup-tip {
+  border-right-color: #18181b !important;
+}
+.dark .mapboxgl-popup-anchor-right .mapboxgl-popup-tip {
+  border-left-color: #18181b !important;
+}
+
+.mapboxgl-popup-close-button {
+  top: 8px !important;
+  right: 8px !important;
+  width: 22px !important;
+  height: 22px !important;
+  border-radius: 9999px !important;
+  background: transparent !important;
+  color: #9ca3af !important;
+  font-size: 13px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+  outline: none !important;
+  border: none !important;
+}
+.mapboxgl-popup-close-button:hover {
+  background: #f3f4f6 !important;
+  color: #374151 !important;
+}
+.dark .mapboxgl-popup-close-button:hover {
+  background: #27272a !important;
+  color: #f3f4f6 !important;
+}
+
+/* Dudit Card inside Mapbox Popup */
+.dmp-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+  max-width: 270px;
+  font-family: inherit;
+}
+
+.dmp-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px 8px 12px;
+  background: #ffffff;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.dark .dmp-header {
+  background: #18181b;
+  border-bottom-color: #24252b;
+}
+
+.dmp-header-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.dmp-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #003229;
+  line-height: 1.2;
+}
+
+.dark .dmp-title {
+  color: #f0f0f0;
+}
+
+.dmp-customer {
+  font-size: 11px;
+  font-weight: 500;
+  color: #6b7280;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dark .dmp-customer {
+  color: #a1a1aa;
+}
+
+.dmp-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+  shrink: 0;
+}
+
+.dmp-badge-green {
+  background: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #dcfce7;
+}
+.dark .dmp-badge-green {
+  background: rgba(20, 83, 45, 0.3);
+  color: #4ade80;
+  border-color: rgba(20, 83, 45, 0.5);
+}
+
+.dmp-badge-purple {
+  background: #faf5ff;
+  color: #7e22ce;
+  border: 1px solid #f3e8ff;
+}
+.dark .dmp-badge-purple {
+  background: rgba(88, 28, 135, 0.3);
+  color: #c084fc;
+  border-color: rgba(88, 28, 135, 0.5);
+}
+
+.dmp-badge-gray {
+  background: #F9FAFB;
+  color: #374151;
+  border: 1px solid #ebebeb;
+}
+.dark .dmp-badge-gray {
+  background: rgba(36, 37, 43, 0.5);
+  color: #d4d4d8;
+  border-color: #24252b;
+}
+
+.dmp-body {
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dmp-address-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  line-height: 1.35;
+}
+
+.dmp-address-icon {
+  margin-top: 2px;
+  color: #059669;
+  flex-shrink: 0;
+  display: flex;
+}
+
+.dmp-address-text {
+  font-size: 11px;
+  color: #4b5563;
+  word-break: break-word;
+}
+
+.dark .dmp-address-text {
+  color: #a1a1aa;
+}
+
+.dmp-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: #6b7280;
+  padding-top: 2px;
+}
+
+.dark .dmp-meta-row {
+  color: #a1a1aa;
+}
+
+.dmp-dot {
+  color: #d1d5db;
+  font-size: 10px;
+}
+.dark .dmp-dot {
+  color: #3f3f46;
+}
+
+.dmp-footer {
+  padding: 6px 12px 10px 12px;
+}
+
+.dmp-button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #059669;
+  color: #ffffff !important;
+  font-size: 11px;
+  font-weight: 600;
+  text-decoration: none !important;
+  transition: background-color 0.15s ease;
+}
+
+.dmp-button:hover {
+  background: #047857;
+}
+
+.dark .dmp-button {
+  background: #059669;
+  color: #ffffff !important;
+}
+
+.dark .dmp-button:hover {
+  background: #047857;
+}

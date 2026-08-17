@@ -9,11 +9,19 @@ import ProductVideoSection from "@/components/erp/product/ProductVideoSection"
 import MarketplaceCategoryModal from "@/components/erp/product/MarketplaceCategoryModal"
 import { getCategoryPathClient } from "@/lib/data/marketplace-categories-client"
 
-const SidebarCard = ({ children, className = "", hasTopStrip = false }: { children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
-    <div className={`bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
-        {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
-        {children}
-    </div>
+const SidebarCard = ({ title, children, className = "", hasTopStrip = false }: { title?: React.ReactNode; children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
+    <>
+        {/* Desktop: card */}
+        <div className={`hidden lg:block bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
+            {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
+            {title ? <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">{title}</h3> : null}
+            {children}
+        </div>
+        {/* Mobile/Tablet: FormSection */}
+        <FormSection title={title} hasSeparator className="lg:hidden">
+            {children}
+        </FormSection>
+    </>
 )
 
 interface ServiceMarketplaceTabProps {
@@ -155,8 +163,7 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
 
                 {/* --- COLUNA DIREITA (Sidebar) --- */}
                 <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
-                    <SidebarCard hasTopStrip>
-                        <h3 className="text-lg font-bold mb-6 mt-2 text-brand-dark dark:text-dark-heading">Configurações</h3>
+                    <SidebarCard hasTopStrip title="Configurações">
                         <div className="space-y-4">
                             <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
                                 <span className="text-sm text-brand-inactive-text dark:text-dark-body">Destacar Serviço</span>
@@ -186,24 +193,17 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
                     </SidebarCard>
 
                     {categoryPath && (
-                        <SidebarCard>
-                            <div className="flex items-center justify-between mb-3">
-                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                                    <Package className="w-5 h-5 text-brand-green" />
-                                    Categoria Oficial
-                                </h3>
-                                <span className="text-xs font-medium bg-green-100 text-green-800 dark:bg-green-950/50 dark:text-green-300 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                    <CheckCircleIcon className="w-3 h-3" /> Categorizado
-                                </span>
-                            </div>
-                            <p className="text-sm text-brand-dark dark:text-dark-heading font-medium">
+                        <SidebarCard title={<><Package className="w-5 h-5 text-brand-green" /> Categoria Oficial</>}>
+                            <span className="text-xs font-medium bg-green-100 text-green-800 dark:bg-green-950/50 dark:text-green-300 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                <CheckCircleIcon className="w-3 h-3" /> Categorizado
+                            </span>
+                            <p className="text-sm text-brand-dark dark:text-dark-heading font-medium mt-2">
                                 {categoryPath}
                             </p>
                         </SidebarCard>
                     )}
 
-                    <SidebarCard>
-                        <h3 className="text-lg font-bold mb-3 text-brand-dark dark:text-dark-heading">Tags e Buscas</h3>
+                    <SidebarCard title="Tags e Buscas">
                         {tags && tags.length > 0 ? (
                             <div className="flex flex-wrap gap-2">
                                 {tags.map((tag: string, i: number) => (

@@ -11,6 +11,7 @@ import { ClockIcon, MapPinIcon, TruckIcon, UserIcon, BlockedIcon, DeliverySentIc
 interface DeliveryKanbanCardProps {
   delivery: any
   onDetails: () => void
+  onEdit?: () => void
   onQuickStatusChange?: (deliveryId: string, status: string) => void
 }
 
@@ -29,6 +30,7 @@ function getRelativeTimeElapsed(createdAtMs: number): string {
 export default function DeliveryKanbanCard({
   delivery,
   onDetails,
+  onEdit,
   onQuickStatusChange,
 }: DeliveryKanbanCardProps) {
   const [elapsed, setElapsed] = useState("")
@@ -43,6 +45,7 @@ export default function DeliveryKanbanCard({
   }, [delivery.createdAtMs])
 
   const statusMeta = getDeliveryStatusMeta(delivery.status)
+  const canEdit = ["pending", "not_sent", "preparing"].includes(delivery.status)
 
   const handleDragStart = (e: React.DragEvent) => {
     e.dataTransfer.setData("text/plain", delivery.id)
@@ -73,7 +76,12 @@ export default function DeliveryKanbanCard({
             )}
           </div>
           <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-            <ActionsDropdown onEdit={onDetails}>
+            <ActionsDropdown
+              onView={onDetails}
+              onEdit={canEdit && onEdit ? onEdit : undefined}
+              onCancel={delivery.status !== "cancelled" ? () => onQuickStatusChange?.(delivery.id, "cancelled") : undefined}
+              cancelLabel="Cancelar entrega"
+            >
               <DropdownItem onClick={() => onQuickStatusChange?.(delivery.id, delivery.status)}>Alterar Status de Entrega</DropdownItem>
             </ActionsDropdown>
           </div>

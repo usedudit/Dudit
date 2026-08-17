@@ -3420,9 +3420,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                     storeId: order.store_id,
                 })
 
-                if (capabilities.hasAppointments || capabilities.hasFinancial) {
-                    await syncCancelledOrderAppointmentsAndTransactions(supabase, order.id)
-                }
+                await syncCancelledOrderAppointmentsAndTransactions(supabase, order.id)
 
                 if (capabilities.hasFinancial) {
                     const { syncReceivableForOrder, cancelPendingSettlementsForOrder } = await import("@/lib/services/transaction.service")
@@ -4231,9 +4229,10 @@ export async function getERPOrdersPageAction(
     | { success: false; error: string }
 > {
     try {
-        const user = await requireUser()
-        if (!user) return { success: false, error: "Não autenticado" }
-        await requirePermission(partnerId, "orders", "view")
+        const access = await requirePermission(partnerId, "orders", "view")
+        if (access.roleId === "delivery") {
+            return { success: false, error: "Sem permissão para acessar a listagem de pedidos." }
+        }
 
         const supabase = createAdminClient()
         const cursor = options?.cursor ?? null

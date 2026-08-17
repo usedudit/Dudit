@@ -893,7 +893,7 @@ export default function ProductsPage({
         <>
             <AnimatePresence mode="wait">
                 {entityState.isOpen && formMode ? (
-                    (formMode !== 'add' && isLoadingDetail && !formProduct) ? (
+                    (formMode !== 'add' && (isLoadingDetail || !formProduct)) ? (
                         <ERPDetailLoading key="loading-product" />
                     ) : (
                         <FadeIn key="form" className="w-full h-full">

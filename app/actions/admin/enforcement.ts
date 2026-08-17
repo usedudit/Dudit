@@ -327,31 +327,38 @@ export async function getAdminPartnerDetail(storeId: string): Promise<any | null
         }
     }
 
-    // 3. Products count & recent
+    // 3. Products count & list
     const [productsCountRes, recentProductsRes] = await Promise.all([
         supabase.from("products").select("id", { count: "exact", head: true }).eq("store_id", storeId).is("deleted_at", null),
-        supabase.from("products").select("id, name, price, is_active, image_url, created_at").eq("store_id", storeId).is("deleted_at", null).order("created_at", { ascending: false }).limit(6),
+        supabase.from("products").select("id, name, price, is_active, images, sku, stock_quantity, created_at").eq("store_id", storeId).is("deleted_at", null).order("created_at", { ascending: false }).limit(50),
     ])
 
-    // 4. Orders count & recent
+    // 4. Services count & list
+    const [servicesCountRes, recentServicesRes] = await Promise.all([
+        supabase.from("services").select("id", { count: "exact", head: true }).eq("store_id", storeId).is("deleted_at", null),
+        supabase.from("services").select("id, name, price, is_active, images, created_at").eq("store_id", storeId).is("deleted_at", null).order("created_at", { ascending: false }).limit(50),
+    ])
+
+    // 5. Orders count & list
     const [ordersCountRes, recentOrdersRes] = await Promise.all([
         supabase.from("orders").select("id", { count: "exact", head: true }).eq("store_id", storeId),
-        supabase.from("orders").select("id, order_number, total_amount, situation, delivery_status, created_at, customer_name").eq("store_id", storeId).order("created_at", { ascending: false }).limit(6),
+        supabase.from("orders").select("id, order_number, total_amount, paid_amount, situation, delivery_status, created_at, customer_name, order_source, payment_method").eq("store_id", storeId).order("created_at", { ascending: false }).limit(50),
     ])
 
-    // 5. Returns count & recent
+    // 6. Returns count & list
+    const partnerId = partner?.id || store.partner_id
     const [returnsCountRes, recentReturnsRes] = await Promise.all([
-        supabase.from("return_requests").select("id", { count: "exact", head: true }).is("deleted_at", null).eq("order_id", storeId), // or via partner_id
-        supabase.from("return_requests").select("id, request_type, status, refund_amount, created_at, customer_name_snapshot").is("deleted_at", null).order("created_at", { ascending: false }).limit(6),
+        supabase.from("return_requests").select("id", { count: "exact", head: true }).is("deleted_at", null).or(`partner_id.eq.${partnerId},store_id.eq.${storeId}`),
+        supabase.from("return_requests").select("id, request_type, status, resolution_type, refund_amount, store_credit_amount, created_at, customer_name_snapshot, order_number_snapshot").is("deleted_at", null).or(`partner_id.eq.${partnerId},store_id.eq.${storeId}`).order("created_at", { ascending: false }).limit(50),
     ])
 
-    // 6. Audit & Risk Events
+    // 7. Audit & Risk Events
     const { data: auditEvents } = await supabase
         .from("admin_audit_logs")
         .select("*")
-        .eq("target_id", storeId)
+        .or(`target_id.eq.${storeId},target_id.eq.${partnerId}`)
         .order("created_at", { ascending: false })
-        .limit(20)
+        .limit(30)
 
     return {
         store,
@@ -359,12 +366,112 @@ export async function getAdminPartnerDetail(storeId: string): Promise<any | null
         ownerProfile,
         productsCount: productsCountRes.count || 0,
         recentProducts: recentProductsRes.data || [],
+        servicesCount: servicesCountRes.count || 0,
+        recentServices: recentServicesRes.data || [],
         ordersCount: ordersCountRes.count || 0,
         recentOrders: recentOrdersRes.data || [],
         returnsCount: returnsCountRes.count || 0,
         recentReturns: recentReturnsRes.data || [],
         auditEvents: auditEvents || [],
     }
+}
+
+export async function updateStoreRiskScore(
+    storeId: string,
+    newScore: number,
+    reason: string
+): Promise<{ success: boolean; error?: string }> {
+    const admin = await requireAdmin("admin")
+    await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
+
+    if (newScore < 0 || newScore > 100) {
+        return { success: false, error: "Pontuação de risco deve estar entre 0 e 100." }
+    }
+
+    const supabase: any = getAdminClient()
+
+    const { data: currentStore } = await supabase
+        .from("stores")
+        .select("id, name, risk_score, partner_id")
+        .eq("id", storeId)
+        .maybeSingle()
+
+    if (!currentStore) {
+        return { success: false, error: "Loja não encontrada." }
+    }
+
+    const oldScore = currentStore.risk_score || 0
+
+    const { error: updateErr } = await supabase
+        .from("stores")
+        .update({ risk_score: newScore, updated_at: new Date().toISOString() })
+        .eq("id", storeId)
+
+    if (updateErr) {
+        return { success: false, error: "Falha ao atualizar score de risco." }
+    }
+
+    await adminAuditLog({
+        adminUserId: admin.userId,
+        actionType: AdminActionType.MODERATION_RISK_SCORE,
+        targetType: "partner",
+        targetId: storeId,
+        metadata: {
+            store_name: currentStore.name,
+            old_score: oldScore,
+            new_score: newScore,
+            reason: reason || "Ajuste manual de score de risco",
+        },
+    })
+
+    return { success: true }
+}
+
+export async function updateUserRiskScore(
+    userId: string,
+    newScore: number,
+    reason: string
+): Promise<{ success: boolean; error?: string }> {
+    const admin = await requireAdmin("admin")
+    await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
+
+    if (newScore < 0 || newScore > 100) {
+        return { success: false, error: "Pontuação de risco deve estar entre 0 e 100." }
+    }
+
+    const supabase: any = getAdminClient()
+
+    const { data: profile } = await supabase
+        .from("user_profiles")
+        .select("user_id, full_name, risk_score")
+        .eq("user_id", userId)
+        .maybeSingle()
+
+    const oldScore = profile?.risk_score || 0
+
+    const { error: updateErr } = await supabase
+        .from("user_profiles")
+        .update({ risk_score: newScore, updated_at: new Date().toISOString() })
+        .eq("user_id", userId)
+
+    if (updateErr) {
+        return { success: false, error: "Falha ao atualizar score de risco do usuário." }
+    }
+
+    await adminAuditLog({
+        adminUserId: admin.userId,
+        actionType: AdminActionType.MODERATION_RISK_SCORE,
+        targetType: "user",
+        targetId: userId,
+        metadata: {
+            user_name: profile?.full_name || userId,
+            old_score: oldScore,
+            new_score: newScore,
+            reason: reason || "Ajuste manual de score de risco",
+        },
+    })
+
+    return { success: true }
 }
 
 // ─── Get Partners (separate from users) ─────────────────────────────────────

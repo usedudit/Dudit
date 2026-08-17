@@ -196,7 +196,8 @@ export function ProductDetailsPageClient({
     const [loadingAddresses, setLoadingAddresses] = useState(false)
     const [loadingCep, setLoadingCep] = useState(false)
     const [newAddressData, setNewAddressData] = useState({
-        zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false
+        zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false,
+        latitude: null as number | null, longitude: null as number | null
     })
 
     const partner = useMemo(() => {
@@ -391,6 +392,8 @@ export function ProductDetailsPageClient({
                     neighborhood: data.bairro || prev.neighborhood,
                     city: data.localidade || data.municipio || prev.city,
                     state: data.uf || prev.state,
+                    latitude: typeof data.latitude === "number" ? data.latitude : prev.latitude,
+                    longitude: typeof data.longitude === "number" ? data.longitude : prev.longitude,
                 }))
             }
         } catch (err) {
@@ -415,6 +418,8 @@ export function ProductDetailsPageClient({
             street, number: finalNumber, complement: newAddressData.complement,
             neighborhood, city, state, zipCode,
             isDefault: userAddresses.length === 0,
+            latitude: newAddressData.latitude ?? null,
+            longitude: newAddressData.longitude ?? null,
             csrf_token: csrfToken,
         })
         if (result.error) {
@@ -427,7 +432,7 @@ export function ProductDetailsPageClient({
                 await loadUserAddresses()
             }
             setShowAddressForm(false)
-            setNewAddressData({ zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false })
+            setNewAddressData({ zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false, latitude: null, longitude: null })
             setDeliveryError(null)
         }
         setDeliveryLoading(false)
@@ -948,9 +953,9 @@ export function ProductDetailsPageClient({
                                     return (
                                         <button key={value} onClick={() => isAvailable && handleAttributeSelect(type, value)}
                                             disabled={!isAvailable} title={!isAvailable ? `${value} (Indisponível)` : value}
-                                            className={`w-14 h-14 rounded-md relative focus:outline-none transition-all overflow-hidden bg-white
+                                            className={`w-14 h-14 rounded-md relative focus:outline-none transition-all overflow-hidden bg-white dark:bg-dark-border/50
                         ${isSelected && isAvailable ? "ring-1 ring-offset-1 ring-brand-green" : ""}
-                        ${!isSelected && isAvailable ? "ring-1 ring-gray-200 hover:ring-gray-300" : ""}
+                        ${!isSelected && isAvailable ? "ring-1 ring-gray-200 hover:ring-gray-300 dark:ring-dark-border dark:hover:ring-dark-border/50" : ""}
                         ${!isAvailable ? "opacity-60 cursor-not-allowed border border-dashed border-brand-border ring-0 grayscale" : ""}`}>
                                             <img src={variantWithImg?.fullImgUrl || PLACEHOLDER} alt={value}
                                                 className={`w-full h-full object-cover ${!isAvailable ? "opacity-50" : ""}`} />
@@ -2063,9 +2068,9 @@ export function ProductDetailsPageClient({
                                     {/* Desktop Prev Button */}
                                     <div className="hidden lg:flex w-10 shrink-0 items-center justify-center">
                                         {galleryItems.length > 1 && (
-                                            <button onClick={goToPrev} className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-brand-border hover:bg-brand-gray dark:hover:bg-dark-border/50 transition-colors shadow-sm">
-                                                <ChevronLeftIcon size={20} className="text-brand-dark" />
-                                            </button>
+                                            <Button variant="filled" onClick={goToPrev} className="w-10 h-10 flex items-center justify-center">
+                                                <ChevronLeftIcon size={20} className="text-brand-dark dark:text-dark-heading" />
+                                            </Button>
                                         )}
                                     </div>
 
@@ -2093,13 +2098,6 @@ export function ProductDetailsPageClient({
                                                             style={{ transformOrigin, scale: smoothScale }} />
                                                     ) : renderGalleryItem(galleryItems[activeImgIndex], "absolute inset-0 w-full h-full object-contain", `Vídeo de ${product.name}`)}
                                                 </AnimatePresence>
-                                                {activeImgIndex < galleryItems.length && galleryItems[activeImgIndex]?.type === "image" && imageVariantLabel[galleryItems[activeImgIndex].src] && (
-                                                    <div className="absolute bottom-3 left-3 z-10">
-                                                        <Badge variant="green" className="text-xs">
-                                                            {imageVariantLabel[galleryItems[activeImgIndex].src]}
-                                                        </Badge>
-                                                    </div>
-                                                )}
                                             </div>
                                         </div>
 
@@ -2108,16 +2106,6 @@ export function ProductDetailsPageClient({
                                             <AnimatePresence mode="wait" custom={slideDirection}>
                                                 {renderGalleryItem(galleryItems[activeImgIndex], "absolute inset-0 w-full h-full object-contain", `Foto de ${product.name} à venda em ${partner.city} - ${partner.state}`)}
                                             </AnimatePresence>
-                                            {activeImgIndex < galleryItems.length && galleryItems[activeImgIndex]?.type === "image" && imageVariantLabel[galleryItems[activeImgIndex].src] && (
-                                                <div className="absolute bottom-3 left-3 z-10">
-                                                    <Badge variant="green" className="text-xs">
-                                                        {imageVariantLabel[galleryItems[activeImgIndex].src]}
-                                                    </Badge>
-                                                </div>
-                                            )}
-
-                                            {/* ActionButtons and Chevron navigation arrows hidden on mobile/tablet product image card as they are already displayed in the top header */}
-
                                         </div>
                                     </div>
 

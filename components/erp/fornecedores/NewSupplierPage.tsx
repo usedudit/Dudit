@@ -59,11 +59,19 @@ const REQUIRED_FIELDS = [
     { field: "cep", tab: "address" },
 ]
 
-const SidebarCard = ({ children, className = "", hasTopStrip = false }: { children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
-    <div className={`bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
-        {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
-        {children}
-    </div>
+const SidebarCard = ({ title, children, className = "", hasTopStrip = false }: { title?: React.ReactNode; children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
+    <>
+        {/* Desktop: card */}
+        <div className={`hidden lg:block bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
+            {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
+            {title ? <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">{title}</h3> : null}
+            {children}
+        </div>
+        {/* Mobile/Tablet: FormSection */}
+        <FormSection title={title} hasSeparator className="lg:hidden">
+            {children}
+        </FormSection>
+    </>
 )
 
 const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplierId, onSuccess, onError }) => {
@@ -114,6 +122,8 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
     const [uf, setUf] = useState("SP")
     const [noNumber, setNoNumber] = useState(false)
     const [municipioIbge, setMunicipioIbge] = useState("")
+    const [latitude, setLatitude] = useState<number | null>(null)
+    const [longitude, setLongitude] = useState<number | null>(null)
 
     const [isSaving, setIsSaving] = useState(false)
     const [isSearchingCnpj, setIsSearchingCnpj] = useState(false)
@@ -322,6 +332,8 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                 city: city,
                 state: uf,
                 municipioCodigoIbge: municipioIbge || undefined,
+                latitude: latitude ?? null,
+                longitude: longitude ?? null,
                 csrf_token: token,
                 notes: observacoes,
                 image_url: finalImageUrl || null,
@@ -717,6 +729,8 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                                                                 setNumber(data.number || "")
                                                                 setNoNumber(data.number === "S/N")
                                                                 if (data.ibge) setMunicipioIbge(data.ibge)
+                                                                setLatitude(typeof data.latitude === "number" ? data.latitude : null)
+                                                                setLongitude(typeof data.longitude === "number" ? data.longitude : null)
                                                             }}
                                                             error={fieldErrors.has("cep")}
                                                             errorMessage={fieldErrors.has("cep") ? "CEP inválido" : undefined}
@@ -772,8 +786,7 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                                     <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
                                         {activeTab === 'general' ? (
                                             <>
-                                                <SidebarCard hasTopStrip>
-                                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Imagem do Fornecedor</h3>
+                                                <SidebarCard hasTopStrip title="Imagem do Fornecedor">
                                                     <div className="flex items-center gap-4 dark:bg-dark-background/50">
                                                         <div onClick={() => imageInputRef.current?.click()} className="w-16 h-16 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border cursor-pointer relative group overflow-hidden">
                                                             {imagePreview ? (

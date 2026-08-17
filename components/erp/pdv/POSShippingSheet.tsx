@@ -27,6 +27,8 @@ type ShippingCustomerDetails = {
         city?: string
         state?: string
         country?: string
+        latitude?: number | null
+        longitude?: number | null
     } | null
 } | null
 
@@ -48,6 +50,8 @@ interface POSShippingSheetProps {
             neighborhood: string
             city: string
             state: string
+            latitude?: number | null
+            longitude?: number | null
         }
     }) => Promise<void> | void
     onApply: (payload: { shippingFee: number; distanceKm?: number | null; breakdown?: Record<string, unknown> | null }) => void
@@ -86,6 +90,8 @@ export default function POSShippingSheet({
     const [neighborhood, setNeighborhood] = useState("")
     const [city, setCity] = useState("")
     const [state, setState] = useState("")
+    const [latitude, setLatitude] = useState<number | null>(null)
+    const [longitude, setLongitude] = useState<number | null>(null)
 
     useEffect(() => {
         if (!isOpen) return
@@ -108,6 +114,8 @@ export default function POSShippingSheet({
         setNeighborhood(customerDetails.address.neighborhood || "")
         setCity(customerDetails.address.city || "")
         setState(customerDetails.address.state || "")
+        setLatitude(typeof customerDetails.address.latitude === "number" ? customerDetails.address.latitude : null)
+        setLongitude(typeof customerDetails.address.longitude === "number" ? customerDetails.address.longitude : null)
     }, [
         customerDetails?.id,
         customerDetails?.address?.zipCode,
@@ -117,6 +125,8 @@ export default function POSShippingSheet({
         customerDetails?.address?.neighborhood,
         customerDetails?.address?.city,
         customerDetails?.address?.state,
+        customerDetails?.address?.latitude,
+        customerDetails?.address?.longitude,
     ])
 
     const isDirty =
@@ -366,6 +376,8 @@ export default function POSShippingSheet({
                         setNeighborhood(addr.neighborhood || "")
                         setCity(addr.city || "")
                         setState(addr.state || "")
+                        setLatitude(typeof addr.latitude === "number" ? addr.latitude : null)
+                        setLongitude(typeof addr.longitude === "number" ? addr.longitude : null)
                         if (addr.number) {
                             if (addr.number === "S/N") {
                                 setNoNumber(true)
@@ -409,7 +421,7 @@ export default function POSShippingSheet({
                             try {
                                 await onCreateAddress({
                                     customerId: customerDetails.id,
-                                    address: { zipCode, street, number, complement, neighborhood, city, state },
+                                    address: { zipCode, street, number, complement, neighborhood, city, state, latitude, longitude },
                                 })
                                 setIsAddressSheetOpen(false)
                             } finally {

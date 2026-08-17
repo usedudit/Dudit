@@ -9,6 +9,7 @@ import { useStore } from "@/lib/store-context"
 import { getPartnerAddressAction, getQuoteDetailsAction } from "@/app/actions/erp/quotes"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { downloadPdf } from "@/lib/pdf/download"
+import { toast } from "@/hooks/use-notification"
 import QuotePreview from "./QuotePreview"
 
 export type QuotePrintModalProps = {
@@ -26,6 +27,7 @@ export default function QuotePrintModal({ isOpen, onClose, quoteId, partnerId }:
     const [isAnimating, setIsAnimating] = useState(false)
     const [activeTab, setActiveTab] = useState("Visualização")
     const [loading, setLoading] = useState(false)
+    const [isDownloading, setIsDownloading] = useState(false)
     const [quoteData, setQuoteData] = useState<any>(null)
 
     useEffect(() => {
@@ -115,23 +117,26 @@ export default function QuotePrintModal({ isOpen, onClose, quoteId, partnerId }:
     const handlePrint = useCallback(() => {
         if (!quoteId) return
         if (isMobile) {
-            downloadPdf(`/api/pdf/orcamento/${quoteId}`, `orcamento-${quoteId}.pdf`)
-                .catch(() => window.open(`/print/orcamento/${quoteId}`, "_blank"))
-            onClose()
+            handleDownloadPdf()
             return
         }
         window.open(`/print/orcamento/${quoteId}`, "_blank")
         onClose()
     }, [quoteId, onClose, isMobile])
 
-    const handleDownloadPdf = useCallback(() => {
-        if (!quoteId) return
-        downloadPdf(`/api/pdf/orcamento/${quoteId}`, `orcamento-${quoteId}.pdf`)
-            .catch(() => {
-                window.open(`/print/orcamento/${quoteId}`, "_blank")
-            })
-        onClose()
-    }, [quoteId, onClose])
+    const handleDownloadPdf = useCallback(async () => {
+        if (!quoteId || isDownloading) return
+        setIsDownloading(true)
+        try {
+            await downloadPdf(`/api/pdf/orcamento/${quoteId}`, `orcamento-${quoteId}.pdf`)
+            onClose()
+        } catch (error: any) {
+            console.error("[QuotePrintModal] Error downloading PDF:", error)
+            toast.error("Erro ao gerar PDF", error?.message || "Não foi possível gerar o PDF. Tente novamente.")
+        } finally {
+            setIsDownloading(false)
+        }
+    }, [quoteId, isDownloading, onClose])
 
     if (!isVisible) return null
 
@@ -192,8 +197,14 @@ export default function QuotePrintModal({ isOpen, onClose, quoteId, partnerId }:
                                         <Button className="flex-1 h-12" onClick={handlePrint} leftIcon={<PrinterIcon size={18} />}>
                                             Imprimir
                                         </Button>
-                                        <Button variant="outline" className="flex-1 h-12" onClick={handleDownloadPdf} leftIcon={<DownloadIcon size={18} />}>
-                                            Salvar PDF
+                                        <Button
+                                            variant="outline"
+                                            className="flex-1 h-12"
+                                            onClick={handleDownloadPdf}
+                                            disabled={isDownloading}
+                                            leftIcon={<DownloadIcon size={18} />}
+                                        >
+                                            {isDownloading ? "Gerando PDF..." : "Salvar PDF"}
                                         </Button>
                                     </div>
                                 </div>
@@ -203,8 +214,14 @@ export default function QuotePrintModal({ isOpen, onClose, quoteId, partnerId }:
                                     <Button className="flex-1 h-12" onClick={handlePrint} leftIcon={<PrinterIcon size={18} />}>
                                         Imprimir
                                     </Button>
-                                    <Button variant="outline" className="flex-1 h-12" onClick={handleDownloadPdf} leftIcon={<DownloadIcon size={18} />}>
-                                        PDF
+                                    <Button
+                                        variant="outline"
+                                        className="flex-1 h-12"
+                                        onClick={handleDownloadPdf}
+                                        disabled={isDownloading}
+                                        leftIcon={<DownloadIcon size={18} />}
+                                    >
+                                        {isDownloading ? "Gerando..." : "PDF"}
                                     </Button>
                                 </div>
                             </div>

@@ -302,49 +302,11 @@ export function resolveActiveResources(businessInfo: { activeResources?: unknown
     const current = normalizeActiveResources(businessInfo.activeResources)
 
     const version = (businessInfo as any).resourcesVersion || 0
-    if (version < 2) {
-      const v2Resources: SystemResourceId[] = ["customers", "reports", "marketing", "showcase"]
-      for (const r of v2Resources) {
-        if (!current.includes(r)) {
-          current.push(r)
-        }
-      }
-    }
-    if (version < 3) {
-      const v3Resources: SystemResourceId[] = ["goals", "returns"]
-      for (const r of v3Resources) {
-        if (!current.includes(r)) {
-          current.push(r)
-        }
-      }
-    }
-    if (version < 4) {
-      const v4Resources: SystemResourceId[] = ["stockMovements", "productCadastros", "serviceCadastros", "coupons", "campaigns"]
-      for (const r of v4Resources) {
-        if (!current.includes(r)) {
-          current.push(r)
-        }
-      }
-    }
-    if (version < 5) {
-      const v5Resources: SystemResourceId[] = ["serviceOrders"]
-      for (const r of v5Resources) {
-        if (!current.includes(r)) {
-          current.push(r)
-        }
-      }
-    }
-    if (version < 6) {
-      const v6Resources: SystemResourceId[] = ["productivity"]
-      for (const r of v6Resources) {
-        if (!current.includes(r)) {
-          current.push(r)
-        }
-      }
-    }
-    if (version < 7) {
-      const v7Resources: SystemResourceId[] = ["communityVideos"]
-      for (const r of v7Resources) {
+    if (version < 8) {
+      // Se não versionado ou versão anterior, assegura que todos os recursos padrão estejam ativos
+      // para evitar que registros legados com ["orders", "products", "services"] desativem financial, pos, etc.
+      const allDefaults = getDefaultResourcesForCategory()
+      for (const r of allDefaults) {
         if (!current.includes(r)) {
           current.push(r)
         }

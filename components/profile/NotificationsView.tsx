@@ -131,7 +131,7 @@ export function NotificationsView({ navigate }: NotificationsViewProps) {
           <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
             Notificações
           </h1>
-          <p className="text-md text-brand-inactive-text mt-1">
+          <p className="text-md text-brand-inactive-text dark:text-dark-body mt-1">
             Escolha quais notificações você deseja receber.
           </p>
         </div>
@@ -163,7 +163,7 @@ export function NotificationsView({ navigate }: NotificationsViewProps) {
                 hasSeparator={idx > 0}
               >
                 <div className="flex items-center justify-end gap-3">
-                  <label className="flex items-center gap-1.5 text-xs text-brand-inactive-text cursor-pointer select-none">
+                  <label className="flex items-center gap-1.5 text-xs text-brand-inactive-text dark:text-dark-body cursor-pointer select-none">
                     <input
                       type="checkbox"
                       checked={pushOn}
@@ -172,7 +172,7 @@ export function NotificationsView({ navigate }: NotificationsViewProps) {
                     />
                     Push
                   </label>
-                  <label className="flex items-center gap-1.5 text-xs text-brand-inactive-text cursor-pointer select-none">
+                  <label className="flex items-center gap-1.5 text-xs text-brand-inactive-text dark:text-dark-body cursor-pointer select-none">
                     <input
                       type="checkbox"
                       checked={enabledOn}
@@ -181,7 +181,7 @@ export function NotificationsView({ navigate }: NotificationsViewProps) {
                     />
                     In-app
                   </label>
-                  <label className="flex items-center gap-1.5 text-xs text-brand-inactive-text cursor-pointer select-none">
+                  <label className="flex items-center gap-1.5 text-xs text-brand-inactive-text dark:text-dark-body cursor-pointer select-none">
                     <input
                       type="checkbox"
                       checked={whatsappOn}

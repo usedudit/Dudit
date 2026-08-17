@@ -37,7 +37,7 @@ export const SupplierDetailPage = ({ supplier, onBack, onEdit }: Props) => {
     const [activeTab, setActiveTab] = useState('General');
     const [isScrolled, setIsScrolled] = useState(false);
     const isMobile = useMediaQuery("(max-width: 767px)");
-    const isTablet = useMediaQuery("(max-width: 1279px)");
+    const isTablet = useMediaQuery("(max-width: 1023px)");
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
     const handleBack = useCallback(() => onBack(), [onBack]);

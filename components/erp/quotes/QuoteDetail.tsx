@@ -12,7 +12,7 @@ import {
     ClockIcon,
     CheckCircleIcon,
 } from '@/lib/icons';
-import { Button, Badge, ActionsDropdown, ThreeDotsLoader, FormDropdown, AlertModal, DefaultModal, FormSection, Tabs, TabsList, TabsTrigger, TabsContent, ListItem } from '@/components/reusable';
+import { Button, Badge, ActionsDropdown, ThreeDotsLoader, FormDropdown, AlertModal, DefaultModal, FormSection, Tabs, TabsList, TabsTrigger, TabsContent, ListItem, CustomerMobileBar } from '@/components/reusable';
 import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading";
 import { getQuoteDetailsAction, updateQuoteStatusAction, deleteQuoteAction, convertQuoteToOrderAction, getQuoteHistoryAction, getPartnerAddressAction, regenerateQuoteApprovalCodeAction } from '@/app/actions/erp/quotes';
 import { useCSRFToken } from "@/hooks/use-csrf-token"
@@ -34,8 +34,6 @@ import QuotePreview from './QuotePreview';
 import QuotePrintModal from './QuotePrintModal';
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url";
 import { ShareModal } from "@/components/marketplace/ShareModal";
-import { UserProfileImage } from '@/lib/utils/UserProfileImage';
-import BottomSheet from '@/components/BottomSheet';
 
 interface QuoteDetailProps {
     quoteId: string;
@@ -182,7 +180,6 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
     }, [partnerId, storeId]);
 
     const [activeTab, setActiveTab] = useState('Dados Gerais');
-    const [isCustomerSheetOpen, setIsCustomerSheetOpen] = useState(false);
     const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
     const [showPrintModal, setShowPrintModal] = useState(false);
 
@@ -458,7 +455,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                 <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
 
                                     {/* Back button - desktop only */}
-                                    <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                                    <div className={`absolute -left-12 top-7 h-full hidden lg:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
                                         <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
                                             <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                         </Button>
@@ -521,7 +518,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                 <TabsContent value="Dados Gerais" className="mt-0 focus-visible:outline-none">
                                     <FadeIn className="grid grid-cols-12 gap-y-8 md:gap-y-0 relative">
                                         {/* LEFT COLUMN */}
-                                        <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
+                                        <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
                                             {/* Quote Status Card */}
                                             <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden mb-8">
                                                 <div className={`p-6 border-b text-left ${quote.converted ? 'bg-slate-50 dark:bg-slate-900/20 border-slate-200 dark:border-slate-800' :
@@ -626,28 +623,13 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
 
                                             {/* Customer - Mobile/Tablet only */}
                                             {quote.customers && (
-                                                <div className="xl:hidden mb-8">
-                                                    <FormSection title="" hasSeparator={false} className="mt-0">
-                                                        <ListItem
-                                                            left={
-                                                                <UserProfileImage
-                                                                    fullName={quote.customers.name || "Cliente"}
-                                                                    imageUrl={quote.customers.image_url || quote.customers.avatar_url || quote.customers.avatar}
-                                                                    className="w-10 h-10 text-base"
-                                                                />
-                                                            }
-                                                            title={quote.customers.name || "Consumidor Final"}
-                                                            description={quote.customers.email || "Sem e-mail cadastrado"}
-                                                            className="border-0 bg-transparent px-0 hover:bg-transparent"
-                                                            showChevron={true}
-                                                            onClick={() => setIsCustomerSheetOpen(true)}
-                                                        />
-                                                    </FormSection>
+                                                <div className="lg:hidden mb-8">
+                                                    <CustomerMobileBar customer={quote.customers} />
                                                 </div>
                                             )}
 
                                             {/* Items List */}
-                                            <FormSection hasSeparator title="Itens do Orçamento" className='mb-8'>
+                                            <FormSection hasSeparator title="Itens do Orçamento">
                                                 <div className="space-y-4">
                                                     {isLoadingQuoteItems ? (
                                                         <div className="flex items-center justify-center py-14">
@@ -697,9 +679,9 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                         </div>
 
                                         {/* RIGHT COLUMN - SIDEBAR */}
-                                        <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
+                                        <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 space-y-6 border-0 lg:border-l border-brand-border dark:border-dark-border">
                                             {quote.customers && (
-                                                <div className="hidden xl:block">
+                                                <div className="hidden lg:block">
                                                     <CustomerCard
                                                         customer={quote.customers}
                                                     />
@@ -992,21 +974,6 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                             shareMessage={`Confira a proposta comercial de ${partnerName}`}
                             label="Link do orçamento"
                         />
-
-                        {quote.customers && (
-                            <BottomSheet
-                                isOpen={isCustomerSheetOpen}
-                                onClose={() => setIsCustomerSheetOpen(false)}
-                                title="Detalhes do Cliente"
-                            >
-                                <div className="pt-2">
-                                    <CustomerCard
-                                        chrome="minimal"
-                                        customer={quote.customers}
-                                    />
-                                </div>
-                            </BottomSheet>
-                        )}
                     </Tabs>
                 </div>
             </FadeIn>

@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Button, Checkbox, IconPlaceholder, Badge, FormDropdown, MoneyInput, ThreeDotsLoader, InfoCard, FormSection, ActionsDropdown, DropdownItem, SavingStatusModal, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
+import { Button, Checkbox, IconPlaceholder, Badge, FormDropdown, MoneyInput, ThreeDotsLoader, InfoCard, FormSection, ActionsDropdown, DropdownItem, SavingStatusModal, Tabs, TabsList, TabsTrigger, FormTextarea } from "@/components/reusable"
 import { KPICard } from "@/components/erp/dashboard/cards/KPICard"
 import { HorizontalKPICard } from "@/components/erp/dashboard/cards/HorizontalKPICard"
 import DefaultModal from "@/components/reusable/DefaultModal"
@@ -989,6 +989,14 @@ export default function TransactionsPage({
         })()
     }, [isViewing, entityState.entityType, entityState.entityId, installmentDetail, installmentDetailLoading, partnerId, notifyError])
 
+    const refreshInstallmentDetail = useCallback(async (groupId?: string | null) => {
+        const gid = groupId || (entityState.entityType === "installment" ? entityState.entityId : null)
+        if (!gid) return
+        const res = await getInstallmentGroupDetailsAction({ partnerId, installmentGroupId: gid })
+        if (res.success) setInstallmentDetail(res.data)
+        else notifyError(res.error || "Erro ao atualizar parcelado")
+    }, [partnerId, entityState.entityType, entityState.entityId, notifyError])
+
     useEffect(() => {
         if (!(isViewing && entityState.entityType === "installment")) return
         setHeaderOverride({
@@ -1084,7 +1092,7 @@ export default function TransactionsPage({
                     paymentAmount: String(Number(row.remainingAmount || 0).toFixed(2)),
                     interestAmount: "0",
                     discountAmount: "0",
-                    paymentMethodId: row.paymentType && row.paymentType !== "Não informado" ? row.paymentType : (row.paymentMethodId || "Pix"),
+                    paymentMethodId: resolveStandardPaymentMethod(row.paymentType) || row.paymentMethodId || "Pix",
                 }
             }
             setSettlePaymentsByInstallment(nextState)
@@ -1234,6 +1242,7 @@ export default function TransactionsPage({
                     return
                 }
                 notifySuccess(res.data.fullyPaid ? "Parcela quitada com sucesso." : "Pagamento parcial registrado.")
+                void refreshInstallmentDetail(selectedInstallmentForPayment.installmentGroupId)
             } else {
                 const res = await recordRegularTransactionPaymentAction({
                     partnerId,
@@ -1270,6 +1279,7 @@ export default function TransactionsPage({
         notifyError,
         notifySuccess,
         refreshTransactionsNow,
+        refreshInstallmentDetail,
     ])
 
     const renderSharedModals = () => {
@@ -1537,7 +1547,7 @@ export default function TransactionsPage({
     }
 
     if (entityState.isOpen && entityState.action === "view" && entityState.entityId && !entityState.entityType) {
-        if (isLoadingDetail && !currentEntity) {
+        if (isLoadingDetail || !currentEntity) {
             return <ERPDetailLoading key="loading-tx-detail" />
         }
         return (
@@ -1622,77 +1632,15 @@ export default function TransactionsPage({
                         <div className="flex-1 overflow-y-auto custom-scrollbar">
                             <div className="max-w-[1300px] mx-auto px-4 md:px-6 py-6 space-y-4">
                                 {/* Summary Cards */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                                    <div className="relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
-                                        <div className="flex items-center gap-3 mb-6">
-                                            <div className="w-10 h-10 rounded-full flex items-center justify-center bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 shrink-0">
-                                                <FileIcon className="w-5 h-5" />
-                                            </div>
-                                            <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading">
-                                                Total
-                                            </span>
-                                        </div>
-                                        <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none">
-                                            {formatCurrency(total)}
-                                        </span>
-                                    </div>
-
-                                    <div className="relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
-                                        <div className="flex items-center gap-3 mb-6">
-                                            <div className="w-10 h-10 rounded-full flex items-center justify-center bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 shrink-0">
-                                                <CheckCircleIcon className="w-5 h-5" />
-                                            </div>
-                                            <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading">
-                                                Pago
-                                            </span>
-                                        </div>
-                                        <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none">
-                                            {formatCurrency(paid)}
-                                        </span>
-                                    </div>
-
-                                    <div className="relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
-                                        <div className="flex items-center gap-3 mb-6">
-                                            <div className="w-10 h-10 rounded-full flex items-center justify-center bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 shrink-0">
-                                                <ClockIcon className="w-5 h-5" />
-                                            </div>
-                                            <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading">
-                                                Restante
-                                            </span>
-                                        </div>
-                                        <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none">
-                                            {formatCurrency(pending)}
-                                        </span>
-                                    </div>
-
-                                    <div className="relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
-                                        <div className="flex items-center gap-3 mb-6">
-                                            <div className="w-10 h-10 rounded-full flex items-center justify-center bg-purple-50 dark:bg-purple-950/20 text-purple-600 dark:text-purple-400 shrink-0">
-                                                <InstallmentIcon className="w-5 h-5" />
-                                            </div>
-                                            <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading">
-                                                Parcelas a quitar
-                                            </span>
-                                        </div>
-                                        <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none">
-                                            {pendingCount}
-                                        </span>
-                                    </div>
-
-                                    <div className="relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
-                                        <div className="flex items-center gap-3 mb-6">
-                                            <div className="w-10 h-10 rounded-full flex items-center justify-center bg-teal-50 dark:bg-teal-950/20 text-teal-600 dark:text-teal-400 shrink-0">
-                                                <CashierIcon className="w-5 h-5" />
-                                            </div>
-                                            <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading">
-                                                Valor total da quitação
-                                            </span>
-                                        </div>
-                                        <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none text-brand-green">
-                                            {formatCurrency(settleModalTotalToPay)}
-                                        </span>
-                                    </div>
-                                </div>
+                                <HorizontalKPICard
+                                    items={[
+                                        { title: "Total", value: formatCurrency(total), icon: FileIcon, iconBg: "bg-indigo-50 dark:bg-indigo-950/20", iconColor: "text-indigo-600 dark:text-indigo-400" },
+                                        { title: "Pago", value: formatCurrency(paid), icon: CheckCircleIcon, iconBg: "bg-emerald-50 dark:bg-emerald-950/20", iconColor: "text-emerald-600 dark:text-emerald-400" },
+                                        { title: "Restante", value: formatCurrency(pending), icon: ClockIcon, iconBg: "bg-amber-50 dark:bg-amber-950/20", iconColor: "text-amber-600 dark:text-amber-400" },
+                                        { title: "Parcelas a quitar", value: pendingCount, icon: InstallmentIcon, iconBg: "bg-purple-50 dark:bg-purple-950/20", iconColor: "text-purple-600 dark:text-purple-400" },
+                                        { title: "Valor total da quitação", value: formatCurrency(settleModalTotalToPay), icon: CashierIcon, iconBg: "bg-teal-50 dark:bg-teal-950/20", iconColor: "text-teal-600 dark:text-teal-400" },
+                                    ]}
+                                />
 
                                 {/* Table / List Container */}
                                 <FormSection hasSeparator title="Parcelas pendentes">
@@ -1725,7 +1673,7 @@ export default function TransactionsPage({
                                                                     paymentAmount: String(Number(row.remainingAmount || 0).toFixed(2)),
                                                                     interestAmount: "0",
                                                                     discountAmount: "0",
-                                                                    paymentMethodId: row.paymentType && row.paymentType !== "Não informado" ? row.paymentType : (row.paymentMethodId || "Pix"),
+                                                                    paymentMethodId: resolveStandardPaymentMethod(row.paymentType) || row.paymentMethodId || "Pix",
                                                                 }
                                                                 const finalPaid = Math.max(0, Number(values.paymentAmount || 0) + Number(values.interestAmount || 0) - Number(values.discountAmount || 0))
                                                                 return (
@@ -1773,7 +1721,6 @@ export default function TransactionsPage({
                                                                                 }))}
                                                                                 options={STANDARD_PAYMENT_METHODS}
                                                                                 placeholder="Selecione"
-                                                                                disabled={!!row.paymentMethodId && sanitizeUUID(row.paymentMethodId) !== null}
                                                                             />
                                                                         </td>
                                                                         <td className="p-2 border-b border-brand-border dark:border-dark-border" style={{ width: "112px" }}>
@@ -1818,7 +1765,7 @@ export default function TransactionsPage({
                                                         paymentAmount: String(Number(row.remainingAmount || 0).toFixed(2)),
                                                         interestAmount: "0",
                                                         discountAmount: "0",
-                                                        paymentMethodId: row.paymentMethodId || paymentMethods?.[0]?.id || "",
+                                                        paymentMethodId: resolveStandardPaymentMethod(row.paymentType) || row.paymentMethodId || "Pix",
                                                     }
                                                     const finalPaid = Math.max(0, Number(values.paymentAmount || 0) + Number(values.interestAmount || 0) - Number(values.discountAmount || 0))
                                                     return (
@@ -1880,7 +1827,6 @@ export default function TransactionsPage({
                                                                         }))}
                                                                         options={STANDARD_PAYMENT_METHODS}
                                                                         placeholder="Selecione"
-                                                                        disabled={!!row.paymentMethodId && sanitizeUUID(row.paymentMethodId) !== null}
                                                                     />
                                                                     <MoneyInput
                                                                         label="Juros"
@@ -1945,7 +1891,7 @@ export default function TransactionsPage({
     }
 
     if (isViewing && entityState.entityType === "installment") {
-        if (installmentDetailLoading && !installmentDetail) {
+        if (installmentDetailLoading || !installmentDetail) {
             return <ERPDetailLoading key="loading-installment-detail" />
         }
         const representativeTxId = installmentDetail?.installments?.[0]?.id || entityState.entityId
@@ -2072,17 +2018,14 @@ export default function TransactionsPage({
                                             </div>
                                         )}
                                         {installmentDetailTab === "notes" && (
-                                            <div className="space-y-4 max-w-3xl">
-                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Observações do Parcelamento</h3>
-                                                <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                                                    Escreva observações ou notas internas para este parcelamento. Elas serão salvas para todas as parcelas do grupo.
-                                                </p>
-                                                <textarea
+                                            <FormSection title="Observações do Parcelamento">
+                                                <FormTextarea
+                                                    name="observacoes"
+                                                    label="Observações"
                                                     value={installmentNotesText}
                                                     onChange={(e) => setInstallmentNotesText(e.target.value)}
                                                     rows={5}
                                                     placeholder="Ex: Contrato assinado presencialmente, renegociação..."
-                                                    className="w-full rounded-xl border border-brand-border dark:border-dark-border p-4 bg-white dark:bg-dark-surface text-sm text-brand-dark dark:text-dark-heading outline-none focus:border-brand-primary"
                                                 />
                                                 <div className="flex justify-end">
                                                     <Button
@@ -2108,7 +2051,7 @@ export default function TransactionsPage({
                                                         {savingInstallmentNotes ? "Salvando..." : "Salvar observações"}
                                                     </Button>
                                                 </div>
-                                            </div>
+                                            </FormSection>
                                         )}
                                     </>
                                 ) : (
@@ -2134,7 +2077,7 @@ export default function TransactionsPage({
         : null
 
     if (isFormOpen) {
-        if (entityState.action === "edit" && isLoadingDetail && entityState.entityType !== "recurring") {
+        if (entityState.action === "edit" && (isLoadingDetail || !editingTx) && entityState.entityType !== "recurring") {
             return <ERPDetailLoading key="loading-tx-edit" />
         }
         return (

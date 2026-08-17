@@ -88,7 +88,7 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
         loadHistory()
     }, [activeTab, historyLoaded, transactionId, partnerId, notifyError])
 
-    if (loading && !detail) {
+    if (loading || !detail) {
         return <ERPDetailLoading key="loading-tx-view" />
     }
     if (!detail) return null
@@ -150,7 +150,7 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                             <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
 
                                 {/* Back button - desktop only */}
-                                <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                                <div className={`absolute -left-12 top-7 h-full hidden lg:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
                                     <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
                                         <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                     </Button>
@@ -203,11 +203,11 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                             <Tabs value={activeTab} onValueChange={setActiveTab}>
                                 <TabsContent value="summary" className="mt-0">
                                     <div className="grid grid-cols-12 gap-y-8 md:gap-y-0 relative">
-                                        <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
+                                        <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
                                             {/* Mobile Contact Section at the top */}
                                             {detail.contactCard && (detail.contactCard.name || detail.contactCard.title) && (
-                                                <div className="xl:hidden mb-6">
-                                                    <FormSection title="" hasSeparator={false} className="mt-0">
+                                                <div className="lg:hidden mb-6">
+                                                    <FormSection title="" className="mt-0">
                                                         <ListItem
                                                             left={
                                                                 <UserProfileImage
@@ -531,7 +531,7 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                             </FormSection>
                                         </div>
 
-                                        <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
+                                        <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 space-y-6 border-0 lg:border-l border-brand-border dark:border-dark-border">
                                             {isCancelled && (
                                                 <InfoCard
                                                     title="Transação cancelada"
@@ -547,7 +547,7 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                                     amount={detail.amount}
                                                 />
                                             ) : detail.contactCard.isCustomer ? (
-                                                <div className="hidden xl:block">
+                                                <div className="hidden lg:block">
                                                     <CustomerCard
                                                         customer={{
                                                             id: detail.contactCard.id ?? undefined,
@@ -562,7 +562,7 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                                     />
                                                 </div>
                                             ) : (
-                                                <div className="hidden xl:block">
+                                                <div className="hidden lg:block">
                                                     <TransactionContactCard
                                                         title={detail.contactCard.title}
                                                         name={detail.contactCard.name}

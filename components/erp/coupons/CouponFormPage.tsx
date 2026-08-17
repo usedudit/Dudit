@@ -63,16 +63,26 @@ interface CouponFormPageProps {
 type PickerMode = "products" | "services" | "categories" | "customers" | "subscriptions" | null
 
 const SidebarCard = ({
+    title,
     children,
     hasTopStrip = true,
 }: {
+    title?: React.ReactNode
     children: React.ReactNode
     hasTopStrip?: boolean
 }) => (
-    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden">
-        {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />}
-        {children}
-    </div>
+    <>
+        {/* Desktop: card */}
+        <div className="hidden lg:block bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden">
+            {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />}
+            {title ? <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">{title}</h3> : null}
+            {children}
+        </div>
+        {/* Mobile/Tablet: FormSection */}
+        <FormSection title={title} hasSeparator className="lg:hidden">
+            {children}
+        </FormSection>
+    </>
 )
 
 function ScopeField({
@@ -582,8 +592,7 @@ export default function CouponFormPage({
                                 </div>
 
                                 <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
-                                    <SidebarCard>
-                                        <h3 className="font-bold text-brand-dark dark:text-dark-heading mb-6">Limites de uso</h3>
+                                    <SidebarCard title="Limites de uso">
                                         <div className="space-y-5">
                                             <div>
                                                 <label className="flex items-start gap-3 mb-3">
@@ -626,8 +635,7 @@ export default function CouponFormPage({
                                         </div>
                                     </SidebarCard>
 
-                                    <SidebarCard>
-                                        <h3 className="font-bold text-brand-dark dark:text-dark-heading mb-6">Validade</h3>
+                                    <SidebarCard title="Validade">
                                         <div className="space-y-4">
                                             <label className="flex items-start gap-3">
                                                 <Checkbox checked={form.unlimitedDate} onChange={(value) => setForm((prev) => ({ ...prev, unlimitedDate: Boolean(value) }))} />

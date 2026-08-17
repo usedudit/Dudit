@@ -38,6 +38,8 @@ export async function createComprehensiveSupplierAction(data: {
   city?: string
   state?: string
   municipioCodigoIbge?: string
+  latitude?: number | null
+  longitude?: number | null
   notes?: string
   image_url?: string | null
   csrf_token?: string
@@ -120,6 +122,8 @@ export async function createComprehensiveSupplierAction(data: {
       state: data.state || null,
       country: data.country || "BR",
       municipio_codigo_ibge: data.municipioCodigoIbge || null,
+      latitude: data.latitude ?? null,
+      longitude: data.longitude ?? null,
       is_default: true,
       address_type: "primary",
     })
@@ -277,6 +281,8 @@ export async function updateComprehensiveSupplierAction(data: {
   city?: string
   state?: string
   municipioCodigoIbge?: string
+  latitude?: number | null
+  longitude?: number | null
   notes?: string
   image_url?: string | null
   csrf_token?: string
@@ -356,6 +362,8 @@ export async function updateComprehensiveSupplierAction(data: {
       state: data.state || null,
       country: data.country || "BR",
       municipio_codigo_ibge: data.municipioCodigoIbge || null,
+      latitude: data.latitude ?? null,
+      longitude: data.longitude ?? null,
       updated_at: new Date().toISOString(),
     }
 

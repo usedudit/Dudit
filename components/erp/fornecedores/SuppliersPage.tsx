@@ -400,7 +400,7 @@ export default function SuppliersPage({
         <>
             <AnimatePresence mode="wait">
                 {entityState.isOpen && isViewing ? (
-                    (isLoadingDetail && !selectedSupplier) ? (
+                    (isLoadingDetail || !selectedSupplier) ? (
                         <ERPDetailLoading key="loading-supplier" />
                     ) : (
                         <FadeIn key="details" className="w-full h-full">
@@ -412,7 +412,7 @@ export default function SuppliersPage({
                         </FadeIn>
                     )
                 ) : (isCreatingEntity || isEditingEntity) ? (
-                    (isEditingEntity && (isLoadingDetail && !selectedSupplier)) ? (
+                    (isEditingEntity && (isLoadingDetail || !selectedSupplier)) ? (
                         <ERPDetailLoading key="loading-supplier-form" />
                     ) : (
                         <FadeIn key="form" className="w-full h-full">

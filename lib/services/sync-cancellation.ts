@@ -88,7 +88,67 @@ export async function syncCancelledOrderAppointmentsAndTransactions(
     console.error("[syncCancelledOrder] Error refunding subscription or exchange credits:", err)
   }
 
-  // 1. Fetch appointments linked to the order
+  // 1. Cancel linked delivery orders and update delivery status if all orders are cancelled
+  if (orderPartnerId) {
+    try {
+      const { data: deliveryLinks } = await supabase
+        .from("delivery_orders")
+        .select("id, delivery_id, status, deliveries!inner(id, partner_id, status, delivery_person_id)")
+        .eq("order_id", orderId)
+
+      for (const link of deliveryLinks || []) {
+        const delivery = (link as any).deliveries
+        if (!delivery?.id) continue
+
+        // Update this delivery_order link to cancelled
+        await supabase
+          .from("delivery_orders")
+          .update({ status: "cancelled" })
+          .eq("id", link.id)
+
+        // Check if all delivery_orders in this delivery are now cancelled/failed
+        const { data: allDeliveryOrders } = await supabase
+          .from("delivery_orders")
+          .select("id, status")
+          .eq("delivery_id", delivery.id)
+
+        const allCancelledOrFailed = (allDeliveryOrders || []).every(
+          (d: any) => d.status === "cancelled" || d.status === "delivery_failed"
+        )
+
+        if (allCancelledOrFailed && delivery.status !== "delivered" && delivery.status !== "cancelled") {
+          await supabase
+            .from("deliveries")
+            .update({
+              status: "cancelled",
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", delivery.id)
+            .eq("partner_id", orderPartnerId)
+
+          if (delivery.delivery_person_id) {
+            try {
+              const { reverseCommissionForEntity } = await import("@/lib/services/commission-ledger.service")
+              await reverseCommissionForEntity({
+                supabase,
+                partnerId: orderPartnerId,
+                entityType: "delivery",
+                entityId: delivery.id,
+                partnerUserId: String(delivery.delivery_person_id),
+                createdByUserId: null,
+              })
+            } catch (commErr) {
+              console.warn("[syncCancelledOrder] reverseCommissionForEntity error:", commErr)
+            }
+          }
+        }
+      }
+    } catch (deliveryErr) {
+      console.error("[syncCancelledOrder] Error syncing linked delivery:", deliveryErr)
+    }
+  }
+
+  // 2. Fetch appointments linked to the order
   const { data: appointments, error: fetchApptsError } = await supabase
     .from("appointments")
     .select("id, status, receivable_transaction_id, payment_transaction_id")

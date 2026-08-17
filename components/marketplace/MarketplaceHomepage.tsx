@@ -151,6 +151,8 @@ export default function MarketplaceHome({
         state: "",
         addressType: "casa",
         noNumber: false,
+        latitude: null as number | null,
+        longitude: null as number | null,
     })
 
     const filteredCities = useMemo(() => {
@@ -266,6 +268,8 @@ export default function MarketplaceHome({
             neighborhood: addr.neighborhood || f.neighborhood,
             city: addr.city || f.city,
             state: addr.state || f.state,
+            latitude: addr.latitude ?? f.latitude,
+            longitude: addr.longitude ?? f.longitude,
         }))
     }
 
@@ -296,6 +300,8 @@ export default function MarketplaceHome({
                 state,
                 isDefault: true,
                 addressType,
+                latitude: form.latitude ?? null,
+                longitude: form.longitude ?? null,
                 csrf_token: token,
             })
 

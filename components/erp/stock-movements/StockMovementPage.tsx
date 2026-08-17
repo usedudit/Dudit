@@ -441,7 +441,7 @@ const StockMovementPageContent = ({ partnerId, storeId, movements: initialMoveme
                     />
                 </FadeIn>
             ) : isViewing && entityState.entityId ? (
-                (isLoadingDetail && !currentEntity && !formattedMovements.find(m => m.id === entityState.entityId)) ? (
+                (isLoadingDetail || (!currentEntity && !formattedMovements.find(m => m.id === entityState.entityId))) ? (
                     <ERPDetailLoading key="loading-stock-detail" />
                 ) : (
                     <FadeIn key="detail" className="w-full h-full">

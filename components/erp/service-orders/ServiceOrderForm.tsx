@@ -4,7 +4,7 @@ import React, { useState, useCallback, useRef, useEffect, useMemo } from "react"
 import {
     Button, Input, FormSection, DatePicker, ThreeDotsLoader, Tabs, TabsList, TabsTrigger, Badge, IconPlaceholder,
     FormDropdown, TimePicker, MoneyInput, PercentageInput, ListItem, RadioButton, InfoCard, DefaultModal, HourInput, FormTextarea,
-    Tooltip
+    Tooltip, CustomerMobileBar
 } from "@/components/reusable"
 import CustomerCard from "@/components/reusable/CustomerCard"
 import Pagination from "@/components/reusable/Pagination"
@@ -956,7 +956,7 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                             <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
 
                                 {/* Back button - desktop only */}
-                                <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                                <div className={`absolute -left-12 top-7 h-full hidden lg:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
                                     <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
                                         <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                     </Button>
@@ -1017,6 +1017,29 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                                     <FadeIn key="general" className="grid grid-cols-12 gap-y-8 md:gap-y-0 w-full">
                                         {/* Left Column (Main Form fields) */}
                                         <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-6">
+                                            {/* Cliente - Mobile/Tablet only */}
+                                            <div className="lg:hidden">
+                                                <CustomerMobileBar
+                                                    customer={selectedCustomer}
+                                                    onSelect={() => setShowCustomerSheet(true)}
+                                                    onRemove={isLocked ? undefined : () => {
+                                                        if (couponId && couponPricingData?.customerScope === "specific") {
+                                                            setCouponId(null)
+                                                            setCouponCode("")
+                                                            setCouponDiscountAmount(0)
+                                                            setCouponPricingData(null)
+                                                            setDiscountType("fixed")
+                                                            setDiscountValue(0)
+                                                            toast({ description: "Cupom removido por ser específico para um ou mais clientes." })
+                                                        }
+                                                        setCustomerId("")
+                                                        setCustomerName("")
+                                                        setSelectedCustomer(null)
+                                                    }}
+                                                    disabled={isLocked}
+                                                />
+                                            </div>
+
                                             <FormSection title="Título">
                                                 <Input
                                                     placeholder="Ex: Manutenção de ar condicionado"
@@ -1153,6 +1176,7 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                                                         />
                                                     </div>
                                                 )}
+                                                <div className="hidden lg:block">
                                                 {selectedCustomer ? (
                                                     <CustomerCard
                                                         customer={selectedCustomer}
@@ -1194,6 +1218,7 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                                                         />
                                                     </div>
                                                 )}
+                                            </div>
                                             </div>
 
                                             <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 space-y-6">

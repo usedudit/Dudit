@@ -31,6 +31,7 @@ import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import Link from "next/link"
 import { toast } from "@/hooks/use-notification"
+import { useSidebar } from "@/lib/sidebar-context"
 
 const formatDeliveryStatusLabel = (status?: string | null, deliveryType?: string | null) => {
     if (!status) return "Não enviado"
@@ -54,9 +55,29 @@ export function AdminOrderDetailView({
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollRef = useRef<HTMLDivElement>(null)
 
+    // Header override for mobile back button
+    let sidebarContext: ReturnType<typeof useSidebar> | null = null
+    try {
+        sidebarContext = useSidebar()
+    } catch { }
+
+    const setHeaderOverride = sidebarContext?.setHeaderOverride
+
     const handleScroll = useCallback(() => {
         setIsScrolled((scrollRef.current?.scrollTop || 0) > 20)
     }, [])
+
+    const orderTitle = `Pedido #${order?.order_number || orderId.slice(0, 8)}`
+
+    useEffect(() => {
+        if (!setHeaderOverride) return
+        setHeaderOverride({
+            title: orderTitle,
+            onBack,
+            isSubPage: true,
+        })
+        return () => setHeaderOverride(null)
+    }, [orderTitle, onBack, setHeaderOverride])
 
     useEffect(() => {
         let isMounted = true
@@ -405,7 +426,7 @@ export function AdminOrderDetailView({
                                                             {order.buyer_id && (
                                                                 <div className="pt-2">
                                                                     <Link
-                                                                        href={`/ddt-admin/users?search=${order.buyer_id}`}
+                                                                        href={`/ddt-admin/users?view=${order.buyer_id}`}
                                                                         className="text-xs font-bold text-brand-green hover:underline"
                                                                     >
                                                                         Ver ficha completa do usuário →
@@ -451,13 +472,13 @@ export function AdminOrderDetailView({
                                                                     <span className="font-bold text-brand-dark dark:text-dark-heading">{store.phone}</span>
                                                                 </div>
                                                             )}
-                                                            {store.partner_id && (
+                                                            {(store.id || order.store_id) && (
                                                                 <div className="pt-2">
                                                                     <Link
-                                                                        href={`/ddt-admin/partners?search=${store.name || store.partner_id}`}
+                                                                        href={`/ddt-admin/partners?view=${store.id || order.store_id}`}
                                                                         className="text-xs font-bold text-brand-green hover:underline"
                                                                     >
-                                                                        Ver ficha completa do parceiro →
+                                                                        Ver ficha completa da loja →
                                                                     </Link>
                                                                 </div>
                                                             )}

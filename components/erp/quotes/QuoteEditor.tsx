@@ -178,7 +178,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
 
                     {/* Customer Selection - Mobile/Tablet only */}
                     <div className="block lg:hidden mb-6">
-                        <FormSection title="" hasSeparator={false} className="mt-0">
+                        <FormSection title="" className="mt-0">
                             {props.selectedCustomer ? (
                                 <ListItem
                                     left={

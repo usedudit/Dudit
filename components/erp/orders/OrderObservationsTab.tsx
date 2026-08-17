@@ -13,7 +13,7 @@ interface OrderObservationsTabProps {
 export const OrderObservationsTab: React.FC<OrderObservationsTabProps> = ({ notes, setNotes, disabled = false }) => {
     return (
         <FadeIn>
-            <FormSection title="Observações" hasSeparator={false} className="mt-0">
+            <FormSection title="Observações" className="mt-0">
                 <FormTextarea
                     name="notes"
                     label=""

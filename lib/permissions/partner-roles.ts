@@ -194,7 +194,7 @@ export const PERMISSION_PRESETS: Record<PartnerRole, PartnerPermissions> = {
         coupons: crudNone,
         goals: crudNone,
         reports: { view_basic: false, view_advanced: false },
-        dashboard: { view: false },
+        dashboard: { view: true },
         delivery: { view: true, create: false, edit: false, update_status: true },
         recurring_plans: recurringNone,
         recurring_subscriptions: recurringNone,

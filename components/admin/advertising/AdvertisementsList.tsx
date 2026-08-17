@@ -1,9 +1,8 @@
 "use client"
 
 import { useState, useTransition, useMemo } from "react"
-import { Button, Badge, Input, Tabs, TabsList, TabsTrigger, Pagination, IconPlaceholder } from "@/components/reusable"
+import { Button, Badge, Input, Tabs, TabsList, TabsTrigger, Pagination, IconPlaceholder, AlertModal } from "@/components/reusable"
 import { TabCountBadge } from "@/components/reusable/TabCountBadge"
-import DestructiveActionModal from "@/components/admin/DestructiveActionModal"
 import { toast } from "@/hooks/use-notification"
 import { PlusIcon, SearchIcon, MegaphoneIcon, CheckCircleIcon, ClockIcon, AlertCircleIcon, EditIcon, TrashIcon } from "@/lib/icons"
 import type { AdminAdvertisementRow } from "@/app/actions/admin/advertisements"
@@ -28,7 +27,7 @@ export default function AdvertisementsList({ initialData }: AdvertisementsListPr
     const [statusTab, setStatusTab] = useState("all")
     const [search, setSearch] = useState("")
     const [page, setPage] = useState(1)
-    const itemsPerPage = 10
+    const itemsPerPage = 8
 
     const [formOpen, setFormOpen] = useState(false)
     const [editing, setEditing] = useState<AdminAdvertisementRow | null>(null)
@@ -323,19 +322,14 @@ export default function AdvertisementsList({ initialData }: AdvertisementsListPr
             />
 
             {/* Modal de Exclusão */}
-            <DestructiveActionModal
+            <AlertModal
                 isOpen={!!deleteTarget}
                 onClose={() => setDeleteTarget(null)}
-                onConfirm={handleDelete}
+                onConfirm={() => handleDelete("Exclusão manual de anúncio")}
                 title="Excluir Anúncio"
-                description="O anúncio será permanentemente removido da plataforma."
-                entityName={deleteTarget?.title || ""}
-                consequences={[
-                    "Remoção imediata da exibição pública",
-                    "Registro obrigatório no Audit Log",
-                ]}
-                confirmText="Confirmar Exclusão"
-                isPending={isPending}
+                description={`Tem certeza que deseja excluir permanentemente o anúncio "${deleteTarget?.title}"?`}
+                confirmText="Excluir Anúncio"
+                variant="danger"
             />
         </FadeIn>
     )

@@ -457,16 +457,13 @@ const OPERATOR_PERMISSIONS: PartnerRoutePermissions = {
 // ─── DELIVERY: Entregador ───────────────────────────────────────────────────
 
 const DELIVERY_PERMISSIONS: PartnerRoutePermissions = {
-    dashboard: noAccess,
+    dashboard: viewOnly,
     // Lojas e Filiais
     stores: noAccess,
     stores_members: noAccess,
     stores_settings: noAccess,
-    // Vendas - view assigned orders only, update delivery status
-    orders: withSpecific(viewOnly, {
-        can_cancel_order: false, can_refund: false, can_update_status: false,
-        can_assign_delivery: false, can_view_values: false, can_apply_discount: false,
-    }),
+    // Vendas
+    orders: noAccess,
     returns: noAccess,
     logistics: withSpecific(viewOnly, {
         can_update_delivery_status: true, can_assign_driver: false,
@@ -770,7 +767,7 @@ export function legacyToRoutePermissions(legacy: PartnerPermissions, role: Partn
 
     if (legacy.orders) {
         const mapped: RoutePermissions = {
-            access: legacy.orders.view,
+            access: role === "DELIVERY" ? false : legacy.orders.view,
             create: legacy.orders.create,
             edit: legacy.orders.edit,
             delete: legacy.orders.delete ?? legacy.orders.delete_cancel ?? false,
@@ -862,7 +859,12 @@ export function legacyToRoutePermissions(legacy: PartnerPermissions, role: Partn
             specific: { can_pay_commission: legacy.productivity.commissions_manage },
         })
     }
-    if (legacy.customers) apply("customers", mapLegacy(legacy.customers))
+    if (legacy.customers) {
+        apply("customers", {
+            ...mapLegacy(legacy.customers),
+            access: role === "DELIVERY" ? false : legacy.customers.view,
+        })
+    }
 
     if (legacy.financial) {
         const mapped: RoutePermissions = {

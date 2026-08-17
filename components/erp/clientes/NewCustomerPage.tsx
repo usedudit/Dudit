@@ -63,11 +63,19 @@ const REQUIRED_FIELDS = [
     { field: "billingCep", tab: "address" },
 ]
 
-const SidebarCard = ({ children, className = "", hasTopStrip = false }: { children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
-    <div className={`bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
-        {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
-        {children}
-    </div>
+const SidebarCard = ({ title, children, className = "", hasTopStrip = false }: { title?: React.ReactNode; children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
+    <>
+        {/* Desktop: card */}
+        <div className={`hidden lg:block bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
+            {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
+            {title ? <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">{title}</h3> : null}
+            {children}
+        </div>
+        {/* Mobile/Tablet: FormSection */}
+        <FormSection title={title} hasSeparator className="lg:hidden">
+            {children}
+        </FormSection>
+    </>
 )
 
 const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customerId, initialData, onSuccess, onError }) => {
@@ -122,6 +130,8 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
     const [uf, setUf] = useState("SP")
     const [municipioIbge, setMunicipioIbge] = useState("")
     const [noNumber, setNoNumber] = useState(false)
+    const [latitude, setLatitude] = useState<number | null>(null)
+    const [longitude, setLongitude] = useState<number | null>(null)
     const [addressType, setAddressType] = useState("Casa")
     const [hasDifferentBillingAddress, setHasDifferentBillingAddress] = useState(false)
 
@@ -403,6 +413,8 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                 city: city,
                 state: uf,
                 municipioCodigoIbge: municipioIbge || undefined,
+                latitude: latitude ?? null,
+                longitude: longitude ?? null,
                 csrf_token: token,
                 status: status === "Ativo" ? "ativo" : status === "Inativo" ? "inativo" : "bloqueado",
                 notes: observacoes,
@@ -855,15 +867,17 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                                 })
                                                             }}
                                                             name="cep"
-                                                            onAddressFetched={(data) => {
-                                                                setStreet(data.street)
-                                                                setNeighborhood(data.neighborhood)
-                                                                setCity(data.city)
-                                                                setUf(data.state || "SP")
-                                                                setNumber(data.number || "")
-                                                                setNoNumber(data.number === "S/N")
-                                                                if (data.ibge) setMunicipioIbge(data.ibge)
-                                                            }}
+onAddressFetched={(data) => {
+                                setStreet(data.street)
+                                setNeighborhood(data.neighborhood)
+                                setCity(data.city)
+                                setUf(data.state || "SP")
+                                setNumber(data.number || "")
+                                setNoNumber(data.number === "S/N")
+                                if (data.ibge) setMunicipioIbge(data.ibge)
+                                setLatitude(typeof data.latitude === "number" ? data.latitude : null)
+                                setLongitude(typeof data.longitude === "number" ? data.longitude : null)
+                            }}
                                                             error={fieldErrors.has("cep")}
                                                             errorMessage={fieldErrors.has("cep") ? "CEP inválido" : undefined}
                                                         />
@@ -980,8 +994,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                     <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
                                         {activeTab === 'general' ? (
                                             <div className="hidden lg:block space-y-8">
-                                                <SidebarCard hasTopStrip>
-                                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Imagem do Cliente</h3>
+                                                <SidebarCard hasTopStrip title="Imagem do Cliente">
                                                     <div className="flex items-center gap-4 dark:bg-dark-background/50">
                                                         <div onClick={() => imageInputRef.current?.click()} className="w-16 h-16 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border cursor-pointer relative group overflow-hidden">
                                                             {imagePreview ? (

@@ -2,15 +2,15 @@
 
 import { useEffect, useRef, useState, useCallback } from "react"
 import dynamic from "next/dynamic"
-import { Button, Badge, InfoCard, ThreeDotsLoader, FormDropdown, Tabs, TabsContent, TabsList, TabsTrigger, CustomerCard, FormSection, ListItem } from "@/components/reusable"
+import { Button, Badge, InfoCard, FormDropdown, Tabs, TabsContent, TabsList, TabsTrigger, CustomerCard, FormSection, ListItem, ActionsDropdown, IconPlaceholder } from "@/components/reusable"
 import AlertModal from "@/components/reusable/AlertModal"
 import Input from "@/components/reusable/Input"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
-import { ChevronLeftIcon, ClockArrowUpIcon, ClockCheckIcon, EstimateTimeIcon, RouteIcon, XIcon } from "@/lib/icons"
-import { getERPDeliveryDetailsAction, getDeliveryRoutePointsAction, updateERPSingleOrderDeliveryStatusAction } from "@/app/actions/erp/deliveries"
-import { formatCurrency, formatDateTime, formatDate, formatQuantityWithUnit, formatUnitPriceWithUnit } from "@/lib/utils"
+import { ChevronLeftIcon, ClockArrowUpIcon, ClockCheckIcon, EstimateTimeIcon, RouteIcon, XIcon, EditIcon } from "@/lib/icons"
+import { getERPDeliveryDetailsAction, getDeliveryRoutePointsAction, updateERPSingleOrderDeliveryStatusAction, updateERPDeliveryStatusAction } from "@/app/actions/erp/deliveries"
+import { formatCurrency, formatDateTime, formatQuantityWithUnit, formatUnitPriceWithUnit } from "@/lib/utils"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { getDeliveryStatusMeta, getPaymentStatusMeta, getDeliveryStatusLabel, getDeliveryStatusIcon } from "@/lib/orders/status"
@@ -58,11 +58,13 @@ export default function DeliveryDetailPage({
     deliveryId,
     partnerId,
     onBack,
+    onEdit,
     planSlug = "free",
 }: {
     deliveryId: string
     partnerId: string
     onBack: () => void
+    onEdit?: (deliveryId: string) => void
     planSlug?: string
 }) {
     const [delivery, setDelivery] = useState<any>(null)
@@ -78,6 +80,12 @@ export default function DeliveryDetailPage({
         orderId: string
         nextStatus: string
         currentStatus: string
+        reasonDropdownValue: string
+        customReasonText: string
+    } | null>(null)
+    const [cancelDeliveryModal, setCancelDeliveryModal] = useState<{
+        isOpen: boolean
+        requiresReason: boolean
         reasonDropdownValue: string
         customReasonText: string
     } | null>(null)
@@ -230,23 +238,62 @@ export default function DeliveryDetailPage({
         }
     }
 
+    const handleCancelDelivery = () => {
+        if (!delivery) return
+        const requiresReason = doesTransitionRequireReason(delivery.status, "cancelled")
+        setCancelDeliveryModal({
+            isOpen: true,
+            requiresReason,
+            reasonDropdownValue: "",
+            customReasonText: "",
+        })
+    }
+
+    const confirmCancelDelivery = async () => {
+        if (!cancelDeliveryModal || !delivery) return
+        const reason = cancelDeliveryModal.reasonDropdownValue === "other"
+            ? cancelDeliveryModal.customReasonText.trim()
+            : CHANGE_STATUS_REASONS.find(r => r.value === cancelDeliveryModal.reasonDropdownValue)?.label || ""
+
+        setCancelDeliveryModal(null)
+        const res = await updateERPDeliveryStatusAction({
+            deliveryId: delivery.id,
+            partnerId,
+            status: "cancelled" as any,
+            changeReason: reason || undefined,
+        })
+
+        if (res.success) {
+            toast.success("Entrega cancelada com sucesso!")
+            loadDeliveryDetails()
+        } else {
+            toast.error(res.error || "Erro ao cancelar entrega.")
+        }
+    }
+
     if (loading) return <ERPDetailLoading key="loading-delivery-detail" />
 
     if (!delivery) {
         return (
             <div className="h-full flex flex-col items-center justify-center p-6 text-center">
-                <p className="text-red-500 font-bold text-lg">Não foi possível carregar a entrega</p>
-                <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-1">
-                    Verifique se o pedido/entrega existe ou se o seu plano atual possui acesso.
-                </p>
-                <Button variant="outline" onClick={handleBack} className="mt-4">
-                    Voltar para Entregas
-                </Button>
+                <IconPlaceholder
+                    placeholderType="image"
+                    imageSrc="https://img.dudit.com.br/static/mascots/Ops.png"
+                    imageAlt="Erro ao carregar entrega"
+                    title="Não foi possível carregar a entrega"
+                    subtitle="Verifique se o pedido/entrega existe ou se o seu plano atual possui acesso."
+                    itemButton={{
+                        text: "Voltar para Entregas",
+                        action: handleBack,
+                        variant: "outline",
+                    }}
+                />
             </div>
         )
     }
 
     const statusMeta = getDeliveryStatusMeta(delivery.status)
+    const canEdit = ["pending", "not_sent", "preparing"].includes(delivery.status)
     const links = (delivery.delivery_orders || []).filter((l: any) => l?.orders)
 
     const allItems = links.flatMap((link: any) => {
@@ -317,7 +364,7 @@ export default function DeliveryDetailPage({
     )
 
     const deliveryInfoMetrics = (
-        <FormSection title="Informações da Entrega" hasSeparator className="mb-8">
+        <FormSection title="Informações da Entrega" hasSeparator>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <ListItem icon={RouteIcon} title="Distância" description={`${Number(delivery.distance_km || 0).toFixed(2)} km`} className="px-4 py-3 gap-4" />
                 <ListItem icon={EstimateTimeIcon} title="Duração Estimada" description={`${delivery.estimated_duration_minutes || 0} min`} className="px-4 py-3 gap-4" />
@@ -354,7 +401,7 @@ export default function DeliveryDetailPage({
     )
 
     const pageHeader = (
-        <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 flex items-center justify-between">
+        <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 flex items-center justify-between gap-3">
             {/* Back button - desktop only */}
             <div className="absolute -left-12 top-1/2 -translate-y-1/2 hidden xl:flex">
                 <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
@@ -362,24 +409,36 @@ export default function DeliveryDetailPage({
                 </Button>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 min-w-0">
                 {/* Back button - mobile/tablet only */}
-                <div className="xl:hidden">
+                <div className="xl:hidden shrink-0">
                     <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
                         <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                     </Button>
                 </div>
-                <div>
-                    <h1 className="text-xl md:text-3xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-3">
+                <div className="min-w-0">
+                    <h1 className="text-xl md:text-3xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-3 truncate">
                         Entrega {delivery?.delivery_number ? `#${delivery.delivery_number}` : ""}
                     </h1>
-                    <p className="text-brand-inactive-text dark:text-dark-body text-xs md:text-sm mt-1">
+                    <p className="text-brand-inactive-text dark:text-dark-body text-xs md:text-sm mt-1 truncate">
                         Criado em {formatDateTime(delivery.created_at)} • {driverName}
                     </p>
                 </div>
             </div>
 
-            <Badge variant={statusMeta.variant} icon={getDeliveryStatusIcon(delivery?.status)}>{statusMeta.label}</Badge>
+            <div className="flex items-center gap-2 md:gap-3 shrink-0">
+                {canEdit && onEdit && (
+                    <Button variant="outline" size="sm" onClick={() => onEdit(delivery.id)} leftIcon={<EditIcon size={16} />} className="hidden sm:inline-flex">
+                        Editar
+                    </Button>
+                )}
+                <Badge variant={statusMeta.variant} icon={getDeliveryStatusIcon(delivery?.status)}>{statusMeta.label}</Badge>
+                <ActionsDropdown
+                    onEdit={canEdit && onEdit ? () => onEdit(delivery.id) : undefined}
+                    onCancel={delivery?.status !== "cancelled" ? handleCancelDelivery : undefined}
+                    cancelLabel="Cancelar entrega"
+                />
+            </div>
         </div>
     )
 
@@ -428,6 +487,43 @@ export default function DeliveryDetailPage({
                     </div>
                 </div>
             )}
+
+            <AlertModal
+                isOpen={cancelDeliveryModal?.isOpen ?? false}
+                onClose={() => setCancelDeliveryModal(null)}
+                onConfirm={confirmCancelDelivery}
+                title="Cancelar Entrega"
+                message={
+                    cancelDeliveryModal?.requiresReason ? (
+                        <div className="flex flex-col gap-4 text-left">
+                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                Esta entrega está como <strong className="text-brand-dark dark:text-dark-heading">{getDeliveryStatusLabel(delivery?.status)}</strong>. Informar um motivo é obrigatório para cancelar.
+                            </p>
+                            <div className="flex flex-col gap-4 mt-2">
+                                <FormDropdown
+                                    label="Motivo do cancelamento"
+                                    options={CHANGE_STATUS_REASONS}
+                                    value={cancelDeliveryModal.reasonDropdownValue || ""}
+                                    setValue={(val) => setCancelDeliveryModal(prev => prev ? { ...prev, reasonDropdownValue: val } : null)}
+                                    placeholder="Selecione o motivo"
+                                />
+                                {cancelDeliveryModal.reasonDropdownValue === "other" && (
+                                    <Input
+                                        label="Descreva o motivo"
+                                        placeholder="Digite o motivo aqui..."
+                                        value={cancelDeliveryModal.customReasonText || ""}
+                                        onChange={(e) => setCancelDeliveryModal(prev => prev ? { ...prev, customReasonText: e.target.value } : null)}
+                                    />
+                                )}
+                            </div>
+                        </div>
+                    ) : (
+                        "Tem certeza que deseja cancelar esta entrega?"
+                    )
+                }
+                confirmText="Confirmar Cancelamento"
+                cancelText="Voltar"
+            />
 
             <AlertModal
                 isOpen={deliveryWarningModal?.isOpen ?? false}

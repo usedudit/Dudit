@@ -161,7 +161,7 @@ export const ServiceResourcesTab: React.FC<ServiceResourcesTabProps> = ({
                                     <tr className="bg-brand-gray dark:bg-dark-border/50">
                                         <th className="py-3 pl-6 pr-4 text-[13px] font-medium text-gray-500 dark:text-dark-body rounded-l-lg">Item</th>
                                         <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body w-40">Tipo de Uso</th>
-                                        <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-36">Qtd.</th>
+                                        <th className={`py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-36 ${!isEditing && "rounded-r-lg"}`}>Qtd.</th>
                                         {isEditing && <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-24 rounded-r-lg">Ações</th>}
                                     </tr>
                                 </thead>

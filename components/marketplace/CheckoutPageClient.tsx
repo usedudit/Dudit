@@ -397,7 +397,8 @@ export function CheckoutPageClient() {
     const [loadingAddresses, setLoadingAddresses] = useState(false)
     const [loadingCep, setLoadingCep] = useState(false)
     const [newAddressData, setNewAddressData] = useState({
-        zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false
+        zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false,
+        latitude: null as number | null, longitude: null as number | null
     })
 
     const [showAddressModal, setShowAddressModal] = useState(false)
@@ -681,6 +682,8 @@ export function CheckoutPageClient() {
                     neighborhood: data.bairro || prev.neighborhood,
                     city: data.localidade || data.municipio || prev.city,
                     state: data.uf || prev.state,
+                    latitude: typeof data.latitude === "number" ? data.latitude : prev.latitude,
+                    longitude: typeof data.longitude === "number" ? data.longitude : prev.longitude,
                 }))
             }
         } catch (err) {
@@ -705,6 +708,8 @@ export function CheckoutPageClient() {
             street, number: finalNumber, complement: newAddressData.complement,
             neighborhood, city, state, zipCode,
             isDefault: userAddresses.length === 0,
+            latitude: newAddressData.latitude ?? null,
+            longitude: newAddressData.longitude ?? null,
             csrf_token: token,
         })
         if (result.error) {
@@ -716,7 +721,7 @@ export function CheckoutPageClient() {
                 setFormData(prev => ({ ...prev, deliveryAddress: buildAddressString(result.address) }))
             }
             setShowAddressForm(false)
-            setNewAddressData({ zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false })
+            setNewAddressData({ zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false, latitude: null, longitude: null })
         }
         setIsLoading(false)
     }

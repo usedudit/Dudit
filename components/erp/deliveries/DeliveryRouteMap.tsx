@@ -1,8 +1,12 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import {
+  buildDeliveryStopPopupHtml,
+  buildStoreOriginPopupHtml,
+} from "@/lib/map/mapbox-popup"
 
-type RoutePoint = {
+export type RoutePoint = {
   orderId: string
   displayId: string
   position: number
@@ -10,21 +14,22 @@ type RoutePoint = {
   longitude: number
   address?: string
   customerName?: string
+  orderNumber?: string | null
+  distanceKm?: number | null
+  totalAmount?: number | null
+  deliveryStatus?: string | null
+  situation?: string | null
+  paymentMethod?: string | null
 }
 
-type RouteOrigin = { lat: number; lng: number } | null | undefined
+export type RouteOrigin = {
+  lat: number
+  lng: number
+  name?: string
+  address?: string
+} | null | undefined
 
-const STORE_PIN_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M3 9l1.5-5h15L21 9"/><path d="M4 9v10a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9"/><path d="M9 20v-6h6v6"/></svg>`
-
-const escapeHtml = (value: any) =>
-  String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
-
-function buildPopupHtml(title: string, subtitle: string, tag?: string) {
-  const tagHtml = tag
-    ? `<span style="display:inline-block;margin-top:6px;padding:2px 8px;border-radius:999px;background:#059669;color:#fff;font-size:11px;font-weight:700">${escapeHtml(tag)}</span>`
-    : ""
-  return `<div style="padding:4px;font-family:system-ui,sans-serif;min-width:140px"><strong style="font-size:13px">${escapeHtml(title)}</strong><p style="margin:2px 0 0;font-size:12px;color:#4B5563">${escapeHtml(subtitle)}</p>${tagHtml}</div>`
-}
+const STORE_PIN_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/><path d="M22 7v3a2 2 0 0 1-2 2v0a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 16 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 12 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 8 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 4 12v0a2 2 0 0 1-2-2V7"/></svg>`
 
 export function DeliveryRouteMap({
   points,
@@ -177,15 +182,22 @@ export function DeliveryRouteMap({
     // Pin da loja (início da rota)
     if (hasOrigin) {
       const el = document.createElement("div")
-      el.className = "flex items-center justify-center rounded-full w-10 h-10 bg-brand-green text-white shadow-md border-2 border-white"
+      el.className = "flex items-center justify-center rounded-full w-9 h-9 bg-brand-green text-white shadow-sm border-2 border-white dark:border-dark-surface cursor-pointer"
       el.innerHTML = STORE_PIN_SVG
 
       const marker = new mapboxgl.Marker({ element: el, anchor: "center" })
         .setLngLat([Number(origin.lng), Number(origin.lat)])
         .addTo(mapRef.current)
+
       marker.setPopup(
-        new mapboxgl.Popup({ offset: 28, closeButton: false })
-          .setHTML(buildPopupHtml("Loja", "Início da rota", "Início")),
+        new mapboxgl.Popup({ offset: 20, closeButton: true, maxWidth: "270px" })
+          .setHTML(buildStoreOriginPopupHtml({
+            storeName: origin.name || "Sua Loja",
+            address: origin.address || "Ponto de partida da entrega",
+            latitude: Number(origin.lat),
+            longitude: Number(origin.lng),
+            tag: "Início",
+          })),
       )
       markersRef.current.push(marker)
       bounds.extend([Number(origin.lng), Number(origin.lat)])
@@ -194,19 +206,35 @@ export function DeliveryRouteMap({
     // Pins numerados dos pedidos, na ordem da rota
     validPoints.forEach((p, idx) => {
       const isLast = idx === validPoints.length - 1
+      const isSingle = validPoints.length === 1
+      const posNumber = p.position || idx + 1
+
       const el = document.createElement("div")
-      el.className = "flex items-center justify-center rounded-full w-9 h-9 border-2 border-white bg-brand-dark text-white font-bold shadow-md"
-      el.style.backgroundColor = isLast && validPoints.length > 1 ? "#7C3AED" : ""
-      el.innerText = String(p.position || idx + 1)
+      const bgClass = isLast && !isSingle ? "bg-purple-600" : "bg-brand-dark"
+      el.className = `flex items-center justify-center rounded-full w-8 h-8 ${bgClass} text-white font-bold text-xs shadow-sm border-2 border-white dark:border-dark-surface cursor-pointer`
+      el.innerText = String(posNumber)
 
       const marker = new mapboxgl.Marker({ element: el, anchor: "center" })
         .setLngLat([Number(p.longitude), Number(p.latitude)])
         .addTo(mapRef.current)
 
-      const tag = validPoints.length === 1 ? "Início / Fim" : isLast ? "Fim" : `Passo ${idx + 1}`
       marker.setPopup(
-        new mapboxgl.Popup({ offset: 28, closeButton: false })
-          .setHTML(buildPopupHtml(p.displayId || `Pedido ${p.position || idx + 1}`, p.address || p.customerName || "", tag)),
+        new mapboxgl.Popup({ offset: 20, closeButton: true, maxWidth: "270px" })
+          .setHTML(buildDeliveryStopPopupHtml({
+            orderId: p.orderId,
+            displayId: p.displayId,
+            position: posNumber,
+            totalPoints: validPoints.length,
+            customerName: p.customerName,
+            address: p.address,
+            latitude: Number(p.latitude),
+            longitude: Number(p.longitude),
+            distanceKm: p.distanceKm,
+            totalAmount: p.totalAmount,
+            deliveryStatus: p.deliveryStatus,
+            situation: p.situation,
+            paymentMethod: p.paymentMethod,
+          })),
       )
       markersRef.current.push(marker)
       bounds.extend([Number(p.longitude), Number(p.latitude)])
@@ -254,17 +282,24 @@ export function DeliveryRouteMap({
       )}
 
       {ready && (
-        <div className="absolute bottom-3 left-3 z-10 flex flex-col gap-1.5 rounded-lg bg-white/90 dark:bg-dark-surface/90 backdrop-blur px-3 py-2 shadow-md border border-brand-border dark:border-dark-border text-[11px] text-brand-dark dark:text-dark-heading">
-          <span className="flex items-center gap-2">
-            <span className="w-4 h-4 rounded-full bg-brand-green border-2 border-white shadow-sm shrink-0" />
+        <div className="absolute bottom-3 left-3 z-10 flex flex-col gap-1.5 rounded-lg bg-white/95 dark:bg-dark-surface/95 px-3 py-2 shadow-sm border border-brand-border dark:border-dark-border text-[11px] text-brand-dark dark:text-dark-heading">
+          <span className="flex items-center gap-2 font-medium">
+            <span className="w-3 h-3 rounded-full bg-brand-green border border-white dark:border-dark-surface shadow-sm shrink-0" />
             Loja (Início)
           </span>
-          <span className="flex items-center gap-2">
-            <span className="w-4 h-4 rounded-full bg-brand-dark border border-white shadow-sm shrink-0" />
-            Pedidos na ordem da rota
+          <span className="flex items-center gap-2 font-medium">
+            <span className="w-3 h-3 rounded-full bg-brand-dark border border-white dark:border-dark-surface shadow-sm shrink-0" />
+            Pedidos na rota
           </span>
+          {points && points.length > 1 && (
+            <span className="flex items-center gap-2 font-medium">
+              <span className="w-3 h-3 rounded-full bg-purple-600 border border-white dark:border-dark-surface shadow-sm shrink-0" />
+              Destino final
+            </span>
+          )}
         </div>
       )}
     </div>
   )
 }
+

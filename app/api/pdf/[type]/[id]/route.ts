@@ -125,11 +125,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         })
     }
 
-    // 4. Construct print template page URL with matching protocol, host, and search parameters
+    // 4. Construct print template page URL using internal HTTP loopback
+    // In containerized deployments (Railway/Docker), the internal Node process listens on HTTP.
+    // Calling https://localhost:PORT triggers net::ERR_SSL_PROTOCOL_ERROR.
+    // Using http://127.0.0.1:PORT ensures direct, fast, non-SSL internal communication.
     const requestUrl = new URL(request.url)
-    const baseUrl = `${requestUrl.protocol}//${requestUrl.host}`
+    const port = process.env.PORT || requestUrl.port || "3000"
     const searchParamsStr = requestUrl.search
-    const printUrl = `${baseUrl}/print/${type}/${id}${searchParamsStr}`
+    const printUrl = `http://127.0.0.1:${port}/print/${type}/${id}${searchParamsStr}`
 
     // 5. Gather request cookies to forward to the Puppeteer browser
     const cookieStore = await cookies()

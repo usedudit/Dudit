@@ -567,7 +567,7 @@ export default function QuotesPage({
         <>
             <AnimatePresence mode="wait">
                 {entityState.isOpen && isViewing ? (
-                    (isLoadingDetail && !activeQuote) ? (
+                    (isLoadingDetail || !activeQuote) ? (
                         <ERPDetailLoading key="loading-quote" />
                     ) : (
                         <FadeIn key="view-quote" className="w-full h-full">
@@ -582,7 +582,7 @@ export default function QuotesPage({
                         </FadeIn>
                     )
                 ) : (isCreating || isEditing || isDuplicating) ? (
-                    ((isEditing || isDuplicating) && (isLoadingDetail && !activeQuote)) ? (
+                    ((isEditing || isDuplicating) && (isLoadingDetail || !activeQuote)) ? (
                         <ERPDetailLoading key="loading-quote-form" />
                     ) : (
                         <FadeIn key="create-quote" className="w-full h-full">

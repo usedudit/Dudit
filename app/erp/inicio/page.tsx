@@ -15,7 +15,27 @@ export default async function InicioPage() {
         redirect("/erp/trocar-erp")
     }
 
-    const { partnerId } = context
+    const { partnerId, roleId } = context
+
+    if (roleId === "delivery") {
+        return (
+            <div className="flex items-center justify-center min-h-[calc(100vh-140px)] p-4 text-center">
+                <FadeIn>
+                    <IconPlaceholder
+                        placeholderType="image"
+                        imageSrc="https://img.dudit.com.br/static/mascots/QRDino.png"
+                        imageAlt="Área do Entregador"
+                        title="Área do Entregador"
+                        subtitle="Acesse a seção de entregas para acompanhar suas rotas e entregas em tempo real."
+                        itemButton={{
+                            text: "Acessar Entregas",
+                            action: "/erp/logistica"
+                        }}
+                    />
+                </FadeIn>
+            </div>
+        )
+    }
 
     const result = await getUnifiedDashboardAction(partnerId)
 

@@ -2187,15 +2187,8 @@ export async function settleInstallmentGroupAction(input: {
 
         const txIdsToLog = pendingTxs?.map((t: any) => t.id) || []
 
-        // Parcelas de venda mantêm o método fixado pela venda (ex: cartão de crédito)
-        const lockedPmByTx = new Map<string, string>(
-            (pendingTxs || [])
-                .map((t: any) => [t.id, sanitizeUUID(t.payment_method_id)])
-                .filter(([, pm]: any[]) => !!pm),
-        )
         const sanitizedPayments = (input.installmentPayments || []).map((p) => {
-            const lockedPm = lockedPmByTx.get(p.transactionId)
-            const validPmId = sanitizeUUID(lockedPm) || sanitizeUUID(p.paymentMethodId)
+            const validPmId = sanitizeUUID(p.paymentMethodId)
             const rawMethodName = (typeof p.paymentMethodId === "string" && !sanitizeUUID(p.paymentMethodId)) ? p.paymentMethodId : null
             return {
                 ...p,

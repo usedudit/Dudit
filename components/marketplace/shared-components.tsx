@@ -505,7 +505,7 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
                         <UserProfileImage
                             fullName={sellerName}
                             imageUrl={partnerImageUrl && !partnerImageUrl.includes("Placeholder.png") ? partnerImageUrl : null}
-                            className="w-8 h-8 border border-gray-100 shrink-0 bg-gray-50 dark:border-dark-border dark:bg-dark-border/30"
+                            className="w-8 h-8 border border-brand-gray shrink-0 dark:border-dark-border"
                         />
                         <div className="flex flex-col min-w-0">
                             <p className="text-[11px] md:text-xs text-brand-dark font-medium truncate leading-tight dark:text-dark-heading">

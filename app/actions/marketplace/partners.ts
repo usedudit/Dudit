@@ -823,6 +823,8 @@ export async function registerPartner(data: any) {
     const rawNeighborhood = data.neighborhood || data.address?.neighborhood || ""
     const rawState = data.state || data.address?.state || ""
     const rawIbge = data.municipioCodigoIbge || data.ibge || data.address?.ibge || data.address?.municipioCodigoIbge || null
+    const rawLatitude = typeof data.latitude === "number" ? data.latitude : (typeof data.address?.latitude === "number" ? data.address.latitude : undefined)
+    const rawLongitude = typeof data.longitude === "number" ? data.longitude : (typeof data.address?.longitude === "number" ? data.address.longitude : undefined)
 
     if (rawZip || rawStreet || rawCity) {
       const enrichedAddress = await enrichAddressData({
@@ -840,6 +842,8 @@ export async function registerPartner(data: any) {
         is_default: true,
         address_type: "primary",
         municipio_codigo_ibge: rawIbge,
+        latitude: rawLatitude,
+        longitude: rawLongitude,
       })
 
       const { error: addressError } = await supabaseAdmin

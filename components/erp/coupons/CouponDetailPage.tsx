@@ -19,17 +19,19 @@ import {
     getCouponValiditySummary,
 } from "@/lib/types/coupon"
 
-const SidebarCard = ({
-    children,
-    hasTopStrip = true,
-}: {
-    children: React.ReactNode
-    hasTopStrip?: boolean
-}) => (
-    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden">
-        {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />}
-        {children}
-    </div>
+const SidebarCard = ({ title, children, className = "", hasTopStrip = true }: { title?: React.ReactNode; children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
+    <>
+        {/* Desktop: card */}
+        <div className={`hidden lg:block bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
+            {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />}
+            {title ? <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">{title}</h3> : null}
+            {children}
+        </div>
+        {/* Mobile/Tablet: FormSection */}
+        <FormSection title={title} hasSeparator className="lg:hidden">
+            {children}
+        </FormSection>
+    </>
 )
 
 function KeyValueRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -150,8 +152,7 @@ export default function CouponDetailPage({
                                         </div>
 
                                         <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
-                                            <SidebarCard>
-                                                <h3 className="font-bold text-brand-dark dark:text-dark-heading mb-4">Status do cupom</h3>
+                                            <SidebarCard title="Status do cupom">
                                                 <div className="space-y-3 text-sm">
                                                     <div className="flex items-center justify-between gap-3">
                                                         <span className="text-brand-inactive-text dark:text-dark-body">Status</span>
@@ -168,8 +169,7 @@ export default function CouponDetailPage({
                                                 </div>
                                             </SidebarCard>
 
-                                            <SidebarCard>
-                                                <h3 className="font-bold text-brand-dark dark:text-dark-heading mb-4">Aplicação</h3>
+                                            <SidebarCard title="Aplicação">
                                                 <div className="space-y-3 text-sm">
                                                     <div className="flex items-center justify-between gap-3">
                                                         <span className="text-brand-inactive-text dark:text-dark-body">Produtos</span>
@@ -230,8 +230,7 @@ export default function CouponDetailPage({
                                         </div>
 
                                         <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
-                                            <SidebarCard>
-                                                <h3 className="font-bold text-brand-dark dark:text-dark-heading mb-4">Resumo do escopo</h3>
+                                            <SidebarCard title="Resumo do escopo">
                                                 <div className="space-y-3 text-sm">
                                                     <div className="flex items-center justify-between gap-3">
                                                         <span className="text-brand-inactive-text dark:text-dark-body">Aplicação</span>

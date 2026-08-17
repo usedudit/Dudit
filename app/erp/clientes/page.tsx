@@ -9,6 +9,11 @@ import { getERPCustomersPageAction } from "@/app/actions/erp/customers"
 export default async function CustomersRoute() {
   const context = await getCurrentPartnerContext()
   if (!context) return <AccessDenied />
+
+  if (context.roleId === "delivery") {
+    return <AccessDenied />
+  }
+
   const partnerId = context.partnerId
   const [{ allowed }, page] = await Promise.all([
     checkPermission(partnerId, "customers", "view"),

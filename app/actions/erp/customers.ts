@@ -95,6 +95,8 @@ export async function createComprehensiveCustomerAction(data: {
   city: string
   state: string
   municipioCodigoIbge?: string | null
+  latitude?: number | null
+  longitude?: number | null
   store_credit?: number
   status?: string
   notes?: string | null
@@ -233,6 +235,8 @@ export async function createComprehensiveCustomerAction(data: {
       municipioCodigoIbge: data.municipioCodigoIbge || undefined,
       addressType: "primary",
       isDefault: true,
+      latitude: data.latitude ?? null,
+      longitude: data.longitude ?? null,
       csrf_token: data.csrf_token,
     })
 
@@ -330,6 +334,8 @@ export async function updateComprehensiveCustomerAction(data: {
   city: string
   state: string
   municipioCodigoIbge?: string | null
+  latitude?: number | null
+  longitude?: number | null
   store_credit?: number
   status?: string
   notes?: string | null
@@ -463,6 +469,8 @@ export async function updateComprehensiveCustomerAction(data: {
         state: data.state,
         country: data.country || "BR",
         municipio_codigo_ibge: data.municipioCodigoIbge || null,
+        latitude: data.latitude ?? null,
+        longitude: data.longitude ?? null,
       })
       const { error: addressUpdateError } = await supabase.from("addresses").update(enrichedCustAddr).eq("id", existingAddresses[0].id)
       if (addressUpdateError) {
@@ -483,6 +491,8 @@ export async function updateComprehensiveCustomerAction(data: {
         municipioCodigoIbge: data.municipioCodigoIbge || undefined,
         addressType: "primary",
         isDefault: true,
+        latitude: data.latitude ?? null,
+        longitude: data.longitude ?? null,
         csrf_token: data.csrf_token,
       })
 
@@ -990,6 +1000,9 @@ export async function getERPCustomersPageAction(
 > {
   try {
     const customerAccess = await requireAuthorizedCustomerContext(partnerId, "view")
+    if (customerAccess.roleId === "delivery") {
+      return { success: false, error: "Sem permissão para acessar a listagem de clientes." }
+    }
     const supabase = customerAccess.admin
     partnerId = customerAccess.partnerId
 

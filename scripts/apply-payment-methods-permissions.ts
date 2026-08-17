@@ -108,7 +108,7 @@ async function applyPaymentMethodsPermissions() {
       coupons: { view: false, create: false, edit: false, delete: false },
       goals: { view: false, create: false, edit: false, delete: false },
       reports: { view_basic: false, view_advanced: false },
-      dashboard: { view: false },
+      dashboard: { view: true },
       delivery: { view: true, create: false, edit: false, update_status: true },
       recurring_plans: { view: false, manage: false },
       recurring_subscriptions: { view: false, manage: false },

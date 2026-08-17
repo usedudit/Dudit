@@ -29,6 +29,7 @@ import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import Link from "next/link"
 import { toast } from "@/hooks/use-notification"
+import { useSidebar } from "@/lib/sidebar-context"
 
 const formatReturnReasonLabel = (rawReason?: string | null): string => {
     if (!rawReason) return "Não informado"
@@ -178,6 +179,14 @@ export function AdminReturnDetailView({ detail, onBack }: AdminReturnDetailViewP
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollRef = useRef<HTMLDivElement>(null)
 
+    // Header override for mobile back button
+    let sidebarContext: ReturnType<typeof useSidebar> | null = null
+    try {
+        sidebarContext = useSidebar()
+    } catch { }
+
+    const setHeaderOverride = sidebarContext?.setHeaderOverride
+
     const handleScroll = useCallback(() => {
         setIsScrolled((scrollRef.current?.scrollTop || 0) > 20)
     }, [])
@@ -189,6 +198,16 @@ export function AdminReturnDetailView({ detail, onBack }: AdminReturnDetailViewP
 
     const returnId = request?.id?.slice(0, 8) || "N/A"
     const statusMeta = getReturnStatusMeta(request?.status)
+
+    useEffect(() => {
+        if (!setHeaderOverride) return
+        setHeaderOverride({
+            title: `Solicitação #${returnId}`,
+            onBack,
+            isSubPage: true,
+        })
+        return () => setHeaderOverride(null)
+    }, [returnId, onBack, setHeaderOverride])
 
     const items = Array.isArray(request?.return_items) ? request.return_items : []
     const evidence = Array.isArray(request?.return_evidence) ? request.return_evidence : []
@@ -416,7 +435,7 @@ export function AdminReturnDetailView({ detail, onBack }: AdminReturnDetailViewP
                                                                 Número: #{request?.order_number_snapshot || request?.orders?.order_number || "-"}
                                                             </p>
                                                             <Link
-                                                                href={`/ddt-admin/orders?search=${request.order_id}`}
+                                                                href={`/ddt-admin/orders?view=${request.order_id}`}
                                                                 className="inline-block text-xs font-bold text-brand-green hover:underline mt-2"
                                                             >
                                                                 Ver pedido completo →
@@ -443,6 +462,16 @@ export function AdminReturnDetailView({ detail, onBack }: AdminReturnDetailViewP
                                                             }
                                                             title={request?.customer_name_snapshot || "Consumidor"}
                                                             description={`ID: ${request?.customer_id || "-"}`}
+                                                            right={
+                                                                request?.customer_id ? (
+                                                                    <Link
+                                                                        href={`/ddt-admin/users?view=${request.customer_id}`}
+                                                                        className="text-xs font-bold text-brand-green hover:underline"
+                                                                    >
+                                                                        Ver Usuário →
+                                                                    </Link>
+                                                                ) : undefined
+                                                            }
                                                         />
                                                     </FormSection>
                                                 </div>
@@ -474,6 +503,17 @@ export function AdminReturnDetailView({ detail, onBack }: AdminReturnDetailViewP
                                                                 </span>
                                                             </div>
                                                         </div>
+
+                                                        {(store.id || request?.store_id || request?.partner_id) && (
+                                                            <div className="pt-3 mt-3 border-t border-brand-border dark:border-dark-border">
+                                                                <Link
+                                                                    href={`/ddt-admin/partners?view=${store.id || request?.store_id || request?.partner_id}`}
+                                                                    className="text-xs font-bold text-brand-green hover:underline"
+                                                                >
+                                                                    Ver ficha da loja →
+                                                                </Link>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>

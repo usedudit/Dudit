@@ -51,11 +51,19 @@ const PIX_KEY_TYPES = [
     { id: "random", name: "Chave Aleatória" },
 ]
 
-const SidebarCard = ({ children, className = "", hasTopStrip = false }: { children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
-    <div className={`bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
-        {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
-        {children}
-    </div>
+const SidebarCard = ({ title, children, className = "", hasTopStrip = false }: { title?: React.ReactNode; children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
+    <>
+        {/* Desktop: card */}
+        <div className={`hidden lg:block bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
+            {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
+            {title ? <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">{title}</h3> : null}
+            {children}
+        </div>
+        {/* Mobile/Tablet: FormSection */}
+        <FormSection title={title} hasSeparator className="lg:hidden">
+            {children}
+        </FormSection>
+    </>
 )
 
 interface PaymentMethod {
@@ -533,8 +541,7 @@ export function PaymentMethodEditPage({ partnerId, storeId: propStoreId, editing
 
                         {/* Right Column */}
                         <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
-                            <SidebarCard hasTopStrip>
-                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Taxas e Custos</h3>
+                            <SidebarCard hasTopStrip title="Taxas e Custos">
                                 <div className="grid grid-cols-1 gap-6">
                                     <FormDropdown
                                         label="Quem paga a taxa?"
@@ -566,8 +573,7 @@ export function PaymentMethodEditPage({ partnerId, storeId: propStoreId, editing
                                 </div>
                             </SidebarCard>
 
-                            <SidebarCard>
-                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Preferências</h3>
+                            <SidebarCard title="Preferências">
                                 <div className="space-y-4">
                                     <div className="flex items-center justify-between">
                                         <div>
@@ -984,8 +990,7 @@ export function PaymentMethodEditPage({ partnerId, storeId: propStoreId, editing
 
                                 {/* Right Column */}
                                 <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
-                                    <SidebarCard hasTopStrip>
-                                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Taxas e Custos</h3>
+                                    <SidebarCard hasTopStrip title="Taxas e Custos">
                                         <div className="grid grid-cols-1 gap-6">
                                             <FormDropdown
                                                 label="Quem paga a taxa?"
@@ -1017,8 +1022,7 @@ export function PaymentMethodEditPage({ partnerId, storeId: propStoreId, editing
                                         </div>
                                     </SidebarCard>
 
-                                    <SidebarCard>
-                                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Preferências</h3>
+                                    <SidebarCard title="Preferências">
                                         <div className="space-y-4">
                                             <div className="flex items-center justify-between">
                                                 <div>

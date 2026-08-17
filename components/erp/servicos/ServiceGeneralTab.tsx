@@ -30,11 +30,19 @@ const FormCombobox = ({
     </div>
 )
 
-const SidebarCard = ({ children, className = "", hasTopStrip = false }: { children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
-    <div className={`bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
-        {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
-        {children}
-    </div>
+const SidebarCard = ({ title, children, className = "", hasTopStrip = false }: { title?: React.ReactNode; children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
+    <>
+        {/* Desktop: card */}
+        <div className={`hidden lg:block bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
+            {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
+            {title ? <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">{title}</h3> : null}
+            {children}
+        </div>
+        {/* Mobile/Tablet: FormSection */}
+        <FormSection title={title} hasSeparator className="lg:hidden">
+            {children}
+        </FormSection>
+    </>
 )
 
 interface ServiceGeneralTabProps {
@@ -172,7 +180,7 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                     <FormSection title="Informações Básicas" className="mb-8">
                         <div className="space-y-6">
                             <div>
-                                <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium block mb-1">Nome do Serviço</span>
+                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Nome do Serviço</span>
                                 <h1 className="text-xl md:text-2xl font-bold text-brand-dark dark:text-dark-heading">
                                     {serviceData.name || "-"}
                                 </h1>
@@ -180,7 +188,7 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
                                 <div>
-                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium block mb-1">Status</span>
+                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body">Status</span>
                                     <div className="flex items-center gap-2">
                                         <span className={`inline-block w-2.5 h-2.5 rounded-full ${serviceData.is_active ? 'bg-emerald-500' : 'bg-gray-400'}`} />
                                         <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
@@ -190,7 +198,7 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                                 </div>
 
                                 <div>
-                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium block mb-1">Exibir na Vitrine</span>
+                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body">Exibir na Vitrine</span>
                                     <div className="flex items-center gap-2">
                                         <span className={`inline-block w-2.5 h-2.5 rounded-full ${serviceData.show_in_marketplace !== false ? 'bg-emerald-500' : 'bg-gray-400'}`} />
                                         <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
@@ -323,8 +331,7 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
 
                 {/* DIREITA (SidebarCard) */}
                 <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
-                    <SidebarCard hasTopStrip>
-                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Organização</h3>
+                    <SidebarCard hasTopStrip title="Organização">
                         <div className="space-y-4">
                             <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
                                 <span className="text-sm text-brand-inactive-text dark:text-dark-body">Código (SKU)</span>
@@ -344,8 +351,7 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                     </SidebarCard>
 
                     {isQuickMode && officialCategoryPath && (
-                        <SidebarCard>
-                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-3 mt-1">Categoria oficial</h3>
+                        <SidebarCard title="Categoria oficial">
                             <div className="p-4 rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/30 dark:bg-dark-border/30 text-sm font-medium text-brand-dark dark:text-dark-heading">
                                 {officialCategoryPath}
                             </div>
@@ -353,8 +359,7 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                     )}
 
                     {!isQuickMode && serviceData.notes && (
-                        <SidebarCard>
-                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-3 mt-1">Observações Internas</h3>
+                        <SidebarCard title="Observações Internas">
                             <p className="text-sm text-brand-dark dark:text-dark-heading whitespace-pre-wrap leading-relaxed">
                                 {serviceData.notes}
                             </p>
@@ -615,8 +620,7 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
 
             {/* DIREITA (Widgets) */}
             <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
-                <SidebarCard hasTopStrip>
-                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Organização</h3>
+                <SidebarCard hasTopStrip title="Organização">
                     <div className="space-y-5">
                         <Input
                             label="Código do Serviço (SKU)"
@@ -679,20 +683,14 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                 </SidebarCard>
 
                 {isQuickMode && (
-                    <SidebarCard>
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                                <Package className="w-5 h-5 text-brand-green" />
-                                Categoria Oficial
-                            </h3>
-                            {officialCategoryPath && (
-                                <span className="text-xs font-medium bg-green-100 text-green-800 px-2 py-1 rounded-full flex items-center gap-1">
-                                    <CheckCircleIcon className="w-3 h-3" /> Categorizado
-                                </span>
-                            )}
-                        </div>
+                    <SidebarCard title={<><Package className="w-5 h-5 text-brand-green" /> Categoria Oficial</>}>
+                        {officialCategoryPath && (
+                            <span className="text-xs font-medium bg-green-100 text-green-800 px-2 py-1 rounded-full flex items-center gap-1">
+                                <CheckCircleIcon className="w-3 h-3" /> Categorizado
+                            </span>
+                        )}
 
-                        <p className="text-sm text-gray-500 mb-4">
+                        <p className="text-sm text-gray-500 mt-2 mb-4">
                             Selecione a categoria oficial do seu serviço.
                         </p>
 
@@ -731,8 +729,7 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                 )}
 
                 {!isQuickMode && (
-                    <SidebarCard>
-                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Observações Internas</h3>
+                    <SidebarCard title="Observações Internas">
                         <FormTextarea
                             label="Anotações"
                             name="notes"

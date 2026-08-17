@@ -6,6 +6,7 @@ import { Button, Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/r
 import { XIcon, PrinterIcon, DownloadIcon } from "@/lib/icons"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { downloadPdf } from "@/lib/pdf/download"
+import { toast } from "@/hooks/use-notification"
 import { InvoicePreview } from "./InvoicePreview"
 import type { InvoiceData } from "@/lib/billing/types"
 
@@ -22,6 +23,7 @@ export function InvoicePrintModal({ isOpen, onClose, invoiceData, invoiceId }: I
     const [isVisible, setIsVisible] = useState(false)
     const [isAnimating, setIsAnimating] = useState(false)
     const [activeTab, setActiveTab] = useState("Visualização")
+    const [isDownloading, setIsDownloading] = useState(false)
 
     useEffect(() => {
         if (isOpen) {
@@ -37,23 +39,26 @@ export function InvoicePrintModal({ isOpen, onClose, invoiceData, invoiceId }: I
     const handlePrint = useCallback(() => {
         if (!invoiceId) return
         if (isMobile) {
-            downloadPdf(`/api/pdf/invoice/${invoiceId}`, `fatura-${invoiceId}.pdf`)
-                .catch(() => window.open(`/print/invoice/${invoiceId}`, "_blank"))
-            onClose()
+            handleDownloadPdf()
             return
         }
         window.open(`/print/invoice/${invoiceId}`, "_blank")
         onClose()
     }, [invoiceId, onClose, isMobile])
 
-    const handleDownloadPdf = useCallback(() => {
-        if (!invoiceId) return
-        downloadPdf(`/api/pdf/invoice/${invoiceId}`, `fatura-${invoiceId}.pdf`)
-            .catch(() => {
-                window.open(`/print/invoice/${invoiceId}`, "_blank")
-            })
-        onClose()
-    }, [invoiceId, onClose])
+    const handleDownloadPdf = useCallback(async () => {
+        if (!invoiceId || isDownloading) return
+        setIsDownloading(true)
+        try {
+            await downloadPdf(`/api/pdf/invoice/${invoiceId}`, `fatura-${invoiceId}.pdf`)
+            onClose()
+        } catch (error: any) {
+            console.error("[InvoicePrintModal] Error downloading PDF:", error)
+            toast.error("Erro ao gerar PDF", error?.message || "Não foi possível gerar o PDF. Tente novamente.")
+        } finally {
+            setIsDownloading(false)
+        }
+    }, [invoiceId, isDownloading, onClose])
 
     if (!isVisible) return null
 
@@ -110,8 +115,14 @@ export function InvoicePrintModal({ isOpen, onClose, invoiceData, invoiceId }: I
                                         <Button className="flex-1 h-12" onClick={handlePrint} leftIcon={<PrinterIcon size={18} />}>
                                             Imprimir
                                         </Button>
-                                        <Button variant="outline" className="flex-1 h-12" onClick={handleDownloadPdf} leftIcon={<DownloadIcon size={18} />}>
-                                            Salvar PDF
+                                        <Button
+                                            variant="outline"
+                                            className="flex-1 h-12"
+                                            onClick={handleDownloadPdf}
+                                            disabled={isDownloading}
+                                            leftIcon={<DownloadIcon size={18} />}
+                                        >
+                                            {isDownloading ? "Gerando PDF..." : "Salvar PDF"}
                                         </Button>
                                     </div>
                                 </div>
@@ -121,8 +132,14 @@ export function InvoicePrintModal({ isOpen, onClose, invoiceData, invoiceId }: I
                                     <Button className="flex-1 h-12" onClick={handlePrint} leftIcon={<PrinterIcon size={18} />}>
                                         Imprimir
                                     </Button>
-                                    <Button variant="outline" className="flex-1 h-12" onClick={handleDownloadPdf} leftIcon={<DownloadIcon size={18} />}>
-                                        PDF
+                                    <Button
+                                        variant="outline"
+                                        className="flex-1 h-12"
+                                        onClick={handleDownloadPdf}
+                                        disabled={isDownloading}
+                                        leftIcon={<DownloadIcon size={18} />}
+                                    >
+                                        {isDownloading ? "Gerando..." : "PDF"}
                                     </Button>
                                 </div>
                             </div>

@@ -79,7 +79,8 @@ export function PlanDetailsPageClient({
     const [loadingAddresses, setLoadingAddresses] = useState(false)
     const [loadingCep, setLoadingCep] = useState(false)
     const [newAddressData, setNewAddressData] = useState({
-        zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false
+        zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false,
+        latitude: null as number | null, longitude: null as number | null
     })
 
     const partner = useMemo(() => {
@@ -197,6 +198,8 @@ export function PlanDetailsPageClient({
                     neighborhood: data.bairro || prev.neighborhood,
                     city: data.localidade || prev.city,
                     state: data.uf || prev.state,
+                    latitude: typeof data.latitude === "number" ? data.latitude : prev.latitude,
+                    longitude: typeof data.longitude === "number" ? data.longitude : prev.longitude,
                 }))
             }
         } catch (err) {
@@ -229,6 +232,8 @@ export function PlanDetailsPageClient({
                 state,
                 isDefault: userAddresses.length === 0,
                 addressType: "casa",
+                latitude: newAddressData.latitude ?? null,
+                longitude: newAddressData.longitude ?? null,
             })
 
             if (result.error) {
@@ -236,7 +241,7 @@ export function PlanDetailsPageClient({
             } else {
                 notifySuccess("Endereço salvo com sucesso!")
                 setShowAddressForm(false)
-                setNewAddressData({ zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false })
+                setNewAddressData({ zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false, latitude: null, longitude: null })
                 await loadUserAddresses()
             }
         } catch (err) {
@@ -397,7 +402,7 @@ export function PlanDetailsPageClient({
 
             {/* Price details */}
             <div className="mb-6 pb-6 border-b border-brand-border">
-                <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium block mb-1">
+                <span className="text-sm text-brand-inactive-text dark:text-dark-body">
                     Valor da assinatura
                 </span>
                 <div className="flex items-baseline gap-1.5">

@@ -4,6 +4,7 @@ import { useMemo } from "react"
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 import { EyeIcon, HeartIcon, SalesIcon, StarIcon, CalendarIcon, TrendingUpIcon, AnalyticsIcon } from "@/lib/icons"
 import { IconPlaceholder } from "@/components/reusable"
+import { HorizontalKPICard } from "@/components/erp/dashboard/cards/HorizontalKPICard"
 
 interface ServiceMetricsTabProps {
     serviceData: any
@@ -47,36 +48,6 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     return null
 }
 
-interface KPICardProps {
-    icon: any
-    title: string
-    value: string
-    subtext: string
-}
-
-function KPICard({ icon: Icon, title, value, subtext }: KPICardProps) {
-    return (
-        <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex flex-col justify-between">
-            <div className="flex justify-between items-start mb-4">
-                <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center shrink-0 text-brand-dark dark:text-dark-heading">
-                        <Icon size={18} className="text-brand-dark dark:text-dark-heading" />
-                    </div>
-                    <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{title}</span>
-                </div>
-            </div>
-            <div className="flex items-baseline space-x-2 mt-2">
-                <h2 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
-                    {value}
-                </h2>
-            </div>
-            <div className="mt-3 text-[12px] font-semibold text-brand-inactive-text dark:text-dark-body">
-                {subtext}
-            </div>
-        </div>
-    )
-}
-
 export function ServiceMetricsTab({ serviceData }: ServiceMetricsTabProps) {
     const hasId = !!serviceData?.id
 
@@ -118,33 +89,35 @@ export function ServiceMetricsTab({ serviceData }: ServiceMetricsTabProps) {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
                 {/* Left/Main Column */}
                 <div className="lg:col-span-8 flex flex-col gap-6">
-                    {/* KPI Cards Grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
-                        <KPICard
-                            icon={EyeIcon}
-                            title="Visitas Totais"
-                            value={formatMetric(serviceData.views_count)}
-                            subtext="Total de visualizações"
-                        />
-                        <KPICard
-                            icon={SalesIcon}
-                            title="Reservas Totais"
-                            value={formatMetric(serviceData.total_bookings)}
-                            subtext={`${formatMetric(serviceData.bookings_last_30_days)} nos últimos 30 dias`}
-                        />
-                        <KPICard
-                            icon={TrendingUpIcon}
-                            title="Reservas (7d)"
-                            value={formatMetric(serviceData.bookings_last_7_days)}
-                            subtext="Volume nos últimos 7 dias"
-                        />
-                        <KPICard
-                            icon={HeartIcon}
-                            title="Favoritos"
-                            value={formatMetric(serviceData.favorites_count)}
-                            subtext="Desejado por clientes"
-                        />
-                    </div>
+                    {/* KPI Cards */}
+                    <HorizontalKPICard
+                        items={[
+                            {
+                                title: "Visitas Totais",
+                                value: formatMetric(serviceData.views_count),
+                                subtext: "Total de visualizações",
+                                icon: EyeIcon,
+                            },
+                            {
+                                title: "Reservas Totais",
+                                value: formatMetric(serviceData.total_bookings),
+                                subtext: `${formatMetric(serviceData.bookings_last_30_days)} nos últimos 30 dias`,
+                                icon: SalesIcon,
+                            },
+                            {
+                                title: "Reservas (7d)",
+                                value: formatMetric(serviceData.bookings_last_7_days),
+                                subtext: "Volume nos últimos 7 dias",
+                                icon: TrendingUpIcon,
+                            },
+                            {
+                                title: "Favoritos",
+                                value: formatMetric(serviceData.favorites_count),
+                                subtext: "Desejado por clientes",
+                                icon: HeartIcon,
+                            },
+                        ]}
+                    />
 
                     {/* Comparison Chart */}
                     <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex flex-col">

@@ -41,11 +41,19 @@ type GoalFormPageProps = {
     onBack: () => void
 }
 
-const SidebarCard = ({ children, className = "", hasTopStrip = false }: { children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
-    <div className={`bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
-        {hasTopStrip && <div className="absolute top-0 left-0 w-full h-[3px] bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
-        {children}
-    </div>
+const SidebarCard = ({ title, children, className = "", hasTopStrip = false }: { title?: React.ReactNode; children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
+    <>
+        {/* Desktop: card */}
+        <div className={`hidden lg:block bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
+            {hasTopStrip && <div className="absolute top-0 left-0 w-full h-[3px] bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
+            {title ? <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">{title}</h3> : null}
+            {children}
+        </div>
+        {/* Mobile/Tablet: FormSection */}
+        <FormSection title={title} hasSeparator className="lg:hidden">
+            {children}
+        </FormSection>
+    </>
 )
 
 function toDateString(date: Date | undefined | null) {
@@ -367,8 +375,8 @@ export default function GoalFormPage({ partnerId, mode, sellers, accounts, initi
 
                 <div className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8">
                     <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
-                        <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
-                            <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12 space-y-10">
+                        <div className="grid grid-cols-12 gap-y-8 lg:gap-y-0">
+                            <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-10">
                                 <FormSection title="Dados da meta">
                                     <div className="grid grid-cols-12 gap-5">
                                         <div className="col-span-12">
@@ -396,6 +404,18 @@ export default function GoalFormPage({ partnerId, mode, sellers, accounts, initi
                                             />
                                         </div>
                                         <div className="col-span-12 md:col-span-6">
+                                            <MoneyInput
+                                                label="Valor alvo"
+                                                value={form.targetAmount}
+                                                onChange={(value) => {
+                                                    setForm((prev) => ({ ...prev, targetAmount: value }))
+                                                    clearFieldError("targetAmount")
+                                                }}
+                                                error={Boolean(fieldErrors.targetAmount)}
+                                                errorMessage={fieldErrors.targetAmount}
+                                            />
+                                        </div>
+                                        <div className="col-span-12 md:col-span-6">
                                             <DatePicker
                                                 label="Início"
                                                 value={form.startDate}
@@ -420,18 +440,6 @@ export default function GoalFormPage({ partnerId, mode, sellers, accounts, initi
                                             />
                                         </div>
                                         <div className="col-span-12 md:col-span-6">
-                                            <MoneyInput
-                                                label="Valor alvo"
-                                                value={form.targetAmount}
-                                                onChange={(value) => {
-                                                    setForm((prev) => ({ ...prev, targetAmount: value }))
-                                                    clearFieldError("targetAmount")
-                                                }}
-                                                error={Boolean(fieldErrors.targetAmount)}
-                                                errorMessage={fieldErrors.targetAmount}
-                                            />
-                                        </div>
-                                        <div className="col-span-12 md:col-span-3">
                                             <FormDropdown
                                                 label="Tipo de bônus"
                                                 value={form.bonusType}
@@ -442,7 +450,7 @@ export default function GoalFormPage({ partnerId, mode, sellers, accounts, initi
                                                 ]}
                                             />
                                         </div>
-                                        <div className="col-span-12 md:col-span-3">
+                                        <div className="col-span-12 md:col-span-6">
                                             {form.bonusType === "fixed" ? (
                                                 <MoneyInput
                                                     label="Valor do bônus"
@@ -468,10 +476,6 @@ export default function GoalFormPage({ partnerId, mode, sellers, accounts, initi
                                             )}
                                         </div>
                                     </div>
-                                </FormSection>
-
-                                <FormSection title="Abrangência" className="xl:hidden">
-                                    {abrangenciaContent}
                                 </FormSection>
 
                                 <FormSection hasSeparator title="Bônus no financeiro">
@@ -507,9 +511,8 @@ export default function GoalFormPage({ partnerId, mode, sellers, accounts, initi
                                 </FormSection>
                             </div>
 
-                            <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
-                                <SidebarCard hasTopStrip className="hidden xl:block">
-                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Abrangência</h3>
+                            <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 space-y-6 border-0 lg:border-l border-brand-border dark:border-dark-border">
+                                <SidebarCard title="Abrangência" hasTopStrip>
                                     {abrangenciaContent}
                                 </SidebarCard>
                             </div>

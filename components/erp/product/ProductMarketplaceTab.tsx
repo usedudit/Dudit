@@ -8,11 +8,19 @@ import MarketplaceCategoryModal from "./MarketplaceCategoryModal"
 import { getCategoryPathClient } from "@/lib/data/marketplace-categories-client"
 import ProductVideoSection from "./ProductVideoSection"
 
-const SidebarCard = ({ children, className = "", hasTopStrip = false }: { children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
-    <div className={`bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
-        {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
-        {children}
-    </div>
+const SidebarCard = ({ title, children, className = "", hasTopStrip = false }: { title?: React.ReactNode; children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
+    <>
+        {/* Desktop: card */}
+        <div className={`hidden lg:block bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
+            {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
+            {title ? <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">{title}</h3> : null}
+            {children}
+        </div>
+        {/* Mobile/Tablet: FormSection */}
+        <FormSection title={title} hasSeparator className="lg:hidden">
+            {children}
+        </FormSection>
+    </>
 )
 
 interface ProductMarketplaceTabProps {
@@ -163,8 +171,7 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
 
                 {/* --- COLUNA DIREITA (Sidebar) --- */}
                 <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
-                    <SidebarCard hasTopStrip>
-                        <h3 className="text-lg font-bold mb-6 mt-2 text-brand-dark dark:text-dark-heading">Configurações</h3>
+                    <SidebarCard hasTopStrip title="Configurações">
                         <div className="space-y-4">
                             <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
                                 <span className="text-sm text-brand-inactive-text dark:text-dark-body">Destacar Produto</span>
@@ -208,25 +215,18 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                         </div>
                     </SidebarCard>
 
-                    <SidebarCard>
-                        <div className="flex items-center justify-between mb-3">
-                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                                <Package className="w-5 h-5 text-brand-green" />
-                                Categoria Oficial
-                            </h3>
-                            {categoryPath && (
-                                <span className="text-xs font-medium bg-green-100 text-green-800 dark:bg-green-950/50 dark:text-green-300 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                    <CheckCircleIcon className="w-3 h-3" /> Categorizado
-                                </span>
-                            )}
-                        </div>
-                        <p className="text-sm text-brand-dark dark:text-dark-heading font-medium">
+                    <SidebarCard title={<><Package className="w-5 h-5 text-brand-green" /> Categoria Oficial</>}>
+                        {categoryPath && (
+                            <span className="text-xs font-medium bg-green-100 text-green-800 dark:bg-green-950/50 dark:text-green-300 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                <CheckCircleIcon className="w-3 h-3" /> Categorizado
+                            </span>
+                        )}
+                        <p className="text-sm text-brand-dark dark:text-dark-heading font-medium mt-2">
                             {categoryPath || "Nenhuma categoria oficial selecionada."}
                         </p>
                     </SidebarCard>
 
-                    <SidebarCard>
-                        <h3 className="text-lg font-bold mb-3 text-brand-dark dark:text-dark-heading">Palavras-chave de busca</h3>
+                    <SidebarCard title="Palavras-chave de busca">
                         {tags && tags.length > 0 ? (
                             <div className="flex flex-wrap gap-2">
                                 {tags.map((tag: string, i: number) => (
@@ -542,8 +542,7 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                 {/* --- DESKTOP (>= lg): CARDS NA SIDEBAR --- */}
                 <div className="hidden lg:block">
                     {/* Card de Configurações */}
-                    <SidebarCard hasTopStrip>
-                        <h3 className="text-lg font-bold mb-6 mt-2 text-brand-dark dark:text-dark-heading">Configurações</h3>
+                    <SidebarCard hasTopStrip title="Configurações">
 
                         <div className="space-y-5">
                             <FormDropdown
@@ -652,20 +651,14 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                     </SidebarCard>
 
                     {/* Card de Categoria Oficial */}
-                    <SidebarCard>
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                                <Package className="w-5 h-5 text-brand-green" />
-                                Categoria Oficial
-                            </h3>
-                            {categoryPath && (
-                                <span className="text-xs font-medium bg-green-100 text-green-800 px-2 py-1 rounded-full flex items-center gap-1">
-                                    <CheckCircleIcon className="w-3 h-3" /> Categorizado
-                                </span>
-                            )}
-                        </div>
+                    <SidebarCard title={<><Package className="w-5 h-5 text-brand-green" /> Categoria Oficial</>}>
+                        {categoryPath && (
+                            <span className="text-xs font-medium bg-green-100 text-green-800 px-2 py-1 rounded-full flex items-center gap-1">
+                                <CheckCircleIcon className="w-3 h-3" /> Categorizado
+                            </span>
+                        )}
 
-                        <p className="text-sm text-gray-500 mb-4">
+                        <p className="text-sm text-gray-500 mt-2 mb-4">
                             Selecione onde seu produto será exibido na árvore de categorias.
                         </p>
 
@@ -694,8 +687,7 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                     </SidebarCard>
 
                     {/* Card de Tags */}
-                    <SidebarCard>
-                        <h3 className="text-lg font-bold mb-2 text-brand-dark dark:text-dark-heading">Palavras-chave de busca</h3>
+                    <SidebarCard title="Palavras-chave de busca">
                         <p className="text-sm text-brand-inactive-text mb-4">
                             Adicione termos relacionados para ajudar clientes a encontrarem este produto no marketplace.
                         </p>

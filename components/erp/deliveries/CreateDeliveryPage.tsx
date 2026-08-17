@@ -17,6 +17,7 @@ import {
     CustomerCard,
     DatePicker,
     FormDropdown,
+    FormSection,
     Input,
     Tabs,
     TabsContent,
@@ -29,10 +30,13 @@ import {
 } from "@/components/reusable"
 import {
     createERPDeliveryAction,
+    updateERPDeliveryAction,
+    getERPDeliveryDetailsAction,
     fetchDeliveryOrderBucketAction,
     fetchDeliveryPeopleBucketAction,
     getERPDeliveryPlanAccessAction,
 } from "@/app/actions/erp/deliveries"
+import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
 import {
     CalendarIcon,
     ChevronLeftIcon,
@@ -100,6 +104,16 @@ function toLocalDateInput(value: Date | string | undefined) {
     return `${year}-${month}-${day}`
 }
 
+function getInitialDateTime() {
+    const now = new Date()
+    const hh = String(now.getHours()).padStart(2, "0")
+    const mm = String(now.getMinutes()).padStart(2, "0")
+    return {
+        date: toLocalDateInput(now),
+        time: `${hh}:${mm}`,
+    }
+}
+
 function buildCustomerAddress(address?: string) {
     if (!address) return null
     return parseAddressString(address)
@@ -110,17 +124,19 @@ function getOrderPreviewImage(order?: OrderPickerItem | null) {
     return getR2ImageUrl(firstItemImage || null, "thumb")
 }
 
-const SidebarCard = ({
-    children,
-    hasTopStrip = true,
-}: {
-    children: React.ReactNode
-    hasTopStrip?: boolean
-}) => (
-    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden text-left">
-        {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-heading rounded-t-2xl" />}
-        {children}
-    </div>
+const SidebarCard = ({ title, children, className = "", hasTopStrip = true }: { title?: React.ReactNode; children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
+    <>
+        {/* Desktop: card */}
+        <div className={`hidden lg:block bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden text-left mb-6 transition-colors ${className}`}>
+            {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-heading rounded-t-2xl" />}
+            {title ? <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">{title}</h3> : null}
+            {children}
+        </div>
+        {/* Mobile/Tablet: FormSection */}
+        <FormSection title={title} hasSeparator className="lg:hidden">
+            {children}
+        </FormSection>
+    </>
 )
 
 export default function CreateDeliveryPage({
@@ -128,24 +144,31 @@ export default function CreateDeliveryPage({
     onBack,
     onSuccess,
     initialOrderIds,
+    editDeliveryId,
 }: {
     partnerId: string
     onBack: () => void
     onSuccess: () => void
     initialOrderIds?: string[]
+    editDeliveryId?: string
 }) {
     const { openPlanUpgrade } = usePlanUpgrade()
     const isMobile = useMediaQuery("(max-width: 768px)")
+
+    const initialDateTime = useMemo(() => getInitialDateTime(), [])
 
     const [activeTab, setActiveTab] = useState("Pedidos")
     const [step, setStep] = useState<1 | 2>(1)
     const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([])
     const [selectedDeliveryPersonId, setSelectedDeliveryPersonId] = useState<string>("")
     const [status, setStatus] = useState("pending")
-    const [date, setDate] = useState("")
-    const [time, setTime] = useState("")
+    const [date, setDate] = useState(initialDateTime.date)
+    const [time, setTime] = useState(initialDateTime.time)
     const [notes, setNotes] = useState("")
     const [isSaving, setIsSaving] = useState(false)
+    const [isLoadingDelivery, setIsLoadingDelivery] = useState(!!editDeliveryId)
+    const [deliveryNumber, setDeliveryNumber] = useState<number | null>(null)
+    const initialLoadedRef = useRef<any>(null)
     const [isOrderSearchOpen, setIsOrderSearchOpen] = useState(false)
     const [planAccess, setPlanAccess] = useState<{ allowed: boolean; maxOrders: number; planSlug: string; message?: string | null } | null>(null)
     const [infoOrder, setInfoOrder] = useState<OrderPickerItem | null>(null)
@@ -160,9 +183,14 @@ export default function CreateDeliveryPage({
     const [orderToRemove, setOrderToRemove] = useState<string | null>(null)
 
     const isDirty = useMemo(() => {
-        if (isSaving) return false
-        return selectedOrderIds.length > 0 || !!selectedDeliveryPersonId || !!date || !!time || !!notes
-    }, [selectedOrderIds, selectedDeliveryPersonId, date, time, notes, isSaving])
+        if (isSaving || isLoadingDelivery) return false
+        if (editDeliveryId && initialLoadedRef.current) {
+            const init = initialLoadedRef.current
+            const sameOrders = selectedOrderIds.length === init.orderIds.length && selectedOrderIds.every((id) => init.orderIds.includes(id))
+            return !sameOrders || selectedDeliveryPersonId !== init.deliveryPersonId || status !== init.status || date !== init.date || time !== init.time || notes !== init.notes
+        }
+        return selectedOrderIds.length > 0 || !!selectedDeliveryPersonId || !!notes
+    }, [selectedOrderIds, selectedDeliveryPersonId, status, date, time, notes, isSaving, isLoadingDelivery, editDeliveryId])
 
     const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isDirty)
 
@@ -175,19 +203,23 @@ export default function CreateDeliveryPage({
         if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5)
     }, [])
 
+    const pageTitle = editDeliveryId
+        ? (deliveryNumber ? `Editar entrega #${deliveryNumber}` : "Editar entrega")
+        : "Nova entrega"
+
     const { setHeaderOverride } = useSidebar()
 
     useEffect(() => {
         setHeaderOverride({
-            title: "Nova entrega",
+            title: pageTitle,
             onBack: handleBack,
             isSubPage: true
         })
         return () => setHeaderOverride(null)
-    }, [handleBack, setHeaderOverride])
+    }, [pageTitle, handleBack, setHeaderOverride])
 
     const orderPicker = usePickerBucket<OrderPickerItem>(
-        () => fetchDeliveryOrderBucketAction(partnerId) as Promise<OrderPickerItem[]>,
+        () => fetchDeliveryOrderBucketAction(partnerId, editDeliveryId) as Promise<OrderPickerItem[]>,
         (order, q) =>
             String(order.displayId || "").toLowerCase().includes(q) ||
             String(order.orderNumber || "").toLowerCase().includes(q) ||
@@ -196,12 +228,63 @@ export default function CreateDeliveryPage({
     )
 
     useEffect(() => {
-        if (!initialOrderIds || initialOrderIds.length === 0) return
-        setSelectedOrderIds(Array.from(new Set(initialOrderIds)).filter(Boolean))
-        // Best effort: load bucket so selected items can render quickly
-        void orderPicker.loadBucket()
+        if (editDeliveryId) {
+            let mounted = true
+            const run = async () => {
+                setIsLoadingDelivery(true)
+                try {
+                    const res = await getERPDeliveryDetailsAction(editDeliveryId, partnerId)
+                    if (!mounted) return
+                    if (!res.success || !res.data) {
+                        toast.error(res.error || "Erro ao carregar dados da entrega para edição.")
+                        onBack()
+                        return
+                    }
+                    const del = res.data
+                    const orderIds = (del.delivery_orders || []).map((l: any) => l.order_id || l.orders?.id).filter(Boolean)
+                    setSelectedOrderIds(orderIds)
+                    setSelectedDeliveryPersonId(del.delivery_person_id || "")
+                    setStatus(del.status || "pending")
+                    const startedDate = del.started_at || del.departure_time || del.created_at
+                    let initialDate = initialDateTime.date
+                    let initialTime = initialDateTime.time
+                    if (startedDate) {
+                        initialDate = toLocalDateInput(startedDate)
+                        const d = new Date(startedDate)
+                        if (!isNaN(d.getTime())) {
+                            const hh = String(d.getHours()).padStart(2, "0")
+                            const mm = String(d.getMinutes()).padStart(2, "0")
+                            initialTime = `${hh}:${mm}`
+                        }
+                    }
+                    setDate(initialDate)
+                    setTime(initialTime)
+                    setNotes(del.notes || "")
+                    setDeliveryNumber(del.delivery_number || null)
+                    initialLoadedRef.current = {
+                        orderIds,
+                        deliveryPersonId: del.delivery_person_id || "",
+                        status: del.status || "pending",
+                        date: initialDate,
+                        time: initialTime,
+                        notes: del.notes || "",
+                    }
+                    void orderPicker.loadBucket()
+                } catch (err: any) {
+                    toast.error(err?.message || "Erro ao carregar entrega.")
+                    onBack()
+                } finally {
+                    if (mounted) setIsLoadingDelivery(false)
+                }
+            }
+            run()
+            return () => { mounted = false }
+        } else if (initialOrderIds && initialOrderIds.length > 0) {
+            setSelectedOrderIds(Array.from(new Set(initialOrderIds)).filter(Boolean))
+            void orderPicker.loadBucket()
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [partnerId])
+    }, [editDeliveryId, partnerId])
 
     useEffect(() => {
         let mounted = true
@@ -271,22 +354,36 @@ export default function CreateDeliveryPage({
         setIsSaving(true)
         try {
             const startedAt = new Date(`${date}T${time}:00`).toISOString()
-            const response = await createERPDeliveryAction({
-                partnerId,
-                orderIds: selectedOrderIds,
-                deliveryPersonId: selectedDeliveryPersonId || null,
-                status: status as any,
-                startedAt,
-                notes,
-            })
+            let response
+            if (editDeliveryId) {
+                response = await updateERPDeliveryAction({
+                    partnerId,
+                    deliveryId: editDeliveryId,
+                    orderIds: selectedOrderIds,
+                    deliveryPersonId: selectedDeliveryPersonId || null,
+                    status: status as any,
+                    startedAt,
+                    notes,
+                })
+            } else {
+                response = await createERPDeliveryAction({
+                    partnerId,
+                    orderIds: selectedOrderIds,
+                    deliveryPersonId: selectedDeliveryPersonId || null,
+                    status: status as any,
+                    startedAt,
+                    notes,
+                })
+            }
+
             if (response.success) {
-                toast.success("Entrega criada com sucesso!")
+                toast.success(editDeliveryId ? "Entrega atualizada com sucesso!" : "Entrega criada com sucesso!")
                 onSuccess()
             } else {
-                toast.error(response.error || "Erro ao criar entrega.")
+                toast.error(response.error || (editDeliveryId ? "Erro ao atualizar entrega." : "Erro ao criar entrega."))
             }
         } catch (err: any) {
-            toast.error(err?.message || "Erro inesperado ao criar entrega.")
+            toast.error(err?.message || "Erro inesperado ao salvar entrega.")
         } finally {
             setIsSaving(false)
         }
@@ -303,6 +400,10 @@ export default function CreateDeliveryPage({
             if (!canAddMore) return prev
             return [...prev, orderId]
         })
+    }
+
+    if (isLoadingDelivery) {
+        return <ERPDetailLoading key="loading-edit-delivery" />
     }
 
     return (
@@ -327,11 +428,11 @@ export default function CreateDeliveryPage({
                                     <div className="flex flex-col gap-1 overflow-hidden min-w-0">
                                         <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
                                             {/* Title hidden on mobile, shown on md+ */}
-                                            <span className="hidden md:inline truncate">Nova entrega</span>
+                                            <span className="hidden md:inline truncate">{pageTitle}</span>
                                         </h1>
 
                                         <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-300 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
-                                            Selecione pedidos, atribua um entregador e defina a saída.
+                                            {editDeliveryId ? "Altere os pedidos, atribua um entregador e defina a saída." : "Selecione pedidos, atribua um entregador e defina a saída."}
                                         </div>
                                     </div>
 
@@ -521,22 +622,22 @@ export default function CreateDeliveryPage({
                                                                             <Badge variant={getDeliveryStatusMeta(order.deliveryStatus).variant}>
                                                                                 {getDeliveryStatusMeta(order.deliveryStatus).label}
                                                                             </Badge>
-                                                                            <button
-                                                                                type="button"
-                                                                                className="p-2 text-brand-inactive-text hover:text-brand-dark transition-colors"
+                                                                            <Button
+                                                                                variant="ghost"
+                                                                                className="w-9 h-9"
                                                                                 onClick={() => setInfoOrder(order)}
                                                                                 title="Informações do pedido"
                                                                             >
                                                                                 <InfoIcon className="w-4 h-4" />
-                                                                            </button>
-                                                                            <button
-                                                                                type="button"
-                                                                                className="p-2 text-brand-inactive-text hover:text-brand-red transition-colors"
+                                                                            </Button>
+                                                                            <Button
+                                                                                variant="ghostred"
+                                                                                className="w-9 h-9"
                                                                                 onClick={() => setOrderToRemove(order.id)}
                                                                                 title="Remover"
                                                                             >
                                                                                 <TrashIcon className="w-4 h-4" />
-                                                                            </button>
+                                                                            </Button>
                                                                         </div>
                                                                     </div>
                                                                 ))}
@@ -605,10 +706,7 @@ export default function CreateDeliveryPage({
                                             </div>
 
                                             <div className="col-span-12 hidden border-l border-brand-border pl-12 dark:border-dark-border lg:block lg:col-span-4">
-                                                <SidebarCard>
-                                                    <h3 className="mb-4 text-lg font-bold text-brand-dark dark:text-dark-heading">
-                                                        Informações da Entrega
-                                                    </h3>
+                                                <SidebarCard title="Informações da Entrega">
                                                     <div className="grid grid-cols-1 gap-4">
                                                         <FormDropdown
                                                             label="Entregador"

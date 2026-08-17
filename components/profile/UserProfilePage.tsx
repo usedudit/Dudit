@@ -42,26 +42,9 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
     const [currentView, setCurrentView] = useState<View>(initialTab || "main")
 
     useEffect(() => {
-        const params = new URLSearchParams(window.location.search)
-        const tabFromUrl = params.get("tab") as View | null
-
-        if (tabFromUrl && tabFromUrl !== currentView) {
-            setCurrentView(tabFromUrl)
-        } else if (!tabFromUrl && currentView !== "main") {
-            setCurrentView("main")
-        }
-    }, [])
-
-    useEffect(() => {
-        const handlePopState = () => {
-            const params = new URLSearchParams(window.location.search)
-            const tabFromUrl = params.get("tab") as View | null
-            setCurrentView(tabFromUrl || "main")
-        }
-
-        window.addEventListener("popstate", handlePopState)
-        return () => window.removeEventListener("popstate", handlePopState)
-    }, [])
+        const tabFromUrl = searchParams.get("tab") as View | null
+        setCurrentView(tabFromUrl || "main")
+    }, [searchParams])
 
     const [isLoading, setIsLoading] = useState(false)
     const [success, setSuccess] = useState<string | null>(null)
@@ -212,7 +195,7 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
         setCurrentView(view)
 
         const url = view === "main" ? "/perfil" : `/perfil?tab=${view}`
-        window.history.pushState(null, "", url)
+        router.push(url)
     }
 
     const startTimer = (
@@ -394,7 +377,7 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
     return (
         <>
             <MarketplaceHeader simpleTitle={getViewTitle()} />
-            <div className="min-h-screen bg-white pt-[40px] lg:pt-[110px] font-sans flex flex-col">
+            <div className="min-h-screen bg-white dark:bg-dark-background pt-[40px] lg:pt-[110px] font-sans flex flex-col">
                 <style>{`.animate-fade-in{animation:fadeIn 0.4s ease-out forwards}@keyframes fadeIn{from{opacity:0}to{opacity:1}}`}</style>
                 <div className="container mx-auto px-4 max-w-[1300px] mt-12 lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">
                     <AnimatePresence mode="wait">
@@ -569,7 +552,7 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                                             <span className="block text-lg font-extrabold text-brand-dark dark:text-dark-heading">
                                                 {dryRunReport.customersCount}
                                             </span>
-                                            <span className="text-[11px] text-brand-inactive-text font-medium">
+                                            <span className="text-[11px] text-brand-inactive-text dark:text-dark-body font-medium">
                                                 Clientes cadastrados
                                             </span>
                                         </div>
@@ -579,7 +562,7 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                                             <span className="block text-lg font-extrabold text-brand-dark dark:text-dark-heading">
                                                 {dryRunReport.productsCount}
                                             </span>
-                                            <span className="text-[11px] text-brand-inactive-text font-medium">
+                                            <span className="text-[11px] text-brand-inactive-text dark:text-dark-body font-medium">
                                                 Produtos
                                             </span>
                                         </div>
@@ -589,7 +572,7 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                                             <span className="block text-lg font-extrabold text-brand-dark dark:text-dark-heading">
                                                 {dryRunReport.servicesCount}
                                             </span>
-                                            <span className="text-[11px] text-brand-inactive-text font-medium">
+                                            <span className="text-[11px] text-brand-inactive-text dark:text-dark-body font-medium">
                                                 Serviços
                                             </span>
                                         </div>
@@ -599,7 +582,7 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                                             <span className="block text-lg font-extrabold text-brand-dark dark:text-dark-heading">
                                                 {dryRunReport.ordersCount}
                                             </span>
-                                            <span className="text-[11px] text-brand-inactive-text font-medium">
+                                            <span className="text-[11px] text-brand-inactive-text dark:text-dark-body font-medium">
                                                 Pedidos realizados
                                             </span>
                                         </div>
@@ -609,7 +592,7 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                                             <span className="block text-lg font-extrabold text-brand-dark dark:text-dark-heading">
                                                 {dryRunReport.serviceOrdersCount}
                                             </span>
-                                            <span className="text-[11px] text-brand-inactive-text font-medium">
+                                            <span className="text-[11px] text-brand-inactive-text dark:text-dark-body font-medium">
                                                 Ordens de Serviço
                                             </span>
                                         </div>
@@ -619,7 +602,7 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                                             <span className="block text-lg font-extrabold text-brand-dark dark:text-dark-heading">
                                                 {dryRunReport.appointmentsCount}
                                             </span>
-                                            <span className="text-[11px] text-brand-inactive-text font-medium">
+                                            <span className="text-[11px] text-brand-inactive-text dark:text-dark-body font-medium">
                                                 Compromissos agendados
                                             </span>
                                         </div>
@@ -630,7 +613,7 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                                             <span className="block text-lg font-extrabold text-brand-dark dark:text-dark-heading">
                                                 {dryRunReport.whatsappCount}
                                             </span>
-                                            <span className="text-[11px] text-brand-inactive-text font-medium">
+                                            <span className="text-[11px] text-brand-inactive-text dark:text-dark-body font-medium">
                                                 Integrações WhatsApp
                                             </span>
                                         </div>
@@ -642,7 +625,7 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                         {/* O QUE SERÁ PERDIDO */}
                         {dryRunReport && (
                             <div className="space-y-3 pt-2">
-                                <h4 className="text-xs font-bold text-brand-inactive-text uppercase tracking-wider">
+                                <h4 className="text-xs font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider">
                                     Ao encerrar sua conta, você perderá permanentemente:
                                 </h4>
                                 <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-brand-dark/80 dark:text-dark-body">
@@ -651,7 +634,7 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                                             <span className="text-red-500 mt-0.5">•</span>
                                             <div>
                                                 <strong className="text-brand-dark dark:text-dark-heading">Cadastro de clientes</strong>
-                                                <span className="block text-xs text-brand-inactive-text">({dryRunReport.customersCount} registros)</span>
+                                                <span className="block text-xs text-brand-inactive-text dark:text-dark-body">({dryRunReport.customersCount} registros)</span>
                                             </div>
                                         </li>
                                     )}
@@ -660,7 +643,7 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                                             <span className="text-red-500 mt-0.5">•</span>
                                             <div>
                                                 <strong className="text-brand-dark dark:text-dark-heading">Produtos e serviços</strong>
-                                                <span className="block text-xs text-brand-inactive-text">({dryRunReport.productsCount + dryRunReport.servicesCount} itens)</span>
+                                                <span className="block text-xs text-brand-inactive-text dark:text-dark-body">({dryRunReport.productsCount + dryRunReport.servicesCount} itens)</span>
                                             </div>
                                         </li>
                                     )}
@@ -669,7 +652,7 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                                             <span className="text-red-500 mt-0.5">•</span>
                                             <div>
                                                 <strong className="text-brand-dark dark:text-dark-heading">Agenda</strong>
-                                                <span className="block text-xs text-brand-inactive-text">({dryRunReport.appointmentsCount} compromissos)</span>
+                                                <span className="block text-xs text-brand-inactive-text dark:text-dark-body">({dryRunReport.appointmentsCount} compromissos)</span>
                                             </div>
                                         </li>
                                     )}
@@ -678,7 +661,7 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                                             <span className="text-red-500 mt-0.5">•</span>
                                             <div>
                                                 <strong className="text-brand-dark dark:text-dark-heading">Financeiro</strong>
-                                                <span className="block text-xs text-brand-inactive-text">(histórico completo de faturamento)</span>
+                                                <span className="block text-xs text-brand-inactive-text dark:text-dark-body">(histórico completo de faturamento)</span>
                                             </div>
                                         </li>
                                     )}
@@ -687,7 +670,7 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                                             <span className="text-red-500 mt-0.5">•</span>
                                             <div>
                                                 <strong className="text-brand-dark dark:text-dark-heading">Integrações</strong>
-                                                <span className="block text-xs text-brand-inactive-text">(conexões ativas de WhatsApp)</span>
+                                                <span className="block text-xs text-brand-inactive-text dark:text-dark-body">(conexões ativas de WhatsApp)</span>
                                             </div>
                                         </li>
                                     )}
@@ -696,7 +679,7 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                                         <span className="text-red-500 mt-0.5">•</span>
                                         <div>
                                             <strong className="text-brand-dark dark:text-dark-heading">Configurações e Equipe</strong>
-                                            <span className="block text-xs text-brand-inactive-text">(dados da empresa e permissões de acesso)</span>
+                                            <span className="block text-xs text-brand-inactive-text dark:text-dark-body">(dados da empresa e permissões de acesso)</span>
                                         </div>
                                     </li>
                                 </ul>
@@ -705,10 +688,10 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
 
                         {/* O QUE SERÁ PRESERVADO */}
                         <div className="space-y-3 pt-2">
-                            <h4 className="text-xs font-bold text-brand-inactive-text uppercase tracking-wider">
+                            <h4 className="text-xs font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider">
                                 O que será preservado
                             </h4>
-                            <p className="text-xs text-brand-inactive-text">
+                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
                                 Para cumprir obrigações legais, manteremos apenas registros mínimos anonimizados relacionados a pedidos, auditoria e compliance.
                             </p>
                             <ul className="space-y-1.5 text-xs font-semibold text-brand-dark/90 dark:text-dark-heading">
@@ -729,7 +712,7 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                             <p className="text-xs font-bold text-brand-red">
                                 Atenção: Esta ação é definitiva e removerá todos os seus dados.
                             </p>
-                            <p className="text-xs text-brand-inactive-text">
+                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
                                 Digite <strong className="text-brand-dark dark:text-dark-heading">EXCLUIR</strong> abaixo para confirmar.
                             </p>
                             <Input

@@ -7,7 +7,31 @@ export type PartnerBusinessInfo = {
 
 export const DEFAULT_BUSINESS_INFO: Required<Pick<PartnerBusinessInfo, "mode" | "activeResources">> = {
   mode: "erp",
-  activeResources: ["orders", "products", "services"],
+  activeResources: [
+    "orders",
+    "products",
+    "services",
+    "quotes",
+    "pos",
+    "deliveries",
+    "financial",
+    "team",
+    "appointments",
+    "customers",
+    "reports",
+    "marketing",
+    "showcase",
+    "goals",
+    "returns",
+    "stockMovements",
+    "productCadastros",
+    "serviceOrders",
+    "serviceCadastros",
+    "coupons",
+    "campaigns",
+    "productivity",
+    "communityVideos",
+  ],
 }
 
 export function normalizeBusinessInfo(input: unknown): Required<Pick<PartnerBusinessInfo, "mode" | "activeResources">> {

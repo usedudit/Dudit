@@ -288,6 +288,8 @@ export async function middleware(request: NextRequest) {
         https://connect.facebook.net
         https://www.facebook.com
         https://*.facebook.com
+        https://pagead2.googlesyndication.com
+        https://*.googlesyndication.com
         https://dudit.com.br
         https://www.dudit.com.br;
     connect-src 'self' data: blob: 
@@ -311,6 +313,10 @@ export async function middleware(request: NextRequest) {
         https://api.mercadolibre.com
         https://www.google-analytics.com 
         https://stats.g.doubleclick.net 
+        https://pagead2.googlesyndication.com
+        https://*.googlesyndication.com
+        https://googleads.g.doubleclick.net
+        https://*.doubleclick.net
         https://cloudflareinsights.com 
         https://*.cloudflare.com
         https://*.r2.cloudflarestorage.com

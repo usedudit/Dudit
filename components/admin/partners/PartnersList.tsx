@@ -1,11 +1,10 @@
 "use client"
 
-import { useState, useTransition, useMemo, useEffect, useCallback } from "react"
-import { Button, Badge, IconPlaceholder, ThreeDotsLoader, Pagination } from "@/components/reusable"
+import { useState, useTransition, useMemo, useCallback } from "react"
+import { Button, Badge, IconPlaceholder, Pagination, AlertModal } from "@/components/reusable"
 import PartnerListRow from "./PartnerListRow"
 import PartnersPageControls from "./PartnersPageControls"
 import AdminPartnerDetailView from "./AdminPartnerDetailView"
-import DestructiveActionModal from "@/components/admin/DestructiveActionModal"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { AnimatePresence } from "framer-motion"
 import { StoreIcon, ExportFileIcon } from "@/lib/icons"
@@ -24,73 +23,81 @@ import {
 import { useMediaQuery } from "@/components/erp/hooks"
 import { formatDate } from "@/lib/utils"
 import { toast } from "@/hooks/use-notification"
+import { useEntityState } from "@/hooks/use-entity-state"
+
+type SortKey = "store" | "owner" | "risk" | "date" | "status"
+type SortDirection = "asc" | "desc"
 
 interface PartnersListProps {
     initialData: CursorPaginatedResult<EnforcementPartner>
     initialStats?: AdminPartnerStats
 }
 
-const PartnersList = ({ initialData, initialStats }: PartnersListProps) => {
+const ITEMS_PER_PAGE = 8
+
+export default function PartnersList({ initialData, initialStats }: PartnersListProps) {
     const isMobile = useMediaQuery("(max-width: 768px)")
+    const { state: entityState, open: openEntity, close: closeEntity } = useEntityState()
+
     const [statusTab, setStatusTab] = useState("all")
-    const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null)
     const [isPending, startTransition] = useTransition()
 
     // Modals
     const [suspendStoreTarget, setSuspendStoreTarget] = useState<EnforcementPartner | null>(null)
     const [unsuspendStoreTarget, setUnsuspendStoreTarget] = useState<EnforcementPartner | null>(null)
     const [disableERPTarget, setDisableERPTarget] = useState<EnforcementPartner | null>(null)
+    const [actionReason, setActionReason] = useState("")
 
     // Stats
     const [stats, setStats] = useState<AdminPartnerStats | undefined>(initialStats)
 
     // Search state
     const [search, setSearch] = useState("")
-    const [debouncedSearch, setDebouncedSearch] = useState("")
-    useEffect(() => {
-        const t = setTimeout(() => setDebouncedSearch(search), 300)
-        return () => clearTimeout(t)
-    }, [search])
 
-    // Data State
-    const [partners, setPartners] = useState<EnforcementPartner[]>(initialData.data || [])
-    const [isLoading, setIsLoading] = useState(false)
+    // Sorting state
+    const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>({
+        key: "date",
+        direction: "desc",
+    })
+
+    // Data State (initialized from SSR)
+    const [partners, setPartners] = useState<EnforcementPartner[]>(initialData?.data || [])
     const [page, setPage] = useState(1)
-    const itemsPerPage = 12
 
-    const fetchPartners = useCallback(() => {
-        setIsLoading(true)
+    const handleSort = (key: SortKey) => {
+        setSortConfig((prev) => {
+            if (prev?.key === key) {
+                return { key, direction: prev.direction === "asc" ? "desc" : "asc" }
+            }
+            return { key, direction: "desc" }
+        })
+    }
+
+    const refreshPartners = useCallback(() => {
         startTransition(async () => {
             try {
                 const [res, statsRes] = await Promise.all([
-                    getPartners(null, 100, debouncedSearch, statusTab === "all" ? undefined : statusTab),
+                    getPartners(null, 100),
                     getAdminPartnerStats(),
                 ])
                 setPartners(res.data || [])
                 setStats(statsRes)
             } catch (err) {
-                console.error("Failed to fetch admin partners:", err)
-                toast.error("Erro ao carregar parceiros")
-            } finally {
-                setIsLoading(false)
+                console.error("Failed to refresh admin partners:", err)
             }
         })
-    }, [statusTab, debouncedSearch])
+    }, [])
 
-    useEffect(() => {
-        fetchPartners()
-        setPage(1)
-    }, [fetchPartners])
-
-    const handleConfirmSuspendStore = (reason: string) => {
+    const handleConfirmSuspendStore = () => {
         if (!suspendStoreTarget) return
         startTransition(async () => {
             try {
-                const res = await suspendStore(suspendStoreTarget.id, reason)
+                const res = await suspendStore(suspendStoreTarget.id, actionReason || "Suspensão administrativa")
                 if (res.success) {
                     toast.success("Loja suspensa com sucesso!")
                     setSuspendStoreTarget(null)
-                    fetchPartners()
+                    setActionReason("")
+                    refreshPartners()
                 } else {
                     toast.error(res.error || "Erro ao suspender loja")
                 }
@@ -100,15 +107,16 @@ const PartnersList = ({ initialData, initialStats }: PartnersListProps) => {
         })
     }
 
-    const handleConfirmUnsuspendStore = (reason: string) => {
+    const handleConfirmUnsuspendStore = () => {
         if (!unsuspendStoreTarget) return
         startTransition(async () => {
             try {
-                const res = await unsuspendStore(unsuspendStoreTarget.id, reason)
+                const res = await unsuspendStore(unsuspendStoreTarget.id, actionReason || "Reativação administrativa")
                 if (res.success) {
                     toast.success("Loja reativada com sucesso!")
                     setUnsuspendStoreTarget(null)
-                    fetchPartners()
+                    setActionReason("")
+                    refreshPartners()
                 } else {
                     toast.error(res.error || "Erro ao reativar loja")
                 }
@@ -118,15 +126,16 @@ const PartnersList = ({ initialData, initialStats }: PartnersListProps) => {
         })
     }
 
-    const handleConfirmDisableERP = (reason: string) => {
+    const handleConfirmDisableERP = () => {
         if (!disableERPTarget) return
         startTransition(async () => {
             try {
-                const res = await disableTenantAccess(disableERPTarget.id, reason)
+                const res = await disableTenantAccess(disableERPTarget.id, actionReason || "Suspensão de acesso ERP")
                 if (res.success) {
                     toast.success("Acesso ao ERP desabilitado!")
                     setDisableERPTarget(null)
-                    fetchPartners()
+                    setActionReason("")
+                    refreshPartners()
                 } else {
                     toast.error(res.error || "Erro ao desabilitar ERP")
                 }
@@ -136,20 +145,87 @@ const PartnersList = ({ initialData, initialStats }: PartnersListProps) => {
         })
     }
 
-    // Pagination
-    const totalPages = Math.ceil(partners.length / itemsPerPage)
-    const paginatedItems = useMemo(() => {
-        const start = (page - 1) * itemsPerPage
-        return partners.slice(start, start + itemsPerPage)
-    }, [partners, page])
+    // Instant in-memory filtering (0ms)
+    const filteredPartners = useMemo(() => {
+        const term = search.trim().toLowerCase()
 
-    // If viewing detail of a specific partner / store
-    if (selectedStoreId) {
+        let result = partners.filter((p) => {
+            // Tab filter
+            const isSuspended = !!p.suspended_at || !p.is_active
+            const isHighRisk = (p.risk_score || 0) >= 50
+            if (statusTab === "active" && isSuspended) return false
+            if (statusTab === "suspended" && !isSuspended) return false
+            if (statusTab === "high_risk" && !isHighRisk) return false
+
+            // Search filter
+            if (term) {
+                const name = String(p.store_name || "").toLowerCase()
+                const owner = String(p.owner_name || "").toLowerCase()
+                const id = String(p.id || "").toLowerCase()
+
+                if (!name.includes(term) && !owner.includes(term) && !id.includes(term)) {
+                    return false
+                }
+            }
+
+            return true
+        })
+
+        // In-memory sorting
+        if (sortConfig) {
+            result = [...result].sort((a, b) => {
+                let aVal: any = ""
+                let bVal: any = ""
+                switch (sortConfig.key) {
+                    case "store":
+                        aVal = (a.store_name || "").toLowerCase()
+                        bVal = (b.store_name || "").toLowerCase()
+                        break
+                    case "owner":
+                        aVal = (a.owner_name || "").toLowerCase()
+                        bVal = (b.owner_name || "").toLowerCase()
+                        break
+                    case "risk":
+                        aVal = Number(a.risk_score || 0)
+                        bVal = Number(b.risk_score || 0)
+                        break
+                    case "date":
+                        aVal = new Date(a.created_at).getTime()
+                        bVal = new Date(b.created_at).getTime()
+                        break
+                    case "status":
+                        aVal = a.suspended_at ? "suspended" : "active"
+                        bVal = b.suspended_at ? "suspended" : "active"
+                        break
+                }
+                if (aVal === bVal) return 0
+                const cmp = aVal < bVal ? -1 : 1
+                return sortConfig.direction === "asc" ? cmp : -cmp
+            })
+        }
+
+        return result
+    }, [partners, statusTab, search, sortConfig])
+
+    // Pagination (Strict 8 items)
+    const totalPages = Math.ceil(filteredPartners.length / ITEMS_PER_PAGE) || 1
+    const paginatedItems = useMemo(() => {
+        const start = (page - 1) * ITEMS_PER_PAGE
+        return filteredPartners.slice(start, start + ITEMS_PER_PAGE)
+    }, [filteredPartners, page])
+
+    // Reset to page 1 on filter/tab/search change
+    useMemo(() => {
+        setPage(1)
+    }, [statusTab, search])
+
+    // If viewing detail of a specific partner via URL (?view=id)
+    if (entityState.isOpen && entityState.action === "view" && entityState.entityId) {
         return (
             <AdminPartnerDetailView
-                storeId={selectedStoreId}
-                onBack={() => setSelectedStoreId(null)}
-                onPartnerUpdated={fetchPartners}
+                storeId={entityState.entityId}
+                onBack={closeEntity}
+                onPartnerUpdated={refreshPartners}
             />
         )
     }
@@ -171,10 +247,10 @@ const PartnersList = ({ initialData, initialStats }: PartnersListProps) => {
                 <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
                     <div className="flex flex-col gap-2 pt-1">
                         <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
-                            Parceiros e Lojas
+                            Lojas & Parceiros
                         </h1>
                         <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
-                            Monitore a atividade, risk score e acesso ao ERP dos vendedores do marketplace.
+                            Monitore lojas credenciadas, pontuação de risco, conformidade e auditoria.
                         </p>
                     </div>
 
@@ -191,72 +267,71 @@ const PartnersList = ({ initialData, initialStats }: PartnersListProps) => {
 
                 {/* Page Controls */}
                 <PartnersPageControls
-                    search={search}
-                    setSearch={setSearch}
                     statusTab={statusTab}
                     setStatusTab={setStatusTab}
+                    search={search}
+                    setSearch={setSearch}
                     tabCounts={stats}
                 />
 
                 {/* List Content */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-24 md:pb-6 relative">
                     <AnimatePresence mode="wait">
-                        {paginatedItems.length === 0 && !isLoading ? (
+                        {paginatedItems.length === 0 ? (
                             <FadeIn key="empty" className="w-full h-full flex items-center justify-center min-h-[400px]">
                                 <IconPlaceholder
                                     placeholderType="image"
-                                    imageSrc="https://img.dudit.com.br/static/mascots/SemLojas.png"
-                                    imageAlt="Nenhuma loja"
+                                    imageSrc="https://img.dudit.com.br/static/mascots/SemPedidos.png"
+                                    imageAlt="Nenhum parceiro"
                                     title="Nenhuma loja encontrada"
-                                    subtitle={search ? "Tente ajustar sua busca." : "Nenhuma loja cadastrada nesta categoria."}
-                                    itemButton={search ? {
-                                        text: "Limpar Busca",
-                                        action: () => setSearch(""),
-                                        variant: "outline"
+                                    subtitle={search || statusTab !== "all" ? "Tente ajustar seus filtros de busca." : "Nenhuma loja cadastrada nesta categoria."}
+                                    itemButton={search || statusTab !== "all" ? {
+                                        text: "Limpar Filtros",
+                                        action: () => {
+                                            setSearch("")
+                                            setStatusTab("all")
+                                        },
+                                        variant: "outline",
                                     } : undefined}
                                 />
-                            </FadeIn>
-                        ) : isLoading ? (
-                            <FadeIn key="loading" className="flex items-center justify-center min-h-[400px]">
-                                <ThreeDotsLoader />
                             </FadeIn>
                         ) : (
                             <FadeIn key="list" className="w-full space-y-4">
                                 {/* Mobile View (Cards) */}
                                 <div className="md:hidden flex flex-col w-full divide-y divide-brand-border dark:divide-dark-border">
-                                    {paginatedItems.map((partner) => (
-                                        <div
-                                            key={partner.id + partner.type}
-                                            className="py-4 flex flex-col gap-2.5 cursor-pointer active:bg-brand-gray/50 dark:active:bg-dark-border/20 transition-colors"
-                                            onClick={() => setSelectedStoreId(partner.id)}
-                                        >
-                                            <div className="flex justify-between items-start gap-2">
-                                                <div className="flex flex-col gap-0.5 min-w-0">
-                                                    <span className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">
-                                                        {partner.store_name || partner.stores?.[0]?.name || "Loja"}
-                                                    </span>
-                                                    <span className="text-xs text-brand-inactive-text truncate">
-                                                        {partner.owner_name || partner.id}
-                                                    </span>
-                                                </div>
-                                                <div className="flex items-center gap-1.5">
-                                                    {partner.risk_score > 0 && (
-                                                        <Badge variant={partner.risk_score >= 50 ? "red" : "orange"}>
-                                                            {partner.risk_score} pts
+                                    {paginatedItems.map((partner) => {
+                                        const isSuspended = !!partner.suspended_at || !partner.is_active
+                                        return (
+                                            <div
+                                                key={partner.id}
+                                                className="py-4 flex flex-col gap-2.5 cursor-pointer active:bg-brand-gray/50 dark:active:bg-dark-border/20 transition-colors"
+                                                onClick={() => openEntity("view", partner.id)}
+                                            >
+                                                <div className="flex justify-between items-start gap-2">
+                                                    <div className="flex flex-col gap-0.5 min-w-0">
+                                                        <span className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">
+                                                            {partner.store_name}
+                                                        </span>
+                                                        <span className="text-xs text-brand-inactive-text truncate">
+                                                            {partner.owner_name || "Lojista"}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5 shrink-0">
+                                                        <Badge variant={partner.risk_score >= 50 ? "red" : partner.risk_score >= 25 ? "orange" : "gray"}>
+                                                            {partner.risk_score || 0} pts
                                                         </Badge>
-                                                    )}
-                                                    <Badge variant={partner.suspended_at ? "red" : partner.is_active ? "green" : "gray"}>
-                                                        {partner.suspended_at ? "Suspensa" : partner.is_active ? "Ativa" : "Inativa"}
-                                                    </Badge>
+                                                        <Badge variant={isSuspended ? "red" : "green"}>
+                                                            {isSuspended ? "Suspensa" : "Ativa"}
+                                                        </Badge>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-center justify-between text-xs text-brand-inactive-text">
+                                                    <span>{formatDate(partner.created_at)}</span>
                                                 </div>
                                             </div>
-
-                                            <div className="flex items-center justify-between text-xs text-brand-inactive-text">
-                                                <span>Cadastrada em {formatDate(partner.created_at)}</span>
-                                                <span className="capitalize">{partner.type === "store" ? "Loja" : "Parceiro"}</span>
-                                            </div>
-                                        </div>
-                                    ))}
+                                        )
+                                    })}
                                 </div>
 
                                 {/* Desktop View: Table */}
@@ -264,30 +339,56 @@ const PartnersList = ({ initialData, initialStats }: PartnersListProps) => {
                                     <div className="overflow-x-auto pb-4 custom-scrollbar">
                                         <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
                                             <thead>
-                                                <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                    <th className="py-3 px-2 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight">Loja / Parceiro</th>
-                                                    <th className="py-3 px-2 w-24 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-tight text-center">Tipo</th>
-                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-tight">Proprietário</th>
-                                                    <th className="py-3 px-2 w-32 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-tight text-center">Cadastro</th>
-                                                    <th className="py-3 px-2 w-24 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-tight text-center">Risco</th>
-                                                    <th className="py-3 px-2 w-28 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-tight text-center">Status</th>
-                                                    <th className="py-3 px-2 w-24 pr-6 rounded-r-lg bg-brand-gray dark:bg-dark-border/50 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">Ações</th>
+                                                <tr className="bg-brand-gray dark:bg-dark-border/50 select-none">
+                                                    <th
+                                                        onClick={() => handleSort("store")}
+                                                        className="py-3 px-2 pl-6 rounded-l-lg text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                    >
+                                                        Loja / Nome {sortConfig?.key === "store" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+                                                    </th>
+                                                    <th
+                                                        onClick={() => handleSort("owner")}
+                                                        className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                    >
+                                                        Proprietário {sortConfig?.key === "owner" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+                                                    </th>
+                                                    <th
+                                                        onClick={() => handleSort("risk")}
+                                                        className="py-3 px-2 w-28 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                    >
+                                                        Score de Risco {sortConfig?.key === "risk" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+                                                    </th>
+                                                    <th
+                                                        onClick={() => handleSort("date")}
+                                                        className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                    >
+                                                        Credenciamento {sortConfig?.key === "date" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+                                                    </th>
+                                                    <th
+                                                        onClick={() => handleSort("status")}
+                                                        className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors text-center"
+                                                    >
+                                                        Status {sortConfig?.key === "status" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+                                                    </th>
+                                                    <th className="py-3 px-2 pr-6 rounded-r-lg text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">
+                                                        Ações
+                                                    </th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 {paginatedItems.map((partner) => (
                                                     <PartnerListRow
-                                                        key={partner.id + partner.type}
+                                                        key={partner.id}
                                                         partner={partner}
                                                         isPending={isPending}
-                                                        onSuspend={setSuspendStoreTarget}
-                                                        onUnsuspend={setUnsuspendStoreTarget}
+                                                        onView={() => openEntity("view", partner.id)}
+                                                        onSuspend={() => setSuspendStoreTarget(partner)}
+                                                        onUnsuspend={() => setUnsuspendStoreTarget(partner)}
+                                                        onSuspendStore={() => setSuspendStoreTarget(partner)}
+                                                        onUnsuspendStore={() => setUnsuspendStoreTarget(partner)}
+                                                        onSuspendPartnerFromStore={() => setSuspendStoreTarget(partner)}
+                                                        onDisableERP={() => setDisableERPTarget(partner)}
                                                         onEnableERP={() => {}}
-                                                        onDisableERP={setDisableERPTarget}
-                                                        onSuspendStore={setSuspendStoreTarget}
-                                                        onUnsuspendStore={setUnsuspendStoreTarget}
-                                                        onSuspendPartnerFromStore={setSuspendStoreTarget}
-                                                        onView={(p) => setSelectedStoreId(p.id)}
                                                     />
                                                 ))}
                                             </tbody>
@@ -311,54 +412,47 @@ const PartnersList = ({ initialData, initialStats }: PartnersListProps) => {
                 </div>
             </div>
 
-            {/* Modals de Ação */}
-            <DestructiveActionModal
+            {/* Modal: Suspender Loja */}
+            <AlertModal
                 isOpen={!!suspendStoreTarget}
-                onClose={() => setSuspendStoreTarget(null)}
+                onClose={() => {
+                    setSuspendStoreTarget(null)
+                    setActionReason("")
+                }}
                 onConfirm={handleConfirmSuspendStore}
                 title="Suspender Loja"
-                description="A loja perderá visibilidade no marketplace e os produtos ficarão pausados."
-                entityName={suspendStoreTarget?.store_name || suspendStoreTarget?.id || ""}
-                consequences={[
-                    "Ocultação imediata dos produtos do catálogo",
-                    "Bloqueio de novas compras para esta loja",
-                    "Registro no Audit Log",
-                ]}
-                confirmText="Confirmar Suspensão"
-                isPending={isPending}
+                description={`Tem certeza que deseja suspender a loja ${suspendStoreTarget?.store_name}? A loja ficará invisível no marketplace e seus anúncios serão pausados.`}
+                confirmText="Suspender Loja"
+                variant="danger"
             />
 
-            <DestructiveActionModal
+            {/* Modal: Reativar Loja */}
+            <AlertModal
                 isOpen={!!unsuspendStoreTarget}
-                onClose={() => setUnsuspendStoreTarget(null)}
+                onClose={() => {
+                    setUnsuspendStoreTarget(null)
+                    setActionReason("")
+                }}
                 onConfirm={handleConfirmUnsuspendStore}
                 title="Reativar Loja"
-                description="A loja voltará a ter visibilidade e receber pedidos no marketplace."
-                entityName={unsuspendStoreTarget?.store_name || unsuspendStoreTarget?.id || ""}
-                consequences={[
-                    "Reativação do catálogo de produtos",
-                    "Desbloqueio de vendas",
-                ]}
-                confirmText="Confirmar Reativação"
-                isPending={isPending}
+                description={`Deseja reativar a loja ${unsuspendStoreTarget?.store_name}? Ela voltará a operar normalmente e receber novos pedidos.`}
+                confirmText="Reativar Loja"
+                variant="success"
             />
 
-            <DestructiveActionModal
+            {/* Modal: Desabilitar Acesso ERP */}
+            <AlertModal
                 isOpen={!!disableERPTarget}
-                onClose={() => setDisableERPTarget(null)}
+                onClose={() => {
+                    setDisableERPTarget(null)
+                    setActionReason("")
+                }}
                 onConfirm={handleConfirmDisableERP}
-                title="Desabilitar Acesso ERP"
-                description="O parceiro não conseguirá mais acessar o painel ERP do Dudit."
-                entityName={disableERPTarget?.store_name || disableERPTarget?.id || ""}
-                consequences={[
-                    "Bloqueio imediato do login no ERP",
-                    "Registro obrigatório no Audit Log",
-                ]}
-                confirmText="Desabilitar ERP"
-                isPending={isPending}
+                title="Desabilitar Acesso ao ERP"
+                description={`Deseja bloquear o acesso do parceiro ${disableERPTarget?.store_name} ao painel do ERP?`}
+                confirmText="Bloquear ERP"
+                variant="danger"
             />
         </FadeIn>
     )
 }
-export default PartnersList
-

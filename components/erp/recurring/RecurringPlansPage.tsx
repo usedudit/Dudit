@@ -328,7 +328,7 @@ export default function RecurringPlansPage({
         <>
             <AnimatePresence mode="wait">
                 {entityState.isOpen && (isViewing || isEditing || isCreating) ? (
-                    ((isViewing || isEditing) && (isLoadingDetail && !selectedPlan)) ? (
+                    ((isViewing || isEditing) && (isLoadingDetail || !selectedPlan)) ? (
                         <ERPDetailLoading key="loading-plan" />
                     ) : (
                         <FadeIn key="form" className="w-full h-full">

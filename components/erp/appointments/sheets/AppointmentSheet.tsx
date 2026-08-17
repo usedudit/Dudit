@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { ChevronLeftIcon, XIcon, SearchIcon, ChevronRightIcon, PlusIcon, CalendarIcon, CheckIcon, ClockIcon, RepeatIcon, ArrowRightIcon, ChevronDownIcon, UserIcon, ThreeDotsIcon, Package, AlertCircleIcon } from '@/lib/icons';
 import { formatBrazilPhone } from "@/lib/utils/phone-utils";
-import { Button, Input, Dropdown, DropdownItem, AlertModal, DatePicker, TimePicker, FormTextarea, ThreeDotsLoader, IconPlaceholder, Spinner, EmailInput, PhoneInput, Checkbox, MoneyInput, InfoCard, Badge, Tabs, TabsList, TabsTrigger, TabsContent, QuantitySelector, DefaultModal } from '@/components/reusable';
+import { Button, Input, Dropdown, DropdownItem, AlertModal, DatePicker, TimePicker, FormTextarea, ThreeDotsLoader, IconPlaceholder, Spinner, EmailInput, PhoneInput, Checkbox, MoneyInput, InfoCard, Badge, Tabs, TabsList, TabsTrigger, TabsContent, QuantitySelector, DefaultModal, Tooltip } from '@/components/reusable';
 import { getAvailableTimeSlotsAction, getAppointmentDetailsDataAction } from '@/app/actions/erp/appointments';
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
@@ -1384,7 +1384,7 @@ export const AppointmentSheet = ({
                             sku: item.sku || product.sku,
                         }
                     }
-                    if (item.stock == null) {
+                    if (item.productId && item.stock == null) {
                         return { ...item, stock: 0 }
                     }
                     return item
@@ -1396,7 +1396,7 @@ export const AppointmentSheet = ({
             if (!cancelled) {
                 productIds.forEach((id: string) => fetchingProductIdsRef.current.delete(id))
                 setSelectedItems(prevItems => prevItems.map((item: any) =>
-                    item.stock == null ? { ...item, stock: 0 } : item
+                    item.productId && item.stock == null ? { ...item, stock: 0 } : item
                 ))
                 setIsEnrichingItems(false)
             }
@@ -1808,7 +1808,7 @@ export const AppointmentSheet = ({
                                             <h3 className="font-bold text-brand-dark dark:text-dark-heading">Horários disponíveis</h3>
                                             <Button
                                                 variant="link"
-                                                className="h-8"
+                                                className="text-sm"
                                                 leftIcon={<CalendarIcon size={18} className="hidden lg:block" />}
                                                 onClick={handleEnterSelectionMode}
                                             >
@@ -1834,11 +1834,15 @@ export const AppointmentSheet = ({
                                                     <button
                                                         key={i}
                                                         onClick={() => { setSelectedTimeSlot(slot); setEditTime(slot); }}
-                                                        className={`w-full p-3 rounded-xl border text-sm font-bold transition-all flex justify-between items-center ${selectedTimeSlot === slot ? 'border-brand-dark border-brand-green text-white' : conflictingTimeSlots.has(slot) ? 'border-amber-300 bg-amber-50/60 text-brand-dark dark:border-amber-800/50 dark:bg-amber-900/10 dark:text-dark-heading' : 'border-brand-border dark:border-dark-border hover:border-brand-dark/30 dark:hover:border-brand-gray/30 text-brand-dark dark:text-dark-heading'}`}
+                                                        className={`w-full p-3 rounded-xl border text-sm font-bold transition-all flex justify-between items-center ${selectedTimeSlot === slot ? 'border-brand-green' : conflictingTimeSlots.has(slot) ? 'border-orange-100 dark:border-orange-900/30 bg-[#fff7ed] dark:bg-orange-900/20 text-brand-dark dark:text-dark-heading' : 'border-brand-border dark:border-dark-border hover:border-brand-dark/30 dark:hover:border-brand-gray/30 text-brand-dark dark:text-dark-heading'}`}
                                                     >
                                                         <span className="flex items-center gap-2">
                                                             {slot}
-                                                            {conflictingTimeSlots.has(slot) && <AlertCircleIcon size={16} className={selectedTimeSlot === slot ? 'text-white' : 'text-amber-600'} />}
+                                                            {conflictingTimeSlots.has(slot) &&
+                                                                <Tooltip text="Conflito com agendamento">
+                                                                    <AlertCircleIcon size={16} className={selectedTimeSlot === slot ? 'text-orange-700 dark:text-orange-300/80' : 'text-orange-700 dark:text-orange-300/80'} />
+                                                                </Tooltip>
+                                                            }
                                                         </span>
                                                         {selectedTimeSlot === slot && <CheckIcon size={18} />}
                                                     </button>
@@ -2282,6 +2286,11 @@ export const AppointmentSheet = ({
                                                                 <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${usageTypeColor}`}>
                                                                     {usageTypeLabel}
                                                                 </span>
+                                                                {!item.productId && (
+                                                                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full border text-brand-inactive-text bg-brand-gray/50 dark:bg-dark-border/40 border-brand-border dark:border-dark-border">
+                                                                        Item manual
+                                                                    </span>
+                                                                )}
                                                             </div>
                                                         </div>
                                                         <div className="flex items-center gap-3 shrink-0">
