@@ -37,7 +37,7 @@ const BOOLEAN_FIELDS = new Set(["is_active", "show_in_marketplace", "highlight_s
 const REQUIRED_FIELDS = [
     { field: "name", tab: "general", validate: (v: any) => !!v?.trim(), message: "Nome é obrigatório" },
     { field: "price", tab: "general", validate: (v: any, data: any) => data.show_price_in_store === false || data.price_type === 'free' || Number(v) > 0, message: "Preço é obrigatório" },
-    { field: "duration_minutes", tab: "general", validate: (v: any, data: any) => (data.billing_unit && data.billing_unit !== 'per_service') || Number(v) > 0, message: "Duração é obrigatória" },
+    { field: "duration_minutes", tab: "general", validate: (v: any, data: any) => (data.billing_unit && data.billing_unit !== 'per_service') || (Number(v) > 0 && Number(v) <= 525600), message: "Duração deve ser entre 1 minuto e 1 ano (525.600 min)" },
 ]
 
 const getEmptyService = () => ({

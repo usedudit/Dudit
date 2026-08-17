@@ -36,6 +36,7 @@ import {
     fetchDeliveryPeopleBucketAction,
     getERPDeliveryPlanAccessAction,
 } from "@/app/actions/erp/deliveries"
+import { assignPlatformDriverToDeliveryAction, fetchAvailablePlatformDeliveryDriversAction } from "@/app/actions/erp/delivery-driver-assignments"
 import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
 import {
     CalendarIcon,
@@ -52,7 +53,7 @@ import { formatCurrency, formatDate, formatDateTime, formatQuantityWithUnit, for
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 
-type DeliveryPerson = { id: string; userId?: string; fullName: string }
+type DeliveryPerson = { id: string; userId?: string; fullName: string; source?: "legacy" | "platform"; vehicleType?: string }
 
 type OrderPickerItem = {
     id: string
@@ -344,8 +345,14 @@ export default function CreateDeliveryPage({
 
     const loadDeliveryPeople = async () => {
         if (deliveryPeople.length > 0) return
-        const list = await fetchDeliveryPeopleBucketAction(partnerId)
-        setDeliveryPeople(list as DeliveryPerson[])
+        const [legacy, platform] = await Promise.all([
+            fetchDeliveryPeopleBucketAction(partnerId),
+            fetchAvailablePlatformDeliveryDriversAction(partnerId).catch(() => []),
+        ])
+        setDeliveryPeople([
+            ...(legacy as DeliveryPerson[]).map((person) => ({ ...person, source: "legacy" as const })),
+            ...(platform as DeliveryPerson[]).map((person) => ({ ...person, id: `platform:${person.id}`, source: "platform" as const })),
+        ])
     }
 
     const handleSave = async () => {
@@ -354,13 +361,17 @@ export default function CreateDeliveryPage({
         setIsSaving(true)
         try {
             const startedAt = new Date(`${date}T${time}:00`).toISOString()
+            const isPlatformDriver = selectedDeliveryPersonId.startsWith("platform:")
+            const platformDriverId = isPlatformDriver ? selectedDeliveryPersonId.slice("platform:".length) : null
+            const legacyDeliveryPersonId = isPlatformDriver ? null : (selectedDeliveryPersonId || null)
             let response
             if (editDeliveryId) {
                 response = await updateERPDeliveryAction({
                     partnerId,
                     deliveryId: editDeliveryId,
                     orderIds: selectedOrderIds,
-                    deliveryPersonId: selectedDeliveryPersonId || null,
+                    deliveryPersonId: legacyDeliveryPersonId,
+                    platformDriverId,
                     status: status as any,
                     startedAt,
                     notes,
@@ -369,7 +380,8 @@ export default function CreateDeliveryPage({
                 response = await createERPDeliveryAction({
                     partnerId,
                     orderIds: selectedOrderIds,
-                    deliveryPersonId: selectedDeliveryPersonId || null,
+                    deliveryPersonId: legacyDeliveryPersonId,
+                    platformDriverId,
                     status: status as any,
                     startedAt,
                     notes,
@@ -377,6 +389,19 @@ export default function CreateDeliveryPage({
             }
 
             if (response.success) {
+                if (platformDriverId) {
+                    const assignmentResult = await assignPlatformDriverToDeliveryAction({
+                        partnerId,
+                        deliveryId: editDeliveryId || response.deliveryId,
+                        orderIds: selectedOrderIds,
+                        driverId: platformDriverId,
+                        notes,
+                    })
+                    if (!assignmentResult.success) {
+                        toast.error(assignmentResult.error)
+                        return
+                    }
+                }
                 toast.success(editDeliveryId ? "Entrega atualizada com sucesso!" : "Entrega criada com sucesso!")
                 onSuccess()
             } else {
@@ -663,7 +688,7 @@ export default function CreateDeliveryPage({
                                                                         { value: "none", label: "Entrega própria" },
                                                                         ...deliveryPeople.map((person) => ({
                                                                             value: person.id,
-                                                                            label: person.fullName,
+                                                                            label: `${person.fullName}${person.source === "platform" ? " · Dudit" : ""}`,
                                                                         })),
                                                                     ]}
                                                                     onFocus={() => {
@@ -716,7 +741,7 @@ export default function CreateDeliveryPage({
                                                                 { value: "none", label: "Entrega própria" },
                                                                 ...deliveryPeople.map((person) => ({
                                                                     value: person.id,
-                                                                    label: person.fullName,
+                                                                    label: `${person.fullName}${person.source === "platform" ? " · Dudit" : ""}`,
                                                                 })),
                                                             ]}
                                                             onFocus={() => {
@@ -767,7 +792,7 @@ export default function CreateDeliveryPage({
                                                 setValue={(value) => setSelectedDeliveryPersonId(value === "none" ? "" : value)}
                                                 options={[
                                                     { value: "none", label: "Sem entregador (não atribuído)" },
-                                                    ...deliveryPeople.map((person) => ({ value: person.id, label: person.fullName })),
+                                                    ...deliveryPeople.map((person) => ({ value: person.id, label: `${person.fullName}${person.source === "platform" ? " · Dudit" : ""}` })),
                                                 ]}
                                                 onFocus={() => { void loadDeliveryPeople() }}
                                             />
@@ -848,17 +873,15 @@ export default function CreateDeliveryPage({
                             </Button>
                         </header>
 
-                        <Tabs defaultValue="dados_gerais" className="flex flex-col flex-1 overflow-hidden">
-                            <div className="px-6 border-b border-brand-border dark:border-dark-border shrink-0">
-                                <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0 h-12">
-                                    <TabsTrigger value="dados_gerais">
-                                        Dados Gerais
-                                    </TabsTrigger>
-                                    <TabsTrigger value="itens">
-                                        Itens do Pedido
-                                    </TabsTrigger>
-                                </TabsList>
-                            </div>
+                        <Tabs defaultValue="dados_gerais">
+                            <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b border-brand-border dark:border-dark-border mb-6">
+                                <TabsTrigger value="dados_gerais" className="px-0 pb-3 text-sm">
+                                    Dados Gerais
+                                </TabsTrigger>
+                                <TabsTrigger value="itens" className="px-0 pb-3 text-sm">
+                                    Itens do Pedido
+                                </TabsTrigger>
+                            </TabsList>
 
                             <div className="flex-1 overflow-y-auto p-6 space-y-6">
                                 <TabsContent value="dados_gerais" className="mt-0 space-y-6">

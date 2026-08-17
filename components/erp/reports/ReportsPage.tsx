@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useCallback, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Tabs, TabsList, TabsTrigger, TabsContent, InfoCard, Button } from "@/components/reusable"
+import { Tabs, TabsList, TabsTrigger, TabsContent, InfoCard, Button, ListItem } from "@/components/reusable"
 import { SummaryCards } from "@/components/erp/dashboard/LeftColumn"
 import { InsightsRegister } from "@/components/erp/dashboard/InsightsRegister"
 import { useDashboard } from "@/components/erp/dashboard/DashboardContext"
@@ -19,7 +19,7 @@ import {
     ListIcon, ClockIcon, CalendarIcon, TargetIcon, BoxIcon, ExportFileIcon,
     AlertCircleIcon,
 } from "@/lib/icons"
-import { ReportTableCard, ReportRankingCard } from "./widgets"
+import { ReportTableCard, ReportRankingCard, FinancialCalendarCard } from "./widgets"
 import type { ProductsDashboardData, ServicesDashboardData, FinancialDashboardData } from "@/lib/data/dashboard"
 import type {
     SalesReportData, CustomerReportData, ReturnsReportData,
@@ -1133,16 +1133,39 @@ function FinancialSection({ financialData }: { financialData: FinancialDashboard
     const router = useRouter()
     const { setExportHandler } = useDashboard()
 
-    const totalDistribution = (financialData.distribution || []).reduce((acc, d) => acc + Number(d.value), 0)
-    const cashflowData = (financialData.cashflow || []).map(p => ({ label: p.label, value: Number(p.value), secondary: Number(p.secondary || 0) }))
+    const totalExpenses = useMemo(() => {
+        return (financialData.expensesByCategory || []).reduce((acc, e) => acc + Number(e.value), 0)
+    }, [financialData.expensesByCategory])
+
+    const cashflowData = useMemo(() => {
+        return (financialData.cashflow || []).map(p => ({
+            label: p.label,
+            value: Number(p.value),
+            secondary: Number(p.secondary || 0),
+        }))
+    }, [financialData.cashflow])
+
+    const alertsList = useMemo(() => {
+        if (financialData.alertsAndPendings && financialData.alertsAndPendings.length > 0) {
+            return financialData.alertsAndPendings
+        }
+        return (financialData.overdueAccounts || []).map(a => ({
+            id: a.id,
+            title: a.title,
+            subtitle: a.subtitle ? `${a.subtitle}${a.meta ? ` · ${a.meta}` : ""}` : (a.meta ? `Vencimento: ${a.meta}` : ""),
+            value: a.value,
+            tone: a.tone || "red",
+            statusLabel: a.tone === "red" ? "Vencido" : "Próximo",
+        }))
+    }, [financialData.alertsAndPendings, financialData.overdueAccounts])
 
     const insights = useMemo(() => generateFinancialInsights({
-        balance: Number(financialData.metrics.find((m: any) => m.title.includes("Saldo"))?.value?.replace(/[^\d,.-]/g, "").replace(",", ".") || 0),
-        receivable: Number(financialData.metrics.find((m: any) => m.title.includes("Receber"))?.value?.replace(/[^\d,.-]/g, "").replace(",", ".") || 0),
-        payable: Number(financialData.metrics.find((m: any) => m.title.includes("Pagar"))?.value?.replace(/[^\d,.-]/g, "").replace(",", ".") || 0),
-        incomeTotal: totalDistribution,
-        expenseTotal: Number(financialData.metrics.find((m: any) => m.title.includes("Despesas"))?.value?.replace(/[^\d,.-]/g, "").replace(",", ".") || 0),
-    }), [financialData])
+        balance: Number(financialData.metrics.find((m: any) => m.title.toLowerCase().includes("saldo"))?.value?.replace(/[^\d,.-]/g, "").replace(",", ".") || 0),
+        receivable: 0,
+        payable: 0,
+        incomeTotal: Number(financialData.metrics.find((m: any) => m.title.toLowerCase().includes("receita"))?.value?.replace(/[^\d,.-]/g, "").replace(",", ".") || 0),
+        expenseTotal: totalExpenses || Number(financialData.metrics.find((m: any) => m.title.toLowerCase().includes("despesa"))?.value?.replace(/[^\d,.-]/g, "").replace(",", ".") || 0),
+    }), [financialData, totalExpenses])
 
     const mappedInsights = useMemo(() => {
         return insights.map(ins => ({
@@ -1152,7 +1175,12 @@ function FinancialSection({ financialData }: { financialData: FinancialDashboard
     }, [insights])
 
     const onExport = useCallback(async (fmt: "csv" | "xlsx") => {
-        const rows = [["Saldo", financialData.metrics.find((m: any) => m.title.includes("Saldo"))?.value || "R$ 0,00"]]
+        const rows = [
+            ["Receitas do mês", financialData.metrics.find((m: any) => m.title.includes("Receitas"))?.value || "R$ 0,00"],
+            ["Despesas do mês", financialData.metrics.find((m: any) => m.title.includes("Despesas"))?.value || "R$ 0,00"],
+            ["Resultado do mês", financialData.metrics.find((m: any) => m.title.includes("Resultado"))?.value || "R$ 0,00"],
+            ["Saldo atual", financialData.metrics.find((m: any) => m.title.includes("Saldo"))?.value || "R$ 0,00"],
+        ]
         if (fmt === "csv") exportCSV("financeiro", ["Indicador", "Valor"], rows)
         else await exportXLSX("financeiro", [{ name: "Financeiro", headers: ["Indicador", "Valor"], rows }])
     }, [financialData])
@@ -1163,67 +1191,126 @@ function FinancialSection({ financialData }: { financialData: FinancialDashboard
         <div className="flex flex-col gap-6 animate-fade-in">
             <InsightsRegister insights={mappedInsights} />
 
+            {/* Row 1: KPI Cards */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
                 <div className="lg:col-span-12">
                     <SummaryCards metrics={financialData.metrics} variant="horizontal" />
                 </div>
             </div>
 
+            {/* Row 2: Fluxo de Caixa + Calendário Financeiro */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-                <div className="lg:col-span-8">
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
+                <div className="lg:col-span-6 flex flex-col">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex flex-col justify-between h-full">
                         <CardHeader icon={MoneyIcon} title="Fluxo de Caixa" />
-                        <DashboardLineChart data={cashflowData} showLegend legendLabels={{ value: "Entradas", secondary: "Saídas" }} />
-                    </div>
-                </div>
-                <div className="lg:col-span-4 flex flex-col gap-6">
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
-                        <CardHeader icon={ChartIcon} title="Distribuição Financeira" />
-                        <div className="flex justify-center">
-                            <DashboardPieChart
-                                data={(financialData.distribution || []).map(d => ({ label: d.label, value: Number(d.value) }))}
-                                totalValue={brl(totalDistribution)} totalLabel="Movimentação"
-                                innerRadius={60} outerRadius={80} className="h-[190px]" showLegend colors={CHART_COLORS_CATEGORY}
+                        <div className="flex-1 flex items-center justify-center">
+                            <DashboardLineChart
+                                data={cashflowData}
+                                colors={["#059669", "#ef4444"]}
+                                showLegend
+                                legendLabels={{ value: "Entradas", secondary: "Saídas" }}
                             />
                         </div>
                     </div>
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
+                </div>
+
+                <div className="lg:col-span-6 flex flex-col">
+                    <FinancialCalendarCard dailyMovements={financialData.dailyMovements} />
+                </div>
+            </div>
+
+            {/* Row 3: Alertas e Pendências + Despesas por Categoria */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+                <div className="lg:col-span-6 flex flex-col">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex flex-col justify-between h-full">
+                        <CardHeader icon={AlertCircleIcon} title="Alertas e Pendências" />
+
+                        <div className="flex-1">
+                            {alertsList.length === 0 ? (
+                                <p className="text-sm text-brand-inactive-text py-8 text-center">Nenhum alerta ou conta pendente.</p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {alertsList.slice(0, 5).map(item => {
+                                        const isOverdue = item.statusLabel === "Vencido" || item.tone === "red"
+                                        return (
+                                            <ListItem
+                                                key={item.id}
+                                                left={
+                                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                                                        isOverdue
+                                                            ? "bg-rose-50 dark:bg-rose-950/40 text-rose-500"
+                                                            : "bg-amber-50 dark:bg-amber-950/40 text-amber-500"
+                                                    }`}>
+                                                        {isOverdue ? <AlertCircleIcon size={18} /> : <ClockIcon size={18} />}
+                                                    </div>
+                                                }
+                                                title={item.title}
+                                                description={item.subtitle}
+                                                titleClassName="text-[14px] font-bold text-brand-dark dark:text-dark-heading"
+                                                descriptionClassName="text-[12px] text-brand-inactive-text dark:text-dark-body font-medium"
+                                                className="!border-0 !bg-transparent hover:!bg-brand-gray/20 dark:hover:!bg-dark-border/20 px-2 py-2.5 transition-colors"
+                                                right={
+                                                    <span className={`text-[12px] font-bold px-3 py-1 rounded-full border ${
+                                                        isOverdue
+                                                            ? "bg-[#fef2f2] dark:bg-rose-950/40 text-[#ef4444] dark:text-rose-300 border-rose-200/80 dark:border-rose-900/40"
+                                                            : "bg-[#fffbeb] dark:bg-amber-950/40 text-[#f59e0b] dark:text-amber-300 border-amber-200/80 dark:border-amber-900/40"
+                                                    }`}>
+                                                        {item.statusLabel || (isOverdue ? "Vencido" : "Próximo")}
+                                                    </span>
+                                                }
+                                            />
+                                        )
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="lg:col-span-6 flex flex-col">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex flex-col justify-between h-full">
                         <CardHeader icon={TagIcon} title="Despesas por Categoria" />
-                        <DashboardBarChart data={(financialData.expensesByCategory || []).map(e => ({ label: e.label, value: Number(e.value) }))} colors={CHART_COLORS_VIVID} showLegend />
+
+                        <div className="flex justify-center flex-1 items-center">
+                            {(financialData.expensesByCategory || []).length === 0 ? (
+                                <p className="text-sm text-brand-inactive-text py-8 text-center">Nenhuma despesa categorizada no período.</p>
+                            ) : (
+                                <DashboardPieChart
+                                    data={(financialData.expensesByCategory || []).map(e => ({ label: e.label, value: Number(e.value) }))}
+                                    totalValue={brl(totalExpenses)}
+                                    totalLabel="Despesas"
+                                    innerRadius={65}
+                                    outerRadius={88}
+                                    className="h-[210px]"
+                                    showLegend
+                                    colors={CHART_COLORS_CATEGORY}
+                                />
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
 
+            {/* Row 4: Últimas Movimentações */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-                <div className="lg:col-span-8">
+                <div className="lg:col-span-12">
                     <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
-                        <CardHeader icon={CreditCardIcon} title="Contas Vencidas / Pendentes" />
-                        {(financialData.overdueAccounts || []).length === 0 ? (
-                            <p className="text-sm text-brand-inactive-text py-6 text-center">Nenhuma conta vencida ou pendente.</p>
-                        ) : (
-                            <div className="space-y-2">
-                                {(financialData.overdueAccounts || []).slice(0, 6).map(a => (
-                                    <div key={a.id} className="flex items-center justify-between py-2 border-b border-brand-border dark:border-dark-border last:border-0">
-                                        <div>
-                                            <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{a.title}</p>
-                                            <p className="text-[11px] text-brand-inactive-text">{a.subtitle}{a.meta ? ` · Venc: ${a.meta}` : ""}</p>
-                                        </div>
-                                        <span className={`text-[13px] font-bold ${a.tone === "red" ? "text-brand-red" : "text-brand-orange"}`}>{a.value}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </div>
-                <div className="lg:col-span-4">
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
                         <CardHeader icon={ListIcon} title="Últimas Movimentações" />
-                        <div className="space-y-4">
-                            {(financialData.latestMovements || []).slice(0, 5).map(m => (
-                                <div key={m.id} className="flex items-center justify-between py-1">
-                                    <div>
-                                        <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{m.title}</p>
-                                        <p className="text-[11px] text-brand-inactive-text">{m.subtitle}{m.meta ? ` · ${m.meta}` : ""}</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2">
+                            {(financialData.latestMovements || []).slice(0, 8).map(m => (
+                                <div key={m.id} className="flex items-center justify-between py-2.5 border-b border-brand-border dark:border-dark-border last:border-0">
+                                    <div className="flex items-center gap-3">
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                                            m.tone === "red"
+                                                ? "bg-rose-50 dark:bg-rose-950/40 text-brand-red"
+                                                : "bg-emerald-50 dark:bg-emerald-950/40 text-brand-green"
+                                        }`}>
+                                            <MoneyIcon size={15} />
+                                        </div>
+                                        <div>
+                                            <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{m.title}</p>
+                                            <p className="text-[11px] text-brand-inactive-text">{m.subtitle}{m.meta ? ` · ${m.meta}` : ""}</p>
+                                        </div>
                                     </div>
                                     <span className={`text-[13px] font-bold ${m.tone === "red" ? "text-brand-red" : "text-brand-green"}`}>{m.value}</span>
                                 </div>

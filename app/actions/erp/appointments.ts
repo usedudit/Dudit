@@ -424,17 +424,14 @@ const APPOINTMENT_LIST_COLUMNS = `
   sales_channel, payment_status, fulfillment_mode, needs_reschedule, sale_id, marketplace_order_id
 `
 
+export const MAX_APPOINTMENT_DURATION_MINUTES = 525600; // 1 year (365 days)
+
 /**
  * Fetch appointments within a date range, with optional staff filter.
  * All filtering is done at the database level - no in-memory filtering.
  *
  * Uses the standard interval overlap condition:
- *   start_date <= queryEnd AND end_date >= queryStart
- * This captures:
- *   - Appointments fully within the range
- *   - Multi-day appointments that started before the range
- *   - Multi-day appointments that end after the range
- *   - Appointments that span the entire range
+ *   start_date <= queryEnd AND (end_date >= queryStart OR end_date IS NULL)
  */
 export async function getAppointmentsByDateRangeAction(
   startDate: string,
@@ -451,9 +448,8 @@ export async function getAppointmentsByDateRangeAction(
       .from("appointments")
       .select(APPOINTMENT_LIST_COLUMNS)
       .eq("partner_id", partnerId)
-      // Optimal overlap: appointment.start_date <= queryEnd AND appointment.end_date >= queryStart
       .lte("start_date", endDate)
-      .gte("end_date", startDate)
+      .or(`end_date.gte.${startDate},and(end_date.is.null,start_date.gte.${startDate})`)
 
     // Staff filtering at DB level
     if (staffId) {
@@ -647,6 +643,16 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
     const limitCheck = await checkLimit(partnerId, "monthly_appointments")
     if (!limitCheck.allowed) {
       return { success: false, error: limitCheck.message || "Limite mensal de agendamentos atingido.", created: [] }
+    }
+
+    // Validate 1-year max duration and dates
+    for (const row of rows) {
+      if (row.duration_minutes > MAX_APPOINTMENT_DURATION_MINUTES) {
+        return { success: false, error: "A duração do agendamento não pode exceder 1 ano (365 dias).", created: [] }
+      }
+      if (row.start_date && row.end_date && row.start_date > row.end_date) {
+        return { success: false, error: "A data final do agendamento não pode ser anterior à data inicial.", created: [] }
+      }
     }
 
     const { data, error } = await supabase.from("appointments").insert(rows).select("*")
@@ -1032,8 +1038,14 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
 
     const nextStartDate = payload.date ?? current.start_date
     const nextStartTime = payload.time ?? current.start_time
-    const shouldRecalculateEnd = payload.date !== undefined || payload.time !== undefined || payload.duration !== undefined
-    const derivedEnd = addMinutesToDateTime(nextStartDate, nextStartTime, Number(payload.duration ?? current.duration_minutes ?? 0))
+    const nextDuration = Number(payload.duration ?? current.duration_minutes ?? 0)
+    const derivedEnd = addMinutesToDateTime(nextStartDate, nextStartTime, nextDuration)
+    const nextEndDate = payload.endDate ?? (payload.date !== undefined || payload.duration !== undefined ? derivedEnd.date : current.end_date)
+    const nextEndTime = payload.endTime ?? (payload.time !== undefined || payload.duration !== undefined ? derivedEnd.time : current.end_time)
+
+    if (nextDuration > MAX_APPOINTMENT_DURATION_MINUTES) {
+      return { success: false, error: "A duração do agendamento não pode exceder 1 ano (365 dias)." }
+    }
 
     const mapped = toDbPayload(
       {
@@ -1042,11 +1054,11 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
         serviceName: payload.serviceName ?? current.service_name,
         serviceId: payload.serviceId ?? current.service_id,
         categoryId: payload.categoryId ?? current.category_id,
-        date: payload.date ?? current.start_date,
-        time: payload.time ?? current.start_time,
-        endDate: shouldRecalculateEnd ? derivedEnd.date : (payload.endDate ?? current.end_date),
-        endTime: shouldRecalculateEnd ? derivedEnd.time : (payload.endTime ?? current.end_time),
-        duration: payload.duration ?? current.duration_minutes,
+        date: nextStartDate,
+        time: nextStartTime,
+        endDate: nextEndDate,
+        endTime: nextEndTime,
+        duration: nextDuration,
         staffId: payload.staffId ?? current.staff_partner_user_id,
         staffName: payload.staffName ?? current.staff_name,
         price: payload.price ?? current.price,

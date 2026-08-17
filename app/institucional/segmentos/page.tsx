@@ -1,280 +1,425 @@
 "use client";
 
-import React from 'react';
-import { motion } from 'framer-motion';
-import { Button } from '@/components/reusable/Button';
-import {
-  FileIcon,
-  ClockIcon,
-  PhoneIcon
-} from '@/lib/icons';
-import { GridLines, SectionHeader, CTA, Navbar, Footer } from '@/components/InstitucionalShared';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
+import {
+    Store,
+    ShoppingBag,
+    Wrench,
+    UtensilsCrossed,
+    Car,
+    Home,
+    Briefcase,
+    Tag,
+    Search,
+    ArrowRight,
+    CheckCircle2,
+    Calendar,
+    Clock,
+    MapPin,
+    ChevronRight,
+    Sparkles,
+    Check
+} from 'lucide-react';
+import { Button } from '@/components/reusable/Button';
+import { Navbar, Footer } from '@/components/InstitucionalShared';
 
-const segments = [
-  {
-    title: "Confeiteiras",
-    description: "Receba pedidos e pagamentos de forma organizada, sem se perder nas conversas do WhatsApp.",
-    type: "confectionery"
-  },
-  {
-    title: "Salões e Barbearias",
-    description: "Agenda online disponível 24h para seus clientes. Sem ligações, sem confusão de horários.",
-    type: "beauty"
-  },
-  {
-    title: "Oficinas e Técnicos",
-    description: "Emita ordens de serviço e mantenha a ficha técnica de cada cliente sempre à mão.",
-    type: "technical"
-  },
-  {
-    title: "Lojas de Roupa",
-    description: "Controle de variações (cor/tamanho/etc), estoque e sua vitrine online pronta em minutos.",
-    type: "fashion"
-  },
-  {
-    title: "Autônomos e Prestadores",
-    description: "Crie orçamentos profissionais em PDF e envie para seus clientes com apenas um clique.",
-    type: "freelance"
-  },
-  {
-    title: "Aluguel de Equipamentos",
-    description: "Controle locações por período, saiba o que está disponível e evite conflitos de agenda.",
-    type: "rental"
-  }
-];
+export default function SegmentosPage() {
+    const router = useRouter();
 
-const SegmentMockup = ({ type }: { type: string }) => {
-  switch (type) {
-    case 'confectionery':
-      return (
-        <div className="bg-white p-4 w-full max-w-[240px] rounded-xl border border-brand-border">
-          <div className="flex items-center gap-2 mb-3 pb-2 border-b border-brand-gray">
-            <div className="w-6 h-6 bg-brand-green rounded-full flex items-center justify-center text-white">
-              <PhoneIcon size={12} color="white" />
-            </div>
-            <span className="text-[10px] font-bold text-brand-inactive-text uppercase">WhatsApp</span>
-          </div>
-          <div className="bg-brand-gray p-2 rounded-lg mb-3">
-            <p className="text-[10px] text-brand-inactive-text italic">"Quero encomendar um bolo de pote para amanhã!"</p>
-          </div>
-          <div className="flex justify-between items-center">
-            <div>
-              <div className="text-[10px] font-bold text-brand-dark">Bolo de Pote</div>
-              <div className="text-[12px] font-bold text-brand-green">R$ 15,00</div>
-            </div>
-            <div className="bg-brand-green text-white text-[8px] font-bold px-2 py-1 rounded">PAGO</div>
-          </div>
+    const onNavigate = (page: string) => {
+        if (page === 'home') router.push('/institucional/inicio');
+        else if (page === 'start-selling') router.push('/auth/login?mode=partner');
+        else if (page === 'explore') router.push('/');
+        else if (page === 'segments') router.push('/institucional/segmentos');
+        else if (page === 'pricing') router.push('/institucional/planos');
+        else if (page === 'terms') router.push('/institucional/termos');
+        else if (page === 'privacidade') router.push('/institucional/privacidade');
+        else if (page === 'about') router.push('/institucional/sobre');
+        else router.push('/');
+    };
+
+    return (
+        <div className="min-h-screen bg-white text-brand-dark flex flex-col selection:bg-brand-green/20 selection:text-brand-dark font-sans">
+            <Navbar onNavigate={onNavigate} />
+
+            <main className="flex-1 w-full pt-[68px]">
+                {/* HERO SECTION */}
+                <SegmentosHero onNavigate={onNavigate} />
+
+                {/* BENTO GRID DE CATEGORIAS */}
+                <CategoriesBentoSection onNavigate={onNavigate} />
+
+                {/* CONEXÃO DIRETA */}
+                <DirectConnectionSection onNavigate={onNavigate} />
+
+                {/* CTA FINAL */}
+                <SegmentosFinalCTA onNavigate={onNavigate} />
+            </main>
+
+            <Footer onNavigate={onNavigate} />
         </div>
-      );
-    case 'beauty':
-      return (
-        <div className="bg-white p-4 w-full max-w-[240px] rounded-xl border border-brand-border">
-          <div className="flex justify-between items-center mb-3">
-            <span className="text-[10px] font-bold text-brand-inactive-text uppercase">Agenda Hoje</span>
-            <ClockIcon size={12} className="text-brand-inactive-text" />
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center gap-3 bg-blue-50 p-2 rounded-lg border border-blue-100">
-              <div className="text-[10px] font-bold text-blue-700">14:00</div>
-              <div className="flex-1">
-                <div className="text-[10px] font-bold text-gray-900">Corte Masculino</div>
-                <div className="text-[8px] text-gray-500">Cliente: Marcos</div>
-              </div>
+    );
+}
+
+/* =========================================================================
+   1. HERO SECTION
+   ========================================================================= */
+function SegmentosHero({ onNavigate }: { onNavigate: (page: string) => void }) {
+    return (
+        <section className="relative bg-white pt-16 pb-20 md:pt-24 md:pb-28 overflow-hidden border-b border-gray-100">
+            <div className="absolute inset-0 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:24px_24px] opacity-60 pointer-events-none" />
+
+            <div className="max-w-[1300px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+                <div className="grid lg:grid-cols-12 gap-12 items-center">
+                    <motion.div
+                        className="lg:col-span-7 flex flex-col items-start"
+                        initial={{ opacity: 0, y: 25 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.6 }}
+                    >
+                        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-brand-green/10 border border-brand-green/20 text-brand-dark text-xs font-semibold mb-6">
+                            <span className="w-2 h-2 rounded-full bg-brand-green" />
+                            <span>Variedade & Proximidade</span>
+                        </div>
+
+                        <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-brand-dark tracking-tight leading-[1.08] mb-6">
+                            Produtos, serviços e negócios de todos os tipos.
+                        </h1>
+
+                        <p className="text-gray-600 text-lg sm:text-xl mb-8 max-w-xl leading-relaxed">
+                            Na Dudit você encontra desde produtos até profissionais e empresas da sua região para resolver o seu dia a dia.
+                        </p>
+
+                        <div className="flex flex-wrap items-center gap-4">
+                            <Button
+                                className="h-12 px-7 text-base font-bold bg-brand-green hover:bg-[#007b4f] text-white shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                onClick={() => onNavigate('explore')}
+                            >
+                                <Search className="w-4 h-4 mr-2" />
+                                Explorar categorias
+                            </Button>
+
+                            <Button
+                                variant="outline"
+                                className="h-12 px-7 text-base font-semibold border-gray-200 text-brand-dark hover:bg-gray-50 transition-all"
+                                onClick={() => onNavigate('start-selling')}
+                            >
+                                Divulgar meu negócio
+                                <ArrowRight className="w-4 h-4 ml-2 text-brand-green" />
+                            </Button>
+                        </div>
+                    </motion.div>
+
+                    <motion.div
+                        className="lg:col-span-5 flex justify-center"
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.7, delay: 0.15 }}
+                    >
+                        <div className="relative w-full max-w-[420px]">
+                            <div className="absolute inset-0 bg-brand-green/10 rounded-3xl blur-2xl -z-10" />
+                            <div className="bg-white border border-gray-200/80 rounded-3xl p-6 sm:p-8 shadow-xl text-center">
+                                <img
+                                    src="https://img.dudit.com.br/static/mascots/Segmentos.png"
+                                    alt="Dino Dudit com vários segmentos e profissões"
+                                    className="w-52 h-52 mx-auto object-contain drop-shadow-sm select-none mb-3"
+                                />
+                                <div className="text-sm font-bold text-brand-dark">Tudo em um só lugar</div>
+                                <div className="text-xs text-gray-500 mt-1">
+                                    De artesanato a serviços automotivos, pertinho de você.
+                                </div>
+                            </div>
+                        </div>
+                    </motion.div>
+                </div>
             </div>
-            <div className="flex items-center gap-3 bg-brand-gray p-2 rounded-lg border border-brand-border opacity-50">
-              <div className="text-[10px] font-bold text-brand-inactive-text">15:00</div>
-              <div className="flex-1">
-                <div className="text-[10px] font-bold text-brand-inactive-text">Barba</div>
-              </div>
+        </section>
+    );
+}
+
+/* =========================================================================
+   2. SEÇÃO: BENTO GRID DE CATEGORIAS E SITUAÇÕES
+   ========================================================================= */
+function CategoriesBentoSection({ onNavigate }: { onNavigate: (page: string) => void }) {
+    return (
+        <section className="py-20 md:py-28 bg-gray-50/50 relative border-b border-gray-100">
+            <div className="max-w-[1300px] mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="text-center max-w-2xl mx-auto mb-16">
+                    <span className="text-xs font-bold text-brand-green uppercase tracking-widest block mb-3">
+                        Encontre o que precisa
+                    </span>
+                    <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-brand-dark tracking-tight mb-4">
+                        Para todos os tipos de necessidades
+                    </h2>
+                    <p className="text-gray-600 text-base sm:text-lg">
+                        Descubra opções perto de você ou coloque seu negócio no mapa para ser encontrado.
+                    </p>
+                </div>
+
+                {/* Bento Grid */}
+                <div className="grid md:grid-cols-12 gap-6">
+                    {/* 1. Lojas e Comércio (Col 7) */}
+                    <div className="md:col-span-7 bg-white rounded-3xl p-6 sm:p-8 border border-gray-200/80 shadow-xs hover:border-brand-green/40 hover:shadow-md transition-all flex flex-col justify-between">
+                        <div>
+                            <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mb-5">
+                                <Store className="w-6 h-6" />
+                            </div>
+                            <span className="text-xs font-bold text-blue-600 uppercase tracking-wider block mb-1">
+                                Comércio Local
+                            </span>
+                            <h3 className="text-2xl font-bold text-brand-dark mb-2">Lojas e comércio</h3>
+                            <p className="text-gray-600 text-sm sm:text-base leading-relaxed mb-6">
+                                Produtos novos e usados, lojas de bairro, promoções e oportunidades para comprar direto de quem vende.
+                            </p>
+
+                            <div className="flex flex-wrap gap-2 mb-6">
+                                {['👗 Moda & Roupas', '📱 Eletrônicos', '🛋️ Móveis & Decoração', '👜 Acessórios', '🧸 Infantil'].map((tag, idx) => (
+                                    <span key={idx} className="text-xs font-medium bg-gray-50 border border-gray-200 text-gray-700 px-3 py-1.5 rounded-full">
+                                        {tag}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="bg-blue-50/40 rounded-2xl p-4 border border-blue-100 flex items-center justify-between">
+                            <div className="text-xs text-gray-700">
+                                <span className="font-bold text-brand-dark">Milhares de itens</span> disponíveis na sua região
+                            </div>
+                            <span className="text-xs font-bold text-blue-600 flex items-center gap-1 cursor-pointer" onClick={() => onNavigate('explore')}>
+                                Explorar <ChevronRight className="w-3.5 h-3.5" />
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* 2. Serviços & Agendamentos (Col 5) */}
+                    <div className="md:col-span-5 bg-white rounded-3xl p-6 sm:p-8 border border-gray-200/80 shadow-xs hover:border-brand-green/40 hover:shadow-md transition-all flex flex-col justify-between">
+                        <div>
+                            <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center mb-5">
+                                <Calendar className="w-6 h-6" />
+                            </div>
+                            <span className="text-xs font-bold text-purple-600 uppercase tracking-wider block mb-1">
+                                Agende Direto
+                            </span>
+                            <h3 className="text-2xl font-bold text-brand-dark mb-2">Serviços e profissionais</h3>
+                            <p className="text-gray-600 text-sm sm:text-base leading-relaxed mb-6">
+                                Encontre profissionais qualificados e agende horários sem complicação e sem espera.
+                            </p>
+
+                            <div className="flex flex-wrap gap-2 mb-6">
+                                {['💇 Barbearias & Salões', '💅 Estética', '💻 Assistência Técnica', '🧹 Diaristas'].map((tag, idx) => (
+                                    <span key={idx} className="text-xs font-medium bg-gray-50 border border-gray-200 text-gray-700 px-3 py-1.5 rounded-full">
+                                        {tag}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="bg-purple-50/40 rounded-2xl p-4 border border-purple-100 flex items-center justify-between">
+                            <div className="text-xs text-gray-700">
+                                <span className="font-bold text-brand-dark">Horários livres</span> hoje e amanhã
+                            </div>
+                            <span className="text-xs font-bold text-purple-600 flex items-center gap-1 cursor-pointer" onClick={() => onNavigate('explore')}>
+                                Agendar <ChevronRight className="w-3.5 h-3.5" />
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* 3. Alimentação & Delícias (Col 4) */}
+                    <div className="md:col-span-4 bg-white rounded-3xl p-6 sm:p-8 border border-gray-200/80 shadow-xs hover:border-brand-green/40 hover:shadow-md transition-all flex flex-col justify-between">
+                        <div>
+                            <div className="w-12 h-12 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center mb-5">
+                                <UtensilsCrossed className="w-6 h-6" />
+                            </div>
+                            <span className="text-xs font-bold text-orange-600 uppercase tracking-wider block mb-1">
+                                Comida Local
+                            </span>
+                            <h3 className="text-xl font-bold text-brand-dark mb-2">Alimentação & delivery</h3>
+                            <p className="text-gray-600 text-xs sm:text-sm leading-relaxed mb-4">
+                                Bolos artesanais, marmitas, lanches e pratos feitos com carinho por quem cozinha na sua cidade.
+                            </p>
+                            <div className="flex flex-wrap gap-1.5 mb-4">
+                                {['🍰 Bolos de Pote', '🍱 Marmitas Fit', '🍔 Lanches', '🥖 Pães Caseiros'].map((tag, idx) => (
+                                    <span key={idx} className="text-[11px] font-medium bg-gray-50 border border-gray-200 text-gray-600 px-2.5 py-1 rounded-lg">
+                                        {tag}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 4. Automotivo & Cuidados (Col 4) */}
+                    <div className="md:col-span-4 bg-white rounded-3xl p-6 sm:p-8 border border-gray-200/80 shadow-xs hover:border-brand-green/40 hover:shadow-md transition-all flex flex-col justify-between">
+                        <div>
+                            <div className="w-12 h-12 rounded-2xl bg-brand-green/10 text-brand-green flex items-center justify-center mb-5">
+                                <Car className="w-6 h-6" />
+                            </div>
+                            <span className="text-xs font-bold text-brand-green uppercase tracking-wider block mb-1">
+                                Seu Veículo
+                            </span>
+                            <h3 className="text-xl font-bold text-brand-dark mb-2">Automotivo</h3>
+                            <p className="text-gray-600 text-xs sm:text-sm leading-relaxed mb-4">
+                                Oficinas mecânicas, troca de óleo, lavagem e estética automotiva, autoelétrica e peças de reposição.
+                            </p>
+                            <div className="flex flex-wrap gap-1.5 mb-4">
+                                {['🔧 Mecânica', '🛢️ Troca de Óleo', '🚗 Estética Auto', '⚡ Autoelétrica'].map((tag, idx) => (
+                                    <span key={idx} className="text-[11px] font-medium bg-gray-50 border border-gray-200 text-gray-600 px-2.5 py-1 rounded-lg">
+                                        {tag}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 5. Casa e Reformas (Col 4) */}
+                    <div className="md:col-span-4 bg-white rounded-3xl p-6 sm:p-8 border border-gray-200/80 shadow-xs hover:border-brand-green/40 hover:shadow-md transition-all flex flex-col justify-between">
+                        <div>
+                            <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center mb-5">
+                                <Home className="w-6 h-6" />
+                            </div>
+                            <span className="text-xs font-bold text-amber-700 uppercase tracking-wider block mb-1">
+                                Seu Lar
+                            </span>
+                            <h3 className="text-xl font-bold text-brand-dark mb-2">Casa e reformas</h3>
+                            <p className="text-gray-600 text-xs sm:text-sm leading-relaxed mb-4">
+                                Eletricistas, encanadores, marceneiros, pedreiros, pintura e reparos rápidos para o seu lar.
+                            </p>
+                            <div className="flex flex-wrap gap-1.5 mb-4">
+                                {['⚡ Eletricista', '🚰 Encanador', '🪵 Marcenaria', '🎨 Pintura'].map((tag, idx) => (
+                                    <span key={idx} className="text-[11px] font-medium bg-gray-50 border border-gray-200 text-gray-600 px-2.5 py-1 rounded-lg">
+                                        {tag}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 6. Negócios Locais & Profissionais (Col 6) */}
+                    <div className="md:col-span-6 bg-white rounded-3xl p-6 sm:p-8 border border-gray-200/80 shadow-xs hover:border-brand-green/40 hover:shadow-md transition-all flex flex-col justify-between">
+                        <div>
+                            <div className="w-12 h-12 rounded-2xl bg-teal-50 text-teal-700 flex items-center justify-center mb-5">
+                                <Briefcase className="w-6 h-6" />
+                            </div>
+                            <span className="text-xs font-bold text-teal-700 uppercase tracking-wider block mb-1">
+                                Autônomos & Empresas
+                            </span>
+                            <h3 className="text-xl font-bold text-brand-dark mb-2">Negócios locais</h3>
+                            <p className="text-gray-600 text-sm leading-relaxed mb-4">
+                                Empresas e profissionais da sua região mostrando o que fazem com catálogo, horários e contato direto pelo WhatsApp.
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs font-bold text-teal-700 bg-teal-50/60 p-3 rounded-xl">
+                            <CheckCircle2 className="w-4 h-4 text-teal-700" />
+                            Perfis verificados e prontos para atender
+                        </div>
+                    </div>
+
+                    {/* 7. Anunciar Qualquer Coisa / Desapego (Col 6) */}
+                    <div className="md:col-span-6 bg-white rounded-3xl p-6 sm:p-8 border border-gray-200/80 shadow-xs hover:border-brand-green/40 hover:shadow-md transition-all flex flex-col justify-between">
+                        <div>
+                            <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mb-5">
+                                <Tag className="w-6 h-6" />
+                            </div>
+                            <span className="text-xs font-bold text-rose-600 uppercase tracking-wider block mb-1">
+                                Para Todo Mundo
+                            </span>
+                            <h3 className="text-xl font-bold text-brand-dark mb-2">Anunciar qualquer coisa</h3>
+                            <p className="text-gray-600 text-sm leading-relaxed mb-4">
+                                Tem algo parado em casa para desapegar ou um produto novo que você produz? Anuncie na Dudit sem pagar taxas.
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs font-bold text-rose-600 bg-rose-50/60 p-3 rounded-xl">
+                            <CheckCircle2 className="w-4 h-4 text-rose-600" />
+                            Anúncio gratuito e direto no WhatsApp
+                        </div>
+                    </div>
+                </div>
             </div>
-          </div>
-        </div>
-      );
-    case 'technical':
-      return (
-        <div className="bg-white p-4 w-full max-w-[240px] rounded-xl border border-brand-border">
-          <div className="flex justify-between items-center mb-3">
-            <span className="text-[10px] font-bold text-brand-inactive-text uppercase">Ordem de Serviço</span>
-            <FileIcon size={12} className="text-brand-inactive-text" />
-          </div>
-          <div className="border-2 border-dashed border-brand-border rounded-lg p-3">
-            <div className="text-[10px] font-bold text-brand-dark mb-1">OS #1284</div>
-            <div className="text-[8px] text-brand-inactive-text mb-3">Troca de Óleo + Filtro</div>
-            <div className="flex justify-between items-center">
-              <div className="text-[10px] font-bold text-brand-dark">R$ 250,00</div>
-              <div className="bg-brand-orange-light text-brand-orange text-[8px] font-bold px-2 py-0.5 rounded">EM ANDAMENTO</div>
+        </section>
+    );
+}
+
+/* =========================================================================
+   3. SEÇÃO: CONEXÃO DIRETA E SEM COMPLICAÇÃO
+   ========================================================================= */
+function DirectConnectionSection({ onNavigate }: { onNavigate: (page: string) => void }) {
+    return (
+        <section className="py-20 md:py-28 bg-white relative border-b border-gray-100">
+            <div className="max-w-[1300px] mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="bg-brand-green/5 rounded-3xl p-8 sm:p-12 border border-brand-green/20 flex flex-col lg:flex-row items-center justify-between gap-8">
+                    <div className="flex flex-col sm:flex-row items-center gap-6 text-center sm:text-left">
+                        <img
+                            src="https://img.dudit.com.br/static/mascots/SacolaVazia.png"
+                            alt="Dino Dudit com sacola de compras"
+                            className="w-28 h-28 object-contain shrink-0 drop-shadow-sm select-none"
+                        />
+                        <div>
+                            <h3 className="text-2xl font-bold text-brand-dark mb-2">
+                                Tudo o que você precisa resolver hoje.
+                            </h3>
+                            <p className="text-gray-600 text-sm sm:text-base max-w-xl">
+                                A Dudit reúne quem compra, quem vende, quem presta serviços e quem quer organizar seu trabalho em uma só plataforma.
+                            </p>
+                        </div>
+                    </div>
+
+                    <Button
+                        className="h-12 px-7 bg-brand-green text-white hover:bg-[#007b4f] font-bold text-sm shrink-0"
+                        onClick={() => onNavigate('start-selling')}
+                    >
+                        Criar minha conta grátis
+                    </Button>
+                </div>
             </div>
-          </div>
-        </div>
-      );
-    case 'fashion':
-      return (
-        <div className="bg-white p-4 w-full max-w-[240px] rounded-xl border border-brand-border">
-          <div className="flex gap-3 mb-3">
-            <div className="w-12 h-12 bg-brand-gray rounded-lg"></div>
-            <div className="flex-1">
-              <div className="text-[10px] font-bold text-brand-dark">Camiseta Básica</div>
-              <div className="text-[12px] font-bold text-brand-green">R$ 59,90</div>
+        </section>
+    );
+}
+
+/* =========================================================================
+   4. CTA FINAL
+   ========================================================================= */
+function SegmentosFinalCTA({ onNavigate }: { onNavigate: (page: string) => void }) {
+    return (
+        <section className="py-20 md:py-28 bg-white relative">
+            <div className="max-w-[1300px] mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="bg-brand-dark rounded-3xl p-8 sm:p-14 lg:p-16 text-center relative overflow-hidden shadow-2xl">
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-brand-green/20 rounded-full blur-3xl pointer-events-none" />
+
+                    <div className="relative z-10 max-w-2xl mx-auto flex flex-col items-center">
+                        <img
+                            src="https://img.dudit.com.br/static/mascots/HappyDino.png"
+                            alt="Dino Dudit alegre"
+                            className="w-28 h-28 sm:w-32 sm:h-32 object-contain mb-6 drop-shadow-md select-none"
+                        />
+
+                        <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white tracking-tight leading-tight mb-4">
+                            O que você precisa hoje pode estar na Dudit.
+                        </h2>
+                        <p className="text-gray-300 text-base sm:text-lg leading-relaxed mb-8 max-w-lg">
+                            Descubra opções da sua cidade ou comece a divulgar o que você faz agora mesmo.
+                        </p>
+
+                        <div className="flex flex-wrap justify-center gap-4 w-full sm:w-auto">
+                            <Button
+                                className="h-12 px-8 text-base font-bold bg-brand-green hover:bg-[#007b4f] text-white shadow-md transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                onClick={() => onNavigate('explore')}
+                            >
+                                <Search className="w-4 h-4 mr-2" />
+                                Explorar Dudit
+                            </Button>
+
+                            <Button
+                                variant="outline"
+                                className="h-12 px-8 text-base font-semibold border-white/20 text-white hover:bg-white/10 transition-all"
+                                onClick={() => onNavigate('start-selling')}
+                            >
+                                Criar conta grátis
+                            </Button>
+                        </div>
+                    </div>
+                </div>
             </div>
-          </div>
-          <div className="flex gap-2 mb-3">
-            {['P', 'M', 'G'].map(s => (
-              <div key={s} className="w-6 h-6 border border-brand-border rounded flex items-center justify-center text-[8px] font-bold">{s}</div>
-            ))}
-          </div>
-          <div className="flex justify-between items-center text-[8px] text-brand-inactive-text">
-            <span>Estoque: 12 un</span>
-            <span className="text-brand-green font-bold">Vitrine Ativa</span>
-          </div>
-        </div>
-      );
-    case 'freelance':
-      return (
-        <div className="bg-white p-4 w-full max-w-[240px] rounded-xl border border-brand-border relative overflow-hidden">
-          <div className="absolute top-0 right-0 bg-brand-dark text-white text-[8px] px-2 py-1 rounded-bl-lg">PDF</div>
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-6 h-6 bg-brand-green/10 rounded flex items-center justify-center text-brand-green">
-              <FileIcon size={12} />
-            </div>
-            <span className="text-[10px] font-bold text-brand-dark">Orçamento Profissional</span>
-          </div>
-          <div className="space-y-1 mb-4">
-            <div className="h-1.5 w-full bg-brand-gray rounded-full"></div>
-            <div className="h-1.5 w-3/4 bg-brand-gray rounded-full"></div>
-            <div className="h-1.5 w-1/2 bg-brand-gray rounded-full"></div>
-          </div>
-          <Button variant="default" className="w-full py-1.5 text-[8px] h-auto bg-brand-green text-white">Enviar por WhatsApp</Button>
-        </div>
-      );
-    case 'rental':
-      return (
-        <div className="bg-white p-4 w-full max-w-[240px] rounded-xl border border-brand-border">
-          <div className="flex justify-between items-center mb-3">
-            <span className="text-[10px] font-bold text-brand-inactive-text uppercase">Locação Ativa</span>
-            <ClockIcon size={12} className="text-brand-inactive-text" />
-          </div>
-          <div className="bg-brand-orange-light/30 border border-brand-orange-light p-2 rounded-lg mb-2">
-            <div className="text-[10px] font-bold text-brand-orange">Furadeira de Impacto</div>
-            <div className="text-[8px] text-brand-orange/80">Cliente: Ricardo</div>
-          </div>
-          <div className="flex justify-between items-center text-[8px]">
-            <span className="text-brand-inactive-text italic">Devolução: Amanhã, 10h</span>
-            <span className="font-bold text-brand-dark">R$ 45,00/dia</span>
-          </div>
-        </div>
-      );
-    default:
-      return null;
-  }
-};
-
-const SegmentsHero = ({ onNavigate }: { onNavigate: (page: string) => void }) => (
-  <section className="relative bg-white pt-32 pb-20 overflow-hidden flex flex-col justify-center">
-    <GridLines />
-    <div className="flex-1 flex flex-col container mx-auto px-4 lg:px-6 max-w-[1300px] w-full relative z-10">
-      <div className="grid lg:grid-cols-2 gap-12 items-center">
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-        >
-          <div className="inline-flex items-center gap-2 border border-brand-border rounded-full px-4 py-1.5 text-xs text-brand-dark mb-8 bg-brand-gray tracking-wider font-bold">
-            SEGMENTOS
-          </div>
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-brand-dark leading-[1.1] mb-6">
-            A Dudit funciona para o seu estilo de negócio
-          </h1>
-          <p className="text-brand-dark text-lg md:text-xl font-medium mb-8 max-w-lg leading-tight">
-            Não importa o que você vende ou qual serviço presta, nós temos as ferramentas certas para organizar seu dia a dia.
-          </p>
-          <div className="flex flex-wrap gap-4">
-            <Button variant="default" className="bg-brand-green text-white" onClick={() => onNavigate('start-selling')}>Começar agora</Button>
-            <Button variant="outline" onClick={() => onNavigate('pricing')}>Ver planos</Button>
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, x: 50 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.8, delay: 0.2 }}
-          className="relative h-[400px] lg:h-[500px] flex items-center justify-center"
-        >
-          <div className="relative z-10 w-full max-w-[500px]">
-            <img
-              src="https://img.dudit.com.br/static/mascots/Segmentos.png"
-              alt="Mascote Segmentos Dudit"
-              className="w-full h-auto"
-            />
-          </div>
-
-          {/* Decorative backgrounds */}
-          <div className="absolute inset-0 bg-brand-gray/50 rounded-[4rem] transform rotate-6 scale-90 -z-10"></div>
-          <div className="absolute inset-0 bg-brand-green/5 rounded-[4rem] transform -rotate-3 scale-95 -z-10"></div>
-        </motion.div>
-      </div>
-    </div>
-  </section>
-);
-
-const SegmentsGrid = () => (
-  <section className="py-24 bg-white relative border-t border-brand-border">
-    <GridLines />
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-      <SectionHeader
-        subtitle="SEM TELAS COMPLICADAS"
-        title="Organize o que realmente traz lucro"
-      />
-      <p className="text-brand-inactive-text max-w-2xl mb-16 text-lg -mt-8">
-        O essencial para o seu negócio rodar liso, sem precisar de cursos para entender o sistema.
-      </p>
-
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {segments.map((segment, idx) => (
-          <motion.div
-            key={idx}
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: idx * 0.1 }}
-            className="group"
-          >
-            <div className="bg-brand-gray border border-brand-border h-64 rounded-xl overflow-hidden relative p-6 flex items-center justify-center mb-6">
-              <SegmentMockup type={segment.type} />
-            </div>
-            <div>
-              <h4 className="text-xl font-bold text-brand-dark mb-2">{segment.title}</h4>
-              <p className="text-brand-inactive-text text-sm leading-relaxed">{segment.description}</p>
-            </div>
-          </motion.div>
-        ))}
-      </div>
-    </div>
-  </section>
-);
-
-export default function SegmentsPage() {
-  const router = useRouter();
-
-  const onNavigate = (page: string) => {
-    if (page === 'home') router.push('/institucional/inicio');
-    else if (page === 'segments') router.push('/institucional/segmentos');
-    else if (page === 'pricing') router.push('/institucional/planos');
-    else if (page === 'terms') router.push('/institucional/termos');
-    else if (page === 'privacidade') router.push('/institucional/privacidade');
-    else if (page === 'start-selling') router.push('/erp/trocar-erp');
-    else console.log('Navigating to:', page);
-  };
-
-  return (
-    <div className="min-h-screen bg-white">
-      <Navbar onNavigate={onNavigate} />
-      <main>
-        <SegmentsHero onNavigate={onNavigate} />
-        <SegmentsGrid />
-        <CTA onNavigate={onNavigate} />
-      </main>
-      <Footer onNavigate={onNavigate} />
-    </div>
-  );
-};
+        </section>
+    );
+}

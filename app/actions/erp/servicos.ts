@@ -222,7 +222,13 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
             promotional_price: data.promotional_price ?? data.promotionalPrice ?? null,
             price_type: data.price_type || data.priceType || 'fixed',
             billing_unit: data.billing_unit || data.billingUnit || 'per_service',
-            duration_minutes: data.duration_minutes || data.durationMinutes || 60,
+            duration_minutes: (() => {
+                const dur = Math.max(1, Number(data.duration_minutes || data.durationMinutes || 60));
+                if (dur > 525600) {
+                    throw new Error("A duração do serviço não pode exceder 1 ano (525.600 minutos).");
+                }
+                return dur;
+            })(),
             buffer_minutes: data.buffer_minutes || data.bufferMinutes || 0,
             service_type: data.service_type || data.serviceType || 'in_person',
             show_in_marketplace: isQuick
@@ -319,8 +325,13 @@ export async function updateServiceAction(data: any): Promise<ActionResponse<any
         if (data.priceType !== undefined) payload.price_type = data.priceType
         if (data.billing_unit !== undefined) payload.billing_unit = data.billing_unit
         if (data.billingUnit !== undefined) payload.billing_unit = data.billingUnit
-        if (data.duration_minutes !== undefined) payload.duration_minutes = data.duration_minutes
-        if (data.durationMinutes !== undefined) payload.duration_minutes = data.durationMinutes
+        if (data.duration_minutes !== undefined || data.durationMinutes !== undefined) {
+            const dur = Math.max(1, Number(data.duration_minutes !== undefined ? data.duration_minutes : data.durationMinutes));
+            if (dur > 525600) {
+                return errorResponse("A duração do serviço não pode exceder 1 ano (525.600 minutos).");
+            }
+            payload.duration_minutes = dur;
+        }
         if (data.buffer_minutes !== undefined) payload.buffer_minutes = data.buffer_minutes
         if (data.bufferMinutes !== undefined) payload.buffer_minutes = data.bufferMinutes
         if (data.service_type !== undefined) payload.service_type = data.service_type

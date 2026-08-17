@@ -65,6 +65,11 @@ const navItems: NavItem[] = [
         href: "/ddt-admin/partners",
     },
     {
+        icon: BriefcaseIcon,
+        label: "Entregadores",
+        href: "/ddt-admin/entregadores",
+    },
+    {
         icon: MegaphoneIcon,
         label: "Publicidade",
         href: "/ddt-admin/advertising",

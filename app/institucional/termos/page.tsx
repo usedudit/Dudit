@@ -38,7 +38,7 @@ export default function TermsPage() {
                                 Termos de Uso
                             </h1>
                             <p className="text-brand-inactive-text text-lg">
-                                Versão 1.5 - Última atualização: Julho de 2026
+                                Versão 1.0 - Última atualização: Agosto de 2026
                             </p>
                         </motion.div>
                     </div>
@@ -46,12 +46,6 @@ export default function TermsPage() {
 
                 <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
                     <div className="prose prose-lg max-w-none text-brand-dark leading-relaxed space-y-12">
-                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-8">
-                            <p className="text-sm text-amber-800">
-                                <strong>⚠️ Este documento é uma base jurídica para revisão com advogado antes da publicação oficial.</strong> Os trechos entre colchetes (ex.: [SEU NOME COMPLETO]) devem ser preenchidos antes da publicação.
-                            </p>
-                        </div>
-
                         <p className="font-medium text-xl border-l-4 border-brand-green pl-6 py-2 bg-brand-gray rounded-r-xl">
                             Estes Termos de Uso ("Termos") regem o acesso e uso da plataforma DUDIT, operada por [SEU NOME COMPLETO], CPF nº [XXX.XXX.XXX-XX] (futuramente constituída como Pessoa Jurídica), com sede na cidade de Lucélia/SP, doravante denominada "DUDIT".
                         </p>

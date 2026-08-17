@@ -12,6 +12,8 @@ import { Button, EmailInput, Input, PasswordInput, PasswordStrengthMeter, Checkb
 import { calculatePasswordScore } from "@/lib/utils"
 import { getErrorMessage } from "@/lib/utils/error-handlers"
 import { preCheckLogin, handleLoginResult } from "@/app/actions/auth/lockout"
+import { recordLegalConsent } from "@/app/actions/auth/legal-consent"
+import { CURRENT_LEGAL_DOCUMENTS } from "@/lib/legal/constants"
 
 // Types
 type AuthMode = "login" | "signup" | "verify-email" | "forgot-password"
@@ -155,6 +157,20 @@ export default function AuthView({
                 // SECURITY: Supabase returns a user with empty identities when email already exists
                 if (data.user && data.user.identities && data.user.identities.length === 0) {
                     throw new Error("Este email já está cadastrado.")
+                }
+
+                // LEGAL: registra o aceite dos Termos de Uso e da Política de
+                // Privacidade. Não bloqueia o cadastro se o registro falhar.
+                if (data.user) {
+                    try {
+                        await Promise.all(
+                            CURRENT_LEGAL_DOCUMENTS.map((doc) =>
+                                recordLegalConsent({ userId: data.user!.id, tipo: doc.tipo, versao: doc.versao, origem: "signup" })
+                            )
+                        )
+                    } catch (e) {
+                        console.error("[AUTH] Falha ao registrar aceite dos documentos legais:", e)
+                    }
                 }
 
                 // SECURITY FIX (CRIT-01): User profile is now created automatically

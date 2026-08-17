@@ -192,6 +192,17 @@ export type ServicesDashboardData = {
   serviceRows: DashboardListItem[]
 }
 
+export type FinancialAlertItem = {
+  id: string
+  title: string
+  subtitle: string
+  meta?: string
+  value: string
+  tone: "red" | "orange"
+  statusLabel: "Vencido" | "Próximo" | "Vence hoje"
+  dueDate?: string
+}
+
 export type FinancialDashboardData = {
   metrics: Metric[]
   revenue: ChartPoint[]
@@ -200,7 +211,9 @@ export type FinancialDashboardData = {
   distribution: ChartPoint[]
   latestMovements: DashboardListItem[]
   overdueAccounts: DashboardListItem[]
+  alertsAndPendings?: FinancialAlertItem[]
   largestExpenses: DashboardListItem[]
+  dailyMovements?: Record<string, { income: number; expense: number; net: number }>
 }
 
 export type OperationsDashboardData = {
@@ -264,6 +277,30 @@ const bucketByDate = (rows: any[], dateKey: string, valueKey: string, days = 14)
   return Array.from(map.entries())
     .reverse()
     .map(([label, value]) => ({ label, value }))
+}
+
+const bucketCashflowByDate = (rows: any[], days = 14) => {
+  const today = getTodayYmdSaoPaulo()
+  const map = new Map<string, { label: string; value: number; secondary: number }>()
+  for (let i = 0; i < days; i++) {
+    const dStr = addDays(today, -i)
+    const label = dateLabel(dStr)
+    map.set(label, { label, value: 0, secondary: 0 })
+  }
+  for (const row of rows) {
+    const dateVal = String(row.payment_date || row.created_at || row.due_date || "").slice(0, 10)
+    const label = dateLabel(dateVal)
+    if (map.has(label)) {
+      const entry = map.get(label)!
+      const amt = Math.abs(money(row.amount))
+      if (row.transaction_type === "income") {
+        entry.value += amt
+      } else if (row.transaction_type === "expense") {
+        entry.secondary += amt
+      }
+    }
+  }
+  return Array.from(map.values()).reverse()
 }
 
 const topFromMap = (map: Map<string, number>, limit = 5) => {
@@ -510,33 +547,143 @@ async function getCachedFinancial(partnerId: string, storeId = ""): Promise<Fina
       async () => {
         const supabase = createAdminClient()
         const today = getTodayYmdSaoPaulo()
-        const from = addDays(today, -29)
+        const from = addDays(today, -120)
         const [accounts, transactions] = await Promise.all([
           supabase.from("finance_accounts").select("id, current_balance, initial_balance, is_active").eq("partner_id", partnerId).eq("is_active", true),
-          supabase.from("transactions").select("id, description, amount, due_date, payment_date, created_at, status, category, transaction_type, kind").eq("partner_id", partnerId).or("kind.is.null,kind.eq.settlement,kind.eq.refund,kind.eq.chargeback").or(`created_at.gte.${from}T00:00:00,due_date.gte.${today}`).order("created_at", { ascending: false }).limit(600),
+          supabase.from("transactions").select("id, description, amount, due_date, payment_date, created_at, status, category, transaction_type, kind").eq("partner_id", partnerId).or("kind.is.null,kind.eq.settlement,kind.eq.refund,kind.eq.chargeback").or(`created_at.gte.${from}T00:00:00,due_date.gte.${from},payment_date.gte.${from}`).order("created_at", { ascending: false }).limit(1000),
         ])
         if (accounts.error) throw accounts.error
         if (transactions.error) throw transactions.error
         const rows = transactions.data || []
         const balance = (accounts.data || []).reduce((acc: number, a: any) => acc + money(a.current_balance ?? a.initial_balance), 0)
-        const receivable = rows.filter((tx: any) => tx.transaction_type === "income" && statusPending(tx.status)).reduce((acc: number, tx: any) => acc + Math.abs(money(tx.amount)), 0)
-        const payable = rows.filter((tx: any) => tx.transaction_type === "expense" && statusPending(tx.status)).reduce((acc: number, tx: any) => acc + Math.abs(money(tx.amount)), 0)
+
+        // Month-level calculations
+        const currentMonthStr = today.slice(0, 7) // "YYYY-MM"
+        const [currY, currM] = currentMonthStr.split("-").map(Number)
+        const prevMonthDate = new Date(Date.UTC(currY, currM - 2, 1))
+        const prevMonthStr = `${prevMonthDate.getUTCFullYear()}-${String(prevMonthDate.getUTCMonth() + 1).padStart(2, "0")}`
+
+        let currentMonthIncome = 0
+        let currentMonthExpense = 0
+        let prevMonthIncome = 0
+        let prevMonthExpense = 0
+
+        const dailyMovements: Record<string, { income: number; expense: number; net: number }> = {}
+
+        for (const tx of rows) {
+          const dateVal = String(tx.payment_date || tx.created_at || tx.due_date || "").slice(0, 10)
+          const amt = Math.abs(money(tx.amount))
+          const isIncome = tx.transaction_type === "income"
+          const isExpense = tx.transaction_type === "expense"
+
+          if (dateVal && dateVal.length >= 10) {
+            const txMonth = dateVal.slice(0, 7)
+            if (txMonth === currentMonthStr) {
+              if (isIncome) currentMonthIncome += amt
+              if (isExpense) currentMonthExpense += amt
+            } else if (txMonth === prevMonthStr) {
+              if (isIncome) prevMonthIncome += amt
+              if (isExpense) prevMonthExpense += amt
+            }
+
+            if (!dailyMovements[dateVal]) {
+              dailyMovements[dateVal] = { income: 0, expense: 0, net: 0 }
+            }
+            if (isIncome) {
+              dailyMovements[dateVal].income += amt
+              dailyMovements[dateVal].net += amt
+            } else if (isExpense) {
+              dailyMovements[dateVal].expense += amt
+              dailyMovements[dateVal].net -= amt
+            }
+          }
+        }
+
+        const currentMonthResult = currentMonthIncome - currentMonthExpense
+        const prevMonthResult = prevMonthIncome - prevMonthExpense
+
         const income = rows.filter((tx: any) => tx.transaction_type === "income")
         const expenses = rows.filter((tx: any) => tx.transaction_type === "expense")
         const expenseCategories = new Map<string, number>()
         for (const tx of expenses) expenseCategories.set(tx.category || "Outros", (expenseCategories.get(tx.category || "Outros") || 0) + Math.abs(money(tx.amount)))
 
+        // Pending and Overdue alerts
+        const pendingTxs = rows.filter((tx: any) => statusPending(tx.status) && tx.due_date)
+        const overdue = pendingTxs.filter((tx: any) => tx.due_date < today)
+        const dueSoon = pendingTxs.filter((tx: any) => tx.due_date >= today && tx.due_date <= addDays(today, 7))
+
+        const alertsAndPendings: FinancialAlertItem[] = [...overdue, ...dueSoon].slice(0, 8).map((tx: any) => {
+          const isOverdue = tx.due_date < today
+          const isToday = tx.due_date === today
+          let daysDiff = 0
+          if (tx.due_date) {
+            const d1 = new Date(today).getTime()
+            const d2 = new Date(tx.due_date).getTime()
+            daysDiff = Math.round(Math.abs(d2 - d1) / (1000 * 60 * 60 * 24))
+          }
+
+          let subtitle = ""
+          let statusLabel: "Vencido" | "Próximo" | "Vence hoje" = "Próximo"
+          let tone: "red" | "orange" = "orange"
+
+          if (isOverdue) {
+            statusLabel = "Vencido"
+            tone = "red"
+            subtitle = `Pagamento vencido • ${brl(Math.abs(money(tx.amount)))}`
+          } else if (isToday) {
+            statusLabel = "Vence hoje"
+            tone = "orange"
+            subtitle = `Vence hoje • ${brl(Math.abs(money(tx.amount)))}`
+          } else {
+            statusLabel = "Próximo"
+            tone = "orange"
+            subtitle = `Vence em ${daysDiff} ${daysDiff === 1 ? "dia" : "dias"} • ${brl(Math.abs(money(tx.amount)))}`
+          }
+
+          return {
+            id: tx.id,
+            title: tx.description || (isOverdue ? "Conta vencida" : "Conta a pagar"),
+            subtitle,
+            meta: dateLabel(tx.due_date),
+            value: brl(Math.abs(money(tx.amount))),
+            tone,
+            statusLabel,
+            dueDate: tx.due_date,
+          }
+        })
+
         return {
           metrics: [
-            { title: "Saldo atual", value: brl(balance), tone: balance >= 0 ? "green" : "red" },
-            { title: "A receber", value: brl(receivable), tone: "green" },
-            { title: "A pagar", value: brl(payable), tone: payable ? "orange" : "green" },
-            { title: "Receita prevista", value: brl(receivable), detail: "contas em aberto", tone: "blue" },
-            { title: "Despesas previstas", value: brl(payable), detail: "contas em aberto", tone: "red" },
+            {
+              title: "Receitas do mês",
+              value: brl(currentMonthIncome),
+              trend: `${percentTrend(currentMonthIncome, prevMonthIncome)} vs mês anterior`,
+              tone: "green",
+            },
+            {
+              title: "Despesas do mês",
+              value: brl(currentMonthExpense),
+              trend: `${percentTrend(currentMonthExpense, prevMonthExpense)} vs mês anterior`,
+              tone: "red",
+            },
+            {
+              title: "Resultado do mês",
+              value: brl(currentMonthResult),
+              trend: `${percentTrend(currentMonthResult, prevMonthResult)} vs mês anterior`,
+              tone: currentMonthResult >= 0 ? "green" : "red",
+            },
+            {
+              title: "Saldo atual",
+              value: brl(balance),
+              trend: "",
+              tone: balance >= 0 ? "green" : "red",
+            },
           ] as Metric[],
           revenue: bucketByDate(income.filter((tx: any) => isPaid(tx.status)), "payment_date", "amount"),
-          cashflow: bucketByDate(rows, "created_at", "amount").map((point) => ({ ...point, value: money(point.value) })),
+          cashflow: bucketCashflowByDate(rows, 14),
           expensesByCategory: topFromMap(expenseCategories),
+          dailyMovements,
+          alertsAndPendings,
           distribution: [
             { label: "Entradas", value: income.reduce((acc: number, tx: any) => acc + Math.abs(money(tx.amount)), 0) },
             { label: "Saídas", value: expenses.reduce((acc: number, tx: any) => acc + Math.abs(money(tx.amount)), 0) },

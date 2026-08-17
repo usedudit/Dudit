@@ -251,8 +251,8 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { ord
                                                             <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
                                                                 {sellerName}
                                                                 {isStoreDeleted(order) && (
-                                                                    <Tooltip text="Este negócio não está mais no Dudit">
-                                                                        <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0 inline-block align-middle cursor-help" />
+                                                                    <Tooltip text="Este negócio não está mais na Dudit">
+                                                                        <span className="w-2.5 h-2.5 rounded-full bg-brand-red shrink-0 inline-block align-middle cursor-help" />
                                                                     </Tooltip>
                                                                 )}
                                                                 {returnHistoryCount > 0 && (
@@ -319,66 +319,66 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { ord
                                                                             className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal rounded-[4px]"
                                                                         />
                                                                     </div>
-                                                                            <div className="flex-1 min-w-0 flex flex-col justify-center">
-                                                                                <div className="flex justify-between items-start">
-                                                                                    <div>
-                                                                                        <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading mb-0.5 group-hover:text-brand-green transition-colors">
-                                                                                            {item.is_gift && <span className="text-brand-green font-bold">[BRINDE] </span>}{item.products?.name || item.services?.name || item.product_name}
-                                                                                        </h4>
+                                                                    <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                                                        <div className="flex justify-between items-start">
+                                                                            <div>
+                                                                                <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading mb-0.5 group-hover:text-brand-green transition-colors">
+                                                                                    {item.is_gift && <span className="text-brand-green font-bold">[BRINDE] </span>}{item.products?.name || item.services?.name || item.product_name}
+                                                                                </h4>
 
-                                                                                        {item.product_variants?.variant_name && (
-                                                                                            <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                                                                                {item.product_variants.variant_name}
-                                                                                            </div>
-                                                                                        )}
-
-                                                                                        <div className="flex items-center gap-2 text-xs mt-1">
-                                                                                            <span className="text-brand-inactive-text dark:text-dark-body">{formatProductQuantity(item.quantity, item.products?.unit)}</span>
-                                                                                            <span className="text-brand-border dark:text-dark-border">|</span>
-                                                                                            <span className="font-medium text-brand-dark dark:text-dark-heading">
-                                                                                                {(() => {
-                                                                                                    const basePrice = Number(item.product_price || 0)
-                                                                                                    if (item.is_gift) {
-                                                                                                        return (
-                                                                                                            <span className="flex items-center gap-1.5 inline-flex">
-                                                                                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body line-through font-normal">{formatCurrency(item.original_price || 0)}</span>
-                                                                                                                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">Grátis</span>
-                                                                                                            </span>
-                                                                                                        )
-                                                                                                    }
-                                                                                                    if (hasItemDiscount && Math.abs(basePrice - discountedPrice) > 0.005) {
-                                                                                                        return (
-                                                                                                            <span className="flex items-center gap-1.5 inline-flex">
-                                                                                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body line-through font-normal">{formatProductUnitPrice(basePrice, item.products?.unit)}</span>
-                                                                                                                <span className="text-xs font-bold text-brand-dark dark:text-dark-heading">{formatProductUnitPrice(discountedPrice, item.products?.unit)}</span>
-                                                                                                            </span>
-                                                                                                        )
-                                                                                                    }
-                                                                                                    return formatProductUnitPrice(basePrice, item.products?.unit)
-                                                                                                })()}
-                                                                                            </span>
-                                                                                        </div>
+                                                                                {item.product_variants?.variant_name && (
+                                                                                    <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                                                                        {item.product_variants.variant_name}
                                                                                     </div>
+                                                                                )}
+
+                                                                                <div className="flex items-center gap-2 text-xs mt-1">
+                                                                                    <span className="text-brand-inactive-text dark:text-dark-body">{formatProductQuantity(item.quantity, item.products?.unit)}</span>
+                                                                                    <span className="text-brand-border dark:text-dark-border">|</span>
+                                                                                    <span className="font-medium text-brand-dark dark:text-dark-heading">
+                                                                                        {(() => {
+                                                                                            const basePrice = Number(item.product_price || 0)
+                                                                                            if (item.is_gift) {
+                                                                                                return (
+                                                                                                    <span className="flex items-center gap-1.5 inline-flex">
+                                                                                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body line-through font-normal">{formatCurrency(item.original_price || 0)}</span>
+                                                                                                        <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">Grátis</span>
+                                                                                                    </span>
+                                                                                                )
+                                                                                            }
+                                                                                            if (hasItemDiscount && Math.abs(basePrice - discountedPrice) > 0.005) {
+                                                                                                return (
+                                                                                                    <span className="flex items-center gap-1.5 inline-flex">
+                                                                                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body line-through font-normal">{formatProductUnitPrice(basePrice, item.products?.unit)}</span>
+                                                                                                        <span className="text-xs font-bold text-brand-dark dark:text-dark-heading">{formatProductUnitPrice(discountedPrice, item.products?.unit)}</span>
+                                                                                                    </span>
+                                                                                                )
+                                                                                            }
+                                                                                            return formatProductUnitPrice(basePrice, item.products?.unit)
+                                                                                        })()}
+                                                                                    </span>
                                                                                 </div>
                                                                             </div>
-                                                                        </>
-                                                                    );
+                                                                        </div>
+                                                                    </div>
+                                                                </>
+                                                            );
 
-                                                                    if (!itemUrl) {
-                                                                        return (
-                                                                            <div key={item.id} className="flex gap-4 p-2 -mx-2 rounded-lg transition-colors">
-                                                                                {cardContent}
-                                                                            </div>
-                                                                        );
-                                                                    }
+                                                            if (!itemUrl) {
+                                                                return (
+                                                                    <div key={item.id} className="flex gap-4 p-2 -mx-2 rounded-lg transition-colors">
+                                                                        {cardContent}
+                                                                    </div>
+                                                                );
+                                                            }
 
-                                                                    return (
-                                                                        <Link href={itemUrl} prefetch={true} key={item.id} className="flex gap-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800/50 p-2 -mx-2 rounded-lg transition-colors group">
-                                                                            {cardContent}
-                                                                        </Link>
-                                                                    );
-                                                                })}
-                                                            </div>
+                                                            return (
+                                                                <Link href={itemUrl} prefetch={true} key={item.id} className="flex gap-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800/50 p-2 -mx-2 rounded-lg transition-colors group">
+                                                                    {cardContent}
+                                                                </Link>
+                                                            );
+                                                        })}
+                                                    </div>
 
                                                     {/* Actions Footer */}
                                                     <div className="flex flex-row justify-between items-center gap-4 mt-8 pt-6 border-t border-brand-border dark:border-dark-border w-full flex-wrap">
@@ -399,7 +399,7 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { ord
                                                             )}
 
                                                             {order.situation === 'paid' && !isOrderFullyReviewed && reviewableItems.length > 0 && (
-                                                                    <ReviewButton
+                                                                <ReviewButton
                                                                     orderId={order.id}
                                                                     partnerId={order.partner_id}
                                                                     storeId={order.store_id}

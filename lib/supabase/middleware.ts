@@ -392,7 +392,7 @@ export async function middleware(request: NextRequest) {
   // 4. CACHE-CONTROL HEADERS (Route-aware) - Must be set BEFORE auth block
   // Public marketplace pages: edge-cacheable with stale-while-revalidate
   // Private/auth pages: never cached
-  const PRIVATE_PREFIXES = ["/erp", "/account", "/auth", "/sacola", "/perfil", "/pedidos", "/api", "/dashboard", "/payment", "/ddt-admin", "/assinaturas", "/colecoes", "/favoritos"]
+  const PRIVATE_PREFIXES = ["/erp", "/account", "/auth", "/sacola", "/perfil", "/pedidos", "/api", "/dashboard", "/payment", "/ddt-admin", "/entregadores", "/assinaturas", "/colecoes", "/favoritos"]
   const PUBLIC_CACHEABLE_PATTERNS = ["/services", "/partners", "/produto"]
 
   const isPrivatePage = PRIVATE_PREFIXES.some(prefix => pathname.startsWith(prefix))

@@ -4,20 +4,19 @@ import React from "react";
 import { motion } from "framer-motion";
 import { ActionsDropdown, Badge, Checkbox } from "@/components/reusable";
 import { UserProfileImage } from "@/lib/utils/UserProfileImage";
-import { 
-    CalendarIcon, 
-    ClockIcon, 
-    LikeIcon, 
-    MoneyIcon, 
-    PartiallyPaidIcon, 
-    PlayIcon, 
-    BlockedIcon, 
-    EyeOffIcon 
+import {
+    ClockIcon,
+    LikeIcon,
+    MoneyIcon,
+    PartiallyPaidIcon,
+    PlayIcon,
+    BlockedIcon,
+    EyeOffIcon
 } from "@/lib/icons";
 import { AlertTriangle } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils/formatters";
 import { Appointment } from "./types";
-import { getEndTime, checkAppointmentCollision } from "./utils";
+import { getEndTime, checkAppointmentCollision, isMultiDay, formatDuration } from "./utils";
 
 interface ColumnDef {
     id: string;
@@ -146,6 +145,23 @@ export const AppointmentListRow = React.memo(
                     );
 
                 case "datetime":
+                    const isLong = isMultiDay(appointment);
+                    if (isLong) {
+                        return (
+                            <div className="flex flex-col text-left min-w-0">
+                                <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading flex items-center gap-1 flex-wrap">
+                                    <span>{formatDate(appointment.date)}</span>
+                                    {appointment.time && <span className="text-xs text-brand-inactive-text">({appointment.time})</span>}
+                                    <span className="text-xs text-brand-inactive-text">até</span>
+                                    <span>{formatDate(appointment.endDate || appointment.date)}</span>
+                                    {appointment.endTime && <span className="text-xs text-brand-inactive-text">({appointment.endTime})</span>}
+                                </span>
+                                <span className="text-xs font-semibold text-brand-blue dark:text-blue-400 mt-0.5">
+                                    {formatDuration(appointment.duration)}
+                                </span>
+                            </div>
+                        );
+                    }
                     const endTimeStr = getEndTime(appointment.time, appointment.duration);
                     return (
                         <div className="flex flex-col text-left min-w-0">

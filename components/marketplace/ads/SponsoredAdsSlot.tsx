@@ -1,9 +1,8 @@
-"use client"
-
 import type { SponsoredAd } from "@/lib/ads/types"
 import { SponsoredAdCard } from "@/components/marketplace/ads/SponsoredAdCard"
-import { shouldRenderExternalFallback } from "@/lib/ads/fallback"
+import { shouldRenderExternalFallback, shouldRenderHouseBanner } from "@/lib/ads/fallback"
 import { GoogleAdSenseFallback } from "@/components/marketplace/ads/GoogleAdSenseFallback"
+import { HouseAdBanner } from "@/components/marketplace/ads/HouseAdBanner"
 
 interface SponsoredAdDetailSlotProps {
     ad: SponsoredAd | null
@@ -12,12 +11,20 @@ interface SponsoredAdDetailSlotProps {
 
 export function SponsoredAdDetailSlot({ ad, className = "" }: SponsoredAdDetailSlotProps) {
     const externalFallback = shouldRenderExternalFallback(ad ? [ad] : [], "detail")
+    const houseBannerEnabled = shouldRenderHouseBanner(ad ? [ad] : [])
 
     if (!ad) {
         if (externalFallback) {
             return (
                 <div className={`mt-4 ${className}`}>
                     <GoogleAdSenseFallback slot="detail" format="rectangle" />
+                </div>
+            )
+        }
+        if (houseBannerEnabled) {
+            return (
+                <div className={`mt-4 ${className}`}>
+                    <HouseAdBanner variant="compact" />
                 </div>
             )
         }

@@ -1512,11 +1512,11 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                 <div className="flex-1">
                                                     <div className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
                                                         <span>{sellerName}</span>
-                                                        <Tooltip text="Este negócio não está mais no Dudit">
-                                                            <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0 inline-block align-middle cursor-help" />
+                                                        <Tooltip text="Este negócio não está mais na Dudit">
+                                                            <span className="w-2.5 h-2.5 rounded-full bg-brand-red shrink-0 inline-block align-middle cursor-help" />
                                                         </Tooltip>
                                                     </div>
-                                                    <div className="text-xs lg:text-sm text-brand-inactive-text dark:text-dark-body mt-0.5 max-w-sm">Este negócio não está mais no Dudit</div>
+                                                    <div className="text-xs lg:text-sm text-brand-inactive-text dark:text-dark-body mt-0.5 max-w-sm">Este negócio não está mais na Dudit</div>
                                                 </div>
                                             </div>
                                         ) : (

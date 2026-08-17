@@ -33,6 +33,7 @@ type CreateDeliveryPayload = {
   partnerId: string
   orderIds: string[]
   deliveryPersonId?: string | null
+  platformDriverId?: string | null
   status: DeliveryStatusValue
   startedAt: string
   notes?: string
@@ -1711,6 +1712,7 @@ export async function updateERPDeliveryAction(payload: {
   deliveryId: string
   orderIds: string[]
   deliveryPersonId?: string | null
+  platformDriverId?: string | null
   status?: DeliveryStatusValue
   startedAt?: string
   notes?: string
@@ -1962,7 +1964,7 @@ export async function updateERPDeliveryAction(payload: {
   }
 
   revalidateDeliveryDashboard(payload.partnerId)
-  return { success: true as const }
+  return { success: true as const, deliveryId: payload.deliveryId }
 }
 
 export async function updateERPSingleOrderDeliveryStatusAction(params: {

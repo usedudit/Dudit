@@ -479,6 +479,9 @@ export const AppointmentSheet = ({
         if (!partnerId) {
             throw new Error("ID do parceiro não configurado.");
         }
+        if (Number(payload.duration || 0) > 525600) {
+            throw new Error("A duração do serviço não pode exceder 1 ano (525.600 minutos).");
+        }
         const result = await createServiceAction({
             partnerId,
             name: payload.name,
@@ -502,8 +505,11 @@ export const AppointmentSheet = ({
     // Helper to determine if we need Range Picker
     const needsRangePicker = useMemo(() => {
         if (selectedServices.length === 0) return false;
-        // If ANY service is not 'Por Serviço', we need the range picker
-        return selectedServices.some(s => s.pricingUnit && s.pricingUnit !== 'Por Serviço');
+        // If ANY service is not 'Por Serviço' or duration >= 1440 min (1 day)
+        return selectedServices.some(s => 
+            (s.pricingUnit && s.pricingUnit !== 'Por Serviço') || 
+            (Number(s.duration || 0) >= 1440)
+        );
     }, [selectedServices]);
 
     // -- Dynamic time slots from server (replaces hardcoded array) --
@@ -519,6 +525,13 @@ export const AppointmentSheet = ({
         const totalDuration = selectedServices.reduce((sum, s) => sum + (Number(s.duration) || 60), 0);
         const maxBuffer = Math.max(0, ...selectedServices.map((s) => Number(s.bufferMinutes) || 0));
         const targetDate = formatDateStr(selectedCalDate);
+
+        if (needsRangePicker || totalDuration >= 1440) {
+            setTimeSlots([]);
+            setConflictingTimeSlots(new Set());
+            setIsLoadingSlots(false);
+            return;
+        }
 
         let cancelled = false;
         setIsLoadingSlots(true);
@@ -854,8 +867,16 @@ export const AppointmentSheet = ({
         else if (currentView === 'datetime') {
             // Validation for range picker
             if (needsRangePicker) {
-                if (new Date(`${startDateRange}T${startTimeRange}`) >= new Date(`${endDateRange}T${endTimeRange}`)) {
+                const startObj = new Date(`${startDateRange}T${startTimeRange}`);
+                const endObj = new Date(`${endDateRange}T${endTimeRange}`);
+                if (startObj >= endObj) {
                     toast.warning("Intervalo inválido", "A data de término deve ser após a data de início.");
+                    return;
+                }
+                const diffMs = endObj.getTime() - startObj.getTime();
+                const diffMinutes = Math.floor(diffMs / 60000);
+                if (diffMinutes > 525600) {
+                    toast.warning("Limite excedido", "A duração máxima permitida para agendamentos é de 1 ano (365 dias).");
                     return;
                 }
             }
@@ -967,6 +988,8 @@ export const AppointmentSheet = ({
             serviceName: selectedServices.map(s => s.name).join(', '),
             date: baseDateStr,
             time: timeStr,
+            endDate: needsRangePicker ? endDateRange : undefined,
+            endTime: needsRangePicker ? endTimeRange : undefined,
             duration: calculatedDuration,
             price: calculatedPrice,
             pricingUnit: selectedServices[0]?.pricingUnit || 'Por Serviço',
@@ -1139,6 +1162,10 @@ export const AppointmentSheet = ({
     };
 
     const handleSaveChanges = () => {
+        if (calculatedDuration > 525600) {
+            toast.warning("Limite excedido", "A duração máxima permitida para agendamentos é de 1 ano (365 dias).");
+            return;
+        }
         const finalDateStr = needsRangePicker ? startDateRange : formatDateStr(selectedCalDate);
         const timeStr = needsRangePicker ? startTimeRange : (editTime || selectedTimeSlot || getDayOpeningTime(selectedCalDate, openingHours));
         const isOutsideHours = checkOutsideOperatingHours(finalDateStr, timeStr, calculatedDuration);
@@ -1177,6 +1204,8 @@ export const AppointmentSheet = ({
             staffId: selectedServices[0]?.staffId,
             date: finalDateStr,
             time: timeStr,
+            endDate: needsRangePicker ? endDateRange : (appointment?.endDate || finalDateStr),
+            endTime: needsRangePicker ? endTimeRange : (appointment?.endTime || timeStr),
             serviceId: selectedServices[0]?.id || null,
             categoryId: selectedServices[0]?.category_id || null,
             services: selectedServices.map(s => ({ id: s.id, name: s.name, price: getEffectiveServicePrice(s), categoryId: s.category_id })),

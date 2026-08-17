@@ -582,12 +582,20 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                                 label="Duração do Serviço (minutos)"
                                 name="duration_minutes"
                                 type="number"
+                                min={1}
+                                max={525600}
                                 value={serviceData.duration_minutes || ""}
                                 onChange={handleFieldChange}
                                 disabled={!isEditing}
                                 required
-                                error={fieldErrors?.has("duration_minutes")}
-                                errorMessage={fieldErrors?.has("duration_minutes") ? "Duração é obrigatória" : undefined}
+                                error={fieldErrors?.has("duration_minutes") || Number(serviceData.duration_minutes || 0) > 525600}
+                                errorMessage={
+                                    Number(serviceData.duration_minutes || 0) > 525600
+                                        ? "Duração máxima permitida é de 1 ano (525.600 min)"
+                                        : fieldErrors?.has("duration_minutes")
+                                        ? "Duração é obrigatória (máx. 525.600 min)"
+                                        : undefined
+                                }
                             />
                             {!isQuickMode && (
                                 <Input

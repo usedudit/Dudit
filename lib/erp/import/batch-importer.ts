@@ -669,7 +669,7 @@ async function importServiceBatch(
       description: row["description"] || null,
       price: cleanNumber(row["price"] ?? "0") ?? 0,
       cost_price: cleanNumber(row["cost_price"] ?? ""),
-      duration_minutes: cleanNumber(row["duration_minutes"] ?? "60") ?? 60,
+      duration_minutes: Math.min(525600, Math.max(1, cleanNumber(row["duration_minutes"] ?? "60") ?? 60)),
       sku: sku || null,
       unit: row["unit"] || "Serviço",
       status,

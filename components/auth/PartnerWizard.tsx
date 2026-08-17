@@ -20,6 +20,8 @@ import { useSupabase } from "@/providers/supabase-provider"
 import type { BusinessMode } from "@/lib/business-info"
 import { getDefaultResourcesForCategory } from "@/lib/system-resources"
 import { isGifFile } from "@/lib/security/file-validator"
+import { recordLegalConsent } from "@/app/actions/auth/legal-consent"
+import { CURRENT_LEGAL_DOCUMENTS } from "@/lib/legal/constants"
 
 const initialPartnerData = {
     categoryId: "",
@@ -230,6 +232,17 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                 if (signErr) throw signErr
                 if (signUp.user?.identities?.length === 0) throw new Error("Este email já está cadastrado.")
                 userId = signUp.user!.id
+
+                // LEGAL: registra o aceite dos documentos legais no cadastro
+                try {
+                    await Promise.all(
+                        CURRENT_LEGAL_DOCUMENTS.map((doc) =>
+                            recordLegalConsent({ userId, tipo: doc.tipo, versao: doc.versao, origem: "signup" })
+                        )
+                    )
+                } catch (e) {
+                    console.error("[PARTNER-WIZARD] Falha ao registrar aceite dos documentos legais:", e)
+                }
             } else {
                 userId = user!.id
             }

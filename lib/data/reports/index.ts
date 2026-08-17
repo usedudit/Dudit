@@ -21,6 +21,7 @@ export type {
   ProductsDashboardData,
   ServicesDashboardData,
   FinancialDashboardData,
+  FinancialAlertItem,
   OperationsDashboardData,
   Metric,
   DashboardListItem,

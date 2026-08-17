@@ -81,6 +81,11 @@ export enum AdminActionType {
 
     // Marketplace search config
     MARKETPLACE_SYNONYM_CHANGE = "marketplace.synonym_change",
+
+    // Delivery drivers
+    DELIVERY_DRIVER_INVITE_CREATE = "delivery_driver.invite_create",
+    DELIVERY_DRIVER_UPDATE = "delivery_driver.update",
+    DELIVERY_DRIVER_DEACTIVATE = "delivery_driver.deactivate",
 }
 
 // ─── Audit Log Types ────────────────────────────────────────────────────────

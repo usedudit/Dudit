@@ -13,6 +13,7 @@ import { NotificationProvider } from "@/hooks/use-notification"
 import { PreventSamePageNavigation } from "@/components/PreventSamePageNavigation"
 import { PWAUpdatePrompt } from "@/components/pwa/PWAUpdatePrompt"
 import { MarketplaceBottomMenu } from "@/components/marketplace/MarketplaceBottomMenu"
+import { LegalConsentBanner } from "@/components/legal/LegalConsentBanner"
 import { TimezoneProvider } from "@/lib/date"
 import { ThemeProvider } from "@/components/theme-provider"
 import Script from "next/script"
@@ -243,6 +244,7 @@ export default async function RootLayout({
                             <PWAUpdatePrompt />
                             <PushNotificationManager />
                             <MarketplaceBottomMenu />
+                            <LegalConsentBanner />
                         </QueryProvider>
                     </SupabaseProvider>
                 </ThemeProvider>

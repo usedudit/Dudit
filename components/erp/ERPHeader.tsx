@@ -449,11 +449,6 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                             <span className="text-[16px] font-bold">Sair da sessão</span>
                         </button>
                     </nav>
-
-                    <div className="mt-8 mb-4 px-4 flex items-center justify-between text-[11px] text-brand-inactive-text/50 dark:text-dark-body/50 font-medium tracking-wide">
-                        <span>versão 1.5.69</span>
-                        <span className="hover:underline cursor-pointer">Termos e Condições</span>
-                    </div>
                 </div>
             </BottomSheet>
 

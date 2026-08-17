@@ -1,962 +1,932 @@
 "use client";
 
-import { useRouter } from 'next/navigation';
-
-import { Button } from '@/components/reusable/Button';
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
-    ArrowRight,
-    PieChart,
-    TrendingUp,
-    Box,
-    Layout,
-    User,
-    ShoppingBag,
+    Search,
     Store,
-    CheckCircle2,
-    MessageCircle,
+    ShoppingBag,
     Calendar,
     Wrench,
-    Search,
+    ArrowRight,
+    MapPin,
+    CheckCircle2,
+    MessageCircle,
     Star,
-    Package
+    Sparkles,
+    Package,
+    Users,
+    DollarSign,
+    Clock,
+    Tag,
+    ChevronRight,
+    Compass,
+    Check
 } from 'lucide-react';
-import { GridLines, SectionHeader, Navbar, Footer, CTA } from '../../../components/InstitucionalShared';
+import { Button } from '@/components/reusable/Button';
+import { Navbar, Footer } from '@/components/InstitucionalShared';
 
-const Hero = () => {
-    return (
-        <section className="relative bg-white pt-32 pb-20 overflow-hidden flex flex-col justify-center">
-            <GridLines />
-            <div className="flex-1 flex flex-col container mx-auto px-4 lg:px-6 max-w-[1300px] w-full">
-                <div className="grid lg:grid-cols-2 gap-12 items-center">
-                    <motion.div
-                        initial={{ opacity: 0, y: 30 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.6 }}
-                    >
-                        <span className="text-brand-green text-sm font-bold tracking-[0.2em] uppercase mb-4 block">Dudit</span>
-                        <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold text-brand-dark leading-[0.85] mb-6">
-                            Descubra.<br />
-                            <span className="text-brand-green">Anuncie.</span><br />
-                            Organize.
-                        </h1>
-                        <p className="text-brand-inactive-text text-lg md:text-xl mb-8 max-w-lg leading-relaxed">
-                            Encontre produtos, serviços e negócios perto de você. E ajude seu negócio a ser descoberto por mais pessoas.
-                        </p>
-                        <div className="flex flex-wrap gap-4">
-                            <Button>Criar meu negócio</Button>
-                            <Button variant="outline">Explorar a Dudit</Button>
-                        </div>
-                    </motion.div>
-
-                    <motion.div
-                        initial={{ opacity: 0, x: 50 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.8, delay: 0.2 }}
-                        className="relative"
-                    >
-                        <div className="bg-white rounded-xl overflow-hidden border border-gray-100 shadow-xl">
-                            <div className="bg-gray-50 p-3 border-b border-gray-100 flex items-center gap-2">
-                                <div className="flex gap-1.5">
-                                    <div className="w-2.5 h-2.5 rounded-full bg-brand-red"></div>
-                                    <div className="w-2.5 h-2.5 rounded-full bg-yellow-400"></div>
-                                    <div className="w-2.5 h-2.5 rounded-full bg-brand-green"></div>
-                                </div>
-                                <div className="bg-white px-3 py-1 rounded text-[10px] text-brand-inactive-text flex-1 text-center font-mono border border-gray-100">dudit.com.br</div>
-                            </div>
-                            <div className="p-6 space-y-3">
-                                <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
-                                    <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                                        <ShoppingBag className="w-4 h-4 text-blue-600" />
-                                    </div>
-                                    <div>
-                                        <div className="text-sm font-bold text-brand-dark">Descubra</div>
-                                        <div className="text-xs text-brand-inactive-text">Produtos, serviços e negócios perto de você</div>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg border border-green-100">
-                                    <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                                        <Store className="w-4 h-4 text-green-600" />
-                                    </div>
-                                    <div>
-                                        <div className="text-sm font-bold text-brand-dark">Anuncie</div>
-                                        <div className="text-xs text-brand-inactive-text">Seja descoberto por mais pessoas</div>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-3 p-3 bg-purple-50 rounded-lg border border-purple-100">
-                                    <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-                                        <CheckCircle2 className="w-4 h-4 text-purple-600" />
-                                    </div>
-                                    <div>
-                                        <div className="text-sm font-bold text-brand-dark">Organize</div>
-                                        <div className="text-xs text-brand-inactive-text">Gestão simples para o seu dia a dia</div>
-                                    </div>
-                                </div>
-                                <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
-                                    <div className="text-center">
-                                        <div className="text-xl font-bold text-brand-green">0%</div>
-                                        <div className="text-[10px] text-brand-inactive-text">comissão</div>
-                                    </div>
-                                    <div className="h-8 w-px bg-gray-100"></div>
-                                    <div className="text-center">
-                                        <div className="text-xl font-bold text-brand-dark">100%</div>
-                                        <div className="text-[10px] text-brand-inactive-text">do lucro é seu</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <motion.div
-                            className="absolute -right-4 md:-right-8 -bottom-6 w-44 bg-white rounded-2xl p-4 border border-gray-100 shadow-lg hidden md:block"
-                            animate={{ y: [0, -10, 0] }}
-                            transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
-                        >
-                            <div className="flex items-center gap-2 mb-2">
-                                <div className="w-8 h-8 bg-brand-green/20 rounded-full flex items-center justify-center">
-                                    <TrendingUp className="w-4 h-4 text-brand-dark" />
-                                </div>
-                                <div className="text-xs font-bold text-brand-dark">Nova venda</div>
-                            </div>
-                            <div className="bg-brand-green/10 rounded-lg p-2 text-xs">
-                                <div className="flex justify-between font-bold text-brand-dark">
-                                    <span>Você recebe</span>
-                                    <span className="text-brand-green">R$ 150,00</span>
-                                </div>
-                            </div>
-                        </motion.div>
-                    </motion.div>
-                </div>
-            </div>
-        </section>
-    );
-};
-
-const CadastroFlow = () => {
-    const steps = [
-        { icon: Box, title: "Cadastre um produto", desc: "ou serviço no sistema" },
-        { icon: Package, title: "Organiza seu estoque", desc: "automaticamente" },
-        { icon: Layout, title: "Atualiza seu catálogo", desc: "em tempo real" },
-        { icon: User, title: "Aparece no seu perfil", desc: "vitrine online pronta" },
-        { icon: ShoppingBag, title: "Pode aparecer no marketplace", desc: "mais visibilidade" },
-    ];
-
-    return (
-        <section className="relative py-24 bg-white overflow-hidden border-t border-gray-100">
-            <GridLines />
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-                <SectionHeader
-                    subtitle="UM CADASTRO, TUDO CONECTADO"
-                    title="Tudo começa com um cadastro."
-                />
-
-                <div className="relative mt-16">
-                    <div className="flex flex-col lg:flex-row items-center gap-4 lg:gap-3 justify-center">
-                        {steps.map((step, idx) => (
-                            <React.Fragment key={idx}>
-                                <motion.div
-                                    initial={{ opacity: 0, y: 20 }}
-                                    whileInView={{ opacity: 1, y: 0 }}
-                                    viewport={{ once: true }}
-                                    transition={{ delay: idx * 0.12 }}
-                                    className="bg-white border border-gray-100 rounded-xl p-5 w-full lg:w-44 text-center hover:border-brand-green/30 hover:shadow-md transition-all group"
-                                >
-                                    <div className="w-11 h-11 bg-brand-green/10 rounded-xl flex items-center justify-center mx-auto mb-3 group-hover:bg-brand-green/20 transition-colors">
-                                        <step.icon className="w-5 h-5 text-brand-dark" />
-                                    </div>
-                                    <h4 className="text-sm font-bold text-brand-dark mb-0.5">{step.title}</h4>
-                                    <p className="text-xs text-brand-inactive-text">{step.desc}</p>
-                                </motion.div>
-                                {idx < steps.length - 1 && (
-                                    <div className="hidden lg:flex items-center shrink-0">
-                                        <ArrowRight className="w-5 h-5 text-brand-inactive-text" />
-                                    </div>
-                                )}
-                            </React.Fragment>
-                        ))}
-                    </div>
-
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        whileInView={{ opacity: 1, scale: 1 }}
-                        viewport={{ once: true }}
-                        transition={{ delay: 0.6 }}
-                        className="text-center mt-10"
-                    >
-                        <div className="inline-flex items-center gap-2 bg-brand-green/10 text-brand-dark text-sm font-bold px-5 py-2.5 rounded-full">
-                            <CheckCircle2 className="w-4 h-4 text-brand-green" />
-                            Sem cadastrar duas vezes
-                        </div>
-                    </motion.div>
-                </div>
-            </div>
-        </section>
-    );
-};
-
-const ParaQuemCompra = () => {
-    const items = [
-        { icon: Search, title: "Encontre produtos", desc: "Busque o que precisa perto de você" },
-        { icon: Wrench, title: "Descubra serviços", desc: "Profissionais da sua região" },
-        { icon: Calendar, title: "Agende", desc: "Horários sem burocracia" },
-        { icon: MessageCircle, title: "Converse", desc: "Tire dúvidas direto com o vendedor" },
-        { icon: Star, title: "Avalie", desc: "Ajude outros compradores" },
-    ];
-
-    return (
-        <section className="relative py-24 bg-white overflow-hidden border-t border-gray-100">
-            <GridLines />
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-                <SectionHeader
-                    subtitle="EXPERIÊNCIA COMPLETA"
-                    title="Para quem compra."
-                />
-
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-12">
-                    {items.map((item, idx) => (
-                        <motion.div
-                            key={idx}
-                            initial={{ opacity: 0, y: 20 }}
-                            whileInView={{ opacity: 1, y: 0 }}
-                            viewport={{ once: true }}
-                            transition={{ delay: idx * 0.08 }}
-                            className="bg-white border border-gray-100 rounded-xl p-5 text-center hover:border-brand-green/30 hover:shadow-sm transition-all group"
-                        >
-                            <div className="w-10 h-10 bg-brand-green/10 rounded-xl flex items-center justify-center mx-auto mb-3 group-hover:bg-brand-green/20 transition-colors">
-                                <item.icon className="w-5 h-5 text-brand-dark" />
-                            </div>
-                            <h4 className="text-sm font-bold text-brand-dark mb-0.5">{item.title}</h4>
-                            <p className="text-xs text-brand-inactive-text">{item.desc}</p>
-                        </motion.div>
-                    ))}
-                </div>
-            </div>
-        </section>
-    );
-};
-
-const ParaQuemVende = () => {
-    const items = [
-        { icon: PieChart, title: "Controle", desc: "Suas vendas e finanças em um só lugar" },
-        { icon: Layout, title: "Organize", desc: "Seu estoque e agenda sem esforço" },
-        { icon: TrendingUp, title: "Venda", desc: "Produtos, serviços e locações" },
-        { icon: Store, title: "Divulgue", desc: "Sua vitrine online para toda região" },
-    ];
-
-    return (
-        <section className="relative py-24 bg-white overflow-hidden border-t border-gray-100">
-            <GridLines />
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-                <SectionHeader
-                    subtitle="FERRAMENTAS COMPLETAS"
-                    title="Para quem vende."
-                />
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-12">
-                    {items.map((item, idx) => (
-                        <motion.div
-                            key={idx}
-                            initial={{ opacity: 0, y: 20 }}
-                            whileInView={{ opacity: 1, y: 0 }}
-                            viewport={{ once: true }}
-                            transition={{ delay: idx * 0.1 }}
-                            className="bg-white border border-gray-100 rounded-xl p-6 text-center hover:border-brand-green/30 hover:shadow-sm transition-all group"
-                        >
-                            <div className="w-12 h-12 bg-brand-green/10 rounded-xl flex items-center justify-center mx-auto mb-3 group-hover:bg-brand-green/20 transition-colors">
-                                <item.icon className="w-6 h-6 text-brand-dark" />
-                            </div>
-                            <h4 className="text-base font-bold text-brand-dark mb-1">{item.title}</h4>
-                            <p className="text-sm text-brand-inactive-text">{item.desc}</p>
-                        </motion.div>
-                    ))}
-                </div>
-            </div>
-        </section>
-    );
-};
-
-const Solutions = () => {
-    return (
-        <section id="solutions" className="relative py-24 bg-white overflow-hidden">
-            <GridLines />
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-                <SectionHeader
-                    subtitle="SIMPLES E DIRETO"
-                    title="Organize seu negócio sem a bagunça do WhatsApp"
-                />
-
-                <p className="text-brand-inactive-text max-w-3xl mb-20 text-lg">
-                    Abandone os cadernos e planilhas. Centralize pedidos, agendamentos e orçamentos em um só lugar, sem pagar comissões abusivas.
-                </p>
-
-                {/* Feature 1: Vitrine Online */}
-                <div className="grid md:grid-cols-2 gap-16 mb-32 items-center">
-                    <motion.div
-                        initial={{ opacity: 0, x: -30 }}
-                        whileInView={{ opacity: 1, x: 0 }}
-                        viewport={{ once: true }}
-                        className="bg-white p-8 border border-gray-100 rounded-2xl relative"
-                    >
-                        {/* Mockup Form */}
-                        <div className="space-y-6">
-                            <div className="flex bg-gray-50 p-1 rounded-lg border border-gray-100 w-fit">
-                                <div className="px-6 py-1.5 bg-white text-brand-dark text-sm font-semibold rounded-md shadow-sm">Produto</div>
-                                <div className="px-6 py-1.5 text-brand-inactive-text text-sm font-medium">Serviço</div>
-                            </div>
-                            <div>
-                                <label className="block text-xs font-semibold text-brand-dark mb-1.5">Nome do item ou serviço</label>
-                                <input disabled type="text" value="Corte de Cabelo ou Produto X" className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm text-brand-dark bg-gray-50" />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-semibold text-brand-dark mb-1.5">Preço na Vitrine</label>
-                                <div className="border border-gray-200 rounded-md overflow-hidden bg-gray-50">
-                                    <div className="px-3 py-2 border-b border-gray-200 flex items-center gap-2">
-                                        <span className="text-sm text-brand-dark">R$ 150,00</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <button className="w-full bg-[#009660] hover:bg-[#007b4f] text-white font-semibold py-2.5 rounded-lg transition-colors">
-                                Publicar na Minha Vitrine
-                            </button>
-                        </div>
-
-                        {/* Overlapping Element */}
-                        <motion.div
-                            initial={{ scale: 0.8, opacity: 0 }}
-                            whileInView={{ scale: 1, opacity: 1 }}
-                            viewport={{ once: true }}
-                            transition={{ delay: 0.2 }}
-                            className="absolute -right-8 -bottom-12 bg-white rounded-xl border border-gray-200 w-56 hidden lg:flex flex-col overflow-hidden"
-                        >
-                            {/* Browser Header */}
-                            <div className="bg-gray-50 border-b border-gray-100 p-3 flex items-center gap-1.5">
-                                <div className="w-3 h-3 rounded-full bg-brand-red"></div>
-                                <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
-                                <div className="w-3 h-3 rounded-full bg-brand-green"></div>
-                                <div className="mx-auto w-24 h-2 bg-gray-200 rounded-full"></div>
-                            </div>
-                            {/* Browser Content */}
-                            <div className="p-4 grid grid-cols-2 gap-3 relative bg-white pb-8">
-                                <div className="bg-gray-100 aspect-square rounded-xl"></div>
-                                <div className="bg-gray-100 aspect-square rounded-xl"></div>
-                                <div className="bg-gray-100 aspect-square rounded-xl"></div>
-                                <div className="bg-gray-100 aspect-square rounded-xl"></div>
-
-                                {/* Floating URL Badge */}
-                                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-[#003828] text-white text-xs font-bold px-4 py-2.5 rounded-full whitespace-nowrap">
-                                    vitrine.dudit.com/sualoja
-                                </div>
-                            </div>
-                        </motion.div>
-                    </motion.div>
-
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        whileInView={{ opacity: 1 }}
-                        viewport={{ once: true }}
-                    >
-                        <span className="text-brand-inactive-text uppercase tracking-wider text-sm font-semibold mb-2 block">CATÁLOGO DIGITAL</span>
-                        <h3 className="text-4xl font-bold text-brand-dark mb-6">Sua vitrine online em 60 segundos</h3>
-                        <p className="text-brand-inactive-text mb-8 leading-relaxed">
-                            Cadastre seus produtos ou serviços e receba um link exclusivo para compartilhar no Instagram ou WhatsApp. Venda para o seu bairro ou para todo o Brasil, com controle total.
-                        </p>
-                        <Button>
-                            Começar grátis <ArrowRight className="w-4 h-4 ml-2" />
-                        </Button>
-                    </motion.div>
-                </div>
-
-                {/* Feature 2: Feita para pequeno negócio */}
-                <div className="grid md:grid-cols-2 gap-16 items-center">
-                    <motion.div
-                        initial={{ opacity: 0, x: -30 }}
-                        whileInView={{ opacity: 1, x: 0 }}
-                        viewport={{ once: true }}
-                        className="order-2 md:order-1"
-                    >
-                        <span className="text-brand-inactive-text uppercase tracking-wider text-sm font-semibold mb-2 block">SISTEMA TUDO-EM-UM</span>
-                        <h3 className="text-4xl font-bold text-brand-dark mb-6">Feito para quem vende, atende ou aluga</h3>
-                        <p className="text-brand-inactive-text mb-8 leading-relaxed">
-                            Seja você um artesão, prestador de serviços ou lojista, a Dudit foi feita para quem quer profissionalizar as vendas e organizar o dia a dia sem complicação técnica.
-                        </p>
-                        <Button>
-                            Organizar meu negócio <ArrowRight className="w-4 h-4 ml-2" />
-                        </Button>
-                    </motion.div>
-
-                    <motion.div
-                        initial={{ opacity: 0, x: 30 }}
-                        whileInView={{ opacity: 1, x: 0 }}
-                        viewport={{ once: true }}
-                        className="order-1 md:order-2 bg-gray-50/50 p-8 md:p-12 rounded-2xl relative h-96 flex items-center justify-center border border-gray-100"
-                    >
-                        <div className="relative w-full max-w-sm h-64">
-                            {/* Main Card - Multichannel */}
-                            <motion.div
-                                className="absolute top-0 left-0 w-72 h-auto bg-white rounded-xl z-10 p-5 border border-gray-200 flex flex-col gap-4"
-                                whileHover={{ y: -5 }}
-                            >
-                                <div className="flex items-center gap-2 mb-2">
-                                    <Layout className="w-4 h-4 text-brand-dark" />
-                                    <span className="text-sm font-bold text-brand-dark">Resumo do Dia</span>
-                                </div>
-
-                                {/* WhatsApp Sale */}
-                                <div className="flex items-center gap-3 bg-green-50 p-2.5 rounded-lg border border-green-100">
-                                    <div className="bg-green-500 p-1.5 rounded-full text-white">
-                                        <MessageCircle size={14} />
-                                    </div>
-                                    <div className="flex-1">
-                                        <div className="text-xs font-bold text-brand-dark">Venda pelo WhatsApp</div>
-                                        <div className="text-[10px] text-brand-inactive-text">Bolo de Pote • Cliente: Ana</div>
-                                    </div>
-                                    <div className="text-xs font-bold text-green-700">R$ 25</div>
-                                </div>
-
-                                {/* Service Scheduled */}
-                                <div className="flex items-center gap-3 bg-blue-50 p-2.5 rounded-lg border border-blue-100">
-                                    <div className="bg-blue-500 p-1.5 rounded-full text-white">
-                                        <Calendar size={14} />
-                                    </div>
-                                    <div className="flex-1">
-                                        <div className="text-xs font-bold text-brand-dark">Serviço Agendado</div>
-                                        <div className="text-[10px] text-brand-inactive-text">Manutenção • Hoje, 14h</div>
-                                    </div>
-                                </div>
-
-                                {/* Physical Store Sale */}
-                                <div className="flex items-center gap-3 bg-gray-50 p-2.5 rounded-lg border border-gray-200">
-                                    <div className="bg-gray-700 p-1.5 rounded-full text-white">
-                                        <Store size={14} />
-                                    </div>
-                                    <div className="flex-1">
-                                        <div className="text-xs font-bold text-brand-dark">Venda no Balcão</div>
-                                        <div className="text-[10px] text-brand-inactive-text">Camiseta Básica</div>
-                                    </div>
-                                    <div className="text-xs font-bold text-brand-dark">R$ 50</div>
-                                </div>
-                            </motion.div>
-
-                            {/* Floating Badge */}
-                            <motion.div
-                                className="absolute -bottom-6 -right-6 bg-brand-green rounded-xl z-30 p-4 text-brand-dark flex items-center gap-3 border-2 border-white"
-                                initial={{ y: 20, opacity: 0 }}
-                                whileInView={{ y: 0, opacity: 1 }}
-                                viewport={{ once: true }}
-                                transition={{ delay: 0.3 }}
-                            >
-                                <div className="bg-white p-2 rounded-full">
-                                    <CheckCircle2 size={20} className="text-brand-green" />
-                                </div>
-                                <div>
-                                    <div className="text-sm font-bold">Tudo Organizado</div>
-                                    <div className="text-[10px] font-medium opacity-80">Em um só lugar</div>
-                                </div>
-                            </motion.div>
-                        </div>
-                    </motion.div>
-                </div>
-            </div>
-        </section>
-    );
-};
-
-const BentoFeatures = () => {
-    const cards = [
-        {
-            title: "Pedidos e Vendas",
-            description: "Receba pedidos, envie orçamentos e organize locações em um só lugar. Tudo automático.",
-            type: "sales",
-            colSpan: "col-span-1"
-        },
-        {
-            title: "Estoque e Agenda",
-            description: "Controle o que entra, o que sai e quem agendou, sem surpresas no fim do dia.",
-            type: "stock",
-            colSpan: "col-span-1"
-        },
-        {
-            title: "Lucro Integral",
-            description: "Acompanhe seu financeiro com clareza. Na Dudit, 100% do valor da venda fica com você.",
-            type: "finance",
-            colSpan: "col-span-1"
-        }
-    ];
-
-    return (
-        <section className="py-24 bg-white relative border-t border-gray-100">
-            <GridLines />
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-                <SectionHeader
-                    subtitle="CONTROLE TOTAL"
-                    title="Tudo o que você precisa, sem complicação"
-                />
-                <p className="text-brand-inactive-text max-w-2xl mb-16 text-lg -mt-8">
-                    O essencial para o seu negócio crescer, sem precisar de cursos para entender o sistema.
-                </p>
-
-                <div className="grid md:grid-cols-3 gap-8">
-                    {cards.map((card, idx) => (
-                        <motion.div
-                            key={idx}
-                            initial={{ opacity: 0, y: 20 }}
-                            whileInView={{ opacity: 1, y: 0 }}
-                            transition={{ delay: idx * 0.1 }}
-                            viewport={{ once: true }}
-                            className={`${card.colSpan} group`}
-                        >
-                            <div className="bg-brand-slate border border-gray-100 h-64 rounded-xl overflow-hidden relative p-6 flex items-center justify-center">
-                                {/* Visuals based on type */}
-                                {card.type === 'sales' && (
-                                    <div className="bg-white p-4 w-full max-w-[240px] rounded-lg border border-gray-100 text-xs">
-                                        <div className="flex justify-between mb-4 border-b pb-2">
-                                            <span className="text-brand-inactive-text">Novo pedido</span>
-                                            <div className="bg-green-100 text-green-700 px-2 py-0.5 rounded text-[10px] font-bold">PIX</div>
-                                        </div>
-                                        <div className="text-xl font-bold text-brand-dark mb-1">R$ 150,00</div>
-                                        <div className="text-brand-inactive-text text-[10px] mb-4">Item da sua Vitrine</div>
-                                        <button className="w-full bg-brand-dark text-white py-2 rounded text-[10px] font-medium">
-                                            Ver na Vitrine
-                                        </button>
-                                    </div>
-                                )}
-                                {card.type === 'stock' && (
-                                    <div className="relative w-full h-full flex justify-center items-center p-4">
-                                        <div className="w-full max-w-[240px] bg-white rounded-lg border border-gray-100 p-3 flex flex-col gap-3">
-                                            <div className="flex justify-between items-center border-b border-gray-50 pb-2">
-                                                <div className="text-[10px] font-bold text-brand-inactive-text uppercase">Estoque & Agenda</div>
-                                                <Calendar size={12} className="text-brand-inactive-text" />
-                                            </div>
-
-                                            <div className="flex items-center justify-between bg-gray-50 p-2 rounded border border-gray-100">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-6 h-6 bg-brand-green/20 rounded flex items-center justify-center">
-                                                        <Box size={10} className="text-brand-dark" />
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-[10px] font-bold text-brand-dark">Produto A</div>
-                                                        <div className="text-[8px] text-brand-inactive-text">12 unidades</div>
-                                                    </div>
-                                                </div>
-                                                <div className="text-[10px] font-bold text-green-600 bg-green-100 px-1.5 py-0.5 rounded">Em alta</div>
-                                            </div>
-
-                                            <div className="flex items-center justify-between bg-gray-50 p-2 rounded border border-gray-100">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-6 h-6 bg-blue-100 rounded flex items-center justify-center">
-                                                        <Calendar size={10} className="text-blue-600" />
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-[10px] font-bold text-brand-dark">Aluguel Equip.</div>
-                                                        <div className="text-[8px] text-brand-inactive-text">Devolução: Hoje</div>
-                                                    </div>
-                                                </div>
-                                                <div className="text-[10px] font-bold text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded">14:00</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                                {card.type === 'finance' && (
-                                    <div className="bg-white w-full max-w-[240px] rounded-lg p-4 border border-gray-100">
-                                        <div className="flex justify-between items-center mb-4">
-                                            <span className="text-[10px] font-bold text-brand-inactive-text uppercase">Seu Lucro</span>
-                                            <PieChart size={14} className="text-brand-inactive-text" />
-                                        </div>
-                                        <div className="flex gap-2 items-end mb-2">
-                                            <div className="w-3 bg-brand-green h-8 rounded-sm"></div>
-                                            <div className="w-3 bg-brand-green h-12 rounded-sm"></div>
-                                            <div className="w-3 bg-gray-200 h-6 rounded-sm"></div>
-                                            <div className="w-3 bg-brand-green h-16 rounded-sm"></div>
-                                            <div className="w-3 bg-brand-green h-10 rounded-sm"></div>
-                                        </div>
-                                        <div className="text-right text-xs font-bold text-brand-dark">+ 100% SEU</div>
-                                    </div>
-                                )}
-                            </div>
-                            <div className="pt-6">
-                                <h4 className="text-xl font-bold text-brand-dark mb-2">{card.title}</h4>
-                                <p className="text-brand-inactive-text text-sm leading-relaxed">{card.description}</p>
-                            </div>
-                        </motion.div>
-                    ))}
-                </div>
-            </div>
-        </section>
-    );
-};
-
-const PaymentSuite = () => {
-    const differentials = [
-        {
-            title: "Venda de Produtos",
-            description: "Sua vitrine online organizada em minutos. Controle o estoque automaticamente e receba pedidos de forma profissional.",
-            type: "commission"
-        },
-        {
-            title: "Prestação de Serviços",
-            description: "Agendamentos simples, ordens de serviço digitais e histórico completo de clientes sem papelada.",
-            type: "easy"
-        },
-        {
-            title: "Produtos + Serviços",
-            description: "Venda peças e mão de obra no mesmo lugar. Gestão integrada para quem faz de tudo um pouco.",
-            type: "page"
-        },
-        {
-            title: "Aluguel de Itens",
-            description: "Controle locações por período, bloqueie estoque automaticamente e evite conflitos de datas.",
-            type: "market"
-        }
-    ];
-
-    return (
-        <section className="py-24 bg-white relative">
-            <GridLines />
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-                <SectionHeader
-                    subtitle="PARA TODOS OS NEGÓCIOS"
-                    title="Uma plataforma, infinitas possibilidades"
-                />
-                <p className="text-brand-inactive-text max-w-3xl mb-16 text-lg -mt-8">
-                    Não importa o que você oferece, temos as ferramentas certas para você profissionalizar sua operação e vender mais.
-                </p>
-
-                <div className="grid md:grid-cols-2 gap-8">
-                    {differentials.map((item, idx) => (
-                        <motion.div
-                            key={idx}
-                            initial={{ opacity: 0, y: 20 }}
-                            whileInView={{ opacity: 1, y: 0 }}
-                            transition={{ delay: idx * 0.1 }}
-                            viewport={{ once: true }}
-                            className="group"
-                        >
-                            {/* Visual Area */}
-                            <div className="bg-brand-slate border border-gray-100 h-64 rounded-xl overflow-hidden relative p-6 flex items-center justify-center">
-
-                                {/* 1. Sem Comissão Visual */}
-                                {item.type === 'commission' && (
-                                    <div className="bg-white p-4 rounded-xl border border-gray-100 w-56 relative">
-                                        <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-3">
-                                            <div className="text-xs text-brand-inactive-text">Valor da Venda</div>
-                                            <div className="font-bold text-brand-dark">R$ 100,00</div>
-                                        </div>
-                                        <div className="flex justify-between items-center bg-brand-green/20 p-2 rounded-lg">
-                                            <div className="text-xs font-bold text-brand-dark">Taxa Dudit</div>
-                                            <div className="font-bold text-brand-dark">R$ 0,00</div>
-                                        </div>
-                                        <div className="absolute -top-3 -right-3 bg-brand-green text-white font-bold text-xs px-2 py-1 rounded">
-                                            100% SEU
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* 2. Fácil de Usar Visual */}
-                                {item.type === 'easy' && (
-                                    <div className="bg-white p-4 rounded-xl border border-gray-100 w-56">
-                                        <div className="flex items-center gap-3 mb-3 border-b border-gray-50 pb-3">
-                                            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                                                <User size={14} className="text-blue-600" />
-                                            </div>
-                                            <div>
-                                                <div className="text-[10px] font-bold text-brand-dark">João Silva</div>
-                                                <div className="text-[8px] text-brand-inactive-text">Cliente desde 2023</div>
-                                            </div>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <div className="flex justify-between items-center text-[10px]">
-                                                <span className="text-brand-inactive-text">Serviço:</span>
-                                                <span className="font-bold text-brand-dark">Manutenção</span>
-                                            </div>
-                                            <div className="flex justify-between items-center text-[10px]">
-                                                <span className="text-brand-inactive-text">Data:</span>
-                                                <span className="font-bold text-brand-dark">Hoje, 14:00</span>
-                                            </div>
-                                            <div className="flex justify-between items-center text-[10px] bg-gray-50 p-1.5 rounded">
-                                                <span className="text-brand-inactive-text">Status:</span>
-                                                <span className="font-bold text-brand-green">Agendado</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* 3. Página Online Visual */}
-                                {item.type === 'page' && (
-                                    <div className="bg-white border border-gray-200 w-56 h-48 rounded-t-xl overflow-hidden flex flex-col relative top-6">
-                                        <div className="bg-gray-50 border-b border-gray-100 p-2 flex items-center gap-1">
-                                            <div className="w-2 h-2 rounded-full bg-red-300"></div>
-                                            <div className="w-2 h-2 rounded-full bg-yellow-300"></div>
-                                            <div className="w-2 h-2 rounded-full bg-green-300"></div>
-                                            <div className="mx-auto bg-white border border-gray-200 rounded px-2 py-0.5 text-[8px] text-brand-inactive-text">vitrine.dudit.com/sualoja</div>
-                                        </div>
-                                        <div className="p-3 space-y-3">
-                                            <div className="flex gap-2">
-                                                <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                                                    <Box size={14} className="text-brand-inactive-text" />
-                                                </div>
-                                                <div className="flex-1">
-                                                    <div className="h-2 w-16 bg-gray-200 rounded mb-1"></div>
-                                                    <div className="h-2 w-10 bg-brand-green/50 rounded"></div>
-                                                </div>
-                                                <div className="text-[10px] font-bold text-brand-dark">R$ 50</div>
-                                            </div>
-                                            <div className="flex gap-2">
-                                                <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
-                                                    <Calendar size={14} className="text-blue-400" />
-                                                </div>
-                                                <div className="flex-1">
-                                                    <div className="h-2 w-20 bg-gray-200 rounded mb-1"></div>
-                                                    <div className="h-2 w-12 bg-blue-200 rounded"></div>
-                                                </div>
-                                                <div className="text-[10px] font-bold text-brand-dark">R$ 120</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* 4. Local Visual */}
-                                {item.type === 'market' && (
-                                    <div className="bg-white p-4 rounded-xl border border-gray-100 w-56">
-                                        <div className="flex justify-between items-center mb-3">
-                                            <div className="text-[10px] font-bold text-brand-inactive-text uppercase">Locações</div>
-                                            <div className="bg-gray-100 text-brand-inactive-text px-2 py-0.5 rounded text-[8px]">Esta semana</div>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <div className="relative h-8 bg-gray-50 rounded border border-gray-100 overflow-hidden">
-                                                <div className="absolute top-0 bottom-0 left-0 w-1/3 bg-gray-200 border-r border-white"></div>
-                                                <div className="absolute top-0 bottom-0 left-1/3 w-1/2 bg-brand-green/40 border-r border-white flex items-center px-2">
-                                                    <span className="text-[8px] font-bold text-brand-dark">Alugado (João)</span>
-                                                </div>
-                                            </div>
-                                            <div className="relative h-8 bg-gray-50 rounded border border-gray-100 overflow-hidden">
-                                                <div className="absolute top-0 bottom-0 left-0 w-1/4 bg-blue-200 border-r border-white flex items-center px-2">
-                                                    <span className="text-[8px] font-bold text-blue-800">Manutenção</span>
-                                                </div>
-                                                <div className="absolute top-0 bottom-0 left-1/4 w-3/4 bg-gray-200"></div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                            </div>
-
-                            {/* Text Area */}
-                            <div className="pt-6">
-                                <h4 className="text-xl font-bold text-brand-dark mb-2">{item.title}</h4>
-                                <p className="text-brand-inactive-text text-sm leading-relaxed">{item.description}</p>
-                            </div>
-                        </motion.div>
-                    ))}
-                </div>
-            </div>
-        </section>
-    )
-}
-
-const GlobalScale = () => {
-    return (
-        <section className="py-24 bg-white relative">
-            <GridLines />
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-                {/* Main Rounded Card Container */}
-                <div className="flex flex-col lg:flex-row min-h-[600px] rounded-3xl overflow-hidden">
-
-                    {/* Left Side - Dark */}
-                    <div className="flex-1 bg-brand-dark p-12 lg:p-16 flex flex-col justify-center relative z-10">
-                        {/* Internal grid lines for the dark area */}
-                        <div className="absolute inset-0 pointer-events-none z-0 flex justify-center w-full h-full opacity-20">
-                            <div className="w-px h-full bg-white/10 mx-auto hidden md:block" />
-                            <div className="w-px h-full bg-white/10 mx-auto hidden md:block" />
-                            <div className="w-px h-full bg-white/10 mx-auto hidden md:block" />
-                        </div>
-
-                        <div className="relative z-10 text-white">
-                            <span className="text-brand-green text-xs uppercase tracking-widest font-bold mb-4 block">SUA VENDA, SEU LUCRO.</span>
-                            <h2 className="text-4xl md:text-5xl font-bold mb-6 leading-tight">Você vende. <br />Você recebe. <br />O lucro é 100% seu.</h2>
-                            <p className="text-brand-inactive-text text-lg mb-12 max-w-md leading-relaxed">
-                                Chega de perder 10%, 20% ou mais em comissões. Na Dudit, o valor integral da venda vai direto para você. Você escolhe como receber e como entregar.
-                            </p>
-
-                            <div className="flex gap-12 pt-8">
-                                <div>
-                                    <div className="text-3xl font-bold text-brand-green mb-1">0%</div>
-                                    <div className="text-brand-inactive-text text-xs">de comissão por venda</div>
-                                </div>
-                                <div>
-                                    <div className="text-3xl font-bold text-brand-green mb-1">100%</div>
-                                    <div className="text-brand-inactive-text text-xs">de autonomia para você</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Right Side - Lime */}
-                    <div className="flex-1 bg-brand-green relative overflow-hidden flex items-center justify-center p-12">
-                        {/* Decorative Rings */}
-                        <div className="absolute inset-0 pointer-events-none">
-                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] border border-white/20 rounded-full opacity-30"></div>
-                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] border border-white/20 rounded-full opacity-30"></div>
-                        </div>
-
-                        <div className="relative z-10 w-full h-full min-h-[400px]">
-                            {/* Loja Local 1 */}
-                            <motion.div
-                                initial={{ y: 20, opacity: 0 }}
-                                whileInView={{ y: 0, opacity: 1 }}
-                                transition={{ delay: 0.1, duration: 0.5 }}
-                                viewport={{ once: true }}
-                                className="absolute top-[10%] left-0 lg:left-[5%] bg-white rounded-2xl p-4 pr-8 flex items-center gap-4 max-w-[280px]"
-                            >
-                                <div className="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center shrink-0">
-                                    <Store size={20} className="text-brand-inactive-text" />
-                                </div>
-                                <div className="flex-1">
-                                    <p className="text-xs text-brand-inactive-text"><span className="font-bold text-brand-dark">Oficina do Seu Manoel</span> vendeu</p>
-                                    <p className="text-sm text-brand-dark font-bold mt-0.5">Troca de Óleo</p>
-                                </div>
-                                <div className="text-brand-green font-bold text-sm">R$ 180,00</div>
-                            </motion.div>
-
-                            {/* Loja Local 2 */}
-                            <motion.div
-                                initial={{ y: 20, opacity: 0 }}
-                                whileInView={{ y: 0, opacity: 1 }}
-                                transition={{ delay: 0.3, duration: 0.5 }}
-                                viewport={{ once: true }}
-                                className="absolute top-[40%] right-0 lg:right-[5%] bg-white rounded-2xl p-4 pr-8 flex items-center gap-4 max-w-[320px]"
-                            >
-                                <div className="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center shrink-0">
-                                    <User size={20} className="text-brand-inactive-text" />
-                                </div>
-                                <div className="flex-1">
-                                    <p className="text-xs text-brand-inactive-text"><span className="font-bold text-brand-dark">Ana Bolos</span> agendou</p>
-                                    <p className="text-sm text-brand-dark font-bold mt-0.5">Bolo de Festa</p>
-                                </div>
-                                <div className="text-brand-green font-bold text-sm">R$ 120,00</div>
-                            </motion.div>
-
-                            {/* Loja Local 3 */}
-                            <motion.div
-                                initial={{ y: 20, opacity: 0 }}
-                                whileInView={{ y: 0, opacity: 1 }}
-                                transition={{ delay: 0.5, duration: 0.5 }}
-                                viewport={{ once: true }}
-                                className="absolute bottom-[10%] left-0 lg:left-[10%] bg-white rounded-2xl p-4 pr-8 flex items-center gap-4 max-w-[280px]"
-                            >
-                                <div className="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center shrink-0">
-                                    <ShoppingBag size={20} className="text-brand-inactive-text" />
-                                </div>
-                                <div className="flex-1">
-                                    <p className="text-xs text-brand-inactive-text"><span className="font-bold text-brand-dark">Loja de Roupas</span> vendeu</p>
-                                    <p className="text-sm text-brand-dark font-bold mt-0.5">Camiseta Branca</p>
-                                </div>
-                                <div className="text-brand-green font-bold text-sm">R$ 59,90</div>
-                            </motion.div>
-
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-    )
-}
-
-const UseCases = () => {
-    const cases = [
-        {
-            text: "Uma loja de roupas que vendia pelo WhatsApp organizou o estoque e ganhou uma vitrine online no mesmo dia.",
-            type: "Loja de Roupas",
-            icon: ShoppingBag
-        },
-        {
-            text: "Uma oficina mecânica substituiu os orçamentos de papel por ordens de serviço digitais, com links de pagamento direto.",
-            type: "Oficina Mecânica",
-            icon: Wrench
-        },
-        {
-            text: "Uma confeitaria local parou de perder pedidos no chat e agora recebe encomendas direto pela sua página.",
-            type: "Confeitaria Local",
-            icon: Store
-        }
-    ];
-
-    return (
-        <section className="py-24 bg-white relative">
-            <GridLines />
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-                <SectionHeader subtitle="FEITO PARA O SEU DIA A DIA" title="Como a Dudit transforma negócios" />
-
-                <div className="grid md:grid-cols-3 gap-8">
-                    {cases.map((item, idx) => (
-                        <motion.div
-                            key={idx}
-                            initial={{ opacity: 0, y: 20 }}
-                            whileInView={{ opacity: 1, y: 0 }}
-                            viewport={{ once: true }}
-                            transition={{ delay: idx * 0.1 }}
-                            className="bg-white border border-gray-100 p-8 rounded-2xl hover:border-brand-green/50 transition-colors"
-                        >
-                            <div className="w-12 h-12 bg-brand-green/20 rounded-full flex items-center justify-center mb-6">
-                                <item.icon className="w-6 h-6 text-brand-dark" />
-                            </div>
-                            <p className="text-brand-dark text-lg font-medium mb-8 leading-relaxed">"{item.text}"</p>
-                            <div className="text-sm font-bold text-brand-dark uppercase tracking-wider">{item.type}</div>
-                        </motion.div>
-                    ))}
-                </div>
-            </div>
-        </section>
-    )
-}
-
-
-const HomePage = () => {
-    const [activePage, setActivePage] = useState('home');
+export default function InicioPage() {
     const router = useRouter();
 
     const onNavigate = (page: string) => {
         if (page === 'home') {
-            setActivePage('home');
-            window.scrollTo(0, 0);
-        }
-        else if (page === 'segments') router.push('/institucional/segmentos');
-        else if (page === 'pricing') router.push('/institucional/planos');
-        else if (page === 'terms') router.push('/institucional/termos');
-        else if (page === 'privacidade') router.push('/institucional/privacidade');
-        else {
-            setActivePage(page);
-            window.scrollTo(0, 0);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else if (page === 'start-selling') {
+            router.push('/auth/login?mode=partner');
+        } else if (page === 'explore') {
+            router.push('/');
+        } else if (page === 'segments') {
+            router.push('/institucional/segmentos');
+        } else if (page === 'pricing') {
+            router.push('/institucional/planos');
+        } else if (page === 'terms') {
+            router.push('/institucional/termos');
+        } else if (page === 'privacidade') {
+            router.push('/institucional/privacidade');
+        } else if (page === 'about') {
+            router.push('/institucional/sobre');
+        } else {
+            router.push('/');
         }
     };
 
     return (
-        <div className="min-h-screen bg-white">
+        <div className="min-h-screen bg-white text-brand-dark flex flex-col selection:bg-brand-green/20 selection:text-brand-dark font-sans">
             <Navbar onNavigate={onNavigate} />
-            <main>
-                {activePage === 'home' && (
-                    <>
-                        <Hero />
-                        <CadastroFlow />
-                        <ParaQuemCompra />
-                        <ParaQuemVende />
-                        <Solutions />
-                        <BentoFeatures />
-                        <PaymentSuite />
-                        <GlobalScale />
-                        <UseCases />
-                        <CTA onNavigate={onNavigate} />
-                    </>
-                )}
-                {activePage !== 'home' && (
-                    <div className="pt-40 pb-20 text-center">
-                        <h2 className="text-4xl font-bold text-brand-dark">Página {activePage} em desenvolvimento</h2>
-                        <Button className="mt-8" onClick={() => setActivePage('home')}>Voltar para Home</Button>
-                    </div>
-                )}
+
+            <main className="flex-1 w-full pt-[68px]">
+                {/* HERO SECTION */}
+                <HeroSection onNavigate={onNavigate} />
+
+                {/* BENTO GRID: O QUE DÁ PRA FAZER NA DUDIT */}
+                <BentoHelpSection onNavigate={onNavigate} />
+
+                {/* PARA QUEM PROCURA / COMPRA */}
+                <DiscoveryForBuyersSection onNavigate={onNavigate} />
+
+                {/* PARA QUEM VENDE / NEGÓCIOS */}
+                <VisibilityForSellersSection onNavigate={onNavigate} />
+
+                {/* SE QUISER ORGANIZAR */}
+                <OrganizationSection onNavigate={onNavigate} />
+
+                {/* SEÇÃO DE DESCOBERTA / CIDADE VIVA */}
+                <LiveDiscoverySection onNavigate={onNavigate} />
+
+                {/* CTA FINAL */}
+                <FinalCTASection onNavigate={onNavigate} />
             </main>
+
             <Footer onNavigate={onNavigate} />
         </div>
     );
-};
+}
 
-export default HomePage;
+/* =========================================================================
+   1. HERO SECTION
+   ========================================================================= */
+function HeroSection({ onNavigate }: { onNavigate: (page: string) => void }) {
+    return (
+        <section className="relative bg-white pt-16 pb-20 md:pt-24 md:pb-28 overflow-hidden border-b border-gray-100">
+            {/* Background subtle grid decoration */}
+            <div className="absolute inset-0 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:24px_24px] opacity-60 pointer-events-none" />
+
+            <div className="max-w-[1300px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+                <div className="grid lg:grid-cols-12 gap-12 lg:gap-8 items-center">
+                    {/* Left Column: Copy & CTAs */}
+                    <motion.div
+                        className="lg:col-span-7 flex flex-col items-start"
+                        initial={{ opacity: 0, y: 25 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.6 }}
+                    >
+                        {/* Pill badge */}
+                        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-brand-green/10 border border-brand-green/20 text-brand-dark text-xs font-semibold mb-6">
+                            <span className="w-2 h-2 rounded-full bg-brand-green animate-pulse" />
+                            <span>Descubra e anuncie perto de você</span>
+                        </div>
+
+                        {/* Main H1 */}
+                        <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[64px] font-extrabold text-brand-dark tracking-tight leading-[1.08] mb-6">
+                            O que você precisa hoje pode estar na{" "}
+                            <span className="text-brand-green">Dudit.</span>
+                        </h1>
+
+                        {/* Subtitle */}
+                        <p className="text-gray-600 text-lg sm:text-xl mb-8 max-w-xl leading-relaxed">
+                            Descubra produtos, serviços e negócios perto de você. Compre, anuncie ou agende de um jeito simples.
+                        </p>
+
+                        {/* Action Buttons */}
+                        <div className="flex flex-wrap items-center gap-4 w-full sm:w-auto">
+                            <Button
+                                className="h-12 px-7 text-base font-bold bg-brand-green hover:bg-[#007b4f] text-white shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                onClick={() => onNavigate('explore')}
+                            >
+                                <Search className="w-4 h-4 mr-2" />
+                                Explorar Dudit
+                            </Button>
+
+                            <Button
+                                variant="outline"
+                                className="h-12 px-7 text-base font-semibold border-gray-200 text-brand-dark hover:bg-gray-50 hover:border-gray-300 transition-all"
+                                onClick={() => onNavigate('start-selling')}
+                            >
+                                Começar grátis
+                                <ArrowRight className="w-4 h-4 ml-2 text-brand-green" />
+                            </Button>
+                        </div>
+
+                        {/* Trust items under CTAs */}
+                        <div className="flex flex-wrap items-center gap-6 mt-10 text-xs font-medium text-gray-500">
+                            <div className="flex items-center gap-1.5">
+                                <CheckCircle2 className="w-4 h-4 text-brand-green" />
+                                <span>Sem taxas escondidas</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                <CheckCircle2 className="w-4 h-4 text-brand-green" />
+                                <span>Contato direto pelo WhatsApp</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                <CheckCircle2 className="w-4 h-4 text-brand-green" />
+                                <span>Lojas e serviços locais</span>
+                            </div>
+                        </div>
+                    </motion.div>
+
+                    {/* Right Column: Visual Hero with Dino & Floating Discovery Cards */}
+                    <motion.div
+                        className="lg:col-span-5 relative"
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.7, delay: 0.15 }}
+                    >
+                        <div className="relative mx-auto max-w-[420px] lg:max-w-none">
+                            {/* Decorative background circle */}
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[340px] h-[340px] sm:w-[420px] sm:h-[420px] bg-brand-green/10 rounded-full blur-3xl -z-10" />
+
+                            {/* Main Card Container */}
+                            <div className="bg-white rounded-3xl border border-gray-200/80 shadow-xl shadow-gray-100/80 p-6 relative overflow-hidden">
+                                {/* Top search simulator */}
+                                <div className="flex items-center gap-3 bg-gray-50 border border-gray-100 rounded-2xl p-3 mb-6">
+                                    <Search className="w-5 h-5 text-gray-400 shrink-0" />
+                                    <div className="text-sm text-gray-400 flex-1 truncate font-normal">
+                                        Buscar bolo, barbeiro, conserto...
+                                    </div>
+                                    <span className="text-[10px] font-bold uppercase tracking-wider bg-brand-green/10 text-brand-green px-2 py-1 rounded-md">
+                                        Perto de mim
+                                    </span>
+                                </div>
+
+                                {/* Center Dino Illustration */}
+                                <div className="relative py-2 flex justify-center items-center">
+                                    <img
+                                        src="https://img.dudit.com.br/static/mascots/OndeVoceEsta.png"
+                                        alt="Dino Dudit descobrindo opções locais"
+                                        className="w-48 h-48 sm:w-56 sm:h-56 object-contain drop-shadow-sm select-none"
+                                    />
+                                </div>
+
+                                {/* Floating Card 1: Produto Local */}
+                                <motion.div
+                                    className="bg-white/95 backdrop-blur-sm border border-gray-100 rounded-2xl p-3 shadow-lg shadow-gray-200/50 mb-3 flex items-center justify-between gap-3"
+                                    animate={{ y: [0, -4, 0] }}
+                                    transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center text-lg">
+                                            🍰
+                                        </div>
+                                        <div>
+                                            <div className="text-xs font-bold text-brand-dark">Bolo Caseiro da Ana</div>
+                                            <div className="text-[11px] text-gray-500 flex items-center gap-1">
+                                                <MapPin className="w-3 h-3 text-brand-green" /> 600m de você
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <span className="text-xs font-bold text-brand-green bg-brand-green/10 px-2 py-1 rounded-lg">
+                                        R$ 22,00
+                                    </span>
+                                </motion.div>
+
+                                {/* Floating Card 2: Serviço / Agendamento */}
+                                <motion.div
+                                    className="bg-white/95 backdrop-blur-sm border border-gray-100 rounded-2xl p-3 shadow-lg shadow-gray-200/50 flex items-center justify-between gap-3"
+                                    animate={{ y: [0, 4, 0] }}
+                                    transition={{ repeat: Infinity, duration: 4.5, ease: "easeInOut", delay: 0.5 }}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-lg">
+                                            ✂️
+                                        </div>
+                                        <div>
+                                            <div className="text-xs font-bold text-brand-dark">Barbearia Central</div>
+                                            <div className="text-[11px] text-gray-500 flex items-center gap-1">
+                                                <Clock className="w-3 h-3 text-blue-500" /> Horário hoje às 16:30
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <span className="text-[11px] font-semibold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg">
+                                        Agendar
+                                    </span>
+                                </motion.div>
+                            </div>
+                        </div>
+                    </motion.div>
+                </div>
+            </div>
+        </section>
+    );
+}
+
+/* =========================================================================
+   2. SEÇÃO: COMO A DUDIT AJUDA (BENTO GRID MODERNO)
+   ========================================================================= */
+function BentoHelpSection({ onNavigate }: { onNavigate: (page: string) => void }) {
+    const [selectedCategory, setSelectedCategory] = useState('doces');
+
+    return (
+        <section className="py-20 md:py-28 bg-gray-50/50 relative border-b border-gray-100">
+            <div className="max-w-[1300px] mx-auto px-4 sm:px-6 lg:px-8">
+                {/* Header */}
+                <div className="text-center max-w-2xl mx-auto mb-16">
+                    <span className="text-xs font-bold text-brand-green uppercase tracking-widest block mb-3">
+                        Tudo em um só lugar
+                    </span>
+                    <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-brand-dark tracking-tight mb-4">
+                        O que você pode fazer na Dudit
+                    </h2>
+                    <p className="text-gray-600 text-base sm:text-lg">
+                        Resolver o que você precisa no dia a dia não precisa ser complicado. Escolha a situação que combina com você hoje.
+                    </p>
+                </div>
+
+                {/* Bento Grid */}
+                <div className="grid md:grid-cols-12 gap-6">
+                    {/* CARD 1: Precisa de alguma coisa? (Col 7) */}
+                    <motion.div
+                        className="md:col-span-7 bg-white rounded-3xl p-6 sm:p-8 border border-gray-200/80 shadow-sm flex flex-col justify-between hover:border-brand-green/40 transition-all"
+                        initial={{ opacity: 0, y: 20 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
+                    >
+                        <div>
+                            <div className="w-12 h-12 rounded-2xl bg-brand-green/10 text-brand-green flex items-center justify-center mb-5">
+                                <Search className="w-6 h-6" />
+                            </div>
+                            <span className="text-xs font-bold text-brand-green uppercase tracking-wider block mb-1">
+                                Encontre rápido
+                            </span>
+                            <h3 className="text-2xl font-bold text-brand-dark mb-3">
+                                Precisa de alguma coisa?
+                            </h3>
+                            <p className="text-gray-600 text-sm sm:text-base leading-relaxed mb-6">
+                                Encontrar lojas, produtos, serviços e oportunidades pertinho de você, com preços reais e contato direto.
+                            </p>
+                        </div>
+
+                        {/* Interactive search & category mockup */}
+                        <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 sm:p-5 mt-2">
+                            <div className="flex flex-wrap gap-2 mb-4">
+                                {[
+                                    { id: 'doces', label: '🍰 Doces & Bolos' },
+                                    { id: 'oficina', label: '🔧 Mecânica & Reparos' },
+                                    { id: 'beleza', label: '💇 Barbearia & Salão' },
+                                    { id: 'roupas', label: '👗 Moda & Roupas' }
+                                ].map((cat) => (
+                                    <button
+                                        key={cat.id}
+                                        onClick={() => setSelectedCategory(cat.id)}
+                                        className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-all ${
+                                            selectedCategory === cat.id
+                                                ? 'bg-brand-dark text-white shadow-sm'
+                                                : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'
+                                        }`}
+                                    >
+                                        {cat.label}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Result preview */}
+                            <div className="bg-white rounded-xl p-3 border border-gray-200/70 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-9 h-9 rounded-lg bg-brand-green/10 flex items-center justify-center text-brand-green font-bold text-xs">
+                                        📍
+                                    </div>
+                                    <div>
+                                        <div className="text-xs font-bold text-brand-dark">
+                                            {selectedCategory === 'doces' && 'Confeitaria Sabor Real'}
+                                            {selectedCategory === 'oficina' && 'Auto Mecânica Express'}
+                                            {selectedCategory === 'beleza' && 'Studio Bella Vita'}
+                                            {selectedCategory === 'roupas' && 'Boutique Urbana'}
+                                        </div>
+                                        <div className="text-[11px] text-gray-500">
+                                            {selectedCategory === 'doces' && 'Pronta entrega • 750m'}
+                                            {selectedCategory === 'oficina' && 'Orçamento no WhatsApp • 1.2 km'}
+                                            {selectedCategory === 'beleza' && 'Agendamento online • 900m'}
+                                            {selectedCategory === 'roupas' && 'Novidades da estação • 500m'}
+                                        </div>
+                                    </div>
+                                </div>
+                                <span className="text-xs font-bold text-brand-green flex items-center gap-1">
+                                    Ver opções <ChevronRight className="w-3.5 h-3.5" />
+                                </span>
+                            </div>
+                        </div>
+                    </motion.div>
+
+                    {/* CARD 2: Tem algo para vender? (Col 5) */}
+                    <motion.div
+                        className="md:col-span-5 bg-white rounded-3xl p-6 sm:p-8 border border-gray-200/80 shadow-sm flex flex-col justify-between hover:border-brand-green/40 transition-all"
+                        initial={{ opacity: 0, y: 20 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
+                        transition={{ delay: 0.1 }}
+                    >
+                        <div>
+                            <div className="w-12 h-12 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center mb-5">
+                                <Tag className="w-6 h-6" />
+                            </div>
+                            <span className="text-xs font-bold text-orange-600 uppercase tracking-wider block mb-1">
+                                Desapego ou Venda
+                            </span>
+                            <h3 className="text-2xl font-bold text-brand-dark mb-3">
+                                Tem algo para vender?
+                            </h3>
+                            <p className="text-gray-600 text-sm sm:text-base leading-relaxed mb-6">
+                                Anuncie produtos, itens usados ou qualquer coisa de forma rápida e sem burocracia.
+                            </p>
+                        </div>
+
+                        {/* Publish announcement card mockup */}
+                        <div className="bg-orange-50/50 border border-orange-100 rounded-2xl p-4">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="text-xs font-bold text-brand-dark flex items-center gap-1.5">
+                                    <span className="w-2 h-2 rounded-full bg-orange-500" />
+                                    Anúncio Ativo na sua Cidade
+                                </div>
+                                <span className="text-[10px] font-semibold bg-white text-gray-500 px-2 py-0.5 rounded border border-gray-200">
+                                    Há 15 min
+                                </span>
+                            </div>
+                            <div className="bg-white rounded-xl p-3 border border-gray-100 flex items-center justify-between">
+                                <div>
+                                    <div className="text-xs font-bold text-brand-dark">Violão Acústico Seminovo</div>
+                                    <div className="text-xs font-extrabold text-orange-600 mt-0.5">R$ 280,00</div>
+                                </div>
+                                <div className="bg-brand-green text-white text-[10px] font-bold px-2.5 py-1.5 rounded-lg flex items-center gap-1">
+                                    <MessageCircle className="w-3 h-3" /> Falar
+                                </div>
+                            </div>
+                        </div>
+                    </motion.div>
+
+                    {/* CARD 3: Tem um negócio? (Col 5) */}
+                    <motion.div
+                        className="md:col-span-5 bg-white rounded-3xl p-6 sm:p-8 border border-gray-200/80 shadow-sm flex flex-col justify-between hover:border-brand-green/40 transition-all"
+                        initial={{ opacity: 0, y: 20 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
+                        transition={{ delay: 0.15 }}
+                    >
+                        <div>
+                            <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mb-5">
+                                <Store className="w-6 h-6" />
+                            </div>
+                            <span className="text-xs font-bold text-blue-600 uppercase tracking-wider block mb-1">
+                                Para Pequenos Negócios
+                            </span>
+                            <h3 className="text-2xl font-bold text-brand-dark mb-3">
+                                Tem um negócio?
+                            </h3>
+                            <p className="text-gray-600 text-sm sm:text-base leading-relaxed mb-6">
+                                Mostre o que você vende e facilite para clientes encontrarem sua loja ou serviço.
+                            </p>
+                        </div>
+
+                        {/* Store mockup */}
+                        <div className="bg-blue-50/50 border border-blue-100 rounded-2xl p-4">
+                            <div className="flex items-center gap-3 bg-white p-3 rounded-xl border border-gray-100 mb-2">
+                                <div className="w-8 h-8 rounded-full bg-brand-green/10 text-brand-green font-bold text-xs flex items-center justify-center">
+                                    🏪
+                                </div>
+                                <div className="flex-1">
+                                    <div className="text-xs font-bold text-brand-dark">Sua Loja na Dudit</div>
+                                    <div className="text-[10px] text-gray-500 font-mono">dudit.com.br/sualoja</div>
+                                </div>
+                                <span className="text-[10px] font-bold text-brand-green bg-brand-green/10 px-2 py-0.5 rounded">
+                                    Aberta
+                                </span>
+                            </div>
+                            <div className="text-[11px] text-gray-600 text-center font-medium">
+                                Link pronto para colocar na bio do Instagram
+                            </div>
+                        </div>
+                    </motion.div>
+
+                    {/* CARD 4: Precisa marcar um horário? (Col 7) */}
+                    <motion.div
+                        className="md:col-span-7 bg-white rounded-3xl p-6 sm:p-8 border border-gray-200/80 shadow-sm flex flex-col justify-between hover:border-brand-green/40 transition-all"
+                        initial={{ opacity: 0, y: 20 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
+                        transition={{ delay: 0.2 }}
+                    >
+                        <div>
+                            <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center mb-5">
+                                <Calendar className="w-6 h-6" />
+                            </div>
+                            <span className="text-xs font-bold text-purple-600 uppercase tracking-wider block mb-1">
+                                Agendamentos Simples
+                            </span>
+                            <h3 className="text-2xl font-bold text-brand-dark mb-3">
+                                Precisa marcar um horário?
+                            </h3>
+                            <p className="text-gray-600 text-sm sm:text-base leading-relaxed mb-6">
+                                Encontre profissionais autônomos, consultorias e serviços locais com agendamento direto.
+                            </p>
+                        </div>
+
+                        {/* Calendar appointment selector mockup */}
+                        <div className="bg-purple-50/40 border border-purple-100 rounded-2xl p-4 sm:p-5">
+                            <div className="text-xs font-bold text-brand-dark mb-3 flex items-center justify-between">
+                                <span>Horários livres hoje</span>
+                                <span className="text-[11px] text-purple-600 font-semibold">Sem espera</span>
+                            </div>
+                            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                                {['10:00', '14:30', '16:00', '18:15'].map((time, idx) => (
+                                    <div
+                                        key={time}
+                                        className={`p-2.5 rounded-xl text-center text-xs font-bold border transition-all ${
+                                            idx === 1
+                                                ? 'bg-brand-green text-white border-brand-green shadow-sm'
+                                                : 'bg-white text-gray-700 border-gray-200'
+                                        }`}
+                                    >
+                                        {time}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </motion.div>
+                </div>
+            </div>
+        </section>
+    );
+}
+
+/* =========================================================================
+   3. SEÇÃO PARA QUEM COMPRA / RESOLVE (O QUE VOCÊ PROCURA?)
+   ========================================================================= */
+function DiscoveryForBuyersSection({ onNavigate }: { onNavigate: (page: string) => void }) {
+    const categories = [
+        { icon: Store, name: "Lojas e Mercados", desc: "Comércio local e produtos artesanais" },
+        { icon: ShoppingBag, name: "Comida & Doces", desc: "Bolos, marmitas, lanches e delícias caseiras" },
+        { icon: Wrench, name: "Serviços & Manutenção", desc: "Eletricistas, encanadores, mecânicos e reformas" },
+        { icon: Calendar, name: "Beleza & Bem-estar", desc: "Barbearias, salões, estética e massagens" },
+        { icon: Package, name: "Produtos Novos & Usados", desc: "Desapegos, eletrônicos e itens para o lar" },
+        { icon: Users, name: "Profissionais Autônomos", desc: "Aulas, consultorias e freelancers da sua área" },
+    ];
+
+    return (
+        <section className="py-20 md:py-28 bg-white relative border-b border-gray-100 overflow-hidden">
+            <div className="max-w-[1300px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+                <div className="grid lg:grid-cols-12 gap-12 items-center">
+                    {/* Left: Text & Categories Grid */}
+                    <div className="lg:col-span-7">
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-green/10 text-brand-green text-xs font-bold uppercase tracking-wider mb-4">
+                            O que você procura?
+                        </div>
+                        <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-brand-dark tracking-tight mb-6">
+                            Encontre produtos e serviços perto de você
+                        </h2>
+                        <p className="text-gray-600 text-lg leading-relaxed mb-10 max-w-xl">
+                            Comprar algo novo ou usado, encontrar um serviço confiável, descobrir negócios próximos ou resolver uma necessidade do dia a dia.
+                        </p>
+
+                        {/* Category items list */}
+                        <div className="grid sm:grid-cols-2 gap-4 mb-10">
+                            {categories.map((cat, idx) => (
+                                <div
+                                    key={idx}
+                                    className="p-4 rounded-2xl border border-gray-100 bg-gray-50/60 hover:bg-white hover:border-brand-green/30 hover:shadow-sm transition-all flex items-start gap-3"
+                                >
+                                    <div className="w-10 h-10 rounded-xl bg-white border border-gray-200/60 flex items-center justify-center shrink-0 text-brand-dark shadow-xs">
+                                        <cat.icon className="w-5 h-5 text-brand-green" />
+                                    </div>
+                                    <div>
+                                        <h4 className="text-sm font-bold text-brand-dark">{cat.name}</h4>
+                                        <p className="text-xs text-gray-500 mt-0.5 leading-snug">{cat.desc}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Core association message box */}
+                        <div className="p-5 rounded-2xl bg-brand-green/10 border border-brand-green/20 flex items-center gap-4">
+                            <span className="text-2xl">💡</span>
+                            <div>
+                                <div className="text-sm font-bold text-brand-dark">
+                                    Quando precisar de alguma coisa, dê uma olhada na Dudit.
+                                </div>
+                                <div className="text-xs text-gray-600 mt-0.5">
+                                    É rápido, não precisa baixar nada pesado e você fala direto com quem vende.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Right: Dino Mascot & Neighborhood Card */}
+                    <div className="lg:col-span-5 flex flex-col items-center">
+                        <div className="relative w-full max-w-[380px]">
+                            {/* Card Background Glow */}
+                            <div className="absolute inset-0 bg-brand-green/10 rounded-3xl blur-2xl -z-10" />
+
+                            <div className="bg-white border border-gray-200/80 rounded-3xl p-6 shadow-xl text-center relative">
+                                <div className="w-40 h-40 mx-auto mb-4 flex items-center justify-center">
+                                    <img
+                                        src="https://img.dudit.com.br/static/mascots/SacolaVazia.png"
+                                        alt="Dino Dudit com compras locais"
+                                        className="w-36 h-36 object-contain drop-shadow-sm select-none"
+                                    />
+                                </div>
+
+                                <h3 className="text-xl font-bold text-brand-dark mb-2">
+                                    Compre direto de quem faz
+                                </h3>
+                                <p className="text-gray-500 text-xs leading-relaxed mb-6">
+                                    Descubra comerciantes e profissionais da sua cidade, incentive quem trabalha por perto e receba rápido.
+                                </p>
+
+                                <Button
+                                    className="w-full h-11 bg-brand-green hover:bg-[#007b4f] text-white font-bold text-sm"
+                                    onClick={() => onNavigate('explore')}
+                                >
+                                    Ver o que tem por perto
+                                    <ArrowRight className="w-4 h-4 ml-2" />
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    );
+}
+
+/* =========================================================================
+   4. SEÇÃO PARA QUEM VENDE (SEU NEGÓCIO NA DUDIT)
+   ========================================================================= */
+function VisibilityForSellersSection({ onNavigate }: { onNavigate: (page: string) => void }) {
+    return (
+        <section className="py-20 md:py-28 bg-gray-50/50 relative border-b border-gray-100 overflow-hidden">
+            <div className="max-w-[1300px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+                <div className="grid lg:grid-cols-12 gap-12 items-center">
+                    {/* Left: Dino Partner Mascot & Vitrine Card */}
+                    <div className="lg:col-span-5 order-2 lg:order-1 flex justify-center">
+                        <div className="relative w-full max-w-[400px]">
+                            <div className="bg-white rounded-3xl border border-gray-200/80 p-6 sm:p-8 shadow-xl">
+                                <div className="flex items-center justify-center mb-6">
+                                    <img
+                                        src="https://img.dudit.com.br/static/mascots/PlanoVender.png"
+                                        alt="Dino Dudit ajudando negócios a vender"
+                                        className="w-40 h-40 object-contain drop-shadow-sm select-none"
+                                    />
+                                </div>
+
+                                <div className="space-y-3">
+                                    <div className="bg-gray-50 p-3.5 rounded-xl border border-gray-100 flex items-center justify-between text-xs">
+                                        <span className="text-gray-500 font-medium">Sua vitrine online</span>
+                                        <span className="font-bold text-brand-dark">Pronta em 2 min</span>
+                                    </div>
+                                    <div className="bg-gray-50 p-3.5 rounded-xl border border-gray-100 flex items-center justify-between text-xs">
+                                        <span className="text-gray-500 font-medium">Comissão por venda</span>
+                                        <span className="font-bold text-brand-green">0% (Livre de taxas)</span>
+                                    </div>
+                                    <div className="bg-gray-50 p-3.5 rounded-xl border border-gray-100 flex items-center justify-between text-xs">
+                                        <span className="text-gray-500 font-medium">WhatsApp & Instagram</span>
+                                        <span className="font-bold text-brand-dark">Conectados</span>
+                                    </div>
+                                </div>
+
+                                <Button
+                                    className="w-full h-11 mt-6 bg-brand-dark hover:bg-black text-white font-bold text-sm"
+                                    onClick={() => onNavigate('start-selling')}
+                                >
+                                    Criar minha vitrine agora
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Right: Copy & Key Message */}
+                    <div className="lg:col-span-7 order-1 lg:order-2">
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-green/10 text-brand-green text-xs font-bold uppercase tracking-wider mb-4">
+                            Mais uma porta aberta
+                        </div>
+                        <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-brand-dark tracking-tight mb-6">
+                            Divulgue seu negócio na Dudit
+                        </h2>
+                        <h3 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4">
+                            Seu negócio também pode ser encontrado na Dudit.
+                        </h3>
+                        <p className="text-gray-600 text-base sm:text-lg leading-relaxed mb-8">
+                            Você já usa Instagram e WhatsApp? Continue usando. A Dudit é mais uma vitrine para seus produtos e serviços chegarem até mais pessoas da sua região.
+                        </p>
+
+                        {/* Realistic benefits list */}
+                        <div className="space-y-4 mb-8">
+                            <div className="flex items-start gap-3.5">
+                                <div className="w-6 h-6 rounded-full bg-brand-green/10 flex items-center justify-center shrink-0 mt-0.5">
+                                    <Check className="w-3.5 h-3.5 text-brand-green stroke-[3]" />
+                                </div>
+                                <div>
+                                    <h4 className="text-sm font-bold text-brand-dark">Mais uma vitrine para ser encontrado</h4>
+                                    <p className="text-xs text-gray-500 mt-0.5">
+                                        Pessoas que estão na sua cidade procurando exatamente o que você faz podem achar você pela busca.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-start gap-3.5">
+                                <div className="w-6 h-6 rounded-full bg-brand-green/10 flex items-center justify-center shrink-0 mt-0.5">
+                                    <Check className="w-3.5 h-3.5 text-brand-green stroke-[3]" />
+                                </div>
+                                <div>
+                                    <h4 className="text-sm font-bold text-brand-dark">Catálogo limpo para compartilhar</h4>
+                                    <p className="text-xs text-gray-500 mt-0.5">
+                                        Envie um link bonito e direto para clientes no WhatsApp ou coloque na bio do seu perfil.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-start gap-3.5">
+                                <div className="w-6 h-6 rounded-full bg-brand-green/10 flex items-center justify-center shrink-0 mt-0.5">
+                                    <Check className="w-3.5 h-3.5 text-brand-green stroke-[3]" />
+                                </div>
+                                <div>
+                                    <h4 className="text-sm font-bold text-brand-dark">Sem promessas vazias, apenas utilidade</h4>
+                                    <p className="text-xs text-gray-500 mt-0.5">
+                                        Não cobramos porcentagem sobre as suas vendas e você negocia do jeito que preferir.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Highlight message */}
+                        <div className="p-4 rounded-xl bg-white border border-gray-200 text-xs text-gray-600 font-medium">
+                            💬 <span className="font-bold text-brand-dark">"A Dudit é mais uma porta para clientes encontrarem você."</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    );
+}
+
+/* =========================================================================
+   5. SEÇÃO SOBRE ORGANIZAÇÃO (COMPLEMENTAR E LEVE)
+   ========================================================================= */
+function OrganizationSection({ onNavigate }: { onNavigate: (page: string) => void }) {
+    const tools = [
+        {
+            title: "Estoque",
+            desc: "Controle o que entra e sai sem precisar de planilhas confusas.",
+            icon: Package,
+            tag: "Prático"
+        },
+        {
+            title: "Clientes & Contatos",
+            desc: "Guarde o histórico de pedidos e facilite o retorno de quem já comprou.",
+            icon: Users,
+            tag: "Histórico"
+        },
+        {
+            title: "Agendamentos & O.S.",
+            desc: "Marque horários e gere ordens de serviço digitais sem papelada.",
+            icon: Calendar,
+            tag: "Sem papel"
+        },
+        {
+            title: "Controle Financeiro",
+            desc: "Acompanhe entradas e saídas. 100% do lucro é seu, sem comissões.",
+            icon: DollarSign,
+            tag: "Transparente"
+        }
+    ];
+
+    return (
+        <section className="py-20 md:py-28 bg-white relative border-b border-gray-100">
+            <div className="max-w-[1300px] mx-auto px-4 sm:px-6 lg:px-8">
+                {/* Header */}
+                <div className="max-w-2xl mx-auto text-center mb-16">
+                    <span className="text-xs font-bold text-brand-green uppercase tracking-widest block mb-3">
+                        Do seu jeito
+                    </span>
+                    <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-brand-dark tracking-tight mb-4">
+                        Organize seu negócio de forma simples
+                    </h2>
+                    <p className="text-gray-600 text-base sm:text-lg">
+                        Se quiser organizar seu negócio, a Dudit também ajuda. Comece pela vitrine e organize no seu próprio ritmo.
+                    </p>
+                </div>
+
+                {/* Grid of organization features */}
+                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+                    {tools.map((item, idx) => (
+                        <div
+                            key={idx}
+                            className="bg-gray-50/70 border border-gray-100 rounded-3xl p-6 hover:bg-white hover:border-brand-green/30 hover:shadow-md transition-all group flex flex-col justify-between"
+                        >
+                            <div>
+                                <div className="flex items-center justify-between mb-5">
+                                    <div className="w-12 h-12 rounded-2xl bg-white border border-gray-200/80 flex items-center justify-center text-brand-green group-hover:bg-brand-green group-hover:text-white transition-colors shadow-xs">
+                                        <item.icon className="w-6 h-6" />
+                                    </div>
+                                    <span className="text-[10px] font-bold uppercase tracking-wider bg-white text-gray-500 px-2.5 py-1 rounded-full border border-gray-200">
+                                        {item.tag}
+                                    </span>
+                                </div>
+                                <h3 className="text-lg font-bold text-brand-dark mb-2">{item.title}</h3>
+                                <p className="text-xs sm:text-sm text-gray-600 leading-relaxed">{item.desc}</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Bottom Banner */}
+                <div className="bg-brand-dark rounded-3xl p-8 sm:p-10 text-white flex flex-col md:flex-row items-center justify-between gap-8">
+                    <div className="flex items-center gap-6">
+                        <img
+                            src="https://img.dudit.com.br/static/mascots/Estoque.png"
+                            alt="Dino organizando"
+                            className="w-20 h-20 sm:w-24 sm:h-24 object-contain shrink-0 drop-shadow select-none"
+                        />
+                        <div>
+                            <h3 className="text-xl sm:text-2xl font-bold text-white mb-1">
+                                Comece pela vitrine. Organize do seu jeito.
+                            </h3>
+                            <p className="text-gray-300 text-xs sm:text-sm max-w-xl">
+                                Você não precisa usar tudo de uma vez. Use apenas o que faz sentido para o seu dia a dia.
+                            </p>
+                        </div>
+                    </div>
+
+                    <Button
+                        className="h-11 px-6 bg-brand-green text-white hover:bg-brand-green/90 font-bold text-sm shrink-0"
+                        onClick={() => onNavigate('start-selling')}
+                    >
+                        Criar conta grátis
+                    </Button>
+                </div>
+            </div>
+        </section>
+    );
+}
+
+/* =========================================================================
+   6. SEÇÃO DE DESCOBERTA (CIDADE VIVA)
+   ========================================================================= */
+function LiveDiscoverySection({ onNavigate }: { onNavigate: (page: string) => void }) {
+    const liveItems = [
+        {
+            title: "Bolo de Cenoura com Chocolate",
+            place: "Confeitaria da Vila",
+            badge: "Recém anunciado",
+            badgeColor: "bg-orange-50 text-orange-600 border-orange-100",
+            price: "R$ 18,00",
+            emoji: "🍰"
+        },
+        {
+            title: "Instalação & Reparo Elétrico",
+            place: "Carlos Eletricista",
+            badge: "Disponível hoje",
+            badgeColor: "bg-blue-50 text-blue-600 border-blue-100",
+            price: "Orçamento grátis",
+            emoji: "⚡"
+        },
+        {
+            title: "Bicicleta Aro 29 seminova",
+            place: "Bairro Jardim das Flores",
+            badge: "Desapego",
+            badgeColor: "bg-green-50 text-green-700 border-green-100",
+            price: "R$ 650,00",
+            emoji: "🚲"
+        },
+        {
+            title: "Corte Degradê & Barboterapia",
+            place: "Barbearia do Silva",
+            badge: "Últimas 2 vagas",
+            badgeColor: "bg-purple-50 text-purple-600 border-purple-100",
+            price: "R$ 45,00",
+            emoji: "💈"
+        }
+    ];
+
+    return (
+        <section className="py-20 md:py-28 bg-gray-50/50 relative border-b border-gray-100">
+            <div className="max-w-[1300px] mx-auto px-4 sm:px-6 lg:px-8">
+                {/* Header */}
+                <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
+                    <div>
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-green/10 text-brand-green text-xs font-bold uppercase tracking-wider mb-3">
+                            Sua região em movimento
+                        </div>
+                        <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-brand-dark tracking-tight">
+                            Descubra coisas novas perto de você
+                        </h2>
+                    </div>
+                    <Button
+                        variant="outline"
+                        className="h-11 px-5 text-sm font-semibold border-gray-300 text-brand-dark hover:bg-white shrink-0 self-start md:self-auto"
+                        onClick={() => onNavigate('explore')}
+                    >
+                        Ver tudo no mapa
+                        <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                </div>
+
+                {/* Live cards grid */}
+                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                    {liveItems.map((item, idx) => (
+                        <div
+                            key={idx}
+                            className="bg-white rounded-3xl p-5 border border-gray-200/80 shadow-xs hover:shadow-md hover:border-brand-green/40 transition-all flex flex-col justify-between"
+                        >
+                            <div>
+                                <div className="flex items-center justify-between mb-4">
+                                    <span className="text-2xl">{item.emoji}</span>
+                                    <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${item.badgeColor}`}>
+                                        {item.badge}
+                                    </span>
+                                </div>
+                                <h3 className="text-sm font-bold text-brand-dark mb-1 leading-snug">{item.title}</h3>
+                                <p className="text-xs text-gray-500 mb-4">{item.place}</p>
+                            </div>
+
+                            <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
+                                <span className="text-sm font-bold text-brand-green">{item.price}</span>
+                                <span className="text-[11px] font-semibold text-gray-500 hover:text-brand-dark flex items-center gap-0.5">
+                                    Ver <ChevronRight className="w-3 h-3" />
+                                </span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </section>
+    );
+}
+
+/* =========================================================================
+   7. SEÇÃO FINAL / CTA
+   ========================================================================= */
+function FinalCTASection({ onNavigate }: { onNavigate: (page: string) => void }) {
+    return (
+        <section className="py-20 md:py-28 bg-white relative">
+            <div className="max-w-[1300px] mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="bg-brand-dark rounded-3xl p-8 sm:p-14 lg:p-16 text-center relative overflow-hidden shadow-2xl">
+                    {/* Background faint glow */}
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-brand-green/20 rounded-full blur-3xl pointer-events-none" />
+
+                    <div className="relative z-10 max-w-2xl mx-auto flex flex-col items-center">
+                        {/* Mascot Happy Dino */}
+                        <img
+                            src="https://img.dudit.com.br/static/mascots/HappyDino.png"
+                            alt="Dino Dudit comemorando"
+                            className="w-28 h-28 sm:w-32 sm:h-32 object-contain mb-6 drop-shadow-md select-none"
+                        />
+
+                        <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white tracking-tight leading-tight mb-4">
+                            O que você precisa hoje?
+                        </h2>
+                        <p className="text-gray-300 text-base sm:text-lg leading-relaxed mb-8 max-w-lg">
+                            Descubra o que a sua região oferece ou coloque seu negócio no mapa para ser encontrado por novos clientes.
+                        </p>
+
+                        <div className="flex flex-wrap justify-center gap-4 w-full sm:w-auto">
+                            <Button
+                                className="h-12 px-8 text-base font-bold bg-brand-green hover:bg-[#007b4f] text-white shadow-md transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                onClick={() => onNavigate('explore')}
+                            >
+                                <Search className="w-4 h-4 mr-2" />
+                                Explorar a Dudit
+                            </Button>
+
+                            <Button
+                                variant="outline"
+                                className="h-12 px-8 text-base font-semibold border-white/20 text-white hover:bg-white/10 transition-all"
+                                onClick={() => onNavigate('start-selling')}
+                            >
+                                Criar conta grátis
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    );
+}

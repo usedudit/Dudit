@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { getAdminClient } from "@/lib/supabase/admin"
+import { ensureLegalConsents } from "@/app/actions/auth/legal-consent"
 
 /**
  * Supabase Auth PKCE Callback Route.
@@ -52,6 +53,16 @@ export async function GET(request: Request) {
             details: profileError.details,
           })
         }
+
+        // LEGAL: garante o aceite dos documentos legais vigentes.
+        // Cobre login via Google (OAuth) e re-tenta o cadastro por e-mail caso
+        // o registro no frontend tenha falhado. Não duplica registros.
+        const provider =
+          (authUser.app_metadata?.provider as string) || undefined
+        await ensureLegalConsents(
+          authUser.id,
+          provider === "google" ? "oauth" : "signup"
+        )
       }
 
       // Clear old city cookie so a new user doesn't see previous user's city

@@ -9,18 +9,98 @@ export const parseLocalDate = (dateStr: string): Date => {
 };
 
 export const isMultiDay = (appointment: Appointment): boolean => {
+    if (!appointment) return false;
     // If it has specific start/end dates that differ
     if (appointment.endDate && appointment.date !== appointment.endDate) return true;
-
     // Or if duration is longer than 24 hours (1440 minutes)
-    if (appointment.duration >= 1440) return true;
-
+    if (Number(appointment.duration || 0) >= 1440) return true;
     return false;
-}
+};
+
+export const getMultiDaySolidStyle = (status: string) => {
+    const s = (status || '').toLowerCase();
+    if (s === 'confirmed' || s === 'confirmado') {
+        return {
+            bg: 'bg-emerald-600 dark:bg-emerald-700',
+            hover: 'hover:bg-emerald-700 dark:hover:bg-emerald-600',
+            text: 'text-white',
+            border: 'border-emerald-700 dark:border-emerald-600',
+            badgeBg: 'bg-emerald-500',
+            shadow: 'shadow-emerald-500/20'
+        };
+    }
+    if (s === 'pago' || s === 'paid' || s === 'completed' || s === 'concluído' || s === 'concluido' || s === 'finished') {
+        return {
+            bg: 'bg-green-600 dark:bg-green-700',
+            hover: 'hover:bg-green-700 dark:hover:bg-green-600',
+            text: 'text-white',
+            border: 'border-green-700 dark:border-green-600',
+            badgeBg: 'bg-green-500',
+            shadow: 'shadow-green-500/20'
+        };
+    }
+    if (s === 'pending' || s === 'aguardando') {
+        return {
+            bg: 'bg-orange-500 dark:bg-orange-600',
+            hover: 'hover:bg-orange-600 dark:hover:bg-orange-500',
+            text: 'text-white',
+            border: 'border-orange-600 dark:border-orange-500',
+            badgeBg: 'bg-orange-400',
+            shadow: 'shadow-orange-500/20'
+        };
+    }
+    if (s === 'reservado' || s === 'reserved') {
+        return {
+            bg: 'bg-blue-600 dark:bg-blue-700',
+            hover: 'hover:bg-blue-700 dark:hover:bg-blue-600',
+            text: 'text-white',
+            border: 'border-blue-700 dark:border-blue-600',
+            badgeBg: 'bg-blue-500',
+            shadow: 'shadow-blue-500/20'
+        };
+    }
+    if (s === 'iniciado' || s === 'in progress') {
+        return {
+            bg: 'bg-teal-700 dark:bg-teal-800',
+            hover: 'hover:bg-teal-800 dark:hover:bg-teal-700',
+            text: 'text-white',
+            border: 'border-teal-800 dark:border-teal-700',
+            badgeBg: 'bg-teal-600',
+            shadow: 'shadow-teal-500/20'
+        };
+    }
+    if (s === 'cancelado' || s === 'canceled' || s === 'cancelar' || s === 'ausência' || s === 'absent') {
+        return {
+            bg: 'bg-red-600 dark:bg-red-700',
+            hover: 'hover:bg-red-700 dark:hover:bg-red-600',
+            text: 'text-white',
+            border: 'border-red-700 dark:border-red-600',
+            badgeBg: 'bg-red-500',
+            shadow: 'shadow-red-500/20'
+        };
+    }
+    if (s === 'indisponível' || s === 'unavailable' || s === 'almoço' || s === 'break') {
+        return {
+            bg: 'bg-gray-500 dark:bg-zinc-600',
+            hover: 'hover:bg-gray-600 dark:hover:bg-zinc-500',
+            text: 'text-white',
+            border: 'border-gray-600 dark:border-zinc-500',
+            badgeBg: 'bg-gray-400',
+            shadow: 'shadow-gray-500/20'
+        };
+    }
+    return {
+        bg: 'bg-blue-600 dark:bg-blue-700',
+        hover: 'hover:bg-blue-700 dark:hover:bg-blue-600',
+        text: 'text-white',
+        border: 'border-blue-700 dark:border-blue-600',
+        badgeBg: 'bg-blue-500',
+        shadow: 'shadow-blue-500/20'
+    };
+};
 
 export const getMultiDayStyle = (status: string) => {
-    // A solid style for multi-day bars similar to Google Calendar
-    const s = status.toLowerCase();
+    const s = (status || '').toLowerCase();
     if (s === 'confirmed' || s === 'confirmado') return 'bg-emerald-600 border-emerald-700 text-white';
     if (s === 'pago' || s === 'paid') return 'bg-green-600 border-green-700 text-white';
     if (s === 'pending' || s === 'aguardando') return 'bg-orange-500 border-orange-600 text-white';
@@ -29,8 +109,8 @@ export const getMultiDayStyle = (status: string) => {
     if (s === 'ausência' || s === 'absent') return 'bg-red-500 border-red-600 text-white';
     if (s === 'indisponível' || s === 'unavailable' || s === 'almoço') return 'bg-gray-500 border-gray-600 text-white';
     if (s === 'concluído' || s === 'concluido' || s === 'finished' || s === 'completed') return 'bg-emerald-700 border-emerald-800 text-white';
-    return 'bg-gray-500 border-gray-600 text-white';
-}
+    return 'bg-blue-600 border-blue-700 text-white';
+};
 
 export const getAppointmentStyle = (status: string) => {
     // Normalize status to lowercase for comparison to handle both Portuguese and English/Internal codes
@@ -166,10 +246,16 @@ export const getEndTime = (startTime: string, durationMinutes: number) => {
 };
 
 export const formatDuration = (minutes: number) => {
-    // If it's effectively a multiple of days (1440 mins)
+    if (!minutes || minutes <= 0) return '0 min';
     if (minutes >= 1440) {
-        const days = Math.round(minutes / 1440);
-        return days === 1 ? '1 dia' : `${days} dias`;
+        const days = Math.round((minutes / 1440) * 10) / 10;
+        if (days >= 30) {
+            const months = Math.floor(days / 30);
+            const remDays = Math.round(days % 30);
+            if (remDays === 0) return months === 1 ? '1 mês' : `${months} meses`;
+            return `${months}m ${remDays}d`;
+        }
+        return days === 1 ? '1 dia' : `${days % 1 === 0 ? days : days.toFixed(1)} dias`;
     }
 
     const hours = Math.floor(minutes / 60);
@@ -179,7 +265,7 @@ export const formatDuration = (minutes: number) => {
     if (hours > 0) parts.push(`${hours}h`);
     if (mins > 0) parts.push(`${mins}m`);
 
-    return parts.join(' ');
+    return parts.join(' ') || `${minutes}m`;
 };
 
 export const formatDateStr = (date: Date) => {
@@ -250,24 +336,40 @@ export const checkAppointmentCollision = (apt: Appointment, allApts: Appointment
     if (!apt || !allApts) return false;
     if (apt.status?.toLowerCase() === 'cancelado') return false;
 
-    // Convert start time to minutes
-    const [sh, sm] = apt.time.split(':').map(Number);
-    const start = sh * 60 + sm;
-    const end = start + (apt.duration || 60);
+    const parseToTimestamp = (dateStr: string, timeStr: string) => {
+        if (!dateStr) return 0;
+        const [y, m, d] = dateStr.split('-').map(Number);
+        const [hh, mm] = (timeStr || '00:00').split(':').map(Number);
+        return new Date(y, (m || 1) - 1, d || 1, hh || 0, mm || 0).getTime();
+    };
+
+    const aptStart = parseToTimestamp(apt.date, apt.time);
+    let aptEnd: number;
+    if (apt.endDate) {
+        aptEnd = parseToTimestamp(apt.endDate, apt.endTime || apt.time);
+        if (aptEnd <= aptStart) aptEnd = aptStart + (apt.duration || 60) * 60000;
+    } else {
+        aptEnd = aptStart + (apt.duration || 60) * 60000;
+    }
 
     return allApts.some(other => {
         // Skip self
         if (other.id === apt.id) return false;
-        // Same professional and date
-        if (other.staffId !== apt.staffId || other.date !== apt.date) return false;
+        // Same professional
+        if (other.staffId !== apt.staffId) return false;
         // Skip cancelled slots
         if (other.status?.toLowerCase() === 'cancelado') return false;
 
-        const [oh, om] = other.time.split(':').map(Number);
-        const otherStart = oh * 60 + om;
-        const otherEnd = otherStart + (other.duration || 60);
+        const otherStart = parseToTimestamp(other.date, other.time);
+        let otherEnd: number;
+        if (other.endDate) {
+            otherEnd = parseToTimestamp(other.endDate, other.endTime || other.time);
+            if (otherEnd <= otherStart) otherEnd = otherStart + (other.duration || 60) * 60000;
+        } else {
+            otherEnd = otherStart + (other.duration || 60) * 60000;
+        }
 
-        return start < otherEnd && otherStart < end;
+        return aptStart < otherEnd && otherStart < aptEnd;
     });
 };
 

@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { MoneyIcon, BlockedIcon, EyeOffIcon, PartiallyPaidIcon, LikeIcon, ClockIcon, PlayIcon } from '@/lib/icons';
 import { AlertTriangle } from 'lucide-react';
 import { Appointment } from './types';
-import { getAppointmentStyle, getEndTime, checkAppointmentCollision } from './utils';
+import { getAppointmentStyle, getEndTime, checkAppointmentCollision, isMultiDay, formatDuration } from './utils';
 
 interface AppointmentListCardProps {
     appointment: Appointment;
@@ -69,7 +69,7 @@ export const AppointmentListCard: React.FC<AppointmentListCardProps> = ({ appoin
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             className={`
-                w-full rounded-xl p-2 border cursor-pointer relative overflow-hidden transition-all active:scale-[0.98]
+                w-full rounded-xl p-2.5 border cursor-pointer relative overflow-hidden transition-all active:scale-[0.98]
                 ${style.container}
             `}
             onClick={() => onClick(appointment)}
@@ -78,8 +78,16 @@ export const AppointmentListCard: React.FC<AppointmentListCardProps> = ({ appoin
                 <div className={`w-1 rounded-full flex-shrink-0 ${style.bar}`}></div>
                 <div className="flex-1 min-w-0 flex flex-col">
                     <div className="flex items-center justify-between mb-0.5">
-                        <span className={`font-bold text-[10px] ${style.title} truncate`}>{appointment.time} - {endTime}</span>
-                        <div className="flex items-center gap-1.5">
+                        {isMultiDay(appointment) ? (
+                            <span className={`font-bold text-[10px] ${style.title} truncate flex items-center gap-1`}>
+                                <span>{appointment.date} {appointment.time}</span>
+                                <span className="opacity-60">→</span>
+                                <span>{appointment.endDate || appointment.date} {appointment.endTime || appointment.time}</span>
+                            </span>
+                        ) : (
+                            <span className={`font-bold text-[10px] ${style.title} truncate`}>{appointment.time} - {endTime}</span>
+                        )}
+                        <div className="flex items-center gap-1.5 shrink-0">
                             {hasCollision && (
                                 <span title="Conflito de horário detectado">
                                     <AlertTriangle size={14} className="text-red-500 shrink-0" />
@@ -97,8 +105,13 @@ export const AppointmentListCard: React.FC<AppointmentListCardProps> = ({ appoin
                     <div className={`font-bold text-[11px] ${style.title} truncate leading-tight mb-0.5`}>{appointment.customer}</div>
                     <div className={`text-[10px] ${style.text} truncate opacity-90 mb-2`}>{appointment.service}</div>
 
-                    <div className="border-t border-black/5 dark:border-white/5 pt-1 mt-auto">
+                    <div className="border-t border-black/5 dark:border-white/5 pt-1 mt-auto flex items-center justify-between">
                         <span className={`text-[9px] font-bold ${style.text} truncate block`}>{appointment.staff}</span>
+                        {isMultiDay(appointment) && (
+                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${style.bar} text-white`}>
+                                {formatDuration(appointment.duration)}
+                            </span>
+                        )}
                     </div>
                 </div>
             </div>
