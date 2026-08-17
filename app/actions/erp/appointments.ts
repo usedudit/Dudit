@@ -424,7 +424,7 @@ const APPOINTMENT_LIST_COLUMNS = `
   sales_channel, payment_status, fulfillment_mode, needs_reschedule, sale_id, marketplace_order_id
 `
 
-export const MAX_APPOINTMENT_DURATION_MINUTES = 525600; // 1 year (365 days)
+const MAX_APPOINTMENT_DURATION_MINUTES = 525600; // 1 year (365 days)
 
 /**
  * Fetch appointments within a date range, with optional staff filter.
