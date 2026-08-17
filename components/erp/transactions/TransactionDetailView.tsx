@@ -88,7 +88,7 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
         loadHistory()
     }, [activeTab, historyLoaded, transactionId, partnerId, notifyError])
 
-    if (loading || !detail) {
+    if (loading) {
         return <ERPDetailLoading key="loading-tx-view" />
     }
     if (!detail) return null

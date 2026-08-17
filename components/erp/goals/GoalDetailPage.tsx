@@ -123,8 +123,17 @@ export default function GoalDetailPage({
     }
   }
 
-  if (isLoading || !goal) {
+  if (isLoading) {
     return <ERPDetailLoading key="loading-goal" />
+  }
+
+  if (!goal) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center p-6 text-center">
+        <p className="text-sm text-brand-inactive-text dark:text-dark-body">Meta não encontrada.</p>
+        <button type="button" onClick={onBack} className="mt-4 px-4 py-2 border rounded-md text-sm">Voltar</button>
+      </div>
+    )
   }
 
   const progressPercent = goal.progress_percent || 0

@@ -220,6 +220,19 @@ export function AdminPartnerDetailView({
     const paginatedReturns = recentReturns.slice((returnPage - 1) * ITEMS_PER_PAGE, returnPage * ITEMS_PER_PAGE)
     const totalReturnPages = Math.ceil(recentReturns.length / ITEMS_PER_PAGE) || 1
 
+    const handleCopyStoreId = useCallback(() => {
+        if (!store?.id) return
+        navigator.clipboard.writeText(store.id)
+        toast.success("ID da loja copiado com sucesso!")
+    }, [store?.id])
+
+    const handleCopyPartnerId = useCallback(() => {
+        const partnerId = store?.partner_id || detail?.partner?.id
+        if (!partnerId) return
+        navigator.clipboard.writeText(partnerId)
+        toast.success("ID do parceiro copiado com sucesso!")
+    }, [store?.partner_id, detail?.partner?.id])
+
     const handleConfirmSuspend = () => {
         if (!store.partner_id) return
         startTransition(async () => {
@@ -312,10 +325,18 @@ export function AdminPartnerDetailView({
                                                 <Badge variant={store.risk_score >= 50 ? "red" : store.risk_score >= 25 ? "orange" : "gray"}>
                                                     Risco: {store.risk_score || 0} pts
                                                 </Badge>
+                                                <button
+                                                    onClick={handleCopyStoreId}
+                                                    title="Copiar ID da loja"
+                                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono bg-brand-gray dark:bg-dark-border/40 hover:bg-brand-gray/80 text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading rounded-lg border border-brand-border dark:border-dark-border transition-colors cursor-pointer"
+                                                >
+                                                    <span>ID: {store.id.slice(0, 8)}...</span>
+                                                    <span className="text-[10px] uppercase font-bold text-brand-link">Copiar</span>
+                                                </button>
                                             </h1>
 
                                             <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
-                                                Responsável: {ownerProfile?.full_name || "Lojista"} • {ownerProfile?.email || "Sem e-mail"}
+                                                Responsável: {ownerProfile?.full_name || "Lojista"} • {ownerProfile?.email || "Sem e-mail"} • ID Loja: {store.id}
                                             </div>
                                         </div>
 
@@ -412,6 +433,20 @@ export function AdminPartnerDetailView({
                                                                     {formatDate(store.created_at)}
                                                                 </span>
                                                             </div>
+                                                            <div>
+                                                                <span className="text-xs font-semibold text-brand-inactive-text block">ID da Loja (UUID)</span>
+                                                                <div className="flex items-center gap-2 mt-0.5">
+                                                                    <span className="font-mono text-xs text-brand-dark dark:text-dark-heading select-all truncate">{store.id}</span>
+                                                                    <button onClick={handleCopyStoreId} className="text-xs font-bold text-brand-green hover:underline shrink-0">Copiar</button>
+                                                                </div>
+                                                            </div>
+                                                            <div>
+                                                                <span className="text-xs font-semibold text-brand-inactive-text block">ID do Parceiro (Tenant)</span>
+                                                                <div className="flex items-center gap-2 mt-0.5">
+                                                                    <span className="font-mono text-xs text-brand-dark dark:text-dark-heading select-all truncate">{store.partner_id || "-"}</span>
+                                                                    {store.partner_id && <button onClick={handleCopyPartnerId} className="text-xs font-bold text-brand-green hover:underline shrink-0">Copiar</button>}
+                                                                </div>
+                                                            </div>
                                                             <div className="sm:col-span-2">
                                                                 <span className="text-xs font-semibold text-brand-inactive-text block">Descrição</span>
                                                                 <p className="text-sm text-brand-dark dark:text-dark-heading mt-0.5">
@@ -478,6 +513,30 @@ export function AdminPartnerDetailView({
                                                         >
                                                             Ajustar Score
                                                         </Button>
+                                                    </div>
+
+                                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden transition-colors">
+                                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">
+                                                            Identificadores
+                                                        </h3>
+                                                        <div className="space-y-2 text-xs">
+                                                            <div>
+                                                                <span className="text-brand-inactive-text block">ID da Loja</span>
+                                                                <div className="flex items-center justify-between mt-0.5">
+                                                                    <span className="font-mono text-brand-dark dark:text-dark-heading">{store.id.slice(0, 14)}...</span>
+                                                                    <button onClick={handleCopyStoreId} className="text-brand-green font-bold hover:underline">Copiar</button>
+                                                                </div>
+                                                            </div>
+                                                            {store.partner_id && (
+                                                                <div>
+                                                                    <span className="text-brand-inactive-text block">ID do Parceiro</span>
+                                                                    <div className="flex items-center justify-between mt-0.5">
+                                                                        <span className="font-mono text-brand-dark dark:text-dark-heading">{store.partner_id.slice(0, 14)}...</span>
+                                                                        <button onClick={handleCopyPartnerId} className="text-brand-green font-bold hover:underline">Copiar</button>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>

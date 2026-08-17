@@ -44,6 +44,14 @@ function formatOrderId(id: string): string {
 }
 
 export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
+    if (!customer) {
+        return (
+            <div className="h-full flex flex-col items-center justify-center p-6 text-center">
+                <p className="text-sm text-brand-inactive-text dark:text-dark-body">Cliente não encontrado.</p>
+                <Button variant="outline" className="mt-4" onClick={onBack}>Voltar</Button>
+            </div>
+        )
+    }
     const realCustomerId = customer.originalId || customer.id;
     const { success: notifySuccess, error: notifyError } = useNotification();
     const { openPlanUpgrade } = usePlanUpgrade();
@@ -241,9 +249,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
         const fetchOrders = async () => {
             setIsLoadingOrders(true);
             try {
-                console.log("[CustomerDetailPage DEBUG] Calling getCustomerOrdersAction with realCustomerId:", realCustomerId);
                 const res = await getCustomerOrdersAction(realCustomerId);
-                console.log("[CustomerDetailPage DEBUG] res received from getCustomerOrdersAction:", res);
                 if (res && "orders" in res && Array.isArray((res as any).orders)) {
                     setFetchedOrders((res as any).orders);
                 }

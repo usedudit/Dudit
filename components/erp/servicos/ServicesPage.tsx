@@ -686,7 +686,7 @@ export default function ServicesPage({
         <>
             <AnimatePresence mode="wait">
                 {entityState.isOpen && formMode ? (
-                    (formMode !== 'add' && (isLoadingDetail || !formService)) ? (
+                    (formMode !== 'add' && isLoadingDetail) ? (
                         <ERPDetailLoading key="loading-service" />
                     ) : (
                         <FadeIn key="form" className="w-full h-full">

@@ -189,7 +189,7 @@ export default function VideosManagement() {
         <>
             <AnimatePresence mode="wait">
                 {isCreating || isEditing || isViewing ? (
-                    ((isEditing || isViewing) && (isVideosLoading || !currentVideo)) ? (
+                    ((isEditing || isViewing) && isVideosLoading) ? (
                         <ERPDetailLoading key="loading-video" />
                     ) : (
                         <FadeIn key="form" className="w-full h-full">

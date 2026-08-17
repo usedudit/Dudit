@@ -265,7 +265,7 @@ export async function middleware(request: NextRequest) {
   const cspHeader = `
     default-src 'self';
     worker-src 'self' blob:;
-    child-src 'self' blob:;
+    child-src 'self' blob: https://*.googlesyndication.com https://*.doubleclick.net https://googleads.g.doubleclick.net https://*.google;
     media-src 'self' blob: ${r2MediaOrigins};
     script-src 'self' 'unsafe-inline' ${process.env.NODE_ENV === 'development' ? "'unsafe-eval'" : ''}
         https://sdk.mercadopago.com 
@@ -274,6 +274,7 @@ export async function middleware(request: NextRequest) {
         https://maps.googleapis.com 
         https://*.googleapis.com 
         https://*.google.com 
+        https://*.google
         https://*.gstatic.com 
         https://api.mapbox.com 
         https://cdn.jsdelivr.net 
@@ -290,6 +291,11 @@ export async function middleware(request: NextRequest) {
         https://*.facebook.com
         https://pagead2.googlesyndication.com
         https://*.googlesyndication.com
+        https://*.doubleclick.net
+        https://googleads.g.doubleclick.net
+        https://*.adtrafficquality.google
+        https://*.googletagservices.com
+        https://www.googletagservices.com
         https://dudit.com.br
         https://www.dudit.com.br;
     connect-src 'self' data: blob: 
@@ -304,6 +310,11 @@ export async function middleware(request: NextRequest) {
         https://maps.googleapis.com 
         https://*.googleapis.com 
         https://*.google.com 
+        https://*.google
+        https://*.adtrafficquality.google
+        https://*.adservice.google.com
+        https://*.adservice.google.com.br
+        https://*.googletagservices.com
         https://api.mapbox.com 
         https://events.mapbox.com 
         https://*.tiles.mapbox.com 
@@ -333,6 +344,14 @@ export async function middleware(request: NextRequest) {
         https://*.mercadopago.com 
         https://checkout.mercadopago.com
         https://accounts.google.com
+        https://*.google.com
+        https://*.google
+        https://*.adtrafficquality.google
+        https://googleads.g.doubleclick.net
+        https://*.doubleclick.net
+        https://pagead2.googlesyndication.com
+        https://tpc.googlesyndication.com
+        https://*.googlesyndication.com
         https://www.mercadolibre.com
         https://www.youtube.com
         https://www.youtube-nocookie.com

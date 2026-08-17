@@ -8,8 +8,7 @@ import {
   recordLegalConsent,
 } from "@/app/actions/auth/legal-consent"
 import type { PendingLegalConsent } from "@/lib/legal/pending"
-import Portal from "@/components/Portal"
-import { Button } from "@/components/reusable/Button"
+import { DefaultModal, ListItem, Button } from "@/components/reusable"
 import { FileTextIcon } from "@/lib/icons"
 
 const DOCUMENT_LABELS: Record<string, string> = {
@@ -47,15 +46,17 @@ export function LegalConsentBanner() {
     }
   }, [user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const isOpen = Boolean(!isAuthLoading && user && pending && pending.length > 0)
+
   // Bloqueia o scroll enquanto o modal está aberto
   useEffect(() => {
-    if (!pending || pending.length === 0) return
+    if (!isOpen) return
     const originalOverflow = document.body.style.overflow
     document.body.style.overflow = "hidden"
     return () => {
       document.body.style.overflow = originalOverflow
     }
-  }, [pending])
+  }, [isOpen])
 
   const handleAccept = async () => {
     if (!pending || pending.length === 0) return
@@ -79,62 +80,60 @@ export function LegalConsentBanner() {
     }
   }
 
-  if (isAuthLoading || !user || pending === null || pending.length === 0) return null
-
   return (
-    <Portal>
-      <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70">
-        <div className="relative bg-white dark:bg-dark-surface rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto p-6">
-          <div className="flex items-start gap-3 mb-4">
-            <div className="shrink-0 flex items-center justify-center h-11 w-11 rounded-full bg-brand-green/10">
-              <FileTextIcon className="h-5 w-5 text-brand-green" />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-brand-dark dark:text-dark-heading">
-                Documentos atualizados
-              </h2>
-              <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-1">
-                Nossos documentos legais foram atualizados. Para continuar usando a Dudit,
-                aceite a nova versão:
-              </p>
-            </div>
-          </div>
-
-          <ul className="space-y-3 mb-6">
-            {pending.map((doc) => (
-              <li
-                key={doc.tipo}
-                className="flex items-center justify-between gap-3 rounded-xl border border-brand-border dark:border-dark-border p-3"
-              >
-                <div>
-                  <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                    {DOCUMENT_LABELS[doc.tipo] ?? doc.tipo}
-                  </p>
-                  <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                    Versão {doc.versao}
-                  </p>
-                </div>
-                {doc.url && (
-                  <Link
-                    href={doc.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs font-bold text-brand-green underline shrink-0"
-                  >
-                    Ler
-                  </Link>
-                )}
-              </li>
-            ))}
-          </ul>
-
-          {error && <p className="text-sm text-brand-red mb-4">{error}</p>}
-
+    <DefaultModal
+      isOpen={isOpen}
+      onClose={() => {}}
+      title="Documentos atualizados"
+      maxWidth="md"
+      footer={
+        <div className="w-full">
           <Button onClick={handleAccept} isLoading={accepting} className="w-full">
             Aceito os documentos atualizados
           </Button>
         </div>
+      }
+    >
+      <div className="space-y-4">
+        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+          Nossos documentos legais foram atualizados. Para continuar usando a Dudit,
+          aceite a nova versão:
+        </p>
+
+        <div className="space-y-3">
+          {(pending ?? []).map((doc) => {
+            const url = doc.url
+            return (
+              <ListItem
+                key={doc.tipo}
+                icon={FileTextIcon}
+                title={DOCUMENT_LABELS[doc.tipo] ?? doc.tipo}
+                description={doc.versao ? `Versão ${doc.versao}` : undefined}
+                onClick={
+                  url
+                    ? () => window.open(url, "_blank", "noopener,noreferrer")
+                    : undefined
+                }
+                right={
+                  url ? (
+                    <Link
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-xs font-bold text-brand-green hover:underline shrink-0"
+                    >
+                      Ler documento
+                    </Link>
+                  ) : null
+                }
+              />
+            )
+          })}
+        </div>
+
+        {error && <p className="text-sm text-brand-red">{error}</p>}
       </div>
-    </Portal>
+    </DefaultModal>
   )
 }

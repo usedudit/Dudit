@@ -89,11 +89,11 @@ export const HARDCODED_PLANS: Record<string, { name: string; objective: string; 
       "Tudo do plano Começar +",
       "Receba pedidos direto pelo sistema",
       "Pagamentos online com Mercado Pago",
-      "Cupons e promoções para vender mais",
+      "Cupons para vender mais",
       "Variações de produtos (cor, tamanho e mais)",
+      "Gestão fácil de trocas e devoluções",
       "Configuração simples de entregas",
       "Controle financeiro com visão do lucro",
-      "Relatórios básicos do negócio",
       "Gestão organizada de fornecedores",
       "Ordens de serviço em um só lugar"
     ],
@@ -111,9 +111,10 @@ export const HARDCODED_PLANS: Record<string, { name: string; objective: string; 
       "Financeiro completo com fluxo de caixa e DRE",
       "Relatórios avançados para decisões estratégicas",
       "Controle de expedição e entregas",
-      "Gestão fácil de trocas e devoluções",
-      "Kits e combos de produtos",
-      "Campanhas promocionais para vender mais"
+      "Campanhas promocionais para vender mais",
+      "Gestão de desempenho e metas",
+      "Melhor controle de estoque",
+      "Envio de lembretes e mensagens automáticas"
     ],
     limits: [
       "Itens e pedidos ilimitados",

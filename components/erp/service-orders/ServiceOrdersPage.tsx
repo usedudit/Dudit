@@ -467,7 +467,7 @@ export default function ServiceOrdersPage({
     <>
       <AnimatePresence mode="wait">
         {entityState.isOpen && (entityState.action === "create" || entityState.action === "edit") ? (
-          (entityState.action === "edit" && (isLoadingDetail || !currentEntity)) ? (
+          (entityState.action === "edit" && isLoadingDetail) ? (
             <ERPDetailLoading key="loading-form" />
           ) : (
             <FadeIn key={entityState.action} className="w-full h-full bg-white dark:bg-dark-background">
@@ -484,7 +484,7 @@ export default function ServiceOrdersPage({
             </FadeIn>
           )
         ) : entityState.isOpen && entityState.action === "view" ? (
-          (isLoadingDetail || !currentEntity) ? (
+          isLoadingDetail ? (
             <ERPDetailLoading key="loading-detail" />
           ) : (
             <FadeIn key="detail" className="w-full h-full bg-white dark:bg-dark-background">

@@ -767,7 +767,7 @@ export default function CouponsPage({
         <>
             <AnimatePresence mode="wait">
                 {wrapperMode === "create" || wrapperMode === "edit" ? (
-                    (wrapperMode === "edit" && ((isLoadingScope || isLoadingRelations) && !selectedCoupon)) ? (
+                    (wrapperMode === "edit" && (isLoadingScope || isLoadingRelations)) ? (
                         <ERPDetailLoading key="loading-coupon-form" />
                     ) : (
                         <FadeIn key="form" className="w-full h-full">
@@ -792,7 +792,7 @@ export default function CouponsPage({
                         </FadeIn>
                     )
                 ) : wrapperMode === "view" ? (
-                    (isLoadingRelations && !selectedCoupon) ? (
+                    isLoadingRelations ? (
                         <ERPDetailLoading key="loading-coupon" />
                     ) : selectedCoupon ? (
                         <FadeIn key="detail" className="w-full h-full">

@@ -153,7 +153,7 @@ export async function getAdminMarketplaceOrderDetail(orderId: string): Promise<a
         .select(`
             *,
             stores!left(id, name, person_type, logo_url, banner_url, phone, description, risk_score, partner_id),
-            order_items(id, product_id, product_name, product_price, quantity, subtotal, net_item_value, product_variants(id, variant_name), products(id, sku, images)),
+            order_items(*, products(id, name, sku, images, unit, price), product_variants(id, variant_name, sku), services(id, name, images, price)),
             return_requests!order_id(
                 id, request_type, status, resolution_type, refund_amount, store_credit_amount, source, created_at,
                 return_items(id, product_name_snapshot, quantity, net_item_value_snapshot, reason)
@@ -169,7 +169,7 @@ export async function getAdminMarketplaceOrderDetail(orderId: string): Promise<a
     if (order.buyer_id) {
         const { data: profile } = await admin
             .from("user_profiles")
-            .select("user_id, full_name, avatar_url, phone, cpf, birth_date")
+            .select("user_id, full_name, avatar_url, phone, cpf, birth_date, risk_score")
             .eq("user_id", order.buyer_id)
             .maybeSingle()
 
@@ -185,6 +185,98 @@ export async function getAdminMarketplaceOrderDetail(orderId: string): Promise<a
         }
     }
 
+    // Query delivery assignments (Dudit platform drivers)
+    let deliveryDriver: any = null
+    let deliveryAssignments: any[] = []
+    try {
+        const { data: assignments } = await admin
+            .from("delivery_assignments")
+            .select(`
+                id, status, assigned_at, accepted_at, picked_up_at, out_for_delivery_at, completed_at, failed_at, cancelled_at, delivery_fee, driver_id,
+                delivery_drivers!driver_id(user_id, city, neighborhood, vehicle_type, is_active)
+            `)
+            .eq("order_id", orderId)
+            .order("assigned_at", { ascending: false })
+
+        deliveryAssignments = assignments || []
+
+        if (assignments && assignments.length > 0) {
+            const latest = assignments[0]
+            const driverUserId = latest.driver_id
+            const { data: driverProf } = await admin
+                .from("user_profiles")
+                .select("user_id, full_name, avatar_url, phone")
+                .eq("user_id", driverUserId)
+                .maybeSingle()
+
+            let driverEmail = null
+            try {
+                const { data: authD } = await admin.auth.admin.getUserById(driverUserId)
+                driverEmail = authD?.user?.email || null
+            } catch {}
+
+            deliveryDriver = {
+                type: "dudit_platform", // Entregador Dudit (convidado manualmente)
+                driver_id: driverUserId,
+                full_name: driverProf?.full_name || "Entregador Dudit",
+                avatar_url: driverProf?.avatar_url || null,
+                phone: driverProf?.phone || null,
+                email: driverEmail,
+                city: (latest.delivery_drivers as any)?.city || null,
+                neighborhood: (latest.delivery_drivers as any)?.neighborhood || null,
+                vehicle_type: (latest.delivery_drivers as any)?.vehicle_type || null,
+                assignment_status: latest.status,
+                assigned_at: latest.assigned_at,
+                delivery_fee: latest.delivery_fee,
+            }
+        }
+    } catch (e) {
+        console.error("Error fetching delivery assignments for admin order detail:", e)
+    }
+
+    // If no platform driver, check if there's a store delivery driver (via deliveries table)
+    if (!deliveryDriver && order.partner_id) {
+        try {
+            const { data: storeDelivery } = await admin
+                .from("deliveries")
+                .select("id, status, started_at, completed_at, notes, delivery_person_id, courier_name, courier_phone")
+                .contains("order_ids", [orderId])
+                .maybeSingle()
+
+            if (storeDelivery) {
+                let courierName = storeDelivery.courier_name
+                let courierPhone = storeDelivery.courier_phone
+                let courierAvatar = null
+
+                if (storeDelivery.delivery_person_id) {
+                    const { data: partnerUserProf } = await admin
+                        .from("user_profiles")
+                        .select("full_name, phone, avatar_url")
+                        .eq("user_id", storeDelivery.delivery_person_id)
+                        .maybeSingle()
+                    if (partnerUserProf) {
+                        courierName = partnerUserProf.full_name || courierName
+                        courierPhone = partnerUserProf.phone || courierPhone
+                        courierAvatar = partnerUserProf.avatar_url
+                    }
+                }
+
+                deliveryDriver = {
+                    type: "store_internal", // Entregador da Loja
+                    driver_id: storeDelivery.delivery_person_id || null,
+                    full_name: courierName || "Entregador da Loja",
+                    avatar_url: courierAvatar,
+                    phone: courierPhone,
+                    delivery_status: storeDelivery.status,
+                    started_at: storeDelivery.started_at,
+                    notes: storeDelivery.notes,
+                }
+            }
+        } catch (e) {
+            console.error("Error fetching store deliveries for admin order detail:", e)
+        }
+    }
+
     // Get audit timeline events for this order
     const { data: auditEvents } = await admin
         .from("admin_audit_logs")
@@ -196,6 +288,8 @@ export async function getAdminMarketplaceOrderDetail(orderId: string): Promise<a
     return {
         ...order,
         buyer_profile: buyerProfile,
+        delivery_driver: deliveryDriver,
+        delivery_assignments: deliveryAssignments,
         audit_events: auditEvents || [],
     }
 }

@@ -1547,7 +1547,7 @@ export default function TransactionsPage({
     }
 
     if (entityState.isOpen && entityState.action === "view" && entityState.entityId && !entityState.entityType) {
-        if (isLoadingDetail || !currentEntity) {
+        if (isLoadingDetail) {
             return <ERPDetailLoading key="loading-tx-detail" />
         }
         return (
@@ -2077,7 +2077,7 @@ export default function TransactionsPage({
         : null
 
     if (isFormOpen) {
-        if (entityState.action === "edit" && (isLoadingDetail || !editingTx) && entityState.entityType !== "recurring") {
+        if (entityState.action === "edit" && isLoadingDetail && entityState.entityType !== "recurring") {
             return <ERPDetailLoading key="loading-tx-edit" />
         }
         return (

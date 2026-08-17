@@ -589,7 +589,7 @@ export default function CashRegisterPage({
         <>
             <AnimatePresence mode="wait">
                 {isViewing && activeViewId ? (
-                    (isDetailLoading || !detailedSession) ? (
+                    isDetailLoading ? (
                         <ERPDetailLoading key="loading-cash-detail" />
                     ) : (
                         <FadeIn key="detail" className="w-full h-full">

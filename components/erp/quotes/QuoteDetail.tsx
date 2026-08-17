@@ -394,7 +394,8 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
         }));
     }, [quote?.items]);
 
-    if (loading || !quote) return <ERPDetailLoading key="loading-quote-view" />;
+    if (loading) return <ERPDetailLoading key="loading-quote-view" />;
+    if (!quote) return null;
 
     const statusInfo = getStatusInfo(quote.status);
     const subtotal = Number(quote.subtotal || 0);
