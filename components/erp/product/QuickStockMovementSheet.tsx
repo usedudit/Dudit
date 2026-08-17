@@ -37,7 +37,7 @@ type Props = {
 }
 
 export default function QuickStockMovementSheet({ isOpen, product, variant, onClose, onSaveSuccess }: Props) {
-    const isMobile = useMediaQuery("(max-width: 768px)")
+    const isMobile = useMediaQuery("(max-width: 1023px)")
     const { success: notifySuccess, error: notifyError } = useNotification()
 
     // Form States
@@ -132,7 +132,7 @@ export default function QuickStockMovementSheet({ isOpen, product, variant, onCl
             {/* Header */}
             <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
                 <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Ajustar estoque</h2>
-                <Button variant="filled" onClick={onClose} size="icon" className="w-[40px] h-[40px]">
+                <Button variant="filled" onClick={onClose} size="icon" className="hidden lg:flex w-[40px] h-[40px]">
                     <XIcon className="h-5 w-5" />
                 </Button>
             </header>

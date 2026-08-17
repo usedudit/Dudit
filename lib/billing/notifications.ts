@@ -5,6 +5,9 @@ type BillingNotificationType =
     | "billing.subscription_cancelled"
     | "billing.subscription_renewed"
     | "billing.subscription_activated"
+    | "billing.refund_requested"
+    | "billing.refund_approved"
+    | "billing.refund_rejected"
 
 const notificationLabels: Record<BillingNotificationType, string> = {
     "billing.payment_received": "Pagamento recebido",
@@ -13,6 +16,9 @@ const notificationLabels: Record<BillingNotificationType, string> = {
     "billing.subscription_cancelled": "Assinatura cancelada",
     "billing.subscription_renewed": "Assinatura renovada",
     "billing.subscription_activated": "Assinatura ativada",
+    "billing.refund_requested": "Solicitação de reembolso enviada",
+    "billing.refund_approved": "Reembolso aprovado",
+    "billing.refund_rejected": "Solicitação de reembolso recusada",
 }
 
 export async function sendBillingNotification(

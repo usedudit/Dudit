@@ -100,6 +100,19 @@ export default function DeliveriesPage({
     const initialTab = searchParams?.get("tab") === "closed" || searchParams?.get("tab") === "cancelled" ? "closed" : "active"
     const [activeTab, setActiveTabState] = useState<"active" | "closed">(initialTab)
 
+    // Sync activeTab and search with URL searchParams
+    useEffect(() => {
+        const currentTabParam = searchParams?.get("tab") === "closed" || searchParams?.get("tab") === "cancelled" ? "closed" : "active"
+        if (currentTabParam !== activeTab) {
+            setActiveTabState(currentTabParam)
+        }
+        const currentSearchParam = searchParams?.get("search") || ""
+        if (currentSearchParam !== search) {
+            setSearchState(currentSearchParam)
+            setDebouncedSearch(currentSearchParam)
+        }
+    }, [searchParams])
+
     const setActiveTab = useCallback((tab: "active" | "closed") => {
         setActiveTabState(tab)
         if (typeof window !== "undefined") {

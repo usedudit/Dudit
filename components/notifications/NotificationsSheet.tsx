@@ -31,7 +31,7 @@ export function NotificationsSheet({ isOpen, onClose }: NotificationsSheetProps)
     setPanelOpen(isOpen)
   }, [isOpen, setPanelOpen])
 
-  const isMobile = useMediaQuery("(max-width: 768px)")
+  const isMobile = useMediaQuery("(max-width: 1023px)")
 
   const handleNavigate = useCallback(() => {
     onClose()
@@ -43,7 +43,7 @@ export function NotificationsSheet({ isOpen, onClose }: NotificationsSheetProps)
         <h2 className="text-lg font-bold text-brand-dark dark:text-dark-heading">
           Notificações
         </h2>
-        <Button variant="filled" onClick={onClose} size="icon">
+        <Button variant="filled" onClick={onClose} size="icon" className="hidden lg:flex">
           <XIcon className="h-5 w-5" />
         </Button>
       </header>

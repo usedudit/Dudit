@@ -30,7 +30,7 @@ type Props = {
 }
 
 export default function SelectProductVariantSheet({ isOpen, product, onClose, onConfirm }: Props) {
-    const isMobile = useMediaQuery("(max-width: 768px)")
+    const isMobile = useMediaQuery("(max-width: 1023px)")
     const [qtyByVariantId, setQtyByVariantId] = useState<Record<string, number>>({})
 
     // Filtering, search, and sorting states
@@ -284,7 +284,7 @@ export default function SelectProductVariantSheet({ isOpen, product, onClose, on
         <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
             <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
                 <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Selecionar variações</h2>
-                <Button variant="filled" onClick={onClose} size="icon">
+                <Button variant="filled" onClick={onClose} size="icon" className="hidden lg:flex">
                     <XIcon className="h-5 w-5" />
                 </Button>
             </header>

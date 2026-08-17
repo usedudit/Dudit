@@ -81,6 +81,7 @@ export function AdminOrderDetailView({
     // Risk Score Modal for Buyer
     const [riskModalOpen, setRiskModalOpen] = useState(false)
     const [newRiskScore, setNewRiskScore] = useState("")
+    const [riskTitle, setRiskTitle] = useState("")
     const [riskReason, setRiskReason] = useState("")
 
     // Header override for mobile back button
@@ -151,10 +152,11 @@ export function AdminOrderDetailView({
 
         startTransition(async () => {
             try {
-                const res = await updateUserRiskScore(order.buyer_id, score, riskReason.trim())
+                const res = await updateUserRiskScore(order.buyer_id, score, riskReason.trim(), riskTitle.trim() || undefined)
                 if (res.success) {
-                    toast.success("Score de risco do cliente atualizado!")
+                    toast.success("Score de risco do cliente atualizado e notificação enviada!")
                     setRiskModalOpen(false)
+                    setRiskTitle("")
                     setRiskReason("")
                     fetchDetail()
                 } else {
@@ -904,6 +906,7 @@ export function AdminOrderDetailView({
                 isOpen={riskModalOpen}
                 onClose={() => {
                     setRiskModalOpen(false)
+                    setRiskTitle("")
                     setRiskReason("")
                 }}
                 title="Ajustar Score de Risco do Cliente"
@@ -922,23 +925,45 @@ export function AdminOrderDetailView({
                             onChange={(e) => setNewRiskScore(e.target.value)}
                             placeholder="Ex: 10"
                         />
+                        <span className="text-[11px] text-brand-inactive-text mt-1 block">
+                            0 a 24: Baixo risco • 25 a 49: Médio risco • 50+: Alto risco (alerta vermelho)
+                        </span>
                     </div>
 
                     <div>
                         <label className="block text-xs font-semibold text-brand-dark dark:text-dark-heading mb-1">
-                            Motivo do Ajuste (Obrigatório para Auditoria)
+                            Título da Notificação (Opcional)
+                        </label>
+                        <Input
+                            type="text"
+                            value={riskTitle}
+                            onChange={(e) => setRiskTitle(e.target.value)}
+                            placeholder="Ex: Atualização no Score de Risco"
+                        />
+                        <span className="text-[11px] text-brand-inactive-text mt-1 block">
+                            Se vazio, um título padrão sobre o ajuste de risco será utilizado.
+                        </span>
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-semibold text-brand-dark dark:text-dark-heading mb-1">
+                            Motivo / Mensagem da Notificação (Enviado para o Cliente)
                         </label>
                         <textarea
                             value={riskReason}
                             onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setRiskReason(e.target.value)}
-                            placeholder="Descreva o motivo do ajuste..."
+                            placeholder="Descreva o motivo do ajuste que será enviado para o cliente..."
                             rows={3}
                             className="w-full px-3 py-2 text-sm rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading placeholder:text-brand-inactive-text focus:outline-none focus:ring-2 focus:ring-brand-green/20"
                         />
                     </div>
 
                     <div className="flex justify-end gap-3 pt-3 border-t border-brand-border dark:border-dark-border">
-                        <Button variant="outline" onClick={() => setRiskModalOpen(false)}>
+                        <Button variant="outline" onClick={() => {
+                            setRiskModalOpen(false)
+                            setRiskTitle("")
+                            setRiskReason("")
+                        }}>
                             Cancelar
                         </Button>
                         <Button onClick={handleSaveRiskScore} disabled={isPending}>

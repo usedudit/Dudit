@@ -38,7 +38,7 @@ function ProductRowSkeleton() {
 }
 
 export default function SelectProductSheet({ isOpen, onClose, products, existingIds, onConfirm }: SelectProductSheetProps) {
-  const isMobile = useMediaQuery("(max-width: 768px)")
+  const isMobile = useMediaQuery("(max-width: 1023px)")
   const [search, setSearch] = useState("")
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
@@ -78,7 +78,7 @@ export default function SelectProductSheet({ isOpen, onClose, products, existing
     <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
       <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
         <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Selecionar Produtos</h2>
-        <Button variant="filled" onClick={onClose} size="icon">
+        <Button variant="filled" onClick={onClose} size="icon" className="hidden lg:flex">
           <XIcon className="h-5 w-5" />
         </Button>
       </header>

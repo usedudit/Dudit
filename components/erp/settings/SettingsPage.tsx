@@ -97,10 +97,13 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
     "recibo-devolucao": "trocas", // Legacy fallback compatibility
   }
 
-  // Sync state from URL on mount
+  // Sync state from URL searchParams
   React.useEffect(() => {
     const tab = searchParams.get("tab")
-    if (!tab) return
+    if (!tab) {
+      setActivePage("home")
+      return
+    }
 
     if (SLUG_TO_PAGE[tab]) {
       setActivePage(SLUG_TO_PAGE[tab])
@@ -116,11 +119,11 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
       setActiveTab(tab)
       setActivePage("home")
     }
-  }, []) // Run once on mount
+  }, [searchParams])
 
   // Sync URL from state changes
   React.useEffect(() => {
-    const currentTab = searchParams.get("tab")
+    const currentTab = searchParams.get("tab") || ""
     let newTab = ""
 
     if (activePage !== "home") {
@@ -136,7 +139,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
       }
       window.history.replaceState(null, "", url.toString())
     }
-  }, [activePage, activeTab, searchParams])
+  }, [activePage, searchParams])
 
   React.useEffect(() => {
     if (activePage !== "home") {

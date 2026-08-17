@@ -88,6 +88,18 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId, planG
         return () => clearTimeout(timer)
     }, [search])
 
+    // Sync activeTab with URL searchParams
+    React.useEffect(() => {
+        const tab = searchParams.get("tab") as any
+        if (validTabs.includes(tab) && tab !== activeTab) {
+            setActiveTab(tab)
+            setPage(1)
+        } else if (!tab && activeTab !== "categories") {
+            setActiveTab("categories")
+            setPage(1)
+        }
+    }, [searchParams])
+
     // Refresh Data
     const refreshData = useCallback(async () => {
         const result = await getProductMetadataAction(partnerId)
@@ -123,7 +135,7 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId, planG
         // Update URL
         const params = new URLSearchParams(searchParams.toString())
         params.set("tab", tab)
-        router.push(`?${params.toString()}`, { scroll: false })
+        router.replace(`?${params.toString()}`, { scroll: false })
     }
 
     const getAddButtonLabel = () => {

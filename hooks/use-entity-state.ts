@@ -46,12 +46,9 @@ function stateFromCurrentUrl(): EntityState {
  *
  * Architecture:
  *   1. Local useState updates SYNCHRONOUSLY on open/close (UI responds in <1ms)
- *   2. URL syncs INSTANTLY via window.history.replaceState (NO Next.js router)
+ *   2. URL syncs INSTANTLY via window.history.pushState/replaceState
  *   3. On browser back/forward, popstate → local state syncs
- *
- * CRITICAL: We do NOT use router.replace() because it triggers Next.js
- * server-side revalidation, causing 2-3 second delays. Instead we use
- * window.history.replaceState() which is <1ms.
+ *   4. Closing uses replaceState to clean action params WITHOUT popping previous pages
  *
  * URL patterns:
  *   /erp/produtos              → list (no action)
@@ -66,49 +63,24 @@ export function useEntityState() {
 
     // ── PRIMARY: Local state (synchronous, instant) ──────────────────────
     const [localState, setLocalState] = useState<EntityState>(() =>
-        stateFromParams(searchParams),
-    )
-
-    // Track the URL we last set via open()/close() so we can distinguish
-    // our own updates from external navigations. Next.js useSearchParams()
-    // is not updated by window.history.replaceState, so its value can be
-    // stale. We only sync from searchParams when the actual browser URL
-    // differs from what we last set, indicating a real external navigation.
-    const expectedHrefRef = useRef(
-        typeof window !== "undefined" ? window.location.href : "",
+        stateFromCurrentUrl(),
     )
 
     // Timestamp of last user action - prevents stale searchParams from overriding
     const lastUserActionRef = useRef(0)
 
     // Keep a ref with the current localState for safe comparison inside effects
-    // (avoids needing localState in effect dependencies, which could cause
-    // race conditions when navigating between pages)
     const localStateRef = useRef(localState)
     localStateRef.current = localState
 
     // ── SECONDARY: Sync from URL on external navigation ──────────────────
-    // This effect listens to Next.js searchParams changes. However, when we use
-    // window.history.replaceState, Next.js may re-fire searchParams reactively
-    // with either the old or new params. We only sync when the actual browser
-    // URL differs from our expected URL (i.e., a REAL external navigation).
     useEffect(() => {
-        const actualHref = window.location.href
-        if (actualHref === expectedHrefRef.current) {
-            // Our own open()/close() just updated the URL and Next.js is
-            // reacting to it belatedly. Skip to avoid stale override.
+        // Guard: if a user action happened very recently (<500ms), ignore
+        // searchParams updates since they're likely stale reactions.
+        if (Date.now() - lastUserActionRef.current < 500) {
             return
         }
-        // Guard: if a user action happened very recently (<1500ms), ignore
-        // searchParams updates since they're likely stale Next.js reactions.
-        // Increased from 500ms to handle slower devices and concurrent rendering.
-        if (Date.now() - lastUserActionRef.current < 1500) {
-            return
-        }
-        // Extra safety: compare URL state with current local state (via ref).
-        // If they match, don't reset - prevents stale searchParams from
-        // closing the entity view after a replaceState.
-        const urlState = stateFromParams(new URLSearchParams(window.location.search))
+        const urlState = stateFromCurrentUrl()
         if (
             urlState.action === localStateRef.current.action &&
             urlState.entityId === localStateRef.current.entityId &&
@@ -117,20 +89,16 @@ export function useEntityState() {
         ) {
             return
         }
-        // External navigation detected (back/forward, link click, etc.)
-        expectedHrefRef.current = actualHref
+        // External navigation detected (link click, router navigation, etc.)
         setLocalState(urlState)
-    }, [searchParams])
+    }, [searchParams, pathname])
 
     // ── Popstate handler for browser back/forward ────────────────────────
     useEffect(() => {
         const handlePopState = () => {
-            // Guard: if current pathname differs from our pathname, we've
-            // navigated to another page. Ignore stale popstate events.
             if (window.location.pathname !== pathname) return
             const urlState = stateFromCurrentUrl()
             setLocalState(urlState)
-            expectedHrefRef.current = window.location.href
         }
         window.addEventListener("popstate", handlePopState)
         return () => window.removeEventListener("popstate", handlePopState)
@@ -156,25 +124,26 @@ export function useEntityState() {
                 return
             }
 
-            const params = new URLSearchParams({ [action]: value })
-            if (entityType) params.set("type", entityType)
-            const url = `${pathname}?${params.toString()}`
-
             // 1. INSTANT: Update local state synchronously
             const wasOpen = localStateRef.current.isOpen
             setLocalState({ action, entityId, isOpen: true, entityType })
             lastUserActionRef.current = Date.now()
-            expectedHrefRef.current = url
 
-            // 2. INSTANT: Sync URL via pushState/replaceState
-            // If the entity modal was already open, we replace the state to avoid polluting history with multiple action steps
+            // 2. INSTANT: Sync URL via pushState / replaceState
             if (typeof window !== "undefined") {
-                const existingState = window.history.state
-                const stateObj = { ...existingState, isEntityOpen: true }
+                const url = new URL(window.location.href)
+                for (const a of ACTION_PARAMS) {
+                    url.searchParams.delete(a)
+                }
+                url.searchParams.delete("type")
+                url.searchParams.set(action, value)
+                if (entityType) url.searchParams.set("type", entityType)
+
+                const newRelative = `${url.pathname}${url.search}${url.hash}`
                 if (wasOpen) {
-                    window.history.replaceState(stateObj, "", url)
+                    window.history.replaceState(window.history.state, "", newRelative)
                 } else {
-                    window.history.pushState(stateObj, "", url)
+                    window.history.pushState(window.history.state, "", newRelative)
                 }
             }
         },
@@ -184,37 +153,36 @@ export function useEntityState() {
     // ── Close: instant local state + instant URL sync ────────────────────
 
     const close = useCallback(() => {
-        // Guard: if it's already closed, do nothing. This prevents double-back history navigations
-        // when close() is called multiple times or as cleanup.
+        // Guard: if it's already closed, do nothing.
         if (!localStateRef.current.isOpen) return
-        // Mark as closed synchronously in the ref so a second close() call in the same
-        // event tick (e.g. onSuccess + onBack both closing) becomes a no-op instead of
-        // triggering an extra history.back() that lands on the previous page.
         localStateRef.current = CLOSED_STATE
-
-        // Safety: if the current URL pathname doesn't match this page's pathname,
-        // it means navigation already occurred. Don't replace the URL or we'd
-        // override the new page's history entry, causing a "back to previous page".
-        if (typeof window !== "undefined" && window.location.pathname !== pathname) {
-            setLocalState(CLOSED_STATE)
-            return
-        }
 
         // 1. INSTANT: Clear local state synchronously
         setLocalState(CLOSED_STATE)
         lastUserActionRef.current = Date.now()
-        expectedHrefRef.current = pathname
 
-        // 2. INSTANT: Sync URL
-        // If we pushed state to open this, use history.back() to clean up browser history
-        if (typeof window !== "undefined" && window.history.state?.isEntityOpen) {
-            window.history.back()
-        } else {
-            if (typeof window !== "undefined") {
-                window.history.replaceState(null, "", pathname)
+        // 2. INSTANT: Clean action parameters from current URL without popping history
+        if (typeof window !== "undefined" && window.location.pathname === pathname) {
+            const url = new URL(window.location.href)
+            for (const a of ACTION_PARAMS) {
+                url.searchParams.delete(a)
             }
+            url.searchParams.delete("type")
+            const newRelative = `${url.pathname}${url.search}${url.hash}`
+            window.history.replaceState(window.history.state, "", newRelative)
         }
     }, [pathname])
+
+    // ── Auto-reset on erp-sidebar-reset ──────────────────────────────────
+    useEffect(() => {
+        const handleReset = () => {
+            if (localStateRef.current.isOpen) {
+                close()
+            }
+        }
+        window.addEventListener("erp-sidebar-reset", handleReset)
+        return () => window.removeEventListener("erp-sidebar-reset", handleReset)
+    }, [close])
 
     // ── Derived booleans (from instant local state) ──────────────────────
 
@@ -228,3 +196,4 @@ export function useEntityState() {
         isDuplicating: localState.action === "duplicate",
     }
 }
+

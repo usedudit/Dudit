@@ -1233,46 +1233,6 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
         return () => document.removeEventListener("click", handleDocumentClick, true)
     }, [hasUnsavedOrderChanges])
 
-    useEffect(() => {
-        const originalPushState = window.history.pushState
-        const originalReplaceState = window.history.replaceState
-
-        const shouldBlockHistoryNavigation = (url?: string | URL | null) => {
-            if (!hasUnsavedOrderChanges || !url) return false
-
-            const current = new URL(window.location.href)
-            const destination = new URL(String(url), current.href)
-            if (destination.origin !== current.origin) return false
-            if (destination.pathname === current.pathname) return false
-
-            setPendingLeaveHref(`${destination.pathname}${destination.search}${destination.hash}`)
-            setIsLeaveWithoutSaveAlertOpen(true)
-            return true
-        }
-
-        window.history.pushState = function pushState(
-            data: any,
-            unused: string,
-            url?: string | URL | null
-        ) {
-            if (shouldBlockHistoryNavigation(url)) return
-            return originalPushState.call(this, data, unused, url)
-        }
-
-        window.history.replaceState = function replaceState(
-            data: any,
-            unused: string,
-            url?: string | URL | null
-        ) {
-            if (shouldBlockHistoryNavigation(url)) return
-            return originalReplaceState.call(this, data, unused, url)
-        }
-
-        return () => {
-            window.history.pushState = originalPushState
-            window.history.replaceState = originalReplaceState
-        }
-    }, [hasUnsavedOrderChanges])
 
     useEffect(() => {
         if (!editingItem) return
@@ -2364,7 +2324,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                             setPendingLeaveHref(null)
                             if (destination) {
                                 bypassBeforeUnloadRef.current = true
-                                window.location.assign(destination)
+                                router.push(destination)
                             }
                         }}
                         title="Sair sem salvar?"

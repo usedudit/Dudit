@@ -53,7 +53,7 @@ interface ReplenishmentSheetProps {
 }
 
 export function ReplenishmentSheet({ isOpen, onClose, partnerId }: ReplenishmentSheetProps) {
-    const isMobile = useMediaQuery("(max-width: 768px)")
+    const isMobile = useMediaQuery("(max-width: 1023px)")
     const router = useRouter()
     const { success: notifySuccess, error: notifyError } = useNotification()
 
@@ -143,7 +143,7 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId }: Replenishment
         <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
             <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
                 <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Sugestões & Oportunidades</h2>
-                <Button variant="filled" onClick={onClose} size="icon">
+                <Button variant="filled" onClick={onClose} size="icon" className="hidden lg:flex">
                     <XIcon className="h-5 w-5" />
                 </Button>
 
@@ -342,7 +342,7 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId }: Replenishment
                         <p className="text-xs text-brand-inactive-text">Girar estoque parado por +90 dias</p>
                     </div>
                 </div>
-                <Button variant="filled" onClick={() => setIsDiscountSheetOpen(false)} size="icon">
+                <Button variant="filled" onClick={() => setIsDiscountSheetOpen(false)} size="icon" className="hidden lg:flex">
                     <XIcon className="h-5 w-5" />
                 </Button>
             </header>

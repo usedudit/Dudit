@@ -52,6 +52,7 @@ const navItems: NavItem[] = [
             { label: "Assinaturas", href: "/ddt-admin/billing/subscriptions" },
             { label: "Pagamentos", href: "/ddt-admin/billing/payments" },
             { label: "Faturas", href: "/ddt-admin/billing/invoices" },
+            { label: "Reembolsos", href: "/ddt-admin/billing/reembolsos" },
         ],
     },
     {

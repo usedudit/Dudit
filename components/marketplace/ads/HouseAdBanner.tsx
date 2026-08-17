@@ -19,7 +19,7 @@ export function HouseAdBanner({ variant = "banner", className = "" }: HouseAdBan
     if (variant === "compact") {
         return (
             <div className={`w-full flex flex-col ${className}`}>
-                <span className="text-[9px] font-semibold tracking-wider text-gray-400 uppercase mb-1 select-none">
+                <span className="text-[9px] font-semibold tracking-wider text-brand-inactive-text uppercase mb-1 select-none">
                     Publicidade
                 </span>
                 <button
@@ -52,7 +52,7 @@ export function HouseAdBanner({ variant = "banner", className = "" }: HouseAdBan
 
     return (
         <div className={`w-full flex flex-col ${className}`}>
-            <span className="text-[10px] font-semibold tracking-wider text-gray-400 uppercase mb-1.5 select-none">
+            <span className="text-[10px] font-semibold tracking-wider text-brand-inactive-text uppercase mb-1.5 select-none">
                 Publicidade
             </span>
             <button

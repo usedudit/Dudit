@@ -558,7 +558,7 @@ export const ShowcaseSubPage = ({
                 onClose={() => setBannerCropModalOpen(false)}
                 imageFile={tempBannerFile}
                 onCropComplete={handleBannerCropComplete}
-                aspectRatio={1300 / 300}
+                aspectRatio={1400 / 300}
             />
 
             <ImageCropperModal

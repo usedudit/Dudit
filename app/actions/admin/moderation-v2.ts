@@ -715,7 +715,8 @@ export async function deleteVariant(
 export async function updatePartnerRiskScore(
     partnerId: string,
     newScore: number,
-    notes?: string
+    notes?: string,
+    customTitle?: string
 ): Promise<{ success: boolean; error?: string }> {
     const admin = await requireAdmin("moderator")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
@@ -724,7 +725,7 @@ export async function updatePartnerRiskScore(
         const fetchAdmin = getAdminClient()
         const { data: store } = await fetchAdmin
             .from("stores")
-            .select("id, risk_score")
+            .select("id, name, risk_score")
             .eq("partner_id", partnerId)
             .order("is_headquarters", { ascending: false })
             .limit(1)
@@ -753,6 +754,45 @@ export async function updatePartnerRiskScore(
             riskScoreIncrement: newScore - previousScore,
             notes,
         })
+
+        // ─── Dispatch In-App + Push Notification ──────────────────────────────
+        try {
+            const { createNotificationsForUsers, getPartnerTeamUserIds } = await import("@/lib/services/notification.service")
+            const teamUserIds = await getPartnerTeamUserIds(partnerId)
+
+            if (teamUserIds.length > 0) {
+                const notifTitle = customTitle?.trim() || (newScore > previousScore
+                    ? `Aviso: Atualização no Score de Risco da loja ${store.name || "Parceiro"}`
+                    : `Ajuste no Score de Risco da loja ${store.name || "Parceiro"}`)
+
+                const notifMessage = notes?.trim()
+                    ? notes.trim()
+                    : `O score de risco da loja foi ajustado de ${previousScore} para ${newScore} pontos.`
+
+                await createNotificationsForUsers(teamUserIds, (uid) => ({
+                    userId: uid,
+                    type: "admin_announcement",
+                    title: notifTitle,
+                    message: notifMessage,
+                    entityType: "announcement",
+                    entityId: null,
+                    data: {
+                        partner_id: partnerId,
+                        store_id: store.id,
+                        store_name: store.name,
+                        old_score: previousScore,
+                        new_score: newScore,
+                        reason: notes?.trim() || null,
+                        audience: "seller",
+                        url: "/erp/configuracoes",
+                    },
+                    idempotencyKey: `risk_score_partner:${partnerId}:${newScore}:${Date.now()}:${uid}`,
+                    origin: "system",
+                }))
+            }
+        } catch (notifErr) {
+            console.error("[MODERATION_V2] Failed to send partner risk notification:", notifErr)
+        }
 
         return { success: true }
     } catch (err: any) {

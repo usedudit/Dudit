@@ -33,7 +33,7 @@ export function SponsoredAdCard({ ad, variant = "banner", className = "" }: Spon
                 <button
                     type="button"
                     onClick={handleClick}
-                    className="group relative w-full text-left rounded-xl overflow-hidden border border-gray-200/80 dark:border-dark-border bg-gray-50 dark:bg-dark-border/50 hover:opacity-95 transition-all duration-200 aspect-[3/1] sm:aspect-[3.2/1]"
+                    className="group relative w-full text-left rounded-xl overflow-hidden border border-gray-200/80 dark:border-dark-border bg-gray-50 dark:bg-dark-border/50 hover:opacity-95 transition-all duration-200 aspect-[1400/300]"
                 >
                     <img
                         src={ad.image_url}
@@ -55,7 +55,7 @@ export function SponsoredAdCard({ ad, variant = "banner", className = "" }: Spon
                 <button
                     type="button"
                     onClick={handleClick}
-                    className="group relative w-full text-left rounded-xl overflow-hidden border border-gray-200/80 dark:border-dark-border bg-gray-50 dark:bg-dark-border/50 hover:opacity-95 transition-all duration-200 aspect-[3.2/1] sm:aspect-[3.6/1]"
+                    className="group relative w-full text-left rounded-xl overflow-hidden border border-gray-200/80 dark:border-dark-border bg-gray-50 dark:bg-dark-border/50 hover:opacity-95 transition-all duration-200 aspect-[1400/300]"
                 >
                     <img
                         src={ad.image_url}
@@ -77,7 +77,7 @@ export function SponsoredAdCard({ ad, variant = "banner", className = "" }: Spon
             <button
                 type="button"
                 onClick={handleClick}
-                className="group relative w-full text-left rounded-xl sm:rounded-2xl overflow-hidden border border-gray-200/80 dark:border-dark-border bg-gray-50 dark:bg-dark-border/50 hover:opacity-95 transition-all duration-200 aspect-[3.2/1] sm:aspect-[3.6/1]"
+                className="group relative w-full text-left rounded-xl sm:rounded-2xl overflow-hidden border border-gray-200/80 dark:border-dark-border bg-gray-50 dark:bg-dark-border/50 hover:opacity-95 transition-all duration-200 aspect-[1400/300]"
             >
                 <img
                     src={ad.image_url}

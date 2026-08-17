@@ -133,7 +133,7 @@ export default function SelectPromotionGiftSheet({
 }: SelectPromotionGiftSheetProps) {
   const [search, setSearch] = useState("")
   const [activeTab, setActiveTab] = useState("products")
-  const isMobile = useMediaQuery("(max-width: 768px)")
+  const isMobile = useMediaQuery("(max-width: 1023px)")
 
   const currentItems = useMemo(() => {
     return activeTab === "products" ? products : services
@@ -168,7 +168,7 @@ export default function SelectPromotionGiftSheet({
     <Div className="flex h-full flex-col bg-white dark:bg-dark-surface">
       <Header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
         <H2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Selecionar Brinde</H2>
-        <Button variant="filled" onClick={onClose} size="icon">
+        <Button variant="filled" onClick={onClose} size="icon" className="hidden lg:flex">
           <XIcon className="h-5 w-5" />
         </Button>
       </Header>

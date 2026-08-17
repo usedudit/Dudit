@@ -35,7 +35,7 @@ export function SupplierSelectorSheet({
   partnerId,
   selectedSupplierIds = [],
 }: SupplierSelectorSheetProps) {
-  const isMobile = useMediaQuery("(max-width: 767px)")
+  const isMobile = useMediaQuery("(max-width: 1023px)")
   const [search, setSearch] = useState("")
   const [suppliers, setSuppliers] = useState<SupplierResult[]>([])
   const [loading, setLoading] = useState(false)
@@ -85,7 +85,7 @@ export function SupplierSelectorSheet({
       <div className="p-4 border-b border-brand-border dark:border-dark-border">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Selecionar Fornecedor</h2>
-          <button onClick={onClose} className="p-1 hover:bg-brand-gray dark:hover:bg-dark-border rounded-lg">
+          <button onClick={onClose} className="hidden lg:flex p-1 hover:bg-brand-gray dark:hover:bg-dark-border rounded-lg">
             <XIcon size={20} className="text-brand-inactive-text" />
           </button>
         </div>

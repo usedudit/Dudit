@@ -41,7 +41,7 @@ export default function PlanItemFormSheet({
     onSave,
     editingItem = null,
 }: SelectPlanItemSheetProps) {
-    const isMobile = useMediaQuery("(max-width: 768px)")
+    const isMobile = useMediaQuery("(max-width: 1023px)")
 
     // Tabs: "product" | "service"
     const [activeTab, setActiveTab] = useState<"product" | "service">("product")
@@ -128,7 +128,7 @@ export default function PlanItemFormSheet({
                 <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">
                     {editingItem ? "Editar Item" : "Adicionar Item ao Plano"}
                 </h2>
-                <Button variant="filled" onClick={onClose} size="icon">
+                <Button variant="filled" onClick={onClose} size="icon" className="hidden lg:flex">
                     <XIcon className="h-5 w-5" />
                 </Button>
             </header>

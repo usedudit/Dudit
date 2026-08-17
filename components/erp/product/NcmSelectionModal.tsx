@@ -74,7 +74,7 @@ export default function NcmSelectionModal({
   isLoading = false,
 }: NcmSelectionModalProps) {
   const [isAnimating, setIsAnimating] = useState(false)
-  const isMobile = useMediaQuery("(max-width: 768px)")
+  const isMobile = useMediaQuery("(max-width: 1023px)")
   const safeSuggestions = suggestions || []
 
   useEffect(() => {

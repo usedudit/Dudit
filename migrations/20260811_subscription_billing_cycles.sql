@@ -6,8 +6,8 @@
 --   - CURRENT cycle purchase  → status completed (paid) + invoice
 --   - NEXT cycle purchase     → status pending (upcoming "Próxima Fatura") + invoice
 --
--- Also relaxes the "one active purchase per partner/plan" constraint to
--- "one per partner/plan/period" so both the current and next cycle can coexist.
+-- Supports status overrides ('active', 'trial', 'pending', 'past_due'/'error'/'failed', 'cancelled')
+-- for manual database testing and full billing cycle synchronization.
 -- ============================================================================
 
 ALTER TABLE public.billing_purchases
@@ -138,9 +138,15 @@ $$;
 
 -- ============================================================================
 -- sync_subscription_to_billing: sync current + next cycle purchases/invoices.
+-- Suporta override de status: 'active', 'trial', 'pending', 'past_due' (erro/falha no cartão), 'cancelled', etc.
 -- ============================================================================
 
-CREATE OR REPLACE FUNCTION public.sync_subscription_to_billing(sub_id UUID)
+CREATE OR REPLACE FUNCTION public.sync_subscription_to_billing(
+    sub_id UUID,
+    p_status_override TEXT DEFAULT NULL,
+    p_period_start TIMESTAMPTZ DEFAULT NULL,
+    p_period_end TIMESTAMPTZ DEFAULT NULL
+)
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -150,7 +156,9 @@ DECLARE
     sub_record RECORD;
     partner_record RECORD;
     existing RECORD;
+    existing_pay RECORD;
     purchase_status TEXT;
+    target_sub_status TEXT;
     v_purchase_id UUID;
     next_purchase_id UUID;
     v_now TIMESTAMPTZ := now();
@@ -161,6 +169,8 @@ DECLARE
     plan_price NUMERIC;
     descr TEXT;
     mp_sub_id TEXT;
+    current_inv RECORD;
+    next_inv RECORD;
 BEGIN
     SELECT s.*, p.id AS plan_id, p.name AS plan_name, p.price AS plan_price, p.slug AS plan_slug
     INTO sub_record
@@ -169,12 +179,50 @@ BEGIN
     WHERE s.id = sub_id;
 
     IF NOT FOUND THEN
-        RETURN jsonb_build_object('error', 'Subscription not found');
+        RETURN jsonb_build_object('success', false, 'error', 'Subscription not found');
+    END IF;
+
+    -- ── 1. Processar override de status e datas (se informados) ──
+    IF p_status_override IS NOT NULL AND trim(p_status_override) <> '' THEN
+        target_sub_status := CASE lower(trim(p_status_override))
+            WHEN 'active'    THEN 'active'
+            WHEN 'trial'     THEN 'trialing'
+            WHEN 'trialing'  THEN 'trialing'
+            WHEN 'pending'   THEN 'pending'
+            WHEN 'past_due'  THEN 'past_due'
+            WHEN 'error'     THEN 'past_due'
+            WHEN 'failed'    THEN 'past_due'
+            WHEN 'rejected'  THEN 'past_due'
+            WHEN 'unpaid'    THEN 'past_due'
+            WHEN 'cancelled' THEN 'cancelled'
+            WHEN 'canceled'  THEN 'cancelled'
+            WHEN 'paused'    THEN 'paused'
+            ELSE lower(trim(p_status_override))
+        END;
+
+        -- Atualizar a assinatura no banco com o status requisitado
+        UPDATE subscriptions
+        SET status = target_sub_status,
+            current_period_start = COALESCE(p_period_start, current_period_start, v_now),
+            current_period_end = COALESCE(p_period_end, current_period_end, v_now + interval '1 month'),
+            past_due_at = CASE WHEN target_sub_status = 'past_due' THEN COALESCE(past_due_at, v_now) ELSE NULL END,
+            trial_end = CASE WHEN target_sub_status = 'trialing' THEN COALESCE(p_period_end, current_period_end, v_now + interval '14 days') ELSE trial_end END,
+            cancelled_at = CASE WHEN target_sub_status = 'cancelled' THEN COALESCE(cancelled_at, v_now) ELSE cancelled_at END,
+            ended_at = CASE WHEN target_sub_status = 'cancelled' THEN COALESCE(ended_at, v_now) ELSE ended_at END,
+            updated_at = v_now
+        WHERE id = sub_id;
+
+        -- Recarregar registro atualizado
+        SELECT s.*, p.id AS plan_id, p.name AS plan_name, p.price AS plan_price, p.slug AS plan_slug
+        INTO sub_record
+        FROM subscriptions s
+        LEFT JOIN plans p ON p.id = s.plan_id
+        WHERE s.id = sub_id;
     END IF;
 
     SELECT * INTO partner_record FROM partners WHERE id = sub_record.partner_id;
     IF NOT FOUND THEN
-        RETURN jsonb_build_object('error', 'Partner not found');
+        RETURN jsonb_build_object('success', false, 'error', 'Partner not found');
     END IF;
 
     plan_price := COALESCE(sub_record.plan_price, 0);
@@ -191,10 +239,10 @@ BEGIN
         ELSE 'pending'
     END;
 
-    -- Compute billing periods (next charge is never in the past)
-    period_start := COALESCE(sub_record.current_period_start, sub_record.created_at, v_now);
-    period_end := COALESCE(sub_record.current_period_end, period_start + interval '1 month');
-    IF period_end <= v_now THEN
+    -- Computa os períodos (a próxima cobrança nunca fica no passado)
+    period_start := COALESCE(p_period_start, sub_record.current_period_start, sub_record.created_at, v_now);
+    period_end := COALESCE(p_period_end, sub_record.current_period_end, period_start + interval '1 month');
+    IF period_end <= v_now AND sub_record.status IN ('active', 'trialing') THEN
         next_start := period_start + interval '1 month';
         WHILE next_start <= v_now LOOP
             next_start := next_start + interval '1 month';
@@ -205,7 +253,7 @@ BEGIN
     END IF;
     next_end := next_start + interval '1 month';
 
-    -- ── CURRENT cycle purchase (upsert) ──
+    -- ── 2. PURCHASE do ciclo ATUAL (upsert) ──
     SELECT bp.* INTO existing
     FROM billing_purchases bp
     WHERE bp.subscription_id = sub_id
@@ -237,7 +285,12 @@ BEGIN
             billing_period_end = COALESCE(billing_period_end, period_end),
             gateway_payment_id = COALESCE(mp_sub_id, gateway_payment_id),
             gateway_status = sub_record.status,
-            metadata = metadata || jsonb_build_object('synced_via', 'sql', 'synced_at', v_now),
+            metadata = metadata || jsonb_build_object(
+                'synced_via', 'sql',
+                'synced_at', v_now,
+                'subscription_status', sub_record.status,
+                'billing_cycle', 'current'
+            ),
             updated_at = v_now
         WHERE id = existing.id;
         v_purchase_id := existing.id;
@@ -256,6 +309,7 @@ BEGIN
                 'plan_name', sub_record.plan_name,
                 'plan_slug', sub_record.plan_slug,
                 'billing_cycle', 'current',
+                'subscription_status', sub_record.status,
                 'synced_via', 'sql',
                 'synced_at', v_now
             )
@@ -263,30 +317,61 @@ BEGIN
         RETURNING id INTO v_purchase_id;
     END IF;
 
-    -- ── Payment record (only active/trialing with MP id) ──
-    IF sub_record.status IN ('active', 'trialing') AND mp_sub_id IS NOT NULL THEN
-        IF NOT EXISTS (
-            SELECT 1 FROM billing_payments
-            WHERE purchase_id = v_purchase_id AND gateway_payment_id = mp_sub_id
-        ) THEN
+    -- ── 3. Pagamento (conforme o status da assinatura) ──
+    SELECT bp.* INTO existing_pay
+    FROM billing_payments bp
+    WHERE bp.purchase_id = v_purchase_id
+    ORDER BY bp.created_at DESC LIMIT 1;
+
+    IF sub_record.status IN ('active', 'trialing') THEN
+        IF existing_pay.id IS NOT NULL THEN
+            UPDATE billing_payments
+            SET status = 'approved',
+                amount = plan_price,
+                net_amount = plan_price,
+                paid_at = COALESCE(paid_at, v_now),
+                gateway_status = sub_record.status,
+                updated_at = v_now
+            WHERE id = existing_pay.id;
+        ELSE
             INSERT INTO billing_payments (
                 purchase_id, amount, currency, fee_amount, net_amount,
                 status, gateway, gateway_payment_id, gateway_status, paid_at
             ) VALUES (
                 v_purchase_id, plan_price, 'BRL', 0, plan_price,
-                CASE WHEN purchase_status = 'completed' THEN 'approved' ELSE 'pending' END,
-                'mercado_pago', mp_sub_id, sub_record.status,
-                CASE WHEN purchase_status = 'completed' THEN v_now ELSE NULL END
+                'approved', 'mercado_pago', mp_sub_id, sub_record.status, v_now
             );
         END IF;
+    ELSIF sub_record.status = 'past_due' THEN
+        -- Simula tentativa de cobrança no cartão com falha/rejeição (permite testar PIX QR Code)
+        IF existing_pay.id IS NOT NULL THEN
+            UPDATE billing_payments
+            SET status = 'rejected',
+                gateway_status = 'rejected',
+                paid_at = NULL,
+                updated_at = v_now
+            WHERE id = existing_pay.id;
+        ELSE
+            INSERT INTO billing_payments (
+                purchase_id, amount, currency, fee_amount, net_amount,
+                status, gateway, gateway_payment_id, gateway_status, paid_at
+            ) VALUES (
+                v_purchase_id, plan_price, 'BRL', 0, plan_price,
+                'rejected', 'mercado_pago', mp_sub_id, 'rejected', NULL
+            );
+        END IF;
+    ELSIF sub_record.status = 'cancelled' AND existing_pay.id IS NOT NULL THEN
+        UPDATE billing_payments
+        SET status = 'cancelled', updated_at = v_now
+        WHERE id = existing_pay.id AND status = 'pending';
     END IF;
 
-    -- ── Invoice for the CURRENT cycle ──
+    -- ── 4. Fatura do ciclo ATUAL ──
     IF purchase_status IN ('completed', 'pending') THEN
         PERFORM billing_generate_invoice_for_purchase(v_purchase_id);
     END IF;
 
-    -- ── NEXT cycle purchase (upcoming "Próxima Fatura") ──
+    -- ── 5. PURCHASE do próximo ciclo ("Próxima Fatura") ──
     next_purchase_id := NULL;
     IF sub_record.status IN ('active', 'trialing') AND plan_price > 0 THEN
         SELECT bp.id INTO next_purchase_id
@@ -314,6 +399,7 @@ BEGIN
                 metadata = metadata || jsonb_build_object(
                     'billing_cycle', 'next',
                     'due_date', next_start,
+                    'subscription_status', sub_record.status,
                     'synced_via', 'sql',
                     'synced_at', v_now
                 ),
@@ -335,6 +421,7 @@ BEGIN
                     'plan_slug', sub_record.plan_slug,
                     'billing_cycle', 'next',
                     'due_date', next_start,
+                    'subscription_status', sub_record.status,
                     'synced_via', 'sql',
                     'synced_at', v_now
                 )
@@ -346,16 +433,33 @@ BEGIN
             PERFORM billing_generate_invoice_for_purchase(next_purchase_id);
         END IF;
     ELSE
-        -- Subscription no longer bills → cancel stale pending "next" purchases.
+        -- Assinatura não fatura mais (ou está atrasada/cancelada) → cancela purchases "next" pendentes
         UPDATE billing_purchases
         SET status = 'cancelled', updated_at = v_now
         WHERE subscription_id = sub_id AND status = 'pending' AND id <> v_purchase_id;
     END IF;
 
+    -- Obter números de fatura para o retorno
+    SELECT invoice_number INTO current_inv FROM billing_invoices WHERE purchase_id = v_purchase_id LIMIT 1;
+    IF next_purchase_id IS NOT NULL THEN
+        SELECT invoice_number INTO next_inv FROM billing_invoices WHERE purchase_id = next_purchase_id LIMIT 1;
+    END IF;
+
     RETURN jsonb_build_object(
-        'purchase_id', v_purchase_id,
+        'success', true,
+        'subscription_id', sub_id,
+        'partner_id', sub_record.partner_id,
+        'subscription_status', sub_record.status,
+        'plan_name', sub_record.plan_name,
+        'plan_price', plan_price,
+        'current_purchase_id', v_purchase_id,
+        'current_purchase_status', purchase_status,
+        'current_period_start', period_start,
+        'current_period_end', period_end,
+        'current_invoice_number', current_inv.invoice_number,
         'next_purchase_id', next_purchase_id,
-        'purchase_status', purchase_status
+        'next_due_date', CASE WHEN next_purchase_id IS NOT NULL THEN next_start ELSE NULL END,
+        'next_invoice_number', next_inv.invoice_number
     );
 END;
 $$;

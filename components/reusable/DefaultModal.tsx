@@ -33,7 +33,7 @@ const DefaultModal: React.FC<DefaultModalProps> = ({
     className = "",
     leftAction,
 }) => {
-    const isMobile = useMediaQuery("(max-width: 768px)")
+    const isMobile = useMediaQuery("(max-width: 1023px)")
 
     const handleClose = () => {
         onClose()

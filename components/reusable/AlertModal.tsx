@@ -105,7 +105,7 @@ const AlertModal: React.FC<AlertModalProps> = ({
 }) => {
   const [isAnimating, setIsAnimating] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const isMobile = useMediaQuery("(max-width: 768px)")
+  const isMobile = useMediaQuery("(max-width: 1023px)")
   const displayMessage = description || message || ""
 
   const effectiveVariant = isDestructive ? "danger" : variant || "danger"

@@ -38,7 +38,7 @@ export default function SelectVideoProductSheet({
     const [tempSelected, setTempSelected] = useState<string | null>(null)
     const [products, setProducts] = useState<ProductItem[]>([])
     const [loading, setLoading] = useState(false)
-    const isMobile = useMediaQuery("(max-width: 768px)")
+    const isMobile = useMediaQuery("(max-width: 1023px)")
 
     useEffect(() => {
         if (isOpen) {
@@ -76,7 +76,7 @@ export default function SelectVideoProductSheet({
         <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
             <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
                 <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Selecionar Produto</h2>
-                <Button variant="filled" onClick={onClose} size="icon">
+                <Button variant="filled" onClick={onClose} size="icon" className="hidden lg:flex">
                     <XIcon className="h-5 w-5" />
                 </Button>
             </header>

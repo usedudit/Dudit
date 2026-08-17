@@ -66,47 +66,6 @@ export function useUnsavedChanges(isDirty: boolean) {
     }
   }, [])
 
-  useEffect(() => {
-    const originalPushState = window.history.pushState
-    const originalReplaceState = window.history.replaceState
-
-    const shouldBlockHistoryNavigation = (url?: string | URL | null) => {
-      if (!isDirtyRef.current || !url || isNavigatingRef.current) return false
-
-      const current = new URL(window.location.href)
-      const destination = new URL(String(url), current.href)
-      if (destination.origin !== current.origin) return false
-      if (destination.pathname === current.pathname) return false
-
-      setPendingNavigation(`${destination.pathname}${destination.search}${destination.hash}`)
-      setShowConfirmDialog(true)
-      return true
-    }
-
-    window.history.pushState = function pushState(
-      data: any,
-      unused: string,
-      url?: string | URL | null
-    ) {
-      if (shouldBlockHistoryNavigation(url)) return
-      return originalPushState.call(this, data, unused, url)
-    }
-
-    window.history.replaceState = function replaceState(
-      data: any,
-      unused: string,
-      url?: string | URL | null
-    ) {
-      if (shouldBlockHistoryNavigation(url)) return
-      return originalReplaceState.call(this, data, unused, url)
-    }
-
-    return () => {
-      window.history.pushState = originalPushState
-      window.history.replaceState = originalReplaceState
-    }
-  }, [])
-
   const confirmNavigation = useCallback(() => {
     isNavigatingRef.current = true
     setShowConfirmDialog(false)
@@ -114,7 +73,7 @@ export function useUnsavedChanges(isDirty: boolean) {
       if (typeof pendingNavigation === "function") {
         pendingNavigation()
       } else {
-        window.location.assign(pendingNavigation)
+        router.push(pendingNavigation)
       }
     } else {
       router.back()

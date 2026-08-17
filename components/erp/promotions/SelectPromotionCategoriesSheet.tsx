@@ -126,7 +126,7 @@ export default function SelectPromotionCategoriesSheet({
 }: SelectPromotionCategoriesSheetProps) {
   const [search, setSearch] = useState("")
   const [activeTab, setActiveTab] = useState("products")
-  const isMobile = useMediaQuery("(max-width: 768px)")
+  const isMobile = useMediaQuery("(max-width: 1023px)")
 
   const filteredCategories = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -146,7 +146,7 @@ export default function SelectPromotionCategoriesSheet({
     <Div className="flex h-full flex-col bg-white dark:bg-dark-surface">
       <Header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
         <H2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Selecionar Categorias</H2>
-        <Button variant="filled" type="button" onClick={onClose} size="icon">
+        <Button variant="filled" type="button" onClick={onClose} size="icon" className="hidden lg:flex">
           <XIcon className="h-5 w-5" />
         </Button>
       </Header>

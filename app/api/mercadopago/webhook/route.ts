@@ -158,13 +158,68 @@ async function processWebhookWithRetry(
   console.log(`[WEBHOOK] Processing payment ${paymentId} (attempt ${attempt + 1}/${MAX_RETRIES})`)
 
   try {
-    // Only handle payment events
+    const supabase = createAdminClient()
+
+    // ── 0. Handle Subscription / Billing Preapproval Events ──
+    if (["subscription_preapproval", "subscription_authorized_payment"].includes(type)) {
+      console.log(`[WEBHOOK] Handling subscription event "${type}" for resource ${paymentId}`)
+      const { getMpPlatformAccessToken } = await import("@/lib/services/mercadopago/subscriptions")
+      const { syncSubscriptionToBilling } = await import("@/lib/billing/sync-subscription")
+      const accessToken = await getMpPlatformAccessToken()
+
+      if (type === "subscription_preapproval") {
+        const mpRes = await fetch(`https://api.mercadopago.com/preapproval/${paymentId}`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        })
+        if (mpRes.ok) {
+          const preapprovalData = await mpRes.json()
+          const { data: sub } = await supabase
+            .from("subscriptions")
+            .select("id, status")
+            .eq("mercado_pago_subscription_id", paymentId.toString())
+            .maybeSingle()
+
+          if (sub) {
+            let targetStatus = sub.status
+            if (preapprovalData.status === "authorized") targetStatus = "active"
+            else if (preapprovalData.status === "cancelled") targetStatus = "cancelled"
+            else if (preapprovalData.status === "paused") targetStatus = "paused"
+
+            await syncSubscriptionToBilling(sub.id, "webhook", targetStatus)
+            console.log(`[WEBHOOK] ✅ Subscription ${sub.id} synced via preapproval event (${preapprovalData.status})`)
+            return
+          }
+        }
+      } else if (type === "subscription_authorized_payment") {
+        const mpRes = await fetch(`https://api.mercadopago.com/authorized_payments/${paymentId}`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        })
+        if (mpRes.ok) {
+          const authPayData = await mpRes.json()
+          const preapprovalId = authPayData.preapproval_id
+          if (preapprovalId) {
+            const { data: sub } = await supabase
+              .from("subscriptions")
+              .select("id, status")
+              .eq("mercado_pago_subscription_id", preapprovalId.toString())
+              .maybeSingle()
+
+            if (sub) {
+              const targetStatus = authPayData.status === "approved" ? "active" : "past_due"
+              await syncSubscriptionToBilling(sub.id, "webhook", targetStatus)
+              console.log(`[WEBHOOK] ✅ Subscription ${sub.id} synced via authorized payment (${authPayData.status})`)
+              return
+            }
+          }
+        }
+      }
+    }
+
+    // Only handle payment events for remaining flows
     if (type !== "payment" || !paymentId) {
       console.log("[WEBHOOK] Not a payment event, skipping")
       return
     }
-
-    const supabase = createAdminClient()
 
     // ── Idempotency check: has this payment already been processed? ──
     const { data: existingOrderData, error: checkError } = await supabase

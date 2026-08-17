@@ -5,7 +5,6 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { Badge, Button, IconPlaceholder, ThreeDotsLoader } from "@/components/reusable"
 import Pagination from "@/components/reusable/Pagination"
 import AlertModal from "@/components/reusable/AlertModal"
-
 import FilterSheet from "@/components/reusable/FilterSheet"
 import type { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Portal from "@/components/Portal"
@@ -19,8 +18,7 @@ import { generateInvoiceAction, getInvoiceAction } from "@/app/actions/billing/i
 import { getPaymentMethodLabel } from "@/lib/billing/invoice-utils"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { formatCurrency, formatDate } from "@/lib/utils"
-import { ArrowUpDownIcon, PrinterIcon, XIcon } from "@/lib/icons"
-import { ShoppingCart } from "lucide-react"
+import { ArrowUpDownIcon, PrinterIcon, XIcon, ShoppingCartIcon } from "@/lib/icons"
 import type { PurchaseWithRelations, BillingInvoice, BillingFilters, SortConfig } from "@/lib/billing/types"
 
 const STATUS_VARIANTS: Record<string, "green" | "red" | "orange" | "blue" | "cyan" | "purple" | "gray"> = {
@@ -42,7 +40,13 @@ const PAYMENT_VARIANTS: Record<string, "green" | "red" | "orange" | "blue" | "pu
     chargeback: "red",
 }
 
-function getStatusLabel(status: string): string {
+function getStatusLabel(status: string, metadata?: any): string {
+    if (status === "pending" && metadata?.billing_cycle === "next") {
+        return "A pagar"
+    }
+    if (status === "pending" && metadata?.subscription_status === "past_due") {
+        return "Em atraso"
+    }
     const labels: Record<string, string> = {
         pending: "Pendente",
         completed: "Concluído",
@@ -56,6 +60,13 @@ function getStatusLabel(status: string): string {
         chargeback: "Chargeback",
     }
     return labels[status] || status
+}
+
+function getStatusVariant(status: string, metadata?: any): "green" | "red" | "orange" | "blue" | "cyan" | "purple" | "gray" {
+    if (status === "pending" && metadata?.subscription_status === "past_due") {
+        return "red"
+    }
+    return STATUS_VARIANTS[status] || "gray"
 }
 
 function getGatewayLabel(gateway: string | null): string {
@@ -259,8 +270,8 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
 
             <div className="flex-1 overflow-y-auto p-6 custom-scrollbar space-y-6">
                 <div className="flex items-center justify-between">
-                    <Badge variant={STATUS_VARIANTS[selectedPurchase.status] || "gray"}>
-                        {getStatusLabel(selectedPurchase.status)}
+                    <Badge variant={getStatusVariant(selectedPurchase.status, selectedPurchase.metadata)}>
+                        {getStatusLabel(selectedPurchase.status, selectedPurchase.metadata)}
                     </Badge>
                     <span className="text-lg font-bold text-brand-dark dark:text-dark-heading">
                         {formatCurrency(selectedPurchase.total_amount)}
@@ -381,7 +392,7 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
                     ) : data.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-20">
                             <IconPlaceholder
-                                icon={ShoppingCart}
+                                icon={ShoppingCartIcon}
                                 title="Nenhuma compra encontrada"
                                 subtitle="Nenhuma compra corresponde aos filtros selecionados."
                             />
@@ -398,8 +409,8 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
                                     amount={p.amount}
                                     totalAmount={p.total_amount}
                                     status={p.status}
-                                    statusLabel={getStatusLabel(p.status)}
-                                    statusVariant={STATUS_VARIANTS[p.status] || "gray"}
+                                    statusLabel={getStatusLabel(p.status, p.metadata)}
+                                    statusVariant={getStatusVariant(p.status, p.metadata)}
                                     gatewayLabel={getGatewayLabel(p.gateway)}
                                     createdAt={p.created_at}
                                     onDetails={() => handleViewDetails(p)}
@@ -449,8 +460,8 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
                                             amount={p.amount}
                                             totalAmount={p.total_amount}
                                             status={p.status}
-                                            statusLabel={getStatusLabel(p.status)}
-                                            statusVariant={STATUS_VARIANTS[p.status] || "gray"}
+                                            statusLabel={getStatusLabel(p.status, p.metadata)}
+                                            statusVariant={getStatusVariant(p.status, p.metadata)}
                                             gatewayLabel={getGatewayLabel(p.gateway)}
                                             createdAt={p.created_at}
                                             columns={filteredColumns}

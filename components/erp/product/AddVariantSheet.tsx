@@ -154,7 +154,7 @@ const VariantImageUpload = React.memo(({
 VariantImageUpload.displayName = "VariantImageUpload"
 
 const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, product, onSaveSuccess, onSavePendingVariants }) => {
-    const isMobile = useMediaQuery("(max-width: 768px)")
+    const isMobile = useMediaQuery("(max-width: 1023px)")
     const { success: notifySuccess, error: notifyError } = useNotification()
     const [isSaving, setIsSaving] = useState(false)
     const [variants, setVariants] = useState<VariantCard[]>([
@@ -715,7 +715,7 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
             {/* HEADER */}
             <div className="flex items-center justify-between px-8 py-5 border-b border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface z-10">
                 <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Adicionar variações</h2>
-                <Button variant="filled" onClick={onClose} className="w-[40px] h-[40px]">
+                <Button variant="filled" onClick={onClose} className="hidden lg:flex w-[40px] h-[40px]">
                     <XIcon className="w-6 h-6 text-brand-inactive-text dark:text-dark-body" />
                 </Button>
             </div>

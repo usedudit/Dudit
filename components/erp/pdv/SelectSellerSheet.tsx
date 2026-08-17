@@ -37,7 +37,7 @@ const SelectSellerSheet = ({ isOpen, onClose, onSelect, selectedSellerId: initia
   const loadMoreLock = useRef(false)
   const listScrollRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
-  const isMobile = useMediaQuery("(max-width: 768px)")
+  const isMobile = useMediaQuery("(max-width: 1023px)")
 
   useEffect(() => {
     if (isOpen) {
@@ -97,7 +97,7 @@ const SelectSellerSheet = ({ isOpen, onClose, onSelect, selectedSellerId: initia
     <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
       <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
         <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Selecionar Vendedor</h2>
-        <Button variant="filled" onClick={onClose} size="icon">
+        <Button variant="filled" onClick={onClose} size="icon" className="hidden lg:flex">
           <XIcon className="h-5 w-5" />
         </Button>
       </header>

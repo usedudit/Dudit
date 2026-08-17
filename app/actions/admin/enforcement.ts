@@ -379,7 +379,8 @@ export async function getAdminPartnerDetail(storeId: string): Promise<any | null
 export async function updateStoreRiskScore(
     storeId: string,
     newScore: number,
-    reason: string
+    reason: string,
+    customTitle?: string
 ): Promise<{ success: boolean; error?: string }> {
     const admin = await requireAdmin("admin")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
@@ -424,13 +425,63 @@ export async function updateStoreRiskScore(
         },
     })
 
+    // ─── Dispatch In-App + Push Notification ──────────────────────────────
+    try {
+        const { createNotificationsForUsers, getStoreTeamUserIds, getPartnerTeamUserIds } = await import("@/lib/services/notification.service")
+
+        let teamUserIds: string[] = []
+        if (currentStore.partner_id) {
+            teamUserIds = await getStoreTeamUserIds({
+                partnerId: currentStore.partner_id,
+                storeId: storeId,
+            })
+            if (teamUserIds.length === 0) {
+                teamUserIds = await getPartnerTeamUserIds(currentStore.partner_id)
+            }
+        }
+
+        if (teamUserIds.length > 0) {
+            const notifTitle = customTitle?.trim() || (newScore > oldScore
+                ? `Aviso: Atualização no Score de Risco da loja ${currentStore.name}`
+                : `Ajuste no Score de Risco da loja ${currentStore.name}`)
+
+            const notifMessage = reason?.trim()
+                ? reason.trim()
+                : `O score de risco da loja foi ajustado de ${oldScore} para ${newScore} pontos.`
+
+            await createNotificationsForUsers(teamUserIds, (uid) => ({
+                userId: uid,
+                type: "admin_announcement",
+                title: notifTitle,
+                message: notifMessage,
+                entityType: "announcement",
+                entityId: null,
+                data: {
+                    store_id: storeId,
+                    store_name: currentStore.name,
+                    partner_id: currentStore.partner_id,
+                    old_score: oldScore,
+                    new_score: newScore,
+                    reason: reason?.trim() || null,
+                    audience: "seller",
+                    url: "/erp/configuracoes",
+                },
+                idempotencyKey: `risk_score_store:${storeId}:${newScore}:${Date.now()}:${uid}`,
+                origin: "system",
+            }))
+        }
+    } catch (notifErr) {
+        console.error("[ADMIN_ENFORCEMENT] Failed to send store risk notification:", notifErr)
+    }
+
     return { success: true }
 }
 
 export async function updateUserRiskScore(
     userId: string,
     newScore: number,
-    reason: string
+    reason: string,
+    customTitle?: string
 ): Promise<{ success: boolean; error?: string }> {
     const admin = await requireAdmin("admin")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
@@ -470,6 +521,41 @@ export async function updateUserRiskScore(
             reason: reason || "Ajuste manual de score de risco",
         },
     })
+
+    // ─── Dispatch In-App + Push Notification ──────────────────────────────
+    try {
+        const { createNotification } = await import("@/lib/services/notification.service")
+
+        const notifTitle = customTitle?.trim() || (newScore > oldScore
+            ? "Aviso sobre seu Score de Risco"
+            : "Atualização no Score da sua Conta")
+
+        const notifMessage = reason?.trim()
+            ? reason.trim()
+            : `O score de risco da sua conta foi ajustado de ${oldScore} para ${newScore} pontos.`
+
+        await createNotification({
+            userId: userId,
+            type: "admin_announcement",
+            title: notifTitle,
+            message: notifMessage,
+            entityType: "announcement",
+            entityId: null,
+            data: {
+                user_id: userId,
+                user_name: profile?.full_name || null,
+                old_score: oldScore,
+                new_score: newScore,
+                reason: reason?.trim() || null,
+                audience: "customer",
+                url: "/perfil",
+            },
+            idempotencyKey: `risk_score_user:${userId}:${newScore}:${Date.now()}`,
+            origin: "system",
+        })
+    } catch (notifErr) {
+        console.error("[ADMIN_ENFORCEMENT] Failed to send user risk notification:", notifErr)
+    }
 
     return { success: true }
 }

@@ -114,8 +114,8 @@ async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, city
 function HomeFeedSkeleton() {
     return (
         <div className="w-full bg-white flex-grow dark:bg-dark-surface">
-            <section className="mt-6 mb-12 px-4 lg:px-0 flex justify-center w-full">
-                <div className="w-full max-w-[1400px] rounded-xl lg:rounded-2xl bg-gray-100 animate-pulse aspect-[2.65/1] md:aspect-auto md:h-[300px] dark:bg-dark-border/50" />
+            <section className="mt-4 sm:mt-6 mb-8 sm:mb-12 px-4 lg:px-0 flex justify-center w-full">
+                <div className="w-full max-w-[1400px] rounded-xl lg:rounded-2xl bg-gray-100 animate-pulse aspect-[1400/300] dark:bg-dark-border/50 shadow-xs" />
             </section>
             <div className="mx-auto max-w-[1400px] px-4 xl:px-0 space-y-10 pb-12">
                 <div className="space-y-4">

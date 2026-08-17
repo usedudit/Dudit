@@ -1036,8 +1036,10 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
             </div>
 
             <div ref={topRef} className={categoryView ? "hidden lg:block" : ""}>
-                <div className="w-full max-w-[1400px] mx-auto lg:rounded-2xl lg:mb-4 overflow-hidden">
-                    <img src={bannerImage} alt="Banner" className="w-full aspect-[2.65/1] md:aspect-auto md:h-[300px] object-cover object-center" />
+                <div className="w-full max-w-[1400px] mx-auto sm:px-4 lg:px-0">
+                    <div className="relative w-full aspect-[1400/300] sm:rounded-xl lg:rounded-2xl overflow-hidden bg-gray-100 dark:bg-dark-border/50 lg:mb-4 shadow-xs">
+                        <img src={bannerImage} alt="Banner" className="w-full h-full object-cover object-center" />
+                    </div>
                 </div>
 
                 <div className="px-5 lg:px-0 py-5 lg:py-2 mb-2 lg:mb-8">

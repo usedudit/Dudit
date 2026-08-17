@@ -53,7 +53,7 @@ const FilterSheet: React.FC<FilterSheetProps> = ({
     zIndexClass,
 }) => {
     const [localFilters, setLocalFilters] = useState<Record<string, any>>(filters)
-    const isMobile = useMediaQuery("(max-width: 768px)")
+    const isMobile = useMediaQuery("(max-width: 1023px)")
 
     // Sincroniza estado local ao abrir
     useEffect(() => {
@@ -100,7 +100,7 @@ const FilterSheet: React.FC<FilterSheetProps> = ({
         <div className="flex flex-col h-full bg-white dark:bg-dark-surface">
             <header className="border-b border-brand-border dark:border-dark-border p-6 flex justify-between items-center">
                 <h2 className="text-xl font-bold dark:text-dark-heading">Filtros</h2>
-                <Button variant="filled" onClick={onClose} size="icon">
+                <Button variant="filled" onClick={onClose} size="icon" className="hidden lg:flex">
                     <XIcon className="w-5 h-5" />
                 </Button>
             </header>

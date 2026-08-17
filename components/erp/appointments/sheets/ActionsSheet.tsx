@@ -91,7 +91,7 @@ export const AddUnavailableSheet = ({
     initialTimeSlot?: string,
     initialStaffId?: string,
 }) => {
-    const isMobile = useMediaQuery("(max-width: 768px)");
+    const isMobile = useMediaQuery("(max-width: 1023px)");
     const isEditing = !!appointment;
 
     // States for main sheet
@@ -242,7 +242,7 @@ export const AddUnavailableSheet = ({
                 <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">
                     {isEditing ? 'Detalhes da Indisponibilidade' : 'Adicionar Horário Indisponível'}
                 </h2>
-                <Button variant="filled" onClick={onClose} size="icon">
+                <Button variant="filled" onClick={onClose} size="icon" className="hidden lg:flex">
                     <XIcon className="h-5 w-5" />
                 </Button>
             </header>
@@ -488,7 +488,7 @@ export const AddUnavailableSheet = ({
         <div className="flex flex-col h-full bg-white dark:bg-dark-surface overflow-hidden">
             <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
                 <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Novo tipo</h2>
-                <Button variant="filled" onClick={() => setIsNewTypeSheetOpen(false)} size="icon">
+                <Button variant="filled" onClick={() => setIsNewTypeSheetOpen(false)} size="icon" className="hidden lg:flex">
                     <XIcon className="h-5 w-5" />
                 </Button>
             </header>
@@ -589,7 +589,7 @@ export const AddUnavailableSheet = ({
 };
 
 export const MoreAppointmentsSheet = ({ date, appointments, onClose, onViewAppointment }: { date: string, appointments: Appointment[], onClose: () => void, onViewAppointment: (apt: Appointment) => void }) => {
-    const isMobile = useMediaQuery("(max-width: 768px)");
+    const isMobile = useMediaQuery("(max-width: 1023px)");
     const [searchQuery, setSearchQuery] = useState('');
     const dateObj = new Date(date + 'T00:00:00');
 
@@ -604,7 +604,7 @@ export const MoreAppointmentsSheet = ({ date, appointments, onClose, onViewAppoi
                 <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading capitalize">
                     {dateObj.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
                 </h2>
-                <Button variant="filled" onClick={onClose} size="icon">
+                <Button variant="filled" onClick={onClose} size="icon" className="hidden lg:flex">
                     <XIcon className="h-5 w-5" />
                 </Button>
             </header>

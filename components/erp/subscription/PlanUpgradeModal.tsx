@@ -53,7 +53,7 @@ function PlanUpgradeModalInner({
   subData: any
   loading: boolean
 }) {
-  const isMobile = useMediaQuery("(max-width: 768px)")
+  const isMobile = useMediaQuery("(max-width: 1023px)")
   const [anim, setAnim] = useState(false)
   const [visible, setVisible] = useState(false)
 

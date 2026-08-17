@@ -204,14 +204,8 @@ function ErpPlanGatedNavItem({
         <Link
             href={href}
             prefetch={false}
-            onClick={(e) => {
-                if (typeof window !== "undefined" && window.location.pathname === href) {
-                    e.preventDefault()
-                    window.dispatchEvent(new CustomEvent('erp-sidebar-reset'))
-                }
-                setTimeout(() => {
-                    onNavigate?.()
-                }, 0)
+            onClick={() => {
+                onNavigate?.()
             }}
             className={itemClass}>
             {content}
@@ -566,18 +560,12 @@ export function ERPSidebar() {
                                                     <Link
                                                         href={item.href}
                                                         prefetch={false}
-                                                        onClick={(e) => {
-                                                            if (typeof window !== "undefined" && window.location.pathname === item.href) {
-                                                                e.preventDefault();
-                                                                window.dispatchEvent(new CustomEvent('erp-sidebar-reset'));
+                                                        onClick={() => {
+                                                            setIsMobileOpen(false)
+                                                            setHoveredItem(null)
+                                                            if (hasSubmenu && !isCollapsed) {
+                                                                toggleSubmenu(item.label)
                                                             }
-                                                            setTimeout(() => {
-                                                                setIsMobileOpen(false)
-                                                                setHoveredItem(null)
-                                                                if (hasSubmenu && !isCollapsed) {
-                                                                    toggleSubmenu(item.label)
-                                                                }
-                                                            }, 0)
                                                         }}
                                                         className={cn(
                                                             "flex items-center rounded-lg transition-colors duration-200 group relative min-h-[44px] w-full justify-start",

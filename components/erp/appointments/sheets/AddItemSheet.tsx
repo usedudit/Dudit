@@ -180,7 +180,7 @@ export default function AddItemSheet({ isOpen, onClose, partnerId, storeId, onCo
                                             ? 'Adicionar item manual'
                                             : 'Adicionar Item'}
                                 </h2>
-                                <Button variant="filled" onClick={onClose} size="icon">
+                                <Button variant="filled" onClick={onClose} size="icon" className="hidden lg:flex">
                                     <XIcon className="h-5 w-5" />
                                 </Button>
                             </header>

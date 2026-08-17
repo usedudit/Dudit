@@ -50,7 +50,7 @@ const SelectCouponSheet = ({
   const [manualCode, setManualCode] = useState("")
   const [coupons, setCoupons] = useState<CouponItem[]>([])
   const [loading, setLoading] = useState(false)
-  const isMobile = useMediaQuery("(max-width: 768px)")
+  const isMobile = useMediaQuery("(max-width: 1023px)")
 
   // Fetch coupons when sheet opens
   const fetchCoupons = useCallback(async () => {
@@ -122,7 +122,7 @@ const SelectCouponSheet = ({
     <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
       <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
         <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Selecionar Cupom</h2>
-        <Button variant="filled" onClick={onClose} size="icon">
+        <Button variant="filled" onClick={onClose} size="icon" className="hidden lg:flex">
           <XIcon className="h-5 w-5" />
         </Button>
       </header>

@@ -13,7 +13,8 @@ import { Button, Input, FormDropdown, IconPlaceholder, DefaultModal, Separator, 
 import { formatCurrency, formatQuantityWithUnit } from "@/lib/utils"
 import { ShareModal } from "./ShareModal"
 import { AddToCollectionModal } from "./AddToCollectionModal"
-import { UserProfileImage } from "@/lib/utils/UserProfileImage"
+import { UserProfileImage, getAvatarColor, getBannerUrlByColor } from "@/lib/utils/UserProfileImage"
+import { getRandomDefaultBanner } from "@/lib/utils/banner"
 import { ReportModal } from "./ReportModal"
 import { ReviewsSection } from "./ReviewsSection"
 import { addToCartAction } from "@/app/actions/marketplace/cart"
@@ -1500,23 +1501,28 @@ export function ProductDetailsPageClient({
             {/* Store (Reputation & Levels Card) */}
             <div className="mb-8 mt-4">
                 {(() => {
-                    const sellerBannerImage = partner.banner_url ? getR2ImageUrl(partner.banner_url, "large") : "https://img.dudit.com.br/static/Placeholder.png";
                     const sellerAvatarImage = partner.store_avatar && !partner.store_avatar.includes("Placeholder.png") ? getR2ImageUrl(partner.store_avatar, "thumb") : null;
+                    const sellerBannerFallback = sellerAvatarImage
+                        ? getRandomDefaultBanner()
+                        : getBannerUrlByColor(getAvatarColor(partner.store_name || "Vendedor"));
+                    const sellerBannerImage = partner.banner_url && !partner.banner_url.includes("Placeholder.png")
+                        ? getR2ImageUrl(partner.banner_url, "large")
+                        : sellerBannerFallback;
 
                     return (
                         <div className="border border-brand-border rounded-2xl overflow-hidden bg-white dark:bg-dark-surface">
                             {/* Top clickable block linking to partner profile */}
                             <Link href={getStoreUrl(partner)} prefetch={false} className="block group">
                                 {/* Banner */}
-                                <div className="aspect-[2.65/1] w-full relative bg-gray-100 dark:bg-dark-border/50 overflow-hidden select-none">
-                                    <img src={sellerBannerImage} alt={`Banner de ${partner.store_name}`} className="w-full h-full object-cover" />
+                                <div className="aspect-[1400/300] w-full relative bg-gray-100 dark:bg-dark-border/50 overflow-hidden select-none">
+                                    <img src={sellerBannerImage} alt={`Banner de ${partner.store_name}`} className="w-full h-full object-cover object-center" />
                                     <div className="absolute inset-0" />
                                 </div>
 
                                 {/* Profile Header */}
                                 <div className="px-4 pt-0 relative flex flex-col">
                                     {/* Avatar Container overlapping the banner */}
-                                    <div className="w-16 h-16 rounded-full border-2 border-white overflow-hidden bg-white -mt-8 z-10 self-start">
+                                    <div className="w-14 h-14 rounded-full border-2 border-white overflow-hidden bg-white -mt-7 z-10 self-start shadow-xs">
                                         <UserProfileImage
                                             fullName={partner.store_name}
                                             imageUrl={sellerAvatarImage}

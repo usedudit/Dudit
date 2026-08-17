@@ -56,9 +56,10 @@ export async function POST(
       return NextResponse.json({ error: "Acesso negado" }, { status: 403 })
     }
 
-    // Only allow manual payment for past_due subscriptions
-    if (subscription.status !== "past_due") {
-      return NextResponse.json({ error: "Apenas assinaturas em atraso podem gerar pagamento manual" }, { status: 400 })
+    // Allow manual payment for past_due, failed, or unpaid subscriptions
+    const allowedStatuses = ["past_due", "failed", "unpaid"]
+    if (!allowedStatuses.includes(subscription.status)) {
+      return NextResponse.json({ error: "Apenas assinaturas em atraso ou pendentes de pagamento podem gerar pagamento manual" }, { status: 400 })
     }
 
     if (!subscription.mercado_pago_subscription_id) {

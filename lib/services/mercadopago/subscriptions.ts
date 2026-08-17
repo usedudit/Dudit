@@ -349,8 +349,8 @@ export async function cancelMpSubscription(
   const { data: sub, error: fetchError } = await admin
     .from("subscriptions")
     .select("id, partner_id, plan_id, mercado_pago_subscription_id, status, current_period_end, cancel_at_period_end")
-    .eq("id", subscriptionId)
-    .single()
+    .or(`id.eq.${subscriptionId},mercado_pago_subscription_id.eq.${subscriptionId}`)
+    .maybeSingle()
 
   if (fetchError || !sub) {
     return { success: false, error: "Assinatura não encontrada" }
@@ -473,6 +473,13 @@ export async function cancelMpSubscription(
   }
 
   invalidatePartnerPlanCache(sub.partner_id)
+
+  try {
+    const { syncSubscriptionToBilling } = await import("@/lib/billing/sync-subscription")
+    await syncSubscriptionToBilling(sub.id, "manual", "cancelled")
+  } catch (syncErr: any) {
+    SecureLogger.error("Failed to sync billing on cancellation", { error: syncErr.message, subscriptionId: sub.id })
+  }
 
   await logBillingEvent(admin, sub.partner_id, "subscription_cancelled", null, {
     subscription_id: subscriptionId,
