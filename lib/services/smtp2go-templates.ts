@@ -6,5 +6,5 @@
  */
 export const SMTP2GO_TEMPLATE_IDS = {
   // Set this after copying the ID from the SMTP2GO template API snippet.
-  deliveryDriverInvitation: "0941556",
+  deliveryDriverInvitation: "6330851",
 } as const
