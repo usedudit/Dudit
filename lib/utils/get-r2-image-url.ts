@@ -32,17 +32,23 @@ export function getR2ImageUrl(
     imagePath = imagePath[0];
   }
 
-  if (!imagePath || (typeof imagePath === "string" && imagePath.trim() === "")) {
+  // Se for nulo, indefinido, vazio ou string inválida
+  if (
+    !imagePath ||
+    typeof imagePath !== "string" ||
+    imagePath.trim() === "" ||
+    imagePath === "null" ||
+    imagePath === "undefined" ||
+    imagePath === "/null" ||
+    imagePath === "/undefined" ||
+    imagePath === "[object Object]"
+  ) {
     return "https://img.dudit.com.br/static/Placeholder.png" // Fallback seguro
-  }
-
-  if (typeof imagePath !== "string") {
-    return "https://img.dudit.com.br/static/Placeholder.png"
   }
 
   // Se for data:// (base64)
   if (imagePath.startsWith("data:")) {
-    return "https://img.dudit.com.br/static/Placeholder.png"
+    return imagePath
   }
 
   // Fallback seguro usando CDN ou domain correto (client-safe, sem secrets)
@@ -66,7 +72,22 @@ export function getR2ImageUrl(
 
   const cleanPath = targetPath.startsWith('/') ? targetPath.substring(1) : targetPath;
 
+  if (
+    !cleanPath ||
+    cleanPath === "null" ||
+    cleanPath === "undefined" ||
+    cleanPath === "[object Object]"
+  ) {
+    return "https://img.dudit.com.br/static/Placeholder.png"
+  }
+
   if (cleanPath.startsWith("cdn-cgi/image/")) {
+    return `${finalBaseUrl}/${cleanPath}`
+  }
+
+  // Se a otimização da Cloudflare estiver explicitamente desativada por env
+  const isOptimizationDisabled = process.env.NEXT_PUBLIC_ENABLE_IMAGE_OPTIMIZATION === "false"
+  if (isOptimizationDisabled) {
     return `${finalBaseUrl}/${cleanPath}`
   }
 

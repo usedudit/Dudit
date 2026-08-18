@@ -12,7 +12,6 @@ import RankingListRow from "./RankingListRow"
 import RankingGridCard from "./RankingGridCard"
 import GoalFormPage from "./GoalFormPage"
 import GoalDetailPage from "./GoalDetailPage"
-import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
 import { useEntityState } from "@/hooks/use-entity-state"
 import {
     deleteSalesGoalAction,
@@ -457,10 +456,6 @@ export default function GoalsPage(props: {
 
     // Render Form Page instead of the list if formMode URL parameter is active
     if (formMode) {
-        if (isLoadingFormOptions || ((formMode === "edit" || formMode === "duplicate") && !editingGoal)) {
-            return <ERPDetailLoading key="loading-goal-form" />
-        }
-
         return (
             <FadeIn key={`goal-form-${formMode}`} className="w-full h-full">
                 <GoalFormPage

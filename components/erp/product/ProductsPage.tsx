@@ -20,7 +20,6 @@ import { getNextPlanTarget, isPlanLimitReachedError } from "@/lib/subscription/l
 import { useErpExport } from "@/hooks/use-erp-export"
 import ExportSelectionModal from "@/components/erp/export/ExportSelectionModal"
 import ExportColumnSelectionModal from "@/components/erp/export/ExportColumnSelectionModal"
-import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
 
 // Actions
 import {
@@ -893,31 +892,26 @@ export default function ProductsPage({
         <>
             <AnimatePresence mode="wait">
                 {entityState.isOpen && formMode ? (
-                    (formMode !== 'add' && isLoadingDetail) ? (
-                        <ERPDetailLoading key="loading-product" />
-                    ) : (
-                        <FadeIn key="form" className="w-full h-full">
-                            <AddProductPage
-                                mode={formMode as any}
-                                setMode={(m) => {
-                                    // Map AddProductPage mode changes to URL updates
-                                    if (m === 'edit' && entityState.entityId) openEntity('edit', entityState.entityId)
-                                    else if (m === 'details' && entityState.entityId) openEntity('view', entityState.entityId)
-                                }}
-                                product={formProduct}
-                                onBack={closeEntity}
-                                onClose={closeEntity}
-                                onSave={handleSaveProduct}
-                                isSaving={isSaving}
-                                suppliers={suppliers}
-                                unidadesMedida={UNIDADES_MEDIDA}
-                                partnerId={partnerId}
-                                partner={partner}
-                                storeId={selectedStore?.id || ""}
-                                isLoadingDetails={isLoadingDetail}
-                            />
-                        </FadeIn>
-                    )
+                    <AddProductPage
+                        key="form"
+                        mode={formMode as any}
+                        setMode={(m) => {
+                            // Map AddProductPage mode changes to URL updates
+                            if (m === 'edit' && entityState.entityId) openEntity('edit', entityState.entityId)
+                            else if (m === 'details' && entityState.entityId) openEntity('view', entityState.entityId)
+                        }}
+                        product={formProduct}
+                        onBack={closeEntity}
+                        onClose={closeEntity}
+                        onSave={handleSaveProduct}
+                        isSaving={isSaving}
+                        suppliers={suppliers}
+                        unidadesMedida={UNIDADES_MEDIDA}
+                        partnerId={partnerId}
+                        partner={partner}
+                        storeId={selectedStore?.id || ""}
+                        isLoadingDetails={isLoadingDetail}
+                    />
                 ) : (
                     <FadeIn
                         key="list"

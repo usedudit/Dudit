@@ -6,7 +6,6 @@ import { Badge, Button, ActionsDropdown, ThreeDotsLoader, AlertModal } from "@/c
 import { ChevronLeftIcon, TargetIcon, Users, MoneyIcon, AwardIcon, CheckCircleIcon, CalendarIcon } from "@/lib/icons"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
 import { useSidebar } from "@/lib/sidebar-context"
 import { deleteSalesGoalAction, getSalesGoalByIdAction } from "@/app/actions/erp/goals"
 import { useToast } from "@/hooks/use-toast"
@@ -124,7 +123,11 @@ export default function GoalDetailPage({
   }
 
   if (isLoading) {
-    return <ERPDetailLoading key="loading-goal" />
+    return (
+      <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+        <ThreeDotsLoader />
+      </div>
+    )
   }
 
   if (!goal) {

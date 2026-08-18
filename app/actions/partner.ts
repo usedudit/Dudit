@@ -6,7 +6,7 @@ import { requireUser } from "@/lib/auth/authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { getAdminClient } from "@/lib/supabase/admin"
-import { UnosendService } from "@/lib/services/unosend.service"
+import { SMTP2GOService } from "@/lib/services/smtp2go.service"
 import { syncToExploreRedis, syncPartnerItemsToExploreRedis } from "@/lib/redis-sync"
 import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { geocodeAddress, enrichAddressData } from "@/lib/services/location.service"
@@ -224,25 +224,19 @@ export async function createPartnerAction(data: CreatePartnerData) {
       },
     ])
 
-    // Send partner account created email via Unosend
+    // Send partner account created email via SMTP2GO
     try {
       const { data: authData } = await supabaseAdmin.auth.admin.getUserById(data.userId)
       const userEmail = authData?.user?.email || null
 
       if (userEmail) {
-        const emailResult = await UnosendService.sendEmail({
+        const emailResult = await SMTP2GOService.sendEmail({
           userId: data.userId,
-          from: process.env.UNOSEND_FROM_EMAIL || "contato@dudit.com.br",
+          from: process.env.SMTP2GO_FROM_EMAIL || "contato@dudit.com.br",
           to: [{ email: userEmail }],
           subject: "Conta de Parceiro Criada com Sucesso! 🚀",
-          // USANDO O TEMPLATE ID QUE VOCÊ ACHOU
-          template_id: "37617cfd-fdee-4894-a842-93e2ff7184f6",
-          variables: {
-            // Garanta que esses nomes são os mesmos que estão entre {{ }} no Unosend
-            full_name: data.storeName,
-            store_name: data.storeName,
-            dashboard_url: "https://dudit.com.br/erp/inicio"
-          }
+          html: `<h1>Conta de parceiro criada com sucesso!</h1><p>Olá, ${data.storeName}.</p><p>Sua conta já está pronta para uso no Dudit ERP.</p><p><a href="https://dudit.com.br/erp/inicio">Acessar o ERP</a></p>`,
+          text: `Olá, ${data.storeName}. Sua conta de parceiro foi criada com sucesso. Acesse https://dudit.com.br/erp/inicio para entrar no Dudit ERP.`,
         })
 
         if (emailResult.success) {

@@ -21,7 +21,6 @@ import ServiceOrderListRow from "./ServiceOrderListRow"
 import ServiceOrderGridCard from "./ServiceOrderGridCard"
 import ServiceOrderForm from "./ServiceOrderForm"
 import ServiceOrderDetail from "./ServiceOrderDetail"
-import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
 import {
   PlusIcon, WrenchIcon, SearchIcon, FilterIcon, TrashIcon,
   ListIcon, GridIcon, ArrowUpDownIcon, ClockIcon, CheckCircleIcon, BlockedIcon, ExportFileIcon,
@@ -467,36 +466,28 @@ export default function ServiceOrdersPage({
     <>
       <AnimatePresence mode="wait">
         {entityState.isOpen && (entityState.action === "create" || entityState.action === "edit") ? (
-          (entityState.action === "edit" && isLoadingDetail) ? (
-            <ERPDetailLoading key="loading-form" />
-          ) : (
-            <FadeIn key={entityState.action} className="w-full h-full bg-white dark:bg-dark-background">
-              <ServiceOrderForm
-                partnerId={partnerId}
-                storeId={storeId}
-                onBack={() => closeEntity()}
-                onSaved={() => {
-                  closeEntity()
-                  handleMutation()
-                }}
-                editData={entityState.action === "edit" ? currentEntity : undefined}
-              />
-            </FadeIn>
-          )
+          <FadeIn key={entityState.action} className="w-full h-full bg-white dark:bg-dark-background">
+            <ServiceOrderForm
+              partnerId={partnerId}
+              storeId={storeId}
+              onBack={() => closeEntity()}
+              onSaved={() => {
+                closeEntity()
+                handleMutation()
+              }}
+              editData={entityState.action === "edit" ? currentEntity : undefined}
+            />
+          </FadeIn>
         ) : entityState.isOpen && entityState.action === "view" ? (
-          isLoadingDetail ? (
-            <ERPDetailLoading key="loading-detail" />
-          ) : (
-            <FadeIn key="detail" className="w-full h-full bg-white dark:bg-dark-background">
-              <ServiceOrderDetail
-                data={currentEntity}
-                partnerId={partnerId}
-                onBack={() => closeEntity()}
-                onMutation={() => handleMutation()}
-                onEdit={(id) => openEntity("edit", id)}
-              />
-            </FadeIn>
-          )
+          <FadeIn key="detail" className="w-full h-full bg-white dark:bg-dark-background">
+            <ServiceOrderDetail
+              data={currentEntity}
+              partnerId={partnerId}
+              onBack={() => closeEntity()}
+              onMutation={() => handleMutation()}
+              onEdit={(id) => openEntity("edit", id)}
+            />
+          </FadeIn>
         ) : (
           <FadeIn key="list" className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
             {/* Desktop Header */}

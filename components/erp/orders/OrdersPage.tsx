@@ -20,7 +20,6 @@ import OrderPageControls from "./OrderPageControls"
 import CreateOrder from "./CreateOrder"
 import OrderDetailView from "./OrderDetailView"
 import PaymentStatusModal from "./PaymentStatusModal"
-import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
 
 // Icons
 import {
@@ -779,9 +778,7 @@ export default function OrdersPage({
     return (
         <>
             <AnimatePresence mode="wait">
-                {entityState.isOpen && (entityState.action === 'view' || entityState.action === 'edit') && isLoadingDetail ? (
-                    <ERPDetailLoading key="loading-order" />
-                ) : entityState.isOpen && entityState.action === 'view' && entityState.entityId ? (
+                {entityState.isOpen && entityState.action === 'view' && entityState.entityId ? (
                     <FadeIn key="view-order" className="w-full h-full bg-white dark:bg-dark-background">
                         <OrderDetailView
                             orderId={entityState.entityId}

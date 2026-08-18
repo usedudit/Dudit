@@ -9,7 +9,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { requireUser } from "@/lib/auth/authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
-import { UnosendService } from "@/lib/services/unosend.service"
+import { SMTP2GOService } from "@/lib/services/smtp2go.service"
 import { SecureLogger } from "@/lib/secure-logger"
 import { getErrorMessage } from "@/lib/utils/error-handlers"
 import type { InternalEmailRequest } from "@/lib/types/unosend.types"
@@ -38,8 +38,8 @@ interface SendEmailResponse {
 // ============================================================================
 
 /**
- * Send an email via Unosend
- * Validates user, checks rate limits, and routes through UnosendService
+ * Send an email via SMTP2GO
+ * Validates user, checks rate limits, and routes through SMTP2GO.
  */
 export async function sendEmailAction(input: SendEmailInput): Promise<SendEmailResponse> {
   try {
@@ -132,7 +132,7 @@ export async function sendEmailAction(input: SendEmailInput): Promise<SendEmailR
     // ====================================================================
     // SEND EMAIL
     // ====================================================================
-    const result = await UnosendService.sendEmail(internalRequest)
+    const result = await SMTP2GOService.sendEmail(internalRequest)
 
     if (!result.success) {
       SecureLogger.warn("[Email Action] Failed to send email", {

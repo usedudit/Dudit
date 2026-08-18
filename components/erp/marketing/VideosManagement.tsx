@@ -20,7 +20,6 @@ import VideoPageControls from "./VideoPageControls"
 import VideoListItem from "./VideoListRow"
 import VideoGridCard from "./VideoGridCard"
 import VideoFormPage from "./VideoFormPage"
-import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
 
 type ActiveTab = "Todos" | "Pendentes" | "Aprovados" | "Rejeitados"
 type ViewMode = "list" | "grid"
@@ -189,19 +188,15 @@ export default function VideosManagement() {
         <>
             <AnimatePresence mode="wait">
                 {isCreating || isEditing || isViewing ? (
-                    ((isEditing || isViewing) && isVideosLoading) ? (
-                        <ERPDetailLoading key="loading-video" />
-                    ) : (
-                        <FadeIn key="form" className="w-full h-full">
-                            <VideoFormPage
-                                video={isEditing || isViewing ? currentVideo : undefined}
-                                onSave={handleSave}
-                                onBack={handleCancel}
-                                partnerId={partnerId}
-                                readOnly={isViewing}
-                            />
-                        </FadeIn>
-                    )
+                    <FadeIn key="form" className="w-full h-full">
+                        <VideoFormPage
+                            video={isEditing || isViewing ? currentVideo : undefined}
+                            onSave={handleSave}
+                            onBack={handleCancel}
+                            partnerId={partnerId}
+                            readOnly={isViewing}
+                        />
+                    </FadeIn>
                 ) : (
                     <FadeIn
                         key="list"

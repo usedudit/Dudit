@@ -13,7 +13,6 @@ import {
     CheckCircleIcon,
 } from '@/lib/icons';
 import { Button, Badge, ActionsDropdown, ThreeDotsLoader, FormDropdown, AlertModal, DefaultModal, FormSection, Tabs, TabsList, TabsTrigger, TabsContent, ListItem, CustomerMobileBar } from '@/components/reusable';
-import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading";
 import { getQuoteDetailsAction, updateQuoteStatusAction, deleteQuoteAction, convertQuoteToOrderAction, getQuoteHistoryAction, getPartnerAddressAction, regenerateQuoteApprovalCodeAction } from '@/app/actions/erp/quotes';
 import { useCSRFToken } from "@/hooks/use-csrf-token"
 import { QuoteHistoryTab } from "./QuoteHistoryTab"
@@ -394,7 +393,13 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
         }));
     }, [quote?.items]);
 
-    if (loading) return <ERPDetailLoading key="loading-quote-view" />;
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+                <ThreeDotsLoader />
+            </div>
+        );
+    }
     if (!quote) return null;
 
     const statusInfo = getStatusInfo(quote.status);

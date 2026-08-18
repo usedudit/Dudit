@@ -20,7 +20,6 @@ import ReturnGridCard from "./ReturnGridCard"
 import ReturnPrintModal from "./ReturnPrintModal"
 import CreateReturnPage from "./CreateReturnPage"
 import ReturnPageControls from "./ReturnPageControls"
-import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
 import type { ReturnRequest } from "./types"
 import { createReturnRequestAction, getReturnRequestsPageAction, processReturnRequestAction } from "@/app/actions/erp/returns"
 import { getReturnResolutionLabel } from "@/lib/returns/types"
@@ -492,20 +491,16 @@ export default function ReturnsPage({ partnerId, roleId, storeId, planGate }: Re
         <>
             <AnimatePresence mode="wait">
                 {entityState.isOpen ? (
-                    (entityState.action !== "create" && isReturnsLoading) ? (
-                        <ERPDetailLoading key="loading-return" />
-                    ) : (
-                        <FadeIn key="form" className="w-full h-full">
-                            <CreateReturnPage
-                                partnerId={partnerId}
-                                mode={entityState.action as any}
-                                returnRequest={activeReturnRequest}
-                                onBack={closeEntity}
-                                onSave={handleSaveReturn}
-                                isSaving={isSaving}
-                            />
-                        </FadeIn>
-                    )
+                    <FadeIn key="form" className="w-full h-full">
+                        <CreateReturnPage
+                            partnerId={partnerId}
+                            mode={entityState.action as any}
+                            returnRequest={activeReturnRequest}
+                            onBack={closeEntity}
+                            onSave={handleSaveReturn}
+                            isSaving={isSaving}
+                        />
+                    </FadeIn>
                 ) : (
                     <FadeIn key="list" className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
                         <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">

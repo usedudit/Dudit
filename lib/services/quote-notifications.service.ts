@@ -1,7 +1,7 @@
 import "server-only"
 
 import { logAuditEvent } from "./timeline.service"
-import { UnosendService } from "./unosend.service"
+import { SMTP2GOService } from "./smtp2go.service"
 import { getAdminClient } from "@/lib/supabase/admin"
 
 export type QuoteNotificationEvent = "shared" | "viewed" | "approved" | "rejected" | "expired" | "converted"
@@ -19,7 +19,7 @@ interface QuoteNotificationInput {
 
 /**
  * Handles all notification and audit logging side effects for the public quotation approval system.
- * Keeps audit records standardized in Portuguese and initiates emails via Unosend.
+ * Keeps audit records standardized in Portuguese and initiates emails via SMTP2GO.
  */
 export async function notifyQuoteEvent(input: QuoteNotificationInput): Promise<void> {
     const { event, quote, actorUserId, actorName, ipAddress, userAgent, rejectionReason, approvalMethod } = input
@@ -86,7 +86,7 @@ export async function notifyQuoteEvent(input: QuoteNotificationInput): Promise<v
         source: actorUserId ? "manual" : "system",
     })
 
-    // 2. Email Notifications via Unosend (Fire-and-forget, fails silently to prevent breaking primary actions)
+    // 2. Email Notifications via SMTP2GO (Fire-and-forget, fails silently to prevent breaking primary actions)
     try {
         const supabase = getAdminClient()
 
@@ -113,7 +113,7 @@ export async function notifyQuoteEvent(input: QuoteNotificationInput): Promise<v
 
         if (event === "shared" && customerEmail) {
             // Email to customer with approval details
-            await UnosendService.sendEmail({
+            await SMTP2GOService.sendEmail({
                 userId: quote.user_id || undefined,
                 to: [{ email: customerEmail, name: customerName }],
                 subject: `Orçamento Disponível - ${quoteNum}`,
@@ -143,7 +143,7 @@ export async function notifyQuoteEvent(input: QuoteNotificationInput): Promise<v
 
         if (event === "approved" && sellerEmail) {
             // Email to seller notifying approval
-            await UnosendService.sendEmail({
+            await SMTP2GOService.sendEmail({
                 userId: quote.user_id || undefined,
                 to: [{ email: sellerEmail }],
                 subject: `Orçamento Aprovado! - ${quoteNum}`,
@@ -167,7 +167,7 @@ export async function notifyQuoteEvent(input: QuoteNotificationInput): Promise<v
 
         if (event === "rejected" && sellerEmail) {
             // Email to seller notifying rejection
-            await UnosendService.sendEmail({
+            await SMTP2GOService.sendEmail({
                 userId: quote.user_id || undefined,
                 to: [{ email: sellerEmail }],
                 subject: `Orçamento Recusado - ${quoteNum}`,
@@ -193,6 +193,6 @@ export async function notifyQuoteEvent(input: QuoteNotificationInput): Promise<v
         }
 
     } catch (emailErr) {
-        console.error("[quote-notifications] Failed to send email via Unosend:", emailErr)
+        console.error("[quote-notifications] Failed to send email via SMTP2GO:", emailErr)
     }
 }

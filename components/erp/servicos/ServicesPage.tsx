@@ -19,7 +19,6 @@ import ExportSelectionModal from "@/components/erp/export/ExportSelectionModal"
 import ExportColumnSelectionModal from "@/components/erp/export/ExportColumnSelectionModal"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
-import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
 
 // Actions
 import {
@@ -686,27 +685,22 @@ export default function ServicesPage({
         <>
             <AnimatePresence mode="wait">
                 {entityState.isOpen && formMode ? (
-                    (formMode !== 'add' && isLoadingDetail) ? (
-                        <ERPDetailLoading key="loading-service" />
-                    ) : (
-                        <FadeIn key="form" className="w-full h-full">
-                            <AddServicePage
-                                mode={formMode as any}
-                                setMode={(m) => {
-                                    // Map AddServicePage mode changes to URL updates
-                                    if (m === 'edit' && entityState.entityId) openEntity('edit', entityState.entityId)
-                                    else if (m === 'details' && entityState.entityId) openEntity('view', entityState.entityId)
-                                }}
-                                service={formService}
-                                onBack={closeEntity}
-                                partnerId={partnerId}
-                                partner={partner}
-                                storeId={selectedStore?.id}
-                                isLoadingDetails={isLoadingDetail}
-                                onClose={handleFormClose}
-                            />
-                        </FadeIn>
-                    )
+                    <AddServicePage
+                        key="form"
+                        mode={formMode as any}
+                        setMode={(m) => {
+                            // Map AddServicePage mode changes to URL updates
+                            if (m === 'edit' && entityState.entityId) openEntity('edit', entityState.entityId)
+                            else if (m === 'details' && entityState.entityId) openEntity('view', entityState.entityId)
+                        }}
+                        service={formService}
+                        onBack={closeEntity}
+                        partnerId={partnerId}
+                        partner={partner}
+                        storeId={selectedStore?.id}
+                        isLoadingDetails={isLoadingDetail}
+                        onClose={handleFormClose}
+                    />
                 ) : (
                     <FadeIn
                         key="list"

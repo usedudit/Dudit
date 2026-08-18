@@ -7,7 +7,8 @@ import { requireAdmin } from "@/lib/auth/admin-authorization"
 import { adminAuditLog } from "@/lib/admin/audit"
 import { AdminActionType } from "@/lib/admin/types"
 import { getAdminClient } from "@/lib/supabase/admin"
-import { UnosendService } from "@/lib/services/unosend.service"
+import { SMTP2GOService } from "@/lib/services/smtp2go.service"
+import { SMTP2GO_TEMPLATE_IDS } from "@/lib/services/smtp2go-templates"
 import type { InternalEmailRequest } from "@/lib/types/unosend.types"
 import type { DeliveryDriverVehicle } from "@/lib/delivery/types"
 
@@ -122,14 +123,21 @@ export async function createDeliveryDriverInvitationAdminAction(input: {
   if (error || !invitation) return { success: false as const, error: "Não foi possível criar o convite." }
 
   const url = inviteUrl(token)
+  const templateId = SMTP2GO_TEMPLATE_IDS.deliveryDriverInvitation || undefined
   const emailRequest: InternalEmailRequest = {
     to: [{ email, name: fullName }],
     subject: "Convite para o Portal do Entregador Dudit",
-    html: `<p>Olá, ${escapeHtml(fullName)}.</p><p>Você foi convidado para o Portal do Entregador Dudit.</p><p><a href="${escapeHtml(url)}">Criar minha conta</a></p><p>Este convite expira em 7 dias e só pode ser aceito com este email.</p>`,
+    template_id: templateId,
+    variables: templateId ? {
+      full_name: fullName,
+      invite_url: url,
+      expiration_days: "7",
+    } : undefined,
+    html: templateId ? undefined : `<p>Olá, ${escapeHtml(fullName)}.</p><p>Você foi convidado para o Portal do Entregador Dudit.</p><p><a href="${escapeHtml(url)}">Criar minha conta</a></p><p>Este convite expira em 7 dias e só pode ser aceito com este email.</p>`,
     text: `Olá, ${fullName}. Acesse ${url} para criar sua conta no Portal do Entregador Dudit. O convite expira em 7 dias.`,
     userId: adminUser.userId,
   }
-  const emailResult = await UnosendService.sendEmail(emailRequest)
+  const emailResult = await SMTP2GOService.sendEmail(emailRequest)
   await adminAuditLog({
     adminUserId: adminUser.userId,
     actionType: AdminActionType.DELIVERY_DRIVER_INVITE_CREATE,

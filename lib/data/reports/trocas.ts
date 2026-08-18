@@ -102,12 +102,12 @@ const fetchReturnsDataStatic = unstable_cache(
     if (returnIds.length > 0) {
       const { data: items } = await supabase
         .from("return_items")
-        .select("item_name, quantity")
+        .select("product_name_snapshot, quantity")
         .in("return_request_id", returnIds)
       if (items) {
         const prodMap = new Map<string, { count: number; totalQuantity: number }>()
         for (const item of items) {
-          const name = item.item_name || "Produto"
+          const name = item.product_name_snapshot || "Produto"
           const cur = prodMap.get(name) || { count: 0, totalQuantity: 0 }
           prodMap.set(name, { count: cur.count + 1, totalQuantity: cur.totalQuantity + (item.quantity || 1) })
         }

@@ -29,7 +29,6 @@ import {
     Pagination,
     Tooltip
 } from "@/components/reusable"
-import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
 import { usePermissions } from "@/lib/permission-context"
 import { useSidebar } from "@/lib/sidebar-context"
 import { getOrderDetailsAction, getOrderHistoryAction } from "@/app/actions/erp/orders"
@@ -336,7 +335,13 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
         loadHistory()
     }, [activeTab, historyLoaded, orderId, partnerId, notifyError])
 
-    if (loading) return <ERPDetailLoading key="loading-order-view" />
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+                <ThreeDotsLoader />
+            </div>
+        )
+    }
 
     if (!order) return null
 

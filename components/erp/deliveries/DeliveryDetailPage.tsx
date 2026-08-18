@@ -2,12 +2,11 @@
 
 import { useEffect, useRef, useState, useCallback } from "react"
 import dynamic from "next/dynamic"
-import { Button, Badge, InfoCard, FormDropdown, Tabs, TabsContent, TabsList, TabsTrigger, CustomerCard, FormSection, ListItem, ActionsDropdown, IconPlaceholder } from "@/components/reusable"
+import { Button, Badge, InfoCard, FormDropdown, Tabs, TabsContent, TabsList, TabsTrigger, CustomerCard, FormSection, ListItem, ActionsDropdown, IconPlaceholder, ThreeDotsLoader } from "@/components/reusable"
 import AlertModal from "@/components/reusable/AlertModal"
 import Input from "@/components/reusable/Input"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
 import { ChevronLeftIcon, ClockArrowUpIcon, ClockCheckIcon, EstimateTimeIcon, RouteIcon, XIcon, EditIcon } from "@/lib/icons"
 import { getERPDeliveryDetailsAction, getDeliveryRoutePointsAction, updateERPSingleOrderDeliveryStatusAction, updateERPDeliveryStatusAction } from "@/app/actions/erp/deliveries"
 import { formatCurrency, formatDateTime, formatQuantityWithUnit, formatUnitPriceWithUnit } from "@/lib/utils"
@@ -271,7 +270,13 @@ export default function DeliveryDetailPage({
         }
     }
 
-    if (loading) return <ERPDetailLoading key="loading-delivery-detail" />
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+                <ThreeDotsLoader />
+            </div>
+        )
+    }
 
     if (!delivery) {
         return (

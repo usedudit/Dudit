@@ -1,5 +1,5 @@
 /**
- * API endpoint for sending emails via Unosend
+ * API endpoint for sending emails via SMTP2GO
  * POST /api/emails/send
  *
  * Security:
@@ -17,7 +17,7 @@ import { SecureLogger } from "@/lib/secure-logger"
 import { withCSRFProtection } from "@/lib/security/csrf-middleware"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
-import { UnosendService } from "@/lib/services/unosend.service"
+import { SMTP2GOService } from "@/lib/services/smtp2go.service"
 import { getErrorMessage } from "@/lib/utils/error-handlers"
 import type { InternalEmailRequest } from "@/lib/types/unosend.types"
 
@@ -109,7 +109,7 @@ async function handler(request: NextRequest) {
       }
     }
 
-    // Max file size check: 40MB per Unosend limits
+    // Keep a 40MB application limit for attachments.
     const totalSize = (body.html?.length || 0) + (body.text?.length || 0) + (body.attachments || []).reduce((sum, att) => sum + att.content.length, 0)
 
     if (totalSize > 40 * 1024 * 1024) {
@@ -146,7 +146,7 @@ async function handler(request: NextRequest) {
       partnerId: body.partnerId,
     }
 
-    const result = await UnosendService.sendEmail(internalRequest)
+    const result = await SMTP2GOService.sendEmail(internalRequest)
 
     // ====================================================================
     // RESPONSE

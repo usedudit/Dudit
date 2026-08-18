@@ -27,6 +27,7 @@ import {
     InfoCard,
     AlertModal,
     FormTextarea,
+    ThreeDotsLoader,
 } from "@/components/reusable"
 import {
     createERPDeliveryAction,
@@ -37,7 +38,6 @@ import {
     getERPDeliveryPlanAccessAction,
 } from "@/app/actions/erp/deliveries"
 import { assignPlatformDriverToDeliveryAction, fetchAvailablePlatformDeliveryDriversAction } from "@/app/actions/erp/delivery-driver-assignments"
-import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
 import {
     CalendarIcon,
     ChevronLeftIcon,
@@ -428,7 +428,11 @@ export default function CreateDeliveryPage({
     }
 
     if (isLoadingDelivery) {
-        return <ERPDetailLoading key="loading-edit-delivery" />
+        return (
+            <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+                <ThreeDotsLoader />
+            </div>
+        )
     }
 
     return (

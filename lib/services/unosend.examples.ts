@@ -1,12 +1,12 @@
 /**
- * Usage examples for Unosend email integration
+ * Usage examples for SMTP2GO email integration
  * These examples show common patterns for sending emails
  *
  * @module unosend.examples
  */
 
 import { sendEmailAction } from "@/app/actions/emails"
-import { UnosendService } from "@/lib/services/unosend.service"
+import { SMTP2GOService } from "@/lib/services/smtp2go.service"
 import type { InternalEmailRequest } from "@/lib/types/unosend.types"
 
 // ============================================================================
@@ -227,7 +227,7 @@ export async function exampleClientSideEmailRequest() {
 }
 
 // ============================================================================
-// EXAMPLE 9: Send direct via UnosendService (for internal use)
+// EXAMPLE 9: Send direct via SMTP2GOService (for internal use)
 // ============================================================================
 
 export async function exampleDirectService() {
@@ -243,7 +243,7 @@ export async function exampleDirectService() {
     partnerId: "partner-456", // optional
   }
 
-  const result = await UnosendService.sendEmail(request)
+  const result = await SMTP2GOService.sendEmail(request)
 
   if (result.success) {
     console.log("✓ Email sent:", result.messageId, `(${result.attempts} attempt(s))`)

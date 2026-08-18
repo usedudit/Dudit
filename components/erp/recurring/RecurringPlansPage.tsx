@@ -23,7 +23,6 @@ import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 
 // Specific Page components
 import NewRecurringPlanPage from "./NewRecurringPlanPage"
-import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
 import PlanPageControls from "./PlanPageControls"
 import PlanGridCard from "./PlanGridCard"
 import PlanListRow from "./PlanListRow"
@@ -328,21 +327,17 @@ export default function RecurringPlansPage({
         <>
             <AnimatePresence mode="wait">
                 {entityState.isOpen && (isViewing || isEditing || isCreating) ? (
-                    ((isViewing || isEditing) && isLoadingDetail) ? (
-                        <ERPDetailLoading key="loading-plan" />
-                    ) : (
-                        <FadeIn key="form" className="w-full h-full">
-                            <NewRecurringPlanPage
-                                partnerId={partnerId}
-                                plan={selectedPlan}
-                                onBack={() => closeEntity()}
-                                onSuccess={() => {
-                                    afterMutation()
-                                    closeEntity()
-                                }}
-                            />
-                        </FadeIn>
-                    )
+                    <FadeIn key="form" className="w-full h-full">
+                        <NewRecurringPlanPage
+                            partnerId={partnerId}
+                            plan={selectedPlan}
+                            onBack={() => closeEntity()}
+                            onSuccess={() => {
+                                afterMutation()
+                                closeEntity()
+                            }}
+                        />
+                    </FadeIn>
                 ) : (
                     <FadeIn
                         key="list"

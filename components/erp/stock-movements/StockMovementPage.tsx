@@ -17,7 +17,6 @@ import FloatingActionBar from "@/components/reusable/FloatingActionBar";
 import CreateStockMovement from './CreateStockMovement';
 import StockMovementDetailPage from './StockMovementDetailPage';
 import StockMovementPageControls from './StockMovementPageControls';
-import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading";
 import StockMovementListItem from './StockMovementListRow';
 import StockMovementGridCard from './StockMovementGridCard';
 import { undoStockMovementAction, undoBatchStockMovementsAction, getStockMovementDetails, getERPStockMovementsPageAction, type ERPStockMovementListCursor } from '@/app/actions/erp/stock-movements';
@@ -441,18 +440,13 @@ const StockMovementPageContent = ({ partnerId, storeId, movements: initialMoveme
                     />
                 </FadeIn>
             ) : isViewing && entityState.entityId ? (
-                isLoadingDetail ? (
-                    <ERPDetailLoading key="loading-stock-detail" />
-                ) : (
-                    <FadeIn key="detail" className="w-full h-full">
-                        <StockMovementDetailPage
-                            movement={currentEntity || formattedMovements.find(m => m.id === entityState.entityId) || null}
-                            isLoading={isLoadingDetail}
-                            onBack={closeEntity}
-                            partnerId={partnerId}
-                        />
-                    </FadeIn>
-                )
+                <StockMovementDetailPage
+                    key="detail"
+                    movement={currentEntity || formattedMovements.find(m => m.id === entityState.entityId) || null}
+                    isLoading={isLoadingDetail}
+                    onBack={closeEntity}
+                    partnerId={partnerId}
+                />
             ) : (
                 <FadeIn
                     key="list"

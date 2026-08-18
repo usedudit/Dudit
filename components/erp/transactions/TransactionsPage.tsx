@@ -20,7 +20,6 @@ import TransactionGridCard from "./TransactionGridCard"
 import CreateTransactionPage, { type CategoryItem, type AccountItem } from "./CreateTransactionPage"
 import TransactionDetailView from "./TransactionDetailView"
 import InstallmentParcelsTable, { type InstallmentParcelRow } from "./InstallmentParcelsTable"
-import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
 import type { ERPTransaction, FinancialTransactionCursor, TransactionTab } from "@/lib/services/transactions.types"
 import type { RecurringOccurrence } from "@/app/actions/erp/recurring-transactions"
 import { markRecurringOccurrenceAsPaidAction, recordRegularTransactionPaymentAction } from "@/app/actions/erp/transactions"
@@ -1548,7 +1547,11 @@ export default function TransactionsPage({
 
     if (entityState.isOpen && entityState.action === "view" && entityState.entityId && !entityState.entityType) {
         if (isLoadingDetail) {
-            return <ERPDetailLoading key="loading-tx-detail" />
+            return (
+                <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+                    <ThreeDotsLoader />
+                </div>
+            )
         }
         return (
             <motion.div
@@ -1891,9 +1894,14 @@ export default function TransactionsPage({
     }
 
     if (isViewing && entityState.entityType === "installment") {
-        if (installmentDetailLoading || !installmentDetail) {
-            return <ERPDetailLoading key="loading-installment-detail" />
+        if (installmentDetailLoading) {
+            return (
+                <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+                    <ThreeDotsLoader />
+                </div>
+            )
         }
+        if (!installmentDetail) return null
         const representativeTxId = installmentDetail?.installments?.[0]?.id || entityState.entityId
         return (
             <FadeIn>
@@ -2078,7 +2086,11 @@ export default function TransactionsPage({
 
     if (isFormOpen) {
         if (entityState.action === "edit" && isLoadingDetail && entityState.entityType !== "recurring") {
-            return <ERPDetailLoading key="loading-tx-edit" />
+            return (
+                <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+                    <ThreeDotsLoader />
+                </div>
+            )
         }
         return (
             <motion.div

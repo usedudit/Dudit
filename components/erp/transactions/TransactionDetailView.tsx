@@ -13,7 +13,6 @@ import { GenericAttachmentsTab } from "../shared/GenericAttachmentsTab"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { formatCurrency, formatQuantityWithUnit, formatUnitPriceWithUnit } from "@/lib/utils"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
 import InstallmentParcelsTable, { type InstallmentParcelRow } from "./InstallmentParcelsTable"
 import { ListItem } from "@/components/reusable"
 import { AdjustIcon, ArrowRightIcon, BankIcon, CashierIcon, DigitalWalletIcon, MoneyIcon, ReturnIcon, ShoppingCartIcon, RepeatIcon, TrendingUpIcon } from "@/lib/icons"
@@ -89,7 +88,11 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
     }, [activeTab, historyLoaded, transactionId, partnerId, notifyError])
 
     if (loading) {
-        return <ERPDetailLoading key="loading-tx-view" />
+        return (
+            <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+                <ThreeDotsLoader />
+            </div>
+        )
     }
     if (!detail) return null
 

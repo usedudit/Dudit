@@ -84,6 +84,17 @@ const createReturnSchema = z.object({
     orderId: z.string().uuid(),
     resolution: z.enum(["exchange", "refund", "store_credit", "none", "rejected"]),
     reason: z.string().trim().min(2).max(120),
+    reasonCategory: z.enum([
+        "buyer_remorse",
+        "size_fit",
+        "wrong_item",
+        "defective",
+        "damaged",
+        "not_as_described",
+        "missing_parts",
+        "arrived_late",
+        "other",
+    ]).optional().nullable(),
     message: z.string().trim().max(2000).optional().nullable(),
     items: z.array(itemSchema).min(1).max(100),
     evidence: z.array(evidenceSchema).max(5).default([]),
@@ -739,6 +750,14 @@ export async function createMarketplaceReturnRequestAction(input: Omit<z.infer<t
         if (error) throw error
         const requestId = String((created as any)?.id || "")
 
+        // Persist structured buyer reason (drives marketplace fault penalty)
+        if (requestId && base.reasonCategory) {
+            await supabase
+                .from("return_requests")
+                .update({ reason_category: base.reasonCategory })
+                .eq("id", requestId)
+        }
+
         await logAuditEvent({
             partnerId: order.partner_id,
             actorUserId: user.id,
@@ -965,7 +984,7 @@ export async function processReturnRequestAction(input: unknown) {
         const { data: request, error: requestError } = await supabase
             .from("return_requests")
             .select(`
-                id, partner_id, store_id, order_id, status, request_type, desired_resolution, approved_resolution, order_total_snapshot, customer_id, customer_name_snapshot, customer_email_snapshot,
+                id, partner_id, store_id, order_id, status, request_type, source, reason_category, desired_resolution, approved_resolution, order_total_snapshot, customer_id, customer_name_snapshot, customer_email_snapshot,
                 orders!order_id(total_amount, amount_paid, payment_provider, mp_payment_id, payment_breakdown, buyer_id, customer_name, store_id),
                 return_items!return_items_return_request_id_fkey(net_item_value_snapshot)
             `)
@@ -1335,6 +1354,20 @@ export async function processReturnRequestAction(input: unknown) {
                 })
             } catch (notifyErr) {
                 console.error("[processReturnRequest] Failed to send notification to customer:", notifyErr)
+            }
+        }
+
+        // Re-sync store in Redis so reputation changes (return fault penalty)
+        // reflect immediately in marketplace store ranking.
+        if (request.source === "marketplace" && (data.nextStatus === "APPROVED" || data.nextStatus === "RESOLVED")) {
+            const storeId = request.store_id || (request as any).orders?.store_id
+            if (storeId) {
+                try {
+                    const { syncToExploreRedis } = await import("@/lib/redis-sync")
+                    await syncToExploreRedis({ id: storeId, type: "loja", data: {} })
+                } catch (redisErr) {
+                    console.error("[processReturnRequest] Redis store re-sync failed:", redisErr)
+                }
             }
         }
 

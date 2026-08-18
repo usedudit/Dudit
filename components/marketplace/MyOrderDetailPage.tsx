@@ -31,6 +31,28 @@ interface MyOrderDetailPageProps {
     onBack: () => void;
 }
 
+type ReturnReasonCategory =
+    | "buyer_remorse"
+    | "size_fit"
+    | "wrong_item"
+    | "defective"
+    | "damaged"
+    | "not_as_described"
+    | "missing_parts"
+    | "arrived_late"
+    | "other";
+
+const RETURN_REASON_CATEGORY_MAP: Record<string, ReturnReasonCategory> = {
+    wrong_item: "wrong_item",
+    defective: "defective",
+    damaged: "damaged",
+    different_from_description: "not_as_described",
+    missing_parts: "missing_parts",
+    arrived_late: "arrived_late",
+    changed_mind: "buyer_remorse",
+    other: "other",
+};
+
 const getStatusConfig = (status: string) => {
     switch (status) {
         case 'paid': return { label: 'Pago', color: 'text-brand-green', icon: CheckCircleIcon, statusText: 'Aprovado' };
@@ -1016,6 +1038,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                 orderId: order.id,
                 resolution: returnResolution,
                 reason: returnReason,
+                reasonCategory: RETURN_REASON_CATEGORY_MAP[returnReason] || "other",
                 message: returnMessage,
                 items: allItems.map((item) => ({
                     order_item_id: item.order_item_id,

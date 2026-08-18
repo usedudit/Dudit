@@ -192,14 +192,14 @@ export function FinancialCalendarCard({ dailyMovements = {}, className = "" }: F
                                     : `Data: ${cell.dayNum}/${month + 1}/${year}`
                             }
                             className={`p-1.5 flex flex-col items-center justify-start min-h-[56px] rounded-[14px] transition-colors relative cursor-default ${isToday
-                                    ? "bg-brand-green-light/40 dark:bg-dark-border/40 ring-1 ring-brand-green/30"
-                                    : "hover:bg-brand-gray/30 dark:hover:bg-dark-border/30"
+                                ? "bg-brand-green-light/40 dark:bg-dark-border/40 ring-1 ring-brand-green/30"
+                                : "hover:bg-brand-gray/30 dark:hover:bg-dark-border/30"
                                 }`}
                         >
                             <span
                                 className={`text-[13px] font-semibold leading-tight ${isToday
-                                        ? "text-brand-green font-bold"
-                                        : "text-brand-dark dark:text-dark-heading"
+                                    ? "text-brand-green font-bold"
+                                    : "text-brand-dark dark:text-dark-heading"
                                     }`}
                             >
                                 {cell.dayNum}
@@ -208,8 +208,8 @@ export function FinancialCalendarCard({ dailyMovements = {}, className = "" }: F
                             {hasMovement ? (
                                 <span
                                     className={`text-[10.5px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full inline-flex items-center justify-center leading-none mt-1 shadow-sm whitespace-nowrap transition-transform hover:scale-105 ${isPositive
-                                            ? "bg-[#d1fae5] dark:bg-emerald-950/60 text-[#059669] dark:text-emerald-300"
-                                            : "bg-[#ffe4e6] dark:bg-rose-950/60 text-[#e11d48] dark:text-rose-300"
+                                        ? "bg-[#d1fae5] dark:bg-emerald-950/60 text-[#059669] dark:text-emerald-300"
+                                        : "bg-[#ffe4e6] dark:bg-rose-950/60 text-[#e11d48] dark:text-rose-300"
                                         }`}
                                 >
                                     {formatCalendarCompact(net)}

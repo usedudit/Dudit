@@ -1,7 +1,7 @@
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getCurrentUser } from "@/lib/auth/authorization"
 import { NextRequest, NextResponse } from "next/server"
-import { UnosendService } from "@/lib/services/unosend.service"
+import { SMTP2GOService } from "@/lib/services/smtp2go.service"
 import { escapeHtml } from "@/lib/security/input-sanitizer"
 
 export async function POST(request: NextRequest) {
@@ -52,13 +52,13 @@ export async function POST(request: NextRequest) {
       console.log("User profile created successfully")
     }
 
-    // Send welcome email via Unosend
+    // Send welcome email via SMTP2GO
     if (email) {
       try {
         const escapedFullName = escapeHtml(fullName || "usuário")
-        const emailResult = await UnosendService.sendEmail({
+        const emailResult = await SMTP2GOService.sendEmail({
           userId,
-          from: process.env.UNOSEND_FROM_EMAIL || "noreply@yourdomain.com",
+          from: process.env.SMTP2GO_FROM_EMAIL || "noreply@dudit.com.br",
           to: [{ email }],
           subject: "Bem-vindo à Plataforma!",
           html: `

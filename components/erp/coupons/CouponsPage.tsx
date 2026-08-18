@@ -23,7 +23,6 @@ import CouponGridCard from "./CouponGridCard"
 import CouponListItem from "./CouponListRow"
 import CouponFormPage from "./CouponFormPage"
 import CouponDetailPage from "./CouponDetailPage"
-import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
 import {
     CouponFormState,
     CouponRelations,
@@ -767,34 +766,28 @@ export default function CouponsPage({
         <>
             <AnimatePresence mode="wait">
                 {wrapperMode === "create" || wrapperMode === "edit" ? (
-                    (wrapperMode === "edit" && (isLoadingScope || isLoadingRelations)) ? (
-                        <ERPDetailLoading key="loading-coupon-form" />
-                    ) : (
-                        <FadeIn key="form" className="w-full h-full">
-                            <CouponFormPage
-                                partnerId={partnerId}
-                                mode={wrapperMode}
-                                coupon={selectedCoupon}
-                                form={form}
-                                setForm={setForm}
-                                scopeData={scopeData}
-                                relations={relations}
-                                setSelectedProductIds={setSelectedProductIds}
-                                setSelectedServiceIds={setSelectedServiceIds}
-                                setSelectedCategoryIds={setSelectedCategoryIds}
-                                setSelectedCustomerIds={setSelectedCustomerIds}
-                                setSelectedStoreIds={setSelectedStoreIds}
-                                onBack={handleBackToList}
-                                onSave={saveCoupon}
-                                isSaving={isSaving}
-                                isLoadingScope={isLoadingScope || isLoadingRelations}
-                            />
-                        </FadeIn>
-                    )
+                    <FadeIn key="form" className="w-full h-full">
+                        <CouponFormPage
+                            partnerId={partnerId}
+                            mode={wrapperMode}
+                            coupon={selectedCoupon}
+                            form={form}
+                            setForm={setForm}
+                            scopeData={scopeData}
+                            relations={relations}
+                            setSelectedProductIds={setSelectedProductIds}
+                            setSelectedServiceIds={setSelectedServiceIds}
+                            setSelectedCategoryIds={setSelectedCategoryIds}
+                            setSelectedCustomerIds={setSelectedCustomerIds}
+                            setSelectedStoreIds={setSelectedStoreIds}
+                            onBack={handleBackToList}
+                            onSave={saveCoupon}
+                            isSaving={isSaving}
+                            isLoadingScope={isLoadingScope || isLoadingRelations}
+                        />
+                    </FadeIn>
                 ) : wrapperMode === "view" ? (
-                    isLoadingRelations ? (
-                        <ERPDetailLoading key="loading-coupon" />
-                    ) : selectedCoupon ? (
+                    selectedCoupon ? (
                         <FadeIn key="detail" className="w-full h-full">
                             <CouponDetailPage
                                 coupon={selectedCoupon}

@@ -1200,7 +1200,7 @@ function FinancialSection({ financialData }: { financialData: FinancialDashboard
 
             {/* Row 2: Fluxo de Caixa + Calendário Financeiro */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-                <div className="lg:col-span-6 flex flex-col">
+                <div className="lg:col-span-8 flex flex-col">
                     <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex flex-col justify-between h-full">
                         <CardHeader icon={MoneyIcon} title="Fluxo de Caixa" />
                         <div className="flex-1 flex items-center justify-center">
@@ -1214,7 +1214,7 @@ function FinancialSection({ financialData }: { financialData: FinancialDashboard
                     </div>
                 </div>
 
-                <div className="lg:col-span-6 flex flex-col">
+                <div className="lg:col-span-4 flex flex-col">
                     <FinancialCalendarCard dailyMovements={financialData.dailyMovements} />
                 </div>
             </div>
@@ -1236,11 +1236,10 @@ function FinancialSection({ financialData }: { financialData: FinancialDashboard
                                             <ListItem
                                                 key={item.id}
                                                 left={
-                                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                                                        isOverdue
-                                                            ? "bg-rose-50 dark:bg-rose-950/40 text-rose-500"
-                                                            : "bg-amber-50 dark:bg-amber-950/40 text-amber-500"
-                                                    }`}>
+                                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${isOverdue
+                                                        ? "bg-rose-50 dark:bg-rose-950/40 text-rose-500"
+                                                        : "bg-amber-50 dark:bg-amber-950/40 text-amber-500"
+                                                        }`}>
                                                         {isOverdue ? <AlertCircleIcon size={18} /> : <ClockIcon size={18} />}
                                                     </div>
                                                 }
@@ -1250,11 +1249,10 @@ function FinancialSection({ financialData }: { financialData: FinancialDashboard
                                                 descriptionClassName="text-[12px] text-brand-inactive-text dark:text-dark-body font-medium"
                                                 className="!border-0 !bg-transparent hover:!bg-brand-gray/20 dark:hover:!bg-dark-border/20 px-2 py-2.5 transition-colors"
                                                 right={
-                                                    <span className={`text-[12px] font-bold px-3 py-1 rounded-full border ${
-                                                        isOverdue
-                                                            ? "bg-[#fef2f2] dark:bg-rose-950/40 text-[#ef4444] dark:text-rose-300 border-rose-200/80 dark:border-rose-900/40"
-                                                            : "bg-[#fffbeb] dark:bg-amber-950/40 text-[#f59e0b] dark:text-amber-300 border-amber-200/80 dark:border-amber-900/40"
-                                                    }`}>
+                                                    <span className={`text-[12px] font-bold px-3 py-1 rounded-full border ${isOverdue
+                                                        ? "bg-[#fef2f2] dark:bg-rose-950/40 text-[#ef4444] dark:text-rose-300 border-rose-200/80 dark:border-rose-900/40"
+                                                        : "bg-[#fffbeb] dark:bg-amber-950/40 text-[#f59e0b] dark:text-amber-300 border-amber-200/80 dark:border-amber-900/40"
+                                                        }`}>
                                                         {item.statusLabel || (isOverdue ? "Vencido" : "Próximo")}
                                                     </span>
                                                 }
@@ -1300,11 +1298,10 @@ function FinancialSection({ financialData }: { financialData: FinancialDashboard
                             {(financialData.latestMovements || []).slice(0, 8).map(m => (
                                 <div key={m.id} className="flex items-center justify-between py-2.5 border-b border-brand-border dark:border-dark-border last:border-0">
                                     <div className="flex items-center gap-3">
-                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                                            m.tone === "red"
-                                                ? "bg-rose-50 dark:bg-rose-950/40 text-brand-red"
-                                                : "bg-emerald-50 dark:bg-emerald-950/40 text-brand-green"
-                                        }`}>
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${m.tone === "red"
+                                            ? "bg-rose-50 dark:bg-rose-950/40 text-brand-red"
+                                            : "bg-emerald-50 dark:bg-emerald-950/40 text-brand-green"
+                                            }`}>
                                             <MoneyIcon size={15} />
                                         </div>
                                         <div>
