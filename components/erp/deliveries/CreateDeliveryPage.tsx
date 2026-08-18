@@ -198,6 +198,7 @@ export default function CreateDeliveryPage({
     const handleBack = useCallback(() => handleNavigation(onBack), [handleNavigation, onBack])
     const searchRef = useRef<HTMLDivElement>(null)
     const [deliveryPeople, setDeliveryPeople] = useState<DeliveryPerson[]>([])
+    const [isDriverSheetOpen, setIsDriverSheetOpen] = useState(false)
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const handleScroll = useCallback(() => {
@@ -354,6 +355,12 @@ export default function CreateDeliveryPage({
             ...(platform as DeliveryPerson[]).map((person) => ({ ...person, id: `platform:${person.id}`, source: "platform" as const })),
         ])
     }
+
+    useEffect(() => {
+        if (deliveryPeople.length === 0) void loadDeliveryPeople()
+        // The loader is intentionally called once when the delivery editor opens.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [partnerId, deliveryPeople.length])
 
     const handleSave = async () => {
         if (selectedOrderIds.length === 0 || !date || !time) return
@@ -752,6 +759,7 @@ export default function CreateDeliveryPage({
                                                                 void loadDeliveryPeople()
                                                             }}
                                                         />
+                                                        {deliveryPeople.some((person) => person.source === "platform") ? <button type="button" onClick={() => setIsDriverSheetOpen(true)} className="-mt-2 text-left text-xs font-semibold text-brand-green hover:underline">Ver entregadores da Dudit</button> : null}
 
                                                         <FormDropdown
                                                             label="Status"
@@ -800,6 +808,7 @@ export default function CreateDeliveryPage({
                                                 ]}
                                                 onFocus={() => { void loadDeliveryPeople() }}
                                             />
+                                            {deliveryPeople.some((person) => person.source === "platform") ? <button type="button" onClick={() => setIsDriverSheetOpen(true)} className="text-left text-xs font-semibold text-brand-green hover:underline">Ver entregadores da Dudit</button> : null}
                                         </div>
                                     </FadeIn>
                                 </TabsContent>
@@ -1004,6 +1013,13 @@ export default function CreateDeliveryPage({
                     </Portal>
                 );
             })()}
+
+            <BottomSheet isOpen={isDriverSheetOpen} onClose={() => setIsDriverSheetOpen(false)} title="Entregadores Dudit">
+                <div className="space-y-3 pb-4">
+                    <p className="text-sm text-brand-inactive-text">Escolha um entregador da plataforma disponível para este parceiro.</p>
+                    {deliveryPeople.filter((person) => person.source === "platform").map((person) => <button key={person.id} type="button" onClick={() => { setSelectedDeliveryPersonId(person.id); setIsDriverSheetOpen(false) }} className="flex w-full items-center justify-between rounded-xl border border-brand-border bg-white p-4 text-left transition hover:border-brand-green dark:border-dark-border dark:bg-dark-surface"><span><span className="block font-semibold">{person.fullName}</span><span className="mt-1 block text-xs text-brand-inactive-text">Dudit · {person.vehicleType || "Veículo não informado"}</span></span><span className="text-sm font-semibold text-brand-green">Selecionar</span></button>)}
+                </div>
+            </BottomSheet>
 
             <AlertModal
                 isOpen={!!orderToRemove}

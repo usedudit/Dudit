@@ -28,6 +28,7 @@ import {
 } from "@/app/actions/erp/finance-accounts"
 import { normalizeBusinessInfo, isQuickMode } from "@/lib/business-info"
 import { createERPDeliveryAction, fetchDeliveryPeopleBucketAction } from "@/app/actions/erp/deliveries"
+import { assignPlatformDriverToDeliveryAction, fetchAvailablePlatformDeliveryDriversAction } from "@/app/actions/erp/delivery-driver-assignments"
 import { pickBankThenCashDefaultFinanceAccountId, type FinanceAccountType } from "@/lib/finance-utils"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
@@ -69,6 +70,8 @@ type FinanceAccountOption = {
 type DeliveryPersonOption = {
     id: string
     fullName: string
+    source?: "legacy" | "platform"
+    vehicleType?: string | null
 }
 
 const REQUIRED_FIELDS = [
@@ -683,8 +686,14 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     useEffect(() => {
         if (deliveryMethod !== "delivery" || deliveryPeople.length > 0) return
         async function loadDeliveryPeople() {
-            const list = await fetchDeliveryPeopleBucketAction(partnerId)
-            setDeliveryPeople((list || []) as DeliveryPersonOption[])
+            const [legacy, platform] = await Promise.all([
+                fetchDeliveryPeopleBucketAction(partnerId),
+                fetchAvailablePlatformDeliveryDriversAction(partnerId).catch(() => []),
+            ])
+            setDeliveryPeople([
+                ...(legacy || []).map((person: any) => ({ ...person, source: "legacy" as const })),
+                ...(platform || []).map((person: any) => ({ ...person, id: `platform:${person.id}`, source: "platform" as const })),
+            ])
         }
         void loadDeliveryPeople()
     }, [deliveryMethod, deliveryPeople.length, partnerId])
@@ -1391,10 +1400,12 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 }
 
                 if (!editOrderId && payload.deliveryMethod === "delivery" && createdOrderId) {
+                    const isPlatformDriver = selectedDeliveryPersonId.startsWith("platform:")
+                    const platformDriverId = isPlatformDriver ? selectedDeliveryPersonId.slice("platform:".length) : null
                     const autoDeliveryResult = await createERPDeliveryAction({
                         partnerId,
                         orderIds: [createdOrderId],
-                        deliveryPersonId: selectedDeliveryPersonId || null,
+                        deliveryPersonId: isPlatformDriver ? null : (selectedDeliveryPersonId || null),
                         status: payload.deliveryStatus as any,
                         startedAt: new Date(`${deliveryDate}T${deliveryTime}:00`).toISOString(),
                         notes: notes?.trim() || undefined,
@@ -1402,6 +1413,15 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
 
                     if (!autoDeliveryResult.success) {
                         notifyError("Pedido criado, mas a entrega automÃ¡tica falhou", autoDeliveryResult.error)
+                    } else if (platformDriverId && autoDeliveryResult.deliveryId) {
+                        const assignmentResult = await assignPlatformDriverToDeliveryAction({
+                            partnerId,
+                            deliveryId: autoDeliveryResult.deliveryId,
+                            orderIds: [createdOrderId],
+                            driverId: platformDriverId,
+                            notes: notes?.trim() || undefined,
+                        })
+                        if (!assignmentResult.success) notifyError("Pedido criado, mas não foi possível atribuir o entregador Dudit", assignmentResult.error)
                     }
                 }
 
@@ -1507,7 +1527,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
 
     const deliveryPeopleOptions = deliveryPeople.map((person) => ({
         value: person.id,
-        label: person.fullName,
+        label: `${person.source === "platform" ? "Dudit · " : ""}${person.fullName}${person.vehicleType ? ` · ${person.vehicleType}` : ""}`,
     }))
 
     if (isLoadingData) {

@@ -84,7 +84,7 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
         <Link
             href={getStoreUrl({ ...partner, ...vitrine })}
             prefetch={false}
-            className={`flex flex-col group cursor-pointer active:scale-[0.98] transition-all duration-300 ${className}`}
+            className={`flex flex-col group cursor-pointer transition-all duration-300 ${className}`}
         >
             <div className="relative w-full aspect-[1400/300] rounded-[16px] overflow-hidden bg-gray-100 mb-3 shrink-0 dark:bg-dark-border/50">
                 <img

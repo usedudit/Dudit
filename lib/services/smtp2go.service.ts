@@ -155,7 +155,7 @@ export class SMTP2GOService {
 
       const data = payload.data || {}
       const emailId = data.email_id || payload.request_id
-      if (response.ok && Number(data.succeeded || 0) > 0 && emailId) {
+      if (response.ok && Number(data.succeeded || 0) > 0) {
         SecureLogger.info("[SMTP2GO] Email accepted", { messageId: emailId, userId: request.userId, attempt: attempt + 1 })
         return { success: true, messageId: emailId, timestamp: new Date(), attempts: attempt + 1 }
       }

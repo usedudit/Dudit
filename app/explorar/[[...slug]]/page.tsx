@@ -253,8 +253,8 @@ export default async function ExplorarPage({
     const resolvedParams = await params
     const resolvedSearchParams = await searchParams
 
-    let slug = resolvedParams.slug || []
-    let firstSlug = slug[0] || ""
+    const routeSlugs = resolvedParams.slug || []
+    const routeFirstSlug = routeSlugs[0] || ""
 
     const user = await getCurrentUser()
     const sessionData = user
@@ -274,20 +274,34 @@ export default async function ExplorarPage({
         }
         : null
 
-    // Server-side redirect: if no city slug in URL, try to redirect to user's city
-    // (only when the user has a saved address in the profile, or a logged-out visitor with a cookie)
-    if (!firstSlug) {
+    const query = typeof resolvedSearchParams.q === "string" ? resolvedSearchParams.q : ""
+    const type = parseMarketplaceType(resolvedSearchParams.type)
+    const section = typeof resolvedSearchParams.section === "string" ? resolvedSearchParams.section : undefined
+
+    const hasSearchIntent = !!query
+        || type !== "tudo"
+        || !!section
+        || typeof resolvedSearchParams.radius === "string"
+        || typeof resolvedSearchParams.categoria === "string"
+
+    const normalizeCityToSlug = (city: string, state: string) => {
+        const normCity = city
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/(^-|-$)/g, "")
+        return `${normCity}-${state.toLowerCase()}`
+    }
+
+    // Modo navegação (sem slug na rota e sem intenção de busca): redireciona para a
+    // localização do usuário (cidade do perfil, cookie ou Brasil), preservando SEO.
+    if (!routeFirstSlug && !hasSearchIntent) {
         let redirectSlug: string | null = null
 
         // 1. Check user profile (logged in WITH address)
         if (userProfile?.city && userProfile?.state) {
-            const normCity = userProfile.city
-                .toLowerCase()
-                .normalize("NFD")
-                .replace(/[\u0300-\u036f]/g, "")
-                .replace(/[^a-z0-9]+/g, "-")
-                .replace(/(^-|-$)/g, "")
-            redirectSlug = `${normCity}-${userProfile.state.toLowerCase()}`
+            redirectSlug = normalizeCityToSlug(userProfile.city, userProfile.state)
         }
         // 2. Logged-in users WITHOUT address: stay on /explorar (Brasil)
         // 3. Check cookie (only for logged-out visitors with saved location)
@@ -299,14 +313,28 @@ export default async function ExplorarPage({
             }
         }
 
-        if (redirectSlug) {
-            redirect(`/explorar/${redirectSlug}`)
-        }
+        redirect(redirectSlug ? `/explorar/${redirectSlug}` : "/explorar/brasil")
     }
 
-    // Se não tem slug, redireciona para /explorar/brasil
+    // Com busca (?q=, type, section...), permanece em /explorar e resolve o escopo para a
+    // cidade do usuário (perfil → cookie → Brasil), mantendo o ?q= na URL.
+    let slug = routeSlugs
+    let firstSlug = routeFirstSlug
     if (!firstSlug) {
-        redirect("/explorar/brasil")
+        let scopeSlug: string | null = null
+
+        if (userProfile?.city && userProfile?.state) {
+            scopeSlug = normalizeCityToSlug(userProfile.city, userProfile.state)
+        } else if (!userProfile) {
+            const cookieStore = await cookies()
+            const savedCity = cookieStore.get("dudit_city")?.value
+            if (savedCity && savedCity !== "brasil" && !savedCity.startsWith("estado-")) {
+                scopeSlug = savedCity
+            }
+        }
+
+        firstSlug = scopeSlug || "brasil"
+        slug = [firstSlug]
     }
 
     // Detecta se é um estado (formato: "estado-sp") ou uma cidade
@@ -316,10 +344,6 @@ export default async function ExplorarPage({
 
     const categorySlug = slug[1] || ""
     const categoria = categorySlug ? (CATEGORY_SLUG_MAP[categorySlug] || categorySlug) : ""
-
-    const query = typeof resolvedSearchParams.q === "string" ? resolvedSearchParams.q : ""
-    const type = parseMarketplaceType(resolvedSearchParams.type)
-    const section = typeof resolvedSearchParams.section === "string" ? resolvedSearchParams.section : undefined
 
     const serverFetchType = type
 
@@ -462,7 +486,12 @@ export default async function ExplorarPage({
             name: estadoNome,
             item: `https://dudit.com.br/explorar/${stateSlug}`,
         })
-    } else if (cidade) {
+    } else if (cidade === "brasil") {
+        breadcrumbItems.push({
+            name: "Brasil",
+            item: "https://dudit.com.br/explorar/brasil",
+        })
+    } else if (routeFirstSlug && cidade) {
         const cidadeNome = cidade
             .split("-")
             .slice(0, -1)
@@ -472,12 +501,6 @@ export default async function ExplorarPage({
         breadcrumbItems.push({
             name: `${cidadeNome}, ${uf}`,
             item: `https://dudit.com.br/explorar/${cidade}`,
-        })
-    } else if (cidade === "" && !isStateRoute) {
-        // brasil
-        breadcrumbItems.push({
-            name: "Brasil",
-            item: "https://dudit.com.br/explorar/brasil",
         })
     }
 

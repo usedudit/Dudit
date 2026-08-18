@@ -28,7 +28,7 @@ export function CollectionCard({ collection, className = "w-[270px] sm:w-[320px]
     <Link
       href={`/colecoes/${collection.id}`}
       prefetch={false}
-      className={`flex flex-col group cursor-pointer active:scale-[0.98] transition-all duration-300 ${className}`}
+      className={`flex flex-col group cursor-pointer transition-all duration-300 ${className}`}
     >
       <div className="relative w-full aspect-[16/10] rounded-[16px] overflow-hidden bg-brand-gray dark:bg-dark-border/30 mb-3 shrink-0">
         {collection.cover_url ? (

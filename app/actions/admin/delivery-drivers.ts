@@ -75,6 +75,53 @@ export async function listDeliveryDriversAdminAction(params?: { limit?: number; 
   }
 }
 
+export async function getDeliveryDriverAdminAction(driverId: string) {
+  await requireAdmin("admin")
+  const admin = getAdminClient()
+  const { data: driver, error } = await admin
+    .from("delivery_drivers")
+    .select("user_id, city, neighborhood, vehicle_type, availability_status, is_active, notes, terms_accepted_at, terms_version, created_at, updated_at")
+    .eq("user_id", driverId)
+    .maybeSingle()
+  if (error || !driver) return { success: false as const, error: "Entregador não encontrado." }
+
+  const [{ data: profile }, authResult, { data: assignments }, { data: links }] = await Promise.all([
+    admin.from("user_profiles").select("user_id, full_name, phone, avatar_url").eq("user_id", driverId).maybeSingle(),
+    admin.auth.admin.getUserById(driverId),
+    admin.from("delivery_assignments").select("id, order_id, partner_id, status, delivery_fee, assigned_at, completed_at, failure_reason, payment_confirmed_at").eq("driver_id", driverId).order("assigned_at", { ascending: false }).limit(100),
+    admin.from("delivery_driver_partners").select("id, partner_id, is_active, created_at").eq("driver_id", driverId).order("created_at", { ascending: false }),
+  ])
+
+  const partnerIds = Array.from(new Set((links || []).map((row: any) => String(row.partner_id)).filter(Boolean)))
+  const { data: stores } = partnerIds.length
+    ? await admin.from("stores").select("partner_id, name").in("partner_id", partnerIds).order("is_headquarters", { ascending: false })
+    : { data: [] as any[] }
+  const partnerNames = new Map<string, string>()
+  for (const store of stores || []) {
+    if (!partnerNames.has(String(store.partner_id))) partnerNames.set(String(store.partner_id), String(store.name || "Parceiro"))
+  }
+
+  const rows = assignments || []
+  const completed = rows.filter((row: any) => row.status === "delivered").length
+  const failed = rows.filter((row: any) => row.status === "failed").length
+  return {
+    success: true as const,
+    driver: {
+      ...driver,
+      profile: profile || null,
+      email: authResult.data?.user?.email || null,
+      assignments: rows.map((row: any) => ({ ...row, partner_name: partnerNames.get(String(row.partner_id)) || "Parceiro" })),
+      partners: (links || []).map((row: any) => ({ ...row, partner_name: partnerNames.get(String(row.partner_id)) || "Parceiro" })),
+      metrics: {
+        total: rows.length,
+        completed,
+        failed,
+        successRate: rows.length ? Math.round((completed / rows.length) * 100) : 0,
+      },
+    },
+  }
+}
+
 export async function createDeliveryDriverInvitationAdminAction(input: {
   email: string
   fullName: string

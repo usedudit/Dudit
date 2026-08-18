@@ -535,31 +535,15 @@ const Header: React.FC<HeaderProps> = ({
         setIsSearchInputFocused(false)
         setDirection("forward")
         startTransition(() => {
-            // Get city from localStorage/cookie or profile
-            let savedCity = typeof window !== "undefined" ? localStorage.getItem("dudit_city") : null
-            if (!savedCity && typeof document !== "undefined") {
-                const match = document.cookie.match(/(?:^|; )dudit_city=([^;]*)/)
-                if (match) savedCity = match[1]
-            }
-
-            // If we have a city, redirect to that city with the query; otherwise search all of Brazil
-            if (savedCity) {
-                router.push(`/explorar/${savedCity}?q=${encodeURIComponent(trimmed)}`)
-            } else {
-                router.push(`/explorar/brasil?q=${encodeURIComponent(trimmed)}`)
-            }
+            // O servidor resolve o escopo (cidade do usuário/cookie/Brasil) e mantém o ?q=.
+            router.push(`/explorar?q=${encodeURIComponent(trimmed)}`)
         })
     }, [searchValue, router, setDirection])
 
     // Get navigation links with city included
     const navigationLinks = useMemo(() => {
-        let savedCity = typeof window !== "undefined" ? localStorage.getItem("dudit_city") : null
-        if (!savedCity && typeof document !== "undefined") {
-            const match = document.cookie.match(/(?:^|; )dudit_city=([^;]*)/)
-            if (match) savedCity = match[1]
-        }
-
-        const basePath = savedCity ? `/explorar/${savedCity}` : "/explorar/brasil"
+        // Escopo resolvido pelo servidor (cidade do usuário/cookie/Brasil) mantém a URL limpa
+        const basePath = "/explorar"
         return [
             { label: "Ofertas do Dia", href: `${basePath}?q=oferta` },
             { label: "Produtos", href: `${basePath}?type=produtos` },
@@ -568,13 +552,8 @@ const Header: React.FC<HeaderProps> = ({
     }, [])
 
     const desktopNavigationLinks = useMemo(() => {
-        let savedCity = typeof window !== "undefined" ? localStorage.getItem("dudit_city") : null
-        if (!savedCity && typeof document !== "undefined") {
-            const match = document.cookie.match(/(?:^|; )dudit_city=([^;]*)/)
-            if (match) savedCity = match[1]
-        }
-
-        const basePath = savedCity ? `/explorar/${savedCity}` : "/explorar/brasil"
+        // Escopo resolvido pelo servidor (cidade do usuário/cookie/Brasil) mantém a URL limpa
+        const basePath = "/explorar"
         return [
             { label: "Ofertas do Dia", href: `${basePath}?q=oferta` },
             { label: "Produtos", href: `${basePath}?type=produtos` },

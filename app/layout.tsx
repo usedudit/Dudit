@@ -16,7 +16,6 @@ import { MarketplaceBottomMenu } from "@/components/marketplace/MarketplaceBotto
 import { LegalConsentBanner } from "@/components/legal/LegalConsentBanner"
 import { TimezoneProvider } from "@/lib/date"
 import { ThemeProvider } from "@/components/theme-provider"
-import Script from "next/script"
 
 const plusJakartaSans = Plus_Jakarta_Sans({
     subsets: ["latin"],
@@ -249,10 +248,10 @@ export default async function RootLayout({
                     </SupabaseProvider>
                 </ThemeProvider>
 
-                <Script
+                <script
+                    async
                     src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8357337871781593"
                     crossOrigin="anonymous"
-                    strategy="lazyOnload"
                 />
             </body>
         </html>

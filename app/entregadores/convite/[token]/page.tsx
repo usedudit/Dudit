@@ -1,11 +1,53 @@
 import { getDeliveryInvitationMetaAction } from "@/app/actions/delivery-drivers"
-import DeliveryInviteForm from "@/components/delivery/DeliveryInviteForm"
+import { acceptDeliveryDriverInvitationAction } from "@/app/actions/delivery-drivers"
+import { getCurrentUser } from "@/lib/auth/authorization"
+import { redirect } from "next/navigation"
+import InviteView from "@/components/InviteView"
 
 export default async function DeliveryInvitePage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
   const meta = await getDeliveryInvitationMetaAction(token)
   if (!meta.valid) {
-    return <main className="mx-auto flex min-h-screen max-w-lg items-center px-6"><div className="w-full rounded-2xl border border-brand-border bg-white p-8 text-center dark:border-dark-border dark:bg-dark-surface"><h1 className="text-xl font-bold">Convite indisponível</h1><p className="mt-2 text-sm text-brand-inactive-text">Este convite é inválido, expirou ou já foi utilizado.</p></div></main>
+    return <InviteView mode="error" message="Este convite é inválido, expirou ou já foi utilizado." />
   }
-  return <DeliveryInviteForm token={token} maskedEmail={meta.email || ""} />
+  const user = await getCurrentUser()
+  const invitePath = `/entregadores/convite/${token}`
+
+  async function handleLoginRedirect() {
+    "use server"
+    redirect(`/auth/login?next=${encodeURIComponent(invitePath)}`)
+  }
+
+  async function handleAccept() {
+    "use server"
+    const result = await acceptDeliveryDriverInvitationAction({ token })
+    if (!result.success) {
+      redirect(`/invite/error?message=${encodeURIComponent(result.error || "Erro ao aceitar convite.")}`)
+    }
+    redirect("/entregadores")
+  }
+
+  if (!user) {
+    return (
+      <InviteView
+        mode="invite"
+        partnerName="Portal do Entregador Dudit"
+        inviteEmail={meta.email || ""}
+        onAccept={handleAccept}
+        onLoginRedirect={handleLoginRedirect}
+      />
+    )
+  }
+
+  return (
+    <InviteView
+      mode="accept"
+      partnerName="Portal do Entregador Dudit"
+      userEmail={user.email || ""}
+      inviteEmail={meta.email || ""}
+      isMismatch={meta.isEmailMatch !== true}
+      onAccept={handleAccept}
+      onLoginRedirect={handleLoginRedirect}
+    />
+  )
 }

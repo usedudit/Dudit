@@ -244,7 +244,7 @@ export function AdminOrderDetailView({
     return (
         <>
             <FadeIn>
-                <div className="flex flex-col bg-white dark:bg-dark-background min-h-screen">
+                <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
                     <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
                         <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
 
@@ -259,32 +259,22 @@ export function AdminOrderDetailView({
                                         </Button>
                                     </div>
 
-                                    {/* Title row - desktop */}
+                                    {/* Title row */}
                                     <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
                                         <div className="flex flex-col gap-1 overflow-hidden min-w-0">
-                                            <div className="flex items-center gap-3 flex-wrap">
-                                                <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
-                                                    <span className="hidden md:inline truncate">Pedido #{orderNumber}</span>
-                                                </h1>
-                                                <Badge variant={paymentMeta.variant}>
-                                                    {paymentMeta.label}
+                                            <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                                                <span className="hidden md:inline truncate">Pedido #{orderNumber}</span>
+                                            </h1>
+                                            <Badge variant={paymentMeta.variant}>
+                                                {paymentMeta.label}
+                                            </Badge>
+                                            {order.delivery_status && (
+                                                <Badge variant="blue">
+                                                    {deliveryStatusLabel}
                                                 </Badge>
-                                                {order.delivery_status && (
-                                                    <Badge variant="blue">
-                                                        {deliveryStatusLabel}
-                                                    </Badge>
-                                                )}
-                                                <button
-                                                    onClick={handleCopyOrderId}
-                                                    title="Copiar ID UUID do pedido"
-                                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono bg-brand-gray dark:bg-dark-border/40 hover:bg-brand-gray/80 text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading rounded-lg border border-brand-border dark:border-dark-border transition-colors cursor-pointer"
-                                                >
-                                                    <span>ID: {order.id.slice(0, 8)}...</span>
-                                                    <span className="text-[10px] uppercase font-bold text-brand-link">Copiar</span>
-                                                </button>
-                                            </div>
+                                            )}
 
-                                            <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
+                                            <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-300 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
                                                 Criado em {formatDateTime(order.created_at)} • Origem: {order.order_source || "Marketplace"} • UUID: {order.id}
                                             </div>
                                         </div>
@@ -698,13 +688,14 @@ export function AdminOrderDetailView({
                                                             <div>
                                                                 <span className="text-brand-inactive-text block">UUID do Pedido</span>
                                                                 <div className="flex items-center gap-2 mt-0.5">
-                                                                    <span className="font-mono text-[11px] text-brand-dark dark:text-dark-heading select-all truncate">{order.id}</span>
-                                                                    <button
+                                                                    <span className="text-brand-dark dark:text-dark-heading select-all truncate">{order.id}</span>
+                                                                    <Button
+                                                                        variant="link"
                                                                         onClick={handleCopyOrderId}
-                                                                        className="text-brand-green font-bold hover:underline shrink-0"
+                                                                        className="text-sm shrink-0"
                                                                     >
                                                                         Copiar
-                                                                    </button>
+                                                                    </Button>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -891,24 +882,25 @@ export function AdminOrderDetailView({
                             </div>
                         </div>
                     </Tabs>
-                </div>
-            </FadeIn>
+                </div >
+            </FadeIn >
 
             {/* Mobile bottom bar */}
-            <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
+            < div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3" >
                 <Button variant="outline" className="flex-1" onClick={handleShare} leftIcon={<ShareIcon size={16} />}>
                     Compartilhar
                 </Button>
-            </div>
+            </div >
 
             {/* Modal: Ajustar Score de Risco do Comprador */}
-            <DefaultModal
+            < DefaultModal
                 isOpen={riskModalOpen}
                 onClose={() => {
                     setRiskModalOpen(false)
                     setRiskTitle("")
                     setRiskReason("")
-                }}
+                }
+                }
                 title="Ajustar Score de Risco do Cliente"
                 description={`Defina a pontuação de risco para o cliente ${order.customer_name || buyer.full_name || "Comprador"}.`}
             >
@@ -971,7 +963,7 @@ export function AdminOrderDetailView({
                         </Button>
                     </div>
                 </div>
-            </DefaultModal>
+            </DefaultModal >
         </>
     )
 }

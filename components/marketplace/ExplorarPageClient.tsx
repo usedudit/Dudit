@@ -299,8 +299,14 @@ export function ExplorarPageClient({
 
         const pathCity = slug[0] || null
         const urlCity = pathCity || searchParams.get("cidade") || null
-        if (urlCity !== selectedCitySlug) {
-            setSelectedCitySlug(urlCity)
+        if (urlCity) {
+            if (urlCity !== selectedCitySlug) {
+                setSelectedCitySlug(urlCity)
+            }
+        } else if (cidade && cidade !== selectedCitySlug) {
+            // Sem cidade na URL (ex: /explorar?q=...): mantém o escopo resolvido
+            // pelo servidor (cidade do usuário/cookie ou Brasil) em vez de zerar.
+            setSelectedCitySlug(cidade)
         }
 
         const urlRadius = searchParams.get("radius")
@@ -327,7 +333,10 @@ export function ExplorarPageClient({
 
 
 
-    // Handle city synchronization from URL/cookies/localProfile on mount
+    // Handle city synchronization from URL/cookies/localProfile on mount.
+    // Apenas persiste o escopo resolvido pelo servidor (cidade do perfil/cookie).
+    // NÃO redireciona mais: o redirect automático causava navegação dupla no
+    // mesmo componente ("Rendered more hooks than during the previous render").
     const citySyncDoneRef = useRef(false)
 
     useEffect(() => {
@@ -337,14 +346,14 @@ export function ExplorarPageClient({
 
         const pathCity = slug[0] || null
         const urlCity = pathCity || searchParams.get("cidade")
+
         if (urlCity) {
             document.cookie = `dudit_city=${urlCity}; path=/; max-age=${60 * 60 * 24 * 30}`
             localStorage.setItem("dudit_city", urlCity)
-            setSelectedCitySlug(urlCity)
             return
         }
 
-        // 1. If logged in, prioritize userProfile address
+        // 1. If logged in, persist the user's saved address city
         if (userProfile?.city && userProfile?.state) {
             const normCity = userProfile.city
                 .toLowerCase()
@@ -353,32 +362,22 @@ export function ExplorarPageClient({
                 .replace(/[^a-z0-9]+/g, "-")
                 .replace(/(^-|-$)/g, "")
             const userCitySlug = `${normCity}-${userProfile.state.toLowerCase()}`
-
-            // Guard: only sync if city actually changed
-            if (userCitySlug !== selectedCitySlug) {
-                document.cookie = `dudit_city=${userCitySlug}; path=/; max-age=${60 * 60 * 24 * 30}`
-                localStorage.setItem("dudit_city", userCitySlug)
-                setSelectedCitySlug(userCitySlug)
-                updateUrl(userCitySlug, selectedCategories, query, currentType)
-            }
+            document.cookie = `dudit_city=${userCitySlug}; path=/; max-age=${60 * 60 * 24 * 30}`
+            localStorage.setItem("dudit_city", userCitySlug)
             return
         }
 
         // 2. Fall back to cookie/localStorage ONLY for logged-out visitors
-        //    (logged-in users without an address stay on /explorar = Brasil)
-        let savedCity: string | null = null
         if (!userProfile) {
-            savedCity = localStorage.getItem("dudit_city")
+            let savedCity = localStorage.getItem("dudit_city")
             if (!savedCity) {
                 const match = document.cookie.match(/(?:^|; )dudit_city=([^;]*)/)
                 if (match) savedCity = match[1]
             }
-        }
-
-        if (savedCity && savedCity !== selectedCitySlug) {
-            setSelectedCitySlug(savedCity)
-            updateUrl(savedCity, selectedCategories, query, currentType)
-            return
+            if (savedCity) {
+                document.cookie = `dudit_city=${savedCity}; path=/; max-age=${60 * 60 * 24 * 30}`
+                localStorage.setItem("dudit_city", savedCity)
+            }
         }
 
         // 3. For logged-out users without a saved location, auto-locate ONLY if permission is already granted

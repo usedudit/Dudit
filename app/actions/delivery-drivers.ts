@@ -124,6 +124,7 @@ export async function getDeliveryInvitationMetaAction(token: string) {
   const rawToken = String(token || "").trim()
   if (!/^[a-f0-9]{64}$/i.test(rawToken)) return { valid: false as const }
   const { getAdminClient } = await import("@/lib/supabase/admin")
+  const { getCurrentUser } = await import("@/lib/auth/authorization")
   const admin = getAdminClient()
   const { data } = await admin
     .from("delivery_driver_invitations")
@@ -131,21 +132,34 @@ export async function getDeliveryInvitationMetaAction(token: string) {
     .eq("token_hash", hashInviteToken(rawToken))
     .maybeSingle()
   const valid = !!data && !data.used_at && !data.revoked_at && !data.locked_at && new Date(data.expires_at) > new Date()
-  return { valid: !!valid, email: valid ? String(data.email).replace(/^(.{2}).*(@.*)$/, "$1***$2") : undefined }
+  const currentUser = valid ? await getCurrentUser() : null
+  const isEmailMatch = valid && currentUser?.email
+    ? currentUser.email.trim().toLowerCase() === String(data.email).trim().toLowerCase()
+    : null
+  return {
+    valid: !!valid,
+    email: valid ? String(data.email).replace(/^(.{2}).*(@.*)$/, "$1***$2") : undefined,
+    isEmailMatch,
+  }
 }
 
-export async function acceptDeliveryDriverInvitationAction(params: {
-  token: string
-  fullName: string
-  phone: string
-}) {
+export async function acceptDeliveryDriverInvitationAction(params: { token: string; fullName?: string; phone?: string }) {
   const rawToken = String(params.token || "").trim()
   if (!/^[a-f0-9]{64}$/i.test(rawToken)) return { success: false as const, error: "Convite inválido." }
+  const { getAdminClient } = await import("@/lib/supabase/admin")
+  const { data: invitation } = await getAdminClient()
+    .from("delivery_driver_invitations")
+    .select("full_name, phone")
+    .eq("token_hash", hashInviteToken(rawToken))
+    .is("used_at", null)
+    .is("revoked_at", null)
+    .maybeSingle()
+  if (!invitation) return { success: false as const, error: "Convite inválido, expirado ou já utilizado." }
   const supabase = await getSupabaseServerClient()
   const { data, error } = await supabase.rpc("accept_delivery_driver_invitation", {
     p_token_hash: hashInviteToken(rawToken),
-    p_full_name: params.fullName.trim(),
-    p_phone: params.phone.trim(),
+    p_full_name: String(invitation.full_name || "").trim(),
+    p_phone: String(invitation.phone || "").trim(),
     p_terms_version: "delivery-driver-mvp-1",
   })
   if (error) return { success: false as const, error: normalizeError(error, "Não foi possível aceitar o convite.") }
