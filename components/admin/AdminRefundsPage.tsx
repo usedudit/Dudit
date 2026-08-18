@@ -166,7 +166,7 @@ export function AdminRefundsPage() {
             <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden">
                 {loading ? (
                     <div className="py-20 flex justify-center items-center">
-                        <Spinner size="lg" />
+                        <Spinner size={32} />
                     </div>
                 ) : data.length === 0 ? (
                     <div className="py-20 text-center text-xs text-brand-inactive-text">

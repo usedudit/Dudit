@@ -44,7 +44,7 @@ export default function SaleReceiptThermalPreview({
 
     return (
         <div
-            className={`mx-auto bg-[#fffef5] text-black font-mono text-[11px] leading-snug shadow-md ${printMode ? "sale-receipt-thermal-print" : ""
+            className={`mx-auto bg-[#fffef5] text-black font-mono text-[11px] leading-snug ${printMode ? "sale-receipt-thermal-print" : ""
                 }`}
             style={{ width: printMode ? "80mm" : "320px", maxWidth: "100%" }}
         >

@@ -3,12 +3,12 @@
 import type React from "react"
 
 interface FormTextareaProps {
-    label: string
+    label?: string
     placeholder?: string
     value?: string
     onChange?: (e: React.ChangeEvent<HTMLTextAreaElement>) => void
     onBlur?: () => void
-    name: string
+    name?: string
     disabled?: boolean
     labelAddon?: React.ReactNode
     required?: boolean
@@ -40,13 +40,17 @@ export const FormTextarea: React.FC<FormTextareaProps> = ({
     showCharacterCount = false,
 }) => (
     <div className={`flex-1 w-full ${className || ""}`}>
-        <div className="flex items-center gap-2 mb-1.5">
-            <label htmlFor={id || name} className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate">
-                {label}
-                {required && <span className="text-brand-red"> *</span>}
-            </label>
-            {labelAddon}
-        </div>
+        {(label || labelAddon) && (
+            <div className="flex items-center gap-2 mb-1.5">
+                {label && (
+                    <label htmlFor={id || name} className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate">
+                        {label}
+                        {required && <span className="text-brand-red"> *</span>}
+                    </label>
+                )}
+                {labelAddon}
+            </div>
+        )}
         <div className="min-h-[100px]">
             <textarea
                 name={name}

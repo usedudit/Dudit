@@ -4,7 +4,7 @@ import { clearActivePartner, getAllUserPartnerAccess, setActivePartner } from "@
 /**
  * Route handler used to explicitly force the user out of their current ERP context.
  * It clears the active_partner_id cookie and redirects to /select-erp.
- * This is used by the "Central do Parceiro" button in the marketplace header.
+ * This is used by the "Central do Vendedor" button in the marketplace header.
  * 
  * Performance: If exactly 1 ERP is found, it auto-selects it and goes to dashboard.
  */

@@ -819,7 +819,7 @@ const Header: React.FC<HeaderProps> = ({
                                 { label: "Meus Favoritos", href: "/favoritos" },
                                 { label: "Minhas Avaliações", href: "/perfil?tab=avaliacoes" },
                                 { label: "Minhas Coleções", href: "/colecoes" },
-                                { label: "Central do Parceiro", href: "/erp/trocar-erp" },
+                                { label: "Central do Vendedor", href: "/erp/trocar-erp" },
                             ] as any[]).map((item, idx) => {
                                 const ItemWrapper: any = item.href ? Link : "div";
                                 const wrapProps = item.href
@@ -1016,7 +1016,7 @@ const Header: React.FC<HeaderProps> = ({
                                             { label: "Meus Favoritos", href: "/favoritos" },
                                             { label: "Minhas Avaliações", href: "/perfil?tab=avaliacoes" },
                                             { label: "Minhas Coleções", href: "/colecoes" },
-                                            { label: "Central do Parceiro", href: "/erp/trocar-erp" },
+                                            { label: "Central do Vendedor", href: "/erp/trocar-erp" },
                                         ] as any[]).map((item, idx) => {
                                             const ItemWrapper: any = item.href ? Link : "div";
                                             const wrapProps = item.href

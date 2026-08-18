@@ -1,15 +1,21 @@
 "use client"
 
 import { useEffect } from "react"
-import type { PaperSize } from "@/lib/labels/presets"
+export type PrintPaperSize = "a4" | "letter" | "thermal"
 
 interface PrintLayoutProps {
     children: React.ReactNode
-    paperSize?: PaperSize
+    paperSize?: PrintPaperSize
 }
 
 export default function PrintLayout({ children, paperSize = "a4" }: PrintLayoutProps) {
     useEffect(() => {
+        // Skip automatic print dialog when rendering inside Puppeteer / headless browser
+        const isHeadless =
+            typeof navigator !== "undefined" &&
+            (navigator.userAgent.includes("Headless") || window.location.search.includes("headless=true"))
+        if (isHeadless) return
+
         const timer = setTimeout(() => {
             window.print()
         }, 500)
@@ -25,12 +31,13 @@ export default function PrintLayout({ children, paperSize = "a4" }: PrintLayoutP
         }
     }, [])
 
-    const paperWidth = paperSize === "letter" ? "215.9mm" : "210mm"
-    const paperHeight = paperSize === "letter" ? "279.4mm" : "297mm"
-    const pageSize = paperSize === "letter" ? "Letter" : "A4"
+    const isThermal = paperSize === "thermal"
+    const paperWidth = isThermal ? "80mm" : paperSize === "letter" ? "215.9mm" : "210mm"
+    const paperHeight = isThermal ? "auto" : paperSize === "letter" ? "279.4mm" : "297mm"
+    const pageSize = isThermal ? "80mm auto" : paperSize === "letter" ? "Letter" : "A4"
 
     return (
-        <div className="min-h-screen bg-white text-black print:bg-white print:text-black">
+        <div className={`bg-white text-black print:bg-white print:text-black ${isThermal ? "w-[80mm] max-w-[80mm] min-h-0 h-auto" : "min-h-screen"}`}>
             <style
                 dangerouslySetInnerHTML={{
                     __html: `
@@ -42,7 +49,7 @@ export default function PrintLayout({ children, paperSize = "a4" }: PrintLayoutP
                                 margin: 0 !important;
                                 padding: 0 !important;
                                 width: ${paperWidth} !important;
-                                height: ${paperHeight} !important;
+                                ${isThermal ? "min-height: auto !important; height: auto !important;" : `height: ${paperHeight} !important;`}
                             }
                             
                             /* Hide browser-added headers and footers */

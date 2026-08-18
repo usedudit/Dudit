@@ -46,7 +46,7 @@ const adminRejectRefundSchema = z.object({
 
 // ─── 1. SOLICITAR REEMBOLSO (LOJISTA) ─────────────────────────────────────────
 
-export async function requestSubscriptionRefundAction(input: z.infer<typeof requestRefundSchema>) {
+export async function requestSubscriptionRefundAction(input: z.input<typeof requestRefundSchema>) {
     try {
         const user = await getCurrentUser()
         if (!user) {
@@ -296,10 +296,10 @@ export async function adminListRefundRequestsAction(params?: {
 
         const stats = {
             total: statsData?.length || 0,
-            pending: statsData?.filter((s) => s.status === "pending" || s.status === "under_review").length || 0,
-            approved: statsData?.filter((s) => s.status === "approved").length || 0,
-            rejected: statsData?.filter((s) => s.status === "rejected").length || 0,
-            within7Days: statsData?.filter((s) => s.is_within_7_days).length || 0,
+            pending: statsData?.filter((s: any) => s.status === "pending" || s.status === "under_review").length || 0,
+            approved: statsData?.filter((s: any) => s.status === "approved").length || 0,
+            rejected: statsData?.filter((s: any) => s.status === "rejected").length || 0,
+            within7Days: statsData?.filter((s: any) => s.is_within_7_days).length || 0,
         }
 
         return {
@@ -318,7 +318,7 @@ export async function adminListRefundRequestsAction(params?: {
 
 // ─── 4. PROCESSAR ESTORNO VIA ADMIN (STEP-UP AUTH & MERCADO PAGO) ─────────────
 
-export async function adminProcessRefundAction(input: z.infer<typeof adminProcessRefundSchema>) {
+export async function adminProcessRefundAction(input: z.input<typeof adminProcessRefundSchema>) {
     const supabase = createAdminClient()
     const nowIso = new Date().toISOString()
 
@@ -547,7 +547,7 @@ export async function adminProcessRefundAction(input: z.infer<typeof adminProces
 
 // ─── 5. RECUSAR REEMBOLSO VIA ADMIN ───────────────────────────────────────────
 
-export async function adminRejectRefundAction(input: z.infer<typeof adminRejectRefundSchema>) {
+export async function adminRejectRefundAction(input: z.input<typeof adminRejectRefundSchema>) {
     const supabase = createAdminClient()
     const nowIso = new Date().toISOString()
 
