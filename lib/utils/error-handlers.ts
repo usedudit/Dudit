@@ -45,13 +45,15 @@ export function getErrorMessage(error: any): string {
     "access_denied": "Acesso negado.",
     "Too many requests": "Muitas tentativas. Tente novamente em breve.",
     "over_email_send_rate_limit": "Muitos e-mails solicitados. Tente novamente em alguns instantes.",
-    "Network request failed": "Erro de conexão. Verifique sua internet.",
+    "Network request failed": "Erro de conexão. Verifique sua internet e tente novamente.",
+    "Failed to fetch": "Erro de conexão com o servidor. Verifique sua internet e tente novamente.",
     "Signup is disabled": "O cadastro de novos usuários está temporariamente desativado.",
     "Provider not enabled": "Este método de login não está disponível no momento.",
     "Password is too short": "A senha deve ter pelo menos 8 caracteres.",
     "New password should be different from the old password": "A nova senha deve ser diferente da atual.",
     "Database error saving new user": "Erro inesperado ao salvar usuário.",
     "Error sending confirmation email": "Erro ao enviar e-mail de confirmação.",
+    "An unexpected response was received from the server": "Erro temporário de comunicação com o servidor. Tente novamente.",
 
     // Database/PostgREST Errors
     "PGRST116": "Registro não encontrado.",
@@ -82,7 +84,8 @@ export function getErrorMessage(error: any): string {
   if (message.includes("rate limit") || message.includes("too many requests") || message.includes("over_email_send_rate_limit")) return "Muitas tentativas. Tente novamente em breve."
   if (message.includes("confirm your email") || message.includes("Email not confirmed") || message.includes("email_not_confirmed")) return "Este e-mail ainda não foi confirmado. Verifique sua caixa de entrada."
   if (message.includes("otp_expired") || message.includes("invalid or has expired") || message.includes("Token has expired")) return "Este link de e-mail é inválido ou expirou."
-  if (message.includes("NetworkError") || message.includes("Failed to fetch")) return "Erro de conexão. Verifique sua internet."
+  if (message.includes("unexpected response") || message.includes("Unexpected response")) return "Erro temporário de comunicação com o servidor. Tente novamente."
+  if (message.includes("NetworkError") || message.includes("Failed to fetch") || message.includes("fetch failed") || message.includes("Network request failed")) return "Erro de conexão. Verifique sua internet e tente novamente."
 
   // Coupon/discount constraint violations
   if (message.includes("coupons_discount_value_valid")) return "O valor do desconto deve ser maior que zero para cupons percentuais ou de valor fixo."

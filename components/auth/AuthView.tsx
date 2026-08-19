@@ -146,6 +146,7 @@ export default function AuthView({
                 options: { redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(getSafeNext(nextParam))}`, queryParams: { access_type: "offline", prompt: "consent" } },
             })
         } catch (e: any) {
+            console.error("[AUTH GOOGLE ERROR]", e)
             setError(getErrorMessage(e))
             setIsLoading(false)
         }
@@ -157,16 +158,21 @@ export default function AuthView({
         setError(null)
 
         try {
+            const cleanEmail = email.trim().toLowerCase()
+
             if (mode === "signup") {
                 if (calculatePasswordScore(password) < 2) throw new Error("A senha deve ser média ou forte.")
 
                 const origin = typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br")
                 const { data, error } = await supabase.auth.signUp({
-                    email,
+                    email: cleanEmail,
                     password,
-                    options: { data: { full_name: generateNameFromEmail(email) }, emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(getSafeNext(nextParam))}` },
+                    options: { data: { full_name: generateNameFromEmail(cleanEmail) }, emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(getSafeNext(nextParam))}` },
                 })
-                if (error) throw error
+                if (error) {
+                    console.error("[AUTH SIGNUP ERROR]", error)
+                    throw error
+                }
 
                 // SECURITY: Supabase returns a user with empty identities when email already exists
                 if (data.user && data.user.identities && data.user.identities.length === 0) {
@@ -187,35 +193,61 @@ export default function AuthView({
                     }
                 }
 
-                // SECURITY FIX (CRIT-01): User profile is now created automatically
-                // by a database trigger on auth.users - no client action needed.
-
                 setVerifyContext("signup")
                 setMode("verify-email")
 
             } else {
-                const preCheck = await preCheckLogin(email)
-                if (!preCheck.allowed) {
-                    throw new Error(preCheck.error || "Acesso temporariamente bloqueado.")
-                }
-
-                const { error } = await supabase.auth.signInWithPassword({ email, password })
-                if (error) {
-                    const lockoutRes = await handleLoginResult(email, false)
-                    if (error.message?.includes("Email not confirmed") || (error as any).code === "email_not_confirmed") {
-                        setError("Este e-mail ainda não foi confirmado. Verifique a caixa de entrada do seu e-mail para ativar sua conta.")
+                try {
+                    const preCheck = await preCheckLogin(cleanEmail)
+                    if (!preCheck.allowed) {
+                        setError(preCheck.error || "Acesso temporariamente bloqueado.")
+                        setIsLoading(false)
                         return
                     }
-                    if (lockoutRes.error) {
-                        throw new Error(lockoutRes.error)
-                    }
-                    throw error
+                } catch (preCheckErr) {
+                    console.warn("[AUTH] preCheckLogin warning (proceeding to auth):", preCheckErr)
                 }
-                await handleLoginResult(email, true)
+
+                const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+                    email: cleanEmail,
+                    password,
+                })
+
+                if (signInError) {
+                    console.error("[AUTH LOGIN ERROR]", signInError)
+                    try {
+                        const lockoutRes = await handleLoginResult(cleanEmail, false)
+                        if (lockoutRes?.error) {
+                            setError(lockoutRes.error)
+                            setIsLoading(false)
+                            return
+                        }
+                    } catch (lockoutErr) {
+                        console.warn("[AUTH] handleLoginResult warning:", lockoutErr)
+                    }
+
+                    if (signInError.message?.includes("Email not confirmed") || (signInError as any).code === "email_not_confirmed") {
+                        setError("Este e-mail ainda não foi confirmado. Verifique a caixa de entrada do seu e-mail para ativar sua conta.")
+                        setIsLoading(false)
+                        return
+                    }
+
+                    setError(getErrorMessage(signInError))
+                    setIsLoading(false)
+                    return
+                }
+
+                try {
+                    await handleLoginResult(cleanEmail, true)
+                } catch (clearErr) {
+                    console.warn("[AUTH] clearFailedLogins warning:", clearErr)
+                }
+
                 // Hard navigation to ensure all server cookies, headers, and fresh layout state are synchronized
                 window.location.assign(getSafeNext(nextParam))
             }
         } catch (e: any) {
+            console.error("[AUTH SUBMIT EXCEPTION]", e)
             setError(getErrorMessage(e))
         } finally {
             setIsLoading(false)
@@ -228,13 +260,17 @@ export default function AuthView({
         setError(null)
         try {
             const origin = typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br")
-            const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
                 redirectTo: `${origin}/auth/update-password`,
             })
-            if (error) throw error
+            if (error) {
+                console.error("[AUTH RESET PASSWORD ERROR]", error)
+                throw error
+            }
             setVerifyContext("recovery")
             setMode("verify-email")
         } catch (e: any) {
+            console.error("[AUTH RESET PASSWORD EXCEPTION]", e)
             setError(getErrorMessage(e))
         } finally {
             setIsLoading(false)

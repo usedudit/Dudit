@@ -22,6 +22,7 @@ import { getDefaultResourcesForCategory } from "@/lib/system-resources"
 import { isGifFile } from "@/lib/security/file-validator"
 import { recordLegalConsent } from "@/app/actions/auth/legal-consent"
 import { CURRENT_LEGAL_DOCUMENTS } from "@/lib/legal/constants"
+import { getErrorMessage } from "@/lib/utils/error-handlers"
 
 const initialPartnerData = {
     categoryId: "",
@@ -273,7 +274,8 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
             if (!res.success) throw new Error(res.error)
             router.push(isUserLoggedIn ? "/erp/inicio" : `/auth/login?mode=verify-email&email=${encodeURIComponent(email)}`)
         } catch (e: any) {
-            setError(e.message)
+            console.error("[PARTNER-WIZARD SUBMIT ERROR]", e)
+            setError(getErrorMessage(e))
         } finally {
             setIsSubmitting(false)
         }

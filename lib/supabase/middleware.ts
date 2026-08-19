@@ -156,11 +156,18 @@ export async function middleware(request: NextRequest) {
       try {
         const originHost = new URL(origin).host
         const expectedHost = new URL(appUrl).host
+        const requestHost = request.headers.get("x-forwarded-host") || request.headers.get("host")
         const isLoopbackOrigin = originHost.startsWith("localhost") || originHost.startsWith("127.0.0.1") || originHost.startsWith("0.0.0.0")
-        const isAllowedOrigin = originHost === expectedHost || isLoopbackOrigin || (isDev && isLoopbackOrigin)
+        const isAllowedOrigin =
+          originHost === expectedHost ||
+          (!!requestHost && originHost === requestHost) ||
+          (!!requestHost && originHost.replace(/^www\./, '') === requestHost.replace(/^www\./, '')) ||
+          (!!expectedHost && originHost.replace(/^www\./, '') === expectedHost.replace(/^www\./, '')) ||
+          isLoopbackOrigin ||
+          (isDev && isLoopbackOrigin)
 
         if (!isAllowedOrigin) {
-          console.warn(`[MIDDLEWARE] CSRF: Blocked cross-origin server action. Origin: ${origin}, Expected: ${expectedHost}`)
+          console.warn(`[MIDDLEWARE] CSRF: Blocked cross-origin server action. Origin: ${origin}, Expected: ${expectedHost}, RequestHost: ${requestHost}`)
           return new NextResponse(
             JSON.stringify({ error: "Requisição bloqueada: origem não autorizada." }),
             { status: 403, headers: { "Content-Type": "application/json" } }
@@ -187,7 +194,8 @@ export async function middleware(request: NextRequest) {
 
   // 1. RATE LIMITING (APIs e Auth POST)
   // Uses category-based system with explicit limits. Exempts routes with custom rate limits.
-  const isApiOrAuthPost = pathname.startsWith("/api/") || (pathname.startsWith("/auth/") && request.method === "POST")
+  // Server Actions have their own in-action rate limiter and return RSC streams, so they are not intercepted with JSON 429.
+  const isApiOrAuthPost = !isServerAction && (pathname.startsWith("/api/") || (pathname.startsWith("/auth/") && request.method === "POST"))
   const isRateLimitExempt = RATE_LIMIT_EXEMPT_PATHS.includes(pathname)
 
   if (isApiOrAuthPost && !isRateLimitExempt) {
