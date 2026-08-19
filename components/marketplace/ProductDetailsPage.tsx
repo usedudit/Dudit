@@ -308,6 +308,69 @@ export function ProductDetailsPageClient({
 
     const [giftDetails, setGiftDetails] = useState<{ name: string; image_url: string | null; isProduct: boolean } | null>(null)
 
+    // Addons & Classifieds (iFood & OLX / Marketplace style)
+    const productAddons = useMemo<any[]>(() => {
+        if (Array.isArray(product.addon_groups) && product.addon_groups.length > 0) return product.addon_groups
+        if (Array.isArray(product.technical_specs?.addon_groups) && product.technical_specs.addon_groups.length > 0) return product.technical_specs.addon_groups
+        return []
+    }, [product])
+
+    const desapegoInfo = useMemo(() => {
+        const rawSpecs = typeof product.technical_specs === 'object' && product.technical_specs !== null ? product.technical_specs : {}
+        return {
+            condition: product.condition || rawSpecs.condition || product.condicao || "Novo",
+            accepts_offers: product.accepts_offers ?? rawSpecs.accepts_offers ?? false,
+            accepts_trades: product.accepts_trades ?? rawSpecs.accepts_trades ?? false,
+            items_included: product.items_included || rawSpecs.items_included || "",
+            expiry_date: product.expiry_date || rawSpecs.expiry_date || null,
+            pickup_neighborhood: product.pickup_neighborhood || rawSpecs.pickup_neighborhood || "",
+        }
+    }, [product])
+
+    const [selectedAddonOptionIds, setSelectedAddonOptionIds] = useState<Record<string, string[]>>({})
+
+    const handleToggleAddonOption = useCallback((groupId: string, optionId: string, maxQuantity: number) => {
+        setSelectedAddonOptionIds((prev) => {
+            const currentList = prev[groupId] || []
+            if (currentList.includes(optionId)) {
+                return { ...prev, [groupId]: currentList.filter(id => id !== optionId) }
+            }
+            if (maxQuantity === 1) {
+                return { ...prev, [groupId]: [optionId] }
+            }
+            if (currentList.length < maxQuantity) {
+                return { ...prev, [groupId]: [...currentList, optionId] }
+            }
+            return prev
+        })
+    }, [])
+
+    const addonsUnitPrice = useMemo(() => {
+        let sum = 0
+        productAddons.forEach((grp) => {
+            const selected = selectedAddonOptionIds[grp.id] || []
+            grp.options?.forEach((opt: any) => {
+                if (selected.includes(opt.id)) {
+                    sum += Number(opt.price) || 0
+                }
+            })
+        })
+        return sum
+    }, [productAddons, selectedAddonOptionIds])
+
+    const validateAddons = useCallback(() => {
+        for (const grp of productAddons) {
+            if (grp.required) {
+                const selected = selectedAddonOptionIds[grp.id] || []
+                if (selected.length < (grp.min_quantity || 1)) {
+                    notifyError("Complemento obrigatório", `Por favor, selecione as opções obrigatórias no grupo: "${grp.name || "Adicionais"}".`)
+                    return false
+                }
+            }
+        }
+        return true
+    }, [productAddons, selectedAddonOptionIds, notifyError])
+
     useEffect(() => {
         if (!activeGiftPromo) {
             setGiftDetails(null)
@@ -650,18 +713,19 @@ export function ProductDetailsPageClient({
         const discountSource = campaignPricingResult.discountSource
         const hasCampaignDiscount = discountSource === "campaign"
         const hasManualPromo = discountSource === "manual"
-        const total = bestPrice * quantity
+        const unitWithAddons = bestPrice + addonsUnitPrice
+        const total = unitWithAddons * quantity
 
         // Real Pix Discount from Partner's payment methods
         const pixMethod = partner.paymentMethods?.find((m: any) => m.payment_type === "pix" && m.is_active)
         const pixDiscountPercent = pixMethod?.discount_percent || 0
-        const pixTotal = bestPrice * quantity * (1 - (pixDiscountPercent / 100))
+        const pixTotal = unitWithAddons * quantity * (1 - (pixDiscountPercent / 100))
 
         // Real Installments from Partner's credit card method
         const ccMethod = partner.paymentMethods?.find((m: any) => m.payment_type === "credito" && m.is_active)
         const hasCC = !!ccMethod
         const maxInstallments = ccMethod?.max_installments || partner.max_installments || 1
-        const installmentPrice = bestPrice / maxInstallments
+        const installmentPrice = unitWithAddons / maxInstallments
 
         const totalDiscountPercent = displayOriginal > 0 ? Math.round(((displayOriginal - bestPrice) / displayOriginal) * 100) : 0
 
@@ -674,6 +738,7 @@ export function ProductDetailsPageClient({
         return {
             current: effective, bestPrice, original: displayOriginal,
             hasCampaignDiscount, hasManualPromo, total,
+            addonsUnitPrice,
             pix: pixTotal,
             pixDiscountPercent,
             hasCC, maxInstallments, installment: installmentPrice,
@@ -681,7 +746,7 @@ export function ProductDetailsPageClient({
             totalDiscountPercent,
             campaignDiscountLabel,
         }
-    }, [product, selectedVariant, quantity, partner, activePromo, activePromotions])
+    }, [product, selectedVariant, quantity, partner, activePromo, activePromotions, addonsUnitPrice])
 
     const avgRating = useMemo(() =>
         reviews.length > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0,
@@ -795,6 +860,7 @@ export function ProductDetailsPageClient({
     const handleAddToCart = useCallback(async () => {
         if (!userId) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname))
         if (isActionInProgress.current) return
+        if (productAddons.length > 0 && !validateAddons()) return
 
         isActionInProgress.current = true
         setLoading(true)
@@ -818,6 +884,7 @@ export function ProductDetailsPageClient({
     const handleBuyNow = useCallback(async () => {
         if (!userId) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname))
         if (isActionInProgress.current) return
+        if (productAddons.length > 0 && !validateAddons()) return
 
         isActionInProgress.current = true
         setLoading(true)
@@ -1241,6 +1308,106 @@ export function ProductDetailsPageClient({
             )}
 
             {VariantsSection}
+
+            {/* Addons / Complementos - estilo iFood */}
+            {productAddons.length > 0 && (
+                <div className="mb-6 space-y-4">
+                    {productAddons.map((grp: any) => {
+                        const selectedIds = selectedAddonOptionIds[grp.id] || []
+                        const maxQty = grp.max_quantity || grp.options?.length || 1
+                        const isRadio = maxQty === 1
+                        return (
+                            <div key={grp.id} className="border border-brand-border dark:border-dark-border rounded-xl overflow-hidden">
+                                <div className="flex items-center justify-between px-4 py-3 bg-brand-gray/40 dark:bg-dark-border/30">
+                                    <div>
+                                        <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading">{grp.name || "Adicionais"}</h4>
+                                        <p className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                            {grp.required ? `Obrigatório · ` : "Opcional · "}
+                                            Escolha {isRadio ? "1 opção" : `até ${maxQty}`}
+                                        </p>
+                                    </div>
+                                    {grp.required && (
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${selectedIds.length >= (grp.min_quantity || 1) ? "bg-brand-green/10 text-brand-green border border-brand-green/20" : "bg-orange-50 text-orange-600 border border-orange-200"}`}>
+                                            {selectedIds.length >= (grp.min_quantity || 1) ? "✓ Selecionado" : "Obrigatório"}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="divide-y divide-brand-border/50 dark:divide-dark-border/50">
+                                    {(grp.options || []).filter((o: any) => o.available !== false).map((opt: any) => {
+                                        const isSelected = selectedIds.includes(opt.id)
+                                        return (
+                                            <button
+                                                key={opt.id}
+                                                type="button"
+                                                className={`w-full flex items-center justify-between px-4 py-3 text-left transition-colors hover:bg-brand-gray/30 dark:hover:bg-dark-border/20 ${isSelected ? "bg-brand-green/5 dark:bg-brand-green/10" : ""}`}
+                                                onClick={() => handleToggleAddonOption(grp.id, opt.id, maxQty)}
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-5 h-5 flex items-center justify-center shrink-0 border-2 transition-colors ${isRadio ? "rounded-full" : "rounded-md"} ${isSelected ? "border-brand-green bg-brand-green text-white" : "border-brand-border dark:border-dark-border"}`}>
+                                                        {isSelected && (
+                                                            <svg viewBox="0 0 12 12" fill="none" className="w-3 h-3">
+                                                                <path d="M2.5 6L5 8.5L9.5 3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                                            </svg>
+                                                        )}
+                                                    </div>
+                                                    <span className="text-sm text-brand-dark dark:text-dark-heading">{opt.name}</span>
+                                                </div>
+                                                {(Number(opt.price) || 0) > 0 && (
+                                                    <span className="text-sm font-semibold text-brand-green shrink-0">
+                                                        + {formatMoney(Number(opt.price))}
+                                                    </span>
+                                                )}
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+                        )
+                    })}
+
+                    {/* Subtotal com addons */}
+                    {addonsUnitPrice > 0 && (
+                        <div className="flex items-center justify-between px-1 py-2 text-sm">
+                            <span className="text-brand-inactive-text dark:text-dark-body">Adicionais selecionados</span>
+                            <span className="font-bold text-brand-green">+ {formatMoney(addonsUnitPrice)}</span>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Badges de Desapego - estilo OLX/Marketplace */}
+            {(desapegoInfo.accepts_offers || desapegoInfo.accepts_trades || desapegoInfo.items_included || desapegoInfo.pickup_neighborhood || desapegoInfo.expiry_date) && (
+                <div className="mb-6 flex flex-wrap gap-2">
+                    {desapegoInfo.accepts_offers && (
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700/30 px-2.5 py-1 rounded-full">
+                            💬 Aceita ofertas
+                        </span>
+                    )}
+                    {desapegoInfo.accepts_trades && (
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/30 px-2.5 py-1 rounded-full">
+                            🔄 Aceita trocas
+                        </span>
+                    )}
+                    {desapegoInfo.pickup_neighborhood && (
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700/30 px-2.5 py-1 rounded-full">
+                            📍 Retirada em {desapegoInfo.pickup_neighborhood}
+                        </span>
+                    )}
+                    {desapegoInfo.expiry_date && (
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/30 px-2.5 py-1 rounded-full">
+                            📅 Validade: {new Date(desapegoInfo.expiry_date).toLocaleDateString("pt-BR")}
+                        </span>
+                    )}
+                </div>
+            )}
+
+            {/* Itens Inclusos */}
+            {desapegoInfo.items_included && (
+                <div className="mb-6 p-3 bg-gray-50 dark:bg-dark-border/20 border border-brand-border dark:border-dark-border rounded-xl">
+                    <h4 className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider mb-1.5">O que está incluso</h4>
+                    <p className="text-sm text-brand-dark dark:text-dark-heading leading-relaxed">{desapegoInfo.items_included}</p>
+                </div>
+            )}
 
             {
                 isProductOwner ? (

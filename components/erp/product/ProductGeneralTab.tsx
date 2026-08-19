@@ -15,6 +15,8 @@ import { useRouter } from "next/navigation"
 import QuickStockMovementSheet from "./QuickStockMovementSheet"
 import { formatCurrency } from "@/lib/utils"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { ProductAddonsSection } from "./ProductAddonsSection"
+import { ProductUsedConditionsSection } from "./ProductUsedConditionsSection"
 
 const FormCombobox = ({
     label,
@@ -617,16 +619,51 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                     </div>
 
                     {isQuickMode && (
-                        <div className="mt-10">
-                            <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
-                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Descrição</h3>
-                            <RichTextEditor
-                                label="Descrição Detalhada"
-                                value={productData?.description || ""}
-                                onChange={(val) => handleInputChange({ target: { name: "description", value: val } })}
-                                disabled={!isEditing}
-                            />
-                        </div>
+                        <>
+                            <div className="mt-10">
+                                <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
+                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Descrição</h3>
+                                <RichTextEditor
+                                    label="Descrição Detalhada"
+                                    value={productData?.description || ""}
+                                    onChange={(val) => handleInputChange({ target: { name: "description", value: val } })}
+                                    disabled={!isEditing}
+                                />
+                            </div>
+
+                            <div className="mt-10">
+                                <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
+                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Complementos e Adicionais</h3>
+                                <ProductAddonsSection
+                                    addonGroups={productData?.addon_groups || []}
+                                    onChange={(groups) => handleInputChange({ target: { name: "addon_groups", value: groups } })}
+                                    isEditing={isEditing}
+                                />
+                            </div>
+
+                            <div className="mt-10">
+                                <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
+                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Condição, Desapego e Validade</h3>
+                                <ProductUsedConditionsSection
+                                    condition={productData?.condicao || productData?.condition || "Novo"}
+                                    onConditionChange={(val) => {
+                                        handleInputChange({ target: { name: "condicao", value: val } })
+                                        handleInputChange({ target: { name: "condition", value: val } })
+                                    }}
+                                    acceptsOffers={!!productData?.accepts_offers}
+                                    onAcceptsOffersChange={(val) => handleInputChange({ target: { name: "accepts_offers", value: val } })}
+                                    acceptsTrades={!!productData?.accepts_trades}
+                                    onAcceptsTradesChange={(val) => handleInputChange({ target: { name: "accepts_trades", value: val } })}
+                                    itemsIncluded={productData?.items_included || ""}
+                                    onItemsIncludedChange={(val) => handleInputChange({ target: { name: "items_included", value: val } })}
+                                    pickupNeighborhood={productData?.pickup_neighborhood || ""}
+                                    onPickupNeighborhoodChange={(val) => handleInputChange({ target: { name: "pickup_neighborhood", value: val } })}
+                                    expiryDate={productData?.expiry_date || null}
+                                    onExpiryDateChange={(val) => handleInputChange({ target: { name: "expiry_date", value: val } })}
+                                    isEditing={isEditing}
+                                />
+                            </div>
+                        </>
                     )}
                 </FormSection>
 

@@ -20,7 +20,15 @@ export function mapProductToFormData(initialProduct: Product | null | undefined)
       initialProduct.is_active !== undefined ? initialProduct.is_active : (initialProduct as any).status === "Active",
     condicao: initialProduct.condition !== undefined ? initialProduct.condition : (initialProduct as any).condicao,
     productType: (initialProduct as any).product_type !== undefined ? (initialProduct as any).product_type : (initialProduct as any).productType,
-    attributes: (initialProduct as any).technical_specs || [],
+    attributes: Array.isArray((initialProduct as any).technical_specs)
+      ? (initialProduct as any).technical_specs
+      : (initialProduct as any).technical_specs?.attributes || [],
+    addon_groups: (initialProduct as any).addon_groups || (initialProduct as any).technical_specs?.addon_groups || [],
+    accepts_offers: (initialProduct as any).accepts_offers ?? (initialProduct as any).technical_specs?.accepts_offers ?? false,
+    accepts_trades: (initialProduct as any).accepts_trades ?? (initialProduct as any).technical_specs?.accepts_trades ?? false,
+    items_included: (initialProduct as any).items_included ?? (initialProduct as any).technical_specs?.items_included ?? "",
+    expiry_date: (initialProduct as any).expiry_date ?? (initialProduct as any).technical_specs?.expiry_date ?? null,
+    pickup_neighborhood: (initialProduct as any).pickup_neighborhood ?? (initialProduct as any).technical_specs?.pickup_neighborhood ?? "",
     warranty_value: (initialProduct as any).warranty ? parseInt((initialProduct as any).warranty.split(" ")[0]) || 0 : 0,
     warranty_period: (initialProduct as any).warranty ? (initialProduct as any).warranty.split(" ").slice(1).join(" ") || "Meses" : "Meses",
     is_highlighted: (initialProduct as any).is_featured || false,

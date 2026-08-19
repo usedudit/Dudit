@@ -32,6 +32,13 @@ export type CheckoutFulfillmentLine = {
   payDepositOnly?: boolean
   depositAmount?: number | null
   fullPrice?: number | null
+  selectedAddons?: Array<{
+    groupId: string
+    groupName: string
+    optionId: string
+    optionName: string
+    price: number
+  }> | null
 }
 
 export type CheckoutFulfillmentPayload = {

@@ -7,6 +7,8 @@ import { TrashIcon, PlusIcon, Package, ArrowUpDownIcon, EditIcon, CheckCircleIco
 import MarketplaceCategoryModal from "./MarketplaceCategoryModal"
 import { getCategoryPathClient } from "@/lib/data/marketplace-categories-client"
 import ProductVideoSection from "./ProductVideoSection"
+import { ProductAddonsSection } from "./ProductAddonsSection"
+import { ProductUsedConditionsSection } from "./ProductUsedConditionsSection"
 
 const SidebarCard = ({ title, children, className = "", hasTopStrip = false }: { title?: React.ReactNode; children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
     <>
@@ -154,6 +156,34 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                         ) : (
                             <p className="text-sm text-brand-inactive-text dark:text-dark-body">Nenhuma especificação cadastrada.</p>
                         )}
+                    </FormSection>
+
+                    {/* Complementos e Adicionais */}
+                    <FormSection hasSeparator title="Complementos e Adicionais">
+                        <ProductAddonsSection
+                            addonGroups={productData?.addon_groups || []}
+                            onChange={() => {}}
+                            isEditing={false}
+                        />
+                    </FormSection>
+
+                    {/* Condição & Desapego */}
+                    <FormSection hasSeparator title="Condição & Desapego">
+                        <ProductUsedConditionsSection
+                            condition={productData?.condicao || productData?.condition || "Novo"}
+                            onConditionChange={() => {}}
+                            acceptsOffers={!!productData?.accepts_offers}
+                            onAcceptsOffersChange={() => {}}
+                            acceptsTrades={!!productData?.accepts_trades}
+                            onAcceptsTradesChange={() => {}}
+                            itemsIncluded={productData?.items_included || ""}
+                            onItemsIncludedChange={() => {}}
+                            pickupNeighborhood={productData?.pickup_neighborhood || ""}
+                            onPickupNeighborhoodChange={() => {}}
+                            expiryDate={productData?.expiry_date || null}
+                            onExpiryDateChange={() => {}}
+                            isEditing={false}
+                        />
                     </FormSection>
 
                     {/* Vídeo */}
@@ -356,6 +386,63 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                                     </Button>
                                 </>
                             )}
+                        </div>
+                    </Accordion>
+                </div>
+
+                {/* --- COMPLEMENTOS / ADICIONAIS (iFood Style) --- */}
+                <div className="mt-8 mb-8">
+                    <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
+                    <Accordion
+                        title={
+                            <span className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mb-6">
+                                Complementos e Adicionais
+                            </span>
+                        }
+                        defaultOpen={false}
+                        triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading text-left"
+                    >
+                        <div className="pt-2">
+                            <ProductAddonsSection
+                                addonGroups={productData?.addon_groups || []}
+                                onChange={(groups) => manualChange("addon_groups", groups)}
+                                isEditing={isEditing}
+                            />
+                        </div>
+                    </Accordion>
+                </div>
+
+                {/* --- CONDIÇÃO, DESAPEGO E VALIDADE (OLX / Marketplace) --- */}
+                <div className="mt-8 mb-8">
+                    <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
+                    <Accordion
+                        title={
+                            <span className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mb-6">
+                                Condição, Desapego e Validade
+                            </span>
+                        }
+                        defaultOpen={false}
+                        triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading text-left"
+                    >
+                        <div className="pt-2">
+                            <ProductUsedConditionsSection
+                                condition={productData?.condicao || productData?.condition || "Novo"}
+                                onConditionChange={(val) => {
+                                    manualChange("condicao", val)
+                                    manualChange("condition", val)
+                                }}
+                                acceptsOffers={!!productData?.accepts_offers}
+                                onAcceptsOffersChange={(val) => manualChange("accepts_offers", val)}
+                                acceptsTrades={!!productData?.accepts_trades}
+                                onAcceptsTradesChange={(val) => manualChange("accepts_trades", val)}
+                                itemsIncluded={productData?.items_included || ""}
+                                onItemsIncludedChange={(val) => manualChange("items_included", val)}
+                                pickupNeighborhood={productData?.pickup_neighborhood || ""}
+                                onPickupNeighborhoodChange={(val) => manualChange("pickup_neighborhood", val)}
+                                expiryDate={productData?.expiry_date || null}
+                                onExpiryDateChange={(val) => manualChange("expiry_date", val)}
+                                isEditing={isEditing}
+                            />
                         </div>
                     </Accordion>
                 </div>

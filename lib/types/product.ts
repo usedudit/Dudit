@@ -1,4 +1,21 @@
 import type React from "react"
+
+export interface ProductAddonOption {
+  id: string
+  name: string
+  price: number
+  is_available: boolean
+}
+
+export interface ProductAddonGroup {
+  id: string
+  name: string
+  required: boolean
+  min_quantity: number
+  max_quantity: number
+  options: ProductAddonOption[]
+}
+
 export interface Product {
   id: string
   name: string
@@ -48,6 +65,13 @@ export interface Product {
   variant_min_price?: number
   variant_max_price?: number
   variant_total_stock?: number
+  technical_specs?: any
+  addon_groups?: ProductAddonGroup[] | null
+  accepts_offers?: boolean | null
+  accepts_trades?: boolean | null
+  items_included?: string | null
+  expiry_date?: string | null
+  pickup_neighborhood?: string | null
 }
 
 export interface ProductDisplay extends Product {
@@ -114,6 +138,13 @@ export interface ProductInput {
   availability_value?: number | null
   availability_unit?: string | null
   moderation_status?: 'approved' | 'pending_moderation' | 'rejected' | null
+  technical_specs?: any
+  addon_groups?: ProductAddonGroup[] | null
+  accepts_offers?: boolean | null
+  accepts_trades?: boolean | null
+  items_included?: string | null
+  expiry_date?: string | null
+  pickup_neighborhood?: string | null
 }
 
 export interface ProductWithDetails extends Product {
