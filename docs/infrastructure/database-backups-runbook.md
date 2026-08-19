@@ -87,58 +87,78 @@ O dump descriptografado deve começar com a assinatura `PGDMP`. Se a autenticaç
 
 ## 4. Restore recomendado em Supabase de teste
 
+O arquivo `dudit-restore.dump` não é um arquivo SQL textual. Ele é um arquivo binário no formato custom do `pg_dump`, portanto não deve ser colado no SQL Editor. O restore real é feito pelo `pg_restore`, conectado diretamente ao banco Supabase de teste. Depois do restore, o SQL Editor pode ser usado para conferir tabelas e contagens.
+
 O teste deve usar um projeto Supabase separado e descartável. Nunca use o projeto de produção.
 
 Um projeto Supabase de teste é preferível ao PostgreSQL Docker puro porque já possui extensões Supabase, como `pg_cron` e `supabase_vault`. Se o projeto de teste já tiver dados importantes, crie um projeto novo em vez de restaurar nele.
 
-Não é necessário instalar PostgreSQL no Windows: o container Docker `dudit-backup-restore-mvp` já possui `pg_restore` e `psql`.
+### Instalar somente as ferramentas de cliente
 
-Copie o dump para o container:
+No Windows, instale o PostgreSQL 17 pelo instalador oficial e selecione as ferramentas de linha de comando. O servidor local não é necessário. Depois confirme:
 
 ```powershell
-docker cp `
-  "C:\Users\MURILO\Downloads\dudit-restore.dump" `
-  dudit-backup-restore-mvp:/tmp/dudit-restore.dump
+pg_restore --version
+psql --version
 ```
 
-Preencha os dados do projeto de teste apenas na sessão atual do PowerShell. Não use a senha nem o host de produção:
+O `pg_restore` deve ser da versão 17 ou superior. Não use um cliente 15 para esse dump/banco PostgreSQL 17.
+
+Se o Windows não encontrar os comandos, adicione a pasta abaixo ao PATH da sessão, ajustando o caminho se necessário:
+
+```powershell
+$env:Path += ";C:\Program Files\PostgreSQL\17\bin"
+```
+
+### Conectar ao projeto Supabase de teste
+
+No projeto Supabase de teste, abra `Connect` e copie os dados de uma conexão `Direct connection`, se disponível. A conexão `Session pooler` também pode ser usada para esse restore. Não use a URL do projeto de produção.
+
+Defina apenas host, porta, usuário e banco na sessão atual:
 
 ```powershell
 $testHost = "db.PROJETO_DE_TESTE.supabase.co"
-$testPort = "5432"
+$testPort = 5432
 $testUser = "postgres"
 $testDatabase = "postgres"
-$testPassword = Read-Host "Senha do banco Supabase de teste"
 ```
 
-Execute o restore no projeto de teste. `--clean --if-exists` só deve ser usado porque o destino é descartável:
+Teste a conexão sem colocar a senha no comando. O `psql` solicitará a senha de forma interativa:
 
 ```powershell
-docker exec -e "PGPASSWORD=$testPassword" `
-  dudit-backup-restore-mvp `
-  pg_restore --exit-on-error --clean --if-exists --no-owner --no-acl `
+$env:PGSSLMODE = "require"
+
+psql -h $testHost -p $testPort -U $testUser -d $testDatabase `
+  -c "select current_database(), version();"
+```
+
+Execute o restore apontando diretamente para o Supabase de teste. O `pg_restore` solicitará a senha sem exibi-la:
+
+```powershell
+pg_restore --verbose --exit-on-error --no-owner --no-acl `
   -h $testHost -p $testPort -U $testUser -d $testDatabase `
-  /tmp/dudit-restore.dump
+  "C:\Users\MURILO\Downloads\dudit-restore.dump"
 ```
 
-Depois da execução:
+Para o primeiro teste, use um projeto Supabase de teste recém-criado. Não use `--clean` em um projeto que contenha dados que você queira manter. Se precisar repetir o teste depois de uma falha parcial, crie outro projeto de teste ou limpe o destino somente depois de confirmar que ele é descartável.
+
+Se aparecer erro de extensão ausente, permissão em schema gerenciado ou objeto já existente, guarde a mensagem completa. Não filtre objetos automaticamente antes de entender o erro, pois isso pode transformar um restore parcial em um falso sucesso.
+
+Não é necessário executar o restore pelo SQL Editor. O SQL Editor será usado na etapa seguinte apenas para validação.
+
+Após a execução, descarte variáveis sensíveis caso tenha usado alguma variável de senha:
 
 ```powershell
-Remove-Variable testPassword
+Remove-Item Env:PGSSLMODE -ErrorAction SilentlyContinue
 ```
 
 Se o projeto de teste estiver vazio e o restore terminar sem erro, o backup está operacionalmente restaurável.
 
 ## 5. Validar tabelas principais
 
-Execute no mesmo container, usando novamente a senha do projeto de teste:
+Depois que o `pg_restore` terminar, abra o SQL Editor do projeto Supabase de teste e execute:
 
-```powershell
-$testPassword = Read-Host "Senha do banco Supabase de teste"
-
-docker exec -e "PGPASSWORD=$testPassword" `
-  dudit-backup-restore-mvp `
-  psql -h $testHost -p $testPort -U $testUser -d $testDatabase -c "
+```sql
 SELECT table_schema || '.' || table_name AS table_name
 FROM information_schema.tables
 WHERE (table_schema, table_name) IN
@@ -151,9 +171,7 @@ WHERE (table_schema, table_name) IN
   ('public','transactions'),
   ('supabase_migrations','schema_migrations')
 )
-ORDER BY 1;"
-
-Remove-Variable testPassword
+ORDER BY 1;
 ```
 
 O resultado deve listar as tabelas esperadas. Para validar dados sem imprimir informações pessoais ou financeiras, use apenas contagens:
