@@ -1,26 +1,23 @@
 "use client"
 
-import React, { useState, useMemo, useRef } from "react"
+import React, { useState, useMemo, useTransition, useCallback } from "react"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { AnimatePresence } from "framer-motion"
-import { TerminalIcon, DatabaseIcon, GlobeIcon, MonitorIcon, XIcon, ClockIcon, UserIcon } from "@/lib/icons"
-import { Button, IconPlaceholder, Badge, ThreeDotsLoader } from "@/components/reusable"
+import {
+    Button,
+    IconPlaceholder,
+    Pagination,
+} from "@/components/reusable"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
-import Pagination from "@/components/reusable/Pagination"
-import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
-import Portal from "@/components/Portal"
-
-import { getAuditLogs } from "@/app/actions/admin/audit-logs"
+import { getAuditLogs, getAuditLogStats, type AuditLogStats } from "@/app/actions/admin/audit-logs"
 import type { AuditLogRow, CursorPaginatedResult } from "@/lib/admin/types"
-import type { AuditLogStats } from "@/app/actions/admin/audit-logs"
-import AuditLogListRow, { getActionBadge, TARGET_TYPE_LABELS, ACTION_TYPE_LABELS } from "./AuditLogListRow"
+import AuditLogListRow, { ACTION_TYPE_LABELS, TARGET_TYPE_LABELS } from "./AuditLogListRow"
 import AuditLogPageControls from "./AuditLogPageControls"
-
-import { formatDateTime } from "@/lib/utils"
-
-import { useEntityPage } from "@/hooks/use-entity-page"
-import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
+import { AdminAuditDetailView } from "./AdminAuditDetailView"
+import { useEntityState } from "@/hooks/use-entity-state"
+import { formatDate } from "@/lib/utils"
+import { DatabaseIcon } from "@/lib/icons"
 
 interface AuditLogListProps {
     initialData: CursorPaginatedResult<AuditLogRow>
@@ -35,366 +32,331 @@ const INITIAL_FILTERS: FilterState = {
     action: [],
 }
 
-const AuditLogList = ({ initialData, initialStats }: AuditLogListProps) => {
+const ITEMS_PER_PAGE = 8
+
+type SortKey = "admin" | "action" | "target" | "date"
+type SortDirection = "asc" | "desc"
+
+export default function AuditLogList({ initialData, initialStats }: AuditLogListProps) {
     const isMobile = useMediaQuery("(max-width: 768px)")
-    const observerTarget = useRef<HTMLDivElement>(null)
+    const { state: entityState, open: openEntity, close: closeEntity } = useEntityState()
+
+    // Tab State
+    const [targetTab, setTargetTab] = useState<string>("all")
     const [stats, setStats] = useState<AuditLogStats | undefined>(initialStats)
 
-    // ─── Local State ──────────────────────────────────────────────────────────
-    const [activeTab, setActiveTab] = useState<string>("all")
-    const [page, setPage] = useState(1)
-    const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
-    const [modals, setModals] = useState({ filter: false })
-    const [detailLog, setDetailLog] = useState<AuditLogRow | null>(null)
-
-    // Search state
+    // Search and Filters
     const [search, setSearch] = useState("")
-    const [debouncedSearch, setDebouncedSearch] = useState("")
-    React.useEffect(() => {
-        const t = setTimeout(() => setDebouncedSearch(search), 300)
-        return () => clearTimeout(t)
-    }, [search])
+    const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
+    const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false)
 
-    // ─── Entity Page ──────────────────────────────────────────────────────────
-    const entityPage = useEntityPage<AuditLogRow, any, string>({
-        entityType: 'audit-logs',
-        partnerId: 'admin',
-        queryKey: ['admin', 'audit-logs', activeTab, debouncedSearch],
-        initialItems: (activeTab === "all" && debouncedSearch === "") ? initialData.data : [],
-        initialNextCursor: (activeTab === "all" && debouncedSearch === "") ? initialData.nextCursor : null,
-        initialHasMore: (activeTab === "all" && debouncedSearch === "") ? initialData.hasMore : true,
-        fetchPageFn: async ({ cursor }) => {
-            const res = await getAuditLogs(cursor, 40, {
-                actionType: "all",
-                targetType: activeTab as any,
-                search: debouncedSearch
-            })
-            return { items: res.data, nextCursor: res.nextCursor, hasMore: res.hasMore }
-        },
-        dedupeKey: (l) => l.id,
-        getDetailFn: async () => null,
+    // Sorting
+    const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>({
+        key: "date",
+        direction: "desc",
     })
 
-    const {
-        items: rawLogs, fetchNextPage, hasNextPage, isFetchingNextPage, isListLoading,
-    } = entityPage
+    // Data State
+    const [logs, setLogs] = useState<AuditLogRow[]>(initialData?.data || [])
+    const [page, setPage] = useState(1)
+    const [isPending, startTransition] = useTransition()
 
-    const itemsPerPage = 8
+    const handleSort = (key: SortKey) => {
+        setSortConfig((prev) => {
+            if (prev?.key === key) {
+                return { key, direction: prev.direction === "asc" ? "desc" : "asc" }
+            }
+            return { key, direction: "desc" }
+        })
+    }
+
+    const refreshLogs = useCallback(() => {
+        startTransition(async () => {
+            try {
+                const [res, statsRes] = await Promise.all([
+                    getAuditLogs(null, 150),
+                    getAuditLogStats(),
+                ])
+                setLogs(res.data || [])
+                setStats(statsRes)
+            } catch (err) {
+                console.error("Failed to refresh audit logs:", err)
+            }
+        })
+    }, [])
+
+    // Instant in-memory filtering (0ms)
+    const filteredLogs = useMemo(() => {
+        const term = search.trim().toLowerCase()
+
+        let result = logs.filter((log) => {
+            // Tab filter
+            if (targetTab !== "all") {
+                if (targetTab === "partner" && log.target_type !== "partner" && log.target_type !== "store") {
+                    return false
+                } else if (targetTab !== "partner" && log.target_type !== targetTab) {
+                    return false
+                }
+            }
+
+            // Action Filter
+            if (filters.action.length > 0) {
+                const actionLabel = ACTION_TYPE_LABELS[log.action_type] || log.action_type
+                if (!filters.action.includes(actionLabel)) {
+                    return false
+                }
+            }
+
+            // Search Filter
+            if (term) {
+                const adminName = String(log.admin_name || "").toLowerCase()
+                const adminEmail = String(log.admin_email || "").toLowerCase()
+                const adminId = String(log.admin_user_id || "").toLowerCase()
+                const targetName = String(log.target_name || "").toLowerCase()
+                const targetId = String(log.target_id || "").toLowerCase()
+                const actionLabel = String(ACTION_TYPE_LABELS[log.action_type] || log.action_type).toLowerCase()
+                const reason = String(log.metadata?.reason || log.metadata?.action || "").toLowerCase()
+
+                if (
+                    !adminName.includes(term) &&
+                    !adminEmail.includes(term) &&
+                    !adminId.includes(term) &&
+                    !targetName.includes(term) &&
+                    !targetId.includes(term) &&
+                    !actionLabel.includes(term) &&
+                    !reason.includes(term)
+                ) {
+                    return false
+                }
+            }
+
+            return true
+        })
+
+        // In-memory sorting
+        if (sortConfig) {
+            result = [...result].sort((a, b) => {
+                let aVal: any = ""
+                let bVal: any = ""
+                switch (sortConfig.key) {
+                    case "admin":
+                        aVal = (a.admin_name || a.admin_email || a.admin_user_id || "").toLowerCase()
+                        bVal = (b.admin_name || b.admin_email || b.admin_user_id || "").toLowerCase()
+                        break
+                    case "action":
+                        aVal = (ACTION_TYPE_LABELS[a.action_type] || a.action_type).toLowerCase()
+                        bVal = (ACTION_TYPE_LABELS[b.action_type] || b.action_type).toLowerCase()
+                        break
+                    case "target":
+                        aVal = (a.target_name || a.target_id || "").toLowerCase()
+                        bVal = (b.target_name || b.target_id || "").toLowerCase()
+                        break
+                    case "date":
+                        aVal = new Date(a.created_at).getTime()
+                        bVal = new Date(b.created_at).getTime()
+                        break
+                }
+                if (aVal === bVal) return 0
+                const cmp = aVal < bVal ? -1 : 1
+                return sortConfig.direction === "asc" ? cmp : -cmp
+            })
+        }
+
+        return result
+    }, [logs, targetTab, search, filters, sortConfig])
+
+    // Pagination (Strict 8 items)
+    const totalPages = Math.max(1, Math.ceil(filteredLogs.length / ITEMS_PER_PAGE))
+    const paginatedItems = useMemo(() => {
+        const start = (page - 1) * ITEMS_PER_PAGE
+        return filteredLogs.slice(start, start + ITEMS_PER_PAGE)
+    }, [filteredLogs, page])
+
+    // Reset page on tab/search/filter change
+    useMemo(() => {
+        setPage(1)
+    }, [targetTab, search, filters])
+
+    // If viewing detail of a specific log (?view=[id])
+    if (entityState.isOpen && entityState.action === "view" && entityState.entityId) {
+        const currentLog = logs.find(l => l.id === entityState.entityId)
+        if (currentLog) {
+            return (
+                <AdminAuditDetailView
+                    log={currentLog}
+                    onBack={closeEntity}
+                />
+            )
+        }
+    }
 
     const filterSections: FilterSectionConfig[] = [
         {
             id: "action",
-            title: "Ação",
+            title: "Tipo de Ação",
             type: "checkbox-list",
-            options: Object.values(ACTION_TYPE_LABELS)
+            options: Object.values(ACTION_TYPE_LABELS),
         },
     ]
 
-    const filteredLogs = useMemo(() => {
-        if (!rawLogs) return []
-        return rawLogs.filter(log => {
-            // Action Filter
-            const actionLabel = ACTION_TYPE_LABELS[log.action_type] || log.action_type
-            const filterMatch = filters.action.length === 0 || filters.action.includes(actionLabel)
-            return filterMatch
-        })
-    }, [rawLogs, filters])
-
-    const totalPages = Math.ceil(filteredLogs.length / itemsPerPage)
-    const paginated = filteredLogs.slice((page - 1) * itemsPerPage, page * itemsPerPage)
-
-    const hasActiveFilters = filters.action.length > 0 || search.length > 0
-    const hasLogs = (rawLogs?.length || 0) > 0
-
-    // Reset page when search or tab changes
-    useMemo(() => {
-        setPage(1)
-    }, [debouncedSearch, activeTab])
+    const hasActiveFilters = search !== "" || filters.action.length > 0
 
     return (
-        <>
-            <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
-                <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
-                    <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
-                        <div className="flex flex-col gap-2 pt-1">
-                            <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
-                                Audit Logs
-                            </h1>
-                            <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
-                                Registro imutável de todas as ações administrativas realizadas no sistema.
-                            </p>
-                        </div>
-                    </div>
+        <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
+            <style>{`
+                .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; } 
+                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
+                .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; border: 2px solid #fff; }
+                .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border: 2px solid #1f2937; }
+                .dark .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+                .hide-scrollbar::-webkit-scrollbar { display: none; }
+                .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+            `}</style>
 
-                    <AuditLogPageControls
-                        activeTab={activeTab}
-                        setActiveTab={setActiveTab}
-                        search={search}
-                        onSearchChange={setSearch}
-                        onOpenFilter={() => setModals({ filter: true })}
-                        hasActiveFilters={hasActiveFilters}
-                        hasData={hasLogs}
-                        stats={stats}
-                    />
+            <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6 space-y-6">
+                {/* Controls (Tabs + Search + Filters) */}
+                <AuditLogPageControls
+                    activeTab={targetTab}
+                    setActiveTab={setTargetTab}
+                    search={search}
+                    onSearchChange={setSearch}
+                    onOpenFilter={() => setIsFilterSheetOpen(true)}
+                    hasActiveFilters={hasActiveFilters}
+                    hasData={logs.length > 0}
+                    stats={stats}
+                />
 
-                    <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-24 md:pb-6 relative">
-                        <AnimatePresence mode="wait">
-                            {isListLoading ? (
-                                <FadeIn key="loading" className="flex items-center justify-center min-h-[500px]">
-                                    <ThreeDotsLoader />
-                                </FadeIn>
-                            ) : !hasLogs && !isListLoading ? (
-                                <FadeIn key="empty" className="w-full h-full flex items-center justify-center min-h-[500px]">
-                                    <IconPlaceholder
-                                        placeholderType="image"
-                                        imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
-                                        imageAlt="Nenhum log"
-                                        title="Nenhum log no sistema"
-                                        subtitle="Ainda não existem logs de auditoria."
-                                    />
-                                </FadeIn>
-                            ) : paginated.length === 0 && !isListLoading ? (
-                                <FadeIn key="empty-results" className="w-full h-full flex items-center justify-center min-h-[500px]">
-                                    <IconPlaceholder
-                                        placeholderType="image"
-                                        imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
-                                        imageAlt="Nenhum resultado"
-                                        title="Nenhum log encontrado"
-                                        subtitle="Tente ajustar seus filtros ou termos de busca."
-                                        itemButton={{
-                                            text: "Limpar filtros",
-                                            action: () => {
-                                                setSearch("")
-                                                setActiveTab("all")
-                                                setFilters(INITIAL_FILTERS)
-                                            },
-                                            variant: "outline"
-                                        }}
-                                    />
-                                </FadeIn>
-                            ) : (
-                                <FadeIn key="list" className="w-full">
-                                    {isMobile ? (
-                                        <div className="flex flex-col w-full border-b border-brand-border dark:border-dark-border">
-                                            {paginated.map((log) => (
-                                                <div
-                                                    key={log.id}
-                                                    className="py-4 border-b border-brand-border dark:border-dark-border last:border-0 flex flex-col gap-2 cursor-pointer"
-                                                    onClick={() => setDetailLog(log)}
-                                                >
-                                                    <div className="flex justify-between items-center">
-                                                        <div className="flex items-center gap-2 text-xs font-medium text-brand-dark dark:text-dark-heading">
-                                                            <ClockIcon size={14} className="text-brand-inactive-text shrink-0" />
-                                                            {formatDateTime(log.created_at)}
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex flex-wrap items-center gap-2">
-                                                        {getActionBadge(log.action_type)}
-                                                        <Badge variant="gray">
-                                                            {log.target_name || TARGET_TYPE_LABELS[log.target_type] || log.target_type}
-                                                        </Badge>
-                                                    </div>
-                                                    <div className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                        {log.metadata?.reason ? String(log.metadata.reason) : log.metadata?.action ? String(log.metadata.action) : "-"}
-                                                    </div>
+                {/* Content Area */}
+                <div>
+                    <AnimatePresence mode="wait">
+                        {filteredLogs.length === 0 ? (
+                            <FadeIn key="empty" className="w-full">
+                                <IconPlaceholder
+                                    icon={DatabaseIcon}
+                                    title="Nenhum log encontrado"
+                                    subtitle={hasActiveFilters ? "Tente ajustar seus filtros de busca." : "Nenhum evento registrado nesta categoria."}
+                                    itemButton={hasActiveFilters ? {
+                                        text: "Limpar Filtros",
+                                        action: () => {
+                                            setSearch("")
+                                            setFilters(INITIAL_FILTERS)
+                                            setTargetTab("all")
+                                        },
+                                        variant: "outline",
+                                    } : undefined}
+                                />
+                            </FadeIn>
+                        ) : (
+                            <FadeIn key="list" className="w-full space-y-4">
+                                {/* Mobile View (Cards) */}
+                                <div className="md:hidden flex flex-col w-full divide-y divide-brand-border dark:divide-dark-border">
+                                    {paginatedItems.map((log) => (
+                                        <div
+                                            key={log.id}
+                                            className="py-4 flex flex-col gap-2.5 cursor-pointer active:bg-brand-gray/50 dark:active:bg-dark-border/20 transition-colors"
+                                            onClick={() => openEntity("view", log.id)}
+                                        >
+                                            <div className="flex justify-between items-start gap-2">
+                                                <div className="flex flex-col gap-0.5 min-w-0">
+                                                    <span className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">
+                                                        {ACTION_TYPE_LABELS[log.action_type] || log.action_type}
+                                                    </span>
+                                                    <span className="text-xs text-brand-inactive-text truncate">
+                                                        Por: {log.admin_name || log.admin_email || "Administrador"}
+                                                    </span>
                                                 </div>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <div className="w-full overflow-hidden rounded-xl relative">
-                                            <div className="overflow-x-auto pb-4 custom-scrollbar">
-                                                <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
-                                                    <thead>
-                                                        <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                            <th className="py-3 px-3 text-[13px] rounded-l-lg font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors">Usuário</th>
-                                                            <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors text-left">Alvo</th>
-                                                            <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors text-left">Motivo / Detalhes</th>
-                                                            <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors text-center">Data / Hora</th>
-                                                            <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors text-center">Tipo</th>
-                                                            <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors rounded-r-lg text-center">Status</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="relative">
-                                                        {paginated.map((log) => (
-                                                            <AuditLogListRow
-                                                                key={log.id}
-                                                                log={log}
-                                                                onView={setDetailLog}
-                                                            />
-                                                        ))}
-                                                    </tbody>
-                                                </table>
+                                                <span className="text-xs font-semibold text-brand-dark dark:text-dark-heading">
+                                                    {TARGET_TYPE_LABELS[log.target_type] || log.target_type}
+                                                </span>
+                                            </div>
+
+                                            <div className="flex items-center justify-between text-xs text-brand-inactive-text">
+                                                <span className="truncate">{log.target_name || log.target_id || "-"}</span>
+                                                <span>{formatDate(log.created_at)}</span>
                                             </div>
                                         </div>
-                                    )}
-                                </FadeIn>
-                            )}
-                        </AnimatePresence>
-                    </div>
+                                    ))}
+                                </div>
 
-                    {hasLogs && (
-                        <Pagination
-                            currentPage={page}
-                            totalPages={totalPages}
-                            onPageChange={(p) => {
-                                setPage(p)
-                                if (p >= totalPages - 1 && hasNextPage && !isFetchingNextPage) {
-                                    void fetchNextPage()
-                                }
-                            }}
-                        />
-                    )}
+                                {/* Desktop View: Table */}
+                                <div className="hidden md:block w-full overflow-hidden rounded-xl relative">
+                                    <div className="overflow-x-auto pb-4 custom-scrollbar">
+                                        <table className="w-full text-left border-separate border-spacing-0 min-w-[950px]">
+                                            <thead>
+                                                <tr className="bg-brand-gray dark:bg-dark-border/50 select-none">
+                                                    <th
+                                                        onClick={() => handleSort("admin")}
+                                                        className="py-3 px-2 pl-6 rounded-l-lg text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                    >
+                                                        Usuário (Executor) {sortConfig?.key === "admin" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+                                                    </th>
+                                                    <th
+                                                        onClick={() => handleSort("action")}
+                                                        className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors text-center"
+                                                    >
+                                                        Ação {sortConfig?.key === "action" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+                                                    </th>
+                                                    <th
+                                                        onClick={() => handleSort("target")}
+                                                        className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                    >
+                                                        Alvo {sortConfig?.key === "target" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+                                                    </th>
+                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight">
+                                                        Motivo / Detalhes
+                                                    </th>
+                                                    <th
+                                                        onClick={() => handleSort("date")}
+                                                        className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors text-center"
+                                                    >
+                                                        Data / Hora {sortConfig?.key === "date" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+                                                    </th>
+                                                    <th className="py-3 px-2 pr-6 rounded-r-lg text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">
+                                                        Ações
+                                                    </th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {paginatedItems.map((log) => (
+                                                    <AuditLogListRow
+                                                        key={log.id}
+                                                        log={log}
+                                                        onView={() => openEntity("view", log.id)}
+                                                    />
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                {/* Pagination */}
+                                {totalPages > 1 && (
+                                    <div className="pt-4">
+                                        <Pagination
+                                            currentPage={page}
+                                            totalPages={totalPages}
+                                            onPageChange={setPage}
+                                        />
+                                    </div>
+                                )}
+                            </FadeIn>
+                        )}
+                    </AnimatePresence>
                 </div>
-            </FadeIn>
+            </div>
 
+            {/* Filter Drawer */}
             <FilterSheet
-                isOpen={modals.filter}
-                onClose={() => setModals({ filter: false })}
+                isOpen={isFilterSheetOpen}
+                onClose={() => setIsFilterSheetOpen(false)}
                 sections={filterSections}
                 filters={filters}
-                setFilters={setFilters as any}
-                onClear={() => setFilters(INITIAL_FILTERS)}
+                setFilters={setFilters}
+                onClear={() => {
+                    setFilters(INITIAL_FILTERS)
+                    setIsFilterSheetOpen(false)
+                }}
             />
-
-            <AuditLogDetailsSheet
-                log={detailLog}
-                isOpen={!!detailLog}
-                onClose={() => setDetailLog(null)}
-            />
-        </>
-    )
-}
-
-export default AuditLogList
-
-// ─── Detail Sheet Sub-component ──────────────────────────────────────────────
-
-interface AuditLogDetailsSheetProps {
-    log: AuditLogRow | null
-    isOpen: boolean
-    onClose: () => void
-}
-
-function AuditLogDetailsSheet({ log, isOpen, onClose }: AuditLogDetailsSheetProps) {
-    const isMobile = useMediaQuery("(max-width: 768px)")
-    const content = log ? (
-        <div className="flex flex-col h-full bg-white dark:bg-dark-surface">
-            {/* Header */}
-            <header className="z-10 shrink-0 flex items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
-                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Detalhes do Log</h2>
-                <Button variant="filled" onClick={onClose} size="icon">
-                    <XIcon className="w-5 h-5" />
-                </Button>
-            </header>
-
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-                {/* Status/Type Header */}
-                <div className="space-y-4">
-                    <div className="flex items-center gap-2">
-                        {getActionBadge(log.action_type)}
-                        <Badge variant="gray">{TARGET_TYPE_LABELS[log.target_type] || log.target_type}</Badge>
-                    </div>
-                    <div>
-                        <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading leading-tight">
-                            {ACTION_TYPE_LABELS[log.action_type] || log.action_type}
-                        </h3>
-                        <p className="text-xs text-brand-inactive-text mt-1 opacity-70 tracking-wider font-bold">LOG ID: {log.id}</p>
-                    </div>
-                </div>
-
-                {/* Primary Info Cards */}
-                <div className="grid grid-cols-1 gap-4">
-                    <div className="p-4 bg-brand-gray dark:bg-dark-border/30 rounded-2xl border border-brand-border dark:border-dark-border space-y-4">
-                        <div className="flex items-start gap-3">
-                            <ClockIcon className="w-5 h-5 text-brand-inactive-text mt-0.5" />
-                            <div>
-                                <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body block">Data e Hora</span>
-                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatDateTime(log.created_at)}</span>
-                            </div>
-                        </div>
-                        <div className="flex items-start gap-3 pt-4 border-t border-brand-border/50 dark:border-dark-border/50">
-                            <UserIcon className="w-5 h-5 text-brand-inactive-text mt-0.5" />
-                            <div>
-                                <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body block">Executor</span>
-                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{log.admin_name || log.admin_email || "N/A"}</span>
-                                <span className="text-[10px] text-brand-inactive-text block opacity-70">UID: {log.admin_user_id}</span>
-                            </div>
-                        </div>
-                        {log.target_id && (
-                            <div className="flex items-start gap-3 pt-4 border-t border-brand-border/50 dark:border-dark-border/50">
-                                <DatabaseIcon className="w-5 h-5 text-brand-inactive-text mt-0.5" />
-                                <div>
-                                    <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body block">Alvo da Ação</span>
-                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-1 block">
-                                        {log.target_name || TARGET_TYPE_LABELS[log.target_type] || log.target_type}
-                                    </span>
-                                    <span className="text-[11px] text-brand-inactive-text bg-white dark:bg-dark-background px-2 py-0.5 rounded border border-brand-border/50 font-mono">
-                                        ID: {log.target_id}
-                                    </span>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* Metadata JSON */}
-                <div className="space-y-3">
-                    <h4 className="text-[13px] font-bold text-brand-inactive-text dark:text-dark-body flex items-center gap-2">
-                        <TerminalIcon size={16} /> Parâmetros e Contexto
-                    </h4>
-                    <div className="bg-brand-gray dark:bg-dark-background border border-brand-border dark:border-dark-border rounded-xl p-4 overflow-x-auto">
-                        <pre className="text-[12px] text-brand-dark dark:text-dark-heading font-mono leading-relaxed">
-                            {JSON.stringify(log.metadata, null, 2)}
-                        </pre>
-                    </div>
-                </div>
-
-                {/* Connection Details */}
-                <div className="space-y-3">
-                    <h4 className="text-[13px] font-bold text-brand-inactive-text dark:text-dark-body">Origem do Acesso</h4>
-                    <div className="space-y-2">
-                        <div className="flex items-center justify-between p-3 bg-brand-gray/50 dark:bg-dark-border/20 rounded-xl border border-brand-border/30 dark:border-dark-border/30">
-                            <div className="flex items-center gap-2">
-                                <GlobeIcon size={14} className="text-brand-inactive-text" />
-                                <span className="text-xs font-medium text-brand-inactive-text">Endereço IP</span>
-                            </div>
-                            <span className="text-xs font-bold text-brand-dark dark:text-dark-heading font-mono">{log.ip_address}</span>
-                        </div>
-                        <div className="flex items-start gap-2 p-3 bg-brand-gray/50 dark:bg-dark-border/20 rounded-xl border border-brand-border/30 dark:border-dark-border/30">
-                            <MonitorIcon size={14} className="text-brand-inactive-text mt-0.5 shrink-0" />
-                            <div className="flex flex-col min-w-0">
-                                <span className="text-xs font-medium text-brand-inactive-text">User Agent</span>
-                                <span className="text-[11px] text-brand-dark dark:text-dark-heading break-words opacity-80 mt-1">{log.user_agent}</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    ) : null
-
-    if (isMobile) {
-        return (
-            <BottomSheet isOpen={isOpen} onClose={onClose}>
-                {content}
-            </BottomSheet>
-        )
-    }
-
-    return (
-        <Portal>
-            <div
-                className={`fixed inset-0 z-50 bg-black/50 transition-opacity ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
-                onClick={onClose}
-            >
-                <div
-                    className={`fixed right-4 top-4 bottom-4 w-96 md:w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    {content}
-                </div>
-            </div>
-        </Portal>
+        </FadeIn>
     )
 }

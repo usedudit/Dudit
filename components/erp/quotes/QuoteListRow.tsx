@@ -59,6 +59,11 @@ const QuoteListItem = React.memo(
                             <div className="flex flex-col text-left">
                                 <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 flex items-center gap-1.5">
                                     <span className="truncate max-w-[200px]">{quote.displayId}</span>
+                                    {(quote.metadata?.origin === "marketplace" || quote.origin === "marketplace") && (
+                                        <Badge variant="blue" className="text-[10px] py-0 px-1 font-bold">
+                                            Vitrine
+                                        </Badge>
+                                    )}
                                 </span>
                                 <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
                                     Criado por {quote.user_profiles?.full_name || "Sistema"}

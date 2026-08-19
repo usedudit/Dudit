@@ -2,7 +2,6 @@
 
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/reusable/Button';
-import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
     ArrowRight,
@@ -18,12 +17,6 @@ import {
     Calendar,
     Wrench,
     Search,
-    Star,
-    Package,
-    Tag,
-    Clock,
-    DollarSign,
-    Sparkles
 } from 'lucide-react';
 import { GridLines, SectionHeader, Navbar, Footer, CTA } from '../../../components/InstitucionalShared';
 
@@ -31,15 +24,14 @@ const Hero = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
     return (
         <section className="relative bg-white pt-32 pb-20 overflow-hidden flex flex-col justify-center">
             <GridLines />
-            <div className="flex-1 flex flex-col container mx-auto px-4 lg:px-6 max-w-[1300px] w-full">
+            <div className="flex-1 flex flex-col container mx-auto px-4 max-w-[1400px] w-full">
                 <div className="grid lg:grid-cols-2 gap-12 items-center">
                     <motion.div
                         initial={{ opacity: 0, y: 30 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.6 }}
                     >
-                        <span className="text-brand-green text-sm font-bold tracking-[0.2em] uppercase mb-4 block">Dudit</span>
-                        <h1 className="text-4xl sm:text-6xl lg:text-7xl font-bold text-brand-dark leading-[0.95] mb-6">
+                        <h1 className="text-5xl font-bold text-brand-dark mb-6">
                             O que você precisa hoje pode estar na <span className="text-brand-green">Dudit.</span>
                         </h1>
                         <p className="text-brand-inactive-text text-lg md:text-xl mb-8 max-w-lg leading-relaxed">
@@ -164,7 +156,7 @@ const BentoFeaturesComoAjuda = () => {
     return (
         <section className="py-24 bg-white relative border-t border-gray-100">
             <GridLines />
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
                 <SectionHeader
                     subtitle="RESOLVER O QUE VOCÊ PRECISA HOJE"
                     title="O que dá pra fazer na Dudit"
@@ -276,7 +268,7 @@ const ParaQuemCompra = () => {
     return (
         <section className="relative py-24 bg-white overflow-hidden border-t border-gray-100">
             <GridLines />
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
                 <SectionHeader
                     subtitle="PARA QUEM PROCURA"
                     title="O que você procura?"
@@ -319,7 +311,7 @@ const ParaQuemVende = () => {
     return (
         <section className="relative py-24 bg-white overflow-hidden border-t border-gray-100">
             <GridLines />
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
                 <SectionHeader
                     subtitle="MAIS UMA PORTA ABERTA"
                     title="Seu negócio também pode ser encontrado na Dudit"
@@ -355,7 +347,7 @@ const SolutionsOrganize = () => {
     return (
         <section id="solutions" className="relative py-24 bg-white overflow-hidden border-t border-gray-100">
             <GridLines />
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
                 <SectionHeader
                     subtitle="COMPLEMENTAR E LEVE"
                     title="Se quiser organizar seu negócio, a Dudit também ajuda"
@@ -552,7 +544,7 @@ const BentoManagementFeatures = () => {
     return (
         <section className="py-24 bg-white relative border-t border-gray-100">
             <GridLines />
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
                 <SectionHeader
                     subtitle="CONTROLE TRANSPARENTE"
                     title="Tudo o que você precisa, sem complicação"
@@ -654,7 +646,7 @@ const GlobalScale = () => {
     return (
         <section className="py-24 bg-white relative border-t border-gray-100">
             <GridLines />
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
                 <div className="flex flex-col lg:flex-row min-h-[600px] rounded-3xl overflow-hidden shadow-xl">
                     <div className="flex-1 bg-brand-dark p-12 lg:p-16 flex flex-col justify-center relative z-10">
                         <div className="absolute inset-0 pointer-events-none z-0 flex justify-center w-full h-full opacity-20">
@@ -770,7 +762,7 @@ const UseCases = () => {
     return (
         <section className="py-24 bg-white relative border-t border-gray-100">
             <GridLines />
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
                 <SectionHeader subtitle="FEITO PARA O SEU DIA A DIA" title="Como a Dudit transforma o dia a dia" />
 
                 <div className="grid md:grid-cols-3 gap-8">

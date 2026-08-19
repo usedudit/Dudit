@@ -25,6 +25,7 @@ import {
     WhatsappIcon,
     StoreIcon,
     MapPinIcon,
+    FileTextIcon,
 } from "@/lib/icons"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { useFavorites } from "@/providers/favorites-provider"
@@ -37,6 +38,8 @@ import { formatCurrency } from "@/lib/utils"
 import { getBillingUnitSuffix } from "@/lib/utils/formatters"
 import { ShareModal } from "./ShareModal"
 import { AddToCollectionModal } from "./AddToCollectionModal"
+import { RequestQuoteModal } from "./RequestQuoteModal"
+import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { ReviewsSection } from "./ReviewsSection"
 import { UserProfileImage, getAvatarColor, getBannerUrlByColor } from "@/lib/utils/UserProfileImage"
 import { getRandomDefaultBanner } from "@/lib/utils/banner"
@@ -71,6 +74,7 @@ interface ServiceDetailsPageClientProps {
     userProfile?: any
     cartCount?: number
     sponsoredAd?: SponsoredAd | null
+    partnerPlanSlug?: string
 }
 
 type BookingStep = "info" | "schedule" | "confirm"
@@ -152,6 +156,7 @@ export function ServiceDetailsPageClient({
     userProfile,
     cartCount,
     sponsoredAd = null,
+    partnerPlanSlug = "free",
 }: ServiceDetailsPageClientProps) {
     const router = useRouter()
     const { user, supabase } = useSupabase()
@@ -168,6 +173,7 @@ export function ServiceDetailsPageClient({
     const [isBooking, setIsBooking] = useState(false)
     const [showShareModal, setShowShareModal] = useState(false)
     const [showCollectionModal, setShowCollectionModal] = useState(false)
+    const [showRequestQuoteModal, setShowRequestQuoteModal] = useState(false)
     const [isMounted, setIsMounted] = useState(false)
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
     const [activeImgIndex, setActiveImgIndex] = useState(0)
@@ -786,21 +792,26 @@ export function ServiceDetailsPageClient({
 
     // ─── Handlers ─────────────────────────────────────────────────────────────
 
-    const buildBookingPayload = useCallback(() => ({
-        serviceId: service.id,
-        partnerId: partner.id,
-        storeId: partner.store_id,
-        booking: {
-            staffId: selectedStaffId,
-            staffName: selectedStaff?.name || "Profissional",
-            date: selectedDate,
-            time: selectedTime,
-            serviceName: service.name,
-            price: pricing.bestPrice,
-            durationMinutes,
-            storeId: partner.store_id,
-        },
-    }), [selectedStaffId, selectedStaff, selectedDate, selectedTime, service, partner, pricing.bestPrice, durationMinutes])
+    const buildBookingPayload = useCallback(() => {
+        const resolvedPartnerId = partner?.id || service.partner_id
+        const resolvedStoreId = service.store_id || partner?.store_id || undefined
+
+        return {
+            serviceId: service.id,
+            partnerId: resolvedPartnerId,
+            storeId: resolvedStoreId,
+            booking: {
+                staffId: selectedStaffId,
+                staffName: selectedStaff?.name || "Profissional",
+                date: selectedDate,
+                time: selectedTime,
+                serviceName: service.name,
+                price: pricing.bestPrice,
+                durationMinutes,
+                storeId: resolvedStoreId,
+            },
+        }
+    }, [selectedStaffId, selectedStaff, selectedDate, selectedTime, service, partner, pricing.bestPrice, durationMinutes])
 
     const handleBookNowCheckout = useCallback(async () => {
         if (!userId) {
@@ -817,11 +828,13 @@ export function ServiceDetailsPageClient({
             const token = await fetchCSRFTokenSingleton() || ""
 
             let cartItemId: string | undefined
+            const payload = buildBookingPayload()
             const result = await prepareServiceBookingCheckoutAction({
-                ...buildBookingPayload(),
+                ...payload,
                 csrf_token: token,
             })
-            if ("error" in result) {
+            if ("error" in result && result.error) {
+                console.warn("[handleBookNowCheckout] Checkout error:", result.error)
                 notifyError("Erro", result.error || "Não foi possível iniciar o checkout.")
                 return
             }
@@ -844,8 +857,8 @@ export function ServiceDetailsPageClient({
 
             const checkoutData = {
                 source: "cart" as const,
-                partnerId: partner.id,
-                storeId: partner.store_id || undefined,
+                partnerId: payload.partnerId,
+                storeId: payload.storeId || undefined,
                 products: [{
                     id: service.id,
                     name: lineLabel,
@@ -853,12 +866,12 @@ export function ServiceDetailsPageClient({
                     quantity: 1,
                 }],
                 partnerInfo: {
-                    address: partner.addresses?.[0] || {},
-                    paymentMethods: (partner.payment_methods || []).map((m: any) => m.payment_type || m.type).filter(Boolean),
-                    mpConnected: !!partner.mp_user_id,
-                    mpPublicKey: partner.mp_public_key,
-                    store_name: partner.store_name,
-                    openingHours: partner.opening_hours || null,
+                    address: partner?.addresses?.[0] || {},
+                    paymentMethods: (partner?.payment_methods || []).map((m: any) => m.payment_type || m.type).filter(Boolean),
+                    mpConnected: !!partner?.mp_user_id,
+                    mpPublicKey: partner?.mp_public_key,
+                    store_name: partner?.store_name,
+                    openingHours: partner?.opening_hours || null,
                 },
                 cartItems: cartLine,
                 deliverySettings: null,
@@ -866,12 +879,13 @@ export function ServiceDetailsPageClient({
 
             sessionStorage.setItem("checkout_session", JSON.stringify(checkoutData))
             router.push("/checkout")
-        } catch {
-            notifyError("Erro", "Erro inesperado ao iniciar checkout.")
+        } catch (err: any) {
+            console.error("[handleBookNowCheckout] Unexpected error:", err)
+            notifyError("Erro", err?.message || "Erro inesperado ao iniciar checkout.")
         } finally {
             setIsBooking(false)
         }
-    }, [userId, router, selectedDate, selectedTime, selectedStaffId, buildBookingPayload, service, partner, price, notifyError])
+    }, [userId, router, selectedDate, selectedTime, selectedStaffId, buildBookingPayload, service, partner, pricing.bestPrice, notifyError])
 
     const handleAddBookingToCart = useCallback(async () => {
         if (!userId) {
@@ -886,32 +900,71 @@ export function ServiceDetailsPageClient({
         setIsBooking(true)
         try {
             const token = await fetchCSRFTokenSingleton() || ""
+            const payload = buildBookingPayload()
             const result = await addServiceBookingToCartAction({
-                ...buildBookingPayload(),
+                ...payload,
                 csrf_token: token,
             })
             if (result.success) {
                 invalidateCartCache()
                 notifySuccess("Adicionado à sacola", "O serviço foi adicionado à sacola.")
             } else {
+                console.warn("[handleAddBookingToCart] Add to cart error:", result.error)
                 notifyError("Erro", result.error || "Não foi possível adicionar à sacola.")
             }
-        } catch {
-            notifyError("Erro", "Erro inesperado.")
+        } catch (err: any) {
+            console.error("[handleAddBookingToCart] Unexpected error:", err)
+            notifyError("Erro", err?.message || "Erro inesperado ao adicionar à sacola.")
         } finally {
             setIsBooking(false)
         }
-    }, [userId, router, selectedDate, selectedTime, selectedStaffId, buildBookingPayload, service.id, partner.id, notifySuccess, notifyError])
+    }, [userId, router, selectedDate, selectedTime, selectedStaffId, buildBookingPayload, notifySuccess, notifyError])
+
+    const handleRequestQuoteClick = useCallback(() => {
+        if (isProductOwner) return
+        const canUseSystemQuote = hasMinimumPlan(partnerPlanSlug || "free", "crescer")
+        if (!canUseSystemQuote) {
+            const cleanPhone = partner.phone ? partner.phone.replace(/\D/g, "") : ""
+            const formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : cleanPhone.length >= 10 ? `55${cleanPhone}` : cleanPhone
+            const startingPriceFormatted = formatCurrency(Number(service.price || 0))
+            const whatsappMsg = encodeURIComponent(`Olá! Vi o serviço "${service.name}" na Dudit (a partir de ${startingPriceFormatted}) e gostaria de solicitar um orçamento para o meu caso.`)
+            const whatsappUrl = `https://wa.me/${formattedPhone}?text=${whatsappMsg}`
+            window.open(whatsappUrl, "_blank")
+            return
+        }
+        if (!userId) {
+            router.push("/auth/login?next=" + encodeURIComponent(typeof window !== "undefined" ? window.location.pathname : ""))
+            return
+        }
+        setShowRequestQuoteModal(true)
+    }, [isProductOwner, partnerPlanSlug, partner.phone, service.name, service.price, userId, router])
+
+    const handleLearnMoreClick = useCallback(() => {
+        const descEl = document.getElementById("service-description")
+        if (descEl) {
+            descEl.scrollIntoView({ behavior: "smooth", block: "start" })
+            setIsDescriptionExpanded(true)
+        }
+    }, [])
 
     // ─── Booking Panel ────────────────────────────────────────────────────────
 
     const BookingPanel = (
         <div className="bg-white dark:bg-dark-surface relative">
             {/* Service Info Header */}
-            <div className="flex items-center gap-2 mb-4">
+            <div className="flex items-center gap-2">
                 <span className="text-[11px] font-bold text-brand-dark dark:text-dark-heading bg-gray-100 dark:bg-dark-border/50 px-2 py-0.5 rounded uppercase tracking-wider">
                     {service.service_type === "online" ? "Remoto" : service.service_type === "hybrid" ? "Híbrido" : "Presencial"}
                 </span>
+                <span className="text-brand-inactive-text dark:text-dark-body text-xs">|</span>
+                {showPrice && (!service.billing_unit || service.billing_unit === 'per_service') && (
+                    <div className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body text-[13px] font-semibold">
+                        <span>Duração: {formatDuration(durationMinutes)}</span>
+                        {bufferMinutes > 0 && (
+                            <span>+ {bufferMinutes}min intervalo</span>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Rating */}
@@ -1085,16 +1138,6 @@ export function ServiceDetailsPageClient({
                         </div>
                     );
                 })()}
-
-                {showPrice && (!service.billing_unit || service.billing_unit === 'per_service') && (
-                    <div className="flex items-center gap-2 text-sm text-brand-inactive-text dark:text-dark-body mt-3">
-                        <ClockIcon size={14} />
-                        <span>{formatDuration(durationMinutes)}</span>
-                        {bufferMinutes > 0 && (
-                            <span className="text-xs text-brand-inactive-text/70 dark:text-dark-body/70">+ {bufferMinutes}min intervalo</span>
-                        )}
-                    </div>
-                )}
             </div>
 
             {/* Brinde de Campanha discreto */}
@@ -1140,8 +1183,8 @@ export function ServiceDetailsPageClient({
                 </div>
             )}
 
-            {/* ── Staff Selection ── */}
-            {showPrice && staff.length > 0 && (
+            {/* ── Staff Selection (Fixed price only) ── */}
+            {showPrice && !isStartingAt && staff.length > 0 && (
                 <div className="mb-6">
                     <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Profissional</label>
                     <div className="flex flex-wrap gap-2">
@@ -1163,8 +1206,8 @@ export function ServiceDetailsPageClient({
                 </div>
             )}
 
-            {/* ── Date Selection ── */}
-            {showPrice && (
+            {/* ── Date Selection (Fixed price only) ── */}
+            {showPrice && !isStartingAt && (
                 <div className="mb-6">
                     <div className="flex justify-between items-center mb-4">
                         <label className="text-sm font-bold text-brand-dark dark:text-dark-heading capitalize">{currentMonth}</label>
@@ -1210,8 +1253,8 @@ export function ServiceDetailsPageClient({
                 </div>
             )}
 
-            {/* ── Time Slots ── */}
-            {showPrice && (
+            {/* ── Time Slots (Fixed price only) ── */}
+            {showPrice && !isStartingAt && (
                 <div className="mb-6">
                     <div className="flex justify-between items-center mb-4">
                         <label className="text-sm font-bold text-brand-dark dark:text-dark-heading">Horários disponíveis</label>
@@ -1265,8 +1308,23 @@ export function ServiceDetailsPageClient({
                 </div>
             )}
 
-            {/* ── Selected Summary ── */}
-            {showPrice && (
+            {/* ── Custom Quote Info (Starting at only) ── */}
+            {showPrice && isStartingAt && (
+                <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20 border border-emerald-200 dark:border-emerald-800/40 space-y-2">
+                    <div className="flex items-center gap-2">
+                        <FileTextIcon size={16} className="text-brand-green" />
+                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                            Orçamento Sob Medida
+                        </span>
+                    </div>
+                    <p className="text-xs text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                        Este serviço possui valor inicial flexível. Solicite uma proposta para receber preços personalizados e tirar dúvidas diretamente com o prestador.
+                    </p>
+                </div>
+            )}
+
+            {/* ── Selected Summary (Fixed price only) ── */}
+            {showPrice && !isStartingAt && (
                 <AnimatePresence>
                     {selectedTime && (
                         <motion.div
@@ -1340,6 +1398,25 @@ export function ServiceDetailsPageClient({
                             </a>
                         )
                     })()}
+                </div>
+            ) : isStartingAt ? (
+                <div className="hidden lg:block space-y-2.5 mb-4">
+                    <Button
+                        onClick={handleRequestQuoteClick}
+                        className="w-full h-[46px]"
+                    >
+                        <span className="flex items-center gap-2">
+                            <FileTextIcon size={18} />
+                            Solicitar orçamento
+                        </span>
+                    </Button>
+                    <Button
+                        variant="outline"
+                        onClick={handleLearnMoreClick}
+                        className="w-full h-[46px]"
+                    >
+                        Saber mais
+                    </Button>
                 </div>
             ) : (
                 <div className="hidden lg:block space-y-2 mb-4">
@@ -1446,7 +1523,7 @@ export function ServiceDetailsPageClient({
             </div>
 
             {/* Políticas da loja */}
-            <div className="border-t border-brand-border pt-4 mb-6">
+            <div className="mb-6">
                 <button
                     type="button"
                     onClick={() => setShowPoliciesModal(true)}
@@ -2076,7 +2153,7 @@ export function ServiceDetailsPageClient({
                             <div className="lg:hidden mb-6">{BookingPanel}</div>
 
                             {/* Description */}
-                            <div className="mb-10">
+                            <div id="service-description" className="mb-10">
                                 <h3 className="text-xl font-medium text-brand-dark dark:text-dark-heading mb-4">Descrição</h3>
                                 <div className={`relative ${!isDescriptionExpanded ? "max-h-[150px] overflow-hidden" : ""}`}>
                                     {service.description ? (
@@ -2132,6 +2209,30 @@ export function ServiceDetailsPageClient({
                                     </a>
                                 )
                             })()
+                        ) : isStartingAt ? (
+                            <>
+                                <div className="flex-1 flex flex-col justify-center min-w-0">
+                                    <span className="text-base font-bold text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                        {pricePrefix}{formatCurrency(pricing.bestPrice || pricing.current)}
+                                    </span>
+                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body truncate">
+                                        {billingSuffix ? `por ${billingSuffix.replace("/", "").trim()}` : "Sob medida"}
+                                    </span>
+                                </div>
+                                <Button
+                                    variant="outline"
+                                    className="rounded-full px-3.5 h-11 text-xs sm:text-sm"
+                                    onClick={handleLearnMoreClick}
+                                >
+                                    Saber mais
+                                </Button>
+                                <Button
+                                    className="flex-1 rounded-full min-w-[140px] h-11 text-xs sm:text-sm font-bold"
+                                    onClick={handleRequestQuoteClick}
+                                >
+                                    Solicitar orçamento
+                                </Button>
+                            </>
                         ) : (
                             <>
                                 <div className="flex-1 flex flex-col justify-center min-w-0">
@@ -2162,6 +2263,15 @@ export function ServiceDetailsPageClient({
                             </>
                         )}
                     </div>
+
+                    {/* Request Quote Modal */}
+                    <RequestQuoteModal
+                        isOpen={showRequestQuoteModal}
+                        onClose={() => setShowRequestQuoteModal(false)}
+                        service={service}
+                        partner={partner}
+                        userProfile={userProfile}
+                    />
                 </div>
             </motion.div>
         </>

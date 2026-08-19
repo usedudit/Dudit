@@ -200,8 +200,7 @@ export async function getPublicRefundDetailsAction(token: string) {
                 ),
                 purchase:purchase_id (
                     id, amount, total_amount, currency, status, purchase_type, description,
-                    billing_period_start, billing_period_end, created_at,
-                    plan:purchaseable_id (id, name, slug, price, features)
+                    billing_period_start, billing_period_end, created_at, purchaseable_type, purchaseable_id
                 ),
                 subscription:subscription_id (
                     id, status, current_period_start, current_period_end, trial_end, cancel_at_period_end
@@ -217,6 +216,17 @@ export async function getPublicRefundDetailsAction(token: string) {
             return { error: "Solicitação de reembolso não encontrada." }
         }
 
+        // Carregar plano se purchaseable_id existir
+        let plan = null
+        if (refund.purchase?.purchaseable_id) {
+            const { data: planData } = await supabase
+                .from("billing_plans")
+                .select("id, name, slug, price, features")
+                .eq("id", refund.purchase.purchaseable_id)
+                .maybeSingle()
+            plan = planData
+        }
+
         // Sanitizar dados da loja matriz
         const stores = (refund.partner as any)?.stores || []
         const hqStore = stores.find((s: any) => s.is_headquarters) || stores[0] || {}
@@ -225,6 +235,10 @@ export async function getPublicRefundDetailsAction(token: string) {
             success: true,
             refund: {
                 ...refund,
+                purchase: refund.purchase ? {
+                    ...refund.purchase,
+                    plan,
+                } : null,
                 partnerName: hqStore.name || "Minha Empresa",
                 partnerLogo: hqStore.logo_url || null,
                 partnerDocument: hqStore.cnpj || hqStore.cpf || "",
@@ -266,7 +280,7 @@ export async function adminListRefundRequestsAction(params?: {
                 ),
                 purchase:purchase_id (
                     id, amount, total_amount, description, status, gateway_payment_id,
-                    plan:purchaseable_id (id, name, price)
+                    purchase_type, purchaseable_type, purchaseable_id
                 ),
                 subscription:subscription_id (
                     id, status, mercado_pago_subscription_id
@@ -289,6 +303,23 @@ export async function adminListRefundRequestsAction(params?: {
             return { error: error.message }
         }
 
+        // Carregar planos para todas as compras listadas
+        const planIds = Array.from(
+            new Set((data || []).map((r: any) => r.purchase?.purchaseable_id).filter(Boolean))
+        )
+        const { data: plansData } = planIds.length
+            ? await supabase.from("billing_plans").select("id, name, slug, price").in("id", planIds)
+            : { data: [] }
+        const planMap = new Map((plansData || []).map((p: any) => [p.id, p]))
+
+        const enrichedData = (data || []).map((r: any) => ({
+            ...r,
+            purchase: r.purchase ? {
+                ...r.purchase,
+                plan: r.purchase.purchaseable_id ? planMap.get(r.purchase.purchaseable_id) || null : null,
+            } : null,
+        }))
+
         // Estatísticas rápidas
         const { data: statsData } = await supabase
             .from("billing_refund_requests")
@@ -304,7 +335,7 @@ export async function adminListRefundRequestsAction(params?: {
 
         return {
             success: true,
-            data: data || [],
+            data: enrichedData,
             totalCount: count || 0,
             page,
             limit,

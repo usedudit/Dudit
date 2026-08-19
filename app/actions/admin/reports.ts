@@ -773,31 +773,121 @@ export async function getAdminTargetDetails(targetType: string, targetId: string
     const adminClient = getAdminClient()
 
     if (targetType === "product") {
-        const { data, error } = await adminClient
+        const { data } = await adminClient
             .from("products")
-            .select("*, store:stores(name, logo_url, person_type)")
+            .select("*, store:stores(id, name, logo_url, risk_score)")
             .eq("id", targetId)
-            .single()
-        if (error || !data) return null
+            .maybeSingle()
         return data
     }
 
-    if (targetType === "partner") {
-        const { data: partner, error } = await adminClient
-            .from("partners")
-            .select("*")
+    if (targetType === "service") {
+        const { data } = await adminClient
+            .from("services")
+            .select("*, store:stores(id, name, logo_url, risk_score)")
             .eq("id", targetId)
-            .single()
-        if (error || !partner) return null
-        const { data: store } = await adminClient
-            .from("stores")
-            .select("name, logo_url, person_type")
-            .eq("partner_id", targetId)
-            .order("is_headquarters", { ascending: false })
-            .limit(1)
             .maybeSingle()
-        return { ...partner, store }
+        return data
+    }
+
+    if (targetType === "partner" || targetType === "store") {
+        let store = null
+        const { data: storeDirect } = await adminClient
+            .from("stores")
+            .select("*, partners(*)")
+            .eq("id", targetId)
+            .maybeSingle()
+        if (storeDirect) {
+            store = storeDirect
+        } else {
+            const { data: storeByPartner } = await adminClient
+                .from("stores")
+                .select("*, partners(*)")
+                .eq("partner_id", targetId)
+                .order("is_headquarters", { ascending: false })
+                .limit(1)
+                .maybeSingle()
+            store = storeByPartner
+        }
+        return store
+    }
+
+    if (targetType === "review") {
+        const { data } = await adminClient
+            .from("reviews")
+            .select("*, user_profiles(full_name), products(name), stores(name)")
+            .eq("id", targetId)
+            .maybeSingle()
+        return data
+    }
+
+    if (targetType === "user") {
+        const { data } = await adminClient
+            .from("user_profiles")
+            .select("*")
+            .eq("user_id", targetId)
+            .maybeSingle()
+        return data
     }
 
     return null
+}
+
+export async function getAdminReportDetailAction(reportId: string) {
+    await requireAdmin("moderator")
+    await requireRateLimit(RateLimitCategory.ADMIN_READ)
+
+    const supabase = await getSupabaseServerClient()
+    const admin = getAdminClient()
+
+    const { data: report, error } = await supabase
+        .from("reports")
+        .select("*")
+        .eq("id", reportId)
+        .maybeSingle()
+
+    if (error || !report) {
+        return null
+    }
+
+    // Reporter info
+    let reporterProfile = null
+    let reporterEmail = null
+    if (report.reporter_user_id) {
+        const { data: p } = await admin
+            .from("user_profiles")
+            .select("*")
+            .eq("user_id", report.reporter_user_id)
+            .maybeSingle()
+        reporterProfile = p
+
+        try {
+            const { data: u } = await admin.auth.admin.getUserById(report.reporter_user_id)
+            reporterEmail = u?.user?.email || null
+        } catch { }
+    }
+
+    // Target details & summary
+    const [targetDetails, targetSummary, auditEvents] = await Promise.all([
+        getAdminTargetDetails(report.target_type, report.target_id),
+        getTargetReportSummary({ targetType: report.target_type as ReportTargetType, targetId: report.target_id }),
+        admin
+            .from("admin_audit_logs")
+            .select("*")
+            .or(`target_id.eq.${report.target_id},target_id.eq.${report.id}`)
+            .order("created_at", { ascending: false })
+            .limit(20)
+            .then((res: any) => res.data || []),
+    ])
+
+    return {
+        report: attachReasonInfo(report as any),
+        reporter: {
+            profile: reporterProfile,
+            email: reporterEmail,
+        },
+        targetDetails,
+        targetSummary,
+        auditEvents,
+    }
 }

@@ -71,7 +71,7 @@ const PorQueExiste = () => {
     return (
         <section className="py-24 bg-white relative border-t border-gray-100">
             <GridLines />
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
                 <SectionHeader
                     subtitle="POR QUE A DUDIT EXISTE?"
                     title="Hoje muita coisa acontece espalhada"
@@ -137,7 +137,7 @@ const BentoPillars = () => {
     return (
         <section className="py-24 bg-white relative border-t border-gray-100">
             <GridLines />
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
                 <SectionHeader
                     subtitle="UMA PLATAFORMA PARA TODOS"
                     title="Feita para pessoas e negócios"
@@ -218,7 +218,7 @@ const SemComplicacao = () => {
     return (
         <section className="py-24 bg-white relative border-t border-gray-100">
             <GridLines />
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
                 <div className="flex flex-col lg:flex-row min-h-[500px] rounded-3xl overflow-hidden shadow-xl">
                     <div className="flex-1 bg-brand-dark p-12 lg:p-16 flex flex-col justify-center relative z-10">
                         <span className="text-brand-green text-xs uppercase tracking-widest font-bold mb-4 block">SEM COMPLICAÇÃO</span>

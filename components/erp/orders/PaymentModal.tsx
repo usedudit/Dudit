@@ -33,6 +33,8 @@ import { fetchJSONWithCSRF } from '@/lib/utils/fetch-with-csrf';
 import { formatPaymentMethodLabel } from '@/lib/utils/payment-method-label';
 import { usePaymentMethods } from '@/hooks/use-payment-methods';
 import { useStore } from '@/lib/store-context';
+import { usePermissions } from '@/lib/permission-context';
+import { hasMinimumPlan } from '@/lib/subscription/plan-tier';
 import { getPOSCustomerDetailsAction } from '@/app/actions/erp/pdv';
 import { calculatePaymentAmounts } from '@/lib/payments/calculation';
 
@@ -375,6 +377,8 @@ const PaymentModal = ({
 }: PaymentModalProps) => {
     const { toast } = useToast();
     const { selectedStore } = useStore();
+    const { planSlug } = usePermissions();
+    const isFreePlan = !hasMinimumPlan(planSlug, "crescer");
 
     const [effectiveDepositPercent, setEffectiveDepositPercent] = useState<number | undefined>(propsDepositPercentage)
     const [fetchedCustomerCredit, setFetchedCustomerCredit] = useState<number | null>(null);
@@ -1666,13 +1670,26 @@ const PaymentModal = ({
         const selectedTypeLabel =
             selectedMethodType === "pix" ? "Pix" :
                 selectedMethodType === "cash" ? "Dinheiro" :
-                    selectedMethodType === "card" ? "Cartão" : "Método";
-        const methodSuffix = selectedMethodObj?.name ? ` ("${selectedMethodObj.name}")` : '';
+                    selectedMethodType === "credit_card" ? "Cartão de Crédito" :
+                        selectedMethodType === "debit_card" ? "Cartão de Débito" :
+                            selectedMethodType === "card" ? "Cartão" : "Método";
+
+        let cardTitle = "Cartão";
+        if (selectedMethodObj) {
+            const canonical = normalizeMethodType(selectedMethodObj.type);
+            if (canonical === "credit_card") cardTitle = "Cartão de Crédito";
+            else if (canonical === "debit_card") cardTitle = "Cartão de Débito";
+        }
+
+        const methodSuffix = (!isFreePlan && selectedMethodObj?.name && !["pix", "dinheiro", "cartao", "cartão", "cartão de crédito", "cartao de credito", "cartão de débito", "cartao de debito"].includes(selectedMethodObj.name.toLowerCase().trim()))
+            ? ` (${selectedMethodObj.name})`
+            : '';
+
         switch (view) {
             case 'methods': return 'Método de Pagamento';
             case 'method_type_select': return `Selecionar ${selectedTypeLabel}`;
             case 'money': return `Dinheiro${methodSuffix}`;
-            case 'card': return `Cartão${methodSuffix}`;
+            case 'card': return `${cardTitle}${methodSuffix}`;
             case 'pix': return `Pix${methodSuffix}`;
             case 'split': return 'Dividir Pagamento';
             case 'split_method_select': return 'Selecionar Método';
@@ -1774,6 +1791,12 @@ const PaymentModal = ({
         const methodsOfType = activeMethods.filter((method: any) => normalizeMethodType(method.type) === methodType);
 
         if (methodsOfType.length === 0 && methodType !== "cash") {
+            if (isFreePlan) {
+                userManuallyChangedRef.current = false;
+                setPaymentCalculation(null);
+                setView(getTargetViewForMethodType(methodType));
+                return;
+            }
             toast({
                 title: "Sem métodos ativos",
                 description: `Nenhum método deste tipo ativo encontrado.`,
@@ -1782,9 +1805,11 @@ const PaymentModal = ({
             return;
         }
 
-        if (methodsOfType.length === 1) {
+        if (isFreePlan || methodsOfType.length === 1) {
             const only = methodsOfType[0];
-            setSelectedMethodId(only.id);
+            if (only) {
+                setSelectedMethodId(only.id);
+            }
             userManuallyChangedRef.current = false;
             setPaymentCalculation(null);
             setView(getTargetViewForMethodType(methodType));
@@ -2588,14 +2613,14 @@ const PaymentModal = ({
                                                 <></>
                                                 {isSinglePricingBusy && (
                                                     <div className="flex items-center gap-2 text-sm font-medium text-brand-inactive-text">
-                                                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-brand-border border-t-brand-green" />
+                                                        <Spinner />
                                                         Calculando valor a cobrar...
                                                     </div>
                                                 )}
 
                                                 {showKeyInputs ? (
-                                                    <div className="space-y-4 border border-yellow-200 dark:border-yellow-900/40 bg-yellow-50/50 dark:bg-yellow-900/10 p-4 rounded-xl text-left">
-                                                        <h5 className="text-sm font-semibold text-yellow-800 dark:text-yellow-400">
+                                                    <div className="space-y-4 text-left">
+                                                        <h5 className="text-sm font-semibold text-brand-dark dark:text-dark-heading pt-4 border-t border-brand-border dark:border-dark-border">
                                                             Cadastrar Chave Pix temporária/padrão
                                                         </h5>
 
@@ -2659,9 +2684,13 @@ const PaymentModal = ({
                                                         <Button
                                                             variant="filled"
                                                             className="w-full h-12 mt-2"
-                                                            onClick={() => {
+                                                            onClick={async () => {
                                                                 if (tempPixKey) {
-                                                                    setShowConfirmSaveModal(true);
+                                                                    if (isFreePlan) {
+                                                                        await handleGeneratePixWithKey(tempPixKey, tempPixKeyType);
+                                                                    } else {
+                                                                        setShowConfirmSaveModal(true);
+                                                                    }
                                                                 }
                                                             }}
                                                             isLoading={isGeneratingPix}
@@ -2711,7 +2740,7 @@ const PaymentModal = ({
                                                         className="font-bold text-lg"
                                                     />
                                                 </div>
-                                                {selectedMethodObj && normalizeMethodType(selectedMethodObj.type) !== 'debit_card' && (
+                                                {!isFreePlan && selectedMethodObj && normalizeMethodType(selectedMethodObj.type) !== 'debit_card' && (
                                                     isMarketplaceOrder ? (
                                                         <div className="rounded-xl bg-gray-50 dark:bg-dark-border/20 p-4">
                                                             <div className="text-xs text-brand-inactive-text uppercase tracking-wide font-bold mb-1">Parcelas</div>
@@ -2747,16 +2776,20 @@ const PaymentModal = ({
                                                                         }));
                                                                     }
                                                                     const maxInst = Math.max(1, Number(selectedMethodObj?.max_installments || 1));
-                                                                    if (view === 'card' && maxInst > 1) {
-                                                                        return Array.from({ length: maxInst }, (_, i) => {
-                                                                            const num = i + 1;
+                                                                    if (maxInst > 1) {
+                                                                        return Array.from({ length: maxInst }, (_, idx) => {
+                                                                            const count = idx + 1;
+                                                                            const single = count > 0 ? paymentBaseAmount / count : paymentBaseAmount;
                                                                             return {
-                                                                                value: String(num),
-                                                                                label: `${num}x de ${formatCurrency(paymentBaseAmount / num)} (Total: ${formatCurrency(paymentBaseAmount)})`
+                                                                                value: String(count),
+                                                                                label: `${count}x de ${formatCurrency(single)} (Total: ${formatCurrency(paymentBaseAmount)})`
                                                                             };
                                                                         });
                                                                     }
-                                                                    return [{ value: "1", label: "1x de " + formatCurrency(paymentBaseAmount) + ` (Total: ${formatCurrency(paymentBaseAmount)})` }];
+                                                                    return [{
+                                                                        value: "1",
+                                                                        label: `1x de ${formatCurrency(paymentBaseAmount)} (Total: ${formatCurrency(paymentBaseAmount)})`
+                                                                    }];
                                                                 })()
                                                             }
                                                         />

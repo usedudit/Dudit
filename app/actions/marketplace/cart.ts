@@ -333,16 +333,14 @@ export async function addToCartAction(productId: string, quantity = 1, csrf_toke
   if (variantId) {
     let query = adminClient
       .from("product_variants")
-      .select("id, product_id, products!inner(partner_id, partners!inner(user_id))")
+      .select("id, product_id, products!inner(partner_id, store_id, partners!inner(user_id))")
       .eq("id", variantId)
-    if (storeId) query = query.eq("products.store_id", storeId)
     productPromise = query.maybeSingle()
   } else {
     let query = adminClient
       .from("products")
-      .select("partner_id, partners!inner(user_id)")
+      .select("partner_id, store_id, partners!inner(user_id)")
       .eq("id", productId)
-    if (storeId) query = query.eq("store_id", storeId)
     productPromise = query.maybeSingle()
   }
 
@@ -375,8 +373,14 @@ export async function addToCartAction(productId: string, quantity = 1, csrf_toke
     resolvedProductId = entity.product_id
     const parentProduct = entity.products as any
     partnerId = parentProduct.partner_id
+    if (parentProduct.store_id && storeId && parentProduct.store_id !== storeId) {
+      return { error: "Este produto não está disponível nesta filial." }
+    }
   } else {
     partnerId = entity.partner_id
+    if (entity.store_id && storeId && entity.store_id !== storeId) {
+      return { error: "Este produto não está disponível nesta filial." }
+    }
   }
 
   // 3. Segurança: Bloqueia compra da própria loja ou de loja da qual faz parte da equipe

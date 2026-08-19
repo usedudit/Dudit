@@ -142,13 +142,18 @@ export async function getUsers(
     // Fetch partner info and auth emails in parallel
     const userIds = items.map((p: any) => p.user_id)
     let partnerMap = new Map()
+    let partnerUserMap = new Map()
     let emailMap = new Map<string, string>()
 
     if (userIds.length > 0) {
-        const [partnersRes, authUsers] = await Promise.all([
+        const [partnersRes, partnerUsersRes, authUsers] = await Promise.all([
             supabase
                 .from("partners")
-                .select("id, user_id, is_active, suspended_at, erp_disabled, stores(name)")
+                .select("id, user_id, is_active, suspended_at, erp_disabled, stores(id, name)")
+                .in("user_id", userIds),
+            supabase
+                .from("partner_users")
+                .select("partner_id, user_id, partners(id, is_active, suspended_at, erp_disabled, stores(id, name))")
                 .in("user_id", userIds),
             Promise.allSettled(
                 userIds.map(async (uid: string) => {
@@ -166,6 +171,12 @@ export async function getUsers(
             partnerMap = new Map(partnersRes.data.map((p: any) => [p.user_id, p]))
         }
 
+        if (partnerUsersRes.data) {
+            partnerUsersRes.data.forEach((pu: any) => {
+                partnerUserMap.set(pu.user_id, pu)
+            })
+        }
+
         authUsers.forEach((result) => {
             if (result.status === "fulfilled" && result.value.email) {
                 emailMap.set(result.value.uid, result.value.email)
@@ -173,24 +184,33 @@ export async function getUsers(
         })
     }
 
-    const mapped: EnforcementUser[] = items.map((p: any) => ({
-        user_id: p.user_id,
-        email: emailMap.get(p.user_id) || "",
-        full_name: p.full_name,
-        banned_at: p.banned_at,
-        banned_until: p.banned_until,
-        banned_reason: p.banned_reason,
-        created_at: p.created_at,
-        partner: partnerMap.get(p.user_id)
-            ? {
-                id: partnerMap.get(p.user_id)!.id,
-                store_name: partnerMap.get(p.user_id)!.stores?.[0]?.name,
-                is_active: partnerMap.get(p.user_id)!.is_active,
-                suspended_at: partnerMap.get(p.user_id)!.suspended_at,
-                erp_disabled: partnerMap.get(p.user_id)!.erp_disabled,
-            }
-            : null,
-    }))
+    const mapped: EnforcementUser[] = items.map((p: any) => {
+        const directPartner = partnerMap.get(p.user_id)
+        const partnerUser = partnerUserMap.get(p.user_id)
+        const partnerInfo = directPartner || partnerUser?.partners
+        const storesCount = directPartner?.stores?.length || partnerUser?.partners?.stores?.length || 0
+
+        return {
+            user_id: p.user_id,
+            email: emailMap.get(p.user_id) || "",
+            full_name: p.full_name || "",
+            banned_at: p.banned_at,
+            banned_until: p.banned_until,
+            banned_reason: p.banned_reason,
+            created_at: p.created_at,
+            stores_count: storesCount,
+            partner: partnerInfo
+                ? {
+                    id: partnerInfo.id,
+                    store_name: partnerInfo.stores?.[0]?.name || "Loja",
+                    is_active: partnerInfo.is_active,
+                    suspended_at: partnerInfo.suspended_at,
+                    erp_disabled: partnerInfo.erp_disabled,
+                    stores_count: storesCount,
+                }
+                : null,
+        }
+    })
 
     return {
         data: mapped,
@@ -297,18 +317,61 @@ export async function getAdminPartnerDetail(storeId: string): Promise<any | null
 
     const supabase: any = getAdminClient()
 
-    // 1. Store
-    const { data: store, error: storeErr } = await supabase
+    // 1. Try finding store by store ID first
+    let store: any = null
+    const { data: storeById } = await supabase
         .from("stores")
         .select("*, partners(*)")
         .eq("id", storeId)
         .maybeSingle()
 
-    if (storeErr || !store) return null
+    if (storeById) {
+        store = storeById
+    } else {
+        // Fallback 1: Try finding store by partner_id
+        const { data: storeByPartner } = await supabase
+            .from("stores")
+            .select("*, partners(*)")
+            .eq("partner_id", storeId)
+            .order("is_headquarters", { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+        if (storeByPartner) {
+            store = storeByPartner
+        } else {
+            // Fallback 2: Check if partner exists directly
+            const { data: partnerData } = await supabase
+                .from("partners")
+                .select("*, stores(*)")
+                .eq("id", storeId)
+                .maybeSingle()
+
+            if (partnerData) {
+                store = partnerData.stores?.[0] || {
+                    id: partnerData.id,
+                    name: partnerData.store_name || "Loja",
+                    partner_id: partnerData.id,
+                    is_active: partnerData.is_active,
+                    risk_score: partnerData.risk_score || 0,
+                    partners: partnerData,
+                }
+                store.partners = partnerData
+            }
+        }
+    }
+
+    if (!store) {
+        console.error("[getAdminPartnerDetail] Store/Partner not found for ID:", storeId)
+        return null
+    }
+
+    const actualStoreId = store.id
+    const partner = store.partners
+    const actualPartnerId = partner?.id || store.partner_id || storeId
 
     // 2. Owner Profile & Email
     let ownerProfile = null
-    const partner = store.partners
     if (partner?.user_id) {
         const { data: profile } = await supabase
             .from("user_profiles")
@@ -329,34 +392,41 @@ export async function getAdminPartnerDetail(storeId: string): Promise<any | null
 
     // 3. Products count & list
     const [productsCountRes, recentProductsRes] = await Promise.all([
-        supabase.from("products").select("id", { count: "exact", head: true }).eq("store_id", storeId).is("deleted_at", null),
-        supabase.from("products").select("id, name, price, is_active, images, sku, stock_quantity, created_at").eq("store_id", storeId).is("deleted_at", null).order("created_at", { ascending: false }).limit(50),
+        supabase.from("products").select("id", { count: "exact", head: true }).eq("store_id", actualStoreId).is("deleted_at", null),
+        supabase.from("products").select("id, name, price, is_active, images, sku, stock_quantity, created_at").eq("store_id", actualStoreId).is("deleted_at", null).order("created_at", { ascending: false }).limit(50),
     ])
 
     // 4. Services count & list
     const [servicesCountRes, recentServicesRes] = await Promise.all([
-        supabase.from("services").select("id", { count: "exact", head: true }).eq("store_id", storeId).is("deleted_at", null),
-        supabase.from("services").select("id, name, price, is_active, images, created_at").eq("store_id", storeId).is("deleted_at", null).order("created_at", { ascending: false }).limit(50),
+        supabase.from("services").select("id", { count: "exact", head: true }).eq("store_id", actualStoreId).is("deleted_at", null),
+        supabase.from("services").select("id, name, price, is_active, images, created_at").eq("store_id", actualStoreId).is("deleted_at", null).order("created_at", { ascending: false }).limit(50),
     ])
 
     // 5. Orders count & list
     const [ordersCountRes, recentOrdersRes] = await Promise.all([
-        supabase.from("orders").select("id", { count: "exact", head: true }).eq("store_id", storeId),
-        supabase.from("orders").select("id, order_number, total_amount, paid_amount, situation, delivery_status, created_at, customer_name, order_source, payment_method").eq("store_id", storeId).order("created_at", { ascending: false }).limit(50),
+        supabase.from("orders").select("id", { count: "exact", head: true }).eq("store_id", actualStoreId),
+        supabase.from("orders").select("id, order_number, total_amount, paid_amount, situation, delivery_status, created_at, customer_name, order_source, payment_method").eq("store_id", actualStoreId).order("created_at", { ascending: false }).limit(50),
     ])
 
     // 6. Returns count & list
-    const partnerId = partner?.id || store.partner_id
+    const returnFilter = actualStoreId && actualPartnerId && actualStoreId !== actualPartnerId
+        ? `partner_id.eq.${actualPartnerId},store_id.eq.${actualStoreId}`
+        : `partner_id.eq.${actualPartnerId}`
+
     const [returnsCountRes, recentReturnsRes] = await Promise.all([
-        supabase.from("return_requests").select("id", { count: "exact", head: true }).is("deleted_at", null).or(`partner_id.eq.${partnerId},store_id.eq.${storeId}`),
-        supabase.from("return_requests").select("id, request_type, status, resolution_type, refund_amount, store_credit_amount, created_at, customer_name_snapshot, order_number_snapshot").is("deleted_at", null).or(`partner_id.eq.${partnerId},store_id.eq.${storeId}`).order("created_at", { ascending: false }).limit(50),
+        supabase.from("return_requests").select("id", { count: "exact", head: true }).is("deleted_at", null).or(returnFilter),
+        supabase.from("return_requests").select("id, request_type, status, resolution_type, refund_amount, store_credit_amount, created_at, customer_name_snapshot, order_number_snapshot").is("deleted_at", null).or(returnFilter).order("created_at", { ascending: false }).limit(50),
     ])
 
     // 7. Audit & Risk Events
+    const auditFilter = actualStoreId && actualPartnerId && actualStoreId !== actualPartnerId
+        ? `target_id.eq.${actualStoreId},target_id.eq.${actualPartnerId}`
+        : `target_id.eq.${actualPartnerId}`
+
     const { data: auditEvents } = await supabase
         .from("admin_audit_logs")
         .select("*")
-        .or(`target_id.eq.${storeId},target_id.eq.${partnerId}`)
+        .or(auditFilter)
         .order("created_at", { ascending: false })
         .limit(30)
 

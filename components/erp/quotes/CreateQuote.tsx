@@ -187,10 +187,16 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     const [expiryDate, setExpiryDate] = useState(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
     const [status, setStatus] = useState('draft');
 
+    const isMarketplaceOrigin = Boolean(
+        existingQuote?.metadata?.origin === "marketplace" ||
+        existingQuote?.origin === "marketplace" ||
+        (existingQuote?.customers && (existingQuote.customers as any).marketplace_user_id)
+    );
+
     const editCaps = useMemo(() => {
-        if (mode === "create" || mode === "duplicate") return getQuoteEditCaps("draft", false);
-        return getQuoteEditCaps(status, Boolean(existingQuote?.converted));
-    }, [mode, status, existingQuote?.converted]);
+        if (mode === "create" || mode === "duplicate") return getQuoteEditCaps("draft", false, false);
+        return getQuoteEditCaps(status, Boolean(existingQuote?.converted), isMarketplaceOrigin);
+    }, [mode, status, existingQuote?.converted, isMarketplaceOrigin]);
 
     // Layout Settings State
     const [primaryColor, setPrimaryColor] = useState(QUOTE_PREVIEW_PRIMARY_COLOR);
@@ -1197,6 +1203,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                                             setSalespersonId={setSalespersonId}
                                             salespeople={salespeople}
                                             canApplyDiscount={canDiscount}
+                                            isMarketplaceOrigin={isMarketplaceOrigin}
                                         />
                                     </div>
                                 </div>

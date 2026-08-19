@@ -139,10 +139,12 @@ export function AdminPartnerDetailView({
             if (data) {
                 setDetail(data)
                 setNewRiskScore(String(data.store?.risk_score || 0))
+            } else {
+                toast.error(`Loja ou parceiro não encontrado (ID: ${storeId})`)
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error("Error fetching partner detail:", err)
-            toast.error("Erro ao carregar dados do parceiro")
+            toast.error(`Erro ao carregar dados: ${err?.message || "Falha desconhecida"}`)
         } finally {
             setIsLoading(false)
         }

@@ -211,22 +211,27 @@ export default function DeliveryDetailPage({
             })
             if (res.success) {
                 toast.success("Status do pedido atualizado com sucesso!")
-                // Re-fetch details & routes
-                const detailRes = await getERPDeliveryDetailsAction(deliveryId, partnerId)
-                if (detailRes.success) {
-                    setDelivery(detailRes.data)
-                    // If sheet is open for this order, update its state too!
-                    if (selectedLink && selectedLink.orders?.id === orderId) {
-                        const updatedLink = (detailRes.data?.delivery_orders || []).find((l: any) => l?.orders?.id === orderId)
-                        if (updatedLink) setSelectedLink(updatedLink)
+                // O servidor já persistiu a alteração. Atualiza apenas o pedido afetado
+                // para evitar recarregar itens, clientes, endereços e a rota inteira.
+                setDelivery((current: any) => {
+                    if (!current) return current
+                    return {
+                        ...current,
+                        status: res.deliveryStatus || current.status,
+                        delivery_orders: (current.delivery_orders || []).map((item: any) =>
+                            item?.orders?.id === orderId
+                                ? {
+                                    ...item,
+                                    status: nextStatus,
+                                    orders: { ...item.orders, delivery_status: nextStatus },
+                                }
+                                : item,
+                        ),
                     }
-                }
-                if (isEscalar) {
-                    const routeRes = await getDeliveryRoutePointsAction({ partnerId, deliveryId })
-                    if (routeRes.success) {
-                        setRoute(routeRes.data)
-                    }
-                }
+                })
+                setSelectedLink((current: any) => current?.orders?.id === orderId
+                    ? { ...current, status: nextStatus, orders: { ...current.orders, delivery_status: nextStatus } }
+                    : current)
             } else {
                 toast.error(res.error || "Erro ao atualizar status do pedido.")
             }

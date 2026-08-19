@@ -16,8 +16,8 @@ import type { SponsoredAd } from "@/lib/ads/types"
 import ThreeDotsLoader from "@/components/reusable/ThreeDotsLoader"
 import { QueryClient, dehydrate } from "@tanstack/react-query"
 import { HydrationBoundary } from "@tanstack/react-query"
-import { redirect } from "next/navigation"
 import { cookies } from "next/headers"
+import { FALLBACK_CATEGORIES, CATEGORY_GRADIENTS } from "@/components/marketplace/explorar-constants"
 
 const CATEGORY_SLUG_MAP: { [key: string]: string } = {
     "casa-e-utilidades": "Casa & Utilidades",
@@ -274,6 +274,8 @@ export default async function ExplorarPage({
         }
         : null
 
+    const cartCount = sessionData?.cartCount || 0
+
     const query = typeof resolvedSearchParams.q === "string" ? resolvedSearchParams.q : ""
     const type = parseMarketplaceType(resolvedSearchParams.type)
     const section = typeof resolvedSearchParams.section === "string" ? resolvedSearchParams.section : undefined
@@ -294,26 +296,83 @@ export default async function ExplorarPage({
         return `${normCity}-${state.toLowerCase()}`
     }
 
-    // Modo navegação (sem slug na rota e sem intenção de busca): redireciona para a
-    // localização do usuário (cidade do perfil, cookie ou Brasil), preservando SEO.
+    // Landing page: sem slug na rota e sem intenção de busca → renderiza cards de categorias
     if (!routeFirstSlug && !hasSearchIntent) {
-        let redirectSlug: string | null = null
-
-        // 1. Check user profile (logged in WITH address)
+        // Resolve city for category links (profile → cookie → brasil)
+        let landingCitySlug = "brasil"
         if (userProfile?.city && userProfile?.state) {
-            redirectSlug = normalizeCityToSlug(userProfile.city, userProfile.state)
-        }
-        // 2. Logged-in users WITHOUT address: stay on /explorar (Brasil)
-        // 3. Check cookie (only for logged-out visitors with saved location)
-        else if (!userProfile) {
+            landingCitySlug = normalizeCityToSlug(userProfile.city, userProfile.state)
+        } else if (!userProfile) {
             const cookieStore = await cookies()
             const savedCity = cookieStore.get("dudit_city")?.value
             if (savedCity && savedCity !== "brasil" && !savedCity.startsWith("estado-")) {
-                redirectSlug = savedCity
+                landingCitySlug = savedCity
             }
         }
 
-        redirect(redirectSlug ? `/explorar/${redirectSlug}` : "/explorar/brasil")
+        return (
+            <div className="min-h-screen bg-white dark:bg-dark-background pt-[40px] lg:pt-[110px] font-sans flex flex-col">
+                <script
+                    type="application/ld+json"
+                    dangerouslySetInnerHTML={{ __html: safeJsonLdStringify({
+                        "@context": "https://schema.org",
+                        "@type": "CollectionPage",
+                        name: "Explorar | Dudit",
+                        description: "Descubra produtos, serviços e negócios perto de você.",
+                        url: "https://dudit.com.br/explorar",
+                    }) }}
+                />
+                <MarketplaceHeader userProfile={userProfile} cartCount={cartCount} />
+
+                <main className="flex-1 max-w-7xl mx-auto w-full px-4 lg:px-8 py-8 lg:py-12">
+                    <div className="mb-8 lg:mb-10">
+                        <h1 className="text-2xl lg:text-4xl font-bold text-brand-dark dark:text-dark-heading">
+                            Explore por categoria
+                        </h1>
+                        <p className="text-sm lg:text-base text-gray-500 dark:text-gray-400 mt-2">
+                            Encontre o que precisa perto de você
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 lg:gap-4">
+                        {FALLBACK_CATEGORIES.map((cat) => {
+                            const gradient = CATEGORY_GRADIENTS[cat.slug] || "from-gray-400 to-gray-500"
+                            const href = `/explorar/${landingCitySlug}/${cat.slug}`
+                            return (
+                                <a
+                                    key={cat.slug}
+                                    href={href}
+                                    className={`relative rounded-2xl overflow-hidden bg-gradient-to-br ${gradient} group cursor-pointer`}
+                                    style={{ aspectRatio: "4/3" }}
+                                >
+                                    <div className="absolute inset-0 p-4 lg:p-5 flex flex-col justify-between z-10">
+                                        <span className="text-white font-bold text-sm lg:text-base leading-tight drop-shadow-sm">
+                                            {cat.name}
+                                        </span>
+                                        <span className="text-white/80 text-xs lg:text-sm font-medium hidden sm:block">
+                                            Ver produtos
+                                        </span>
+                                    </div>
+                                    {cat.icon_url ? (
+                                        <img
+                                            src={cat.icon_url}
+                                            alt={cat.name}
+                                            className="absolute bottom-2 right-2 w-16 h-16 lg:w-20 lg:h-20 object-contain opacity-90 group-hover:scale-110 group-hover:opacity-100 transition-all duration-300 drop-shadow-lg"
+                                        />
+                                    ) : (
+                                        <div className="absolute bottom-3 right-3 w-14 h-14 lg:w-16 lg:h-16 rounded-full bg-white/20 flex items-center justify-center">
+                                            <span className="text-2xl lg:text-3xl">📦</span>
+                                        </div>
+                                    )}
+                                </a>
+                            )
+                        })}
+                    </div>
+                </main>
+
+                <MarketplaceFooter />
+            </div>
+        )
     }
 
     // Com busca (?q=, type, section...), permanece em /explorar e resolve o escopo para a
@@ -380,8 +439,6 @@ export default async function ExplorarPage({
             resolvedCityName = `${resolved.city} - ${resolved.state}`
         }
     }
-
-    const cartCount = sessionData?.cartCount || 0
 
     let refCoords = userProfile?.latitude && userProfile?.longitude
         ? { lat: userProfile.latitude, lng: userProfile.longitude }

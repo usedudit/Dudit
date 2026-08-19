@@ -129,6 +129,7 @@ export async function getSubscriptionStatusAction(): Promise<ActionResponse<any>
     }
 
     return successResponse({
+      partner_id: partner.id,
       plan: {
         id: plan.id,
         name: plan.name,

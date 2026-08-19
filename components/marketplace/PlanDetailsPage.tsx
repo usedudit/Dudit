@@ -255,7 +255,7 @@ export function PlanDetailsPageClient({
 
     const handleSubscribe = async () => {
         if (!userId) {
-            router.push(`/auth/login?redirect=${encodeURIComponent(window.location.pathname)}`)
+            router.push(`/auth/login?next=${encodeURIComponent(window.location.pathname)}`)
             return
         }
 

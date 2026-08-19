@@ -26,7 +26,7 @@ export function usePaymentMethods(partnerId: string, storeId?: string | null) {
         },
         staleTime: 60_000,
         refetchOnWindowFocus: false,
-        enabled: !!partnerId,
+        enabled: Boolean(partnerId && partnerId.trim().length > 0),
     })
 
     const methods = data?.methods || []

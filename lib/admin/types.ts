@@ -285,6 +285,7 @@ export interface EnforcementUser {
     banned_until: string | null
     banned_reason: string | null
     created_at: string
+    stores_count?: number
     partner?: {
         id: string
         store_name: string
@@ -292,6 +293,7 @@ export interface EnforcementUser {
         suspended_at: string | null
         erp_disabled: boolean
         stores?: { name: string }[]
+        stores_count?: number
     } | null
 }
 

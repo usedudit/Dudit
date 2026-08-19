@@ -62,7 +62,7 @@ export function UserCollectionsPage({ collections: initialCollections }: UserCol
         <div className="flex flex-col min-h-screen bg-white dark:bg-dark-surface transition-colors duration-300">
             <MarketplaceHeader simpleTitle="Minhas coleções" />
 
-            <div className="flex-1 flex flex-col container mx-auto px-4 max-w-[1400px] w-full pt-6 md:pt-10 pb-20 mt-[78px] lg:mt-[108px] relative overflow-hidden">
+            <div className="container mx-auto px-4 max-w-[1300px] mt-12 lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">
                 <div className="hidden lg:block items-center mb-8">
                     {/* Header */}
                     <div className="flex items-center justify-between mb-8">
@@ -128,8 +128,9 @@ export function UserCollectionsPage({ collections: initialCollections }: UserCol
                         </>
                     )}
                 </div>
-                <MarketplaceFooter />
             </div>
+
+            <MarketplaceFooter />
 
             {/* Create Modal */}
             <DefaultModal

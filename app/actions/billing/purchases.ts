@@ -3,12 +3,14 @@
 import { getAdminClient } from "@/lib/supabase/admin"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import { requirePartnerAccess } from "@/lib/auth/authorization"
+import { getAdminRole } from "@/lib/auth/admin-authorization"
+import { resolveBillingPartnerScope } from "@/lib/billing/auth-helper"
 import { logBillingAudit } from "@/lib/billing/audit"
 import type { BillingPurchase, CreatePurchaseInput, PurchaseWithRelations, BillingPageResult, BillingPageData, BillingFilters } from "@/lib/billing/types"
 import { validateCSRFForAction } from "@/lib/security/csrf-middleware"
 
-function applyFilters(query: any, filters?: BillingFilters) {
-    if (filters?.partner_id) {
+function applyFilters(query: any, filters?: BillingFilters, skipPartnerId = false) {
+    if (!skipPartnerId && filters?.partner_id) {
         query = query.eq("partner_id", filters.partner_id)
     }
     if (filters?.purchase_type && filters.purchase_type !== "all") {
@@ -32,14 +34,6 @@ function applyFilters(query: any, filters?: BillingFilters) {
     return query
 }
 
-function buildPurchaseQuery(filters?: BillingFilters) {
-    const admin = getAdminClient()
-    let query = admin
-        .from("billing_purchases")
-        .select("*, partners!billing_purchases_partner_id_fkey(id, stores(name))")
-    return applyFilters(query, filters)
-}
-
 export async function listPurchasesAction(
     cursor?: string | null,
     limit: number = 20,
@@ -48,8 +42,25 @@ export async function listPurchasesAction(
     const user = await getCurrentUser()
     if (!user) return { data: [], nextCursor: null, hasMore: false }
 
+    const scope = await resolveBillingPartnerScope(user, filters?.partner_id)
+    if (!scope.allowed) {
+        return { data: [], nextCursor: null, hasMore: false }
+    }
+
     const admin = getAdminClient()
-    let query = buildPurchaseQuery(filters)
+    let query = admin
+        .from("billing_purchases")
+        .select("*, partners!billing_purchases_partner_id_fkey(id, stores(name))")
+
+    if (scope.partnerIds) {
+        if (scope.partnerIds.length === 1) {
+            query = query.eq("partner_id", scope.partnerIds[0])
+        } else {
+            query = query.in("partner_id", scope.partnerIds)
+        }
+    }
+
+    query = applyFilters(query, filters, true)
         .order("created_at", { ascending: false })
         .limit(limit + 1)
 
@@ -90,6 +101,15 @@ export async function getPurchaseAction(purchaseId: string): Promise<PurchaseWit
 
     if (error || !data) return null
 
+    const adminUser = await getAdminRole()
+    if (!adminUser) {
+        try {
+            await requirePartnerAccess(data.partner_id, user)
+        } catch {
+            return null
+        }
+    }
+
     return {
         ...data,
         partner_name: (data as any).partners?.stores?.[0]?.name || null,
@@ -108,7 +128,10 @@ export async function createPurchaseAction(
         const user = await getCurrentUser()
         if (!user) return { success: false, error: "Não autenticado" }
 
-        await requirePartnerAccess(input.partner_id, user)
+        const adminUser = await getAdminRole()
+        if (!adminUser) {
+            await requirePartnerAccess(input.partner_id, user)
+        }
 
         const admin = getAdminClient()
         const totalAmount = input.total_amount ?? input.amount
@@ -161,8 +184,23 @@ export async function listPurchasesPageAction(
     const user = await getCurrentUser()
     if (!user) return { data: [], total: 0, page, pageSize }
 
+    const scope = await resolveBillingPartnerScope(user, filters?.partner_id)
+    if (!scope.allowed) {
+        return { data: [], total: 0, page, pageSize }
+    }
+
     const admin = getAdminClient()
-    const baseQuery = applyFilters(admin.from("billing_purchases"), filters)
+    let baseQuery = admin.from("billing_purchases")
+
+    if (scope.partnerIds) {
+        if (scope.partnerIds.length === 1) {
+            baseQuery = baseQuery.eq("partner_id", scope.partnerIds[0])
+        } else {
+            baseQuery = baseQuery.in("partner_id", scope.partnerIds)
+        }
+    }
+
+    baseQuery = applyFilters(baseQuery, filters, true)
     const { count } = await baseQuery.select("*", { count: "exact", head: true })
 
     let dataQuery = baseQuery
@@ -202,13 +240,19 @@ export async function updatePurchaseStatusAction(
         const admin = getAdminClient()
         const { data: purchase } = await admin
             .from("billing_purchases")
-            .select("partner_id")
+            .select("partner_id, status")
             .eq("id", purchaseId)
             .maybeSingle()
 
         if (!purchase) return { success: false, error: "Compra não encontrada" }
 
-        await requirePartnerAccess(purchase.partner_id, user)
+        const adminUser = await getAdminRole()
+        if (!adminUser) {
+            await requirePartnerAccess(purchase.partner_id, user)
+            if (status !== "cancelled" || purchase.status !== "pending") {
+                return { success: false, error: "Operação não permitida" }
+            }
+        }
 
         const { error } = await admin
             .from("billing_purchases")
@@ -229,3 +273,4 @@ export async function updatePurchaseStatusAction(
         return { success: false, error: error.message }
     }
 }
+

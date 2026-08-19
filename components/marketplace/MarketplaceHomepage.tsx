@@ -323,43 +323,6 @@ export default function MarketplaceHome({
     const hasNoLocation = !selectedCityName
     const hasNoProductsOrVitrines = selectedCityName && sections.length === 0
 
-    const renderMarketingSection = () => (
-        <section className="bg-[#fff3db] py-16 md:py-24 mb-0 w-full mt-auto dark:bg-[#2a2417]">
-            <div className="mx-auto max-w-[1400px] px-4 flex flex-col md:flex-row items-center gap-12 md:gap-24">
-                <div className="flex-1 md:max-w-[500px]">
-                    <h1 className="text-4xl md:text-[3.5rem] font-black text-brand-dark mb-6 leading-[1.1] tracking-tight dark:text-dark-heading">
-                        Pare de trabalhar para pagar comissão. Fique com o lucro.
-                    </h1>
-                    <p className="font-bold text-gray-800 text-lg mb-4 dark:text-dark-heading">
-                        Chega de dar 20% da sua venda pros aplicativos e depender de algoritmos.
-                    </p>
-                    <p className="text-gray-600 text-base md:text-lg mb-8 leading-relaxed dark:text-dark-body">
-                        Monte sua vitrine, organize seus clientes e venda direto, de graça. <br /><br />
-                        Não somos um marketplace mercenário. Aqui não tem taxa e o cliente é seu do começo ao fim.
-                    </p>
-                    <button
-                        onClick={() => router.push(user ? "/erp/trocar-erp" : "/auth/login?mode=partner")}
-                        className="bg-brand-green text-white font-bold py-3.5 px-8 rounded-full hover:bg-[#047857] transition-colors"
-                    >
-                        Criar Conta Grátis e Vender Mais
-                    </button>
-                </div>
-
-                <div className="flex-1 relative h-[300px] md:h-[400px] w-full mt-8 md:mt-0">
-                    <div className="absolute top-0 left-0 w-[55%] md:w-[280px] aspect-[4/3] z-10 shadow-lg rounded-[16px] overflow-hidden border-4 border-white transform -rotate-2">
-                        <img src="https://img.elo7.com.br/elo7-assets/Jaque.DbUaCvDP.webp" className="w-full h-full object-cover" alt="Vitrine Local 1" loading="lazy" />
-                    </div>
-                    <div className="absolute top-[10%] right-0 w-[50%] md:w-[260px] aspect-[3/4] z-20 shadow-xl rounded-[16px] overflow-hidden border-4 border-white transform rotate-3">
-                        <img src="https://img.elo7.com.br/elo7-assets/Bolo_2.DbQJb_rC.webp" className="w-full h-full object-cover" alt="Vitrine Local 2" loading="lazy" />
-                    </div>
-                    <div className="absolute bottom-[-10%] left-[20%] w-[45%] md:w-[240px] aspect-square z-30 shadow-2xl rounded-[16px] overflow-hidden border-4 border-white transform -rotate-6">
-                        <img src="https://img.elo7.com.br/elo7-assets/Copo.Ch2n71m8.webp" className="w-full h-full object-cover" alt="Vitrine Local 3" loading="lazy" />
-                    </div>
-                </div>
-            </div>
-        </section>
-    )
-
     const renderAddressModal = () => {
         if (!user || !isAddressModalOpen) return null
 
@@ -636,7 +599,6 @@ export default function MarketplaceHome({
 
                 {renderAddressModal()}
                 {renderVisitorModal()}
-                {renderMarketingSection()}
             </div>
         )
     } else if (hasNoProductsOrVitrines) {
@@ -665,7 +627,6 @@ export default function MarketplaceHome({
 
                 {renderAddressModal()}
                 {renderVisitorModal()}
-                {renderMarketingSection()}
             </div>
         )
     } else {
@@ -704,7 +665,6 @@ export default function MarketplaceHome({
 
                 {renderAddressModal()}
                 {renderVisitorModal()}
-                {renderMarketingSection()}
             </div>
         )
     }

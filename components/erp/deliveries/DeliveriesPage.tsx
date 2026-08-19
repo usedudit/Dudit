@@ -162,7 +162,7 @@ export default function DeliveriesPage({
         queryKey,
         initialPage: { items: initialDeliveries, nextCursor: initialNextCursor, hasMore: initialHasMore },
         fetchFn: async ({ cursor }) => {
-            const res = await getERPDeliveriesPageAction(partnerId, { cursor, limit: 100 })
+            const res = await getERPDeliveriesPageAction(partnerId, { cursor, limit: 25 })
             if (!res.success) throw new Error(res.error || "Erro ao carregar entregas.")
             return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
         },

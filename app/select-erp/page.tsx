@@ -52,8 +52,8 @@ export default async function SelectErpPage() {
 
     // Multiple stores - show selection screen
     return (
-        <div className="flex flex-col min-h-screen bg-gray-50">
-            <header className="lg:flex flex-col w-full sticky top-0 z-50 shadow-md">
+        <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-dark-background transition-colors duration-300">
+            <header className="lg:flex flex-col w-full bg-brand-dark sticky top-0 z-50 shadow-md">
                 <div className="w-full h-[68px] flex items-center justify-center max-w-[1400px] px-2 mx-auto gap-4">
                     <a href="/" className="cursor-pointer shrink-0 z-[110] pt-1">
                         <img
@@ -70,10 +70,10 @@ export default async function SelectErpPage() {
             <main className="flex-1 flex flex-col justify-center items-center px-4 py-12 md:py-16">
                 <div className="w-full max-w-lg flex flex-col gap-6">
                     <div className="text-center mb-4">
-                        <h1 className="text-2xl font-bold text-brand-dark mb-2">
+                        <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading mb-2">
                             Que bom te ver por aqui!
                         </h1>
-                        <p className="text-brand-dark text-sm">
+                        <p className="text-brand-dark dark:text-dark-heading text-sm">
                             Você tem acesso a uma ou mais lojas. Escolha qual deseja acessar.
                         </p>
                     </div>
@@ -101,7 +101,7 @@ export default async function SelectErpPage() {
                                                     {isOwn ? (
                                                         <p className="text-xs font-bold text-brand-green">Sua loja · Matriz</p>
                                                     ) : (
-                                                        <p className="text-xs font-bold text-brand-inactive-text">{roleLabel}</p>
+                                                        <p className="text-xs font-bold text-brand-inactive-text dark:text-dark-body">{roleLabel}</p>
                                                     )}
                                                 </div>
                                             }
@@ -116,7 +116,7 @@ export default async function SelectErpPage() {
                                         />
                                     </button>
                                     {isOwn && index < sortedAccess.length - 1 && (
-                                        <div className="my-2 border-b border-gray-200" />
+                                        <div className="my-2 border-b border-gray-200 dark:border-dark-border" />
                                     )}
                                 </form>
                             )
@@ -142,7 +142,8 @@ export default async function SelectErpPage() {
             <footer className="w-full h-[68px] py-6 border-t border-white/10 bg-brand-dark">
                 <div className="max-w-[1400px] mx-auto px-6 flex flex-col md:flex-row justify-center items-center">
                     <p className="text-white text-xs sm:text-sm font-medium tracking-tight">
-                        © {new Date().getFullYear()} Dudit Tecnologia Ltda. Todos os direitos reservados.
+                        © {new Date().getFullYear()} Dudit Tecnologia Ltda. Todos os
+                        direitos reservados.
                     </p>
                 </div>
             </footer>

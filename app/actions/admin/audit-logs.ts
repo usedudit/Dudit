@@ -51,51 +51,113 @@ export async function getAuditLogStats(): Promise<AuditLogStats> {
 // ─── Shared Enrichment Logic ──────────────────────────────────────────────────
 
 async function enrichAuditLogs(admin: any, items: AuditLogRow[]) {
-    if (!items.length) return items;
+    if (!items.length) return items
 
-    // 1. Batch fetch admin names
-    const adminIds = [...new Set(items.map(l => l.admin_user_id))]
+    // 1. Batch fetch admin names & emails
+    const adminIds = [...new Set(items.map(l => l.admin_user_id).filter(Boolean))]
     if (adminIds.length > 0) {
-        const { data: admins } = await admin
-            .from("user_profiles")
-            .select("user_id, full_name")
-            .in("user_id", adminIds)
-        
-        const adminMap = new Map<string, any>(admins?.map((a: any) => [a.user_id, a]) || [])
-        items.forEach((item: AuditLogRow) => {
-            const profile = adminMap.get(item.admin_user_id)
-            if (profile) {
-                item.admin_name = profile.full_name
+        const [profilesRes, authUsers] = await Promise.all([
+            admin
+                .from("user_profiles")
+                .select("user_id, full_name")
+                .in("user_id", adminIds),
+            Promise.allSettled(
+                adminIds.map(async (uid: string) => {
+                    try {
+                        const { data: u } = await admin.auth.admin.getUserById(uid)
+                        return { uid, email: u?.user?.email || "" }
+                    } catch {
+                        return { uid, email: "" }
+                    }
+                })
+            ),
+        ])
+
+        const adminMap = new Map<string, string>(profilesRes.data?.map((a: any) => [a.user_id, a.full_name]) || [])
+        const emailMap = new Map<string, string>()
+        authUsers.forEach(res => {
+            if (res.status === "fulfilled" && res.value.email) {
+                emailMap.set(res.value.uid, res.value.email)
             }
+        })
+
+        items.forEach((item: AuditLogRow) => {
+            const name = adminMap.get(item.admin_user_id)
+            const email = emailMap.get(item.admin_user_id) || item.admin_email
+            if (name) item.admin_name = name
+            if (email) item.admin_email = email
         })
     }
 
     // 2. Batch fetch target names
-    const productIds = items.filter(i => i.target_type === 'product' && i.target_id).map(i => i.target_id)
-    const partnerIds = items.filter(i => i.target_type === 'partner' && i.target_id).map(i => i.target_id)
-    const userIds = items.filter(i => i.target_type === 'user' && i.target_id).map(i => i.target_id)
-    
-    // In some cases target_type is 'review' but we don't have a simple name for it, we might just skip or handle later.
+    const productIds = items.filter(i => (i.target_type === 'product') && i.target_id).map(i => i.target_id!)
+    const serviceIds = items.filter(i => (i.target_type === 'service') && i.target_id).map(i => i.target_id!)
+    const partnerIds = items.filter(i => (i.target_type === 'partner' || i.target_type === 'store') && i.target_id).map(i => i.target_id!)
+    const userIds = items.filter(i => (i.target_type === 'user') && i.target_id).map(i => i.target_id!)
+    const orderIds = items.filter(i => (i.target_type === 'order') && i.target_id).map(i => i.target_id!)
+
+    const targetMap = new Map<string, string>()
+
+    const fetches: Promise<any>[] = []
 
     if (productIds.length > 0) {
-        const { data: prods } = await admin.from("products").select("id, name").in("id", productIds)
-        const map = new Map<string, string>(prods?.map((p: any) => [p.id, p.name]) || [])
-        items.forEach(i => { if (i.target_type === 'product' && i.target_id) i.target_name = map.get(i.target_id) })
+        fetches.push(
+            admin.from("products").select("id, name").in("id", productIds).then(({ data }: any) => {
+                ;(data || []).forEach((p: any) => targetMap.set(`product:${p.id}`, p.name))
+            })
+        )
     }
-    
+
+    if (serviceIds.length > 0) {
+        fetches.push(
+            admin.from("services").select("id, name").in("id", serviceIds).then(({ data }: any) => {
+                ;(data || []).forEach((s: any) => targetMap.set(`service:${s.id}`, s.name))
+            })
+        )
+    }
+
     if (partnerIds.length > 0) {
-        const { data: stores } = await admin.from("stores").select("partner_id, person_type").in("partner_id", partnerIds)
-        const map = new Map<string, string>(stores?.map((s: any) => [s.partner_id, s.person_type]) || [])
-        items.forEach(i => { if (i.target_type === 'partner' && i.target_id) i.target_name = map.get(i.target_id) })
+        fetches.push(
+            admin.from("stores").select("id, partner_id, name").in("id", partnerIds).then(({ data }: any) => {
+                ;(data || []).forEach((s: any) => {
+                    targetMap.set(`partner:${s.id}`, s.name)
+                    targetMap.set(`store:${s.id}`, s.name)
+                    if (s.partner_id) {
+                        targetMap.set(`partner:${s.partner_id}`, s.name)
+                    }
+                })
+            })
+        )
     }
 
     if (userIds.length > 0) {
-        const { data: users } = await admin.from("user_profiles").select("user_id, full_name").in("user_id", userIds)
-        const map = new Map<string, string>(users?.map((u: any) => [u.user_id, u.full_name]) || [])
-        items.forEach(i => { if (i.target_type === 'user' && i.target_id) i.target_name = map.get(i.target_id) })
+        fetches.push(
+            admin.from("user_profiles").select("user_id, full_name").in("user_id", userIds).then(({ data }: any) => {
+                ;(data || []).forEach((u: any) => targetMap.set(`user:${u.user_id}`, u.full_name))
+            })
+        )
     }
 
-    return items;
+    if (orderIds.length > 0) {
+        fetches.push(
+            admin.from("orders").select("id, order_number").in("id", orderIds).then(({ data }: any) => {
+                ;(data || []).forEach((o: any) => targetMap.set(`order:${o.id}`, `#${o.order_number || o.id.slice(0, 8)}`))
+            })
+        )
+    }
+
+    await Promise.all(fetches)
+
+    items.forEach((item: AuditLogRow) => {
+        if (item.target_id) {
+            const resolved = targetMap.get(`${item.target_type}:${item.target_id}`) || targetMap.get(`partner:${item.target_id}`) || targetMap.get(`store:${item.target_id}`)
+            if (resolved) {
+                item.target_name = resolved
+            }
+        }
+    })
+
+    return items
 }
 
 // ─── Get Audit Logs ─────────────────────────────────────────────────────────

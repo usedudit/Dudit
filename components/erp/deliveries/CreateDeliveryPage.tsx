@@ -46,12 +46,14 @@ import {
     TrashIcon,
     InfoIcon,
     XIcon,
+    TruckIcon,
 } from "@/lib/icons"
 import { getDeliveryStatusMeta, getPaymentStatusMeta } from "@/lib/orders/status"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { formatCurrency, formatDate, formatDateTime, formatQuantityWithUnit, formatUnitPriceWithUnit } from "@/lib/utils"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
+import DeliveryDriverPickerSheet from "@/components/erp/deliveries/DeliveryDriverPickerSheet"
 
 type DeliveryPerson = { id: string; userId?: string; fullName: string; source?: "legacy" | "platform"; vehicleType?: string }
 
@@ -234,6 +236,10 @@ export default function CreateDeliveryPage({
             let mounted = true
             const run = async () => {
                 setIsLoadingDelivery(true)
+                // A lista de pedidos é independente do cabeçalho da entrega.
+                // Inicia as duas consultas juntas para o editor não ficar bloqueado
+                // pelo detalhe completo da entrega.
+                void orderPicker.loadBucket()
                 try {
                     const res = await getERPDeliveryDetailsAction(editDeliveryId, partnerId)
                     if (!mounted) return
@@ -245,7 +251,7 @@ export default function CreateDeliveryPage({
                     const del = res.data
                     const orderIds = (del.delivery_orders || []).map((l: any) => l.order_id || l.orders?.id).filter(Boolean)
                     setSelectedOrderIds(orderIds)
-                    setSelectedDeliveryPersonId(del.delivery_person_id || "")
+                    setSelectedDeliveryPersonId(del.delivery_person_id || (del.platform_driver_id ? `platform:${del.platform_driver_id}` : ""))
                     setStatus(del.status || "pending")
                     const startedDate = del.started_at || del.departure_time || del.created_at
                     let initialDate = initialDateTime.date
@@ -265,13 +271,12 @@ export default function CreateDeliveryPage({
                     setDeliveryNumber(del.delivery_number || null)
                     initialLoadedRef.current = {
                         orderIds,
-                        deliveryPersonId: del.delivery_person_id || "",
+                        deliveryPersonId: del.delivery_person_id || (del.platform_driver_id ? `platform:${del.platform_driver_id}` : ""),
                         status: del.status || "pending",
                         date: initialDate,
                         time: initialTime,
                         notes: del.notes || "",
                     }
-                    void orderPicker.loadBucket()
                 } catch (err: any) {
                     toast.error(err?.message || "Erro ao carregar entrega.")
                     onBack()
@@ -348,7 +353,7 @@ export default function CreateDeliveryPage({
         if (deliveryPeople.length > 0) return
         const [legacy, platform] = await Promise.all([
             fetchDeliveryPeopleBucketAction(partnerId),
-            fetchAvailablePlatformDeliveryDriversAction(partnerId).catch(() => []),
+            fetchAvailablePlatformDeliveryDriversAction(partnerId, editDeliveryId).catch(() => []),
         ])
         setDeliveryPeople([
             ...(legacy as DeliveryPerson[]).map((person) => ({ ...person, source: "legacy" as const })),
@@ -705,6 +710,11 @@ export default function CreateDeliveryPage({
                                                                     onFocus={() => {
                                                                         void loadDeliveryPeople()
                                                                     }}
+                                                                    actionItem={{
+                                                                        label: "Entregadores Dudit",
+                                                                        icon: <TruckIcon size={16} />,
+                                                                        onClick: () => setIsDriverSheetOpen(true),
+                                                                    }}
                                                                 />
 
                                                                 <FormDropdown
@@ -758,8 +768,12 @@ export default function CreateDeliveryPage({
                                                             onFocus={() => {
                                                                 void loadDeliveryPeople()
                                                             }}
+                                                            actionItem={{
+                                                                label: "Entregadores Dudit",
+                                                                icon: <TruckIcon size={16} />,
+                                                                onClick: () => setIsDriverSheetOpen(true),
+                                                            }}
                                                         />
-                                                        {deliveryPeople.some((person) => person.source === "platform") ? <button type="button" onClick={() => setIsDriverSheetOpen(true)} className="-mt-2 text-left text-xs font-semibold text-brand-green hover:underline">Ver entregadores da Dudit</button> : null}
 
                                                         <FormDropdown
                                                             label="Status"
@@ -807,8 +821,12 @@ export default function CreateDeliveryPage({
                                                     ...deliveryPeople.map((person) => ({ value: person.id, label: `${person.fullName}${person.source === "platform" ? " · Dudit" : ""}` })),
                                                 ]}
                                                 onFocus={() => { void loadDeliveryPeople() }}
+                                                actionItem={{
+                                                    label: "Entregadores Dudit",
+                                                    icon: <TruckIcon size={16} />,
+                                                    onClick: () => setIsDriverSheetOpen(true),
+                                                }}
                                             />
-                                            {deliveryPeople.some((person) => person.source === "platform") ? <button type="button" onClick={() => setIsDriverSheetOpen(true)} className="text-left text-xs font-semibold text-brand-green hover:underline">Ver entregadores da Dudit</button> : null}
                                         </div>
                                     </FadeIn>
                                 </TabsContent>
@@ -1014,12 +1032,18 @@ export default function CreateDeliveryPage({
                 );
             })()}
 
-            <BottomSheet isOpen={isDriverSheetOpen} onClose={() => setIsDriverSheetOpen(false)} title="Entregadores Dudit">
-                <div className="space-y-3 pb-4">
-                    <p className="text-sm text-brand-inactive-text">Escolha um entregador da plataforma disponível para este parceiro.</p>
-                    {deliveryPeople.filter((person) => person.source === "platform").map((person) => <button key={person.id} type="button" onClick={() => { setSelectedDeliveryPersonId(person.id); setIsDriverSheetOpen(false) }} className="flex w-full items-center justify-between rounded-xl border border-brand-border bg-white p-4 text-left transition hover:border-brand-green dark:border-dark-border dark:bg-dark-surface"><span><span className="block font-semibold">{person.fullName}</span><span className="mt-1 block text-xs text-brand-inactive-text">Dudit · {person.vehicleType || "Veículo não informado"}</span></span><span className="text-sm font-semibold text-brand-green">Selecionar</span></button>)}
-                </div>
-            </BottomSheet>
+            <DeliveryDriverPickerSheet
+                isOpen={isDriverSheetOpen}
+                onClose={() => setIsDriverSheetOpen(false)}
+                drivers={deliveryPeople
+                    .filter((person) => person.source === "platform")
+                    .map((person) => ({
+                        id: person.id,
+                        fullName: person.fullName,
+                        vehicleType: person.vehicleType,
+                    }))}
+                onSelect={setSelectedDeliveryPersonId}
+            />
 
             <AlertModal
                 isOpen={!!orderToRemove}

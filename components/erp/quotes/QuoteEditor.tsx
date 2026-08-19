@@ -96,6 +96,7 @@ interface QuoteEditorProps {
     salespeople?: { id: string; name: string }[];
     quotePromotions?: any[];
     canApplyDiscount?: boolean;
+    isMarketplaceOrigin?: boolean;
 }
 
 const QuoteEditor = (props: QuoteEditorProps) => {
@@ -189,9 +190,16 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                         />
                                     }
                                     title={props.selectedCustomer.name}
-                                    description={props.selectedCustomer.email || "Sem e-mail cadastrado"}
+                                    description={
+                                        <div className="flex flex-col gap-0.5">
+                                            <span>{props.selectedCustomer.email || props.selectedCustomer.phone || "Cliente"}</span>
+                                            {props.isMarketplaceOrigin && (
+                                                <span className="text-[11px] text-brand-green font-semibold">Solicitado via Vitrine Digital</span>
+                                            )}
+                                        </div>
+                                    }
                                     className="border-0 bg-transparent px-0 hover:bg-transparent"
-                                    showChevron={true}
+                                    showChevron={!customerLocked}
                                     onClick={customerLocked ? undefined : () => props.setIsCustomerSheetOpen(true)}
                                 />
                             ) : (
@@ -204,7 +212,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                     title="Nenhum cliente selecionado"
                                     description="Clique para selecionar um cliente"
                                     className="border-0 bg-transparent px-0 hover:bg-transparent"
-                                    showChevron={true}
+                                    showChevron={!customerLocked}
                                     onClick={customerLocked ? undefined : () => props.setIsCustomerSheetOpen(true)}
                                 />
                             )}
@@ -602,9 +610,16 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                             />
                                         </div>
                                         <div>
-                                            <h4 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight">{props.selectedCustomer.name}</h4>
+                                            <div className="flex items-center gap-2">
+                                                <h4 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight">{props.selectedCustomer.name}</h4>
+                                                {props.isMarketplaceOrigin && (
+                                                    <Badge variant="blue" className="text-[10px] py-0 px-1.5 font-bold uppercase">
+                                                        Vitrine Digital
+                                                    </Badge>
+                                                )}
+                                            </div>
                                             <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
-                                                {props.selectedCustomer.email}
+                                                {props.selectedCustomer.email || props.selectedCustomer.phone || "Cliente"}
                                             </span>
                                         </div>
                                     </div>
@@ -612,6 +627,11 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                         <Button variant="outlinered" onClick={() => props.setSelectedCustomer(null)}>
                                             Remover
                                         </Button>
+                                    )}
+                                    {customerLocked && props.isMarketplaceOrigin && (
+                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body italic">
+                                            Cliente vinculado à vitrine digital
+                                        </span>
                                     )}
                                 </div>
                             ) : (

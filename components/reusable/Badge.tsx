@@ -26,19 +26,19 @@ interface BadgeProps {
 
 const variantStyles: Record<BadgeVariant, string> = {
     green:
-        "bg-green-50 text-green-700 border-green-100 dark:bg-green-900/30 dark:text-green-400 dark:border-green-900/50",
+        "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
     red:
-        "bg-red-50 text-red-700 border-red-100 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900/30",
+        "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
     orange:
-        "bg-orange-50 text-brand-orange border-orange-100 dark:bg-orange-900/20 dark:text-orange-400 dark:border-orange-900/30",
+        "bg-orange-100 text-brand-orange dark:bg-orange-900/30 dark:text-orange-400",
     blue:
-        "bg-blue-50 text-blue-700 border-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-900/30",
+        "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
     cyan:
-        "bg-cyan-50 text-cyan-700 border-cyan-100 dark:bg-cyan-900/20 dark:text-cyan-400 dark:border-cyan-900/30",
+        "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400",
     purple:
-        "bg-purple-50 text-purple-700 border-purple-100 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-900/30",
+        "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
     gray:
-        "bg-brand-gray text-brand-dark border-brand-border dark:bg-dark-border/30 dark:text-dark-heading dark:border-dark-border",
+        "bg-brand-gray text-brand-dark dark:bg-dark-border/30 dark:text-dark-heading",
 }
 
 const defaultIcons: Partial<Record<BadgeVariant, React.ElementType>> = {

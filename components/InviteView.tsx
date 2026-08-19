@@ -22,9 +22,9 @@ WavesBackground.displayName = "WavesBackground"
 // ─── Shell compartilhado ─────────────────────────────────────────────────────
 function Shell({ children }: { children: React.ReactNode }) {
     return (
-        <div className="min-h-screen flex flex-col font-sans bg-brand-gray">
+        <div className="min-h-screen flex flex-col font-sans bg-brand-gray dark:bg-dark-background transition-colors duration-300">
             {/* HEADER */}
-            <header className="w-full bg-white border-b border-gray-100 sticky top-0 z-50 h-[80px] flex items-center shadow-sm">
+            <header className="w-full bg-white dark:bg-dark-surface border-b border-gray-100 dark:border-dark-border sticky top-0 z-50 h-[80px] flex items-center shadow-sm">
                 <div className="container mx-auto px-4 max-w-[1300px] flex justify-between items-center h-full">
                     <Link href="/" prefetch={false} className="shrink-0 cursor-pointer">
                         <img src="https://img.dudit.com.br/static/Logo.png" alt="Dudit" width={110} height={32} className="h-8 w-auto" />
@@ -44,7 +44,7 @@ function Shell({ children }: { children: React.ReactNode }) {
                 <div className="w-full flex flex-col items-center pt-[60px] pb-12 z-10 px-4">
                     <motion.div
                         initial="hidden" animate="visible" exit="exit"
-                        className="bg-white rounded-lg shadow-xl w-full max-w-[500px] p-10 flex flex-col items-center text-center space-y-6"
+                        className="bg-white dark:bg-dark-surface rounded-lg shadow-xl w-full max-w-[500px] p-10 flex flex-col items-center text-center space-y-6"
                     >
                         {children}
                     </motion.div>
@@ -91,8 +91,8 @@ export default function InviteView(props: InviteViewProps) {
                     <AlertCircleIcon size={40} />
                 </div>
                 <div>
-                    <h2 className="text-2xl font-bold text-brand-dark mb-2">Convite Inválido</h2>
-                    <p className="text-brand-inactive-text text-sm">
+                    <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading mb-2">Convite Inválido</h2>
+                    <p className="text-brand-inactive-text dark:text-dark-body text-sm">
                         Ocorreu um problema ao processar seu convite.
                     </p>
                 </div>
@@ -108,7 +108,7 @@ export default function InviteView(props: InviteViewProps) {
                     <Link href="/" prefetch={false}>Ir para a página inicial</Link>
                 </Button>
 
-                <Link href="/" prefetch={false} className="text-sm text-brand-inactive-text hover:text-brand-green mt-4 font-medium">
+                <Link href="/" prefetch={false} className="text-sm text-brand-inactive-text dark:text-dark-body hover:text-brand-green mt-4 font-medium">
                     ← Voltar para o início
                 </Link>
             </Shell>
@@ -124,17 +124,17 @@ export default function InviteView(props: InviteViewProps) {
                     <BriefcaseIcon size={40} />
                 </div>
                 <div>
-                    <h2 className="text-2xl font-bold text-brand-dark mb-2">Finalizar Convite</h2>
-                    <p className="text-brand-inactive-text text-sm">
-                        Você está prestes a entrar na equipe de <strong className="text-brand-dark">{partnerName}</strong>.
+                    <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading mb-2">Finalizar Convite</h2>
+                    <p className="text-brand-inactive-text dark:text-dark-body text-sm">
+                        Você está prestes a entrar na equipe de <strong className="text-brand-dark dark:text-dark-heading">{partnerName}</strong>.
                     </p>
                 </div>
 
-                <div className={`w-full p-4 rounded-xl border text-left ${isMismatch ? "bg-red-50 border-red-200" : "bg-gray-50 border-brand-border"}`}>
+                <div className={`w-full p-4 rounded-xl border text-left ${isMismatch ? "bg-red-50 border-red-200" : "bg-gray-50 dark:bg-dark-border/30 border-brand-border dark:border-dark-border"}`}>
                     <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs text-brand-inactive-text font-medium">Conectado como:</span>
+                        <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium">Conectado como:</span>
                     </div>
-                    <p className={`font-semibold break-all text-sm ${isMismatch ? "text-brand-red" : "text-brand-dark"}`}>
+                    <p className={`font-semibold break-all text-sm ${isMismatch ? "text-brand-red" : "text-brand-dark dark:text-dark-heading"}`}>
                         {userEmail}
                     </p>
                 </div>
@@ -170,24 +170,24 @@ export default function InviteView(props: InviteViewProps) {
                 <BriefcaseIcon size={40} />
             </div>
             <div>
-                <h2 className="text-2xl font-bold text-brand-dark mb-2">Convite para equipe</h2>
-                <p className="text-brand-inactive-text text-sm">
-                    Você foi convidado para participar de <strong className="text-brand-dark">{partnerName}</strong>.
+                <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading mb-2">Convite para equipe</h2>
+                <p className="text-brand-inactive-text dark:text-dark-body text-sm">
+                    Você foi convidado para participar de <strong className="text-brand-dark dark:text-dark-heading">{partnerName}</strong>.
                 </p>
             </div>
 
-            <div className="w-full p-4 rounded-xl bg-gray-50 border border-brand-border text-left">
-                <p className="text-xs text-brand-inactive-text mb-1">Este convite foi enviado para:</p>
-                <p className="font-semibold text-brand-dark break-all text-sm">{inviteEmail}</p>
+            <div className="w-full p-4 rounded-xl bg-gray-50 dark:bg-dark-border/30 border border-brand-border dark:border-dark-border text-left">
+                <p className="text-xs text-brand-inactive-text dark:text-dark-body mb-1">Este convite foi enviado para:</p>
+                <p className="font-semibold text-brand-dark dark:text-dark-heading break-all text-sm">{inviteEmail}</p>
             </div>
 
             {userEmail ? (
                 <>
-                    <div className="w-full p-4 rounded-xl bg-gray-50 border border-brand-border text-left">
+                    <div className="w-full p-4 rounded-xl bg-gray-50 dark:bg-dark-border/30 border border-brand-border dark:border-dark-border text-left">
                         <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs text-brand-inactive-text font-medium">Conectado como:</span>
+                            <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium">Conectado como:</span>
                         </div>
-                        <p className="font-semibold text-brand-dark break-all text-sm">{userEmail}</p>
+                        <p className="font-semibold text-brand-dark dark:text-dark-heading break-all text-sm">{userEmail}</p>
                     </div>
                     <form action={onAccept} className="w-full">
                         <Button type="submit" className="w-full flex items-center justify-center gap-2 h-12">

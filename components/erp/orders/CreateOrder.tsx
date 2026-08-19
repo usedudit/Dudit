@@ -28,7 +28,7 @@ import {
 } from "@/app/actions/erp/finance-accounts"
 import { normalizeBusinessInfo, isQuickMode } from "@/lib/business-info"
 import { createERPDeliveryAction, fetchDeliveryPeopleBucketAction } from "@/app/actions/erp/deliveries"
-import { assignPlatformDriverToDeliveryAction, fetchAvailablePlatformDeliveryDriversAction } from "@/app/actions/erp/delivery-driver-assignments"
+import { assignPlatformDriverToDeliveryAction, fetchAvailablePlatformDeliveryDriversAction, syncPlatformDriverForOrderAction } from "@/app/actions/erp/delivery-driver-assignments"
 import { pickBankThenCashDefaultFinanceAccountId, type FinanceAccountType } from "@/lib/finance-utils"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
@@ -45,6 +45,7 @@ import { getServiceCheckoutSettingsAction } from "@/app/actions/marketplace/serv
 // Tabs
 import { OrderGeneralTab } from "./OrderGeneralTab"
 import { AddressTab } from "./AddressTab"
+import DeliveryDriverPickerSheet from "@/components/erp/deliveries/DeliveryDriverPickerSheet"
 import { OrderObservationsTab } from "./OrderObservationsTab"
 import { OrderAttachmentsTab } from "./OrderAttachmentsTab"
 import { uploadAndSavePendingAttachments } from "@/lib/utils/attachment-uploader"
@@ -310,6 +311,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     const [deliveryTime, setDeliveryTime] = useState(formatCurrentLocalTime())
     const [financeAccounts, setFinanceAccounts] = useState<FinanceAccountOption[]>([])
     const [deliveryPeople, setDeliveryPeople] = useState<DeliveryPersonOption[]>([])
+    const [isDriverSheetOpen, setIsDriverSheetOpen] = useState(false)
     const [financeAccountId, setFinanceAccountId] = useState("")
 
     // items
@@ -571,6 +573,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 setOriginalPaymentBreakdown(loadedPaymentBreakdown)
                 setDeliveryStatus(order.delivery_status || "not_sent")
                 setOriginalDeliveryStatus(order.delivery_status || "not_sent")
+                if (order.platform_driver_id) setSelectedDeliveryPersonId(`platform:${order.platform_driver_id}`)
                 setDeliveryDate(order.created_at.split('T')[0])
                 setDeliveryTime(formatCurrentLocalTime(new Date(order.created_at)))
                 setFinanceAccountId(order.finance_account_id || "")
@@ -1423,6 +1426,15 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                         })
                         if (!assignmentResult.success) notifyError("Pedido criado, mas não foi possível atribuir o entregador Dudit", assignmentResult.error)
                     }
+                } else if (editOrderId) {
+                    const isPlatformDriver = selectedDeliveryPersonId.startsWith("platform:")
+                    const syncResult = await syncPlatformDriverForOrderAction({
+                        partnerId,
+                        orderId: editOrderId,
+                        driverId: isPlatformDriver ? selectedDeliveryPersonId.slice("platform:".length) : null,
+                        notes: notes?.trim() || undefined,
+                    })
+                    if (!syncResult.success) notifyError("Pedido salvo, mas não foi possível atualizar o entregador Dudit", syncResult.error)
                 }
 
                 notifySuccess(editOrderId ? `Pedido atualizado com sucesso!` : `Pedido criado com sucesso!`)
@@ -1925,6 +1937,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                             deliveryDate={deliveryDate}
                                             deliveryTime={deliveryTime}
                                             deliveryPeopleOptions={deliveryPeopleOptions}
+                                            onOpenDeliveryDriverSheet={() => setIsDriverSheetOpen(true)}
                                             setDeliveryStatus={setDeliveryStatus}
                                             setSelectedDeliveryPersonId={setSelectedDeliveryPersonId}
                                             setDeliveryDate={setDeliveryDate}
@@ -1976,6 +1989,19 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                         </div>
                     </div>
                 </Tabs>
+
+                <DeliveryDriverPickerSheet
+                    isOpen={isDriverSheetOpen}
+                    onClose={() => setIsDriverSheetOpen(false)}
+                    drivers={deliveryPeople
+                        .filter((person) => person.source === "platform")
+                        .map((person) => ({
+                            id: person.id,
+                            fullName: person.fullName,
+                            vehicleType: person.vehicleType,
+                        }))}
+                    onSelect={setSelectedDeliveryPersonId}
+                />
 
                 <SelectCustomerSheet
                     isOpen={isCustomerSheetOpen}

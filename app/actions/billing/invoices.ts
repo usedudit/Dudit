@@ -2,7 +2,9 @@
 
 import { getAdminClient } from "@/lib/supabase/admin"
 import { getCurrentUser } from "@/lib/auth/server-user"
-import { requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { requirePartnerAccess, requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { getAdminRole } from "@/lib/auth/admin-authorization"
+import { resolveBillingPartnerScope } from "@/lib/billing/auth-helper"
 import { generateInvoiceForPurchase } from "@/lib/billing/invoice-generation"
 import { logBillingAudit } from "@/lib/billing/audit"
 import type { BillingPurchase, BillingPayment, BillingInvoice, BillingPageResult, InvoiceData } from "@/lib/billing/types"
@@ -26,12 +28,15 @@ export async function generateInvoiceAction(
             return { success: false, error: "Compra não encontrada" }
         }
 
-        await requirePartnerAccessWithPermission(
-            purchase.partner_id,
-            "billing" as any,
-            "view",
-            user,
-        )
+        const adminUser = await getAdminRole()
+        if (!adminUser) {
+            await requirePartnerAccessWithPermission(
+                purchase.partner_id,
+                "billing" as any,
+                "view",
+                user,
+            )
+        }
 
         return await generateInvoiceForPurchase(purchaseId, user.id)
     } catch (error: any) {
@@ -47,6 +52,11 @@ export async function listInvoicesAction(
     const user = await getCurrentUser()
     if (!user) return { data: [], nextCursor: null, hasMore: false }
 
+    const scope = await resolveBillingPartnerScope(user, partnerId)
+    if (!scope.allowed) {
+        return { data: [], nextCursor: null, hasMore: false }
+    }
+
     const admin = getAdminClient()
     let query = admin
         .from("billing_invoices")
@@ -54,8 +64,12 @@ export async function listInvoicesAction(
         .order("created_at", { ascending: false })
         .limit(limit + 1)
 
-    if (partnerId) {
-        query = query.eq("partner_id", partnerId)
+    if (scope.partnerIds) {
+        if (scope.partnerIds.length === 1) {
+            query = query.eq("partner_id", scope.partnerIds[0])
+        } else {
+            query = query.in("partner_id", scope.partnerIds)
+        }
     }
     if (cursor) {
         query = query.lt("created_at", cursor)
@@ -89,10 +103,23 @@ export async function getInvoiceAction(invoiceId: string): Promise<BillingInvoic
         .maybeSingle()
 
     if (error || !data) return null
+
+    const adminUser = await getAdminRole()
+    if (!adminUser && data.partner_id) {
+        try {
+            await requirePartnerAccess(data.partner_id, user)
+        } catch {
+            return null
+        }
+    }
+
     return data as BillingInvoice
 }
 
 export async function getInvoiceByPurchaseAction(purchaseId: string): Promise<BillingInvoice | null> {
+    const user = await getCurrentUser()
+    if (!user) return null
+
     const admin = getAdminClient()
     const { data, error } = await admin
         .from("billing_invoices")
@@ -101,6 +128,16 @@ export async function getInvoiceByPurchaseAction(purchaseId: string): Promise<Bi
         .maybeSingle()
 
     if (error || !data) return null
+
+    const adminUser = await getAdminRole()
+    if (!adminUser && data.partner_id) {
+        try {
+            await requirePartnerAccess(data.partner_id, user)
+        } catch {
+            return null
+        }
+    }
+
     return data as BillingInvoice
 }
 
@@ -117,15 +154,18 @@ export async function getInvoiceForPrintAction(invoiceId: string): Promise<Invoi
 
     if (error || !data) return null
 
-    try {
-        await requirePartnerAccessWithPermission(
-            data.billing_purchases.partner_id,
-            "billing" as any,
-            "view",
-            user,
-        )
-    } catch {
-        return null
+    const adminUser = await getAdminRole()
+    if (!adminUser) {
+        try {
+            await requirePartnerAccessWithPermission(
+                data.billing_purchases.partner_id,
+                "billing" as any,
+                "view",
+                user,
+            )
+        } catch {
+            return null
+        }
     }
 
     await admin
@@ -144,3 +184,4 @@ export async function getInvoiceForPrintAction(invoiceId: string): Promise<Invoi
 
     return (data as any).invoice_data as InvoiceData
 }
+

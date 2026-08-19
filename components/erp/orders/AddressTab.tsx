@@ -7,6 +7,7 @@ import { CepInput } from "@/components/reusable/Inputs/CepInput"
 import { StateComboBox } from "@/components/reusable/Inputs/StateComboBox"
 import { NumberInputWithCheckbox } from "@/components/reusable/Inputs/NumberInputWithCheckbox"
 import { getDeliveryStatusMeta } from "@/lib/orders/status"
+import { TruckIcon } from "@/lib/icons"
 
 const formatDateString = (dateStr: string) => {
     if (!dateStr) return "-"
@@ -30,6 +31,7 @@ interface AddressTabProps {
     deliveryDate: string
     deliveryTime: string
     deliveryPeopleOptions: Array<{ value: string; label: string }>
+    onOpenDeliveryDriverSheet?: () => void
     setDeliveryStatus: (val: string) => void
     setSelectedDeliveryPersonId: (val: string) => void
     setDeliveryDate: (val: string) => void
@@ -65,6 +67,7 @@ export const AddressTab: React.FC<AddressTabProps> = ({
     deliveryDate,
     deliveryTime,
     deliveryPeopleOptions,
+    onOpenDeliveryDriverSheet,
     setDeliveryStatus,
     setSelectedDeliveryPersonId,
     setDeliveryDate,
@@ -184,6 +187,11 @@ export const AddressTab: React.FC<AddressTabProps> = ({
                                     value={selectedDeliveryPersonId || "none"}
                                     setValue={(val: any) => setSelectedDeliveryPersonId(val === "none" ? "" : val)}
                                     options={[{ value: "none", label: "Sem entregador (não atribuído)" }, ...deliveryPeopleOptions]}
+                                    actionItem={onOpenDeliveryDriverSheet ? {
+                                        label: "Entregadores Dudit",
+                                        icon: <TruckIcon size={16} />,
+                                        onClick: onOpenDeliveryDriverSheet,
+                                    } : undefined}
                                     disabled={isDeliveryLocked}
                                 />
                                 <FormDropdown

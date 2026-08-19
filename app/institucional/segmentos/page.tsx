@@ -219,7 +219,7 @@ const SegmentsHero = ({ onNavigate }: { onNavigate: (page: string) => void }) =>
 const SegmentsGrid = () => (
   <section className="py-24 bg-white relative border-t border-brand-border">
     <GridLines />
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+    <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
       <SectionHeader
         subtitle="PARA TODOS OS TIPOS DE NEGÓCIOS"
         title="Encontre o que precisa ou mostre o que você faz"

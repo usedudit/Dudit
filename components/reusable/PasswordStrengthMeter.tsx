@@ -49,7 +49,7 @@ export const PasswordStrengthMeter = ({ password }: { password: string }) => {
                     {text}
                 </span>
             </div>
-            <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden mb-3">
+            <div className="h-1.5 w-full bg-gray-100 dark:bg-dark-border/30 rounded-full overflow-hidden mb-3">
                 <motion.div
                     className={`h-full ${color}`}
                     initial={{ width: 0 }}
@@ -65,7 +65,7 @@ export const PasswordStrengthMeter = ({ password }: { password: string }) => {
                         ) : (
                             <CancelCircleIcon size={12} className="text-brand-red shrink-0" />
                         )}
-                        <span className={cn("text-xs", req.met ? "text-brand-inactive-text font-medium" : "text-brand-inactive-text/50")}>
+                        <span className={cn("text-xs", req.met ? "text-brand-inactive-text dark:text-dark-body font-medium" : "text-brand-inactive-text/50 dark:text-dark-body/50")}>
                             {req.text}
                         </span>
                     </div>

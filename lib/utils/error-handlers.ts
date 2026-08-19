@@ -10,7 +10,8 @@ const NEXT_RSC_PRODUCTION_PLACEHOLDER =
 export function getErrorMessage(error: any): string {
   if (!error) return "Ocorreu um erro inesperado."
 
-  const message = typeof error === "string" ? error : error.message || "Erro desconhecido"
+  const rawMessage = typeof error === "string" ? error : error?.message
+  const message = typeof rawMessage === "string" && rawMessage.length > 0 ? rawMessage : "Erro desconhecido"
   const code = error?.code || error?.status
 
   // Next.js App Router: production Server Components use a generic English message + digest

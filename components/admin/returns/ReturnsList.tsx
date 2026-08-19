@@ -367,6 +367,9 @@ export default function ReturnsList({ initialData, initialStats }: ReturnsListPr
                                                     >
                                                         Pedido {sortConfig?.key === "order_number" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
                                                     </th>
+                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight">
+                                                        Loja
+                                                    </th>
                                                     <th
                                                         onClick={() => handleSort("customer")}
                                                         className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
@@ -375,13 +378,13 @@ export default function ReturnsList({ initialData, initialStats }: ReturnsListPr
                                                     </th>
                                                     <th
                                                         onClick={() => handleSort("date")}
-                                                        className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                        className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors text-center"
                                                     >
                                                         Data {sortConfig?.key === "date" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
                                                     </th>
                                                     <th
                                                         onClick={() => handleSort("refund_type")}
-                                                        className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                        className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors text-center"
                                                     >
                                                         Resolução {sortConfig?.key === "refund_type" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
                                                     </th>
@@ -390,6 +393,12 @@ export default function ReturnsList({ initialData, initialStats }: ReturnsListPr
                                                         className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors text-center"
                                                     >
                                                         Status {sortConfig?.key === "status" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+                                                    </th>
+                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">
+                                                        Total
+                                                    </th>
+                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">
+                                                        Origem
                                                     </th>
                                                     <th className="py-3 px-2 pr-6 rounded-r-lg text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">
                                                         Ações

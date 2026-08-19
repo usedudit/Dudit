@@ -66,6 +66,11 @@ const QuoteGridCard = React.memo(
                                 >
                                     {quote.displayId}
                                 </h3>
+                                {(quote.metadata?.origin === "marketplace" || quote.origin === "marketplace") && (
+                                    <Badge variant="blue" className="text-[10px] py-0 px-1 font-bold shrink-0">
+                                        Vitrine
+                                    </Badge>
+                                )}
                                 <div className="flex items-center shrink-0">
                                     <Tooltip text={`Status: ${quote.statusLabel}`}>
                                         <Badge

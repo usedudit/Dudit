@@ -1028,7 +1028,7 @@ export function ProductDetailsPageClient({
                     ) : (
                         <span className="text-[11px] font-bold text-brand-dark dark:text-dark-heading bg-gray-100 dark:bg-dark-border/50 px-2 py-0.5 rounded uppercase tracking-wider">Novo</span>
                     )}
-                    <span className="text-gray-300 text-xs">|</span>
+                    <span className="text-brand-inactive-text dark:text-dark-body text-xs">|</span>
                     <span className="text-[13px] font-semibold text-brand-inactive-text dark:text-dark-body">
                         {product.product_type?.toLowerCase() === "digital" ? "Produto Digital" : (product.product_type?.toLowerCase() === "service" || product.product_type?.toLowerCase() === "serviço" || product.product_type?.toLowerCase() === "servico") ? "Serviço" : "Produto Físico"}
                     </span>

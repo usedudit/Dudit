@@ -11,6 +11,7 @@ import { getServiceUrl } from "@/lib/utils/url-generator"
 import { getCurrentUser } from "@/lib/auth/authorization"
 import { getUserSessionData } from "@/lib/data/user"
 import { getSponsoredAdsForSlot } from "@/app/actions/marketplace/ads"
+import { getPartnerPlan } from "@/lib/services/subscription.service"
 import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
 
 export const dynamic = 'force-dynamic'
@@ -101,10 +102,11 @@ export default async function ServiceDetailsPage({
         }
     }
 
-    // Fetch staff + reviews in parallel
+    // Fetch staff + reviews + partner plan in parallel
     const partner = Array.isArray(service.partners) ? service.partners[0] : service.partners
-    const [staff, reviews, detailAds] = await Promise.all([
-        getServiceStaffMembers(partner?.id || service.partner_id, storeId),
+    const resolvedPartnerId = partner?.id || service.partner_id
+    const [staff, reviews, detailAds, partnerPlan] = await Promise.all([
+        getServiceStaffMembers(resolvedPartnerId, storeId),
         getServiceReviews(id, storeId),
         getSponsoredAdsForSlot("detail", {
             lat: userProfile?.latitude ?? null,
@@ -113,8 +115,10 @@ export default async function ServiceDetailsPage({
             city: userProfile?.city ?? null,
             state: userProfile?.state ?? currentCidadeUf.split("-").pop()?.toUpperCase() ?? null,
         }),
+        getPartnerPlan(resolvedPartnerId).catch(() => null),
     ])
     const detailAd = detailAds[0] ?? null
+    const partnerPlanSlug = partnerPlan?.slug || "free"
 
     // Schema.org JSON-LD for Service
     const reviewCount = reviews?.length || 0
@@ -169,6 +173,7 @@ export default async function ServiceDetailsPage({
                 userProfile={userProfile}
                 cartCount={cartCount}
                 sponsoredAd={detailAd}
+                partnerPlanSlug={partnerPlanSlug}
             />
 
             <MarketplaceFooter />

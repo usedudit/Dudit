@@ -27,6 +27,7 @@ export type NotificationEntityType =
   | "message"
   | "announcement"
   | "product"
+  | "quote"
   | null
 
 export interface NotificationRecord {

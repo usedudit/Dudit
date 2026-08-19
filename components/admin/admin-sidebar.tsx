@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { usePathname } from "next/navigation"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
-import { Menu, XIcon, ChevronRightIcon, ChevronDownIcon, HomeIcon, ShieldIcon, ShoppingCartIcon, ReturnIcon, MoneyIcon, UserIcon, MegaphoneIcon, FlagIcon, FileIcon, BriefcaseIcon } from "@/lib/icons"
+import { Menu, XIcon, ChevronRightIcon, ChevronDownIcon, HomeIcon, ShieldIcon, ShoppingCartIcon, ReturnIcon, MoneyIcon, UserIcon, MegaphoneIcon, FlagIcon, FileIcon, BriefcaseIcon, MotorbikeIcon } from "@/lib/icons"
 import * as TooltipPrimitive from "@radix-ui/react-tooltip"
 import { useSidebarState } from "@/lib/hooks/use-sidebar-state"
 import { motion, AnimatePresence } from "framer-motion"
@@ -66,7 +66,7 @@ const navItems: NavItem[] = [
         href: "/ddt-admin/partners",
     },
     {
-        icon: BriefcaseIcon,
+        icon: MotorbikeIcon,
         label: "Entregadores",
         href: "/ddt-admin/entregadores",
     },
@@ -109,7 +109,7 @@ export function AdminSidebar({ initialExpanded = true }: AdminSidebarProps) {
     const isCollapsed = !isExpanded
 
     const isMobileOpen = sidebarContext ? sidebarContext.isMobileOpen : false
-    const setIsMobileOpen = sidebarContext ? sidebarContext.setIsMobileOpen : () => {}
+    const setIsMobileOpen = sidebarContext ? sidebarContext.setIsMobileOpen : () => { }
 
     const [isMounted, setIsMounted] = useState(false)
     const [openSubmenu, setOpenSubmenu] = useState<string | null>(null)

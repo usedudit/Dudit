@@ -846,11 +846,7 @@ export async function fetchDeliveryOrderBucketAction(partnerId: string, excludeD
     activeOrdersQuery = activeOrdersQuery.neq("deliveries.id", excludeDeliveryId)
   }
 
-  const { data: activeDeliveryOrders } = await activeOrdersQuery
-
-  const activeOrderIds = new Set((activeDeliveryOrders || []).map((row: any) => row.order_id))
-
-  const { data, error } = await supabase
+  const ordersQuery = supabase
     .from("orders")
     .select(`
       id,
@@ -872,6 +868,13 @@ export async function fetchDeliveryOrderBucketAction(partnerId: string, excludeD
     .eq("partner_id", partnerId)
     .order("created_at", { ascending: false })
     .limit(500)
+
+  const [{ data: activeDeliveryOrders }, { data, error }] = await Promise.all([
+    activeOrdersQuery,
+    ordersQuery,
+  ])
+
+  const activeOrderIds = new Set((activeDeliveryOrders || []).map((row: any) => row.order_id))
 
   if (error) {
     console.error("[fetchDeliveryOrderBucketAction]", error)
@@ -1224,6 +1227,13 @@ export async function createERPDeliveryAction(payload: CreateDeliveryPayload) {
     finalDeliveryId = created.id
   }
 
+  // A reatribuição encerra o vínculo operacional anterior sem apagar o histórico.
+  await getAdminClient()
+    .from("delivery_assignments")
+    .update({ status: "cancelled" })
+    .eq("delivery_id", finalDeliveryId)
+    .in("status", ["assigned", "accepted", "picked_up", "out_for_delivery"])
+
   // Insert ordered delivery links
   const linkRows = orderIds.map((orderId, idx) => ({
     delivery_id: finalDeliveryId,
@@ -1420,7 +1430,19 @@ export async function getERPDeliveryDetailsAction(deliveryId: string, partnerId:
   const { data, error } = await supabase
     .from("deliveries")
     .select(`
-      *,
+      id,
+      partner_id,
+      delivery_person_id,
+      status,
+      distance_km,
+      estimated_duration_minutes,
+      started_at,
+      departure_time,
+      delivered_at,
+      completed_at,
+      created_at,
+      notes,
+      delivery_number,
       delivery_orders(
         id,
         order_id,
@@ -1468,11 +1490,21 @@ export async function getERPDeliveryDetailsAction(deliveryId: string, partnerId:
 
   if (error) return { success: false as const, error: error.message }
 
-  const deliveryPersonNameById = await getPartnerUserNameByIdMap(
-    supabase,
-    partnerId,
-    data?.delivery_person_id ? [String(data.delivery_person_id)] : [],
-  )
+  const [{ data: platformAssignment }, deliveryPersonNameById] = await Promise.all([
+    getAdminClient()
+      .from("delivery_assignments")
+      .select("driver_id")
+      .eq("delivery_id", deliveryId)
+      .in("status", ["assigned", "accepted", "picked_up", "out_for_delivery"])
+      .order("assigned_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    getPartnerUserNameByIdMap(
+      supabase,
+      partnerId,
+      data?.delivery_person_id ? [String(data.delivery_person_id)] : [],
+    ),
+  ])
 
   const buyerIds = Array.from(new Set((data?.delivery_orders || [])
     .map((doItem: any) => doItem?.orders?.buyer_id)
@@ -1506,6 +1538,7 @@ export async function getERPDeliveryDetailsAction(deliveryId: string, partnerId:
 
   const hydrated = {
     ...data,
+    platform_driver_id: platformAssignment?.driver_id ? String(platformAssignment.driver_id) : null,
     delivery_orders: (data?.delivery_orders || []).map((doItem: any) => {
       const order = doItem.orders
       if (!order) return doItem
@@ -1858,6 +1891,13 @@ export async function updateERPDeliveryAction(payload: {
 
   if (updateError) return { success: false as const, error: updateError.message }
 
+  // Mantém histórico das atribuições Dudit e libera uma nova atribuição na edição.
+  await getAdminClient()
+    .from("delivery_assignments")
+    .update({ status: "cancelled" })
+    .eq("delivery_id", payload.deliveryId)
+    .in("status", ["assigned", "accepted", "picked_up", "out_for_delivery"])
+
   const { error: deleteLinksError } = await supabase.from("delivery_orders").delete().eq("delivery_id", payload.deliveryId)
   if (deleteLinksError) return { success: false as const, error: deleteLinksError.message }
 
@@ -2083,9 +2123,11 @@ export async function updateERPSingleOrderDeliveryStatusAction(params: {
   const statuses = (allLinks || []).map((l: any) => l.status)
   const allFinished = statuses.every((s: string) => ["delivered", "delivery_failed", "cancelled"].includes(s))
   const anyDelivered = statuses.some((s: string) => s === "delivered")
+  let resultingDeliveryStatus = String(currentDelivery.status || "pending")
 
   if (allFinished) {
     const finalDeliveryStatus = anyDelivered ? "delivered" : "delivery_failed"
+    resultingDeliveryStatus = finalDeliveryStatus
     const deliveryPatch: Record<string, unknown> = { status: finalDeliveryStatus }
     if (finalDeliveryStatus === "delivered") {
       deliveryPatch.departure_time = nowIso
@@ -2125,5 +2167,5 @@ export async function updateERPSingleOrderDeliveryStatusAction(params: {
   }
 
   revalidateDeliveryDashboard(params.partnerId)
-  return { success: true as const }
+  return { success: true as const, deliveryStatus: resultingDeliveryStatus }
 }

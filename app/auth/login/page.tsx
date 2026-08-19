@@ -25,12 +25,20 @@ const PartnerWizard = dynamic(
 type PageMode = "auth" | "partner"
 type AuthMode = "login" | "signup" | "verify-email" | "forgot-password"
 
-function RedirectToHome() {
+// Só aceita caminhos internos para evitar open-redirect
+function getSafeNext(rawNext: string | null): string {
+  if (rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") && !rawNext.includes("://")) {
+    return rawNext
+  }
+  return "/"
+}
+
+function RedirectToHome({ next }: { next: string }) {
   const router = useRouter()
   useLayoutEffect(() => {
-    router.replace("/")
-  }, [router])
-  return <div className="min-h-screen bg-brand-gray" />
+    router.replace(getSafeNext(next))
+  }, [router, next])
+  return <div className="min-h-screen bg-brand-gray dark:bg-dark-background" />
 }
 
 // Local translations to satisfy internationalization static analysis checks
@@ -52,6 +60,7 @@ function AuthContent() {
   const rawModeParam = searchParams.get("mode")
   const verifiedParam = searchParams.get("verified")
   const isPartnerMode = rawModeParam === "partner"
+  const nextParam = searchParams.get("next") || "/"
 
   /**
    * Logged-in + mode=partner: `null` = ainda decidir (mostrar loading);
@@ -133,7 +142,7 @@ function AuthContent() {
   }, [pageMode])
 
   if (user && !isPartnerMode && errorParam !== "account_deleting") {
-    return <RedirectToHome />
+    return <RedirectToHome next={nextParam} />
   }
 
   if (user && isPartnerMode && canShowPartnerWizardWhenLoggedIn === null) {
@@ -223,7 +232,7 @@ function AuthContent() {
 // Wrapper com Suspense para evitar erro de useSearchParams no build
 export default function AuthPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-brand-gray" />}>
+    <Suspense fallback={<div className="min-h-screen bg-brand-gray dark:bg-dark-background" />}>
       <AuthContent />
     </Suspense>
   )

@@ -2,6 +2,9 @@
 
 import { getAdminClient } from "@/lib/supabase/admin"
 import { getCurrentUser } from "@/lib/auth/server-user"
+import { requirePartnerAccess } from "@/lib/auth/authorization"
+import { getAdminRole } from "@/lib/auth/admin-authorization"
+import { resolveBillingPartnerScope } from "@/lib/billing/auth-helper"
 import { logBillingAudit } from "@/lib/billing/audit"
 import type { BillingPayment, BillingPageResult, BillingFilters } from "@/lib/billing/types"
 
@@ -13,6 +16,11 @@ export async function listPaymentsAction(
     const user = await getCurrentUser()
     if (!user) return { data: [], nextCursor: null, hasMore: false }
 
+    const scope = await resolveBillingPartnerScope(user, filters?.partner_id)
+    if (!scope.allowed) {
+        return { data: [], nextCursor: null, hasMore: false }
+    }
+
     const admin = getAdminClient()
     let query = admin
         .from("billing_payments")
@@ -20,8 +28,12 @@ export async function listPaymentsAction(
         .order("created_at", { ascending: false })
         .limit(limit + 1)
 
-    if (filters?.partner_id) {
-        query = query.eq("billing_purchases.partner_id", filters.partner_id)
+    if (scope.partnerIds) {
+        if (scope.partnerIds.length === 1) {
+            query = query.eq("billing_purchases.partner_id", scope.partnerIds[0])
+        } else {
+            query = query.in("billing_purchases.partner_id", scope.partnerIds)
+        }
     }
     if (filters?.status) {
         query = query.eq("status", filters.status)
@@ -55,6 +67,23 @@ export async function getPaymentsForPurchaseAction(purchaseId: string): Promise<
     if (!user) return []
 
     const admin = getAdminClient()
+    const { data: purchase } = await admin
+        .from("billing_purchases")
+        .select("partner_id")
+        .eq("id", purchaseId)
+        .maybeSingle()
+
+    if (!purchase) return []
+
+    const adminUser = await getAdminRole()
+    if (!adminUser) {
+        try {
+            await requirePartnerAccess(purchase.partner_id, user)
+        } catch {
+            return []
+        }
+    }
+
     const { data, error } = await admin
         .from("billing_payments")
         .select("*")
@@ -87,6 +116,11 @@ export async function createPaymentAction(
             .maybeSingle()
 
         if (!purchase) return { success: false, error: "Compra não encontrada" }
+
+        const adminUser = await getAdminRole()
+        if (!adminUser) {
+            await requirePartnerAccess(purchase.partner_id, user)
+        }
 
         const { error } = await admin
             .from("billing_payments")
@@ -129,6 +163,13 @@ export async function updatePaymentStatusAction(
 
     if (!payment) return { success: false, error: "Pagamento não encontrado" }
 
+    const partnerId = (payment as any).billing_purchases?.partner_id
+    const adminUser = await getAdminRole()
+    if (!adminUser) {
+        if (!partnerId) return { success: false, error: "Acesso negado" }
+        await requirePartnerAccess(partnerId, user)
+    }
+
     const updateData: Record<string, any> = { status }
     if (status === "approved") {
         updateData.paid_at = new Date().toISOString()
@@ -147,7 +188,6 @@ export async function updatePaymentStatusAction(
 
     if (error) return { success: false, error: error.message }
 
-    const partnerId = (payment as any).billing_purchases?.partner_id
     if (partnerId) {
         const auditAction = status === "approved" ? "billing.payment.approved"
             : status === "rejected" ? "billing.payment.rejected"
@@ -163,3 +203,4 @@ export async function updatePaymentStatusAction(
 
     return { success: true }
 }
+

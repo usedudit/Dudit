@@ -256,9 +256,9 @@ export default function AuthView({
     }
 
     return (
-        <div className="min-h-screen flex flex-col font-sans bg-brand-gray">
+        <div className="min-h-screen flex flex-col font-sans bg-brand-gray dark:bg-dark-background transition-colors duration-300">
             {/* HEADER */}
-            <header className="w-full bg-white border-b border-gray-100 sticky top-0 z-50 h-[80px] flex items-center shadow-sm">
+            <header className="w-full bg-white dark:bg-dark-surface border-b border-gray-100 dark:border-dark-border sticky top-0 z-50 h-[80px] flex items-center shadow-sm">
                 <div className="container mx-auto px-4 max-w-[1300px] flex justify-between items-center h-full">
                     <Link href="/" prefetch={false} className="shrink-0 cursor-pointer">
                         <img src="https://img.dudit.com.br/static/Logo.png" alt="Dudit" width={110} height={32} className="h-8 w-auto" />
@@ -284,16 +284,16 @@ export default function AuthView({
                             <motion.div
                                 key="verify"
                                 variants={cardVariants} initial="hidden" animate="visible" exit="exit"
-                                className="bg-white rounded-lg shadow-xl w-full max-w-[500px] p-10 flex flex-col items-center text-center space-y-6"
+                                className="bg-white dark:bg-dark-surface rounded-lg shadow-xl w-full max-w-[500px] p-10 flex flex-col items-center text-center space-y-6"
                             >
                                 <div className="mx-auto h-20 w-20 bg-brand-green/10 text-brand-green rounded-full flex items-center justify-center">
                                     <MailIcon size={40} />
                                 </div>
                                 <div>
-                                    <h2 className="text-2xl font-bold text-brand-dark mb-2">
+                                    <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading mb-2">
                                         {verifyContext === "signup" ? "Verifique seu email" : "Link enviado!"}
                                     </h2>
-                                    <p className="text-brand-inactive-text text-sm">
+                                    <p className="text-brand-inactive-text dark:text-dark-body text-sm">
                                         {verifyContext === "signup"
                                             ? <>Enviamos um link de confirmação para <strong>{email}</strong></>
                                             : <>Enviamos as instruções de recuperação para <strong>{email}</strong></>
@@ -326,7 +326,7 @@ export default function AuthView({
                                     </div>
                                 )}
 
-                                <button onClick={() => setMode("login")} className="text-sm text-brand-inactive-text hover:text-brand-green mt-4 font-medium">← Voltar para Login</button>
+                                <button onClick={() => setMode("login")} className="text-sm text-brand-inactive-text dark:text-dark-body hover:text-brand-green mt-4 font-medium">← Voltar para Login</button>
                             </motion.div>
                         )}
 
@@ -335,13 +335,13 @@ export default function AuthView({
                             <motion.div
                                 key="forgot"
                                 variants={cardVariants} initial="hidden" animate="visible" exit="exit"
-                                className="bg-white rounded-lg shadow-xl w-full max-w-[500px] p-8 md:p-10"
+                                className="bg-white dark:bg-dark-surface rounded-lg shadow-xl w-full max-w-[500px] p-8 md:p-10"
                             >
                                 <div className="mb-6">
-                                    <h2 className="text-2xl text-brand-dark mb-2 font-medium">
+                                    <h2 className="text-2xl text-brand-dark dark:text-dark-heading mb-2 font-medium">
                                         Redefinir Senha
                                     </h2>
-                                    <p className="text-brand-inactive-text text-sm">
+                                    <p className="text-brand-inactive-text dark:text-dark-body text-sm">
                                         Digite seu e-mail para receber o link de redefinição.
                                     </p>
                                 </div>
@@ -374,7 +374,7 @@ export default function AuthView({
                                 </form>
 
                                 <div className="mt-8 pt-6 border-t border-brand-border text-center">
-                                    <p className="text-sm text-brand-inactive-text">
+                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">
                                         Precisa de ajuda? <a href="mailto:contato@dudit.com.br" className="text-brand-green font-bold hover:underline">Fale com a gente</a>
                                     </p>
                                 </div>
@@ -386,11 +386,11 @@ export default function AuthView({
                             <motion.div
                                 key="main-auth"
                                 variants={cardVariants} initial="hidden" animate="visible" exit="exit"
-                                className="bg-white rounded-lg shadow-xl w-full max-w-[880px] min-h-[460px] p-6 md:p-10 flex flex-col md:flex-row relative"
+                                className="bg-white dark:bg-dark-surface rounded-lg shadow-xl w-full max-w-[880px] min-h-[460px] p-6 md:p-10 flex flex-col md:flex-row relative"
                             >
                                 {/* Social Column */}
                                 <div className="flex-1 flex flex-col md:pr-8 mb-8 md:mb-0">
-                                    <h2 className="text-2xl text-brand-dark mb-8 font-medium">
+                                    <h2 className="text-2xl text-brand-dark dark:text-dark-heading mb-8 font-medium">
                                         {mode === "login" ? "Entre com suas redes sociais" : "Crie com suas redes"}
                                     </h2>
                                     <Button type="button" variant="outline" onClick={handleGoogleAuth} className="w-full gap-3 pl-4 bg-transparent">
@@ -407,13 +407,13 @@ export default function AuthView({
                                 </div>
 
                                 {/* Divider */}
-                                <div className="relative md:w-[1px] bg-gray-200 my-6 md:my-0 flex items-center justify-center">
-                                    <span className="absolute bg-white px-2 text-brand-inactive-text text-xs uppercase">ou</span>
+                                <div className="relative md:w-[1px] bg-gray-200 dark:bg-dark-border my-6 md:my-0 flex items-center justify-center">
+                                    <span className="absolute bg-white dark:bg-dark-surface px-2 text-brand-inactive-text dark:text-dark-body text-xs uppercase">ou</span>
                                 </div>
 
                                 {/* Form Column */}
                                 <div className="flex-1 flex flex-col md:pl-8">
-                                    <h2 className="text-2xl text-brand-dark mb-8 font-medium">
+                                    <h2 className="text-2xl text-brand-dark dark:text-dark-heading mb-8 font-medium">
                                         {mode === "login" ? "Digite o seu e-mail e senha" : "Preencha seus dados"}
                                     </h2>
 
@@ -444,7 +444,7 @@ export default function AuthView({
                                         {mode === "signup" && (
                                             <div className="flex items-center gap-2 pt-1">
                                                 <Checkbox id="terms" checked={acceptedTerms} onChange={(checked) => setAcceptedTerms(checked as boolean)} />
-                                                <label htmlFor="terms" className="text-sm text-brand-inactive-text cursor-pointer">Aceito os <Link href="institucional/termos" prefetch={false} className="underline text-brand-dark">Termos de uso</Link></label>
+                                                <label htmlFor="terms" className="text-sm text-brand-inactive-text dark:text-dark-body cursor-pointer">Aceito os <Link href="institucional/termos" prefetch={false} className="underline text-brand-dark dark:text-dark-heading">Termos de uso</Link></label>
                                             </div>
                                         )}
 
@@ -461,7 +461,7 @@ export default function AuthView({
 
                     {(mode === "login" || mode === "signup") && (
                         <div className="mt-8 text-center space-y-4">
-                            <p className="text-gray-500 text-[14px]">
+                            <p className="text-gray-500 dark:text-dark-body text-[14px]">
                                 {mode === "login" ? "Não tem uma conta?" : "Já tem uma conta?"}{" "}
                                 <button onClick={() => { setError(null); setMode(mode === "login" ? "signup" : "login") }} className="text-brand-green font-bold hover:underline">
                                     {mode === "login" ? "Crie a sua" : "Entrar"}

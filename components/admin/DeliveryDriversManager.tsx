@@ -1,79 +1,559 @@
 "use client"
 
-import Link from "next/link"
-import { useMemo, useState } from "react"
-import { PlusIcon, SearchIcon, TruckIcon } from "@/lib/icons"
+import React, { useState, useTransition, useMemo, useCallback, useEffect } from "react"
+import {
+    Button,
+    Badge,
+    Input,
+    Tabs,
+    TabsList,
+    TabsTrigger,
+    Pagination,
+    IconPlaceholder,
+    AlertModal,
+} from "@/components/reusable"
+import { TabCountBadge } from "@/components/reusable/TabCountBadge"
 import { toast } from "@/hooks/use-notification"
 import {
-  listDeliveryDriversAdminAction,
-  updateDeliveryDriverAdminAction,
+    SearchIcon,
+    ExportFileIcon,
+    PlusIcon,
+    TruckIcon,
+} from "@/lib/icons"
+import {
+    listDeliveryDriversAdminAction,
+    updateDeliveryDriverAdminAction,
+    getDeliveryDriverStatsAdminAction,
 } from "@/app/actions/admin/delivery-drivers"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
-import { Button } from "@/components/reusable"
+import { FadeIn } from "@/components/animations/FadeIn"
+import { AnimatePresence } from "framer-motion"
+import { formatDate } from "@/lib/utils"
+import { useEntityState } from "@/hooks/use-entity-state"
+import { AdminDeliveryDriverInviteView } from "./delivery-drivers/AdminDeliveryDriverInviteView"
+import { AdminDeliveryDriverDetailView } from "./delivery-drivers/AdminDeliveryDriverDetailView"
 
-type DriverRow = any
+type SortKey = "name" | "city" | "vehicle" | "status" | "date"
+type SortDirection = "asc" | "desc"
 
-export default function DeliveryDriversManager({ initialData }: { initialData: { items: DriverRow[]; hasMore: boolean; nextCursor: string | null } }) {
-  const [items, setItems] = useState<DriverRow[]>(initialData.items || [])
-  const [cursor, setCursor] = useState(initialData.nextCursor)
-  const [loading, setLoading] = useState(false)
-  const [search, setSearch] = useState("")
-  const [status, setStatus] = useState("all")
+interface DeliveryDriversManagerProps {
+    initialData: {
+        items: any[]
+        hasMore: boolean
+        nextCursor: string | null
+    }
+    initialStats?: {
+        total: number
+        active: number
+        inactive: number
+        available: number
+        offline: number
+    }
+}
 
-  const filteredItems = useMemo(() => items.filter((driver) => {
-    const haystack = `${driver.profile?.full_name || ""} ${driver.email || ""} ${driver.city || ""} ${driver.neighborhood || ""}`.toLowerCase()
-    return (!search.trim() || haystack.includes(search.trim().toLowerCase())) && (status === "all" || (status === "active" ? driver.is_active : !driver.is_active))
-  }), [items, search, status])
+const ITEMS_PER_PAGE = 8
 
-  const stats = useMemo(() => ({
-    total: items.length,
-    active: items.filter((item) => item.is_active).length,
-    available: items.filter((item) => item.is_active && item.availability_status === "available").length,
-    offline: items.filter((item) => !item.is_active || item.availability_status === "offline").length,
-  }), [items])
+export default function DeliveryDriversManager({ initialData, initialStats }: DeliveryDriversManagerProps) {
+    const { state: entityState, open: openEntity, close: closeEntity } = useEntityState()
 
-  const loadMore = async () => {
-    if (!cursor || loading) return
-    setLoading(true)
-    const result = await listDeliveryDriversAdminAction({ limit: 25, cursor })
-    setLoading(false)
-    if (!result.success) return toast.error(result.error)
-    setItems((current) => [...current, ...result.items])
-    setCursor(result.nextCursor)
-  }
+    const [drivers, setDrivers] = useState<any[]>(initialData?.items || [])
+    const [stats, setStats] = useState(initialStats)
+    const [statusTab, setStatusTab] = useState("all")
+    const [search, setSearch] = useState("")
+    const [page, setPage] = useState(1)
+    const [isPending, startTransition] = useTransition()
 
-  const toggle = async (driver: DriverRow) => {
-    setLoading(true)
-    const result = await updateDeliveryDriverAdminAction({ driverId: driver.user_id, city: driver.city, neighborhood: driver.neighborhood, vehicleType: driver.vehicle_type, isActive: !driver.is_active, notes: driver.notes || "" })
-    setLoading(false)
-    if (!result.success) return toast.error(result.error)
-    setItems((current) => current.map((item) => item.user_id === driver.user_id ? { ...item, is_active: !driver.is_active, availability_status: driver.is_active ? "offline" : item.availability_status } : item))
-    toast.success(driver.is_active ? "Entregador desativado." : "Entregador ativado.")
-  }
+    // Sorting
+    const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>({
+        key: "date",
+        direction: "desc",
+    })
 
-  return (
-    <main className="max-w-[1300px] space-y-6 p-4 md:p-6">
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-        <div><p className="text-sm text-brand-inactive-text">Administração Dudit</p><h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Entregadores</h1><p className="mt-1 text-sm text-brand-inactive-text">Gerencie os entregadores da plataforma e seus acessos.</p></div>
-        <Link href="/ddt-admin/entregadores/novo" className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-green px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-green/90"><PlusIcon size={18} />Novo entregador</Link>
-      </div>
+    // Toggle Modal
+    const [toggleTarget, setToggleTarget] = useState<any | null>(null)
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {[["Total", stats.total], ["Ativos", stats.active], ["Disponíveis", stats.available], ["Offline", stats.offline]].map(([label, value]) => <div key={String(label)} className="rounded-2xl border border-brand-border bg-white p-5 dark:border-dark-border dark:bg-dark-surface"><p className="text-2xl font-bold">{value}</p><p className="mt-1 text-xs font-semibold uppercase tracking-wide text-brand-inactive-text">{label}</p></div>)}
-      </div>
+    const handleSort = (key: SortKey) => {
+        setSortConfig((prev) => {
+            if (prev?.key === key) {
+                return { key, direction: prev.direction === "asc" ? "desc" : "asc" }
+            }
+            return { key, direction: "desc" }
+        })
+    }
 
-      <div className="flex flex-col gap-3 rounded-2xl border border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface md:flex-row">
-        <label className="relative flex-1"><SearchIcon size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-inactive-text" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por nome, email ou localização" className="w-full rounded-xl border border-brand-border bg-brand-gray py-2.5 pl-10 pr-3 text-sm outline-none focus:border-brand-green dark:border-dark-border dark:bg-dark-border/40" /></label>
-        <select value={status} onChange={(event) => setStatus(event.target.value)} className="rounded-xl border border-brand-border bg-brand-gray px-3 py-2.5 text-sm dark:border-dark-border dark:bg-dark-border/40"><option value="all">Todos os status</option><option value="active">Ativos</option><option value="inactive">Inativos</option></select>
-      </div>
+    const refreshDrivers = useCallback(() => {
+        startTransition(async () => {
+            try {
+                const [res, statsRes] = await Promise.all([
+                    listDeliveryDriversAdminAction({ limit: 50 }),
+                    getDeliveryDriverStatsAdminAction(),
+                ])
+                if (res.success) {
+                    setDrivers(res.items || [])
+                }
+                setStats(statsRes)
+            } catch (err) {
+                console.error("Failed to refresh delivery drivers:", err)
+            }
+        })
+    }, [])
 
-      {filteredItems.length === 0 ? <div className="rounded-2xl border border-dashed border-brand-border bg-white p-12 text-center dark:border-dark-border dark:bg-dark-surface"><TruckIcon size={38} className="mx-auto text-brand-inactive-text" /><p className="mt-3 font-semibold">Nenhum entregador encontrado</p><p className="mt-1 text-sm text-brand-inactive-text">Cadastre o primeiro entregador da plataforma.</p></div> : <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">{filteredItems.map((driver) => <article key={driver.user_id} className="flex flex-col rounded-2xl border border-brand-border bg-white p-5 transition hover:border-brand-dark/30 dark:border-dark-border dark:bg-dark-surface">
-        <div className="flex items-start justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><UserProfileImage fullName={driver.profile?.full_name || "Entregador"} imageUrl={driver.profile?.avatar_url} className="h-14 w-14 text-xl" /><div className="min-w-0"><h2 className="truncate font-bold">{driver.profile?.full_name || "Entregador"}</h2><p className="truncate text-xs text-brand-inactive-text">{driver.email || "Email não disponível"}</p></div></div><span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${driver.is_active ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>{driver.is_active ? "Ativo" : "Inativo"}</span></div>
-        <div className="mt-5 grid grid-cols-2 gap-3 text-sm"><div><p className="text-xs text-brand-inactive-text">Localização</p><p className="mt-1 font-semibold">{driver.city} · {driver.neighborhood}</p></div><div><p className="text-xs text-brand-inactive-text">Veículo</p><p className="mt-1 font-semibold capitalize">{driver.vehicle_type}</p></div></div>
-        <div className="mt-5 flex items-center justify-between border-t border-brand-border pt-4 dark:border-dark-border"><span className="text-xs font-medium text-brand-inactive-text">{driver.availability_status === "available" ? "Disponível" : "Offline"}</span><div className="flex items-center gap-3"><button type="button" onClick={() => toggle(driver)} disabled={loading} className="text-xs font-semibold text-brand-inactive-text hover:text-brand-dark">{driver.is_active ? "Desativar" : "Ativar"}</button><Link href={`/ddt-admin/entregadores/${driver.user_id}`} className="text-sm font-semibold text-brand-green">Ver detalhes</Link></div></div>
-      </article>)}</div>}
-      {cursor ? <div className="flex justify-center"><Button variant="outline" onClick={loadMore} disabled={loading}>{loading ? "Carregando..." : "Carregar mais"}</Button></div> : null}
+    useEffect(() => {
+        if (!initialStats) {
+            getDeliveryDriverStatsAdminAction().then(setStats).catch(() => {})
+        }
+    }, [initialStats])
 
-    </main>
-  )
+    const handleConfirmToggle = () => {
+        if (!toggleTarget) return
+        startTransition(async () => {
+            try {
+                const res = await updateDeliveryDriverAdminAction({
+                    driverId: toggleTarget.user_id,
+                    city: toggleTarget.city,
+                    neighborhood: toggleTarget.neighborhood,
+                    vehicleType: toggleTarget.vehicle_type,
+                    isActive: !toggleTarget.is_active,
+                    notes: toggleTarget.notes || undefined,
+                })
+                if (res.success) {
+                    toast.success(toggleTarget.is_active ? "Entregador desativado." : "Entregador ativado.")
+                    setToggleTarget(null)
+                    refreshDrivers()
+                } else {
+                    toast.error(res.error || "Erro ao atualizar status.")
+                }
+            } catch (err: any) {
+                toast.error(err.message || "Erro inesperado.")
+            }
+        })
+    }
+
+    // In-memory instant filter (0ms)
+    const filteredDrivers = useMemo(() => {
+        const q = search.trim().toLowerCase()
+
+        let result = drivers.filter((d) => {
+            // Status Tab
+            if (statusTab === "active" && !d.is_active) return false
+            if (statusTab === "inactive" && d.is_active) return false
+            if (statusTab === "available" && (!d.is_active || d.availability_status !== "available")) return false
+            if (statusTab === "offline" && (d.is_active && d.availability_status === "available")) return false
+
+            // Search
+            if (q) {
+                const name = String(d.profile?.full_name || "").toLowerCase()
+                const email = String(d.email || "").toLowerCase()
+                const phone = String(d.profile?.phone || "").toLowerCase()
+                const city = String(d.city || "").toLowerCase()
+                const neighborhood = String(d.neighborhood || "").toLowerCase()
+
+                if (!name.includes(q) && !email.includes(q) && !phone.includes(q) && !city.includes(q) && !neighborhood.includes(q)) {
+                    return false
+                }
+            }
+
+            return true
+        })
+
+        // Sorting
+        if (sortConfig) {
+            result = [...result].sort((a, b) => {
+                let aVal: any = ""
+                let bVal: any = ""
+                switch (sortConfig.key) {
+                    case "name":
+                        aVal = (a.profile?.full_name || "").toLowerCase()
+                        bVal = (b.profile?.full_name || "").toLowerCase()
+                        break
+                    case "city":
+                        aVal = (a.city || "").toLowerCase()
+                        bVal = (b.city || "").toLowerCase()
+                        break
+                    case "vehicle":
+                        aVal = (a.vehicle_type || "").toLowerCase()
+                        bVal = (b.vehicle_type || "").toLowerCase()
+                        break
+                    case "status":
+                        aVal = a.is_active ? 1 : 0
+                        bVal = b.is_active ? 1 : 0
+                        break
+                    case "date":
+                        aVal = new Date(a.created_at || 0).getTime()
+                        bVal = new Date(b.created_at || 0).getTime()
+                        break
+                }
+                if (aVal === bVal) return 0
+                const cmp = aVal < bVal ? -1 : 1
+                return sortConfig.direction === "asc" ? cmp : -cmp
+            })
+        }
+
+        return result
+    }, [drivers, statusTab, search, sortConfig])
+
+    // Pagination (Strict 8 items)
+    const totalPages = Math.max(1, Math.ceil(filteredDrivers.length / ITEMS_PER_PAGE))
+    const paginatedItems = useMemo(() => {
+        const start = (page - 1) * ITEMS_PER_PAGE
+        return filteredDrivers.slice(start, start + ITEMS_PER_PAGE)
+    }, [filteredDrivers, page])
+
+    // Reset page on filter/search change
+    useMemo(() => {
+        setPage(1)
+    }, [statusTab, search])
+
+    // Sub-view: Create / Invite (URL: ?create=true)
+    if (entityState.isOpen && entityState.action === "create") {
+        return (
+            <AdminDeliveryDriverInviteView
+                onBack={closeEntity}
+                onSuccess={() => {
+                    closeEntity()
+                    refreshDrivers()
+                }}
+            />
+        )
+    }
+
+    // Sub-view: Detail (URL: ?view=[driverId])
+    if (entityState.isOpen && entityState.action === "view" && entityState.entityId) {
+        return (
+            <AdminDeliveryDriverDetailView
+                driverId={entityState.entityId}
+                onBack={closeEntity}
+                onDriverUpdated={refreshDrivers}
+            />
+        )
+    }
+
+    return (
+        <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
+            <style>{`
+                .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; } 
+                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
+                .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; border: 2px solid #fff; }
+                .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border: 2px solid #1f2937; }
+                .dark .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+                .hide-scrollbar::-webkit-scrollbar { display: none; }
+                .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+            `}</style>
+
+            <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
+                {/* Desktop Header */}
+                <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
+                    <div className="flex flex-col gap-2 pt-1">
+                        <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
+                            Entregadores
+                        </h1>
+                        <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
+                            Gerencie os entregadores credenciados da plataforma, convites e áreas de atuação.
+                        </p>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        <Button
+                            variant="outline"
+                            onClick={() => toast.success("Exportação iniciada em segundo plano")}
+                            leftIcon={<ExportFileIcon size={18} />}
+                        >
+                            Exportar
+                        </Button>
+                        <Button
+                            variant="filled"
+                            onClick={() => openEntity("create")}
+                            leftIcon={<PlusIcon size={18} />}
+                        >
+                            Novo Entregador
+                        </Button>
+                    </div>
+                </div>
+
+                {/* Tabs */}
+                <div className="mb-6 px-4 md:px-8">
+                    <Tabs value={statusTab} onValueChange={setStatusTab}>
+                        <TabsList className="px-0">
+                            <TabsTrigger
+                                value="all"
+                                badge={stats && <TabCountBadge count={stats.total} variant="gray" />}
+                            >
+                                Todos
+                            </TabsTrigger>
+                            <TabsTrigger
+                                value="active"
+                                badge={stats && <TabCountBadge count={stats.active} variant="green" />}
+                            >
+                                Ativos
+                            </TabsTrigger>
+                            <TabsTrigger
+                                value="inactive"
+                                badge={stats && <TabCountBadge count={stats.inactive} variant="red" />}
+                            >
+                                Inativos
+                            </TabsTrigger>
+                            <TabsTrigger
+                                value="available"
+                                badge={stats && <TabCountBadge count={stats.available} variant="blue" />}
+                            >
+                                Disponíveis
+                            </TabsTrigger>
+                            <TabsTrigger
+                                value="offline"
+                                badge={stats && <TabCountBadge count={stats.offline} variant="gray" />}
+                            >
+                                Offline
+                            </TabsTrigger>
+                        </TabsList>
+                    </Tabs>
+                </div>
+
+                {/* Search & Actions Bar */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-6 px-4 md:px-8">
+                    <div className="w-full sm:w-80">
+                        <Input
+                            placeholder="Buscar por nome, email, telefone..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            prefix={<SearchIcon size={16} className="text-brand-inactive-text" />}
+                        />
+                    </div>
+                    <div className="sm:hidden">
+                        <Button
+                            variant="filled"
+                            onClick={() => openEntity("create")}
+                            leftIcon={<PlusIcon size={18} />}
+                            className="w-full"
+                        >
+                            Novo Entregador
+                        </Button>
+                    </div>
+                </div>
+
+                {/* List Content */}
+                <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-24 md:pb-6 relative">
+                    <AnimatePresence mode="wait">
+                        {paginatedItems.length === 0 ? (
+                            <FadeIn key="empty" className="w-full h-full flex items-center justify-center min-h-[400px]">
+                                <IconPlaceholder
+                                    placeholderType="image"
+                                    imageSrc="https://img.dudit.com.br/static/mascots/SemPedidos.png"
+                                    imageAlt="Nenhum entregador"
+                                    title="Nenhum entregador encontrado"
+                                    subtitle={search || statusTab !== "all" ? "Tente ajustar seus filtros de busca." : "Nenhum entregador credenciado nesta categoria."}
+                                    itemButton={search || statusTab !== "all" ? {
+                                        text: "Limpar Filtros",
+                                        action: () => {
+                                            setSearch("")
+                                            setStatusTab("all")
+                                        },
+                                        variant: "outline",
+                                    } : {
+                                        text: "Convidar Primeiro Entregador",
+                                        action: () => openEntity("create"),
+                                        variant: "filled",
+                                    }}
+                                />
+                            </FadeIn>
+                        ) : (
+                            <FadeIn key="list" className="w-full space-y-4">
+                                {/* Desktop View: Table */}
+                                <div className="hidden md:block w-full overflow-hidden rounded-xl relative">
+                                    <div className="overflow-x-auto pb-4 custom-scrollbar">
+                                        <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
+                                            <thead>
+                                                <tr className="bg-brand-gray dark:bg-dark-border/50 select-none">
+                                                    <th
+                                                        onClick={() => handleSort("name")}
+                                                        className="py-3 px-2 pl-6 rounded-l-lg text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                    >
+                                                        Entregador / Nome {sortConfig?.key === "name" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+                                                    </th>
+                                                    <th
+                                                        onClick={() => handleSort("city")}
+                                                        className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                    >
+                                                        Localização {sortConfig?.key === "city" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+                                                    </th>
+                                                    <th
+                                                        onClick={() => handleSort("vehicle")}
+                                                        className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                    >
+                                                        Veículo {sortConfig?.key === "vehicle" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+                                                    </th>
+                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">
+                                                        Disponibilidade
+                                                    </th>
+                                                    <th
+                                                        onClick={() => handleSort("status")}
+                                                        className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors text-center"
+                                                    >
+                                                        Status {sortConfig?.key === "status" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+                                                    </th>
+                                                    <th
+                                                        onClick={() => handleSort("date")}
+                                                        className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                    >
+                                                        Cadastro {sortConfig?.key === "date" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+                                                    </th>
+                                                    <th className="py-3 px-2 pr-6 rounded-r-lg text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">
+                                                        Ações
+                                                    </th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {paginatedItems.map((driver) => (
+                                                    <tr
+                                                        key={driver.user_id}
+                                                        className="border-b border-brand-border dark:border-dark-border hover:bg-brand-gray/40 dark:hover:bg-dark-border/20 transition-colors"
+                                                    >
+                                                        <td className="py-4 px-2 pl-6">
+                                                            <div
+                                                                className="flex items-center gap-3 cursor-pointer group"
+                                                                onClick={() => openEntity("view", driver.user_id)}
+                                                            >
+                                                                <UserProfileImage
+                                                                    fullName={driver.profile?.full_name || "Entregador"}
+                                                                    imageUrl={driver.profile?.avatar_url}
+                                                                    className="w-10 h-10 text-base shrink-0"
+                                                                />
+                                                                <div className="flex flex-col min-w-0">
+                                                                    <span className="font-bold text-sm text-brand-dark dark:text-dark-heading group-hover:text-brand-green transition-colors truncate">
+                                                                        {driver.profile?.full_name || "Entregador"}
+                                                                    </span>
+                                                                    <span className="text-xs text-brand-inactive-text truncate">
+                                                                        {driver.email || driver.profile?.phone || "Sem e-mail"}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+
+                                                        <td className="py-4 px-2">
+                                                            <div className="flex flex-col text-sm">
+                                                                <span className="font-semibold text-brand-dark dark:text-dark-heading">
+                                                                    {driver.city}
+                                                                </span>
+                                                                <span className="text-xs text-brand-inactive-text">
+                                                                    {driver.neighborhood}
+                                                                </span>
+                                                            </div>
+                                                        </td>
+
+                                                        <td className="py-4 px-2">
+                                                            <span className="text-sm font-medium text-brand-dark dark:text-dark-heading capitalize">
+                                                                {driver.vehicle_type === "moto" ? "Motocicleta" : "Automóvel"}
+                                                            </span>
+                                                        </td>
+
+                                                        <td className="py-4 px-2 text-center">
+                                                            <Badge variant={driver.availability_status === "available" ? "blue" : "gray"}>
+                                                                {driver.availability_status === "available" ? "Disponível" : "Offline"}
+                                                            </Badge>
+                                                        </td>
+
+                                                        <td className="py-4 px-2 text-center">
+                                                            <Badge variant={driver.is_active ? "green" : "red"}>
+                                                                {driver.is_active ? "Ativo" : "Inativo"}
+                                                            </Badge>
+                                                        </td>
+
+                                                        <td className="py-4 px-2 text-xs text-brand-inactive-text">
+                                                            {formatDate(driver.created_at)}
+                                                        </td>
+
+                                                        <td className="py-4 px-2 pr-6 text-center">
+                                                            <div className="flex items-center justify-center gap-2">
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={() => openEntity("view", driver.user_id)}
+                                                                >
+                                                                    Detalhes
+                                                                </Button>
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={() => setToggleTarget(driver)}
+                                                                    className={driver.is_active ? "text-red-600 border-red-200 hover:bg-red-50" : "text-brand-green border-brand-green/30 hover:bg-brand-green/10"}
+                                                                >
+                                                                    {driver.is_active ? "Desativar" : "Ativar"}
+                                                                </Button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                {/* Mobile View: Cards */}
+                                <div className="md:hidden flex flex-col w-full divide-y divide-brand-border dark:divide-dark-border">
+                                    {paginatedItems.map((driver) => (
+                                        <div
+                                            key={driver.user_id}
+                                            className="py-4 flex flex-col gap-2.5 cursor-pointer active:bg-brand-gray/50 dark:active:bg-dark-border/20 transition-colors"
+                                            onClick={() => openEntity("view", driver.user_id)}
+                                        >
+                                            <div className="flex justify-between items-start gap-2">
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                    <UserProfileImage
+                                                        fullName={driver.profile?.full_name || "Entregador"}
+                                                        imageUrl={driver.profile?.avatar_url}
+                                                        className="w-10 h-10 text-base shrink-0"
+                                                    />
+                                                    <div className="flex flex-col min-w-0">
+                                                        <span className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">
+                                                            {driver.profile?.full_name || "Entregador"}
+                                                        </span>
+                                                        <span className="text-xs text-brand-inactive-text truncate">
+                                                            {driver.city} • {driver.vehicle_type}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <Badge variant={driver.is_active ? "green" : "red"}>
+                                                    {driver.is_active ? "Ativo" : "Inativo"}
+                                                </Badge>
+                                            </div>
+
+                                            <div className="flex items-center justify-between text-xs text-brand-inactive-text pt-1">
+                                                <span>{formatDate(driver.created_at)}</span>
+                                                <span className="font-semibold text-brand-green">Ver detalhes →</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Pagination */}
+                                {totalPages > 1 && (
+                                    <div className="pt-4">
+                                        <Pagination
+                                            currentPage={page}
+                                            totalPages={totalPages}
+                                            onPageChange={setPage}
+                                        />
+                                    </div>
+                                )}
+                            </FadeIn>
+                        )}
+                    </AnimatePresence>
+                </div>
+            </div>
+
+            {/* Modal: Ativar/Desativar */}
+            <AlertModal
+                isOpen={!!toggleTarget}
+                onClose={() => setToggleTarget(null)}
+                onConfirm={handleConfirmToggle}
+                title={toggleTarget?.is_active ? "Desativar Entregador" : "Ativar Entregador"}
+                description={
+                    toggleTarget?.is_active
+                        ? `Tem certeza que deseja desativar o cadastro de ${toggleTarget?.profile?.full_name || toggleTarget?.email}? O entregador não receberá novas corridas.`
+                        : `Deseja reativar o acesso de ${toggleTarget?.profile?.full_name || toggleTarget?.email}?`
+                }
+                confirmText={toggleTarget?.is_active ? "Desativar" : "Ativar"}
+                variant={toggleTarget?.is_active ? "danger" : "success"}
+            />
+        </FadeIn>
+    )
 }

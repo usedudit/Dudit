@@ -6,13 +6,13 @@ export const dynamic = "force-dynamic"
 
 export default async function AuditLogsPage() {
     const [initialData, initialStats] = await Promise.all([
-        getAuditLogs(null, 50),
+        getAuditLogs(null, 100),
         getAuditLogStats(),
     ])
 
     return (
         <>
-            <AdminHeader pageTitle="Audit Logs" />
+            <AdminHeader pageTitle="Logs de Auditoria" />
             <AuditLogList initialData={initialData} initialStats={initialStats} />
         </>
     )

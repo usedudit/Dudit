@@ -462,7 +462,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
           )}
 
           {activePage === "team" && <TeamSubPage key="team" partnerId={partner.id} onBack={() => setActivePage("home")} teamPlanBlocked={teamPlanBlocked} />}
-          {activePage === "subscription" && canAccessSubscription && <SubscriptionSubPage key="subscription" onBack={() => setActivePage("home")} />}
+          {activePage === "subscription" && canAccessSubscription && <SubscriptionSubPage key="subscription" partnerId={partner.id} onBack={() => setActivePage("home")} />}
           {activePage === "crediario" && <SimpleSettingsSubPage key="crediario" title="Crediário" onBack={() => setActivePage("home")} />}
           {activePage === "comissao" && canAccessCommissions && <CommissionsSubPage key="comissao" partnerId={partner.id} onBack={() => setActivePage("home")} planGate={commissionsPlanBlocked ? { requiredPlanSlug: "crescer" as const } : undefined} />}
           {activePage === "trocas" && <ReturnPolicySubPage key="trocas" partnerId={partner.id} onBack={() => setActivePage("home")} />}

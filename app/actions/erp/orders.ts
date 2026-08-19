@@ -2315,7 +2315,27 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
             return sellerProfile?.full_name || null
         }
 
-        const [customers, sellerName] = await Promise.all([resolveCustomer(), resolveSellerName()])
+        const resolvePlatformDriverId = async () => {
+            const { data: link } = await supabase
+                .from("delivery_orders")
+                .select("delivery_id")
+                .eq("order_id", data.id)
+                .limit(1)
+                .maybeSingle()
+            if (!link?.delivery_id) return null
+            const { data: assignment } = await supabase
+                .from("delivery_assignments")
+                .select("driver_id")
+                .eq("delivery_id", link.delivery_id)
+                .eq("order_id", data.id)
+                .in("status", ["assigned", "accepted", "picked_up", "out_for_delivery"])
+                .order("assigned_at", { ascending: false })
+                .limit(1)
+                .maybeSingle()
+            return assignment?.driver_id ? String(assignment.driver_id) : null
+        }
+
+        const [customers, sellerName, platformDriverId] = await Promise.all([resolveCustomer(), resolveSellerName(), resolvePlatformDriverId()])
 
         const subtotalValue = Number((data.order_items || []).reduce((acc: number, item: any) => {
             return acc + Number(item?.subtotal ?? (Number(item?.quantity || 0) * Number(item?.product_price || 0)))
@@ -2363,6 +2383,7 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
                 payment_method_extra_amount: paymentMethodExtraAmount,
                 is_refunded: isRefunded,
                 refunded_amount: refundedAmount,
+                platform_driver_id: platformDriverId,
             },
         }
     }

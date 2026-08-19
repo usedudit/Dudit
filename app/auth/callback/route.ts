@@ -8,10 +8,19 @@ import { ensureLegalConsents } from "@/app/actions/auth/legal-consent"
  * This route is called by Supabase after a user clicks on an email confirmation
  * link or completes an OAuth login. It exchanges the "code" parameter for a session.
  */
+
+// Só aceita caminhos internos para evitar open-redirect
+function getSafeNext(rawNext: string | null): string {
+  if (rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") && !rawNext.includes("://")) {
+    return rawNext
+  }
+  return "/"
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url) // Tirei o 'origin' daqui
   const code = searchParams.get("code")
-  const next = searchParams.get("next") ?? "/"
+  const next = getSafeNext(searchParams.get("next"))
 
   // Use sua variável de ambiente ou o domínio fixo
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br"

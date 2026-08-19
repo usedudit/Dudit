@@ -63,7 +63,7 @@ export interface QuoteEditCaps {
     bannerMessage: string | null
 }
 
-export function getQuoteEditCaps(status: string, converted: boolean): QuoteEditCaps {
+export function getQuoteEditCaps(status: string, converted: boolean, isMarketplaceOrigin: boolean = false): QuoteEditCaps {
     const s = normalizeQuoteStatus(status)
 
     if (converted || s === "converted_to_order") {
@@ -86,7 +86,7 @@ export function getQuoteEditCaps(status: string, converted: boolean): QuoteEditC
     if (s === "draft") {
         return {
             canEditItems: true,
-            canEditCustomer: true,
+            canEditCustomer: !isMarketplaceOrigin,
             canEditIssueDate: true,
             canEditDiscountShipping: true,
             canEditProposalNotes: true,

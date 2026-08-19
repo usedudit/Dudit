@@ -1,25 +1,309 @@
 "use client"
 
+import React, { useState, useMemo } from "react"
 import Link from "next/link"
-import { useState } from "react"
+import { FadeIn } from "@/components/animations/FadeIn"
+import { Button, Badge, IconPlaceholder } from "@/components/reusable"
 import { toast } from "@/hooks/use-notification"
 import { setMyDeliveryAvailabilityAction } from "@/app/actions/delivery-drivers"
+import {
+    TruckIcon,
+    CheckCircleIcon,
+    ClockIcon,
+    ArrowRightIcon,
+    Package,
+    ReloadIcon,
+} from "@/lib/icons"
+import { formatCurrency, formatDate } from "@/lib/utils"
+import DeliveryAssignmentListRow, {
+    type DeliveryAssignmentItem,
+    statusConfig,
+} from "./DeliveryAssignmentListRow"
 
-const statusLabels: Record<string, string> = { assigned: "Atribuída", accepted: "Aceita", picked_up: "Retirada", out_for_delivery: "Saiu para entrega", delivered: "Entregue", failed: "Falhou" }
+interface DeliveryDashboardProps {
+    dashboard: {
+        pending?: number
+        in_progress?: number
+        completed?: number
+        availability?: "available" | "offline" | "occupied" | string
+    } | null
+    deliveries: DeliveryAssignmentItem[]
+}
 
-export default function DeliveryDashboard({ dashboard, deliveries }: { dashboard: any; deliveries: any[] }) {
-  const [availability, setAvailability] = useState(String(dashboard?.availability || "offline"))
-  const [saving, setSaving] = useState(false)
-  const changeAvailability = async (value: "available" | "offline") => {
-    setSaving(true)
-    const result = await setMyDeliveryAvailabilityAction(value)
-    setSaving(false)
-    if (!result.success) return toast.error(result.error)
-    setAvailability(value)
-  }
-  return <main className="mx-auto max-w-5xl space-y-6 px-4 py-8 md:px-6">
-    <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end"><div><p className="text-sm text-brand-inactive-text">Operação</p><h1 className="text-3xl font-bold">Olá, entregador</h1></div><div className="flex items-center gap-2 rounded-xl border border-brand-border bg-white p-2 dark:border-dark-border dark:bg-dark-surface"><span className="px-2 text-sm font-medium">Disponibilidade</span><select value={availability === "occupied" ? "available" : availability} onChange={(event) => changeAvailability(event.target.value as "available" | "offline")} disabled={saving || availability === "occupied"} className="rounded-lg border border-brand-border bg-transparent px-2 py-1.5 text-sm"><option value="available">Disponível</option><option value="offline">Offline</option></select></div></div>
-    <div className="grid gap-4 md:grid-cols-4">{[["Pendentes", dashboard?.pending || 0], ["Em andamento", dashboard?.in_progress || 0], ["Concluídas", dashboard?.completed || 0], ["Status", availability === "occupied" ? "Ocupado" : availability === "available" ? "Disponível" : "Offline"]].map(([label, value]) => <div key={String(label)} className="rounded-2xl border border-brand-border bg-white p-5 dark:border-dark-border dark:bg-dark-surface"><p className="text-sm text-brand-inactive-text">{label}</p><p className="mt-2 text-2xl font-bold">{value}</p></div>)}</div>
-    <section className="rounded-2xl border border-brand-border bg-white dark:border-dark-border dark:bg-dark-surface"><div className="flex items-center justify-between border-b border-brand-border px-5 py-4 dark:border-dark-border"><h2 className="font-bold">Últimas entregas</h2><Link href="/entregadores/entregas" className="text-sm font-semibold text-brand-green">Ver todas</Link></div><div className="divide-y divide-brand-border dark:divide-dark-border">{deliveries.length === 0 ? <p className="p-5 text-sm text-brand-inactive-text">Nenhuma entrega atribuída.</p> : deliveries.map((delivery) => <Link href={`/entregadores/entregas/${delivery.assignment_id}`} key={delivery.assignment_id} className="flex items-center justify-between gap-4 px-5 py-4 hover:bg-brand-gray dark:hover:bg-dark-border/40"><div><p className="font-semibold">Pedido {delivery.order_number || `#${String(delivery.order_id).slice(0, 8)}`}</p><p className="text-sm text-brand-inactive-text">{delivery.partner_name} · {delivery.customer_name}</p></div><span className="text-sm">{statusLabels[delivery.status] || delivery.status}</span></Link>)}</div></section>
-  </main>
+export default function DeliveryDashboard({ dashboard, deliveries = [] }: DeliveryDashboardProps) {
+    const [availability, setAvailability] = useState<string>(
+        String(dashboard?.availability || "offline")
+    )
+    const [saving, setSaving] = useState(false)
+    const [recentTab, setRecentTab] = useState<"all" | "pending" | "in_progress" | "completed">("all")
+
+    const changeAvailability = async (value: "available" | "offline") => {
+        setSaving(true)
+        const result = await setMyDeliveryAvailabilityAction(value)
+        setSaving(false)
+        if (!result.success) {
+            toast.error(result.error || "Não foi possível atualizar a disponibilidade.")
+            return
+        }
+        setAvailability(value)
+        toast.success(value === "available" ? "Você está online para receber entregas!" : "Você está offline.")
+    }
+
+    const filteredDeliveries = useMemo(() => {
+        return deliveries.filter((item) => {
+            if (recentTab === "pending") return ["assigned", "accepted"].includes(item.status)
+            if (recentTab === "in_progress") return ["picked_up", "out_for_delivery"].includes(item.status)
+            if (recentTab === "completed") return item.status === "delivered"
+            return true
+        })
+    }, [deliveries, recentTab])
+
+    const isAvailable = availability === "available"
+    const isOccupied = availability === "occupied"
+
+    return (
+        <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
+            <div className="mx-auto w-full pt-4 px-4 md:px-8 pb-12 flex flex-col gap-6">
+                {/* DESKTOP HEADER */}
+                <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+                    <div className="flex flex-col gap-1">
+                        <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
+                            Portal do Entregador
+                        </h1>
+                        <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
+                            Acompanhe seus indicadores, disponibilidade e entregas em tempo real.
+                        </p>
+                    </div>
+
+                    {/* AVAILABILITY STATUS CONTROLLER */}
+                    <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 rounded-2xl border border-brand-border bg-white p-1.5 shadow-xs dark:border-dark-border dark:bg-dark-surface">
+                            <div className="flex items-center gap-2 pl-2.5 pr-1">
+                                <span
+                                    className={`h-2.5 w-2.5 rounded-full ${
+                                        isOccupied
+                                            ? "bg-amber-500 animate-pulse"
+                                            : isAvailable
+                                            ? "bg-emerald-500 animate-pulse"
+                                            : "bg-gray-400"
+                                    }`}
+                                />
+                                <span className="text-xs font-bold text-brand-dark dark:text-dark-heading">
+                                    {isOccupied ? "Ocupado" : isAvailable ? "Disponível" : "Offline"}
+                                </span>
+                            </div>
+
+                            <select
+                                value={isOccupied ? "available" : availability}
+                                onChange={(e) => changeAvailability(e.target.value as "available" | "offline")}
+                                disabled={saving || isOccupied}
+                                className="rounded-xl border border-brand-border bg-brand-gray px-3 py-1.5 text-xs font-semibold text-brand-dark outline-none transition dark:border-dark-border dark:bg-dark-border dark:text-dark-heading cursor-pointer disabled:opacity-50"
+                            >
+                                <option value="available">Ficar Disponível</option>
+                                <option value="offline">Ficar Offline</option>
+                            </select>
+                        </div>
+
+                        <Button
+                            variant="outline"
+                            onClick={() => window.location.reload()}
+                            className="hidden sm:inline-flex"
+                            leftIcon={<ReloadIcon size={15} />}
+                        >
+                            Atualizar
+                        </Button>
+                    </div>
+                </div>
+
+                {/* KPI METRIC CARDS */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {/* CARD 1: PENDENTES */}
+                    <div className="flex flex-col justify-between rounded-2xl border border-brand-border bg-white p-5 shadow-xs transition hover:shadow-md dark:border-dark-border dark:bg-dark-surface">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text">
+                                Pendentes
+                            </span>
+                            <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                                <ClockIcon size={18} />
+                            </div>
+                        </div>
+                        <div className="mt-4">
+                            <p className="text-3xl font-bold text-brand-dark dark:text-dark-heading">
+                                {dashboard?.pending || 0}
+                            </p>
+                            <p className="text-xs text-brand-inactive-text mt-1">Aguardando início</p>
+                        </div>
+                    </div>
+
+                    {/* CARD 2: EM ANDAMENTO */}
+                    <div className="flex flex-col justify-between rounded-2xl border border-brand-border bg-white p-5 shadow-xs transition hover:shadow-md dark:border-dark-border dark:bg-dark-surface">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text">
+                                Em Andamento
+                            </span>
+                            <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                                <TruckIcon size={18} />
+                            </div>
+                        </div>
+                        <div className="mt-4">
+                            <p className="text-3xl font-bold text-brand-dark dark:text-dark-heading">
+                                {dashboard?.in_progress || 0}
+                            </p>
+                            <p className="text-xs text-brand-inactive-text mt-1">Em rota de entrega</p>
+                        </div>
+                    </div>
+
+                    {/* CARD 3: CONCLUÍDAS */}
+                    <div className="flex flex-col justify-between rounded-2xl border border-brand-border bg-white p-5 shadow-xs transition hover:shadow-md dark:border-dark-border dark:bg-dark-surface">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text">
+                                Concluídas
+                            </span>
+                            <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                                <CheckCircleIcon size={18} />
+                            </div>
+                        </div>
+                        <div className="mt-4">
+                            <p className="text-3xl font-bold text-brand-dark dark:text-dark-heading">
+                                {dashboard?.completed || 0}
+                            </p>
+                            <p className="text-xs text-brand-inactive-text mt-1">Entregas finalizadas</p>
+                        </div>
+                    </div>
+
+                    {/* CARD 4: STATUS OPERACIONAL */}
+                    <div className="flex flex-col justify-between rounded-2xl border border-brand-border bg-white p-5 shadow-xs transition hover:shadow-md dark:border-dark-border dark:bg-dark-surface">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text">
+                                Status Operacional
+                            </span>
+                            <div className="w-9 h-9 rounded-xl bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+                                <Package size={18} />
+                            </div>
+                        </div>
+                        <div className="mt-4">
+                            <p className="text-2xl font-bold text-brand-dark dark:text-dark-heading truncate">
+                                {isOccupied ? "Ocupado" : isAvailable ? "Disponível" : "Offline"}
+                            </p>
+                            <p className="text-xs text-brand-inactive-text mt-1">
+                                {isAvailable
+                                    ? "Pronto para novos pedidos"
+                                    : isOccupied
+                                    ? "Realizando rota ativa"
+                                    : "Indisponível para rotas"}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* RECENT DELIVERIES SECTION */}
+                <section className="rounded-2xl border border-brand-border bg-white dark:border-dark-border dark:bg-dark-surface shadow-xs overflow-hidden">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-brand-border px-5 py-4 dark:border-dark-border">
+                        <div>
+                            <h2 className="font-bold text-lg text-brand-dark dark:text-dark-heading">
+                                Últimas Entregas Atribuídas
+                            </h2>
+                            <p className="text-xs text-brand-inactive-text mt-0.5">
+                                Visualize rapidamente suas entregas recentes e seus status.
+                            </p>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                            {/* MINI TABS */}
+                            <div className="flex items-center bg-brand-gray dark:bg-dark-border/40 p-1 rounded-xl text-xs font-semibold">
+                                <button
+                                    onClick={() => setRecentTab("all")}
+                                    className={`px-3 py-1 rounded-lg transition-colors ${
+                                        recentTab === "all"
+                                            ? "bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading shadow-xs"
+                                            : "text-brand-inactive-text hover:text-brand-dark"
+                                    }`}
+                                >
+                                    Todas
+                                </button>
+                                <button
+                                    onClick={() => setRecentTab("pending")}
+                                    className={`px-3 py-1 rounded-lg transition-colors ${
+                                        recentTab === "pending"
+                                            ? "bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading shadow-xs"
+                                            : "text-brand-inactive-text hover:text-brand-dark"
+                                    }`}
+                                >
+                                    Pendentes
+                                </button>
+                                <button
+                                    onClick={() => setRecentTab("in_progress")}
+                                    className={`px-3 py-1 rounded-lg transition-colors ${
+                                        recentTab === "in_progress"
+                                            ? "bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading shadow-xs"
+                                            : "text-brand-inactive-text hover:text-brand-dark"
+                                    }`}
+                                >
+                                    Em Rota
+                                </button>
+                                <button
+                                    onClick={() => setRecentTab("completed")}
+                                    className={`px-3 py-1 rounded-lg transition-colors ${
+                                        recentTab === "completed"
+                                            ? "bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading shadow-xs"
+                                            : "text-brand-inactive-text hover:text-brand-dark"
+                                    }`}
+                                >
+                                    Concluídas
+                                </button>
+                            </div>
+
+                            <Link href="/entregadores/entregas">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    rightIcon={<ArrowRightIcon size={14} />}
+                                    className="text-xs h-8"
+                                >
+                                    Ver todas
+                                </Button>
+                            </Link>
+                        </div>
+                    </div>
+
+                    {deliveries.length === 0 ? (
+                        <div className="py-12">
+                            <IconPlaceholder
+                                placeholderType="image"
+                                imageSrc="https://img.dudit.com.br/static/mascots/Logistica.png"
+                                imageAlt="Sem entregas recentes"
+                                title="Nenhuma entrega atribuída"
+                                subtitle="Assim que novos pedidos forem designados a você, eles aparecerão aqui."
+                            />
+                        </div>
+                    ) : filteredDeliveries.length === 0 ? (
+                        <div className="p-8 text-center text-sm text-brand-inactive-text">
+                            Nenhuma entrega nesta categoria.
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse min-w-[700px]">
+                                <thead>
+                                    <tr className="bg-brand-gray/60 dark:bg-dark-border/30 border-b border-brand-border dark:border-dark-border text-xs font-semibold text-brand-inactive-text">
+                                        <th className="py-3 px-3 pl-6">Pedido</th>
+                                        <th className="py-3 px-3">Loja</th>
+                                        <th className="py-3 px-3">Cliente</th>
+                                        <th className="py-3 px-3">Endereço</th>
+                                        <th className="py-3 px-3">Valores</th>
+                                        <th className="py-3 px-3 text-center">Status</th>
+                                        <th className="py-3 px-3 pr-6 text-center">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filteredDeliveries.slice(0, 6).map((item) => (
+                                        <DeliveryAssignmentListRow key={item.assignment_id} assignment={item} />
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </section>
+            </div>
+        </FadeIn>
+    )
 }

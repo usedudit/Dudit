@@ -232,3 +232,23 @@ export async function updateDeliveryDriverAdminAction(input: {
   revalidatePath("/ddt-admin/entregadores")
   return { success: true as const }
 }
+
+export async function getDeliveryDriverStatsAdminAction() {
+  await requireAdmin("admin")
+  const admin = getAdminClient()
+  const [totalRes, activeRes, inactiveRes, availableRes, offlineRes] = await Promise.all([
+    admin.from("delivery_drivers").select("user_id", { count: "exact", head: true }),
+    admin.from("delivery_drivers").select("user_id", { count: "exact", head: true }).eq("is_active", true),
+    admin.from("delivery_drivers").select("user_id", { count: "exact", head: true }).eq("is_active", false),
+    admin.from("delivery_drivers").select("user_id", { count: "exact", head: true }).eq("is_active", true).eq("availability_status", "available"),
+    admin.from("delivery_drivers").select("user_id", { count: "exact", head: true }).or("is_active.eq.false,availability_status.eq.offline"),
+  ])
+  return {
+    total: totalRes.count || 0,
+    active: activeRes.count || 0,
+    inactive: inactiveRes.count || 0,
+    available: availableRes.count || 0,
+    offline: offlineRes.count || 0,
+  }
+}
+

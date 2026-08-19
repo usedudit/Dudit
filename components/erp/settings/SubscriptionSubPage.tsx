@@ -248,13 +248,15 @@ interface SubscriptionData {
         status: string | null
     } | null
     usage: Record<string, number>
+    partner_id?: string
 }
 
-export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
+export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string; onBack: () => void }) => {
     const [plans, setPlans] = useState<any[]>([])
     const [subData, setSubData] = useState<SubscriptionData | null>(null)
     const [loading, setLoading] = useState(true)
     const [actionLoading, setActionLoading] = useState<string | null>(null)
+    const effectivePartnerId = partnerId || subData?.partner_id
 
     // Wrapper state for Upgrade Plan
     const [plansOpen, setPlansOpen] = useState(false)
@@ -803,7 +805,7 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
                             <h3 className="text-lg md:text-xl font-bold text-brand-dark dark:text-dark-heading mb-4 px-1">
                                 Histórico de Faturas
                             </h3>
-                            <BillingPage showTitle={false} />
+                            <BillingPage initialPartnerId={effectivePartnerId} showTitle={false} />
                         </div>
                     </div>
                 </div>

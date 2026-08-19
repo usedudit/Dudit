@@ -25,46 +25,26 @@ export async function getStorefrontPaymentMethodsAction(partnerId: string, store
 
   const supabase = await getSupabaseServerClient()
 
-  let methodsRows: any[] | null = null
-  let error: any = null
+  let query = supabase
+    .from("payment_methods")
+    .select(
+      "id, type, payment_type, is_active, is_default, " +
+      "discount_percent, fee_percent, fee_fixed, " +
+      "max_installments, supports_installments, priority, card_brand, store_id"
+    )
+    .eq("partner_id", partnerId)
+    .eq("is_active", true)
+    .order("is_default", { ascending: false })
+    .order("priority", { ascending: false })
+    .order("discount_percent", { ascending: false })
 
   if (storeId) {
-    const res = await supabase
-      .from("payment_methods")
-      .select(
-        "id, type, payment_type, is_active, is_default, " +
-        "discount_percent, fee_percent, fee_fixed, " +
-        "max_installments, supports_installments, priority, card_brand, store_id"
-      )
-      .eq("partner_id", partnerId)
-      .eq("store_id", storeId)
-      .eq("is_active", true)
-      .order("is_default", { ascending: false })
-      .order("priority", { ascending: false })
-      .order("discount_percent", { ascending: false })
-
-    if (!res.error && res.data && res.data.length > 0) {
-      methodsRows = res.data
-    }
+    query = query.or(`store_id.is.null,store_id.eq.${storeId}`)
+  } else {
+    query = query.is("store_id", null)
   }
 
-  if (!methodsRows) {
-    const res = await supabase
-      .from("payment_methods")
-      .select(
-        "id, type, payment_type, is_active, is_default, " +
-        "discount_percent, fee_percent, fee_fixed, " +
-        "max_installments, supports_installments, priority, card_brand, store_id"
-      )
-      .eq("partner_id", partnerId)
-      .eq("is_active", true)
-      .order("is_default", { ascending: false })
-      .order("priority", { ascending: false })
-      .order("discount_percent", { ascending: false })
-
-    methodsRows = res.data
-    error = res.error
-  }
+  const { data: methodsRows, error } = await query
 
   const methods = methodsRows as any[] | null
 

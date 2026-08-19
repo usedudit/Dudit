@@ -107,22 +107,103 @@ export async function addServiceBookingToCartAction(
   if (guard.error) return { error: guard.error }
 
   const admin = getAdminClient()
-  let serviceQuery = admin
+  const { data: service, error: serviceError } = await admin
     .from("services")
-    .select("id, is_active, partner_id")
+    .select("id, is_active, status, deleted_at, partner_id, store_id, price")
     .eq("id", input.serviceId)
-    .eq("partner_id", input.partnerId)
-  if (input.storeId) serviceQuery = serviceQuery.eq("store_id", input.storeId)
-  const { data: service } = await serviceQuery.maybeSingle()
+    .maybeSingle()
 
-  if (!service?.is_active) return { error: "Serviço indisponível." }
+  if (serviceError || !service) {
+    console.error("[addServiceBookingToCartAction] Service not found:", {
+      serviceId: input.serviceId,
+      error: serviceError?.message,
+    })
+    return { error: "Serviço não encontrado." }
+  }
+
+  if (service.partner_id !== input.partnerId) {
+    console.warn("[addServiceBookingToCartAction] Partner mismatch:", {
+      servicePartnerId: service.partner_id,
+      inputPartnerId: input.partnerId,
+    })
+    return { error: "Serviço não pertence a este estabelecimento." }
+  }
+
+  if (
+    service.deleted_at ||
+    service.status === "archived" ||
+    service.status === "inativo" ||
+    service.is_active === false
+  ) {
+    console.warn("[addServiceBookingToCartAction] Service inactive or archived:", {
+      id: service.id,
+      status: service.status,
+      is_active: service.is_active,
+      deleted_at: service.deleted_at,
+    })
+    return { error: "Este serviço está temporariamente indisponível." }
+  }
+
+  if (service.store_id && input.storeId && service.store_id !== input.storeId) {
+    console.warn("[addServiceBookingToCartAction] Store exclusivity mismatch:", {
+      serviceStoreId: service.store_id,
+      inputStoreId: input.storeId,
+    })
+    return { error: "Este serviço não está disponível nesta unidade." }
+  }
+
+  // Check if identical booking already exists in cart for this user
+  const { data: existingItems } = await supabase
+    .from("cart_items")
+    .select("id, booking_metadata")
+    .eq("user_id", user.id)
+    .eq("item_type", "service_booking")
+    .eq("service_id", input.serviceId)
+
+  const match = (existingItems || []).find((item: any) => {
+    try {
+      const existingDate = item.booking_metadata?.date
+      const existingTime = item.booking_metadata?.time
+      const existingStaff = item.booking_metadata?.staffId
+      return (
+        existingDate === input.booking.date &&
+        existingTime === input.booking.time &&
+        existingStaff === input.booking.staffId
+      )
+    } catch {
+      return false
+    }
+  })
+
+  const effectiveStoreId = input.storeId || service.store_id || null
+
+  if (match?.id) {
+    const { error: updateError } = await supabase
+      .from("cart_items")
+      .update({
+        selected: true,
+        store_id: effectiveStoreId,
+        booking_metadata: input.booking,
+        pay_deposit_only: Boolean(input.payDepositOnly),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", match.id)
+
+    if (updateError) {
+      console.error("[addServiceBookingToCartAction] Update existing cart item error:", updateError)
+      return { error: updateError.message }
+    }
+
+    await revalidateCart(user.id)
+    return { success: true, cartItemId: match.id }
+  }
 
   const { data, error } = await supabase
     .from("cart_items")
     .insert({
       user_id: user.id,
       partner_id: input.partnerId,
-      store_id: input.storeId || null,
+      store_id: effectiveStoreId,
       item_type: "service_booking",
       service_id: input.serviceId,
       product_id: null,
@@ -134,7 +215,39 @@ export async function addServiceBookingToCartAction(
     .select("id")
     .single()
 
-  if (error) return { error: error.message }
+  if (error) {
+    if (error.code === "23505" || error.message?.includes("cart_items_user_service_booking_key")) {
+      const { data: existing } = await supabase
+        .from("cart_items")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("item_type", "service_booking")
+        .eq("service_id", input.serviceId)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (existing?.id) {
+        await supabase
+          .from("cart_items")
+          .update({
+            selected: true,
+            store_id: effectiveStoreId,
+            booking_metadata: input.booking,
+            pay_deposit_only: Boolean(input.payDepositOnly),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existing.id)
+
+        await revalidateCart(user.id)
+        return { success: true, cartItemId: existing.id }
+      }
+    }
+
+    console.error("[addServiceBookingToCartAction] Insert cart_items error:", error)
+    return { error: error.message }
+  }
+
   await revalidateCart(user.id)
   return { success: true, cartItemId: data.id }
 }
@@ -273,15 +386,26 @@ export async function addPurchasableServiceToCartAction(
   if (guard.error) return { error: guard.error }
 
   const admin = getAdminClient()
-  let serviceQuery = admin
+  const { data: service, error: serviceError } = await admin
     .from("services")
-    .select("id, name, price, is_active")
+    .select("id, name, price, is_active, status, deleted_at, partner_id, store_id")
     .eq("id", input.serviceId)
-    .eq("partner_id", input.partnerId)
-  if (input.storeId) serviceQuery = serviceQuery.eq("store_id", input.storeId)
-  const { data: service } = await serviceQuery.maybeSingle()
+    .maybeSingle()
 
-  if (!service?.is_active) return { error: "Serviço indisponível." }
+  if (serviceError || !service) return { error: "Serviço não encontrado." }
+  if (service.partner_id !== input.partnerId) return { error: "Serviço não pertence a este estabelecimento." }
+  if (
+    service.deleted_at ||
+    service.status === "archived" ||
+    service.status === "inativo" ||
+    service.is_active === false
+  ) {
+    return { error: "Este serviço está temporariamente indisponível." }
+  }
+  if (service.store_id && input.storeId && service.store_id !== input.storeId) {
+    return { error: "Este serviço não está disponível nesta unidade." }
+  }
+
   return { error: "Este serviço requer agendamento. Selecione data e horário." }
 
   const booking: ServiceBookingMetadata = {
@@ -300,6 +424,7 @@ export async function addPurchasableServiceToCartAction(
     partnerId: input.partnerId,
     booking,
     csrf_token: input.csrf_token,
+    storeId: input.storeId,
   })
 }
 
@@ -314,23 +439,23 @@ export async function getGiftItemDetailsAction(input: {
   if (input.itemType === "product") {
     let q = admin
       .from("products")
-      .select("name, image_url, images")
+      .select("name, image_url, images, store_id")
       .eq("id", input.itemId)
       .eq("is_active", true)
       .eq("show_in_marketplace", true)
-    if (input.storeId) q = q.eq("store_id", input.storeId)
-    const { data } = await q.single()
+    const { data } = await q.maybeSingle()
     if (!data) return null
+    if (data.store_id && input.storeId && data.store_id !== input.storeId) return null
     return { name: data.name, image_url: data.image_url || (data.images?.[0]) || null, isProduct: true as const }
   }
   let q = admin
     .from("services")
-    .select("name, images")
+    .select("name, images, store_id")
     .eq("id", input.itemId)
     .eq("is_active", true)
     .eq("show_in_marketplace", true)
-  if (input.storeId) q = q.eq("store_id", input.storeId)
-  const { data } = await q.single()
+  const { data } = await q.maybeSingle()
   if (!data) return null
+  if (data.store_id && input.storeId && data.store_id !== input.storeId) return null
   return { name: data.name, image_url: (data.images?.[0]) || null, isProduct: false as const }
 }

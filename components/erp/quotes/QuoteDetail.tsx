@@ -475,6 +475,11 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                                 <Badge variant={statusInfo.variant} icon={statusInfo.icon}>
                                                     {statusInfo.label}
                                                 </Badge>
+                                                {(quote?.metadata?.origin === "marketplace" || quote?.origin === "marketplace") && (
+                                                    <Badge variant="blue" className="text-xs">
+                                                        Vitrine Digital
+                                                    </Badge>
+                                                )}
                                             </h1>
                                             <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
                                                 Criado em {formattedIssueDate} • Válido até {formattedExpiryDate}

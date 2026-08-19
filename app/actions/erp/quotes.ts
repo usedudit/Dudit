@@ -30,6 +30,7 @@ import { withTelemetry } from "@/lib/utils/action-logger"
 import { notifyQuoteEvent } from "@/lib/services/quote-notifications.service"
 import { endOfDay, getTodayYmd } from "@/lib/date"
 import { requireAuthorizedCustomerContext, requireAuthorizedPartnerContext } from "@/lib/services/authorized-customer-access"
+import { createNotification } from "@/lib/services/notification.service"
 
 export type ERPQuoteListCursor = { createdAt: string; id: string }
 
@@ -700,12 +701,88 @@ export async function updateQuoteAction(data: {
                 source: "manual",
             })
 
+            // If quote originated from marketplace, notify customer
+            await notifyMarketplaceQuoteReady(data.quoteId, data.partnerId)
+
             return successResponse({ id: data.quoteId })
         } catch (err: any) {
             console.error("[updateQuoteAction] Error:", err)
             return errorResponse(err.message || "Erro interno ao atualizar orçamento")
         }
     });
+}
+
+export async function notifyMarketplaceQuoteReady(quoteId: string, partnerId: string) {
+    try {
+        const supabase = await getSupabaseServerClient()
+        const { data: quote } = await supabase
+            .from("quotes")
+            .select(`
+                id,
+                quote_number,
+                status,
+                total,
+                public_token,
+                metadata,
+                customer_id,
+                customers (
+                    id,
+                    name,
+                    marketplace_user_id
+                )
+            `)
+            .eq("id", quoteId)
+            .eq("partner_id", partnerId)
+            .maybeSingle()
+
+        if (!quote) return
+
+        const meta = (quote.metadata || {}) as Record<string, any>
+        const marketplaceUserId = meta.marketplace_user_id || (quote.customers as any)?.marketplace_user_id
+        if (!marketplaceUserId) return
+
+        // Auto-generate public_token if missing
+        let publicToken = quote.public_token
+        if (!publicToken) {
+            publicToken = crypto.randomUUID()
+            await getAdminClient().from("quotes").update({ public_token: publicToken }).eq("id", quoteId)
+        }
+
+        // Fetch store / partner name
+        const { data: store } = await supabase
+            .from("stores")
+            .select("name")
+            .eq("partner_id", partnerId)
+            .order("is_headquarters", { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+        const partnerName = store?.name || "Estabelecimento"
+        const serviceName = meta.service_name || "Serviço"
+
+        await createNotification({
+            userId: marketplaceUserId,
+            title: `Orçamento pronto: ${partnerName}`,
+            message: `Seu orçamento para "${serviceName}" foi preparado com os valores e prazos! Clique para visualizar a proposta.`,
+            type: "message_received",
+            entityType: "quote",
+            entityId: quoteId,
+            data: {
+                public_token: publicToken,
+                token: publicToken,
+                audience: "customer",
+                quote_id: quoteId,
+                quote_number: quote.quote_number,
+                partner_id: partnerId,
+                service_name: serviceName,
+                href: `/quote/${publicToken}`,
+            },
+            idempotencyKey: `quote-ready-${quoteId}-${meta.updated_at || Date.now()}`,
+            origin: "system",
+        })
+    } catch (err) {
+        console.error("[notifyMarketplaceQuoteReady] Error:", err)
+    }
 }
 
 async function saveQuoteSnapshot(supabase: any, quoteId: string, partnerId: string) {

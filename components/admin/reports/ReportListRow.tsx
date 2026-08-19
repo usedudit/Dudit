@@ -60,7 +60,9 @@ const ReportListRow = React.memo(({
             <td className="p-2 pl-6 border-b border-brand-border dark:border-dark-border">
                 <div className="flex flex-col text-left min-w-0">
                     <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading leading-tight truncate">
-                        {report.target_name}
+                        {report.target_type === "review"
+                            ? `Avaliação #${report.target_id.slice(0, 8)}`
+                            : report.target_name || report.target_id}
                     </span>
                     <span className="text-[11px] font-medium text-brand-inactive-text opacity-70">
                         {report.target_id}
@@ -78,18 +80,12 @@ const ReportListRow = React.memo(({
             {/* Quem Denunciou */}
             <td className="p-2 border-b border-brand-border dark:border-dark-border text-left">
                 <div className="flex flex-col min-w-0">
-                    <div className="flex items-center gap-1">
-                        <UserIcon size={12} className="text-brand-inactive-text shrink-0" />
-                        <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate">
-                            {report.reporter_name}
-                        </span>
-                    </div>
-                    <div className="flex items-center gap-1 opacity-70">
-                        <MailIcon size={11} className="text-brand-inactive-text shrink-0" />
-                        <span className="text-[11px] font-medium text-brand-inactive-text truncate">
-                            {report.reporter_email || "N/A"}
-                        </span>
-                    </div>
+                    <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate">
+                        {report.reporter_name || "Usuário"}
+                    </span>
+                    <span className="text-[11px] font-medium text-brand-inactive-text opacity-70">
+                        {report.reporter_user_id}
+                    </span>
                 </div>
             </td>
 

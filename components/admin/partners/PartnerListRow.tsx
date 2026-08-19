@@ -46,50 +46,38 @@ const PartnerListRow = React.memo(({
             className={`group hover:[&:not(:has(.action-btn:hover))]:bg-brand-gray dark:hover:[&:not(:has(.action-btn:hover))]:bg-dark-border/10 transition-colors cursor-pointer ${isStore ? "bg-blue-50/30 dark:bg-blue-900/5" : "bg-white dark:bg-dark-background"}`}
             onClick={() => onView(partner)}
         >
-            {/* Parceiro / Loja */}
+            {/* Loja */}
             <td className="p-2 pl-6 border-b border-brand-border dark:border-dark-border text-left">
                 <div className="flex flex-col min-w-0">
                     <div className="flex items-center gap-2">
-                        {isStore ? (
-                            <StoreIcon size={14} className="text-blue-500 shrink-0" />
-                        ) : (
-                            <StoreIcon size={14} className="text-brand-dark shrink-0" />
-                        )}
                         <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading leading-tight truncate">
                             {partner.store_name || partner.stores?.[0]?.name || "Loja"}
                         </span>
+                        {partner.risk_score > 0 && (
+                            <Badge variant={partner.risk_score >= 50 ? "red" : partner.risk_score >= 25 ? "orange" : "gray"}>
+                                Risco: {partner.risk_score}
+                            </Badge>
+                        )}
                     </div>
-                    <span className="text-[11px] font-medium text-brand-inactive-text opacity-70 ml-6">
+                    <span className="text-[11px] font-medium text-brand-inactive-text opacity-70">
                         {partner.id}
                     </span>
                 </div>
             </td>
 
-            {/* Tipo */}
-            <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
-                {isStore ? (
-                    <Badge variant="blue">Loja</Badge>
-                ) : (
-                    <Badge variant="green">Parceiro</Badge>
-                )}
-            </td>
-
-            {/* Dono */}
+            {/* Proprietário */}
             <td className="p-2 border-b border-brand-border dark:border-dark-border text-left">
                 <div className="flex flex-col min-w-0">
-                    <div className="flex items-center gap-1">
-                        <UserIcon size={12} className="text-brand-inactive-text shrink-0" />
-                        <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate">
-                            {partner.owner_name}
-                        </span>
-                    </div>
-                    <span className="text-[11px] font-medium text-brand-inactive-text opacity-70 ml-4">
-                        {partner.owner_user_id || "N/A"}
+                    <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate">
+                        {partner.owner_name || "Lojista"}
+                    </span>
+                    <span className="text-[11px] font-medium text-brand-inactive-text opacity-70">
+                        {partner.owner_user_id || "-"}
                     </span>
                 </div>
             </td>
 
-            {/* Data */}
+            {/* Data de Cadastro */}
             <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
                 <div className="flex flex-col items-center">
                     <span className="font-medium text-[13px] text-brand-dark dark:text-dark-heading">
@@ -101,38 +89,15 @@ const PartnerListRow = React.memo(({
                 </div>
             </td>
 
-            {/* Risco */}
-            <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
-                <div className="flex justify-center">
-                    {partner.risk_score > 0 ? (
-                        <Badge variant={partner.risk_score >= 50 ? "red" : partner.risk_score >= 20 ? "orange" : "blue"}>
-                            {partner.risk_score}
-                        </Badge>
-                    ) : "-"}
-                </div>
-            </td>
-
             {/* Status */}
             <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
                 <div className="flex justify-center">
-                    {isStore ? (
-                        partner.suspended_at ? (
-                            <Badge variant="orange">Suspensa</Badge>
-                        ) : partner.is_active ? (
-                            <Badge variant="green">Ativa</Badge>
-                        ) : (
-                            <Badge variant="gray">Inativa</Badge>
-                        )
+                    {partner.suspended_at ? (
+                        <Badge variant="red">Suspensa</Badge>
+                    ) : partner.is_active ? (
+                        <Badge variant="green">Ativa</Badge>
                     ) : (
-                        partner.erp_disabled ? (
-                            <Badge variant="red">ERP Off</Badge>
-                        ) : partner.suspended_at ? (
-                            <Badge variant="orange">Suspenso</Badge>
-                        ) : !partner.is_active ? (
-                            <Badge variant="gray">Inativo</Badge>
-                        ) : (
-                            <Badge variant="green">Ativo</Badge>
-                        )
+                        <Badge variant="gray">Inativa</Badge>
                     )}
                 </div>
             </td>

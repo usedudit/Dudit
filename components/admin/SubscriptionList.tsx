@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useTransition, useMemo, useCallback } from "react"
+import Link from "next/link"
 import { Button, Badge, Input, Tabs, TabsList, TabsTrigger, Pagination, IconPlaceholder, AlertModal } from "@/components/reusable"
 import { TabCountBadge } from "@/components/reusable/TabCountBadge"
 import { toast } from "@/hooks/use-notification"
@@ -300,19 +301,22 @@ export default function SubscriptionList({ initialData, initialStats }: Subscrip
                                                             className="border-b border-brand-border dark:border-dark-border hover:bg-brand-gray/40 dark:hover:bg-dark-border/20 transition-colors"
                                                         >
                                                             <td className="py-4 px-2 pl-6">
-                                                                <div className="flex items-center gap-3">
+                                                                <Link
+                                                                    href={`/ddt-admin/partners?view=${sub.partner_id}`}
+                                                                    className="flex items-center gap-3 group cursor-pointer"
+                                                                >
                                                                     <div className="w-10 h-10 rounded-xl bg-brand-gray dark:bg-dark-border/40 border border-brand-border dark:border-dark-border flex items-center justify-center shrink-0">
-                                                                        <StoreIcon className="w-5 h-5 text-brand-inactive-text" />
+                                                                        <StoreIcon className="w-5 h-5 text-brand-inactive-text group-hover:text-brand-green transition-colors" />
                                                                     </div>
                                                                     <div className="flex flex-col">
-                                                                        <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">
+                                                                        <span className="font-bold text-sm text-brand-dark dark:text-dark-heading group-hover:text-brand-green transition-colors truncate max-w-[200px]">
                                                                             {sub.store_name || "Loja Parceira"}
                                                                         </span>
                                                                         <span className="text-xs text-brand-inactive-text">
                                                                             ID: {sub.partner_id.slice(0, 8)}...
                                                                         </span>
                                                                     </div>
-                                                                </div>
+                                                                </Link>
                                                             </td>
 
                                                             <td className="py-4 px-2">
@@ -360,14 +364,17 @@ export default function SubscriptionList({ initialData, initialStats }: Subscrip
                                         return (
                                             <div key={sub.partner_id} className="py-4 flex flex-col gap-2.5">
                                                 <div className="flex justify-between items-start gap-2">
-                                                    <div className="flex flex-col gap-0.5 min-w-0">
-                                                        <span className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">
+                                                    <Link
+                                                        href={`/ddt-admin/partners?view=${sub.partner_id}`}
+                                                        className="flex flex-col gap-0.5 min-w-0"
+                                                    >
+                                                        <span className="font-bold text-sm text-brand-dark dark:text-dark-heading hover:text-brand-green truncate">
                                                             {sub.store_name || "Loja"}
                                                         </span>
                                                         <span className="text-xs text-brand-inactive-text truncate">
                                                             MP ID: {sub.mp_user_id || "Não conectado"}
                                                         </span>
-                                                    </div>
+                                                    </Link>
                                                     <Badge variant={isConnected ? "green" : "red"}>
                                                         {isConnected ? "Conectado" : "Desconectado"}
                                                     </Badge>

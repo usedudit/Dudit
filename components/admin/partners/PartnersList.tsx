@@ -344,7 +344,7 @@ export default function PartnersList({ initialData, initialStats }: PartnersList
                                                         onClick={() => handleSort("store")}
                                                         className="py-3 px-2 pl-6 rounded-l-lg text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
                                                     >
-                                                        Loja / Nome {sortConfig?.key === "store" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+                                                        Loja {sortConfig?.key === "store" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
                                                     </th>
                                                     <th
                                                         onClick={() => handleSort("owner")}
@@ -353,16 +353,10 @@ export default function PartnersList({ initialData, initialStats }: PartnersList
                                                         Proprietário {sortConfig?.key === "owner" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
                                                     </th>
                                                     <th
-                                                        onClick={() => handleSort("risk")}
-                                                        className="py-3 px-2 w-28 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
-                                                    >
-                                                        Score de Risco {sortConfig?.key === "risk" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
-                                                    </th>
-                                                    <th
                                                         onClick={() => handleSort("date")}
-                                                        className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                        className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors text-center"
                                                     >
-                                                        Credenciamento {sortConfig?.key === "date" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+                                                        Cadastro {sortConfig?.key === "date" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
                                                     </th>
                                                     <th
                                                         onClick={() => handleSort("status")}

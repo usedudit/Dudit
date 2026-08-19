@@ -102,10 +102,21 @@ export function formatPaymentMethodLabel(
     nameLower === typeLower ||
     (typeLower === "dinheiro" && (nameLower === "cash" || nameLower === "money" || nameLower === "dinheiro" || nameLower === "espécie" || nameLower === "espece" || nameLower === "carteira")) ||
     (typeLower === "pix" && nameLower === "pix") ||
-    (typeLower === "cartão de crédito" && (nameLower === "credito" || nameLower === "crédito" || nameLower === "credit" || nameLower === "credit_card" || nameLower === "creditcard")) ||
-    (typeLower === "cartão de débito" && (nameLower === "debito" || nameLower === "débito" || nameLower === "debit" || nameLower === "debit_card" || nameLower === "debitcard")) ||
+    (typeLower === "cartão de crédito" && (nameLower === "cartão de crédito" || nameLower === "cartao de credito" || nameLower === "cartão de credito" || nameLower === "cartao de crédito" || nameLower === "credito" || nameLower === "crédito" || nameLower === "credit" || nameLower === "credit_card" || nameLower === "creditcard" || nameLower === "cartão" || nameLower === "cartao" || nameLower === "card")) ||
+    (typeLower === "cartão de débito" && (nameLower === "cartão de débito" || nameLower === "cartao de debito" || nameLower === "cartão de debito" || nameLower === "cartao de débito" || nameLower === "debito" || nameLower === "débito" || nameLower === "debit" || nameLower === "debit_card" || nameLower === "debitcard" || nameLower === "cartão" || nameLower === "cartao" || nameLower === "card")) ||
+    (typeLower === "cartão" && (nameLower === "cartão" || nameLower === "cartao" || nameLower === "card" || nameLower.includes("credito") || nameLower.includes("crédito") || nameLower.includes("debito") || nameLower.includes("débito"))) ||
+    (typeLower === "transferência" && (nameLower === "transferência" || nameLower === "transferencia" || nameLower === "transferência bancária" || nameLower === "transferencia bancaria" || nameLower === "bank_transfer" || nameLower === "ted" || nameLower === "doc")) ||
+    (typeLower === "outros" && (nameLower === "outros" || nameLower === "outro" || nameLower === "other")) ||
     (typeLower === "boleto" && (nameLower === "boleto" || nameLower === "boleto bancário" || nameLower === "boleto bancario"))
 
-  const base = isSameConcept ? finalType : `${finalType} (${finalName})`
+  // Se o tipo for apenas "Cartão" e o nome for "Cartão de Crédito", use "Cartão de Crédito"
+  let resolvedLabel = finalType
+  if (typeLower === "cartão" && (nameLower.includes("crédito") || nameLower.includes("credito"))) {
+    resolvedLabel = "Cartão de Crédito"
+  } else if (typeLower === "cartão" && (nameLower.includes("débito") || nameLower.includes("debito"))) {
+    resolvedLabel = "Cartão de Débito"
+  }
+
+  const base = isSameConcept ? resolvedLabel : `${resolvedLabel} (${finalName})`
   return installmentSuffix ? `${base}${installmentSuffix}` : base
 }

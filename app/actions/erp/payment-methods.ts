@@ -136,8 +136,7 @@ function sanitizeInstallmentFees(input: InstallmentFeeInput[] | undefined, maxIn
         }
         if (row.feePercent < 0 || row.feePercent > 100) {
             throw new Error(`Taxa inválida na parcela ${row.installmentNumber}`)
-        }
-        if (dedupe.has(row.installmentNumber)) {
+        }        if (dedupe.has(row.installmentNumber)) {
             throw new Error(`Parcela ${row.installmentNumber} configurada em duplicidade`)
         }
         dedupe.set(row.installmentNumber, row.feePercent)
@@ -146,8 +145,8 @@ function sanitizeInstallmentFees(input: InstallmentFeeInput[] | undefined, maxIn
     return Array.from(dedupe.entries()).map(([installment_number, fee_percent]) => ({ installment_number, fee_percent }))
 }
 
-const getCachedPaymentMethods = (partnerId: string) => unstable_cache(
-    async () => {
+const getCachedPaymentMethods = unstable_cache(
+    async (partnerId: string) => {
         const supabase = createAdminClient()
         const { data: methods, error } = await supabase
             .from("payment_methods")
@@ -185,21 +184,24 @@ const getCachedPaymentMethods = (partnerId: string) => unstable_cache(
             finance_account_name: method.finance_accounts?.name || null,
         }))
     },
-    [`payment-methods-${partnerId}`],
+    ["erp-payment-methods-by-partner"],
     {
-        tags: [`payment-methods-${partnerId}`],
+        tags: ["payment-methods"],
         revalidate: 3600 // 1 hour TTL
     }
 )
 
 export async function getPaymentMethodsAction(partnerId: string, storeId?: string | null) {
+    if (!partnerId) {
+        return { methods: [] }
+    }
     await requirePartnerAccessWithPermission(partnerId)
 
     try {
-        const all = await getCachedPaymentMethods(partnerId)()
+        const all = await getCachedPaymentMethods(partnerId)
         if (storeId) {
-            const storeMethods = all.filter((m: any) => m.store_id === storeId)
-            if (storeMethods.length > 0) return { methods: storeMethods }
+            const storeMethods = all.filter((m: any) => m.store_id === storeId || !m.store_id)
+            return { methods: storeMethods }
         }
         return { methods: all }
     } catch (err: any) {

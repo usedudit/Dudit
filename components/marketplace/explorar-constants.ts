@@ -12,27 +12,32 @@ export const CATEGORY_SLUG_MAP: { [key: string]: string } = {
     "outros": "Outros"
 }
 
-export const CATEGORY_GRADIENTS = [
-    "from-[#FF8008] to-[#FFC837]",
-    "from-[#11998e] to-[#38ef7d]",
-    "from-[#00c6ff] to-[#0072ff]",
-    "from-[#7F00FF] to-[#E100FF]",
-    "from-[#fe0979] to-[#ff6a00]",
-    "from-[#F7971E] to-[#FFD200]",
-    "from-[#4facfe] to-[#00f2fe]",
-    "from-[#00b09b] to-[#96c93d]"
-]
+export const CATEGORY_GRADIENTS: Record<string, string> = {
+    "casa-e-utilidades": "from-[#FF8008] to-[#FFC837]",
+    "moda-e-beleza": "from-[#fe0979] to-[#ff6a00]",
+    "saude-e-bem-estar": "from-[#11998e] to-[#38ef7d]",
+    "tecnologia-e-eletronicos": "from-[#00c6ff] to-[#0072ff]",
+    "auto-e-moto": "from-[#4facfe] to-[#00f2fe]",
+    "pets": "from-[#7F00FF] to-[#E100FF]",
+    "construcao-e-ferramentas": "from-[#F7971E] to-[#FFD200]",
+    "agro-e-jardim": "from-[#00b09b] to-[#96c93d]",
+    "infantil-e-brinquedos": "from-[#e44d26] to-[#f16529]",
+    "alimentacao": "from-[#d63031] to-[#e17055]",
+    "outros": "from-[#636e72] to-[#b2bec3]",
+}
 
 export const FALLBACK_CATEGORIES = [
-    { name: "Casa & Utilidades", icon_url: "https://img.dudit.com.br/static/categories/products/Casa-e-utilidades.png" },
-    { name: "Moda & Beleza", icon_url: "https://img.dudit.com.br/static/categories/products/Moda-e-beleza.png" },
-    { name: "Saúde & Bem-estar", icon_url: "https://img.dudit.com.br/static/categories/products/Saude-e-bem-estar.png" },
-    { name: "Tecnologia & Eletrônicos", icon_url: "https://img.dudit.com.br/static/categories/products/Tecnologia-e-eletronicos.png" },
-    { name: "Auto & Moto", icon_url: "https://img.dudit.com.br/static/categories/products/Auto-e-moto.png" },
-    { name: "Pets", icon_url: "https://img.dudit.com.br/static/categories/products/Pets.png" },
-    { name: "Construção & Ferramentas", icon_url: "https://img.dudit.com.br/static/categories/products/Construcao-e-ferramentas.png" },
-    { name: "Agro & Jardim", icon_url: "https://img.dudit.com.br/static/categories/products/Agro-e-jardim.png" },
-    { name: "Infantil & Brinquedos", icon_url: "https://img.dudit.com.br/static/categories/products/Infantil-e-brinquedos.png" }
+    { name: "Casa & Utilidades", slug: "casa-e-utilidades", icon_url: "https://img.dudit.com.br/static/categories/products/Casa-e-utilidades.png" },
+    { name: "Moda & Beleza", slug: "moda-e-beleza", icon_url: "https://img.dudit.com.br/static/categories/products/Moda-e-beleza.png" },
+    { name: "Saúde & Bem-estar", slug: "saude-e-bem-estar", icon_url: "https://img.dudit.com.br/static/categories/products/Saude-e-bem-estar.png" },
+    { name: "Tecnologia & Eletrônicos", slug: "tecnologia-e-eletronicos", icon_url: "https://img.dudit.com.br/static/categories/products/Tecnologia-e-eletronicos.png" },
+    { name: "Auto & Moto", slug: "auto-e-moto", icon_url: "https://img.dudit.com.br/static/categories/products/Auto-e-moto.png" },
+    { name: "Pets", slug: "pets", icon_url: "https://img.dudit.com.br/static/categories/products/Pets.png" },
+    { name: "Construção & Ferramentas", slug: "construcao-e-ferramentas", icon_url: "https://img.dudit.com.br/static/categories/products/Construcao-e-ferramentas.png" },
+    { name: "Agro & Jardim", slug: "agro-e-jardim", icon_url: "https://img.dudit.com.br/static/categories/products/Agro-e-jardim.png" },
+    { name: "Infantil & Brinquedos", slug: "infantil-e-brinquedos", icon_url: "https://img.dudit.com.br/static/categories/products/Infantil-e-brinquedos.png" },
+    { name: "Alimentação", slug: "alimentacao", icon_url: "" },
+    { name: "Outros", slug: "outros", icon_url: "" },
 ]
 
 export const COMMON_CITY_ACCENTS: Record<string, string> = {

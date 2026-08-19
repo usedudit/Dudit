@@ -8,7 +8,7 @@ export async function preCheckLogin(email: string): Promise<{ allowed: boolean; 
     try {
         await requireRateLimit(RateLimitCategory.AUTH_LOGIN)
     } catch {
-        return { allowed: false, error: "Muitas tentativas de acesso a partir deste IP. Tente novamente em 15 minutos." }
+        return { allowed: false, error: "Muitas tentativas de acesso. Tente novamente em 15 minutos." }
     }
 
     const { locked, remainingSeconds } = await checkAccountLockout(email)

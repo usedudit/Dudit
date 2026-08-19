@@ -13,6 +13,33 @@ interface OrderListRowProps {
     onDetail: (order: any) => void
 }
 
+function formatDeliveryLabel(status?: string, type?: string): string {
+    const s = String(status || "").toLowerCase()
+    const t = String(type || "").toLowerCase()
+    const statusMap: Record<string, string> = {
+        pending: "Pendente",
+        preparing: "Em preparo",
+        ready_for_pickup: "Pronto p/ retirada",
+        sent: "Enviado",
+        in_transit: "Em trânsito",
+        delivered: "Entregue",
+        failed: "Falhou",
+        returned: "Devolvido",
+        cancelled: "Cancelado",
+    }
+    const typeMap: Record<string, string> = {
+        standard: "Padrão",
+        express: "Expressa",
+        pickup: "Retirada",
+        delivery: "Entrega",
+        same_day: "Mesmo dia",
+        scheduled: "Agendada",
+    }
+    const statusText = statusMap[s] || (s ? s.charAt(0).toUpperCase() + s.slice(1) : "-")
+    const typeText = typeMap[t]
+    return typeText ? `${statusText} (${typeText})` : statusText
+}
+
 const OrderListRow = React.memo(({ order, isPending, onDetail }: OrderListRowProps) => {
     const returns = Array.isArray(order.return_requests) ? order.return_requests : []
     const exchangeOrder = order.exchange_parent_order_id || order.exchange_return_request_id
@@ -56,15 +83,12 @@ const OrderListRow = React.memo(({ order, isPending, onDetail }: OrderListRowPro
 
             <td className="p-2 border-b border-brand-border dark:border-dark-border text-left">
                 <div className="flex flex-col min-w-0">
-                    <div className="flex items-center gap-1">
-                        <StoreIcon size={12} className="text-brand-inactive-text shrink-0" />
-                        <span className="font-medium text-[13px] text-brand-dark dark:text-dark-heading truncate">
-                            {order.stores?.name || order.partners?.store_name || "-"}
-                        </span>
-                    </div>
-                    {order.stores?.name && (
-                        <span className="text-[11px] font-medium text-brand-inactive-text ml-4">
-                            Loja: {order.stores.name}
+                    <span className="font-medium text-[13px] text-brand-dark dark:text-dark-heading truncate">
+                        {order.stores?.name || order.partners?.store_name || "-"}
+                    </span>
+                    {order.store_id && (
+                        <span className="text-[11px] font-medium text-brand-inactive-text opacity-70">
+                            ID: {order.store_id.slice(0, 8)}...
                         </span>
                     )}
                 </div>
@@ -85,7 +109,7 @@ const OrderListRow = React.memo(({ order, isPending, onDetail }: OrderListRowPro
 
             <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
                 <span className="font-medium text-[13px] text-brand-dark dark:text-dark-heading">
-                    {order.delivery_status || "-"}
+                    {formatDeliveryLabel(order.delivery_status, order.delivery_type)}
                 </span>
             </td>
 

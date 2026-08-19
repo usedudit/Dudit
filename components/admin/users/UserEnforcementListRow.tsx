@@ -44,29 +44,29 @@ const UserEnforcementListRow = React.memo(({
                     <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading leading-tight truncate">
                         {user.full_name || "Sem nome"}
                     </span>
-                    <span className="text-[11px] font-medium text-brand-inactive-text opacity-70">
-                        {user.user_id}
+                    <span className="text-[11px] font-medium text-brand-inactive-text opacity-70 truncate">
+                        {user.email || user.user_id}
                     </span>
                 </div>
             </td>
 
-            {/* Loja */}
+            {/* Lojas Vinculadas */}
             <td className="p-2 border-b border-brand-border dark:border-dark-border text-left">
-                {user.partner ? (
-                    <div className="flex flex-col min-w-0">
-                        <div className="flex items-center gap-1">
-                            <StoreIcon size={12} className="text-brand-inactive-text shrink-0" />
-                            <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate">
-                                {user.partner?.store_name || user.partner?.stores?.[0]?.name || "Loja"}
+                {(() => {
+                    const count = user.stores_count || user.partner?.stores_count || (user.partner ? 1 : 0)
+                    if (count > 0) {
+                        return (
+                            <span className="font-medium text-[13px] text-brand-dark dark:text-dark-heading">
+                                {count === 1 ? "1 loja vinculada" : `${count} lojas vinculadas`}
                             </span>
-                        </div>
-                        <span className="text-[11px] font-medium text-brand-inactive-text opacity-70 ml-4">
-                            {user.partner?.id}
+                        )
+                    }
+                    return (
+                        <span className="text-[12px] font-medium text-brand-inactive-text opacity-60">
+                            Nenhuma loja
                         </span>
-                    </div>
-                ) : (
-                    <span className="text-[11px] font-medium text-brand-inactive-text opacity-50">Sem loja</span>
-                )}
+                    )
+                })()}
             </td>
 
             {/* Data */}

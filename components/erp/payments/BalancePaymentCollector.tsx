@@ -8,6 +8,8 @@ import { usePaymentMethods } from "@/hooks/use-payment-methods"
 import { getPaymentMethodDetailsAction, updatePaymentMethodAction } from "@/app/actions/erp/payment-methods"
 import { generateStaticPix } from "@/lib/utils/pix-generator"
 import { useStore } from "@/lib/store-context"
+import { usePermissions } from "@/lib/permission-context"
+import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import QRCode from "qrcode"
 import {
   buildAvailableMethodTypes,
@@ -67,7 +69,9 @@ export function BalancePaymentCollector({
   onHeaderStateChange,
 }: BalancePaymentCollectorProps) {
   const { selectedStore } = useStore()
-  const { methods, isLoading } = usePaymentMethods(partnerId)
+  const { planSlug } = usePermissions()
+  const isFreePlan = !hasMinimumPlan(planSlug, "crescer")
+  const { methods, isLoading } = usePaymentMethods(partnerId, selectedStore?.id)
   const activeMethods = useMemo(
     () => (methods || []).filter((m: PartnerPaymentMethod) => m.is_active !== false),
     [methods],
@@ -207,8 +211,21 @@ export function BalancePaymentCollector({
   const openMethodType = (type: string) => {
     setSelectedMethodType(type)
     const matches = activeMethods.filter((m: PartnerPaymentMethod) => normalizeMethodType(m.type) === type)
-    if (matches.length === 1) {
-      selectSingleMethod(matches[0])
+    if (isFreePlan || matches.length === 1) {
+      if (matches.length > 0) {
+        selectSingleMethod(matches[0])
+      } else {
+        const dummy: PartnerPaymentMethod = {
+          id: "",
+          name: type === "cash" ? "Dinheiro" : type === "pix" ? "Pix" : type === "credit_card" ? "Cartão de Crédito" : type === "debit_card" ? "Cartão de Débito" : "Outros",
+          type,
+          is_active: true,
+        }
+        setSelectedMethod(dummy)
+        setAmount(remainingBalance)
+        setView(getTargetViewForMethodType(type) as PaymentFlowView)
+        emitLegs([buildFlatLeg(dummy, remainingBalance, lockedInstallments || 1)])
+      }
       return
     }
     setView("method_type_select")
@@ -424,9 +441,14 @@ export function BalancePaymentCollector({
           onTempPixKeyChange={setTempPixKey}
           tempPixKeyType={tempPixKeyType}
           onTempPixKeyTypeChange={setTempPixKeyType}
+          isFreePlan={isFreePlan}
           onConfirmGenerateWithKey={() => {
             if (tempPixKey) {
-              setShowConfirmSaveModal(true)
+              if (isFreePlan) {
+                handleGeneratePixWithKey(tempPixKey, tempPixKeyType)
+              } else {
+                setShowConfirmSaveModal(true)
+              }
             }
           }}
         />
@@ -442,7 +464,7 @@ export function BalancePaymentCollector({
           onInstallmentsChange={setInstallments}
           maxInstallments={lockedInstallments || 1}
           readOnlyInstallments
-          hideInstallments={normalizeMethodType(selectedMethod.type) === "debit_card"}
+          hideInstallments={isFreePlan || normalizeMethodType(selectedMethod.type) === "debit_card"}
           totalPaid={amount}
           totalNeed={remainingBalance}
         />

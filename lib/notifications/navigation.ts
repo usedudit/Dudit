@@ -48,5 +48,16 @@ export function getNotificationHref(params: {
     return "/erp/produtos"
   }
 
+  if (entityType === "quote") {
+    if (audience === "seller" || audience === "admin") {
+      return entityId ? `/erp/orcamentos?quote=${encodeURIComponent(entityId)}` : `/erp/orcamentos`
+    }
+    const token = (data?.public_token as string) || (data?.token as string)
+    if (token) {
+      return `/quote/${encodeURIComponent(token)}`
+    }
+    return "/"
+  }
+
   return "/"
 }

@@ -270,6 +270,7 @@ export default function UserEnforcementList({ initialData, initialStats }: UserE
                                 <div className="md:hidden flex flex-col w-full divide-y divide-brand-border dark:divide-dark-border">
                                     {paginatedItems.map((user) => {
                                         const isBanned = !!user.banned_at
+                                        const storesCount = user.stores_count || user.partner?.stores_count || (user.partner ? 1 : 0)
                                         return (
                                             <div
                                                 key={user.user_id}
@@ -282,7 +283,7 @@ export default function UserEnforcementList({ initialData, initialStats }: UserE
                                                             {user.full_name || "Usuário"}
                                                         </span>
                                                         <span className="text-xs text-brand-inactive-text truncate">
-                                                            {user.email || "Sem e-mail"}
+                                                            {user.email || user.user_id}
                                                         </span>
                                                     </div>
                                                     <Badge variant={isBanned ? "red" : "green"}>
@@ -291,10 +292,9 @@ export default function UserEnforcementList({ initialData, initialStats }: UserE
                                                 </div>
 
                                                 <div className="flex items-center justify-between text-xs text-brand-inactive-text">
-                                                    <div className="flex items-center gap-1.5 min-w-0">
-                                                        <StoreIcon size={12} className="shrink-0" />
-                                                        <span className="truncate">{user.partner?.store_name || "Sem loja vinculada"}</span>
-                                                    </div>
+                                                    <span>
+                                                        {storesCount > 0 ? (storesCount === 1 ? "1 loja vinculada" : `${storesCount} lojas vinculadas`) : "Nenhuma loja"}
+                                                    </span>
                                                     <span>{formatDate(user.created_at)}</span>
                                                 </div>
                                             </div>
@@ -305,30 +305,24 @@ export default function UserEnforcementList({ initialData, initialStats }: UserE
                                 {/* Desktop View: Table */}
                                 <div className="hidden md:block w-full overflow-hidden rounded-xl relative">
                                     <div className="overflow-x-auto pb-4 custom-scrollbar">
-                                        <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
+                                        <table className="w-full text-left border-separate border-spacing-0 min-w-[900px]">
                                             <thead>
                                                 <tr className="bg-brand-gray dark:bg-dark-border/50 select-none">
                                                     <th
                                                         onClick={() => handleSort("name")}
                                                         className="py-3 px-2 pl-6 rounded-l-lg text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
                                                     >
-                                                        Usuário / Nome {sortConfig?.key === "name" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
-                                                    </th>
-                                                    <th
-                                                        onClick={() => handleSort("email")}
-                                                        className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
-                                                    >
-                                                        E-mail {sortConfig?.key === "email" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+                                                        Usuário {sortConfig?.key === "name" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
                                                     </th>
                                                     <th
                                                         onClick={() => handleSort("store")}
                                                         className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
                                                     >
-                                                        Loja Vinculada {sortConfig?.key === "store" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+                                                        Lojas Vinculadas {sortConfig?.key === "store" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
                                                     </th>
                                                     <th
                                                         onClick={() => handleSort("date")}
-                                                        className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                        className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors text-center"
                                                     >
                                                         Cadastro {sortConfig?.key === "date" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
                                                     </th>
