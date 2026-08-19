@@ -70,7 +70,7 @@ export async function middleware(request: NextRequest) {
   const isSystemPath =
     pathname === "/" ||
     PUBLIC_PATHS.filter(p => p !== "/").some(p => pathname.startsWith(p)) ||
-    ["/institucional", "/erp", "/account", "/auth", "/sacola", "/perfil", "/pedidos", "/api", "/dashboard", "/payment", "/checkout", "/ddt-admin", "/entregadores", "/invite", "/vitrine", "/produto", "/assinaturas", "/colecoes", "/favoritos", "/select-erp"].some(p => pathname.startsWith(p));
+    ["/institucional", "/erp", "/account", "/auth", "/sacola", "/perfil", "/pedidos", "/api", "/print", "/dashboard", "/payment", "/checkout", "/ddt-admin", "/entregadores", "/invite", "/vitrine", "/produto", "/assinaturas", "/colecoes", "/favoritos", "/select-erp"].some(p => pathname.startsWith(p));
 
   // Apenas intercepta paths de 1 ou 2 segmentos que não são de sistema
   if (!isSystemPath && (segments.length === 1 || segments.length === 2)) {
@@ -156,7 +156,8 @@ export async function middleware(request: NextRequest) {
       try {
         const originHost = new URL(origin).host
         const expectedHost = new URL(appUrl).host
-        const isAllowedOrigin = originHost === expectedHost || (isDev && (originHost.startsWith("localhost") || originHost.startsWith("127.0.0.1")))
+        const isLoopbackOrigin = originHost.startsWith("localhost") || originHost.startsWith("127.0.0.1") || originHost.startsWith("0.0.0.0")
+        const isAllowedOrigin = originHost === expectedHost || isLoopbackOrigin || (isDev && isLoopbackOrigin)
 
         if (!isAllowedOrigin) {
           console.warn(`[MIDDLEWARE] CSRF: Blocked cross-origin server action. Origin: ${origin}, Expected: ${expectedHost}`)

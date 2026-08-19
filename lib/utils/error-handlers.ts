@@ -31,19 +31,27 @@ export function getErrorMessage(error: any): string {
   const errorMap: Record<string, string> = {
     // Auth Errors
     "invalid_credentials": "E-mail ou senha incorretos.",
-    "Email not confirmed": "Por favor, confirme seu e-mail antes de entrar.",
-    "User already registered": "Este e-mail já está cadastrado.",
     "Invalid login credentials": "E-mail ou senha incorretos.",
+    "email_not_confirmed": "Este e-mail ainda não foi confirmado. Verifique sua caixa de entrada.",
+    "Email not confirmed": "Este e-mail ainda não foi confirmado. Verifique sua caixa de entrada.",
+    "User already registered": "Este e-mail já está cadastrado.",
+    "user_already_exists": "Este e-mail já está cadastrado.",
+    "user_not_found": "Conta não encontrada.",
+    "User not found": "Conta não encontrada.",
+    "otp_expired": "Este link de e-mail é inválido ou expirou.",
+    "Email link is invalid or has expired": "Este link de e-mail é inválido ou expirou.",
+    "Token has expired or is invalid": "Este link de e-mail é inválido ou expirou.",
+    "invalid_grant": "Link ou credenciais inválidas ou expiradas.",
+    "access_denied": "Acesso negado.",
     "Too many requests": "Muitas tentativas. Tente novamente em breve.",
+    "over_email_send_rate_limit": "Muitos e-mails solicitados. Tente novamente em alguns instantes.",
     "Network request failed": "Erro de conexão. Verifique sua internet.",
     "Signup is disabled": "O cadastro de novos usuários está temporariamente desativado.",
     "Provider not enabled": "Este método de login não está disponível no momento.",
-    "User not found": "Usuário não encontrado.",
     "Password is too short": "A senha deve ter pelo menos 8 caracteres.",
     "New password should be different from the old password": "A nova senha deve ser diferente da atual.",
     "Database error saving new user": "Erro inesperado ao salvar usuário.",
-    "Error sending confirmation email": "Erro ao enviar e-mail de confirmação",
-    "Email link is invalid or has expired": "Este link de e-mail é inválido ou expirou.",
+    "Error sending confirmation email": "Erro ao enviar e-mail de confirmação.",
 
     // Database/PostgREST Errors
     "PGRST116": "Registro não encontrado.",
@@ -68,10 +76,12 @@ export function getErrorMessage(error: any): string {
   if (code && errorMap[String(code)]) return errorMap[String(code)]
 
   // Substring search for common patterns
-  if (message.includes("credentials")) return "E-mail ou senha incorretos."
+  if (message.includes("credentials") || message.includes("Invalid login")) return "E-mail ou senha incorretos."
+  if (message.includes("user not found") || message.includes("User not found")) return "Conta não encontrada."
   if (message.includes("already registered") || message.includes("already exists")) return "Este e-mail já está cadastrado."
-  if (message.includes("rate limit") || message.includes("too many requests")) return "Muitas tentativas. Tente novamente em breve."
-  if (message.includes("confirm your email")) return "Por favor, confirme seu e-mail antes de entrar."
+  if (message.includes("rate limit") || message.includes("too many requests") || message.includes("over_email_send_rate_limit")) return "Muitas tentativas. Tente novamente em breve."
+  if (message.includes("confirm your email") || message.includes("Email not confirmed") || message.includes("email_not_confirmed")) return "Este e-mail ainda não foi confirmado. Verifique sua caixa de entrada."
+  if (message.includes("otp_expired") || message.includes("invalid or has expired") || message.includes("Token has expired")) return "Este link de e-mail é inválido ou expirou."
   if (message.includes("NetworkError") || message.includes("Failed to fetch")) return "Erro de conexão. Verifique sua internet."
 
   // Coupon/discount constraint violations

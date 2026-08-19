@@ -236,12 +236,13 @@ export async function updateDeliveryDriverAdminAction(input: {
 export async function getDeliveryDriverStatsAdminAction() {
   await requireAdmin("admin")
   const admin = getAdminClient()
-  const [totalRes, activeRes, inactiveRes, availableRes, offlineRes] = await Promise.all([
+  const [totalRes, activeRes, inactiveRes, availableRes, offlineRes, invitesRes] = await Promise.all([
     admin.from("delivery_drivers").select("user_id", { count: "exact", head: true }),
     admin.from("delivery_drivers").select("user_id", { count: "exact", head: true }).eq("is_active", true),
     admin.from("delivery_drivers").select("user_id", { count: "exact", head: true }).eq("is_active", false),
     admin.from("delivery_drivers").select("user_id", { count: "exact", head: true }).eq("is_active", true).eq("availability_status", "available"),
     admin.from("delivery_drivers").select("user_id", { count: "exact", head: true }).or("is_active.eq.false,availability_status.eq.offline"),
+    admin.from("delivery_driver_invitations").select("id", { count: "exact", head: true }).is("used_at", null).is("revoked_at", null),
   ])
   return {
     total: totalRes.count || 0,
@@ -249,6 +250,101 @@ export async function getDeliveryDriverStatsAdminAction() {
     inactive: inactiveRes.count || 0,
     available: availableRes.count || 0,
     offline: offlineRes.count || 0,
+    pendingInvites: invitesRes.count || 0,
   }
 }
+
+export async function listDeliveryDriverInvitationsAdminAction(params?: { limit?: number }) {
+  await requireAdmin("admin")
+  const admin = getAdminClient()
+  const limit = Math.min(Math.max(Number(params?.limit || 50), 1), 100)
+
+  const { data, error } = await admin
+    .from("delivery_driver_invitations")
+    .select("id, email, full_name, phone, city, neighborhood, vehicle_type, notes, created_at, expires_at, used_at, revoked_at")
+    .order("created_at", { ascending: false })
+    .limit(limit)
+
+  if (error) {
+    return { success: false as const, error: "Não foi possível carregar os convites." }
+  }
+
+  return {
+    success: true as const,
+    items: Array.isArray(data) ? data : [],
+  }
+}
+
+export async function revokeDeliveryDriverInvitationAdminAction(invitationId: string) {
+  const adminUser = await requireAdmin("admin")
+  const admin = getAdminClient()
+
+  const { error } = await admin
+    .from("delivery_driver_invitations")
+    .update({ revoked_at: new Date().toISOString() })
+    .eq("id", invitationId)
+
+  if (error) {
+    return { success: false as const, error: "Não foi possível revogar o convite." }
+  }
+
+  await adminAuditLog({
+    adminUserId: adminUser.userId,
+    actionType: AdminActionType.DELIVERY_DRIVER_INVITE_REVOKE,
+    targetType: "system",
+    targetId: invitationId,
+    metadata: { invitationId },
+  })
+
+  revalidatePath("/ddt-admin/entregadores")
+  return { success: true as const }
+}
+
+export async function resendDeliveryDriverInvitationAdminAction(invitationId: string) {
+  const adminUser = await requireAdmin("admin")
+  const admin = getAdminClient()
+
+  const { data: inv, error } = await admin
+    .from("delivery_driver_invitations")
+    .select("id, email, full_name, phone, city, neighborhood, vehicle_type, notes")
+    .eq("id", invitationId)
+    .maybeSingle()
+
+  if (error || !inv) {
+    return { success: false as const, error: "Convite não encontrado." }
+  }
+
+  const token = randomBytes(32).toString("hex")
+  const tokenHash = createHash("sha256").update(token).digest("hex")
+
+  await admin
+    .from("delivery_driver_invitations")
+    .update({
+      token_hash: tokenHash,
+      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      revoked_at: null,
+      used_at: null,
+    })
+    .eq("id", invitationId)
+
+  const url = inviteUrl(token)
+  const templateId = SMTP2GO_TEMPLATE_IDS.deliveryDriverInvitation || undefined
+  const emailRequest: InternalEmailRequest = {
+    to: [{ email: inv.email, name: inv.full_name }],
+    subject: "Convite para o Portal do Entregador Dudit",
+    template_id: templateId,
+    variables: templateId ? {
+      full_name: inv.full_name,
+      invite_url: url,
+      expiration_days: "7",
+    } : undefined,
+    html: templateId ? undefined : `<p>Olá, ${escapeHtml(inv.full_name)}.</p><p>Você foi convidado para o Portal do Entregador Dudit.</p><p><a href="${escapeHtml(url)}">Criar minha conta</a></p><p>Este convite expira em 7 dias e só pode ser aceito com este email.</p>`,
+    text: `Olá, ${inv.full_name}. Acesse ${url} para criar sua conta no Portal do Entregador Dudit. O convite expira em 7 dias.`,
+    userId: adminUser.userId,
+  }
+
+  const emailResult = await SMTP2GOService.sendEmail(emailRequest)
+  return { success: true as const, emailSent: emailResult.success, inviteUrl: url }
+}
+
 

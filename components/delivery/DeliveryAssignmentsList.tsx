@@ -3,17 +3,24 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef } from "react"
 import { AnimatePresence } from "framer-motion"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { Button, IconPlaceholder, ThreeDotsLoader } from "@/components/reusable"
+import { Button, IconPlaceholder, ThreeDotsLoader, FormDropdown } from "@/components/reusable"
 import Pagination from "@/components/reusable/Pagination"
 import {
     listMyDeliveryAssignmentsAction,
+    getDeliveryDashboardAction,
+    setMyDeliveryAvailabilityAction,
 } from "@/app/actions/delivery-drivers"
 import { toast } from "@/hooks/use-notification"
 import {
     ReloadIcon,
     ArrowUpDownIcon,
 } from "@/lib/icons"
-import DeliveryPageControls, { type DeliveryTab } from "./DeliveryPageControls"
+import { useMediaQuery } from "@/components/erp/hooks"
+import DeliveryPageControls, {
+    type DeliveryTab,
+    type DeliveryFilterState,
+    INITIAL_DELIVERY_FILTERS,
+} from "./DeliveryPageControls"
 import DeliveryAssignmentListRow, { type DeliveryAssignmentItem } from "./DeliveryAssignmentListRow"
 import DeliveryAssignmentGridCard from "./DeliveryAssignmentGridCard"
 
@@ -23,6 +30,7 @@ type SortDirection = "asc" | "desc"
 const ITEMS_PER_PAGE = 12
 
 export default function DeliveryAssignmentsList() {
+    const isTabletOrMobile = useMediaQuery("(max-width: 1023px)")
     const [activeTab, setActiveTab] = useState<DeliveryTab>("todas")
     const [search, setSearch] = useState("")
     const [viewMode, setViewMode] = useState<"list" | "grid">("list")
@@ -30,6 +38,12 @@ export default function DeliveryAssignmentsList() {
     const [allItems, setAllItems] = useState<DeliveryAssignmentItem[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [isRefreshing, setIsRefreshing] = useState(false)
+    const [filters, setFilters] = useState<DeliveryFilterState>(INITIAL_DELIVERY_FILTERS)
+
+    // Availability State
+    const [availability, setAvailability] = useState<string>("available")
+    const [isAvailabilityLoading, setIsAvailabilityLoading] = useState(false)
+
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection }>({
         key: "date",
         direction: "desc",
@@ -52,15 +66,22 @@ export default function DeliveryAssignmentsList() {
         else setIsLoading(true)
 
         try {
-            // Load all assignments to enable rich client-side search, tabs & pagination
-            const result = await listMyDeliveryAssignmentsAction({ bucket: "all", limit: 50 })
-            if (!result.success) {
-                toast.error(result.error || "Erro ao carregar entregas.")
-                return
+            const [assignmentsRes, dashboardRes] = await Promise.all([
+                listMyDeliveryAssignmentsAction({ bucket: "all", limit: 50 }),
+                getDeliveryDashboardAction(),
+            ])
+
+            if (assignmentsRes.success) {
+                setAllItems(assignmentsRes.items || [])
+            } else {
+                toast.error(assignmentsRes.error || "Erro ao carregar entregas.")
             }
-            setAllItems(result.items || [])
+
+            if (dashboardRes.success && dashboardRes.data) {
+                setAvailability(String(dashboardRes.data.availability || "available"))
+            }
         } catch (e: any) {
-            toast.error(e?.message || "Erro inesperado ao buscar entregas.")
+            toast.error(e?.message || "Erro inesperado ao buscar dados.")
         } finally {
             setIsLoading(false)
             setIsRefreshing(false)
@@ -71,10 +92,38 @@ export default function DeliveryAssignmentsList() {
         void loadData()
     }, [loadData])
 
-    // Reset pagination when tab or search changes
+    // Reset pagination when tab, search or filters change
     useEffect(() => {
         setCurrentPage(1)
-    }, [activeTab, search])
+    }, [activeTab, search, filters])
+
+    const changeAvailability = async (value: string) => {
+        const nextStatus = value as "available" | "offline"
+        setIsAvailabilityLoading(true)
+        const result = await setMyDeliveryAvailabilityAction(nextStatus)
+        setIsAvailabilityLoading(false)
+
+        if (!result.success) {
+            toast.error(result.error || "Não foi possível atualizar a disponibilidade.")
+            return
+        }
+
+        setAvailability(nextStatus)
+        toast.success(
+            nextStatus === "available"
+                ? "Você está Disponível para receber pedidos!"
+                : "Você está Offline."
+        )
+    }
+
+    // List of partner names for dynamic filter options
+    const partnerOptions = useMemo(() => {
+        const set = new Set<string>()
+        allItems.forEach((it) => {
+            if (it.partner_name) set.add(it.partner_name)
+        })
+        return Array.from(set)
+    }, [allItems])
 
     // Counts per tab
     const tabCounts = useMemo(() => {
@@ -101,7 +150,7 @@ export default function DeliveryAssignmentsList() {
         return counts
     }, [allItems])
 
-    // Filter by tab & search query
+    // Filter by tab, search query & advanced filters
     const filteredItems = useMemo(() => {
         return allItems.filter((item) => {
             // Tab filtering
@@ -109,6 +158,43 @@ export default function DeliveryAssignmentsList() {
             if (activeTab === "in_progress" && !["picked_up", "out_for_delivery"].includes(item.status)) return false
             if (activeTab === "completed" && item.status !== "delivered") return false
             if (activeTab === "failed" && !["failed", "cancelled"].includes(item.status)) return false
+
+            // Partner name filter
+            if (
+                filters.partnerNames.length > 0 &&
+                !filters.partnerNames.includes(item.partner_name || "")
+            ) {
+                return false
+            }
+
+            // Payment method filter
+            if (filters.paymentMethods.length > 0) {
+                const method = String(item.payment_method || "").toLowerCase()
+                const matches = filters.paymentMethods.some((pm) => {
+                    const normalized = pm.toLowerCase()
+                    if (normalized.includes("dinheiro") && method.includes("dinheiro")) return true
+                    if (normalized.includes("pix") && method.includes("pix")) return true
+                    if (normalized.includes("crédito") && (method.includes("crédito") || method.includes("credito"))) return true
+                    if (normalized.includes("débito") && (method.includes("débito") || method.includes("debito"))) return true
+                    return method.includes(normalized)
+                })
+                if (!matches) return false
+            }
+
+            // Status filter
+            if (filters.status.length > 0) {
+                const statusMap: Record<string, string> = {
+                    "Atribuída": "assigned",
+                    "Aceita": "accepted",
+                    "Retirada no Local": "picked_up",
+                    "Em Rota de Entrega": "out_for_delivery",
+                    "Entregue": "delivered",
+                    "Falha na Entrega": "failed",
+                    "Cancelada": "cancelled",
+                }
+                const selectedCodes = filters.status.map((s) => statusMap[s] || s)
+                if (!selectedCodes.includes(item.status)) return false
+            }
 
             // Search filtering
             if (search.trim()) {
@@ -132,7 +218,7 @@ export default function DeliveryAssignmentsList() {
 
             return true
         })
-    }, [allItems, activeTab, search])
+    }, [allItems, activeTab, search, filters])
 
     // Sorted items
     const sortedItems = useMemo(() => {
@@ -175,6 +261,11 @@ export default function DeliveryAssignmentsList() {
     }
 
     const hasAnyDeliveries = allItems.length > 0
+    const isOccupied = availability === "occupied"
+    const isAvailable = availability === "available"
+
+    // Effective view mode: on tablet/mobile it's always grid
+    const effectiveViewMode = isTabletOrMobile ? "grid" : viewMode
 
     return (
         <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
@@ -200,7 +291,35 @@ export default function DeliveryAssignmentsList() {
                         </p>
                     </div>
 
+                    {/* TOP CONTROLS: AVAILABILITY & REFRESH */}
                     <div className="flex items-center gap-3">
+                        {/* AVAILABILITY SELECTOR VIA FORMDROPDOWN */}
+                        <div className="flex items-center gap-2 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl p-1 shadow-xs">
+                            <div className="flex items-center gap-2 pl-2 pr-1">
+                                <span
+                                    className={`h-2.5 w-2.5 rounded-full shrink-0 ${
+                                        isOccupied
+                                            ? "bg-amber-500 animate-pulse"
+                                            : isAvailable
+                                            ? "bg-emerald-500 animate-pulse"
+                                            : "bg-gray-400"
+                                    }`}
+                                />
+                            </div>
+                            <div className="w-36">
+                                <FormDropdown
+                                    value={isOccupied ? "available" : availability}
+                                    setValue={changeAvailability}
+                                    disabled={isAvailabilityLoading || isOccupied}
+                                    options={[
+                                        { value: "available", label: "Disponível" },
+                                        { value: "offline", label: "Offline" },
+                                    ]}
+                                    className="border-0 bg-transparent text-xs font-semibold"
+                                />
+                            </div>
+                        </div>
+
                         <Button
                             variant="outline"
                             onClick={() => loadData(true)}
@@ -212,7 +331,43 @@ export default function DeliveryAssignmentsList() {
                     </div>
                 </div>
 
-                {/* CONTROLS (Tabs, Search, View Mode) */}
+                {/* MOBILE AVAILABILITY BAR */}
+                <div className="md:hidden flex items-center justify-between gap-2 px-4 mb-3">
+                    <div className="flex-1 flex items-center gap-2 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl p-1 shadow-xs">
+                        <span
+                            className={`h-2.5 w-2.5 rounded-full shrink-0 ml-2 ${
+                                isOccupied
+                                    ? "bg-amber-500 animate-pulse"
+                                    : isAvailable
+                                    ? "bg-emerald-500 animate-pulse"
+                                    : "bg-gray-400"
+                            }`}
+                        />
+                        <div className="flex-1">
+                            <FormDropdown
+                                value={isOccupied ? "available" : availability}
+                                setValue={changeAvailability}
+                                disabled={isAvailabilityLoading || isOccupied}
+                                options={[
+                                    { value: "available", label: "Disponível" },
+                                    { value: "offline", label: "Offline" },
+                                ]}
+                                className="border-0 bg-transparent text-xs font-semibold"
+                            />
+                        </div>
+                    </div>
+
+                    <Button
+                        variant="outline"
+                        onClick={() => loadData(true)}
+                        disabled={isRefreshing || isLoading}
+                        className="h-10 px-3 shrink-0"
+                    >
+                        <ReloadIcon size={16} className={isRefreshing ? "animate-spin" : ""} />
+                    </Button>
+                </div>
+
+                {/* CONTROLS (Tabs, Search, FilterSheet, View Mode) */}
                 <DeliveryPageControls
                     activeTab={activeTab}
                     setActiveTab={setActiveTab}
@@ -221,6 +376,9 @@ export default function DeliveryAssignmentsList() {
                     viewMode={viewMode}
                     onViewModeChange={setViewMode}
                     tabCounts={tabCounts}
+                    filters={filters}
+                    setFilters={setFilters}
+                    partnerOptions={partnerOptions}
                 />
 
                 {/* CONTENT AREA */}
@@ -237,7 +395,7 @@ export default function DeliveryAssignmentsList() {
                             >
                                 <IconPlaceholder
                                     placeholderType="image"
-                                    imageSrc="https://img.dudit.com.br/static/mascots/Logistica.png"
+                                    imageSrc="https://img.dudit.com.br/static/mascots/Entregas.png"
                                     imageAlt="Sem entregas"
                                     title="Você ainda não tem entregas"
                                     subtitle="Quando novos pedidos forem atribuídos a você pelos lojistas, eles aparecerão aqui."
@@ -257,18 +415,19 @@ export default function DeliveryAssignmentsList() {
                                     imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
                                     imageAlt="Nenhuma entrega encontrada"
                                     title="Nenhuma entrega encontrada"
-                                    subtitle="Tente ajustar os termos de busca ou mudar a categoria selecionada."
+                                    subtitle="Tente ajustar os termos de busca ou limpar os filtros selecionados."
                                     itemButton={{
                                         text: "Limpar filtros",
                                         action: () => {
                                             setSearch("")
                                             setActiveTab("todas")
+                                            setFilters(INITIAL_DELIVERY_FILTERS)
                                         },
                                         variant: "outline",
                                     }}
                                 />
                             </FadeIn>
-                        ) : viewMode === "grid" ? (
+                        ) : effectiveViewMode === "grid" ? (
                             /* GRID VIEW */
                             <FadeIn key={`grid-${activeTab}`} className="w-full">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-6">
@@ -311,7 +470,11 @@ export default function DeliveryAssignmentsList() {
                                                             <span>Pedido</span>
                                                             <ArrowUpDownIcon
                                                                 size={13}
-                                                                className={sortConfig.key === "order" ? "text-brand-green" : "opacity-40"}
+                                                                className={
+                                                                    sortConfig.key === "order"
+                                                                        ? "text-brand-green"
+                                                                        : "opacity-40"
+                                                                }
                                                             />
                                                         </div>
                                                     </th>
@@ -332,7 +495,11 @@ export default function DeliveryAssignmentsList() {
                                                             <span>Valores</span>
                                                             <ArrowUpDownIcon
                                                                 size={13}
-                                                                className={sortConfig.key === "fee" ? "text-brand-green" : "opacity-40"}
+                                                                className={
+                                                                    sortConfig.key === "fee"
+                                                                        ? "text-brand-green"
+                                                                        : "opacity-40"
+                                                                }
                                                             />
                                                         </div>
                                                     </th>

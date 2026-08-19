@@ -1513,7 +1513,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                         {order.payment_provider === "Mercado Pago" ? "Mercado Pago" : "Pagamento direto"}
                                                     </span>
                                                 }
-                                                className="border-none px-0 py-2 !bg-transparent shadow-none hover:border-none cursor-default"
+                                                className="border-none px-0 py-0 !bg-transparent shadow-none hover:border-none cursor-default"
                                                 onClick={handlePixClick}
                                                 right={
                                                     <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(totalAmount)}</span>

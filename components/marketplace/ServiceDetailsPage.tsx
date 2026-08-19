@@ -235,14 +235,15 @@ export function ServiceDetailsPageClient({
         const p = Array.isArray(service.partners) ? service.partners[0] : service.partners
         const store = service?.stores || p?.stores || p?.store
         const address = store?.addresses?.[0] || p?.addresses?.[0] || {}
-        const storeId = store?.id || p?.store_id || service.store_id || p?.id || service.partner_id || "1"
+        const storeId = store?.id || p?.store_id || service.store_id || null
+        const partnerId = p?.id || service.partner_id
         const storeName = store?.name || p?.name || p?.store_name || "Profissional"
 
         return {
-            id: storeId,
+            id: partnerId,
+            partner_id: partnerId,
             store_id: storeId,
             name: storeName,
-            partner_id: p?.id || service.partner_id,
             user_id: p?.user_id,
             phone: store?.phone || store?.whatsapp_phone || p?.phone,
             store_name: storeName,
@@ -793,7 +794,7 @@ export function ServiceDetailsPageClient({
     // ─── Handlers ─────────────────────────────────────────────────────────────
 
     const buildBookingPayload = useCallback(() => {
-        const resolvedPartnerId = partner?.id || service.partner_id
+        const resolvedPartnerId = service.partner_id || partner?.partner_id || partner?.id
         const resolvedStoreId = service.store_id || partner?.store_id || undefined
 
         return {
@@ -1461,6 +1462,7 @@ export function ServiceDetailsPageClient({
                             <ListItem
                                 icon={StoreIcon}
                                 title="No estabelecimento/local do vendedor"
+                                className="border-0 px-0 py-0"
                             />
                         )}
                         {service.fulfillment_modes?.includes("customer_location") && (

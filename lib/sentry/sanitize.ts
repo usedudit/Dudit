@@ -221,7 +221,28 @@ export function sanitizeEvent(event: Event): Event {
   return sanitized
 }
 
-export function beforeSend(event: ErrorEvent, _hint: EventHint): ErrorEvent | null {
+export function beforeSend(event: ErrorEvent, hint?: EventHint): ErrorEvent | null {
+  const error: any = hint?.originalException
+  const message = (typeof error === "string" ? error : error?.message) || event?.message || ""
+  const code = error?.code || ""
+  const name = error?.name || ""
+
+  if (
+    code === "ECONNRESET" ||
+    code === "EPIPE" ||
+    code === "ECANCELED" ||
+    code === "ERR_STREAM_PREMATURE_CLOSE" ||
+    code === "UND_ERR_ABORTED" ||
+    message === "aborted" ||
+    message.includes("aborted") ||
+    message.includes("ECONNRESET") ||
+    message.includes("socket hang up") ||
+    message.includes("The user aborted a request") ||
+    name === "AbortError"
+  ) {
+    return null
+  }
+
   return sanitizeEvent(event) as ErrorEvent
 }
 

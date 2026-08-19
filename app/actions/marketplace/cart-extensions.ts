@@ -103,9 +103,6 @@ export async function addServiceBookingToCartAction(
 
   const supabase = await getSupabaseServerClient()
   const user = await requireUser()
-  const guard = await assertCanBuyFromStore(user.id, input.partnerId, input.storeId)
-  if (guard.error) return { error: guard.error }
-
   const admin = getAdminClient()
   const { data: service, error: serviceError } = await admin
     .from("services")
@@ -121,13 +118,29 @@ export async function addServiceBookingToCartAction(
     return { error: "Serviço não encontrado." }
   }
 
-  if (service.partner_id !== input.partnerId) {
-    console.warn("[addServiceBookingToCartAction] Partner mismatch:", {
-      servicePartnerId: service.partner_id,
-      inputPartnerId: input.partnerId,
-    })
-    return { error: "Serviço não pertence a este estabelecimento." }
+  const canonicalPartnerId = service.partner_id
+  let effectiveStoreId = input.storeId || service.store_id || null
+
+  if (input.partnerId && input.partnerId !== canonicalPartnerId) {
+    const { data: storeMatch } = await admin
+      .from("stores")
+      .select("id, partner_id")
+      .eq("id", input.partnerId)
+      .maybeSingle()
+
+    if (storeMatch && storeMatch.partner_id === canonicalPartnerId) {
+      if (!effectiveStoreId) effectiveStoreId = storeMatch.id
+    } else {
+      console.warn("[addServiceBookingToCartAction] Partner mismatch:", {
+        servicePartnerId: canonicalPartnerId,
+        inputPartnerId: input.partnerId,
+      })
+      return { error: "Serviço não pertence a este estabelecimento." }
+    }
   }
+
+  const guard = await assertCanBuyFromStore(user.id, canonicalPartnerId, effectiveStoreId)
+  if (guard.error) return { error: guard.error }
 
   if (
     service.deleted_at ||
@@ -144,10 +157,10 @@ export async function addServiceBookingToCartAction(
     return { error: "Este serviço está temporariamente indisponível." }
   }
 
-  if (service.store_id && input.storeId && service.store_id !== input.storeId) {
+  if (service.store_id && effectiveStoreId && service.store_id !== effectiveStoreId) {
     console.warn("[addServiceBookingToCartAction] Store exclusivity mismatch:", {
       serviceStoreId: service.store_id,
-      inputStoreId: input.storeId,
+      effectiveStoreId,
     })
     return { error: "Este serviço não está disponível nesta unidade." }
   }
@@ -175,8 +188,6 @@ export async function addServiceBookingToCartAction(
     }
   })
 
-  const effectiveStoreId = input.storeId || service.store_id || null
-
   if (match?.id) {
     const { error: updateError } = await supabase
       .from("cart_items")
@@ -202,7 +213,7 @@ export async function addServiceBookingToCartAction(
     .from("cart_items")
     .insert({
       user_id: user.id,
-      partner_id: input.partnerId,
+      partner_id: canonicalPartnerId,
       store_id: effectiveStoreId,
       item_type: "service_booking",
       service_id: input.serviceId,
@@ -382,9 +393,6 @@ export async function addPurchasableServiceToCartAction(
 
   const supabase = await getSupabaseServerClient()
   const user = await requireUser()
-  const guard = await assertCanBuyFromStore(user.id, input.partnerId, input.storeId)
-  if (guard.error) return { error: guard.error }
-
   const admin = getAdminClient()
   const { data: service, error: serviceError } = await admin
     .from("services")
@@ -393,7 +401,27 @@ export async function addPurchasableServiceToCartAction(
     .maybeSingle()
 
   if (serviceError || !service) return { error: "Serviço não encontrado." }
-  if (service.partner_id !== input.partnerId) return { error: "Serviço não pertence a este estabelecimento." }
+
+  const canonicalPartnerId = service.partner_id
+  let effectiveStoreId = input.storeId || service.store_id || null
+
+  if (input.partnerId && input.partnerId !== canonicalPartnerId) {
+    const { data: storeMatch } = await admin
+      .from("stores")
+      .select("id, partner_id")
+      .eq("id", input.partnerId)
+      .maybeSingle()
+
+    if (storeMatch && storeMatch.partner_id === canonicalPartnerId) {
+      if (!effectiveStoreId) effectiveStoreId = storeMatch.id
+    } else {
+      return { error: "Serviço não pertence a este estabelecimento." }
+    }
+  }
+
+  const guard = await assertCanBuyFromStore(user.id, canonicalPartnerId, effectiveStoreId)
+  if (guard.error) return { error: guard.error }
+
   if (
     service.deleted_at ||
     service.status === "archived" ||
@@ -402,7 +430,7 @@ export async function addPurchasableServiceToCartAction(
   ) {
     return { error: "Este serviço está temporariamente indisponível." }
   }
-  if (service.store_id && input.storeId && service.store_id !== input.storeId) {
+  if (service.store_id && effectiveStoreId && service.store_id !== effectiveStoreId) {
     return { error: "Este serviço não está disponível nesta unidade." }
   }
 
@@ -421,10 +449,10 @@ export async function addPurchasableServiceToCartAction(
 
   return addServiceBookingToCartAction({
     serviceId: input.serviceId,
-    partnerId: input.partnerId,
+    partnerId: canonicalPartnerId,
     booking,
     csrf_token: input.csrf_token,
-    storeId: input.storeId,
+    storeId: effectiveStoreId || undefined,
   })
 }
 

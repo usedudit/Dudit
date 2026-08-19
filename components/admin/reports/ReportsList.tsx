@@ -6,15 +6,13 @@ import { AnimatePresence } from "framer-motion"
 import { toast } from "@/hooks/use-notification"
 import {
     Button,
-    Badge,
-    Input,
     Pagination,
     IconPlaceholder,
     DefaultModal,
 } from "@/components/reusable"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
-import type { Report, ReportsStats, ReportStatus } from "@/app/actions/admin/reports"
+import type { Report, ReportsStats } from "@/app/actions/admin/reports"
 import {
     getReports,
     getReportsStats,
@@ -24,25 +22,16 @@ import {
     revertReportValidation,
 } from "@/app/actions/admin/reports"
 import ReportListRow from "./ReportListRow"
-import ReportsPageControls from "./ReportsPageControls"
+import ReportsPageControls, { type ReportFilterState, INITIAL_REPORT_FILTERS } from "./ReportsPageControls"
 import { AdminReportDetailView } from "./AdminReportDetailView"
 import { useEntityState } from "@/hooks/use-entity-state"
-import { formatDate } from "@/lib/utils"
-import { ShieldIcon } from "@/lib/icons"
+import { ShieldIcon, ArrowUpDownIcon } from "@/lib/icons"
 
 interface ReportsListProps {
     initialData: Report[]
     initialStats: ReportsStats
     initialHasMore?: boolean
     initialNextCursor?: string | null
-}
-
-interface FilterState {
-    targetType: string[]
-}
-
-const INITIAL_FILTERS: FilterState = {
-    targetType: [],
 }
 
 const ITEMS_PER_PAGE = 8
@@ -59,7 +48,7 @@ export default function ReportsList({
 
     // Filters
     const [statusTab, setStatusTab] = useState<string>("pending")
-    const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
+    const [filters, setFilters] = useState<ReportFilterState>(INITIAL_REPORT_FILTERS)
     const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false)
     const [search, setSearch] = useState("")
 
@@ -106,13 +95,13 @@ export default function ReportsList({
         })
     }, [])
 
-    const handleConfirmResolve = () => {
+    const handleResolve = () => {
         if (!resolveTarget) return
         startTransition(async () => {
             try {
-                const res = await resolveReport(resolveTarget.id, actionReason || "Denúncia procedente")
+                const res = await resolveReport(resolveTarget.id, actionReason || "Denúncia procedente confirmada")
                 if (res.success) {
-                    toast.success("Denúncia validada com sucesso!")
+                    toast.success("Denúncia validada com sucesso (+5 score de risco atribuído)")
                     setResolveTarget(null)
                     setActionReason("")
                     refreshReports()
@@ -125,13 +114,13 @@ export default function ReportsList({
         })
     }
 
-    const handleConfirmDismiss = () => {
+    const handleDismiss = () => {
         if (!dismissTarget) return
         startTransition(async () => {
             try {
-                const res = await dismissReport(dismissTarget.id, actionReason || "Denúncia improcedente")
+                const res = await dismissReport(dismissTarget.id, actionReason || "Denúncia improcedente ou sem provas")
                 if (res.success) {
-                    toast.success("Denúncia descartada!")
+                    toast.success("Denúncia descartada")
                     setDismissTarget(null)
                     setActionReason("")
                     refreshReports()
@@ -144,13 +133,13 @@ export default function ReportsList({
         })
     }
 
-    const handleConfirmSpam = () => {
+    const handleSpam = () => {
         if (!spamTarget) return
         startTransition(async () => {
             try {
-                const res = await markReportSpam(spamTarget.id, actionReason || "Classificada como spam")
+                const res = await markReportSpam(spamTarget.id, actionReason || "Denúncia abusiva / spam")
                 if (res.success) {
-                    toast.success("Denúncia marcada como spam!")
+                    toast.success("Denúncia marcada como spam")
                     setSpamTarget(null)
                     setActionReason("")
                     refreshReports()
@@ -163,18 +152,18 @@ export default function ReportsList({
         })
     }
 
-    const handleConfirmRevert = () => {
+    const handleRevert = () => {
         if (!revertTarget) return
         startTransition(async () => {
             try {
-                const res = await revertReportValidation(revertTarget.id, actionReason || "Reversão administrativa")
+                const res = await revertReportValidation(revertTarget.id, actionReason || "Reversão administrativa de validação")
                 if (res.success) {
-                    toast.success("Validação revertida com sucesso!")
+                    toast.success("Validação revertida com sucesso (-5 score de risco)")
                     setRevertTarget(null)
                     setActionReason("")
                     refreshReports()
                 } else {
-                    toast.error(res.error || "Erro ao reverter validação")
+                    toast.error(res.error || "Erro ao reverter denúncia")
                 }
             } catch (err: any) {
                 toast.error(err.message || "Erro inesperado")
@@ -188,14 +177,23 @@ export default function ReportsList({
 
         let result = reports.filter((r) => {
             // Tab filter
-            if (statusTab !== "all" && r.status !== statusTab) return false
+            if (statusTab !== "all" && r.status !== statusTab) {
+                return false
+            }
 
-            // FilterSheet targetType
+            // Target Type filter
             if (filters.targetType.length > 0) {
-                const targetLabel = r.target_type === "product" ? "Produto" : r.target_type === "service" ? "Serviço" : r.target_type === "partner" ? "Parceiro" : "Avaliação"
-                if (!filters.targetType.includes(targetLabel)) {
-                    return false
+                const typeMap: Record<string, string> = {
+                    "Produto": "product",
+                    "Serviço": "service",
+                    "Parceiro": "partner",
+                    "Avaliação": "review",
                 }
+                const match = filters.targetType.some((t) => {
+                    const mapped = typeMap[t] || t.toLowerCase()
+                    return r.target_type === mapped
+                })
+                if (!match) return false
             }
 
             // Search filter
@@ -299,7 +297,19 @@ export default function ReportsList({
                 .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
             `}</style>
 
-            <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6 space-y-6">
+            <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
+                {/* Desktop Header */}
+                <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
+                    <div className="flex flex-col gap-2 pt-1">
+                        <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
+                            Denúncias
+                        </h1>
+                        <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
+                            Gerencie, investigue e valide denúncias contra produtos, serviços, lojas e avaliações.
+                        </p>
+                    </div>
+                </div>
+
                 {/* Header Controls */}
                 <ReportsPageControls
                     activeTab={statusTab}
@@ -307,25 +317,26 @@ export default function ReportsList({
                     search={search}
                     onSearchChange={setSearch}
                     onOpenFilter={() => setIsFilterSheetOpen(true)}
+                    filters={filters}
+                    setFilters={setFilters}
                     hasActiveFilters={hasActiveFilters}
-                    hasData={reports.length > 0}
                     stats={stats}
                 />
 
                 {/* Content Area */}
-                <div>
+                <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-6 px-4 md:px-8">
                     <AnimatePresence mode="wait">
                         {filteredReports.length === 0 ? (
                             <FadeIn key="empty" className="w-full">
                                 <IconPlaceholder
                                     icon={ShieldIcon}
                                     title="Nenhuma denúncia encontrada"
-                                    subtitle={hasActiveFilters ? "Tente ajustar seus filtros de busca." : "Nenhuma denúncia nesta categoria."}
+                                    subtitle={hasActiveFilters ? "Tente ajustar seus filtros de busca." : "Nenhuma denúncia nesta categoria no momento."}
                                     itemButton={hasActiveFilters ? {
                                         text: "Limpar Filtros",
                                         action: () => {
                                             setSearch("")
-                                            setFilters(INITIAL_FILTERS)
+                                            setFilters(INITIAL_REPORT_FILTERS)
                                             setStatusTab("pending")
                                         },
                                         variant: "outline",
@@ -337,76 +348,80 @@ export default function ReportsList({
                                 {/* Mobile View (Cards) */}
                                 <div className="md:hidden flex flex-col w-full divide-y divide-brand-border dark:divide-dark-border">
                                     {paginatedItems.map((report) => (
-                                        <div
+                                        <ReportListRow
                                             key={report.id}
-                                            className="py-4 flex flex-col gap-2.5 cursor-pointer active:bg-brand-gray/50 dark:active:bg-dark-border/20 transition-colors"
-                                            onClick={() => openEntity("view", report.id)}
-                                        >
-                                            <div className="flex justify-between items-start gap-2">
-                                                <div className="flex flex-col gap-0.5 min-w-0">
-                                                    <span className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">
-                                                        {report.target_type === "review" ? `Avaliação #${report.target_id.slice(0, 8)}` : report.target_name || report.target_id}
-                                                    </span>
-                                                    <span className="text-xs text-brand-inactive-text truncate">
-                                                        Por: {report.reporter_name || "Usuário"}
-                                                    </span>
-                                                </div>
-                                                <Badge variant={report.status === "validated" ? "red" : report.status === "pending" ? "orange" : "gray"}>
-                                                    {report.status === "validated" ? "Validada" : report.status === "pending" ? "Pendente" : report.status === "spam" ? "Spam" : "Descartada"}
-                                                </Badge>
-                                            </div>
-
-                                            <div className="flex items-center justify-between text-xs text-brand-inactive-text">
-                                                <span className="truncate">{report.reason_label || report.reason}</span>
-                                                <span>{formatDate(report.created_at)}</span>
-                                            </div>
-                                        </div>
+                                            report={report}
+                                            isPending={isPending}
+                                            onDetail={() => openEntity("view", report.id)}
+                                            onResolve={() => setResolveTarget(report)}
+                                            onDismiss={() => setDismissTarget(report)}
+                                            onSpam={() => setSpamTarget(report)}
+                                            onRevert={() => setRevertTarget(report)}
+                                        />
                                     ))}
                                 </div>
 
-                                {/* Desktop View: Table */}
-                                <div className="hidden md:block w-full overflow-hidden rounded-xl relative">
-                                    <div className="overflow-x-auto pb-4 custom-scrollbar">
-                                        <table className="w-full text-left border-separate border-spacing-0 min-w-[950px]">
+                                {/* Desktop View (Table) */}
+                                <div className="hidden md:block w-full overflow-hidden rounded-2xl border border-brand-border dark:border-dark-border relative bg-white dark:bg-dark-surface shadow-xs">
+                                    <div className="overflow-x-auto custom-scrollbar">
+                                        <table className="w-full text-left border-collapse min-w-[900px]">
                                             <thead>
-                                                <tr className="bg-brand-gray dark:bg-dark-border/50 select-none">
+                                                <tr className="bg-brand-gray/80 dark:bg-dark-border/40 border-b border-brand-border dark:border-dark-border select-none">
                                                     <th
                                                         onClick={() => handleSort("target")}
-                                                        className="py-3 px-2 pl-6 rounded-l-lg text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                        className="py-3 px-3 pl-6 text-xs font-semibold text-brand-inactive-text dark:text-dark-body cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
                                                     >
-                                                        Item Denunciado {sortConfig?.key === "target" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
-                                                    </th>
-                                                    <th
-                                                        onClick={() => handleSort("reason")}
-                                                        className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
-                                                    >
-                                                        Motivo {sortConfig?.key === "reason" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
-                                                    </th>
-                                                    <th
-                                                        onClick={() => handleSort("reporter")}
-                                                        className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
-                                                    >
-                                                        Denunciante {sortConfig?.key === "reporter" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
-                                                    </th>
-                                                    <th
-                                                        onClick={() => handleSort("date")}
-                                                        className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors text-center"
-                                                    >
-                                                        Data {sortConfig?.key === "date" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span>Alvo</span>
+                                                            <ArrowUpDownIcon size={13} className={sortConfig?.key === "target" ? "text-brand-green" : "opacity-40"} />
+                                                        </div>
                                                     </th>
                                                     <th
                                                         onClick={() => handleSort("type")}
-                                                        className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors text-center"
+                                                        className="py-3 px-3 text-xs font-semibold text-brand-inactive-text dark:text-dark-body cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
                                                     >
-                                                        Tipo {sortConfig?.key === "type" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span>Tipo</span>
+                                                            <ArrowUpDownIcon size={13} className={sortConfig?.key === "type" ? "text-brand-green" : "opacity-40"} />
+                                                        </div>
+                                                    </th>
+                                                    <th
+                                                        onClick={() => handleSort("reason")}
+                                                        className="py-3 px-3 text-xs font-semibold text-brand-inactive-text dark:text-dark-body cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                    >
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span>Motivo</span>
+                                                            <ArrowUpDownIcon size={13} className={sortConfig?.key === "reason" ? "text-brand-green" : "opacity-40"} />
+                                                        </div>
+                                                    </th>
+                                                    <th
+                                                        onClick={() => handleSort("reporter")}
+                                                        className="py-3 px-3 text-xs font-semibold text-brand-inactive-text dark:text-dark-body cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                    >
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span>Denunciante</span>
+                                                            <ArrowUpDownIcon size={13} className={sortConfig?.key === "reporter" ? "text-brand-green" : "opacity-40"} />
+                                                        </div>
+                                                    </th>
+                                                    <th
+                                                        onClick={() => handleSort("date")}
+                                                        className="py-3 px-3 text-xs font-semibold text-brand-inactive-text dark:text-dark-body cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors text-center"
+                                                    >
+                                                        <div className="flex items-center justify-center gap-1.5">
+                                                            <span>Data</span>
+                                                            <ArrowUpDownIcon size={13} className={sortConfig?.key === "date" ? "text-brand-green" : "opacity-40"} />
+                                                        </div>
                                                     </th>
                                                     <th
                                                         onClick={() => handleSort("status")}
-                                                        className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors text-center"
+                                                        className="py-3 px-3 text-xs font-semibold text-brand-inactive-text dark:text-dark-body cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors text-center"
                                                     >
-                                                        Status {sortConfig?.key === "status" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+                                                        <div className="flex items-center justify-center gap-1.5">
+                                                            <span>Status</span>
+                                                            <ArrowUpDownIcon size={13} className={sortConfig?.key === "status" ? "text-brand-green" : "opacity-40"} />
+                                                        </div>
                                                     </th>
-                                                    <th className="py-3 px-2 pr-6 rounded-r-lg text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">
+                                                    <th className="py-3 px-3 pr-6 text-xs font-semibold text-brand-inactive-text dark:text-dark-body text-center">
                                                         Ações
                                                     </th>
                                                 </tr>
@@ -436,6 +451,7 @@ export default function ReportsList({
                                             currentPage={page}
                                             totalPages={totalPages}
                                             onPageChange={setPage}
+                                            inline
                                         />
                                     </div>
                                 )}
@@ -453,119 +469,127 @@ export default function ReportsList({
                 filters={filters}
                 setFilters={setFilters}
                 onClear={() => {
-                    setFilters(INITIAL_FILTERS)
+                    setFilters(INITIAL_REPORT_FILTERS)
                     setIsFilterSheetOpen(false)
                 }}
             />
 
-            {/* Modal: Validar */}
+            {/* MODAL: Resolve / Validate */}
             <DefaultModal
                 isOpen={!!resolveTarget}
-                onClose={() => {
-                    setResolveTarget(null)
-                    setActionReason("")
-                }}
+                onClose={() => { setResolveTarget(null); setActionReason("") }}
                 title="Validar Denúncia"
-                description={`Tem certeza que deseja validar a denúncia contra "${resolveTarget?.target_name || resolveTarget?.target_id}"? Isso atribuirá +5 pontos de risco.`}
+                maxWidth="md"
                 footer={
-                    <div className="flex justify-end gap-2">
-                        <Button variant="outline" onClick={() => { setResolveTarget(null); setActionReason(""); }}>Cancelar</Button>
-                        <Button variant="destructive" onClick={handleConfirmResolve} disabled={isPending}>Validar Denúncia</Button>
+                    <div className="flex items-center justify-end gap-2 w-full">
+                        <Button variant="outline" onClick={() => setResolveTarget(null)} disabled={isPending}>
+                            Cancelar
+                        </Button>
+                        <Button variant="destructive" onClick={handleResolve} isLoading={isPending}>
+                            Validar (+5 Risco)
+                        </Button>
                     </div>
                 }
             >
-                <div className="space-y-2 pt-2">
-                    <label className="text-xs font-medium text-brand-dark dark:text-dark-heading">
-                        Justificativa da Decisão
-                    </label>
-                    <Input
-                        placeholder="Informe a motivação para validação..."
+                <div className="space-y-4 py-2">
+                    <p className="text-xs text-brand-inactive-text">
+                        A confirmação desta denúncia adicionará <strong>+5 pontos de score de risco</strong> ao alvo e marcará o registro como validado.
+                    </p>
+                    <textarea
                         value={actionReason}
                         onChange={(e) => setActionReason(e.target.value)}
+                        placeholder="Justificativa da validação (opcional)..."
+                        className="w-full min-h-[90px] rounded-xl border border-brand-border bg-white p-3 text-sm text-brand-dark outline-none focus:border-brand-green dark:border-dark-border dark:bg-dark-surface dark:text-white"
                     />
                 </div>
             </DefaultModal>
 
-            {/* Modal: Descartar */}
+            {/* MODAL: Dismiss */}
             <DefaultModal
                 isOpen={!!dismissTarget}
-                onClose={() => {
-                    setDismissTarget(null)
-                    setActionReason("")
-                }}
+                onClose={() => { setDismissTarget(null); setActionReason("") }}
                 title="Descartar Denúncia"
-                description={`Deseja descartar a denúncia de "${dismissTarget?.reporter_name}"?`}
+                maxWidth="md"
                 footer={
-                    <div className="flex justify-end gap-2">
-                        <Button variant="outline" onClick={() => { setDismissTarget(null); setActionReason(""); }}>Cancelar</Button>
-                        <Button variant="default" onClick={handleConfirmDismiss} disabled={isPending}>Descartar</Button>
+                    <div className="flex items-center justify-end gap-2 w-full">
+                        <Button variant="outline" onClick={() => setDismissTarget(null)} disabled={isPending}>
+                            Cancelar
+                        </Button>
+                        <Button variant="default" onClick={handleDismiss} isLoading={isPending}>
+                            Descartar
+                        </Button>
                     </div>
                 }
             >
-                <div className="space-y-2 pt-2">
-                    <label className="text-xs font-medium text-brand-dark dark:text-dark-heading">
-                        Motivo do Descarte
-                    </label>
-                    <Input
-                        placeholder="Informe o motivo..."
+                <div className="space-y-4 py-2">
+                    <p className="text-xs text-brand-inactive-text">
+                        Descartar denúncias improcedentes encerra o ticket sem penalizar o alvo denunciado.
+                    </p>
+                    <textarea
                         value={actionReason}
                         onChange={(e) => setActionReason(e.target.value)}
+                        placeholder="Motivo do descarte (opcional)..."
+                        className="w-full min-h-[90px] rounded-xl border border-brand-border bg-white p-3 text-sm text-brand-dark outline-none focus:border-brand-green dark:border-dark-border dark:bg-dark-surface dark:text-white"
                     />
                 </div>
             </DefaultModal>
 
-            {/* Modal: Spam */}
+            {/* MODAL: Spam */}
             <DefaultModal
                 isOpen={!!spamTarget}
-                onClose={() => {
-                    setSpamTarget(null)
-                    setActionReason("")
-                }}
-                title="Marcar como Spam"
-                description="Classificar esta denúncia como spam?"
+                onClose={() => { setSpamTarget(null); setActionReason("") }}
+                title="Marcar Denúncia como Spam"
+                maxWidth="md"
                 footer={
-                    <div className="flex justify-end gap-2">
-                        <Button variant="outline" onClick={() => { setSpamTarget(null); setActionReason(""); }}>Cancelar</Button>
-                        <Button variant="default" onClick={handleConfirmSpam} disabled={isPending}>Marcar como Spam</Button>
+                    <div className="flex items-center justify-end gap-2 w-full">
+                        <Button variant="outline" onClick={() => setSpamTarget(null)} disabled={isPending}>
+                            Cancelar
+                        </Button>
+                        <Button variant="default" onClick={handleSpam} isLoading={isPending}>
+                            Confirmar Spam
+                        </Button>
                     </div>
                 }
             >
-                <div className="space-y-2 pt-2">
-                    <label className="text-xs font-medium text-brand-dark dark:text-dark-heading">
-                        Observação (Opcional)
-                    </label>
-                    <Input
-                        placeholder="Observação..."
+                <div className="space-y-4 py-2">
+                    <p className="text-xs text-brand-inactive-text">
+                        Denúncias marcadas como spam indicam comportamento abusivo do denunciante e são arquivadas.
+                    </p>
+                    <textarea
                         value={actionReason}
                         onChange={(e) => setActionReason(e.target.value)}
+                        placeholder="Observações sobre o spam (opcional)..."
+                        className="w-full min-h-[90px] rounded-xl border border-brand-border bg-white p-3 text-sm text-brand-dark outline-none focus:border-brand-green dark:border-dark-border dark:bg-dark-surface dark:text-white"
                     />
                 </div>
             </DefaultModal>
 
-            {/* Modal: Reverter */}
+            {/* MODAL: Revert */}
             <DefaultModal
                 isOpen={!!revertTarget}
-                onClose={() => {
-                    setRevertTarget(null)
-                    setActionReason("")
-                }}
+                onClose={() => { setRevertTarget(null); setActionReason("") }}
                 title="Reverter Validação"
-                description="Isso removerá os 5 pontos de risco atribuídos anteriormente."
+                maxWidth="md"
                 footer={
-                    <div className="flex justify-end gap-2">
-                        <Button variant="outline" onClick={() => { setRevertTarget(null); setActionReason(""); }}>Cancelar</Button>
-                        <Button variant="default" onClick={handleConfirmRevert} disabled={isPending}>Reverter</Button>
+                    <div className="flex items-center justify-end gap-2 w-full">
+                        <Button variant="outline" onClick={() => setRevertTarget(null)} disabled={isPending}>
+                            Cancelar
+                        </Button>
+                        <Button variant="default" onClick={handleRevert} isLoading={isPending}>
+                            Reverter (-5 Risco)
+                        </Button>
                     </div>
                 }
             >
-                <div className="space-y-2 pt-2">
-                    <label className="text-xs font-medium text-brand-dark dark:text-dark-heading">
-                        Motivo da Reversão
-                    </label>
-                    <Input
-                        placeholder="Informe o motivo da reversão..."
+                <div className="space-y-4 py-2">
+                    <p className="text-xs text-brand-inactive-text">
+                        A reversão retornará o registro para pendente e subtrairá <strong>-5 pontos de risco</strong> do alvo.
+                    </p>
+                    <textarea
                         value={actionReason}
                         onChange={(e) => setActionReason(e.target.value)}
+                        placeholder="Justificativa da reversão..."
+                        className="w-full min-h-[90px] rounded-xl border border-brand-border bg-white p-3 text-sm text-brand-dark outline-none focus:border-brand-green dark:border-dark-border dark:bg-dark-surface dark:text-white"
                     />
                 </div>
             </DefaultModal>

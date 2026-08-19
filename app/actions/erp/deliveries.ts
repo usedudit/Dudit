@@ -403,7 +403,7 @@ export async function getDeliveryRoutePointsAction(params: { partnerId: string; 
 
   const { data: store } = await supabase
     .from("stores")
-    .select("id, name, addresses!store_id(street, number, complement, neighborhood, city, state, postal_code, latitude, longitude)")
+    .select("id, name, addresses!store_id(street, number, complement, neighborhood, city, state, zip_code, latitude, longitude)")
     .eq("partner_id", params.partnerId)
     .order("is_headquarters", { ascending: false })
     .limit(1)

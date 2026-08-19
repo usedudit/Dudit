@@ -18,6 +18,14 @@ import { CURRENT_LEGAL_DOCUMENTS } from "@/lib/legal/constants"
 // Types
 type AuthMode = "login" | "signup" | "verify-email" | "forgot-password"
 
+// Só aceita caminhos internos para evitar open-redirect
+function getSafeNext(rawNext: string | null): string {
+    if (rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") && !rawNext.includes("://")) {
+        return rawNext
+    }
+    return "/"
+}
+
 // Helpers
 function getEmailProvider(email: string) {
     const domain = email?.split("@")[1]?.toLowerCase()
@@ -78,7 +86,12 @@ export default function AuthView({
     const [retryCount, setRetryCount] = useState(0)
     const [verifyContext, setVerifyContext] = useState<"signup" | "recovery">("signup")
 
-    // supabase singleton imported directly
+    // Update mode if initialMode prop changes (e.g. from query params)
+    useEffect(() => {
+        if (initialMode) {
+            setMode(initialMode)
+        }
+    }, [initialMode])
 
     // Logic to handle timer decrement (Fix for the reported bug)
     useEffect(() => {
@@ -102,35 +115,35 @@ export default function AuthView({
             if (hash.includes("error=")) {
                 const errorDescriptionMatch = hash.match(/error_description=([^&]+)/)
                 const errorDescription = errorDescriptionMatch ? decodeURIComponent(errorDescriptionMatch[1].replace(/\+/g, ' ')) : "Erro na autenticação"
-                setError(errorDescription)
+                setError(getErrorMessage(errorDescription))
                 // Clear the hash without reloading
                 window.history.replaceState(null, '', window.location.pathname + window.location.search)
             } else if (hash.includes("access_token=")) {
                 setIsLoading(true)
-                // supabase-js atuomatically parses the hash into a session
+                // supabase-js automatically parses the hash into a session
                 supabase.auth.getSession().then((res: any) => {
                     const { data, error } = res;
                     if (error) {
                         setError(getErrorMessage(error))
                         setIsLoading(false)
                     } else if (data?.session) {
-                        // Successfully logged in via hash fragment, redirect
-                        router.push(nextParam)
-                        router.refresh()
+                        // Successfully logged in via hash fragment, hard navigate to destination
+                        window.location.assign(getSafeNext(nextParam))
                     } else {
                         setIsLoading(false)
                     }
                 })
             }
         }
-    }, [supabase.auth, router, nextParam])
+    }, [nextParam])
 
     const handleGoogleAuth = async () => {
         setIsLoading(true)
         try {
+            const origin = typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br")
             await supabase.auth.signInWithOAuth({
                 provider: "google",
-                options: { redirectTo: `https://dudit.com.br/auth/callback?next=${encodeURIComponent(nextParam)}`, queryParams: { access_type: "offline", prompt: "consent" } },
+                options: { redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(getSafeNext(nextParam))}`, queryParams: { access_type: "offline", prompt: "consent" } },
             })
         } catch (e: any) {
             setError(getErrorMessage(e))
@@ -147,10 +160,11 @@ export default function AuthView({
             if (mode === "signup") {
                 if (calculatePasswordScore(password) < 2) throw new Error("A senha deve ser média ou forte.")
 
+                const origin = typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br")
                 const { data, error } = await supabase.auth.signUp({
                     email,
                     password,
-                    options: { data: { full_name: generateNameFromEmail(email) }, emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextParam)}` },
+                    options: { data: { full_name: generateNameFromEmail(email) }, emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(getSafeNext(nextParam))}` },
                 })
                 if (error) throw error
 
@@ -188,9 +202,8 @@ export default function AuthView({
                 const { error } = await supabase.auth.signInWithPassword({ email, password })
                 if (error) {
                     const lockoutRes = await handleLoginResult(email, false)
-                    if (error.message.includes("Email not confirmed")) {
-                        setVerifyContext("signup")
-                        setMode("verify-email")
+                    if (error.message?.includes("Email not confirmed") || (error as any).code === "email_not_confirmed") {
+                        setError("Este e-mail ainda não foi confirmado. Verifique a caixa de entrada do seu e-mail para ativar sua conta.")
                         return
                     }
                     if (lockoutRes.error) {
@@ -199,8 +212,8 @@ export default function AuthView({
                     throw error
                 }
                 await handleLoginResult(email, true)
-                router.push(nextParam)
-                router.refresh()
+                // Hard navigation to ensure all server cookies, headers, and fresh layout state are synchronized
+                window.location.assign(getSafeNext(nextParam))
             }
         } catch (e: any) {
             setError(getErrorMessage(e))
@@ -214,8 +227,9 @@ export default function AuthView({
         setIsLoading(true)
         setError(null)
         try {
+            const origin = typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br")
             const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                redirectTo: `${window.location.origin}/auth/update-password`,
+                redirectTo: `${origin}/auth/update-password`,
             })
             if (error) throw error
             setVerifyContext("recovery")

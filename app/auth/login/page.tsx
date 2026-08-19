@@ -34,11 +34,23 @@ function getSafeNext(rawNext: string | null): string {
 }
 
 function RedirectToHome({ next }: { next: string }) {
-  const router = useRouter()
   useLayoutEffect(() => {
-    router.replace(getSafeNext(next))
-  }, [router, next])
-  return <div className="min-h-screen bg-brand-gray dark:bg-dark-background" />
+    window.location.replace(getSafeNext(next))
+  }, [next])
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-brand-gray dark:bg-dark-background">
+      <div className="flex flex-col items-center gap-3 animate-pulse">
+        <img
+          src="https://img.dudit.com.br/static/Logo.png"
+          alt="Dudit"
+          width={110}
+          height={32}
+          className="h-8 w-auto"
+        />
+        <p className="text-xs text-brand-inactive-text dark:text-dark-body">Redirecionando...</p>
+      </div>
+    </div>
+  )
 }
 
 // Local translations to satisfy internationalization static analysis checks
@@ -165,7 +177,7 @@ function AuthContent() {
           className="w-full h-full"
         >
           <AuthView
-            initialMode={rawModeParam === "verify-email" ? "verify-email" : "login"}
+            initialMode={rawModeParam === "verify-email" ? "verify-email" : rawModeParam === "forgot-password" ? "forgot-password" : "login"}
             email={emailParam}
             onSwitchToPartner={() => setPageMode("partner")}
           />

@@ -84,6 +84,7 @@ export enum AdminActionType {
 
     // Delivery drivers
     DELIVERY_DRIVER_INVITE_CREATE = "delivery_driver.invite_create",
+    DELIVERY_DRIVER_INVITE_REVOKE = "delivery_driver.invite_revoke",
     DELIVERY_DRIVER_UPDATE = "delivery_driver.update",
     DELIVERY_DRIVER_DEACTIVATE = "delivery_driver.deactivate",
 }

@@ -1,47 +1,23 @@
 "use client"
 
-import React, { useState, useEffect, useRef, useMemo } from "react"
+import React, { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
-import { Drawer } from "vaul"
-import * as TooltipPrimitive from "@radix-ui/react-tooltip"
-import { cn } from "@/lib/utils"
 import {
-    HomeIcon,
     TruckIcon,
     HelpCircleIcon,
     ChevronLeftIcon,
-    ChevronRightIcon,
     ChevronDownIcon,
-    MenuIcon,
     MoonIcon,
     SunIcon,
+    UserIcon,
     LogoutIcon,
 } from "@/lib/icons"
-import { useSidebar } from "@/lib/sidebar-context"
 import { Dropdown, DropdownItem } from "@/components/reusable"
+import BottomSheet from "@/components/BottomSheet"
 import { getUserInitials, getAvatarColor } from "@/lib/utils/UserProfileImage"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
-
-interface NavItem {
-    label: string
-    href: string
-    icon: any
-}
-
-const navItems: NavItem[] = [
-    {
-        label: "Início",
-        href: "/entregadores",
-        icon: HomeIcon,
-    },
-    {
-        label: "Minhas Entregas",
-        href: "/entregadores/entregas",
-        icon: TruckIcon,
-    },
-]
 
 const ChevronRight = ({ className }: { className?: string }) => (
     <svg
@@ -58,217 +34,6 @@ const ChevronRight = ({ className }: { className?: string }) => (
     </svg>
 )
 
-export function DeliveryPortalSidebar() {
-    const pathname = usePathname()
-    const { isExpanded, toggleSidebar, isMobileOpen, setIsMobileOpen } = useSidebar()
-    const isCollapsed = !isExpanded
-    const [isMounted, setIsMounted] = useState(false)
-
-    useEffect(() => {
-        setIsMounted(true)
-    }, [])
-
-    const isActivePath = (href: string) => {
-        if (href === "/entregadores") {
-            return pathname === "/entregadores"
-        }
-        return pathname === href || pathname.startsWith(`${href}/`)
-    }
-
-    const activeClasses = "bg-brand-gray text-brand-dark font-semibold dark:bg-dark-border dark:text-dark-heading shadow-xs"
-    const inactiveClasses = "text-brand-inactive-text hover:bg-brand-gray hover:text-brand-dark dark:text-dark-body dark:hover:bg-dark-border/60 dark:hover:text-dark-heading"
-
-    return (
-        <>
-            {/* DESKTOP SIDEBAR */}
-            <aside
-                className={cn(
-                    "hidden md:flex flex-col bg-white dark:bg-dark-background border-r border-brand-border dark:border-dark-border z-30 transition-all duration-300 ease-in-out shrink-0 select-none relative",
-                    isCollapsed ? "w-[72px]" : "w-64"
-                )}
-            >
-                {/* LOGO AREA */}
-                <div
-                    className={cn(
-                        "h-16 flex items-center px-4 border-b border-brand-border dark:border-dark-border transition-all duration-300",
-                        isCollapsed ? "justify-center px-2" : "justify-between"
-                    )}
-                >
-                    <Link
-                        href="/entregadores"
-                        className="flex items-center gap-3 overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-brand-green rounded-lg"
-                    >
-                        {!isCollapsed ? (
-                            <img
-                                src="https://img.dudit.com.br/static/Logo.png"
-                                alt="Dudit"
-                                className="h-7 w-auto transition-all"
-                            />
-                        ) : (
-                            <div className="w-9 h-9 rounded-xl bg-brand-green/10 dark:bg-brand-green/20 text-brand-green font-bold flex items-center justify-center text-lg shadow-xs">
-                                D
-                            </div>
-                        )}
-                    </Link>
-                </div>
-
-                {/* SECTION LABEL */}
-                {!isCollapsed && (
-                    <div className="px-5 pt-5 pb-2">
-                        <p className="text-[11px] font-bold uppercase tracking-wider text-brand-inactive-text/70 dark:text-dark-body/60">
-                            Portal do Entregador
-                        </p>
-                    </div>
-                )}
-
-                {/* NAVIGATION ITEMS */}
-                <nav
-                    className={cn(
-                        "grow py-3 px-3",
-                        isCollapsed ? "overflow-visible" : "overflow-y-auto overflow-x-hidden custom-scrollbar"
-                    )}
-                >
-                    <ul className="space-y-1.5">
-                        {navItems.map((item) => {
-                            const Icon = item.icon
-                            const active = isActivePath(item.href)
-
-                            if (isCollapsed) {
-                                return (
-                                    <li key={item.label} className="relative group w-full">
-                                        <TooltipPrimitive.Provider delayDuration={150}>
-                                            <TooltipPrimitive.Root>
-                                                <TooltipPrimitive.Trigger asChild>
-                                                    <Link
-                                                        href={item.href}
-                                                        className={cn(
-                                                            "flex items-center justify-center rounded-xl transition-all duration-200 min-h-[44px] w-full",
-                                                            active ? activeClasses : inactiveClasses
-                                                        )}
-                                                    >
-                                                        <Icon
-                                                            size={20}
-                                                            className={cn(
-                                                                "transition-colors",
-                                                                active ? "text-brand-green" : "text-current"
-                                                            )}
-                                                        />
-                                                    </Link>
-                                                </TooltipPrimitive.Trigger>
-                                                <TooltipPrimitive.Portal>
-                                                    <TooltipPrimitive.Content
-                                                        side="right"
-                                                        sideOffset={12}
-                                                        className="z-50 rounded-lg bg-brand-dark dark:bg-dark-surface px-3 py-1.5 text-xs font-semibold text-white shadow-md animate-in fade-in-0 zoom-in-95"
-                                                    >
-                                                        {item.label}
-                                                        <TooltipPrimitive.Arrow className="fill-brand-dark dark:fill-dark-surface" />
-                                                    </TooltipPrimitive.Content>
-                                                </TooltipPrimitive.Portal>
-                                            </TooltipPrimitive.Root>
-                                        </TooltipPrimitive.Provider>
-                                    </li>
-                                )
-                            }
-
-                            return (
-                                <li key={item.label} className="w-full">
-                                    <Link
-                                        href={item.href}
-                                        className={cn(
-                                            "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 text-sm font-medium",
-                                            active ? activeClasses : inactiveClasses
-                                        )}
-                                    >
-                                        <Icon
-                                            size={20}
-                                            className={cn(
-                                                "transition-colors shrink-0",
-                                                active ? "text-brand-green" : "text-current"
-                                            )}
-                                        />
-                                        <span className="truncate">{item.label}</span>
-                                    </Link>
-                                </li>
-                            )
-                        })}
-                    </ul>
-                </nav>
-
-                {/* BOTTOM / COLLAPSE BUTTON */}
-                <div className="p-3 border-t border-brand-border dark:border-dark-border flex items-center justify-between gap-2">
-                    {!isCollapsed ? (
-                        <div className="flex items-center gap-2 text-xs text-brand-inactive-text dark:text-dark-body truncate pl-1">
-                            <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
-                            <span className="truncate">Operação Ativa</span>
-                        </div>
-                    ) : null}
-
-                    <button
-                        type="button"
-                        onClick={toggleSidebar}
-                        aria-label={isCollapsed ? "Expandir menu lateral" : "Recolher menu lateral"}
-                        className={cn(
-                            "flex items-center justify-center h-9 w-9 rounded-xl text-brand-inactive-text hover:bg-brand-gray hover:text-brand-dark dark:hover:bg-dark-border dark:hover:text-dark-heading transition-colors",
-                            isCollapsed && "mx-auto"
-                        )}
-                        title={isCollapsed ? "Expandir menu lateral" : "Recolher menu lateral"}
-                    >
-                        {isCollapsed ? <ChevronRightIcon size={18} /> : <ChevronLeftIcon size={18} />}
-                    </button>
-                </div>
-            </aside>
-
-            {/* MOBILE DRAWER (VAUL) */}
-            <Drawer.Root open={isMobileOpen} onOpenChange={setIsMobileOpen}>
-                <Drawer.Portal>
-                    <Drawer.Overlay className="fixed inset-0 bg-black/50 z-50 backdrop-blur-xs" />
-                    <Drawer.Content className="bg-white dark:bg-dark-background border-t border-brand-border dark:border-dark-border flex flex-col rounded-t-[24px] max-h-[85vh] fixed bottom-0 left-0 right-0 z-60 outline-none shadow-2xl">
-                        <div className="mx-auto w-12 h-1.5 shrink-0 rounded-full bg-gray-300 dark:bg-dark-border mt-3 mb-2" />
-                        <div className="px-5 py-4 border-b border-brand-border dark:border-dark-border flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <img
-                                    src="https://img.dudit.com.br/static/Logo.png"
-                                    alt="Dudit"
-                                    className="h-6 w-auto"
-                                />
-                                <span className="text-xs font-semibold uppercase tracking-wider text-brand-inactive-text">
-                                    Portal do Entregador
-                                </span>
-                            </div>
-                        </div>
-                        <div className="p-4 flex-1 overflow-y-auto">
-                            <nav className="flex flex-col gap-2">
-                                {navItems.map((item) => {
-                                    const Icon = item.icon
-                                    const active = isActivePath(item.href)
-                                    return (
-                                        <Link
-                                            key={item.label}
-                                            href={item.href}
-                                            onClick={() => setIsMobileOpen(false)}
-                                            className={cn(
-                                                "flex items-center gap-3 p-3.5 rounded-xl transition-colors text-base font-medium",
-                                                active ? activeClasses : inactiveClasses
-                                            )}
-                                        >
-                                            <Icon
-                                                size={22}
-                                                className={cn(active ? "text-brand-green" : "text-current")}
-                                            />
-                                            <span>{item.label}</span>
-                                        </Link>
-                                    )
-                                })}
-                            </nav>
-                        </div>
-                    </Drawer.Content>
-                </Drawer.Portal>
-            </Drawer.Root>
-        </>
-    )
-}
-
 interface UserProfileData {
     fullName: string
     email: string
@@ -280,8 +45,8 @@ export function DeliveryPortalHeader({ userProfile }: { userProfile?: UserProfil
     const { theme, setTheme } = useTheme()
     const router = useRouter()
     const pathname = usePathname()
-    const { setIsMobileOpen } = useSidebar()
     const [isTransitioning, setIsTransitioning] = useState(false)
+    const [isProfileOpen, setIsProfileOpen] = useState(false)
 
     const userName = userProfile?.fullName || "Entregador"
     const userEmail = userProfile?.email || ""
@@ -289,33 +54,31 @@ export function DeliveryPortalHeader({ userProfile }: { userProfile?: UserProfil
     const avatarColor = userProfile?.avatarColor || getAvatarColor(userName)
 
     const getPageTitle = () => {
-        if (pathname === "/entregadores") return "Início"
-        if (pathname === "/entregadores/entregas") return "Minhas Entregas"
         if (pathname.startsWith("/entregadores/entregas/")) return "Detalhes da Entrega"
-        return "Portal do Entregador"
+        return "Minhas Entregas"
     }
 
-    const isSubPage = pathname.startsWith("/entregadores/entregas/") && pathname !== "/entregadores/entregas"
+    const isSubPage = pathname.startsWith("/entregadores/entregas/")
     const displayTitle = getPageTitle()
 
-    const handleThemeChange = (event: React.MouseEvent<HTMLButtonElement>) => {
+    const handleThemeButtonClick = (newTheme: string) => {
         if (isTransitioning) return
 
         // @ts-ignore
         if (!document.startViewTransition) {
-            setTheme(theme === "dark" ? "light" : "dark")
+            setTheme(newTheme)
             return
         }
 
-        const x = event.clientX
-        const y = event.clientY
-        const endRadius = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y))
+        const x = window.innerWidth - 24
+        const y = 24
+        const endRadius = Math.hypot(x, window.innerHeight - y)
 
         setIsTransitioning(true)
 
         // @ts-ignore
         const transition = document.startViewTransition(() => {
-            setTheme(theme === "dark" ? "light" : "dark")
+            setTheme(newTheme)
         })
 
         transition.ready.then(() => {
@@ -346,38 +109,33 @@ export function DeliveryPortalHeader({ userProfile }: { userProfile?: UserProfil
         <header className="sticky top-0 bg-brand-page-bg dark:bg-dark-background z-30 border-b border-brand-border dark:border-dark-border">
             <div className="px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-14 relative">
-                    {/* LEFT / BREADCRUMB */}
+                    {/* LEFT / LOGO & BREADCRUMB */}
                     <div className="flex items-center gap-3">
                         {isSubPage ? (
                             <button
-                                className="text-brand-dark dark:text-dark-heading md:hidden p-1.5 -ml-1.5 rounded-lg hover:bg-brand-gray dark:hover:bg-dark-border"
-                                onClick={() => router.push("/entregadores/entregas")}
-                                aria-label="Voltar"
+                                className="text-brand-dark dark:text-dark-heading p-1.5 -ml-1.5 rounded-lg hover:bg-brand-gray dark:hover:bg-dark-border transition-colors cursor-pointer"
+                                onClick={() => router.push("/entregadores")}
+                                aria-label="Voltar para entregas"
                             >
                                 <ChevronLeftIcon className="w-6 h-6" />
                             </button>
-                        ) : (
-                            <button
-                                className="text-brand-dark dark:text-dark-heading md:hidden p-1.5 -ml-1.5 rounded-lg hover:bg-brand-gray dark:hover:bg-dark-border"
-                                onClick={() => setIsMobileOpen(true)}
-                                aria-label="Abrir menu"
-                            >
-                                <MenuIcon className="w-6 h-6" />
-                            </button>
-                        )}
+                        ) : null}
 
                         {/* DESKTOP BREADCRUMB */}
-                        <div className="hidden md:flex items-center gap-2">
+                        <div className="flex items-center gap-2">
                             <Link
                                 href="/entregadores"
-                                className="group flex items-center gap-2 pl-2 pr-3 py-1 rounded-full hover:bg-gray-100 dark:hover:bg-dark-border transition-colors cursor-pointer select-none"
+                                className="group flex items-center gap-2 pl-1 pr-2 py-1 rounded-full hover:bg-gray-100 dark:hover:bg-dark-border transition-colors cursor-pointer select-none"
                             >
-                                <div className="w-5 h-5 rounded-md bg-brand-green/10 text-brand-green flex items-center justify-center">
-                                    <TruckIcon size={13} />
+                                <img
+                                    src="https://img.dudit.com.br/static/Logo.png"
+                                    alt="Dudit"
+                                    className="h-6 w-auto mr-1"
+                                />
+                                <div className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-brand-green/10 text-brand-green text-xs font-bold">
+                                    <TruckIcon size={12} />
+                                    <span>Portal do Entregador</span>
                                 </div>
-                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading leading-none">
-                                    Portal do Entregador
-                                </span>
                             </Link>
 
                             <ChevronRight className="w-4 h-4 text-brand-inactive-text/50 dark:text-dark-body/50" />
@@ -388,21 +146,14 @@ export function DeliveryPortalHeader({ userProfile }: { userProfile?: UserProfil
                         </div>
                     </div>
 
-                    {/* MOBILE TITLE */}
-                    <div className="absolute top-1/2 left-1/2 -translate-y-1/2 -translate-x-1/2 md:hidden max-w-[200px] truncate text-center">
-                        <h1 className="text-base font-bold text-brand-dark dark:text-dark-heading truncate">
-                            {displayTitle}
-                        </h1>
-                    </div>
-
                     {/* RIGHT ACTIONS */}
                     <div className="flex items-center gap-3">
-                        {/* THEME TOGGLE */}
+                        {/* THEME TOGGLE BUTTON */}
                         <button
                             type="button"
-                            onClick={handleThemeChange}
+                            onClick={() => handleThemeButtonClick(theme === "dark" ? "light" : "dark")}
                             aria-label="Alternar tema claro/escuro"
-                            className="flex h-9 w-9 items-center justify-center rounded-full border border-brand-border bg-white text-brand-dark hover:bg-brand-gray dark:border-dark-border dark:bg-dark-surface dark:text-dark-heading dark:hover:bg-dark-border transition-colors cursor-pointer shrink-0"
+                            className="hidden sm:flex h-9 w-9 items-center justify-center rounded-full border border-brand-border bg-white text-brand-dark hover:bg-brand-gray dark:border-dark-border dark:bg-dark-surface dark:text-dark-heading dark:hover:bg-dark-border transition-colors cursor-pointer shrink-0"
                             title="Alternar tema"
                         >
                             {theme === "dark" ? (
@@ -412,68 +163,165 @@ export function DeliveryPortalHeader({ userProfile }: { userProfile?: UserProfil
                             )}
                         </button>
 
-                        <div className="h-6 w-px bg-brand-border dark:border-dark-border" />
+                        <div className="hidden sm:block h-6 w-px bg-brand-border dark:border-dark-border" />
 
-                        {/* USER PROFILE DROPDOWN */}
+                        {/* MOBILE PROFILE AVATAR TRIGGER */}
+                        <div className="md:hidden flex items-center cursor-pointer" onClick={() => setIsProfileOpen(true)}>
+                            <div
+                                className={`w-8 h-8 rounded-full ${avatarColor || getAvatarColor(userName)} flex items-center justify-center text-white font-bold text-sm border border-brand-border dark:border-dark-border shadow-xs relative`}
+                            >
+                                {userInitials || getUserInitials(userName)}
+                            </div>
+                        </div>
+
+                        {/* DESKTOP PROFILE DROPDOWN (IDENTICAL TO ERPHEADER) */}
                         <Dropdown
-                            align="right"
-                            showChevron={false}
                             trigger={
-                                <div className="flex items-center gap-2 cursor-pointer select-none">
+                                <div className="hidden md:flex items-center space-x-2 p-1 cursor-pointer hover:bg-brand-gray dark:hover:bg-dark-border rounded-full transition-colors group">
                                     <div
-                                        className={cn(
-                                            "w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs shadow-xs border border-brand-border dark:border-dark-border",
-                                            avatarColor
-                                        )}
+                                        className={`w-8 h-8 rounded-full ${avatarColor || getAvatarColor(userName)} flex items-center justify-center text-white font-bold text-sm border border-brand-border dark:border-dark-border group-hover:shadow-xs transition-all relative`}
                                     >
-                                        {userInitials}
+                                        {userInitials || getUserInitials(userName)}
                                     </div>
-                                    <div className="hidden lg:flex flex-col text-left">
-                                        <span className="text-xs font-bold text-brand-dark dark:text-dark-heading leading-tight truncate max-w-[120px]">
-                                            {userName}
-                                        </span>
-                                        <span className="text-[10px] text-brand-green font-semibold leading-tight">
-                                            Entregador
-                                        </span>
-                                    </div>
-                                    <ChevronDownIcon size={14} className="hidden lg:block text-brand-inactive-text opacity-60" />
+                                    <ChevronDownIcon
+                                        className="w-4 h-4 mr-2 text-brand-inactive-text group-hover:text-brand-dark dark:group-hover:text-dark-heading transition-colors"
+                                    />
                                 </div>
                             }
+                            align="right"
+                            showChevron={false}
+                            width="w-64"
                         >
                             <div className="px-4 py-3 border-b border-brand-border dark:border-dark-border">
-                                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
-                                    {userName}
-                                </p>
-                                {userEmail && (
-                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate mt-0.5">
-                                        {userEmail}
-                                    </p>
-                                )}
-                                <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/50 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">
-                                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                    Entregador Ativo
+                                <div className="flex items-center space-x-3 mb-4">
+                                    <div
+                                        className={`w-10 h-10 rounded-full ${avatarColor || getAvatarColor(userName)} flex items-center justify-center text-white font-bold text-sm border border-brand-border dark:border-dark-border shadow-xs`}
+                                    >
+                                        {userInitials || getUserInitials(userName)}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <p className="font-semibold text-sm text-brand-dark dark:text-dark-heading truncate">
+                                                {userName}
+                                            </p>
+                                        </div>
+                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate mt-0.5">
+                                            {userEmail}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="py-1 border-y border-brand-border dark:border-dark-border">
+                                    <DropdownItem
+                                        className="flex items-center gap-3 w-full"
+                                        onClick={() => handleThemeButtonClick(theme === "dark" ? "light" : "dark")}
+                                    >
+                                        <MoonIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
+                                        <span className="text-sm font-normal text-brand-inactive-text">Modo escuro</span>
+                                    </DropdownItem>
+                                </div>
+
+                                <div className="py-2">
+                                    <DropdownItem>
+                                        <Link href="/perfil" prefetch={false} className="flex items-center gap-3 w-full">
+                                            <UserIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
+                                            <span className="text-sm font-normal text-brand-inactive-text">Meu perfil</span>
+                                        </Link>
+                                    </DropdownItem>
+                                    <DropdownItem>
+                                        <Link href="/ajuda" prefetch={false} className="flex items-center gap-3 w-full">
+                                            <HelpCircleIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
+                                            <span className="text-sm font-normal text-brand-inactive-text">Central de ajuda</span>
+                                        </Link>
+                                    </DropdownItem>
+                                </div>
+
+                                <div className="py-1 border-t border-brand-border dark:border-dark-border mt-1">
+                                    <DropdownItem className="flex items-center gap-3 w-full hover:bg-brand-red/10" onClick={handleSignOut}>
+                                        <LogoutIcon className="w-4 h-4 text-brand-red" />
+                                        <span className="text-sm font-normal text-brand-red">Sair da sessão</span>
+                                    </DropdownItem>
                                 </div>
                             </div>
-
-                            <DropdownItem onClick={() => router.push("/entregadores")}>
-                                <HomeIcon size={16} /> Painel Inicial
-                            </DropdownItem>
-                            <DropdownItem onClick={() => router.push("/entregadores/entregas")}>
-                                <TruckIcon size={16} /> Minhas Entregas
-                            </DropdownItem>
-                            <DropdownItem onClick={() => router.push("/ajuda")}>
-                                <HelpCircleIcon size={16} /> Central de Ajuda
-                            </DropdownItem>
-
-                            <div className="border-t border-brand-border dark:border-dark-border my-1" />
-
-                            <DropdownItem onClick={handleSignOut} className="text-red-600 dark:text-red-400">
-                                <LogoutIcon size={16} /> Sair da conta
-                            </DropdownItem>
                         </Dropdown>
                     </div>
                 </div>
             </div>
+
+            {/* MOBILE BOTTOMSHEET (IDENTICAL TO ERPHEADER) */}
+            <BottomSheet isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)}>
+                <div className="flex flex-col py-1">
+                    <div className="flex items-center space-x-4 mb-6 px-2 mt-4">
+                        <div
+                            className={`w-14 h-14 rounded-full ${avatarColor || getAvatarColor(userName)} flex items-center justify-center text-white font-bold text-xl border border-brand-border dark:border-dark-border shadow-md`}
+                        >
+                            {userInitials || getUserInitials(userName)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                                <p className="font-bold text-lg text-brand-dark dark:text-dark-heading truncate">
+                                    {userName}
+                                </p>
+                                <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-green-500 text-white whitespace-nowrap">
+                                    Entregador
+                                </span>
+                            </div>
+                            <p className="text-sm text-brand-inactive-text dark:text-dark-body truncate">{userEmail}</p>
+                        </div>
+                    </div>
+
+                    <nav className="flex flex-col gap-1">
+                        <div className="flex items-center justify-between p-4 rounded-2xl bg-gray-50 dark:bg-dark-border/30 border border-transparent hover:border-brand-border/30 dark:hover:border-dark-border/50 transition-all">
+                            <div className="flex items-center gap-3">
+                                <MoonIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                <span className="text-[16px] font-medium text-brand-dark dark:text-dark-heading">Modo escuro</span>
+                            </div>
+                            <button
+                                onClick={() => handleThemeButtonClick(theme === "dark" ? "light" : "dark")}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${theme === "dark" ? "bg-brand-green" : "bg-gray-300 dark:bg-dark-border"
+                                    }`}
+                            >
+                                <span
+                                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-xs transition-transform ${theme === "dark" ? "translate-x-5" : "translate-x-1"
+                                        }`}
+                                />
+                            </button>
+                        </div>
+
+                        <Link
+                            href="/perfil"
+                            onClick={() => setIsProfileOpen(false)}
+                            prefetch={false}
+                            className="flex items-center gap-4 p-4 rounded-2xl hover:bg-gray-50 dark:hover:bg-dark-border/30 transition-all w-full text-left"
+                        >
+                            <UserIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                            <span className="text-[16px] font-medium text-brand-dark dark:text-dark-heading">Meu perfil</span>
+                        </Link>
+
+                        <Link
+                            href="/ajuda"
+                            onClick={() => setIsProfileOpen(false)}
+                            prefetch={false}
+                            className="flex items-center gap-4 p-4 rounded-2xl hover:bg-gray-50 dark:hover:bg-dark-border/30 transition-all w-full text-left"
+                        >
+                            <HelpCircleIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                            <span className="text-[16px] font-medium text-brand-dark dark:text-dark-heading">Central de ajuda</span>
+                        </Link>
+
+                        <div className="h-px bg-brand-border dark:bg-dark-border my-2 mx-2 opacity-50" />
+
+                        <button
+                            onClick={handleSignOut}
+                            className="flex items-center gap-4 p-4 rounded-2xl bg-red-50/50 dark:bg-red-900/10 text-brand-red w-full text-left transition-all hover:bg-red-50 dark:hover:bg-red-900/20"
+                        >
+                            <div className="w-5 h-5 bg-red-500 rounded flex items-center justify-center shadow-xs">
+                                <LogoutIcon className="w-3.5 h-3.5 text-white" />
+                            </div>
+                            <span className="text-[16px] font-bold">Sair da sessão</span>
+                        </button>
+                    </nav>
+                </div>
+            </BottomSheet>
         </header>
     )
 }

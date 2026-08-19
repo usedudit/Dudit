@@ -13,23 +13,14 @@ import { useMediaQuery } from "@/components/erp/hooks"
 import { getAuditLogs, getAuditLogStats, type AuditLogStats } from "@/app/actions/admin/audit-logs"
 import type { AuditLogRow, CursorPaginatedResult } from "@/lib/admin/types"
 import AuditLogListRow, { ACTION_TYPE_LABELS, TARGET_TYPE_LABELS } from "./AuditLogListRow"
-import AuditLogPageControls from "./AuditLogPageControls"
+import AuditLogPageControls, { type AuditFilterState, INITIAL_AUDIT_FILTERS } from "./AuditLogPageControls"
 import { AdminAuditDetailView } from "./AdminAuditDetailView"
 import { useEntityState } from "@/hooks/use-entity-state"
-import { formatDate } from "@/lib/utils"
-import { DatabaseIcon } from "@/lib/icons"
+import { DatabaseIcon, ArrowUpDownIcon } from "@/lib/icons"
 
 interface AuditLogListProps {
     initialData: CursorPaginatedResult<AuditLogRow>
     initialStats?: AuditLogStats
-}
-
-interface FilterState {
-    action: string[]
-}
-
-const INITIAL_FILTERS: FilterState = {
-    action: [],
 }
 
 const ITEMS_PER_PAGE = 8
@@ -47,7 +38,7 @@ export default function AuditLogList({ initialData, initialStats }: AuditLogList
 
     // Search and Filters
     const [search, setSearch] = useState("")
-    const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
+    const [filters, setFilters] = useState<AuditFilterState>(INITIAL_AUDIT_FILTERS)
     const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false)
 
     // Sorting
@@ -107,6 +98,14 @@ export default function AuditLogList({ initialData, initialStats }: AuditLogList
                 }
             }
 
+            // Target Type Filter
+            if (filters.targetType.length > 0) {
+                const targetLabel = TARGET_TYPE_LABELS[log.target_type] || log.target_type
+                if (!filters.targetType.includes(targetLabel)) {
+                    return false
+                }
+            }
+
             // Search Filter
             if (term) {
                 const adminName = String(log.admin_name || "").toLowerCase()
@@ -140,8 +139,8 @@ export default function AuditLogList({ initialData, initialStats }: AuditLogList
                 let bVal: any = ""
                 switch (sortConfig.key) {
                     case "admin":
-                        aVal = (a.admin_name || a.admin_email || a.admin_user_id || "").toLowerCase()
-                        bVal = (b.admin_name || b.admin_email || b.admin_user_id || "").toLowerCase()
+                        aVal = (a.admin_name || a.admin_email || "").toLowerCase()
+                        bVal = (b.admin_name || b.admin_email || "").toLowerCase()
                         break
                     case "action":
                         aVal = (ACTION_TYPE_LABELS[a.action_type] || a.action_type).toLowerCase()
@@ -172,14 +171,14 @@ export default function AuditLogList({ initialData, initialStats }: AuditLogList
         return filteredLogs.slice(start, start + ITEMS_PER_PAGE)
     }, [filteredLogs, page])
 
-    // Reset page on tab/search/filter change
+    // Reset page on filter changes
     useMemo(() => {
         setPage(1)
     }, [targetTab, search, filters])
 
     // If viewing detail of a specific log (?view=[id])
     if (entityState.isOpen && entityState.action === "view" && entityState.entityId) {
-        const currentLog = logs.find(l => l.id === entityState.entityId)
+        const currentLog = logs.find((l) => l.id === entityState.entityId)
         if (currentLog) {
             return (
                 <AdminAuditDetailView
@@ -190,16 +189,25 @@ export default function AuditLogList({ initialData, initialStats }: AuditLogList
         }
     }
 
+    const actionOptions = Array.from(new Set(logs.map((l) => ACTION_TYPE_LABELS[l.action_type] || l.action_type)))
+    const targetTypeOptions = Array.from(new Set(logs.map((l) => TARGET_TYPE_LABELS[l.target_type] || l.target_type)))
+
     const filterSections: FilterSectionConfig[] = [
         {
             id: "action",
             title: "Tipo de Ação",
             type: "checkbox-list",
-            options: Object.values(ACTION_TYPE_LABELS),
+            options: actionOptions.slice(0, 15),
+        },
+        {
+            id: "targetType",
+            title: "Tipo de Alvo",
+            type: "checkbox-list",
+            options: targetTypeOptions,
         },
     ]
 
-    const hasActiveFilters = search !== "" || filters.action.length > 0
+    const hasActiveFilters = search !== "" || filters.action.length > 0 || filters.targetType.length > 0
 
     return (
         <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
@@ -213,7 +221,19 @@ export default function AuditLogList({ initialData, initialStats }: AuditLogList
                 .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
             `}</style>
 
-            <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6 space-y-6">
+            <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
+                {/* Desktop Header */}
+                <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
+                    <div className="flex flex-col gap-2 pt-1">
+                        <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
+                            Logs de Auditoria
+                        </h1>
+                        <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
+                            Rastreie todas as ações administrativas, alterações e eventos críticos da plataforma.
+                        </p>
+                    </div>
+                </div>
+
                 {/* Controls (Tabs + Search + Filters) */}
                 <AuditLogPageControls
                     activeTab={targetTab}
@@ -221,13 +241,14 @@ export default function AuditLogList({ initialData, initialStats }: AuditLogList
                     search={search}
                     onSearchChange={setSearch}
                     onOpenFilter={() => setIsFilterSheetOpen(true)}
+                    filters={filters}
+                    setFilters={setFilters}
                     hasActiveFilters={hasActiveFilters}
-                    hasData={logs.length > 0}
                     stats={stats}
                 />
 
                 {/* Content Area */}
-                <div>
+                <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-6 px-4 md:px-8">
                     <AnimatePresence mode="wait">
                         {filteredLogs.length === 0 ? (
                             <FadeIn key="empty" className="w-full">
@@ -239,7 +260,7 @@ export default function AuditLogList({ initialData, initialStats }: AuditLogList
                                         text: "Limpar Filtros",
                                         action: () => {
                                             setSearch("")
-                                            setFilters(INITIAL_FILTERS)
+                                            setFilters(INITIAL_AUDIT_FILTERS)
                                             setTargetTab("all")
                                         },
                                         variant: "outline",
@@ -270,48 +291,60 @@ export default function AuditLogList({ initialData, initialStats }: AuditLogList
                                                 </span>
                                             </div>
 
-                                            <div className="flex items-center justify-between text-xs text-brand-inactive-text">
-                                                <span className="truncate">{log.target_name || log.target_id || "-"}</span>
-                                                <span>{formatDate(log.created_at)}</span>
+                                            <div className="flex justify-between items-center text-xs text-brand-inactive-text pt-1">
+                                                <span>Alvo: {log.target_name || log.target_id || "Sistema"}</span>
+                                                <span>{log.created_at ? new Date(log.created_at).toLocaleDateString("pt-BR") : ""}</span>
                                             </div>
                                         </div>
                                     ))}
                                 </div>
 
-                                {/* Desktop View: Table */}
-                                <div className="hidden md:block w-full overflow-hidden rounded-xl relative">
-                                    <div className="overflow-x-auto pb-4 custom-scrollbar">
-                                        <table className="w-full text-left border-separate border-spacing-0 min-w-[950px]">
+                                {/* Desktop View (Table) */}
+                                <div className="hidden md:block w-full overflow-hidden rounded-2xl border border-brand-border dark:border-dark-border relative bg-white dark:bg-dark-surface shadow-xs">
+                                    <div className="overflow-x-auto custom-scrollbar">
+                                        <table className="w-full text-left border-collapse min-w-[900px]">
                                             <thead>
-                                                <tr className="bg-brand-gray dark:bg-dark-border/50 select-none">
+                                                <tr className="bg-brand-gray/80 dark:bg-dark-border/40 border-b border-brand-border dark:border-dark-border select-none">
+                                                    <th
+                                                        onClick={() => handleSort("date")}
+                                                        className="py-3 px-3 pl-6 text-xs font-semibold text-brand-inactive-text dark:text-dark-body cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors w-44"
+                                                    >
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span>Data/Hora</span>
+                                                            <ArrowUpDownIcon size={13} className={sortConfig?.key === "date" ? "text-brand-green" : "opacity-40"} />
+                                                        </div>
+                                                    </th>
                                                     <th
                                                         onClick={() => handleSort("admin")}
-                                                        className="py-3 px-2 pl-6 rounded-l-lg text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                        className="py-3 px-3 text-xs font-semibold text-brand-inactive-text dark:text-dark-body cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors w-56"
                                                     >
-                                                        Usuário (Executor) {sortConfig?.key === "admin" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span>Administrador</span>
+                                                            <ArrowUpDownIcon size={13} className={sortConfig?.key === "admin" ? "text-brand-green" : "opacity-40"} />
+                                                        </div>
                                                     </th>
                                                     <th
                                                         onClick={() => handleSort("action")}
-                                                        className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors text-center"
+                                                        className="py-3 px-3 text-xs font-semibold text-brand-inactive-text dark:text-dark-body cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
                                                     >
-                                                        Ação {sortConfig?.key === "action" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span>Ação Realizada</span>
+                                                            <ArrowUpDownIcon size={13} className={sortConfig?.key === "action" ? "text-brand-green" : "opacity-40"} />
+                                                        </div>
                                                     </th>
                                                     <th
                                                         onClick={() => handleSort("target")}
-                                                        className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                        className="py-3 px-3 text-xs font-semibold text-brand-inactive-text dark:text-dark-body cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
                                                     >
-                                                        Alvo {sortConfig?.key === "target" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span>Alvo</span>
+                                                            <ArrowUpDownIcon size={13} className={sortConfig?.key === "target" ? "text-brand-green" : "opacity-40"} />
+                                                        </div>
                                                     </th>
-                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight">
-                                                        Motivo / Detalhes
+                                                    <th className="py-3 px-3 text-xs font-semibold text-brand-inactive-text dark:text-dark-body">
+                                                        Tipo
                                                     </th>
-                                                    <th
-                                                        onClick={() => handleSort("date")}
-                                                        className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors text-center"
-                                                    >
-                                                        Data / Hora {sortConfig?.key === "date" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
-                                                    </th>
-                                                    <th className="py-3 px-2 pr-6 rounded-r-lg text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">
+                                                    <th className="py-3 px-3 pr-6 text-xs font-semibold text-brand-inactive-text dark:text-dark-body text-center w-24">
                                                         Ações
                                                     </th>
                                                 </tr>
@@ -336,6 +369,7 @@ export default function AuditLogList({ initialData, initialStats }: AuditLogList
                                             currentPage={page}
                                             totalPages={totalPages}
                                             onPageChange={setPage}
+                                            inline
                                         />
                                     </div>
                                 )}
@@ -345,7 +379,7 @@ export default function AuditLogList({ initialData, initialStats }: AuditLogList
                 </div>
             </div>
 
-            {/* Filter Drawer */}
+            {/* Filter Drawer / Sheet */}
             <FilterSheet
                 isOpen={isFilterSheetOpen}
                 onClose={() => setIsFilterSheetOpen(false)}
@@ -353,7 +387,7 @@ export default function AuditLogList({ initialData, initialStats }: AuditLogList
                 filters={filters}
                 setFilters={setFilters}
                 onClear={() => {
-                    setFilters(INITIAL_FILTERS)
+                    setFilters(INITIAL_AUDIT_FILTERS)
                     setIsFilterSheetOpen(false)
                 }}
             />

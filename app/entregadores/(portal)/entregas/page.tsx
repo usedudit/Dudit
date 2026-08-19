@@ -1,16 +1,7 @@
-import type { Metadata } from "next"
-import DeliveryAssignmentsList from "@/components/delivery/DeliveryAssignmentsList"
-
-export const metadata: Metadata = {
-  title: "Minhas Entregas",
-  robots: {
-    index: false,
-    follow: false,
-  },
-}
+import { redirect } from "next/navigation"
 
 export const dynamic = "force-dynamic"
 
-export default function DeliveryAssignmentsPage() {
-  return <DeliveryAssignmentsList />
+export default function DeliveryAssignmentsRedirectPage() {
+  redirect("/entregadores")
 }

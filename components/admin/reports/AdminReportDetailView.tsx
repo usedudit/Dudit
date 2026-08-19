@@ -6,7 +6,6 @@ import {
     AlertTriangleIcon,
     CheckCircleIcon,
     CancelCircleIcon,
-    ReturnIcon,
     ShieldIcon,
     PackageIcon,
     StoreIcon,
@@ -124,7 +123,7 @@ export function AdminReportDetailView({
         if (!report) return
         startTransition(async () => {
             try {
-                const res = await dismissReport(report.id, actionReason || "Denúncia improcedente")
+                const res = await dismissReport(report.id, actionReason || "Denúncia improcedente ou sem provas")
                 if (res.success) {
                     toast.success("Denúncia descartada")
                     setDismissModalOpen(false)
@@ -144,7 +143,7 @@ export function AdminReportDetailView({
         if (!report) return
         startTransition(async () => {
             try {
-                const res = await markReportSpam(report.id, actionReason || "Denúncia marcada como spam")
+                const res = await markReportSpam(report.id, actionReason || "Denúncia abusiva / spam")
                 if (res.success) {
                     toast.success("Denúncia marcada como spam")
                     setSpamModalOpen(false)
@@ -206,9 +205,9 @@ export function AdminReportDetailView({
         user: "Usuário",
     }
 
-    const statusMap: Record<string, { variant: "orange" | "red" | "gray" | "purple"; label: string }> = {
+    const statusMap: Record<string, { variant: "orange" | "green" | "gray" | "purple"; label: string }> = {
         pending: { variant: "orange", label: "Pendente" },
-        validated: { variant: "red", label: "Validada" },
+        validated: { variant: "green", label: "Validada" },
         dismissed: { variant: "gray", label: "Descartada" },
         spam: { variant: "purple", label: "Spam" },
     }
@@ -222,31 +221,36 @@ export function AdminReportDetailView({
     return (
         <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background">
             {/* Header Desktop */}
-            <div className="hidden md:flex items-center justify-between px-8 py-4 border-b border-brand-border dark:border-dark-border">
-                <div className="flex items-center gap-3">
-                    <Button variant="ghost" size="sm" onClick={onBack} className="p-2 h-auto text-brand-dark dark:text-dark-heading">
-                        <ChevronLeftIcon size={18} />
+            <div className="hidden md:flex items-center justify-between px-8 py-5 border-b border-brand-border dark:border-dark-border">
+                <div className="flex items-center gap-4">
+                    <Button
+                        variant="filled"
+                        onClick={onBack}
+                        className="w-10 h-10 p-0 flex items-center justify-center rounded-xl"
+                    >
+                        <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                     </Button>
                     <div className="flex flex-col">
-                        <div className="flex items-center gap-2">
-                            <h1 className="text-xl font-bold text-brand-dark dark:text-dark-heading">
+                        <div className="flex items-center gap-2.5">
+                            <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading font-mono">
                                 Denúncia #{report.id.slice(0, 8)}
                             </h1>
-                            <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
+                            <Badge variant={statusInfo.variant} className="px-2.5 py-0.5 text-xs">
+                                {statusInfo.label}
+                            </Badge>
                         </div>
-                        <span className="text-xs text-brand-inactive-text">
+                        <span className="text-xs text-brand-inactive-text mt-0.5">
                             Registrada em {formatDateTime(report.created_at)}
                         </span>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2.5">
                     {report.status === "pending" && (
                         <>
                             <Button
                                 size="sm"
                                 variant="outline"
-                                className="text-brand-dark dark:text-dark-heading"
                                 onClick={() => setDismissModalOpen(true)}
                                 disabled={isPending}
                             >
@@ -255,7 +259,7 @@ export function AdminReportDetailView({
                             <Button
                                 size="sm"
                                 variant="outline"
-                                className="text-purple-600 border-purple-200 hover:bg-purple-50"
+                                className="text-purple-600 border-purple-200 hover:bg-purple-50 dark:hover:bg-purple-950/20"
                                 onClick={() => setSpamModalOpen(true)}
                                 disabled={isPending}
                             >
@@ -275,7 +279,7 @@ export function AdminReportDetailView({
                         <Button
                             size="sm"
                             variant="outline"
-                            className="text-orange-600 border-orange-200 hover:bg-orange-50"
+                            className="text-orange-600 border-orange-200 hover:bg-orange-50 dark:hover:bg-orange-950/20"
                             onClick={() => setRevertModalOpen(true)}
                             disabled={isPending}
                         >
@@ -286,7 +290,7 @@ export function AdminReportDetailView({
             </div>
 
             {/* Content Body */}
-            <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6">
+            <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 max-w-[1200px] mx-auto w-full">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* Coluna 1: Alvo Denunciado & Denunciante */}
                     <div className="space-y-6">
@@ -305,7 +309,7 @@ export function AdminReportDetailView({
                                                 ? `Avaliação #${report.target_id.slice(0, 8)}`
                                                 : target?.name || report.target_name || report.target_id}
                                         </span>
-                                        <span className="text-xs text-brand-inactive-text opacity-70">
+                                        <span className="text-xs text-brand-inactive-text opacity-70 font-mono">
                                             ID: {report.target_id}
                                         </span>
                                     </div>
@@ -322,7 +326,7 @@ export function AdminReportDetailView({
                                         {target.store.id && (
                                             <Link
                                                 href={`/ddt-admin/partners?view=${target.store.id}`}
-                                                className="text-brand-dark dark:text-dark-heading font-medium hover:underline flex items-center gap-1"
+                                                className="text-brand-dark dark:text-dark-heading font-semibold hover:underline flex items-center gap-1"
                                             >
                                                 Ver Loja <ArrowRightIcon size={12} />
                                             </Link>
@@ -334,15 +338,15 @@ export function AdminReportDetailView({
                             {/* Sumário de denúncias deste alvo */}
                             {targetSummary && (
                                 <div className="grid grid-cols-3 gap-3 pt-2">
-                                    <div className="p-3 bg-brand-gray/30 dark:bg-dark-border/10 rounded-lg text-center">
+                                    <div className="p-3 bg-brand-gray/30 dark:bg-dark-border/10 rounded-xl text-center">
                                         <span className="text-[11px] text-brand-inactive-text">Total Denúncias</span>
                                         <p className="text-base font-bold text-brand-dark dark:text-dark-heading">{targetSummary.total}</p>
                                     </div>
-                                    <div className="p-3 bg-brand-gray/30 dark:bg-dark-border/10 rounded-lg text-center">
-                                        <span className="text-[11px] text-brand-inactive-text">Validadas</span>
-                                        <p className="text-base font-bold text-red-600">{targetSummary.validated}</p>
+                                    <div className="p-3 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-xl text-center">
+                                        <span className="text-[11px] text-emerald-700 dark:text-emerald-400">Validadas</span>
+                                        <p className="text-base font-bold text-emerald-700 dark:text-emerald-400">{targetSummary.validated}</p>
                                     </div>
-                                    <div className="p-3 bg-brand-gray/30 dark:bg-dark-border/10 rounded-lg text-center">
+                                    <div className="p-3 bg-brand-gray/30 dark:bg-dark-border/10 rounded-xl text-center">
                                         <span className="text-[11px] text-brand-inactive-text">Descartadas</span>
                                         <p className="text-base font-bold text-brand-inactive-text">{targetSummary.dismissed}</p>
                                     </div>
@@ -359,18 +363,18 @@ export function AdminReportDetailView({
                                     <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">
                                         {reporter?.profile?.full_name || report.reporter_name || "Usuário Anônimo"}
                                     </span>
-                                    <span className="text-xs text-brand-inactive-text">
+                                    <span className="text-xs text-brand-inactive-text font-mono">
                                         ID: {report.reporter_user_id}
                                     </span>
                                 </div>
                                 {reporter?.email && (
                                     <div className="text-xs text-brand-inactive-text pt-1">
-                                        Email: {reporter.email}
+                                        Email: <span className="font-medium text-brand-dark dark:text-dark-heading">{reporter.email}</span>
                                     </div>
                                 )}
                                 {reporter?.profile?.phone && (
                                     <div className="text-xs text-brand-inactive-text">
-                                        Telefone: {reporter.profile.phone}
+                                        Telefone: <span className="font-medium text-brand-dark dark:text-dark-heading">{reporter.profile.phone}</span>
                                     </div>
                                 )}
                             </div>
@@ -394,20 +398,20 @@ export function AdminReportDetailView({
                                 {report.description && (
                                     <div>
                                         <span className="text-xs text-brand-inactive-text">Descrição Informada pelo Usuário</span>
-                                        <div className="mt-1 p-3 bg-brand-gray/50 dark:bg-dark-border/20 rounded-lg text-sm text-brand-dark dark:text-dark-body whitespace-pre-wrap">
+                                        <div className="mt-1 p-3.5 bg-brand-gray/50 dark:bg-dark-border/20 rounded-xl text-sm text-brand-dark dark:text-dark-body whitespace-pre-wrap leading-relaxed">
                                             {report.description}
                                         </div>
                                     </div>
                                 )}
 
                                 {report.resolution_reason && (
-                                    <div className="p-3 bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-lg">
+                                    <div className="p-3.5 bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-xl">
                                         <span className="text-xs font-semibold text-blue-700 dark:text-blue-300">Justificativa da Moderação</span>
-                                        <p className="text-sm text-brand-dark dark:text-dark-body mt-0.5">
+                                        <p className="text-sm text-brand-dark dark:text-dark-body mt-0.5 leading-relaxed">
                                             {report.resolution_reason}
                                         </p>
                                         {report.resolved_at && (
-                                            <span className="text-[11px] text-brand-inactive-text block mt-1">
+                                             <span className="text-[11px] text-brand-inactive-text block mt-1">
                                                 Resolvido em {formatDateTime(report.resolved_at)}
                                             </span>
                                         )}
@@ -424,7 +428,7 @@ export function AdminReportDetailView({
                             >
                                 <div className="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
                                     {auditEvents.map((evt: any) => (
-                                        <div key={evt.id} className="p-3 bg-brand-gray/30 dark:bg-dark-border/10 rounded-lg text-xs space-y-1">
+                                        <div key={evt.id} className="p-3 bg-brand-gray/30 dark:bg-dark-border/10 rounded-xl text-xs space-y-1">
                                             <div className="flex justify-between items-center">
                                                 <span className="font-semibold text-brand-dark dark:text-dark-heading">{evt.action_type}</span>
                                                 <span className="text-[10px] text-brand-inactive-text">{formatDateTime(evt.created_at)}</span>
@@ -446,22 +450,23 @@ export function AdminReportDetailView({
                 isOpen={resolveModalOpen}
                 onClose={() => setResolveModalOpen(false)}
                 title="Validar Denúncia"
-                description="A validação atribui +5 pontos de risco ao parceiro/alvo e conclui a denúncia como procedente."
+                maxWidth="md"
                 footer={
-                    <div className="flex justify-end gap-2">
+                    <div className="flex items-center justify-end gap-2 w-full">
                         <Button variant="outline" onClick={() => setResolveModalOpen(false)}>Cancelar</Button>
-                        <Button variant="destructive" onClick={handleResolve} disabled={isPending}>Validar Denúncia</Button>
+                        <Button variant="destructive" onClick={handleResolve} disabled={isPending}>Validar (+5 Risco)</Button>
                     </div>
                 }
             >
-                <div className="space-y-2 pt-2">
-                    <label className="text-xs font-medium text-brand-dark dark:text-dark-heading">
-                        Justificativa da Decisão
-                    </label>
-                    <Input
-                        placeholder="Informe a motivação para validação..."
+                <div className="space-y-4 py-2">
+                    <p className="text-xs text-brand-inactive-text">
+                        A confirmação desta denúncia adicionará <strong>+5 pontos de score de risco</strong> ao alvo e marcará o registro como validado.
+                    </p>
+                    <textarea
                         value={actionReason}
                         onChange={(e) => setActionReason(e.target.value)}
+                        placeholder="Justificativa da validação..."
+                        className="w-full min-h-[90px] rounded-xl border border-brand-border bg-white p-3 text-sm text-brand-dark outline-none focus:border-brand-green dark:border-dark-border dark:bg-dark-surface dark:text-white"
                     />
                 </div>
             </DefaultModal>
@@ -471,22 +476,23 @@ export function AdminReportDetailView({
                 isOpen={dismissModalOpen}
                 onClose={() => setDismissModalOpen(false)}
                 title="Descartar Denúncia"
-                description="A denúncia será marcada como descartada (improcedente) sem penalidades ao alvo."
+                maxWidth="md"
                 footer={
-                    <div className="flex justify-end gap-2">
+                    <div className="flex items-center justify-end gap-2 w-full">
                         <Button variant="outline" onClick={() => setDismissModalOpen(false)}>Cancelar</Button>
                         <Button variant="default" onClick={handleDismiss} disabled={isPending}>Descartar</Button>
                     </div>
                 }
             >
-                <div className="space-y-2 pt-2">
-                    <label className="text-xs font-medium text-brand-dark dark:text-dark-heading">
-                        Motivo do Descarte
-                    </label>
-                    <Input
-                        placeholder="Informe o motivo..."
+                <div className="space-y-4 py-2">
+                    <p className="text-xs text-brand-inactive-text">
+                        Descartar denúncias improcedentes encerra o ticket sem penalidades ao alvo.
+                    </p>
+                    <textarea
                         value={actionReason}
                         onChange={(e) => setActionReason(e.target.value)}
+                        placeholder="Motivo do descarte..."
+                        className="w-full min-h-[90px] rounded-xl border border-brand-border bg-white p-3 text-sm text-brand-dark outline-none focus:border-brand-green dark:border-dark-border dark:bg-dark-surface dark:text-white"
                     />
                 </div>
             </DefaultModal>
@@ -496,22 +502,23 @@ export function AdminReportDetailView({
                 isOpen={spamModalOpen}
                 onClose={() => setSpamModalOpen(false)}
                 title="Marcar Denúncia como Spam"
-                description="O registro será classificado como spam."
+                maxWidth="md"
                 footer={
-                    <div className="flex justify-end gap-2">
+                    <div className="flex items-center justify-end gap-2 w-full">
                         <Button variant="outline" onClick={() => setSpamModalOpen(false)}>Cancelar</Button>
                         <Button variant="default" onClick={handleSpam} disabled={isPending}>Marcar como Spam</Button>
                     </div>
                 }
             >
-                <div className="space-y-2 pt-2">
-                    <label className="text-xs font-medium text-brand-dark dark:text-dark-heading">
-                        Observação (Opcional)
-                    </label>
-                    <Input
-                        placeholder="Observação..."
+                <div className="space-y-4 py-2">
+                    <p className="text-xs text-brand-inactive-text">
+                        Denúncias marcadas como spam indicam comportamento abusivo do denunciante e são arquivadas.
+                    </p>
+                    <textarea
                         value={actionReason}
                         onChange={(e) => setActionReason(e.target.value)}
+                        placeholder="Observações sobre o spam..."
+                        className="w-full min-h-[90px] rounded-xl border border-brand-border bg-white p-3 text-sm text-brand-dark outline-none focus:border-brand-green dark:border-dark-border dark:bg-dark-surface dark:text-white"
                     />
                 </div>
             </DefaultModal>
@@ -521,22 +528,23 @@ export function AdminReportDetailView({
                 isOpen={revertModalOpen}
                 onClose={() => setRevertModalOpen(false)}
                 title="Reverter Validação da Denúncia"
-                description="Isso removerá os 5 pontos de risco atribuídos anteriormente e mudará o status para descartada."
+                maxWidth="md"
                 footer={
-                    <div className="flex justify-end gap-2">
+                    <div className="flex items-center justify-end gap-2 w-full">
                         <Button variant="outline" onClick={() => setRevertModalOpen(false)}>Cancelar</Button>
-                        <Button variant="default" onClick={handleRevert} disabled={isPending}>Reverter Validação</Button>
+                        <Button variant="default" onClick={handleRevert} disabled={isPending}>Reverter (-5 Risco)</Button>
                     </div>
                 }
             >
-                <div className="space-y-2 pt-2">
-                    <label className="text-xs font-medium text-brand-dark dark:text-dark-heading">
-                        Motivo da Reversão
-                    </label>
-                    <Input
-                        placeholder="Informe o motivo da reversão..."
+                <div className="space-y-4 py-2">
+                    <p className="text-xs text-brand-inactive-text">
+                        A reversão retornará o registro para pendente e subtrairá <strong>-5 pontos de risco</strong> do alvo.
+                    </p>
+                    <textarea
                         value={actionReason}
                         onChange={(e) => setActionReason(e.target.value)}
+                        placeholder="Justificativa da reversão..."
+                        className="w-full min-h-[90px] rounded-xl border border-brand-border bg-white p-3 text-sm text-brand-dark outline-none focus:border-brand-green dark:border-dark-border dark:bg-dark-surface dark:text-white"
                     />
                 </div>
             </DefaultModal>

@@ -1,8 +1,8 @@
 "use client"
 
 import React, { useState, useTransition, useEffect, useCallback } from "react"
-import { Button, FormSection, Input, ThreeDotsLoader } from "@/components/reusable"
-import { ChevronLeftIcon, UserIcon, TruckIcon } from "@/lib/icons"
+import { Button, FormSection, Input, FormDropdown } from "@/components/reusable"
+import { ChevronLeftIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { toast } from "@/hooks/use-notification"
 import { createDeliveryDriverInvitationAdminAction } from "@/app/actions/admin/delivery-drivers"
@@ -25,11 +25,16 @@ export function AdminDeliveryDriverInviteView({ onBack, onSuccess }: AdminDelive
         notes: "",
     })
 
-    const { setHeaderOverride } = useSidebar()
+    let sidebarContext: ReturnType<typeof useSidebar> | null = null
+    try {
+        sidebarContext = useSidebar()
+    } catch { }
+    const setHeaderOverride = sidebarContext?.setHeaderOverride
 
     const handleBack = useCallback(() => onBack(), [onBack])
 
     useEffect(() => {
+        if (!setHeaderOverride) return
         setHeaderOverride({
             title: "Novo Entregador",
             onBack: handleBack,
@@ -76,24 +81,28 @@ export function AdminDeliveryDriverInviteView({ onBack, onSuccess }: AdminDelive
 
     return (
         <FadeIn className="flex flex-col bg-white dark:bg-dark-background min-h-screen">
-            <div className="w-full max-w-[1100px] mx-auto px-4 md:px-6 py-6 space-y-6">
-                {/* Desktop Header */}
-                <div className="hidden md:flex items-center justify-between pb-4 border-b border-brand-border dark:border-dark-border">
-                    <div className="flex items-center gap-4">
-                        <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center">
-                            <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                        </Button>
-                        <div className="flex flex-col">
-                            <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading tracking-tight">
-                                Cadastrar Novo Entregador
-                            </h1>
-                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                                Envie um convite de acesso para o entregador atuar na plataforma Dudit.
-                            </p>
-                        </div>
+            {/* Desktop Header */}
+            <div className="hidden md:flex items-center justify-between px-8 py-5 border-b border-brand-border dark:border-dark-border">
+                <div className="flex items-center gap-4">
+                    <Button
+                        variant="filled"
+                        onClick={onBack}
+                        className="w-10 h-10 p-0 flex items-center justify-center rounded-xl"
+                    >
+                        <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                    </Button>
+                    <div className="flex flex-col">
+                        <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading tracking-tight">
+                            Cadastrar Novo Entregador
+                        </h1>
+                        <p className="text-xs text-brand-inactive-text mt-0.5">
+                            Envie um convite de acesso por e-mail para o entregador atuar na plataforma Dudit.
+                        </p>
                     </div>
                 </div>
+            </div>
 
+            <div className="w-full max-w-[1000px] mx-auto px-4 md:px-8 py-6 space-y-6">
                 {/* Form */}
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <FormSection title="Dados Pessoais & Contato" hasSeparator>
@@ -120,18 +129,18 @@ export function AdminDeliveryDriverInviteView({ onBack, onSuccess }: AdminDelive
                                 onChange={(e) => update("phone", e.target.value)}
                                 placeholder="(00) 00000-0000"
                             />
-                            <div>
-                                <label className="block text-xs font-semibold text-brand-dark dark:text-dark-heading mb-1.5">
+                            <div className="flex flex-col">
+                                <label className="block text-sm font-medium text-brand-dark dark:text-dark-heading mb-1.5">
                                     Tipo de Veículo
                                 </label>
-                                <select
+                                <FormDropdown
                                     value={form.vehicleType}
-                                    onChange={(e) => update("vehicleType", e.target.value)}
-                                    className="w-full px-3 py-2 text-sm rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading focus:outline-none focus:ring-2 focus:ring-brand-green/20"
-                                >
-                                    <option value="moto">Motocicleta (Moto)</option>
-                                    <option value="carro">Automóvel (Carro)</option>
-                                </select>
+                                    setValue={(val) => update("vehicleType", val)}
+                                    options={[
+                                        { value: "moto", label: "Motocicleta (Moto)" },
+                                        { value: "carro", label: "Automóvel (Carro)" },
+                                    ]}
+                                />
                             </div>
                         </div>
                     </FormSection>
@@ -165,7 +174,7 @@ export function AdminDeliveryDriverInviteView({ onBack, onSuccess }: AdminDelive
                                 onChange={(e) => update("notes", e.target.value)}
                                 placeholder="Informações operacionais, disponibilidade ou restrições..."
                                 rows={3}
-                                className="w-full px-3 py-2 text-sm rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading placeholder:text-brand-inactive-text focus:outline-none focus:ring-2 focus:ring-brand-green/20"
+                                className="w-full px-3 py-2.5 text-sm rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading placeholder:text-brand-inactive-text focus:outline-none focus:ring-2 focus:ring-brand-green/20"
                             />
                         </div>
                     </FormSection>
@@ -175,7 +184,7 @@ export function AdminDeliveryDriverInviteView({ onBack, onSuccess }: AdminDelive
                         <Button type="button" variant="outline" onClick={onBack}>
                             Cancelar
                         </Button>
-                        <Button type="submit" disabled={isPending}>
+                        <Button type="submit" disabled={isPending} isLoading={isPending}>
                             {isPending ? "Enviando Convite..." : "Enviar Convite"}
                         </Button>
                     </div>

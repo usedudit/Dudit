@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { useSupabase } from "@/providers/supabase-provider"
 import {
   getPendingLegalConsents,
@@ -21,12 +22,14 @@ const DOCUMENT_LABELS: Record<string, string> = {
  * Aparece quando existe uma versão em vigor que o usuário ainda não aceitou.
  */
 export function LegalConsentBanner() {
+  const pathname = usePathname()
   const { user, isLoading: isAuthLoading } = useSupabase()
   const [pending, setPending] = useState<PendingLegalConsent[] | null>(null)
   const [accepting, setAccepting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (pathname?.startsWith("/print")) return
     if (!user) {
       setPending(null)
       return

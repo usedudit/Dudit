@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef } from "react"
+import { usePathname } from "next/navigation"
 import { useSupabase } from "@/providers/supabase-provider"
 import { isFirebaseClientConfigured } from "@/lib/notifications/firebase-config"
 import { registerPushSubscriptionAction } from "@/app/actions/notifications"
@@ -31,10 +32,13 @@ function getDeviceFingerprint(): string {
 }
 
 export function PushNotificationManager() {
+  const pathname = usePathname()
   const { user } = useSupabase()
   const lastRegisteredTokenRef = useRef<string | null>(null)
 
   useEffect(() => {
+    if (pathname?.startsWith("/print")) return
+    if (typeof navigator !== "undefined" && navigator.userAgent.includes("Headless")) return
     if (!user?.id || !isFirebaseClientConfigured()) return
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) return
     if (!("Notification" in window)) return

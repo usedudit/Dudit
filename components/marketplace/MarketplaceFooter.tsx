@@ -33,7 +33,7 @@ const Footer: React.FC<FooterProps> = ({ setView }) => {
 
                     {/* Logo + Descrição */}
                     <div className="md:w-1/3">
-                        <Link href="/" prefetch={true} className="inline-block mb-6">
+                        <Link href="/" prefetch={false} className="inline-block mb-6">
                             <img
                                 src="https://img.dudit.com.br/cdn-cgi/image/width=140,format=auto,quality=80/static/Logo.png"
                                 alt="Dudit"
@@ -65,8 +65,8 @@ const Footer: React.FC<FooterProps> = ({ setView }) => {
                         <div>
                             <h4 className="text-sm font-medium text-white mb-6">Plataforma</h4>
                             <ul className="space-y-4">
-                                <li><Link href="/erp/vender" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Explorar</Link></li>
-                                <li><Link href="/erp/painel" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Anunciar na Dudit</Link></li>
+                                <li><Link href="/explorar" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Explorar</Link></li>
+                                <li><Link href="/auth/login?mode=partner" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Anunciar na Dudit</Link></li>
                             </ul>
                         </div>
 

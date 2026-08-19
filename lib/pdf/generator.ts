@@ -223,29 +223,51 @@ export async function generatePdf(url: string, nextCookies: any[]): Promise<Buff
         // Set headless flag so PrintLayout doesn't trigger auto-print timer
         urlObj.searchParams.set("headless", "true")
 
+        // Intercept network requests to abort heavy ads, trackers, media and analytics
+        await page.setRequestInterception(true)
+        page.on("request", (req) => {
+            const resourceType = req.resourceType()
+            const reqUrl = req.url()
+            if (
+                resourceType === "media" ||
+                resourceType === "eventsource" ||
+                resourceType === "websocket" ||
+                reqUrl.includes("googlesyndication") ||
+                reqUrl.includes("googleadservices") ||
+                reqUrl.includes("doubleclick") ||
+                reqUrl.includes("analytics") ||
+                reqUrl.includes("sentry")
+            ) {
+                req.abort().catch(() => {})
+                return
+            }
+            req.continue().catch(() => {})
+        })
+
         // Open internal print URL - fast DOM lifecycle
         await page.goto(urlObj.toString(), {
             waitUntil: "domcontentloaded",
-            timeout: 15000,
+            timeout: 10000,
         })
 
-        // Ensure custom fonts and images are ready
-        await Promise.all([
-            page.evaluateHandle(() => document.fonts.ready),
-            page.evaluate(async () => {
-                const images = Array.from(document.images)
-                await Promise.all(
-                    images.map((img) => {
-                        if (img.complete) return Promise.resolve()
-                        return new Promise((resolve) => {
-                            img.onload = resolve
-                            img.onerror = resolve
-                            setTimeout(resolve, 2000)
-                        })
+        // Fast check: wait max 300ms for fonts and images to be ready
+        await page.evaluate(async () => {
+            await Promise.race([
+                document.fonts ? document.fonts.ready : Promise.resolve(),
+                new Promise((r) => setTimeout(r, 300)),
+            ])
+            const images = Array.from(document.images)
+            await Promise.all(
+                images.map((img) => {
+                    if (img.complete) return Promise.resolve()
+                    return new Promise((resolve) => {
+                        img.onload = resolve
+                        img.onerror = resolve
+                        setTimeout(resolve, 300)
                     })
-                )
-            }),
-        ])
+                })
+            )
+        })
 
         if (isThermal) {
             // Calculate exact height of thermal receipt content to create a continuous roll PDF

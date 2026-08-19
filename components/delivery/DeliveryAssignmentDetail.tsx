@@ -153,7 +153,7 @@ export default function DeliveryAssignmentDetail({
                 {/* TOP BREADCRUMB / BACK */}
                 <div className="flex items-center justify-between">
                     <Link
-                        href="/entregadores/entregas"
+                        href="/entregadores"
                         className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-inactive-text hover:text-brand-green transition-colors"
                     >
                         <ChevronLeftIcon size={18} />

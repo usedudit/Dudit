@@ -4,6 +4,7 @@ import React, { useRef, useState, useCallback, useEffect } from "react"
 import { AnimatePresence } from "framer-motion"
 import { Button, Input } from "@/components/reusable"
 import FilterChip from "@/components/reusable/FilterChip"
+import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import { TabCountBadge } from "@/components/reusable/TabCountBadge"
 import {
@@ -18,12 +19,20 @@ import {
     Package,
     XIcon,
 } from "@/lib/icons"
+import { useMediaQuery } from "@/components/erp/hooks"
 
 export type DeliveryTab = "todas" | "pending" | "in_progress" | "completed" | "failed"
 
-interface FilterState {
-    partnerName?: string
-    paymentMethod?: string
+export interface DeliveryFilterState {
+    partnerNames: string[]
+    paymentMethods: string[]
+    status: string[]
+}
+
+export const INITIAL_DELIVERY_FILTERS: DeliveryFilterState = {
+    partnerNames: [],
+    paymentMethods: [],
+    status: [],
 }
 
 interface DeliveryPageControlsProps {
@@ -31,7 +40,6 @@ interface DeliveryPageControlsProps {
     setActiveTab: (tab: DeliveryTab) => void
     search: string
     onSearchChange: (value: string) => void
-    onOpenFilter?: () => void
     viewMode: "list" | "grid"
     onViewModeChange: (mode: "list" | "grid") => void
     tabCounts?: {
@@ -41,9 +49,9 @@ interface DeliveryPageControlsProps {
         completed?: number
         failed?: number
     }
-    filters?: FilterState
-    setFilters?: React.Dispatch<React.SetStateAction<FilterState>>
-    hasActiveFilters?: boolean
+    filters: DeliveryFilterState
+    setFilters: React.Dispatch<React.SetStateAction<DeliveryFilterState>>
+    partnerOptions?: string[]
 }
 
 export default function DeliveryPageControls({
@@ -51,14 +59,15 @@ export default function DeliveryPageControls({
     setActiveTab,
     search,
     onSearchChange,
-    onOpenFilter,
     viewMode,
     onViewModeChange,
     tabCounts = {},
-    filters = {},
+    filters,
     setFilters,
-    hasActiveFilters = false,
+    partnerOptions = [],
 }: DeliveryPageControlsProps) {
+    const isTabletOrMobile = useMediaQuery("(max-width: 1023px)")
+    const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false)
     const filtersContainerRef = useRef<HTMLDivElement>(null)
     const [filterScrollState, setFilterScrollState] = useState({ left: false, right: false })
 
@@ -77,21 +86,66 @@ export default function DeliveryPageControls({
         return () => window.removeEventListener("resize", checkFilterScroll)
     }, [checkFilterScroll, filters])
 
+    const hasActiveFilters =
+        filters.partnerNames.length > 0 ||
+        filters.paymentMethods.length > 0 ||
+        filters.status.length > 0
+
+    const filterSections: FilterSectionConfig[] = [
+        ...(partnerOptions.length > 0
+            ? [
+                  {
+                      id: "partnerNames",
+                      title: "Estabelecimentos",
+                      type: "checkbox-list" as const,
+                      options: partnerOptions,
+                  },
+              ]
+            : []),
+        {
+            id: "paymentMethods",
+            title: "Formas de Pagamento",
+            type: "checkbox-list" as const,
+            options: ["Dinheiro", "PIX", "Cartão de Crédito", "Cartão de Débito"],
+        },
+        {
+            id: "status",
+            title: "Status Operacional",
+            type: "checkbox-list" as const,
+            options: [
+                "Atribuída",
+                "Aceita",
+                "Retirada no Local",
+                "Em Rota de Entrega",
+                "Entregue",
+                "Falha na Entrega",
+                "Cancelada",
+            ],
+        },
+    ]
+
     const BadgeList = () => (
         <AnimatePresence>
-            {filters.partnerName && (
+            {filters.partnerNames.length > 0 && (
                 <FilterChip
                     label="Loja"
-                    value={filters.partnerName}
+                    value={filters.partnerNames.join(", ")}
                     icon={<Package size={12} />}
-                    onRemove={() => setFilters?.((prev) => ({ ...prev, partnerName: undefined }))}
+                    onRemove={() => setFilters((prev) => ({ ...prev, partnerNames: [] }))}
                 />
             )}
-            {filters.paymentMethod && (
+            {filters.paymentMethods.length > 0 && (
                 <FilterChip
                     label="Pagamento"
-                    value={filters.paymentMethod}
-                    onRemove={() => setFilters?.((prev) => ({ ...prev, paymentMethod: undefined }))}
+                    value={filters.paymentMethods.join(", ")}
+                    onRemove={() => setFilters((prev) => ({ ...prev, paymentMethods: [] }))}
+                />
+            )}
+            {filters.status.length > 0 && (
+                <FilterChip
+                    label="Status"
+                    value={filters.status.join(", ")}
+                    onRemove={() => setFilters((prev) => ({ ...prev, status: [] }))}
                 />
             )}
         </AnimatePresence>
@@ -164,30 +218,18 @@ export default function DeliveryPageControls({
                         </button>
                     )}
                 </div>
-                <div className="flex items-center bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-full p-1 h-[42px] shrink-0">
-                    <button
-                        onClick={() => onViewModeChange("list")}
-                        className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${
-                            viewMode === "list"
-                                ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading"
-                                : "text-gray-400 hover:text-gray-600 dark:text-dark-body"
-                        }`}
-                        aria-label="Visualização em lista"
-                    >
-                        <ListIcon className="w-[18px] h-[18px]" />
-                    </button>
-                    <button
-                        onClick={() => onViewModeChange("grid")}
-                        className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${
-                            viewMode === "grid"
-                                ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading"
-                                : "text-gray-400 hover:text-gray-600 dark:text-dark-body"
-                        }`}
-                        aria-label="Visualização em grid"
-                    >
-                        <GridIcon className="w-[18px] h-[18px]" />
-                    </button>
-                </div>
+
+                <Button
+                    variant="outline"
+                    onClick={() => setIsFilterSheetOpen(true)}
+                    className="w-[42px] h-[42px] p-0 flex items-center justify-center relative shrink-0"
+                    aria-label="Abrir filtros"
+                >
+                    <FilterIcon className="w-4 h-4" />
+                    {hasActiveFilters && (
+                        <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-brand-green" />
+                    )}
+                </Button>
             </div>
 
             {/* DESKTOP CONTROLS */}
@@ -213,15 +255,23 @@ export default function DeliveryPageControls({
                             </button>
                         )}
                     </div>
-                    {onOpenFilter && (
-                        <Button
-                            variant="outline"
-                            onClick={onOpenFilter}
-                            leftIcon={<FilterIcon size={18} />}
-                        >
-                            Filtros
-                        </Button>
-                    )}
+
+                    <Button
+                        variant="outline"
+                        onClick={() => setIsFilterSheetOpen(true)}
+                        leftIcon={<FilterIcon size={18} />}
+                        className="relative"
+                    >
+                        Filtros
+                        {hasActiveFilters && (
+                            <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-brand-green text-white text-[10px] font-bold">
+                                {filters.partnerNames.length +
+                                    filters.paymentMethods.length +
+                                    filters.status.length}
+                            </span>
+                        )}
+                    </Button>
+
                     {hasActiveFilters && (
                         <div className="h-8 w-px bg-brand-border dark:bg-dark-border mx-1" />
                     )}
@@ -248,33 +298,35 @@ export default function DeliveryPageControls({
                     />
                 </div>
 
-                {/* View Mode Toggles */}
-                <div className="flex items-center bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-full p-1 h-[42px] shrink-0">
-                    <button
-                        onClick={() => onViewModeChange("list")}
-                        className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${
-                            viewMode === "list"
-                                ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading"
-                                : "text-gray-400 hover:text-gray-600 dark:text-dark-body"
-                        }`}
-                        title="Visualização em lista/tabela"
-                        aria-label="Visualização em lista"
-                    >
-                        <ListIcon className="w-[18px] h-[18px]" />
-                    </button>
-                    <button
-                        onClick={() => onViewModeChange("grid")}
-                        className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${
-                            viewMode === "grid"
-                                ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading"
-                                : "text-gray-400 hover:text-gray-600 dark:text-dark-body"
-                        }`}
-                        title="Visualização em cards/grid"
-                        aria-label="Visualização em grid"
-                    >
-                        <GridIcon className="w-[18px] h-[18px]" />
-                    </button>
-                </div>
+                {/* View Mode Toggles (ONLY VISIBLE ON DESKTOP) */}
+                {!isTabletOrMobile && (
+                    <div className="flex items-center bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-full p-1 h-[42px] shrink-0">
+                        <button
+                            onClick={() => onViewModeChange("list")}
+                            className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${
+                                viewMode === "list"
+                                    ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading"
+                                    : "text-gray-400 hover:text-gray-600 dark:text-dark-body"
+                            }`}
+                            title="Visualização em lista/tabela"
+                            aria-label="Visualização em lista"
+                        >
+                            <ListIcon className="w-[18px] h-[18px]" />
+                        </button>
+                        <button
+                            onClick={() => onViewModeChange("grid")}
+                            className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${
+                                viewMode === "grid"
+                                    ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading"
+                                    : "text-gray-400 hover:text-gray-600 dark:text-dark-body"
+                            }`}
+                            title="Visualização em cards/grid"
+                            aria-label="Visualização em grid"
+                        >
+                            <GridIcon className="w-[18px] h-[18px]" />
+                        </button>
+                    </div>
+                )}
             </div>
 
             {/* MOBILE ACTIVE CHIPS */}
@@ -283,6 +335,16 @@ export default function DeliveryPageControls({
                     <BadgeList />
                 </div>
             </div>
+
+            {/* FILTER SHEET MODAL */}
+            <FilterSheet
+                isOpen={isFilterSheetOpen}
+                onClose={() => setIsFilterSheetOpen(false)}
+                sections={filterSections}
+                filters={filters}
+                setFilters={setFilters}
+                onClear={() => setFilters(INITIAL_DELIVERY_FILTERS)}
+            />
         </div>
     )
 }

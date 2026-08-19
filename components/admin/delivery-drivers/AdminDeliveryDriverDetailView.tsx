@@ -7,9 +7,10 @@ import {
     PackageIcon,
     ClockIcon,
     StoreIcon,
-    ShareIcon,
-    EditIcon,
-    AlertTriangleIcon,
+    UserIcon,
+    MailIcon,
+    PhoneIcon,
+    MapPinIcon,
 } from "@/lib/icons"
 import {
     Button,
@@ -21,10 +22,10 @@ import {
     ThreeDotsLoader,
     FormSection,
     IconPlaceholder,
-    ListItem,
     Pagination,
     AlertModal,
 } from "@/components/reusable"
+import { TabCountBadge } from "@/components/reusable/TabCountBadge"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils"
 import {
@@ -58,13 +59,18 @@ export function AdminDeliveryDriverDetailView({
     // Modals
     const [toggleModalOpen, setToggleModalOpen] = useState(false)
 
-    const { setHeaderOverride } = useSidebar()
+    let sidebarContext: ReturnType<typeof useSidebar> | null = null
+    try {
+        sidebarContext = useSidebar()
+    } catch { }
+    const setHeaderOverride = sidebarContext?.setHeaderOverride
 
     const handleBack = useCallback(() => onBack(), [onBack])
 
     const driverName = driver?.profile?.full_name || "Entregador"
 
     useEffect(() => {
+        if (!setHeaderOverride) return
         setHeaderOverride({
             title: `Entregador: ${driverName}`,
             onBack: handleBack,
@@ -132,8 +138,6 @@ export function AdminDeliveryDriverDetailView({
             <div className="flex flex-col items-center justify-center min-h-[400px] p-6 text-center">
                 <IconPlaceholder
                     icon={TruckIcon}
-                    containerSize="w-16 h-16 mb-2"
-                    iconSize="w-6 h-6"
                     title="Entregador não encontrado"
                     subtitle="O cadastro pode ter sido removido ou o ID está incorreto."
                     itemButton={{
@@ -157,64 +161,74 @@ export function AdminDeliveryDriverDetailView({
 
     return (
         <FadeIn className="flex flex-col bg-white dark:bg-dark-background min-h-screen">
-            <div className="w-full max-w-[1300px] mx-auto px-4 md:px-6 py-6 space-y-6">
-                {/* Desktop Header */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-brand-border dark:border-dark-border">
-                    <div className="flex items-center gap-4">
-                        <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center shrink-0">
-                            <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                        </Button>
-                        <div className="flex flex-col min-w-0">
-                            <div className="flex items-center gap-3 flex-wrap">
-                                <h1 className="text-2xl md:text-3xl font-bold text-brand-dark dark:text-dark-heading tracking-tight truncate">
-                                    {profile.full_name || "Entregador"}
-                                </h1>
-                                <Badge variant={driver.is_active ? "green" : "red"}>
-                                    {driver.is_active ? "Ativo" : "Inativo"}
-                                </Badge>
-                                <Badge variant={driver.availability_status === "available" ? "blue" : "gray"}>
-                                    {driver.availability_status === "available" ? "Disponível" : "Offline"}
-                                </Badge>
-                                <Badge variant="gray" className="capitalize">
-                                    {driver.vehicle_type === "moto" ? "Motocicleta" : "Automóvel"}
-                                </Badge>
-                            </div>
-                            <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                {driver.email || "Sem e-mail cadastrado"} • ID: {driver.user_id}
-                            </p>
+            {/* Header Desktop */}
+            <div className="hidden md:flex items-center justify-between px-8 py-5 border-b border-brand-border dark:border-dark-border">
+                <div className="flex items-center gap-4">
+                    <Button
+                        variant="filled"
+                        onClick={onBack}
+                        className="w-10 h-10 p-0 flex items-center justify-center rounded-xl"
+                    >
+                        <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                    </Button>
+                    <div className="flex flex-col">
+                        <div className="flex items-center gap-3">
+                            <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading tracking-tight truncate">
+                                {profile.full_name || "Entregador"}
+                            </h1>
+                            <Badge variant={driver.is_active ? "green" : "red"}>
+                                {driver.is_active ? "Ativo" : "Inativo"}
+                            </Badge>
+                            <Badge variant={driver.availability_status === "available" ? "blue" : "gray"}>
+                                {driver.availability_status === "available" ? "Disponível" : "Offline"}
+                            </Badge>
+                            <Badge variant="purple" className="capitalize">
+                                {driver.vehicle_type === "moto" ? "Motocicleta" : "Automóvel"}
+                            </Badge>
                         </div>
-                    </div>
-
-                    <div className="flex items-center gap-3 shrink-0">
-                        {driver.is_active ? (
-                            <Button
-                                variant="destructive"
-                                onClick={() => setToggleModalOpen(true)}
-                            >
-                                Desativar Entregador
-                            </Button>
-                        ) : (
-                            <Button
-                                variant="outline"
-                                onClick={() => setToggleModalOpen(true)}
-                                className="text-brand-green border-brand-green/30 hover:bg-brand-green/10"
-                            >
-                                Ativar Entregador
-                            </Button>
-                        )}
+                        <p className="text-xs text-brand-inactive-text mt-0.5">
+                            {driver.email || "Sem e-mail cadastrado"} • ID: <span className="font-mono">{driver.user_id}</span>
+                        </p>
                     </div>
                 </div>
 
+                <div className="flex items-center gap-3 shrink-0">
+                    {driver.is_active ? (
+                        <Button
+                            variant="destructive"
+                            onClick={() => setToggleModalOpen(true)}
+                        >
+                            Desativar Entregador
+                        </Button>
+                    ) : (
+                        <Button
+                            variant="outline"
+                            onClick={() => setToggleModalOpen(true)}
+                            className="text-brand-green border-brand-green/30 hover:bg-brand-green/10"
+                        >
+                            Ativar Entregador
+                        </Button>
+                    )}
+                </div>
+            </div>
+
+            <div className="w-full max-w-[1200px] mx-auto px-4 md:px-8 py-6 space-y-6">
                 {/* Tabs */}
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
-                    <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b border-brand-border dark:border-dark-border mb-6">
-                        <TabsTrigger value="general">
-                            Dados Cadastrais & Métricas
-                        </TabsTrigger>
-                        <TabsTrigger value="history">
-                            Histórico de Entregas ({assignments.length})
-                        </TabsTrigger>
-                    </TabsList>
+                    <div className="mb-6">
+                        <TabsList className="px-0">
+                            <TabsTrigger value="general" icon={UserIcon}>
+                                Dados Cadastrais & Métricas
+                            </TabsTrigger>
+                            <TabsTrigger
+                                value="history"
+                                icon={TruckIcon}
+                                badge={<TabCountBadge count={assignments.length} variant="gray" />}
+                            >
+                                Histórico de Entregas
+                            </TabsTrigger>
+                        </TabsList>
+                    </div>
 
                     {/* Aba 1: Dados & Métricas */}
                     <TabsContent value="general" className="mt-0">
@@ -231,7 +245,7 @@ export function AdminDeliveryDriverDetailView({
                                 </div>
                                 <div className="p-4 bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border">
                                     <span className="text-xs text-brand-inactive-text font-medium">Taxa de Sucesso</span>
-                                    <p className="text-2xl font-bold text-brand-blue dark:text-blue-400 mt-1">{metrics.successRate}%</p>
+                                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-1">{metrics.successRate}%</p>
                                 </div>
                                 <div className="p-4 bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border">
                                     <span className="text-xs text-brand-inactive-text font-medium">Falhas / Cancelamentos</span>
@@ -287,7 +301,7 @@ export function AdminDeliveryDriverDetailView({
                                             <div>
                                                 <span className="text-xs font-semibold text-brand-inactive-text block">Veículo</span>
                                                 <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5 block capitalize">
-                                                    {driver.vehicle_type}
+                                                    {driver.vehicle_type === "moto" ? "Motocicleta" : "Automóvel"}
                                                 </span>
                                             </div>
                                             <div>
@@ -358,8 +372,6 @@ export function AdminDeliveryDriverDetailView({
                                     <div className="py-12">
                                         <IconPlaceholder
                                             icon={TruckIcon}
-                                            containerSize="w-14 h-14 mb-2"
-                                            iconSize="w-6 h-6"
                                             title="Nenhuma entrega registrada"
                                             subtitle="Este entregador ainda não realizou corridas pela plataforma."
                                         />
@@ -367,9 +379,9 @@ export function AdminDeliveryDriverDetailView({
                                 ) : (
                                     <div className="space-y-4">
                                         {/* Desktop Table */}
-                                        <div className="hidden md:block overflow-hidden rounded-xl border border-brand-border dark:border-dark-border">
+                                        <div className="hidden md:block overflow-hidden rounded-2xl border border-brand-border dark:border-dark-border">
                                             <table className="w-full text-left text-sm">
-                                                <thead className="bg-brand-gray dark:bg-dark-border/40 text-brand-inactive-text font-medium border-b border-brand-border dark:border-dark-border">
+                                                <thead className="bg-brand-gray/80 dark:bg-dark-border/40 text-brand-inactive-text font-medium border-b border-brand-border dark:border-dark-border">
                                                     <tr>
                                                         <th className="py-3 px-4">Pedido</th>
                                                         <th className="py-3 px-4">Loja</th>
@@ -379,7 +391,7 @@ export function AdminDeliveryDriverDetailView({
                                                         <th className="py-3 px-4 text-right">Ações</th>
                                                     </tr>
                                                 </thead>
-                                                <tbody className="divide-y divide-brand-border dark:divide-dark-border">
+                                                <tbody className="divide-y divide-brand-border/60 dark:divide-dark-border/40">
                                                     {paginatedAssignments.map((a: any) => (
                                                         <tr key={a.id} className="hover:bg-brand-gray/30 dark:hover:bg-dark-border/20 transition-colors">
                                                             <td className="py-3 px-4 font-mono font-bold text-brand-dark dark:text-dark-heading">
@@ -447,6 +459,7 @@ export function AdminDeliveryDriverDetailView({
                                                     currentPage={historyPage}
                                                     totalPages={totalHistoryPages}
                                                     onPageChange={setHistoryPage}
+                                                    inline
                                                 />
                                             </div>
                                         )}

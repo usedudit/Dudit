@@ -6,6 +6,7 @@ import {
     ShieldIcon,
     UserIcon,
     ArrowRightIcon,
+    DatabaseIcon,
 } from "@/lib/icons"
 import {
     Button,
@@ -37,7 +38,7 @@ export function AdminAuditDetailView({
     useEffect(() => {
         if (!setHeaderOverride) return
         setHeaderOverride({
-            title: `Log de Auditoria #${log.id.slice(0, 8)}`,
+            title: `Log #${log.id.slice(0, 8)}`,
             onBack,
             isSubPage: true,
         })
@@ -71,19 +72,23 @@ export function AdminAuditDetailView({
     return (
         <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background">
             {/* Header Desktop */}
-            <div className="hidden md:flex items-center justify-between px-8 py-4 border-b border-brand-border dark:border-dark-border">
-                <div className="flex items-center gap-3">
-                    <Button variant="ghost" size="sm" onClick={onBack} className="p-2 h-auto text-brand-dark dark:text-dark-heading">
-                        <ChevronLeftIcon size={18} />
+            <div className="hidden md:flex items-center justify-between px-8 py-5 border-b border-brand-border dark:border-dark-border">
+                <div className="flex items-center gap-4">
+                    <Button
+                        variant="filled"
+                        onClick={onBack}
+                        className="w-10 h-10 p-0 flex items-center justify-center rounded-xl"
+                    >
+                        <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                     </Button>
                     <div className="flex flex-col">
-                        <div className="flex items-center gap-2">
-                            <h1 className="text-xl font-bold text-brand-dark dark:text-dark-heading">
+                        <div className="flex items-center gap-2.5">
+                            <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading font-mono">
                                 Registro #{log.id.slice(0, 8)}
                             </h1>
                             {getActionBadge(log.action_type)}
                         </div>
-                        <span className="text-xs text-brand-inactive-text">
+                        <span className="text-xs text-brand-inactive-text mt-0.5">
                             Registrado em {formatDateTime(log.created_at)}
                         </span>
                     </div>
@@ -95,7 +100,7 @@ export function AdminAuditDetailView({
             </div>
 
             {/* Content Body */}
-            <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6">
+            <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 max-w-[1200px] mx-auto w-full">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* Coluna 1: Executor & Alvo */}
                     <div className="space-y-6">
@@ -108,18 +113,18 @@ export function AdminAuditDetailView({
                                     <span className="font-bold text-base text-brand-dark dark:text-dark-heading">
                                         {log.admin_name || "Administrador"}
                                     </span>
-                                    <span className="text-xs text-brand-inactive-text">
+                                    <span className="text-xs text-brand-inactive-text font-mono">
                                         ID: {log.admin_user_id || "Sistema"}
                                     </span>
                                 </div>
                                 {log.admin_email && (
                                     <div className="text-xs text-brand-inactive-text pt-1">
-                                        Email: {log.admin_email}
+                                        Email: <span className="font-medium text-brand-dark dark:text-dark-heading">{log.admin_email}</span>
                                     </div>
                                 )}
                                 {log.ip_address && (
                                     <div className="text-xs text-brand-inactive-text">
-                                        IP: <code className="font-mono">{log.ip_address}</code>
+                                        IP: <code className="font-mono bg-white dark:bg-dark-surface px-1.5 py-0.5 rounded border border-brand-border dark:border-dark-border">{log.ip_address}</code>
                                     </div>
                                 )}
                                 {log.user_agent && (
@@ -144,7 +149,7 @@ export function AdminAuditDetailView({
                                             {log.target_name || log.target_id || "Sistema"}
                                         </span>
                                         {log.target_id && (
-                                            <span className="text-xs text-brand-inactive-text opacity-70">
+                                            <span className="text-xs text-brand-inactive-text opacity-70 font-mono">
                                                 ID: {log.target_id}
                                             </span>
                                         )}
@@ -183,9 +188,9 @@ export function AdminAuditDetailView({
                                 </div>
 
                                 {reason && (
-                                    <div className="p-3 bg-brand-gray/50 dark:bg-dark-border/20 rounded-lg">
-                                        <span className="text-xs text-brand-inactive-text font-medium">Motivo / Justificativa</span>
-                                        <p className="text-sm text-brand-dark dark:text-dark-body mt-1 whitespace-pre-wrap">
+                                    <div className="p-3.5 bg-brand-gray/50 dark:bg-dark-border/20 rounded-xl">
+                                        <span className="text-xs text-brand-inactive-text font-semibold">Motivo / Justificativa</span>
+                                        <p className="text-sm text-brand-dark dark:text-dark-body mt-1 whitespace-pre-wrap leading-relaxed">
                                             {String(reason)}
                                         </p>
                                     </div>
@@ -197,7 +202,7 @@ export function AdminAuditDetailView({
                             title="Payload & Metadados"
                             description="Dados brutos associados a este evento"
                         >
-                            <div className="bg-brand-gray/40 dark:bg-dark-border/20 p-4 rounded-xl overflow-x-auto custom-scrollbar">
+                            <div className="bg-brand-gray/40 dark:bg-dark-border/20 p-4 rounded-xl overflow-x-auto custom-scrollbar border border-brand-border/60 dark:border-dark-border/40">
                                 <pre className="text-xs font-mono text-brand-dark dark:text-dark-body whitespace-pre-wrap">
                                     {JSON.stringify(metadata, null, 2)}
                                 </pre>
