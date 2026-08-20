@@ -43,7 +43,7 @@ const NUMERIC_FIELDS = new Set([
     "preparation_days", "warranty_value", "availability_value",
 ])
 
-const BOOLEAN_FIELDS = new Set(["is_active", "allow_sell_without_stock", "show_in_marketplace", "is_highlighted", "show_price_in_store"])
+const BOOLEAN_FIELDS = new Set(["is_active", "allow_sell_without_stock", "show_in_marketplace", "show_price_in_store"])
 
 const REQUIRED_FIELDS = [
     { field: "name", tab: "general", validate: (v: any) => !!v?.trim(), message: "Nome é obrigatório" },
@@ -72,11 +72,11 @@ const getEmptyProduct = () => ({
     price: 0, costPrice: 0, stock: 0, minStock: 0, maxStock: 0, promotional_price: null, promotionTypeId: null,
     condicao: "Novo", unidade: "UN", localizacao: "", location_id: "", productType: "Físico",
     images: [], primary_image_index: 0, video_type: null, video_url: "", video_thumbnail: null, video_duration: null, video_provider_id: null,
-    is_active: true, show_in_marketplace: true, allow_sell_without_stock: false,     is_highlighted: false, show_price_in_store: true,
+    is_active: true, show_in_marketplace: true, allow_sell_without_stock: false, show_price_in_store: true,
     marketplace_category_id: null, availability_value: 0, availability_unit: "Dias",
     warranty_value: 0, warranty_period: "Meses",
     attributes: [], related_products: [],
-    addon_groups: [], accepts_offers: false, accepts_trades: false, items_included: "", expiry_date: null, pickup_neighborhood: "",
+    addon_groups: [], accepts_offers: false, accepts_trades: false,
     ncm: "", cest: "", origin: 0, item_type: "00", fci_code: null,
     cfop_internal: "5102", cfop_external: "6102", csosn: "102", tax_percentage: 0,
     pis_cst: "99", pis_rate: 0, cofins_cst: "99", cofins_rate: 0, ipi_cst: "99", ipi_code: null,
@@ -162,7 +162,6 @@ const AddProductPage: FC<AddProductPageProps> = ({
         return {
             ...initialProductState,
             show_in_marketplace: true,
-            is_highlighted: false,
         }
     }, [initialProductState, isQuick])
 
@@ -643,7 +642,6 @@ const AddProductPage: FC<AddProductPageProps> = ({
                 packagingType: d.packaging_type,
                 preparationDays: Number(d.preparation_days) || 0,
                 allow_sell_without_stock: d.allow_sell_without_stock || false,
-                featured: d.is_highlighted,
                 videoType: d.video_type || null,
                 videoUrl: d.video_url || null,
                 videoThumbnail: d.video_thumbnail || null,
@@ -653,16 +651,10 @@ const AddProductPage: FC<AddProductPageProps> = ({
                     addon_groups: d.addon_groups || [],
                     accepts_offers: !!d.accepts_offers,
                     accepts_trades: !!d.accepts_trades,
-                    items_included: d.items_included || "",
-                    expiry_date: d.expiry_date || null,
-                    pickup_neighborhood: d.pickup_neighborhood || "",
                 },
                 addon_groups: d.addon_groups || [],
                 accepts_offers: !!d.accepts_offers,
                 accepts_trades: !!d.accepts_trades,
-                items_included: d.items_included || "",
-                expiry_date: d.expiry_date || null,
-                pickup_neighborhood: d.pickup_neighborhood || "",
                 warranty,
                 availability_value: Number(d.availability_value) || 0,
                 availability_unit: d.availability_unit || "Dias",

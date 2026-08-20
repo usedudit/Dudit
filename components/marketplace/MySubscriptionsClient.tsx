@@ -17,6 +17,9 @@ import {
 } from "@/app/actions/marketplace/recurring-subscriptions"
 import { formatFullDate, formatCurrency } from "@/lib/utils"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { getPlanUrl, getStoreUrl } from "@/lib/utils/url-generator"
+import Link from "next/link"
+
 import {
   ClockIcon,
   BlockedIcon,
@@ -260,16 +263,37 @@ export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] 
                     )}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading">
-                          {sub.plan?.name || "Plano"}
-                        </h3>
+                        {sub.plan ? (
+                          <Link
+                            href={getPlanUrl(sub.plan, sub.partner)}
+                            prefetch={false}
+                            className="font-bold text-lg text-brand-dark dark:text-dark-heading hover:text-brand-green transition-colors truncate"
+                          >
+                            {sub.plan.name}
+                          </Link>
+                        ) : (
+                          <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading truncate">
+                            Plano
+                          </h3>
+                        )}
                         <Badge variant={statusVariant(sub.status)}>
                           {getStatusLabel(sub.status)}
                         </Badge>
                       </div>
-                      <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-0.5">
-                        {sub.partner?.name || sub.partner?.store_name}
-                      </p>
+                      {sub.partner ? (
+                        <Link
+                          href={getStoreUrl(sub.partner)}
+                          prefetch={false}
+                          className="text-sm text-brand-inactive-text dark:text-dark-body mt-0.5 hover:text-brand-green transition-colors block truncate"
+                        >
+                          {sub.partner?.name || sub.partner?.store_name}
+                        </Link>
+                      ) : (
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-0.5 truncate">
+                          {sub.partner?.name || sub.partner?.store_name}
+                        </p>
+                      )}
+
                       
                       <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-brand-inactive-text dark:text-dark-body font-medium">
                         <div className="flex items-center gap-1.5">

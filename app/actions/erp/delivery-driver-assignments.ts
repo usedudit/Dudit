@@ -84,36 +84,221 @@ export async function assignPlatformDriverToDeliveryAction(input: {
   return { success: true as const, count: rows.length }
 }
 
-export async function syncPlatformDriverForOrderAction(input: {
+export async function requestDuditDeliveryAction(input: {
   partnerId: string
   orderId: string
-  driverId?: string | null
+  deliveryId?: string | null
   notes?: string
 }) {
+  const user = await requireUser()
   await requirePartnerRouteAccess(input.partnerId, "logistics", { specificPermission: "can_assign_driver" })
   const admin = getAdminClient()
-  const { data: link } = await admin
-    .from("delivery_orders")
-    .select("delivery_id, deliveries!inner(id, partner_id, status)")
+
+  const { data: order } = await admin
+    .from("orders")
+    .select("id, partner_id, delivery_fee, delivery_status, store_id")
+    .eq("id", input.orderId)
+    .eq("partner_id", input.partnerId)
+    .maybeSingle()
+
+  if (!order) {
+    return { success: false as const, error: "Pedido não encontrado." }
+  }
+
+  // Cancel any existing active assignment for this order before creating the new request
+  await admin
+    .from("delivery_assignments")
+    .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
     .eq("order_id", input.orderId)
-    .eq("deliveries.partner_id", input.partnerId)
-    .in("deliveries.status", ["pending", "not_sent", "preparing"])
+    .in("status", ["available", "requested", "assigned"])
+
+  const payload: Record<string, any> = {
+    order_id: input.orderId,
+    delivery_id: input.deliveryId || null,
+    partner_id: input.partnerId,
+    driver_id: null,
+    assigned_by: user.id,
+    status: "available",
+    delivery_fee: Number(order.delivery_fee || 0),
+    notes: String(input.notes || "").trim().slice(0, 500) || null,
+    assigned_at: new Date().toISOString(),
+  }
+
+  const { data: inserted, error } = await admin
+    .from("delivery_assignments")
+    .insert(payload)
+    .select("id")
+    .single()
+
+  if (error) {
+    return { success: false as const, error: "Não foi possível solicitar a entrega Dudit: " + error.message }
+  }
+
+  // Set order delivery_status to preparing if not already
+  if (order.delivery_status !== "preparing" && order.delivery_status !== "sent") {
+    await admin
+      .from("orders")
+      .update({ delivery_status: "preparing" })
+      .eq("id", input.orderId)
+  }
+
+  await logAuditEvent({
+    partnerId: input.partnerId,
+    actorUserId: user.id,
+    entityType: "delivery_assignment",
+    entityId: inserted.id,
+    actionType: "dudit_delivery_requested",
+    changeLines: ["Entrega solicitada para a rede de entregadores Dudit"],
+    metadata: { orderId: input.orderId, deliveryId: input.deliveryId },
+    source: "erp",
+  })
+
+  revalidatePath("/erp/logistica")
+  revalidatePath("/erp/pedidos")
+  revalidatePath("/entregadores")
+  revalidatePath("/entregadores/disponiveis")
+
+  return { success: true as const, assignmentId: inserted.id }
+}
+
+export async function cancelDuditDeliveryRequestAction(input: {
+  partnerId: string
+  orderId: string
+}) {
+  const user = await requireUser()
+  await requirePartnerRouteAccess(input.partnerId, "logistics", { specificPermission: "can_assign_driver" })
+  const admin = getAdminClient()
+
+  const { data: assignment } = await admin
+    .from("delivery_assignments")
+    .select("id, status")
+    .eq("order_id", input.orderId)
+    .eq("partner_id", input.partnerId)
+    .in("status", ["available", "requested", "assigned", "accepted"])
+    .order("assigned_at", { ascending: false })
     .limit(1)
     .maybeSingle()
 
-  if (!link?.delivery_id) return { success: true as const }
+  if (!assignment) {
+    return { success: false as const, error: "Nenhuma solicitação ativa encontrada para cancelar." }
+  }
 
-  await admin
+  const { error } = await admin
     .from("delivery_assignments")
-    .update({ status: "cancelled" })
-    .eq("delivery_id", link.delivery_id)
-    .eq("order_id", input.orderId)
-    .in("status", ["assigned", "accepted", "picked_up", "out_for_delivery"])
+    .update({
+      status: "cancelled",
+      cancelled_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", assignment.id)
 
-  if (!input.driverId) return { success: true as const }
+  if (error) {
+    return { success: false as const, error: "Não foi possível cancelar a solicitação." }
+  }
+
+  await logAuditEvent({
+    partnerId: input.partnerId,
+    actorUserId: user.id,
+    entityType: "delivery_assignment",
+    entityId: assignment.id,
+    actionType: "dudit_delivery_cancelled",
+    changeLines: ["Solicitação de entregador Dudit cancelada"],
+    metadata: { orderId: input.orderId },
+    source: "erp",
+  })
+
+  revalidatePath("/erp/logistica")
+  revalidatePath("/erp/pedidos")
+  revalidatePath("/entregadores")
+  revalidatePath("/entregadores/disponiveis")
+
+  return { success: true as const }
+}
+
+export async function getDuditDeliveryRequestStatusAction(input: {
+  partnerId: string
+  orderId: string
+}) {
+  await requireUser()
+  await requirePartnerRouteAccess(input.partnerId, "logistics")
+  const admin = getAdminClient()
+
+  const { data: assignment } = await admin
+    .from("delivery_assignments")
+    .select(`
+      id,
+      status,
+      assigned_at,
+      accepted_at,
+      picked_up_at,
+      out_for_delivery_at,
+      completed_at,
+      delivery_fee,
+      notes,
+      driver_id
+    `)
+    .eq("order_id", input.orderId)
+    .eq("partner_id", input.partnerId)
+    .in("status", ["available", "requested", "assigned", "accepted", "picked_up", "out_for_delivery", "delivered"])
+    .order("assigned_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (!assignment) {
+    return { success: true as const, activeRequest: null }
+  }
+
+  let driverInfo: { name: string; phone?: string; vehicleType?: string } | null = null
+  if (assignment.driver_id) {
+    const [{ data: profile }, { data: driver }] = await Promise.all([
+      admin.from("user_profiles").select("full_name, phone").eq("user_id", assignment.driver_id).maybeSingle(),
+      admin.from("delivery_drivers").select("vehicle_type").eq("user_id", assignment.driver_id).maybeSingle(),
+    ])
+    driverInfo = {
+      name: profile?.full_name || "Entregador Dudit",
+      phone: profile?.phone || undefined,
+      vehicleType: driver?.vehicle_type || undefined,
+    }
+  }
+
+  return {
+    success: true as const,
+    activeRequest: {
+      id: assignment.id,
+      status: assignment.status,
+      assignedAt: assignment.assigned_at,
+      acceptedAt: assignment.accepted_at,
+      pickedUpAt: assignment.picked_up_at,
+      outForDeliveryAt: assignment.out_for_delivery_at,
+      completedAt: assignment.completed_at,
+      deliveryFee: Number(assignment.delivery_fee || 0),
+      notes: assignment.notes || "",
+      driver: driverInfo,
+    },
+  }
+}
+
+export async function syncPlatformDriverForOrderAction(input: {
+  partnerId: string
+  orderId: string
+  driverId: string | null
+  deliveryId?: string | null
+  notes?: string
+}) {
+  if (!input.driverId) {
+    return { success: true as const }
+  }
+  if (input.driverId === "dudit_network") {
+    return requestDuditDeliveryAction({
+      partnerId: input.partnerId,
+      orderId: input.orderId,
+      deliveryId: input.deliveryId,
+      notes: input.notes,
+    })
+  }
   return assignPlatformDriverToDeliveryAction({
     partnerId: input.partnerId,
-    deliveryId: String(link.delivery_id),
+    deliveryId: input.deliveryId || input.orderId,
     orderIds: [input.orderId],
     driverId: input.driverId,
     notes: input.notes,

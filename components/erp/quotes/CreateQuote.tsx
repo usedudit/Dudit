@@ -817,6 +817,66 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                     return;
                 }
 
+                // 1. Process Item Additions, Updates and Deletions FIRST
+                const origItems: any[] = originalQuoteData.items || [];
+                const origById = new Map<string, any>(
+                    origItems.filter((x: any) => x.quoteItemId).map((x: any) => [x.quoteItemId, x]),
+                );
+
+                for (let idx = 0; idx < quoteItems.length; idx++) {
+                    const cur = quoteItems[idx];
+                    const isManualOrBlank = cur.isBlank || cur.isManual || String(cur.id || "").startsWith("legacy-");
+                    if (!cur.quoteItemId) {
+                        const addRes = await addQuoteItemAction({
+                            quoteId: existingQuote.id,
+                            partnerId,
+                            productId: isManualOrBlank ? null : cur.id,
+                            customName: isManualOrBlank ? cur.name : undefined,
+                            description: undefined,
+                            quantity: cur.qty,
+                            unitPrice: cur.price,
+                            sortOrder: idx,
+                        });
+                        if (!addRes.success) {
+                            notifyError("Item", (addRes as { error?: string }).error || "Erro ao adicionar item.");
+                            return;
+                        }
+                        continue;
+                    }
+                    const o = origById.get(cur.quoteItemId);
+                    if (!o) continue;
+                    const changed =
+                        Number(o.qty) !== Number(cur.qty) ||
+                        Number(o.price) !== Number(cur.price) ||
+                        String(o.name || "") !== String(cur.name || "");
+                    if (changed) {
+                        const upd = await updateQuoteItemAction({
+                            itemId: cur.quoteItemId,
+                            partnerId,
+                            customName: isManualOrBlank ? cur.name : undefined,
+                            quantity: cur.qty,
+                            unitPrice: cur.price,
+                            sortOrder: idx,
+                        });
+                        if (!upd.success) {
+                            notifyError("Item", (upd as { error?: string }).error || "Erro ao atualizar item.");
+                            return;
+                        }
+                    }
+                }
+
+                for (const o of origItems) {
+                    if (!o.quoteItemId) continue;
+                    if (!quoteItems.some((c: any) => c.quoteItemId === o.quoteItemId)) {
+                        const del = await deleteQuoteItemAction(o.quoteItemId, partnerId);
+                        if (!del.success) {
+                            notifyError("Item", (del as { error?: string }).error || "Erro ao remover item.");
+                            return;
+                        }
+                    }
+                }
+
+                // 2. Update Quote Financials, Notes, and Settings (runs notification with fully updated items & totals)
                 const upRes = await updateQuoteAction({
                     quoteId: existingQuote.id,
                     partnerId,
@@ -840,63 +900,6 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                 if (!upRes.success) {
                     notifyError("Erro ao salvar", (upRes as { error?: string }).error || "Ocorreu um erro inesperado.");
                     return;
-                }
-
-                const origItems: any[] = originalQuoteData.items || [];
-                const origById = new Map<string, any>(
-                    origItems.filter((x: any) => x.quoteItemId).map((x: any) => [x.quoteItemId, x]),
-                );
-
-                for (let idx = 0; idx < quoteItems.length; idx++) {
-                    const cur = quoteItems[idx];
-                    if (!cur.quoteItemId) {
-                        const addRes = await addQuoteItemAction({
-                            quoteId: existingQuote.id,
-                            partnerId,
-                            productId: cur.isBlank ? null : cur.id,
-                            customName: cur.isBlank ? cur.name : undefined,
-                            description: undefined,
-                            quantity: cur.qty,
-                            unitPrice: cur.price,
-                            sortOrder: idx,
-                        });
-                        if (!addRes.success) {
-                            notifyError("Item", (addRes as { error?: string }).error || "Erro ao adicionar item.");
-                            return;
-                        }
-                        continue;
-                    }
-                    const o = origById.get(cur.quoteItemId);
-                    if (!o) continue;
-                    const changed =
-                        Number(o.qty) !== Number(cur.qty) ||
-                        Number(o.price) !== Number(cur.price) ||
-                        String(o.name || "") !== String(cur.name || "");
-                    if (changed) {
-                        const upd = await updateQuoteItemAction({
-                            itemId: cur.quoteItemId,
-                            partnerId,
-                            customName: cur.isManual || cur.isBlank ? cur.name : undefined,
-                            quantity: cur.qty,
-                            unitPrice: cur.price,
-                            sortOrder: idx,
-                        });
-                        if (!upd.success) {
-                            notifyError("Item", (upd as { error?: string }).error || "Erro ao atualizar item.");
-                            return;
-                        }
-                    }
-                }
-
-                for (const o of origItems) {
-                    if (!o.quoteItemId) continue;
-                    if (!quoteItems.some((c: any) => c.quoteItemId === o.quoteItemId)) {
-                        const del = await deleteQuoteItemAction(o.quoteItemId, partnerId);
-                        if (!del.success) {
-                            notifyError("Item", (del as { error?: string }).error || "Erro ao remover item.");
-                            return;
-                        }
-                    }
                 }
 
                 if (status !== originalQuoteData.status) {

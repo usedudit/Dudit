@@ -57,8 +57,9 @@ import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { VendorPaymentMethodsModal } from "./VendorPaymentMethodsModal"
 import { StorePoliciesModal } from "./StorePoliciesModal"
-import { getStoreUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
+import { getStoreUrl, getServiceUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
 import { createSlug, createCategorySlug } from "@/lib/utils/slugify"
+
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { SponsoredAdDetailSlot } from "@/components/marketplace/ads/SponsoredAdsSlot"
@@ -1534,7 +1535,6 @@ export function ServiceDetailsPageClient({
                     <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">Políticas da loja</span>
                     <ChevronRightIcon size={18} className="text-brand-inactive-text dark:text-dark-body" />
                 </button>
-                <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">Trocas, devoluções, prazos e condições do vendedor</p>
             </div>
 
             {/* Store (Reputation & Levels Card) */}
@@ -1643,11 +1643,12 @@ export function ServiceDetailsPageClient({
             <ShareModal
                 isOpen={showShareModal}
                 onClose={() => setShowShareModal(false)}
-                url={isMounted ? window.location.href : ""}
+                url={isMounted ? `${window.location.origin}${getServiceUrl(service, partner)}` : ""}
                 title={service.name}
                 shareMessage={`🗓️ Olha esse serviço na Dudit!\n\n*${service.name}*\nConfere aqui os detalhes:`}
                 label="Link do serviço"
             />
+
 
             <AddToCollectionModal
                 isOpen={showCollectionModal}
@@ -1716,13 +1717,14 @@ export function ServiceDetailsPageClient({
                 hideHeader={true}
             >
                 <div className="flex flex-col relative">
-                    <button
+                    <Button
+                        variant="filled"
                         onClick={() => setShowResponsibilityModal(false)}
-                        className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-black/5 hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/20 flex items-center justify-center text-brand-dark dark:text-dark-heading transition-colors"
+                        className="absolute top-3 right-3 z-10 w-10 h-10"
                         title="Fechar"
                     >
-                        <XIcon size={16} />
-                    </button>
+                        <XIcon size={18} />
+                    </Button>
                     {/* Header with Dual Squares */}
                     <div className="bg-brand-gray dark:bg-dark-border/30 rounded-2xl p-10 flex items-center justify-center gap-8 mb-8 relative group">
                         <div className="w-20 h-20 bg-white dark:bg-dark-surface rounded-2xl p-4 flex items-center justify-center transform transition-transform group-hover:-rotate-3 overflow-hidden">

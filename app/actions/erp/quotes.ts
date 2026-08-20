@@ -31,6 +31,8 @@ import { notifyQuoteEvent } from "@/lib/services/quote-notifications.service"
 import { endOfDay, getTodayYmd } from "@/lib/date"
 import { requireAuthorizedCustomerContext, requireAuthorizedPartnerContext } from "@/lib/services/authorized-customer-access"
 import { createNotification } from "@/lib/services/notification.service"
+import { generateShortId, isUuid } from "@/lib/utils/short-id"
+
 
 export type ERPQuoteListCursor = { createdAt: string; id: string }
 
@@ -744,7 +746,7 @@ export async function notifyMarketplaceQuoteReady(quoteId: string, partnerId: st
         // Auto-generate public_token if missing
         let publicToken = quote.public_token
         if (!publicToken) {
-            publicToken = crypto.randomUUID()
+            publicToken = generateShortId(6)
             await getAdminClient().from("quotes").update({ public_token: publicToken }).eq("id", quoteId)
         }
 
@@ -777,7 +779,7 @@ export async function notifyMarketplaceQuoteReady(quoteId: string, partnerId: st
                 service_name: serviceName,
                 href: `/quote/${publicToken}`,
             },
-            idempotencyKey: `quote-ready-${quoteId}-${meta.updated_at || Date.now()}`,
+            idempotencyKey: `quote-ready-${quoteId}-${Math.floor(Date.now() / (10 * 60 * 1000))}`,
             origin: "system",
         })
     } catch (err) {
@@ -2199,7 +2201,7 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                 .maybeSingle()
 
             // 1b. Fallback: try by quote id (UUID)
-            if (!quote && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(publicToken)) {
+            if (!quote && isUuid(publicToken)) {
                 const { data: quoteById } = await admin
                     .from("quotes")
                     .select(`
@@ -2218,7 +2220,7 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                     quote = quoteById
                     // Auto-generate public_token if missing
                     if (!quote.public_token) {
-                        await admin.from("quotes").update({ public_token: crypto.randomUUID() }).eq("id", quote.id)
+                        await admin.from("quotes").update({ public_token: generateShortId(6) }).eq("id", quote.id)
                         const { data: refreshed } = await admin.from("quotes").select("public_token").eq("id", quote.id).single()
                         if (refreshed?.public_token) quote.public_token = refreshed.public_token
                     }
@@ -2227,7 +2229,7 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
 
             // 1c. Auto-generate public_token if quote exists but has none
             if (quote && !quote.public_token) {
-                await admin.from("quotes").update({ public_token: crypto.randomUUID() }).eq("id", quote.id)
+                await admin.from("quotes").update({ public_token: generateShortId(6) }).eq("id", quote.id)
                 const { data: refreshed } = await admin.from("quotes").select("public_token").eq("id", quote.id).single()
                 if (refreshed?.public_token) quote.public_token = refreshed.public_token
             }
@@ -2330,141 +2332,136 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                 .limit(1)
                 .maybeSingle()
 
-            // 5. Fetch details for fallback snapshot if formal snapshot is null
+            // 5. Fetch live details and items
             let sellerInfo = null
             let items: any[] = []
-            let fallbackSnapshot = null
             let sellerName = null
 
-            if (!quote.snapshot) {
-                if (quote.user_id) {
-                    const { data: profile } = await admin
-                        .from("user_profiles")
-                        .select("full_name")
-                        .eq("user_id", quote.user_id)
-                        .maybeSingle()
-                    if (profile) {
-                        const { data: authData } = await admin.auth.admin.getUserById(quote.user_id)
-                        const authUser = authData?.user ? { email: authData.user.email } : null
-                        sellerInfo = {
-                            name: profile.full_name,
-                            email: authUser?.email || null
-                        }
-                        sellerName = profile.full_name
-                    }
-                }
-
-                const { data: quoteItems } = await admin
-                    .from("quote_items")
-                    .select(`
-                        *,
-                        products(
-                            name,
-                            sku,
-                            images,
-                            unit,
-                            product_variants(
-                                id,
-                                variant_name,
-                                sku,
-                                variant_options
-                            )
-                        )
-                    `)
-                    .eq("quote_id", quote.id)
-                    .order("sort_order", { ascending: true })
-                items = quoteItems || []
-
-                const formattedItems = items.map((item: any) => {
-                    let resolvedImage = item.products?.images && item.products.images.length > 0 ? item.products.images[0] : "https://img.dudit.com.br/static/Placeholder.png";
-                    if (item.custom_name && item.products?.product_variants) {
-                        const customName = item.custom_name.trim();
-                        const productName = item.products.name || "";
-                        const suffix = customName.startsWith(productName)
-                            ? customName.slice(productName.length).replace(/^[\s-–-]+/, "").trim()
-                            : customName;
-
-                        const match = item.products.product_variants.find(
-                            (v: any) =>
-                                v.variant_name?.toLowerCase().trim() === suffix.toLowerCase() ||
-                                v.variant_name?.toLowerCase().trim() === customName.toLowerCase() ||
-                                (item.product_sku_snapshot && v.sku?.toLowerCase().trim() === item.product_sku_snapshot.toLowerCase().trim())
-                        );
-                        if (match?.variant_options?.image) {
-                            resolvedImage = match.variant_options.image;
-                        }
-                    }
-
-                    return {
-                        id: item.id,
-                        product_id: item.product_id,
-                        name: item.custom_name || item.product_name_snapshot || item.products?.name || "Produto sem nome",
-                        sku: item.product_sku_snapshot || item.products?.sku || "",
-                        quantity: Number(item.quantity || 0),
-                        unit_price: Number(item.unit_price || 0),
-                        total_price: Number(item.unit_price || 0) * Number(item.quantity || 0),
-                        description: item.description || "",
-                        image: resolvedImage,
-                        unit: item.products?.unit || "un"
-                    };
-                })
-
-                let partnerAddressFormatted = "Endereço não cadastrado"
-                const { data: partnerAddr } = await admin
-                    .from("addresses")
-                    .select("*")
-                    .eq("partner_id", quote.partner_id)
-                    .eq("is_default", true)
+            if (quote.user_id) {
+                const { data: profile } = await admin
+                    .from("user_profiles")
+                    .select("full_name")
+                    .eq("user_id", quote.user_id)
                     .maybeSingle()
-                if (partnerAddr) {
-                    const streetNumber = [partnerAddr.street, partnerAddr.number].filter(Boolean).join(", ")
-                    const neighborhoodCityState = [partnerAddr.neighborhood, [partnerAddr.city, partnerAddr.state].filter(Boolean).join("/")].filter(Boolean).join(" - ")
-                    partnerAddressFormatted = [streetNumber, neighborhoodCityState].filter(Boolean).join("\n")
-                }
-
-                // Store already fetched above
-
-                let partnerEmail = null
-                if (quote.partners?.user_id) {
-                    try {
-                        const { data: authData } = await admin.auth.admin.getUserById(quote.partners.user_id)
-                        partnerEmail = authData?.user?.email || null
-                    } catch (err) {
-                        console.error("Error fetching partner email in fallback:", err)
+                if (profile) {
+                    const { data: authData } = await admin.auth.admin.getUserById(quote.user_id)
+                    const authUser = authData?.user ? { email: authData.user.email } : null
+                    sellerInfo = {
+                        name: profile.full_name,
+                        email: authUser?.email || null
                     }
-                }
-
-                fallbackSnapshot = {
-                    quote_number: quote.quote_number,
-                    issue_date: quote.issue_date,
-                    expiration_date: quote.expiration_date,
-                    notes: quote.notes,
-                    subtotal: Number(quote.subtotal || 0),
-                    discount_type: quote.discount_type,
-                    discount_value: Number(quote.discount_value || 0),
-                    shipping_cost: Number(quote.shipping_cost || 0),
-                    additional_costs: Number(quote.additional_costs || 0),
-                    total: Number(quote.total || 0),
-                    partner: {
-                        name: store?.name || "Parceiro",
-                        image_url: store?.logo_url || null,
-                        email: partnerEmail,
-                        phone: store?.phone || null,
-                        address: partnerAddressFormatted
-                    },
-                    seller: sellerInfo,
-                    customer: quote.customers ? {
-                        ...quote.customers,
-                        addresses: quote.customers.addresses || []
-                    } : null,
-                    items: formattedItems,
-                    payment_terms: quote.metadata?.payment_terms || null,
-                    coupon_data: quote.metadata?.coupon_data || null,
-                    metadata: quote.metadata || {}
+                    sellerName = profile.full_name
                 }
             }
 
-            let resolvedSnapshot = quote.snapshot || fallbackSnapshot
+            const { data: quoteItems } = await admin
+                .from("quote_items")
+                .select(`
+                    *,
+                    products(
+                        name,
+                        sku,
+                        images,
+                        unit,
+                        product_variants(
+                            id,
+                            variant_name,
+                            sku,
+                            variant_options
+                        )
+                    )
+                `)
+                .eq("quote_id", quote.id)
+                .order("sort_order", { ascending: true })
+            items = quoteItems || []
+
+            const formattedItems = items.map((item: any) => {
+                let resolvedImage = item.products?.images && item.products.images.length > 0 ? item.products.images[0] : "https://img.dudit.com.br/static/Placeholder.png";
+                if (item.custom_name && item.products?.product_variants) {
+                    const customName = item.custom_name.trim();
+                    const productName = item.products.name || "";
+                    const suffix = customName.startsWith(productName)
+                        ? customName.slice(productName.length).replace(/^[\s-–-]+/, "").trim()
+                        : customName;
+
+                    const match = item.products.product_variants.find(
+                        (v: any) =>
+                            v.variant_name?.toLowerCase().trim() === suffix.toLowerCase() ||
+                            v.variant_name?.toLowerCase().trim() === customName.toLowerCase() ||
+                            (item.product_sku_snapshot && v.sku?.toLowerCase().trim() === item.product_sku_snapshot.toLowerCase().trim())
+                    );
+                    if (match?.variant_options?.image) {
+                        resolvedImage = match.variant_options.image;
+                    }
+                }
+
+                return {
+                    id: item.id,
+                    product_id: item.product_id,
+                    name: item.custom_name || item.product_name_snapshot || item.products?.name || "Produto sem nome",
+                    sku: item.product_sku_snapshot || item.products?.sku || "",
+                    quantity: Number(item.quantity || 0),
+                    unit_price: Number(item.unit_price || 0),
+                    total_price: Number(item.unit_price || 0) * Number(item.quantity || 0),
+                    description: item.description || "",
+                    image: resolvedImage,
+                    unit: item.products?.unit || "un"
+                };
+            })
+
+            let partnerAddressFormatted = "Endereço não cadastrado"
+            const { data: partnerAddr } = await admin
+                .from("addresses")
+                .select("*")
+                .eq("partner_id", quote.partner_id)
+                .eq("is_default", true)
+                .maybeSingle()
+            if (partnerAddr) {
+                const streetNumber = [partnerAddr.street, partnerAddr.number].filter(Boolean).join(", ")
+                const neighborhoodCityState = [partnerAddr.neighborhood, [partnerAddr.city, partnerAddr.state].filter(Boolean).join("/")].filter(Boolean).join(" - ")
+                partnerAddressFormatted = [streetNumber, neighborhoodCityState].filter(Boolean).join("\n")
+            }
+
+            let partnerEmail = null
+            if (quote.partners?.user_id) {
+                try {
+                    const { data: authData } = await admin.auth.admin.getUserById(quote.partners.user_id)
+                    partnerEmail = authData?.user?.email || null
+                } catch (err) {
+                    console.error("Error fetching partner email:", err)
+                }
+            }
+
+            const liveSnapshot = {
+                quote_number: quote.quote_number,
+                issue_date: quote.issue_date,
+                expiration_date: quote.expiration_date,
+                notes: quote.notes,
+                subtotal: Number(quote.subtotal || 0),
+                discount_type: quote.discount_type,
+                discount_value: Number(quote.discount_value || 0),
+                shipping_cost: Number(quote.shipping_cost || 0),
+                additional_costs: Number(quote.additional_costs || 0),
+                total: Number(quote.total || 0),
+                partner: {
+                    name: store?.name || "Parceiro",
+                    image_url: store?.logo_url || null,
+                    email: partnerEmail,
+                    phone: store?.phone || null,
+                    address: partnerAddressFormatted
+                },
+                seller: sellerInfo,
+                customer: quote.customers ? {
+                    ...quote.customers,
+                    addresses: quote.customers.addresses || []
+                } : null,
+                items: formattedItems,
+                payment_terms: quote.metadata?.payment_terms || null,
+                coupon_data: quote.metadata?.coupon_data || null,
+                metadata: quote.metadata || {}
+            }
+
+            let resolvedSnapshot = (quote.converted && quote.snapshot) ? quote.snapshot : liveSnapshot
             if (!sellerName && resolvedSnapshot?.seller?.name) {
                 sellerName = resolvedSnapshot.seller.name
             }
@@ -2506,7 +2503,7 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                     partner_id: quote.partner_id,
                     customers: quote.customers || null,
                     partners: Array.isArray(quote.partners) ? quote.partners[0] : (quote.partners || null),
-                    items: items,
+                    items: formattedItems,
                     primary_color: previewMeta.primaryColor || null,
                     secondary_color: previewMeta.secondaryColor || null,
                     quote_title: previewMeta.quoteTitle || null,

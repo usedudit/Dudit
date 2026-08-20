@@ -11,8 +11,6 @@ import { logAuditEvent } from "@/lib/services/timeline.service"
 import { generateSignedUploadUrl } from "@/lib/r2/server"
 import {
   R2_PREFIXES,
-  ALLOWED_MIME_TYPES,
-  ALLOWED_EXTENSIONS,
   MAX_FILE_SIZE,
   getUploadKindFromMimeType,
   getUploadValidationRules,
@@ -21,6 +19,7 @@ import {
 import { createNotification } from "@/lib/services/notification.service"
 import { revalidatePath } from "next/cache"
 import { checkLimit, increment_usage_counter } from "@/lib/services/subscription.service"
+import { generateShortId, isUuid } from "@/lib/utils/short-id"
 
 export type ServiceOrderListCursor = { createdAt: string; id: string } | null
 
@@ -247,7 +246,7 @@ export async function createServiceOrderAction(
       return { success: false, error: limitCheck.message || "Limite mensal de ordens de serviço atingido." }
     }
 
-    const publicToken = crypto.randomUUID()
+    const publicToken = generateShortId(6)
 
     const { data, error } = await admin
       .from("service_orders")
@@ -318,51 +317,51 @@ export async function createServiceOrderAction(
       } catch { }
     }
 
-// Create linked order in orders table (mirror appointments flow)
+    // Create linked order in orders table (mirror appointments flow)
     const orderRefNote = `service_order:${data.id}:order`
     const buildLinkedOrderPayload = (total: number) => ({
-        partner_id: partnerId,
-        store_id: storeId,
-        buyer_id: customerId,
-        customer_name: (data.customer_snapshot as any)?.name || null,
-        total_amount: total,
-        subtotal_value: 0,
-        discount_value: input.discount_value || 0,
-        discount_type: input.discount_type || "fixed",
-        discount_amount: 0,
-        additional_costs: input.other_costs || 0,
-        paid_amount: 0,
-        situation: "pending",
-        delivery_status: "not_sent",
-        delivery_type: "pickup",
-        order_source: "admin_service_order",
-        payment_method: "Método não definido",
-        notes: orderRefNote,
-        created_at: new Date().toISOString(),
-        created_by: user.id,
+      partner_id: partnerId,
+      store_id: storeId,
+      buyer_id: customerId,
+      customer_name: (data.customer_snapshot as any)?.name || null,
+      total_amount: total,
+      subtotal_value: 0,
+      discount_value: input.discount_value || 0,
+      discount_type: input.discount_type || "fixed",
+      discount_amount: 0,
+      additional_costs: input.other_costs || 0,
+      paid_amount: 0,
+      situation: "pending",
+      delivery_status: "not_sent",
+      delivery_type: "pickup",
+      order_source: "admin_service_order",
+      payment_method: "Método não definido",
+      notes: orderRefNote,
+      created_at: new Date().toISOString(),
+      created_by: user.id,
     })
 
     let linkedOrderResult: any = await admin
-        .from("orders")
-        .insert(buildLinkedOrderPayload(0))
-        .select("id")
-        .single()
+      .from("orders")
+      .insert(buildLinkedOrderPayload(0))
+      .select("id")
+      .single()
 
     // Retry with a minimum positive total if the DB still enforces total_amount > 0
     if (linkedOrderResult?.error && /positive|total_amount|check constraint/i.test(String(linkedOrderResult.error.message || ""))) {
-        linkedOrderResult = await admin
-            .from("orders")
-            .insert(buildLinkedOrderPayload(0.01))
-            .select("id")
-            .single()
+      linkedOrderResult = await admin
+        .from("orders")
+        .insert(buildLinkedOrderPayload(0.01))
+        .select("id")
+        .single()
     }
 
     const linkedOrder = linkedOrderResult?.data || null
     const linkedOrderErr = linkedOrderResult?.error || null
 
     if (linkedOrderErr || !linkedOrder?.id) {
-        console.error("[createServiceOrderAction] Falha ao criar pedido vinculado à OS:", linkedOrderErr)
-        throw new Error(`Falha ao criar pedido vinculado à OS: ${linkedOrderErr?.message || "erro desconhecido"}`)
+      console.error("[createServiceOrderAction] Falha ao criar pedido vinculado à OS:", linkedOrderErr)
+      throw new Error(`Falha ao criar pedido vinculado à OS: ${linkedOrderErr?.message || "erro desconhecido"}`)
     }
 
     await admin.from("service_orders").update({ order_id: linkedOrder.id }).eq("id", data.id)
@@ -1039,7 +1038,7 @@ export async function ensurePublicTokenAction(partnerId: string, serviceOrderId:
       .eq("partner_id", partnerId)
       .single()
     if (data?.public_token) return data.public_token
-    const newToken = crypto.randomUUID()
+    const newToken = generateShortId(6)
     await admin.from("service_orders").update({ public_token: newToken }).eq("id", serviceOrderId)
     return newToken
   } catch {
@@ -1069,27 +1068,31 @@ export async function getServiceOrderByTokenAction(
 
     if (error || !row) {
       // Fallback: try lookup by id for legacy OSs without public_token
-      const { data: byId } = await admin
-        .from("service_orders")
-        .select(`
-          id, store_id, order_number, status, title, description, diagnosis, expected_completion_date, completed_at,
-          total_service_amount, total_product_amount, total_amount, signature_image_key, signed_at,
-          customer_snapshot, created_at, sale_id, specifications, metadata, lockout_until, partner_id, assigned_user_id,
-          public_token, payment_status, paid_amount, payment_method, priority, estimated_hours, expected_completion_time,
-          stores!left (
-            id, name, logo_url, phone
-          )
-        `)
-        .eq("id", token)
-        .single()
-      if (byId) {
-        // Generate public_token on the fly for this OS
-        if (!byId.public_token) {
-          const newToken = crypto.randomUUID()
-          await admin.from("service_orders").update({ public_token: newToken }).eq("id", token)
-          byId.public_token = newToken
+      if (isUuid(token)) {
+        const { data: byId } = await admin
+          .from("service_orders")
+          .select(`
+            id, store_id, order_number, status, title, description, diagnosis, expected_completion_date, completed_at,
+            total_service_amount, total_product_amount, total_amount, signature_image_key, signed_at,
+            customer_snapshot, created_at, sale_id, specifications, metadata, lockout_until, partner_id, assigned_user_id,
+            public_token, payment_status, paid_amount, payment_method, priority, estimated_hours, expected_completion_time,
+            stores!left (
+              id, name, logo_url, phone
+            )
+          `)
+          .eq("id", token)
+          .single()
+        if (byId) {
+          // Generate public_token on the fly for this OS
+          if (!byId.public_token || isUuid(byId.public_token)) {
+            const newToken = generateShortId(6)
+            await admin.from("service_orders").update({ public_token: newToken }).eq("id", token)
+            byId.public_token = newToken
+          }
+          row = byId
+        } else {
+          throw new Error("Ordem de serviço não encontrada")
         }
-        row = byId
       } else {
         throw new Error("Ordem de serviço não encontrada")
       }
@@ -1529,7 +1532,7 @@ export async function confirmServiceOrderPaymentAction(payload: {
 
     // Calculate subtotal (merchandise/services base total)
     const subtotal = orderServices.reduce((acc: number, s: any) => acc + Number(s.total_price || 0), 0) +
-                     orderProducts.reduce((acc: number, p: any) => acc + Number(p.total_price || 0), 0)
+      orderProducts.reduce((acc: number, p: any) => acc + Number(p.total_price || 0), 0)
 
     // Calculate discount amount from order discount fields
     let discountAmount = 0
@@ -2019,13 +2022,22 @@ export async function getPublicPresignedUploadUrlAction(
 
     // 1. Fetch OS by token to get partner and assigned user details
     const admin = getAdminClient()
-    const { data: order, error } = await admin
+    let { data: order, error } = await admin
       .from("service_orders")
       .select("id, partner_id, assigned_user_id")
       .eq("public_token", token)
       .maybeSingle()
 
-    if (error || !order) {
+    if (!order && isUuid(token)) {
+      const { data: orderById } = await admin
+        .from("service_orders")
+        .select("id, partner_id, assigned_user_id")
+        .eq("id", token)
+        .maybeSingle()
+      if (orderById) order = orderById
+    }
+
+    if (!order) {
       return { success: false, error: "Ordem de serviço não encontrada ou token inválido" }
     }
 
@@ -2065,13 +2077,22 @@ export async function signPublicServiceOrderAction(
     const admin = getAdminClient()
 
     // 1. Fetch OS by token
-    const { data: order, error } = await admin
+    let { data: order, error } = await admin
       .from("service_orders")
       .select("id, status, assigned_user_id, partner_id, customer_snapshot")
       .eq("public_token", token)
       .maybeSingle()
 
-    if (error || !order) {
+    if (!order && isUuid(token)) {
+      const { data: orderById } = await admin
+        .from("service_orders")
+        .select("id, status, assigned_user_id, partner_id, customer_snapshot")
+        .eq("id", token)
+        .maybeSingle()
+      if (orderById) order = orderById
+    }
+
+    if (!order) {
       return { success: false, error: "Ordem de serviço não encontrada ou token inválido" }
     }
 

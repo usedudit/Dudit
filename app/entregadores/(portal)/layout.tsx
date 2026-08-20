@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth/authorization"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { ThemeProvider } from "@/components/theme-provider"
 import { DeliveryPortalHeader } from "@/components/delivery/DeliveryPortalChrome"
+import { DeliverySidebar } from "@/components/delivery/DeliverySidebar"
 import { DeliveryAccessDenied } from "@/components/delivery/DeliveryAccessDenied"
 
 export default async function DeliveryPortalLayout({ children }: { children: React.ReactNode }) {
@@ -15,7 +16,7 @@ export default async function DeliveryPortalLayout({ children }: { children: Rea
   const supabase = await getSupabaseServerClient()
   const { data: driverData } = await supabase
     .from("delivery_drivers")
-    .select("user_id, is_active")
+    .select("user_id, is_active, availability_status")
     .eq("user_id", user.id)
     .maybeSingle()
 
@@ -30,11 +31,19 @@ export default async function DeliveryPortalLayout({ children }: { children: Rea
 
   return (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
-      <div className="flex flex-col min-h-screen bg-white dark:bg-dark-background text-brand-dark dark:text-white transition-colors duration-200">
-        <DeliveryPortalHeader userProfile={userProfile} />
-        <main className="flex-1 w-full bg-white dark:bg-dark-background transition-colors duration-200">
-          {isDriver ? children : <DeliveryAccessDenied userEmail={user.email || ""} />}
-        </main>
+      <div className="flex h-screen w-screen overflow-hidden bg-brand-page-bg dark:bg-dark-background text-brand-dark dark:text-white transition-colors duration-200">
+        {isDriver && (
+          <DeliverySidebar
+            userProfile={userProfile}
+            initialOnline={driverData?.availability_status === "available"}
+          />
+        )}
+        <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-brand-page-bg dark:bg-dark-background">
+          <DeliveryPortalHeader userProfile={userProfile} />
+          <main className="flex-1 overflow-y-auto min-h-0 bg-brand-page-bg dark:bg-dark-background">
+            {isDriver ? children : <DeliveryAccessDenied userEmail={user.email || ""} />}
+          </main>
+        </div>
       </div>
     </ThemeProvider>
   )

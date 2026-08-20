@@ -4,7 +4,8 @@ import { useState, useRef, Fragment, useEffect } from "react"
 import { useSupabase } from "@/providers/supabase-provider"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { getStoreUrl, getProductUrl, getServiceUrl } from "@/lib/utils/url-generator"
+import { getStoreUrl, getProductUrl, getServiceUrl, getPlanUrl } from "@/lib/utils/url-generator"
+
 import { TrashIcon, ChevronUpIcon, ChevronDownIcon } from "@/lib/icons"
 import { QuantitySelector } from "@/components/reusable/QuantitySelector"
 import { AnimatePresence, motion } from "framer-motion"
@@ -109,13 +110,18 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
 
     const getItemPricingContext = (item: any, promotions: any[]) => {
         const isService = item.item_type === "service_booking"
-        const basePrice = isService ? Number(item.services?.price || 0) : Number(item.products?.price || 0)
+        const addonsSum = (item.booking_metadata?.selectedAddons || []).reduce(
+            (sum: number, a: any) => sum + (Number(a.price) || 0),
+            0
+        )
+        const basePrice = (isService ? Number(item.services?.price || 0) : Number(item.products?.price || 0)) + addonsSum
         const unitPrice = (!isService && item.variant_id && item.product_variants)
-            ? Number(item.product_variants.price_adjustment) || basePrice
+            ? (Number(item.product_variants.price_adjustment) || (basePrice - addonsSum)) + addonsSum
             : basePrice
-        const promoPrice = isService
+        const rawPromo = isService
             ? (item.services?.promotional_price ? Number(item.services.promotional_price) : 0)
             : (item.products?.promotional_price ? Number(item.products.promotional_price) : 0)
+        const promoPrice = rawPromo > 0 ? rawPromo + addonsSum : 0
         const individualPromo = (!isService && !item.variant_id && promoPrice > 0 && promoPrice < unitPrice) ? promoPrice
             : (isService && promoPrice > 0 && promoPrice < unitPrice) ? promoPrice
                 : null
@@ -170,13 +176,14 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
 
     const getItemUrl = (item: any, partner: any) => {
         if (item.item_type === "service_booking") {
-            return getServiceUrl({ ...item.services, id: item.service_id }, partner)
+            return getServiceUrl({ ...item.services, id: item.service_id, short_id: item.services?.short_id }, partner)
         }
         if (item.item_type === "subscription") {
-            return getProductUrl({ ...item.recurring_plans, id: item.recurring_plan_id }, partner)
+            return getPlanUrl({ ...item.recurring_plans, id: item.recurring_plan_id, short_id: item.recurring_plans?.short_id }, partner)
         }
-        return getProductUrl({ ...item.products, id: item.product_id }, partner)
+        return getProductUrl({ ...item.products, id: item.product_id, short_id: item.products?.short_id }, partner)
     }
+
 
     const isItemOutOfStock = (item: any): boolean => {
         const type = item.item_type || "product"
@@ -382,6 +389,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                 serviceId: item.service_id || undefined,
                 recurringPlanId: item.recurring_plan_id || undefined,
                 quantity: getItemQuantity(item),
+                selectedAddons: item.booking_metadata?.selectedAddons || undefined,
             })),
             deliverySettings: partnerData.deliverySettings
         }
@@ -430,6 +438,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                 image: getItemImage(item),
                 availabilityValue: Number(item.products?.availability_value || 0),
                 availabilityUnit: item.products?.availability_unit || "Minutos",
+                selectedAddons: item.booking_metadata?.selectedAddons || undefined,
             }))
 
     const getDeliveryLabel = (partnerData: any, selectedItemsTotal: number = 0) => {
@@ -627,6 +636,24 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                     </p>
                                                                                                 )}
 
+                                                                                                {Array.isArray(item.booking_metadata?.selectedAddons) && item.booking_metadata.selectedAddons.length > 0 && (
+                                                                                                    <div className="mt-1 flex flex-wrap gap-1">
+                                                                                                        {item.booking_metadata.selectedAddons.map((addon: any, aIdx: number) => (
+                                                                                                            <span
+                                                                                                                key={aIdx}
+                                                                                                                className="inline-flex items-center gap-1 text-[11px] font-medium bg-brand-gray dark:bg-dark-border/40 text-brand-dark dark:text-dark-heading px-2 py-0.5 rounded-md border border-brand-border/60 dark:border-dark-border/60"
+                                                                                                            >
+                                                                                                                <span>{addon.optionName || addon.name}</span>
+                                                                                                                {(Number(addon.price) || 0) > 0 && (
+                                                                                                                    <span className="text-brand-green font-semibold">
+                                                                                                                        (+{formatCurrency(Number(addon.price))})
+                                                                                                                    </span>
+                                                                                                                )}
+                                                                                                            </span>
+                                                                                                        ))}
+                                                                                                    </div>
+                                                                                                )}
+
                                                                                                 {item.item_type === "service_booking" && getItemBooking(item) && (
                                                                                                     <p className="text-[12px] text-brand-inactive-text dark:text-dark-body mt-0.5">{getItemBooking(item)}</p>
                                                                                                 )}
@@ -675,7 +702,8 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                             <span>Este horário não está mais disponível</span>
                                                                                                             <span className="text-brand-inactive-text/40 dark:text-dark-body/40">•</span>
                                                                                                             <Link
-                                                                                                                href={getServiceUrl({ id: item.service_id, name: item.services?.name || item.booking_metadata?.serviceName }, data.partner)}
+                                                                                                                href={getServiceUrl({ id: item.service_id, short_id: item.services?.short_id, name: item.services?.name || item.booking_metadata?.serviceName }, data.partner)}
+
                                                                                                                 className="font-semibold text-brand-green hover:underline"
                                                                                                             >
                                                                                                                 Remarcar
@@ -753,11 +781,31 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                     >
                                                                                                         {getItemName(item)}
                                                                                                     </Link>
+
                                                                                                     {item.variant_id && item.product_variants && (
                                                                                                         <p className="text-[13px] text-brand-inactive-text dark:text-dark-body mb-1">
                                                                                                             {item.product_variants.variant_type}: <span className="font-medium text-brand-dark dark:text-dark-heading">{item.product_variants.variant_name}</span>
                                                                                                         </p>
                                                                                                     )}
+
+                                                                                                    {Array.isArray(item.booking_metadata?.selectedAddons) && item.booking_metadata.selectedAddons.length > 0 && (
+                                                                                                        <div className="mt-1 mb-1.5 flex flex-wrap gap-1">
+                                                                                                            {item.booking_metadata.selectedAddons.map((addon: any, aIdx: number) => (
+                                                                                                                <span
+                                                                                                                    key={aIdx}
+                                                                                                                    className="inline-flex items-center gap-1 text-[11px] font-medium bg-brand-gray dark:bg-dark-border/40 text-brand-dark dark:text-dark-heading px-2 py-0.5 rounded-md border border-brand-border/60 dark:border-dark-border/60"
+                                                                                                                >
+                                                                                                                    <span>{addon.optionName || addon.name}</span>
+                                                                                                                    {(Number(addon.price) || 0) > 0 && (
+                                                                                                                        <span className="text-brand-green font-semibold">
+                                                                                                                            (+{formatCurrency(Number(addon.price))})
+                                                                                                                        </span>
+                                                                                                                    )}
+                                                                                                                </span>
+                                                                                                            ))}
+                                                                                                        </div>
+                                                                                                    )}
+
                                                                                                     {item.item_type === "service_booking" && getItemBooking(item) && (
                                                                                                         <p className="text-[13px] text-brand-inactive-text dark:text-dark-body mb-1">{getItemBooking(item)}</p>
                                                                                                     )}
@@ -776,7 +824,8 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                             <span>Este horário não está mais disponível</span>
                                                                                                             <span className="text-brand-inactive-text/40 dark:text-dark-body/40">•</span>
                                                                                                             <Link
-                                                                                                                href={getServiceUrl({ id: item.service_id, name: item.services?.name || item.booking_metadata?.serviceName }, data.partner)}
+                                                                                                                href={getServiceUrl({ id: item.service_id, short_id: item.services?.short_id, name: item.services?.name || item.booking_metadata?.serviceName }, data.partner)}
+
                                                                                                                 className="font-semibold text-brand-green hover:underline"
                                                                                                             >
                                                                                                                 Remarcar

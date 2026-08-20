@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react"
 import { Package, ShoppingCartIcon, AlertTriangleIcon, XIcon, ClockIcon, ArrowLeftIcon, SparklesIcon, TagIcon } from "@/lib/icons"
-import { Button, MoneyInput, IconPlaceholder, Spinner, Badge, InfoCard, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
+import { Button, MoneyInput, IconPlaceholder, Spinner, Badge, InfoCard, Tabs, TabsList, TabsTrigger, ThreeDotsLoader } from "@/components/reusable"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
@@ -146,7 +146,10 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId }: Replenishment
                 <Button variant="filled" onClick={onClose} size="icon" className="hidden lg:flex">
                     <XIcon className="h-5 w-5" />
                 </Button>
+            </header>
 
+            {/* Content List */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 pb-32 relative">
                 {/* Navigation Tabs */}
                 <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
                     <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b border-brand-border dark:border-dark-border mb-6">
@@ -158,14 +161,11 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId }: Replenishment
                         </TabsTrigger>
                     </TabsList>
                 </Tabs>
-            </header>
 
-            {/* Content List */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 pb-32 relative">
                 {activeTab === "reposicao" ? (
                     loadingSuggestions ? (
                         <div className="flex items-center justify-center py-16">
-                            <Spinner size={28} />
+                            <ThreeDotsLoader />
                         </div>
                     ) : suggestions.length === 0 ? (
                         <div className="py-12">

@@ -336,17 +336,6 @@ const QuotePreview = ({
                                                 </div>
                                             </div>
                                         </div>
-
-                                        {note && (
-                                            <div className="px-8 pb-12">
-                                                <div className="w-full">
-                                                    <h4 className="font-bold text-xs mb-1.5 text-black">Observações da Proposta</h4>
-                                                    <p className="text-[11px] text-gray-500 leading-relaxed whitespace-pre-wrap">
-                                                        {note}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        )}
                                     </div>
                                 )}
 

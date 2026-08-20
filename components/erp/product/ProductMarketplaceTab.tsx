@@ -2,13 +2,21 @@
 
 import React, { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Input, FormDropdown, RichTextEditor, TagsInput, Button, Accordion, IconPlaceholder, FormSection, Badge } from "@/components/reusable"
+import { Input, FormDropdown, RichTextEditor, TagsInput, Button, Accordion, IconPlaceholder, FormSection, Badge, Checkbox } from "@/components/reusable"
 import { TrashIcon, PlusIcon, Package, ArrowUpDownIcon, EditIcon, CheckCircleIcon, ChevronDownIcon } from "@/lib/icons"
 import MarketplaceCategoryModal from "./MarketplaceCategoryModal"
 import { getCategoryPathClient } from "@/lib/data/marketplace-categories-client"
 import ProductVideoSection from "./ProductVideoSection"
 import { ProductAddonsSection } from "./ProductAddonsSection"
-import { ProductUsedConditionsSection } from "./ProductUsedConditionsSection"
+
+const CONDITION_OPTIONS = [
+    { value: "Novo", label: "Novo" },
+    { value: "Usado - Como novo", label: "Usado - Como novo" },
+    { value: "Usado - Bom", label: "Usado - Bom" },
+    { value: "Usado - Marcas de uso", label: "Usado - Marcas de uso" },
+    { value: "Recondicionado", label: "Recondicionado" },
+    { value: "Para conserto / peças", label: "Para conserto / peças" },
+]
 
 const SidebarCard = ({ title, children, className = "", hasTopStrip = false }: { title?: React.ReactNode; children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
     <>
@@ -167,25 +175,6 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                         />
                     </FormSection>
 
-                    {/* Condição & Desapego */}
-                    <FormSection hasSeparator title="Condição & Desapego">
-                        <ProductUsedConditionsSection
-                            condition={productData?.condicao || productData?.condition || "Novo"}
-                            onConditionChange={() => {}}
-                            acceptsOffers={!!productData?.accepts_offers}
-                            onAcceptsOffersChange={() => {}}
-                            acceptsTrades={!!productData?.accepts_trades}
-                            onAcceptsTradesChange={() => {}}
-                            itemsIncluded={productData?.items_included || ""}
-                            onItemsIncludedChange={() => {}}
-                            pickupNeighborhood={productData?.pickup_neighborhood || ""}
-                            onPickupNeighborhoodChange={() => {}}
-                            expiryDate={productData?.expiry_date || null}
-                            onExpiryDateChange={() => {}}
-                            isEditing={false}
-                        />
-                    </FormSection>
-
                     {/* Vídeo */}
                     <FormSection hasSeparator title="Vídeo">
                         <ProductVideoSection
@@ -203,12 +192,6 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                 <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
                     <SidebarCard hasTopStrip title="Configurações">
                         <div className="space-y-4">
-                            <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
-                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Destacar Produto</span>
-                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                    {productData?.is_highlighted ? "Sim" : "Não"}
-                                </span>
-                            </div>
                             <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
                                 <span className="text-sm text-brand-inactive-text dark:text-dark-body">Tipo de Produto</span>
                                 <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
@@ -242,6 +225,17 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                                     {productData?.warranty_value ? `${productData.warranty_value} ${productData.warranty_period || "Meses"}` : "Sem garantia"}
                                 </span>
                             </div>
+
+                            {(productData?.accepts_offers || productData?.accepts_trades) && (
+                                <div className="flex flex-wrap gap-2 pt-3 border-t border-brand-border/50 dark:border-dark-border/50">
+                                    {productData?.accepts_offers && (
+                                        <Badge variant="blue">Aceita Ofertas</Badge>
+                                    )}
+                                    {productData?.accepts_trades && (
+                                        <Badge variant="purple">Aceita Trocas</Badge>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </SidebarCard>
 
@@ -412,41 +406,6 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                     </Accordion>
                 </div>
 
-                {/* --- CONDIÇÃO, DESAPEGO E VALIDADE (OLX / Marketplace) --- */}
-                <div className="mt-8 mb-8">
-                    <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
-                    <Accordion
-                        title={
-                            <span className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mb-6">
-                                Condição, Desapego e Validade
-                            </span>
-                        }
-                        defaultOpen={false}
-                        triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading text-left"
-                    >
-                        <div className="pt-2">
-                            <ProductUsedConditionsSection
-                                condition={productData?.condicao || productData?.condition || "Novo"}
-                                onConditionChange={(val) => {
-                                    manualChange("condicao", val)
-                                    manualChange("condition", val)
-                                }}
-                                acceptsOffers={!!productData?.accepts_offers}
-                                onAcceptsOffersChange={(val) => manualChange("accepts_offers", val)}
-                                acceptsTrades={!!productData?.accepts_trades}
-                                onAcceptsTradesChange={(val) => manualChange("accepts_trades", val)}
-                                itemsIncluded={productData?.items_included || ""}
-                                onItemsIncludedChange={(val) => manualChange("items_included", val)}
-                                pickupNeighborhood={productData?.pickup_neighborhood || ""}
-                                onPickupNeighborhoodChange={(val) => manualChange("pickup_neighborhood", val)}
-                                expiryDate={productData?.expiry_date || null}
-                                onExpiryDateChange={(val) => manualChange("expiry_date", val)}
-                                isEditing={isEditing}
-                            />
-                        </div>
-                    </Accordion>
-                </div>
-
                 <div className="mt-8 mb-8">
                     <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
                     <Accordion title={
@@ -466,18 +425,6 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                 <div className="block lg:hidden space-y-8">
                     <FormSection title="Configurações" hasSeparator>
                         <div className="space-y-5">
-                            <FormDropdown
-                                label="Destacar Produto"
-                                options={[
-                                    { value: "true", label: "Sim" },
-                                    { value: "false", label: "Não" },
-                                ]}
-                                value={String(productData?.is_highlighted || "false")}
-                                setValue={(v) => manualChange("is_highlighted", v === "true")}
-                                disabled={!isEditing}
-                                width="w-full"
-                            />
-
                             <FormDropdown
                                 label="Tipo de Produto"
                                 options={[
@@ -507,13 +454,12 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                             ) : (
                                 <FormDropdown
                                     label="Condição"
-                                    options={[
-                                        { value: "Novo", label: "Novo" },
-                                        { value: "Usado", label: "Usado" },
-                                        { value: "Recondicionado", label: "Recondicionado" },
-                                    ]}
-                                    value={productData?.condicao || "Novo"}
-                                    setValue={(v) => manualChange("condicao", v)}
+                                    options={CONDITION_OPTIONS}
+                                    value={productData?.condicao || productData?.condition || "Novo"}
+                                    setValue={(v) => {
+                                        manualChange("condicao", v)
+                                        manualChange("condition", v)
+                                    }}
                                     disabled={!isEditing}
                                     width="w-full"
                                 />
@@ -566,6 +512,21 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                                     setValue={(v) => manualChange("warranty_period", v)}
                                     disabled={!isEditing}
                                     width="w-full"
+                                />
+                            </div>
+
+                            <div className="pt-2 border-t border-brand-border/50 dark:border-dark-border/50 space-y-3">
+                                <Checkbox
+                                    checked={!!productData?.accepts_offers}
+                                    label="Aceita proposta de preço (negociação)"
+                                    onChange={(val) => manualChange("accepts_offers", val)}
+                                    disabled={!isEditing}
+                                />
+                                <Checkbox
+                                    checked={!!productData?.accepts_trades}
+                                    label="Aceita troca por outro item"
+                                    onChange={(val) => manualChange("accepts_trades", val)}
+                                    disabled={!isEditing}
                                 />
                             </div>
                         </div>
@@ -633,18 +594,6 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
 
                         <div className="space-y-5">
                             <FormDropdown
-                                label="Destacar Produto"
-                                options={[
-                                    { value: "true", label: "Sim" },
-                                    { value: "false", label: "Não" },
-                                ]}
-                                value={String(productData?.is_highlighted || "false")}
-                                setValue={(v) => manualChange("is_highlighted", v === "true")}
-                                disabled={!isEditing}
-                                width="w-full"
-                            />
-
-                            <FormDropdown
                                 label="Tipo de Produto"
                                 options={[
                                     { value: "Físico", label: "Físico" },
@@ -673,13 +622,12 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                             ) : (
                                 <FormDropdown
                                     label="Condição"
-                                    options={[
-                                        { value: "Novo", label: "Novo" },
-                                        { value: "Usado", label: "Usado" },
-                                        { value: "Recondicionado", label: "Recondicionado" },
-                                    ]}
-                                    value={productData?.condicao || "Novo"}
-                                    setValue={(v) => manualChange("condicao", v)}
+                                    options={CONDITION_OPTIONS}
+                                    value={productData?.condicao || productData?.condition || "Novo"}
+                                    setValue={(v) => {
+                                        manualChange("condicao", v)
+                                        manualChange("condition", v)
+                                    }}
                                     disabled={!isEditing}
                                     width="w-full"
                                 />
@@ -732,6 +680,21 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                                     setValue={(v) => manualChange("warranty_period", v)}
                                     disabled={!isEditing}
                                     width="w-full"
+                                />
+                            </div>
+
+                            <div className="pt-2 border-t border-brand-border/50 dark:border-dark-border/50 space-y-3">
+                                <Checkbox
+                                    checked={!!productData?.accepts_offers}
+                                    label="Aceita proposta de preço (negociação)"
+                                    onChange={(val) => manualChange("accepts_offers", val)}
+                                    disabled={!isEditing}
+                                />
+                                <Checkbox
+                                    checked={!!productData?.accepts_trades}
+                                    label="Aceita troca por outro item"
+                                    onChange={(val) => manualChange("accepts_trades", val)}
+                                    disabled={!isEditing}
                                 />
                             </div>
                         </div>

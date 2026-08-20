@@ -5,10 +5,8 @@ import { getStoreUrl, getProductUrl } from "@/lib/utils/url-generator"
 export const revalidate = 86400
 
 const CATEGORY_SLUGS = [
-    "casa-e-utilidades", "moda-e-beleza", "saude-e-bem-estar",
-    "tecnologia-e-eletronicos", "auto-e-moto", "pets",
-    "construcao-e-ferramentas", "agro-e-jardim", "infantil-e-brinquedos",
-    "alimentacao", "outros",
+    "alimentacao", "casa", "tecnologia", "moda-e-beleza", "saude",
+    "automotivo", "pets", "servicos", "outros",
 ]
 
 const ESTADOS = [
@@ -57,26 +55,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     if (!supabase) return baseUrls
 
     try {
-        const [partnersResponse, storesResponse, productsResponse, citiesResponse] = await Promise.all([
-            // Top 200 partners
-            supabase
-                .from("stores")
-                .select("id, name, slug, updated_at, created_at, addresses(city, state)")
-                .eq("is_active", true)
-                .order("created_at", { ascending: false })
-                .limit(1000),
-
+        const [storesResponse, productsResponse, citiesResponse] = await Promise.all([
             // Top 1000 stores
             supabase
                 .from("stores")
-                .select("id, name, slug, updated_at, created_at, addresses(city, state)")
+                .select("id, short_id, name, slug, updated_at, created_at, addresses(city, state)")
                 .eq("is_active", true)
                 .order("created_at", { ascending: false })
                 .limit(1000),
 
             // Top 500 most recent public products in marketplace.
-            // Keep this on the safe RPC so sitemap generation does not
-            // require direct access to the operational products table.
             supabase
                 .rpc("get_marketplace_products_public", { p_product_ids: null, p_store_id: null })
                 .order("created_at", { ascending: false })
@@ -91,7 +79,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
                 .limit(200),
         ])
 
-        if (partnersResponse.error) console.error("Sitemap partners error:", partnersResponse.error)
         if (storesResponse.error) console.error("Sitemap stores error:", storesResponse.error)
         if (productsResponse.error) console.error("Sitemap products error:", productsResponse.error)
         if (citiesResponse.error) console.error("Sitemap cities error:", citiesResponse.error)

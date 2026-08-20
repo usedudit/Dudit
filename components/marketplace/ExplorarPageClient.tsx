@@ -1300,16 +1300,13 @@ export function ExplorarPageClient({
 
     // ─── Themed rotating sections ───────────────────────────────────────
     const CATEGORY_THEMES = [
-        { id: "auto", title: "Hora de cuidar do veículo", slug: "auto-e-moto", category: "Auto & Moto", emoji: "🚗" },
-        { id: "casa", title: "Dando um trato na casa", slug: "casa-e-utilidades", category: "Casa & Utilidades", emoji: "🏠" },
-        { id: "moda", title: "Renove o visual", slug: "moda-e-beleza", category: "Moda & Beleza", emoji: "👗" },
-        { id: "tecnologia", title: "Tecnologia pra facilitar", slug: "tecnologia-e-eletronicos", category: "Tecnologia & Eletrônicos", emoji: "💻" },
-        { id: "pet", title: "Mimos pro seu pet", slug: "pets", category: "Pets", emoji: "🐾" },
-        { id: "saude", title: "Cuide de você", slug: "saude-e-bem-estar", category: "Saúde & Bem-estar", emoji: "💚" },
-        { id: "construcao", title: "Reformando a casa", slug: "construcao-e-ferramentas", category: "Construção & Ferramentas", emoji: "🔧" },
-        { id: "agro", title: "Pro campo e jardim", slug: "agro-e-jardim", category: "Agro & Jardim", emoji: "🌱" },
-        { id: "infantil", title: "Diversão para os pequenos", slug: "infantil-e-brinquedos", category: "Infantil & Brinquedos", emoji: "🧸" },
         { id: "alimentacao", title: "Sabores da região", slug: "alimentacao", category: "Alimentação", emoji: "🍽️" },
+        { id: "casa", title: "Dando um trato na casa", slug: "casa", category: "Casa", emoji: "🏠" },
+        { id: "tecnologia", title: "Tecnologia pra facilitar", slug: "tecnologia", category: "Tecnologia", emoji: "💻" },
+        { id: "moda", title: "Renove o visual", slug: "moda-e-beleza", category: "Moda e Beleza", emoji: "👗" },
+        { id: "saude", title: "Cuide de você", slug: "saude", category: "Saúde", emoji: "💚" },
+        { id: "automotivo", title: "Hora de cuidar do veículo", slug: "automotivo", category: "Automotivo", emoji: "🚗" },
+        { id: "pet", title: "Mimos pro seu pet", slug: "pets", category: "Pets", emoji: "🐾" },
     ]
 
     const themedSections = useMemo(() => {
@@ -1357,6 +1354,11 @@ export function ExplorarPageClient({
     const showCommunityVideos = communityVideos.length > 0
 
     const goToCategory = (catName: string) => {
+        // "Serviços" usa o tipo de listagem de serviços em vez de uma categoria de produto
+        if (catName === "Serviços" || catName.toLowerCase() === "servicos") {
+            router.push(`/explorar/${selectedCitySlug || "brasil"}?type=servicos`)
+            return
+        }
         const catSlug = categoryToSlug(catName)
         const typeParam = currentType && currentType !== "tudo" ? `?type=${currentType}` : ""
         router.push(`/explorar/${selectedCitySlug || "brasil"}/${catSlug}${typeParam}`)

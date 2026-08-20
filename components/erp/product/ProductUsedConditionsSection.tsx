@@ -11,8 +11,8 @@ interface ProductUsedConditionsSectionProps {
     onAcceptsOffersChange: (val: boolean) => void
     acceptsTrades: boolean
     onAcceptsTradesChange: (val: boolean) => void
-    itemsIncluded: string
-    onItemsIncludedChange: (val: string) => void
+    itemsIncluded?: string
+    onItemsIncludedChange?: (val: string) => void
     pickupNeighborhood: string
     onPickupNeighborhoodChange: (val: string) => void
     expiryDate: string | null
@@ -72,13 +72,6 @@ export const ProductUsedConditionsSection: React.FC<ProductUsedConditionsSection
                     )}
                 </div>
 
-                {itemsIncluded && (
-                    <div className="p-3 rounded-xl bg-brand-gray/30 dark:bg-dark-border/20 border border-brand-border dark:border-dark-border">
-                        <span className="text-xs text-brand-inactive-text block mb-1">Acompanha:</span>
-                        <p className="text-brand-dark dark:text-dark-heading font-medium">{itemsIncluded}</p>
-                    </div>
-                )}
-
                 {pickupNeighborhood && (
                     <div className="flex items-center gap-2 text-brand-dark dark:text-dark-heading">
                         <MapPinIcon size={16} className="text-brand-primary" />
@@ -130,16 +123,6 @@ export const ProductUsedConditionsSection: React.FC<ProductUsedConditionsSection
                     disabled={!isEditing}
                 />
             </div>
-
-            <Input
-                label="O que acompanha o produto? (Acessórios, caixa, manuais)"
-                name="items_included"
-                value={itemsIncluded || ""}
-                onChange={(e) => onItemsIncludedChange(e.target.value)}
-                placeholder="Ex: Acompanha caixa original, cabo USB e capa de proteção"
-                disabled={!isEditing}
-                className="w-full"
-            />
 
             <div className="pt-2 border-t border-brand-border/60 dark:border-dark-border/40">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">

@@ -173,10 +173,11 @@ export function ReviewsView({ navigate }: ReviewsViewProps) {
 
                         let itemUrl = ""
                         if (isService && review.services) {
-                            itemUrl = getServiceUrl({ ...review.services, id: review.service_id }, review.partners)
+                            itemUrl = getServiceUrl({ ...review.services, id: review.service_id, short_id: review.services?.short_id }, review.partners)
                         } else if (review.products) {
-                            itemUrl = getProductUrl({ ...review.products, id: review.product_id }, review.partners)
+                            itemUrl = getProductUrl({ ...review.products, id: review.product_id, short_id: review.products?.short_id }, review.partners)
                         }
+
 
                         const itemImage = getPrimaryProductDisplayImage({
                             images: item?.images || null,

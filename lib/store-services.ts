@@ -8,17 +8,18 @@ type RawService = Record<string, unknown>
 // staff-assignment fields out of serialized responses even though these
 // helpers execute with the server client.
 const PUBLIC_SERVICE_SELECT = `
-    id, partner_id, store_id, name, description, price, duration_minutes,
+    id, short_id, partner_id, store_id, name, description, price, duration_minutes,
     images, is_active, status, rating, category_id, subcategory_id, sku, unit,
     show_in_marketplace, tags, price_type, billing_unit, video_url, video_type,
     video_thumbnail, video_duration, video_provider_id, service_type,
     warranty, buffer_minutes, marketplace_category_id, fulfillment_modes,
     payment_requirement, show_price_in_store, promotional_price,
-    marketplace_score, views_count, bookings_last_30_days, favorites_count, highlight_service,
+    marketplace_score, views_count, bookings_last_30_days, favorites_count,
     created_at,
     category:service_categories!category_id(name),
     subcategory:service_categories!subcategory_id(name)
 `
+
 
 const ERP_SERVICE_SELECT = `
     *,

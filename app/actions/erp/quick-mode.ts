@@ -167,9 +167,19 @@ export async function getOnboardingStatusAction(partnerId: string) {
         const addresses = store.addresses || []
         const hasPix = (paymentMethods || []).some((m: any) => (m.type === 'pix' || m.payment_type === 'pix') && m.is_active)
         const hasAddress = (addresses || []).length > 0 && !!(addresses as any)[0].zip_code
-        const hasHours = !!store.opening_hours && Object.keys(store.opening_hours as any).length > 0
+
+        // Verifica se pelo menos 1 dia está habilitado nos horários
+        const openingHours = store.opening_hours as any
+        const hasHours = !!openingHours && typeof openingHours === "object" && Object.values(openingHours).some(
+            (day: any) => day?.enabled === true
+        )
+
         const hasItems = ((productsCount.count || 0) + (servicesCount.count || 0)) > 0
-        const hasShowcase = !!store.logo_url && !!store.banner_url && !store.banner_url.includes('default/')
+
+        // Considera completo se tem logo OU (banner e não é o default)
+        const hasLogo = !!store.logo_url
+        const hasCustomBanner = !!store.banner_url && !store.banner_url.includes('default/')
+        const hasShowcase = hasLogo || hasCustomBanner
 
         // Checks
         const checklist = {

@@ -484,7 +484,7 @@ export function PaymentWrapper({
             transition={{ duration: 0.2 }}
             className="fixed inset-0 z-[100] bg-white dark:bg-dark-surface overflow-y-auto custom-scrollbar flex flex-col"
         >
-            <header className="lg:flex flex-col w-full bg-brand-dark sticky top-0 z-50 shadow-md">
+            <header className="lg:flex flex-col w-full bg-brand-dark dark:bg-dark-surface border-b border-white/10 sticky top-0 z-50 shadow-md">
                 <div className="w-full h-[68px] flex items-center justify-between max-w-[1300px] px-2 mx-auto gap-4">
                     <a href="/" className="cursor-pointer shrink-0 z-[110] pt-1">
                         <img

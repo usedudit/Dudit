@@ -20,16 +20,14 @@ import { cookies } from "next/headers"
 import { FALLBACK_CATEGORIES, CATEGORY_GRADIENTS } from "@/components/marketplace/explorar-constants"
 
 const CATEGORY_SLUG_MAP: { [key: string]: string } = {
-    "casa-e-utilidades": "Casa & Utilidades",
-    "moda-e-beleza": "Moda & Beleza",
-    "saude-e-bem-estar": "Saúde & Bem-estar",
-    "tecnologia-e-eletronicos": "Tecnologia & Eletrônicos",
-    "auto-e-moto": "Auto & Moto",
-    "pets": "Pets",
-    "construcao-e-ferramentas": "Construção & Ferramentas",
-    "agro-e-jardim": "Agro & Jardim",
-    "infantil-e-brinquedos": "Infantil & Brinquedos",
     "alimentacao": "Alimentação",
+    "casa": "Casa",
+    "tecnologia": "Tecnologia",
+    "moda-e-beleza": "Moda e Beleza",
+    "saude": "Saúde",
+    "automotivo": "Automotivo",
+    "pets": "Pets",
+    "servicos": "Serviços",
     "outros": "Outros"
 }
 
@@ -337,7 +335,9 @@ export default async function ExplorarPage({
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 lg:gap-4">
                         {FALLBACK_CATEGORIES.map((cat) => {
                             const gradient = CATEGORY_GRADIENTS[cat.slug] || "from-gray-400 to-gray-500"
-                            const href = `/explorar/${landingCitySlug}/${cat.slug}`
+                            const href = cat.slug === "servicos"
+                                ? `/explorar/${landingCitySlug}?type=servicos`
+                                : `/explorar/${landingCitySlug}/${cat.slug}`
                             return (
                                 <a
                                     key={cat.slug}

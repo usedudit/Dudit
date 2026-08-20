@@ -234,7 +234,6 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
             show_in_marketplace: isQuick
                 ? (data.show_in_marketplace !== undefined ? data.show_in_marketplace : (data.showInMarketplace !== undefined ? data.showInMarketplace : true))
                 : (data.show_in_marketplace ?? data.showInMarketplace ?? true),
-            highlight_service: data.highlight_service || data.highlightService || false,
             show_price_in_store: data.show_price_in_store !== false && data.showPriceInStore !== false,
             marketplace_category_id: data.marketplace_category_id || data.marketplaceCategoryId || null,
             tags: data.tags || [],
@@ -338,8 +337,6 @@ export async function updateServiceAction(data: any): Promise<ActionResponse<any
         if (data.serviceType !== undefined) payload.service_type = data.serviceType
         if (data.show_in_marketplace !== undefined) payload.show_in_marketplace = data.show_in_marketplace
         if (data.showInMarketplace !== undefined) payload.show_in_marketplace = data.showInMarketplace
-        if (data.highlight_service !== undefined) payload.highlight_service = data.highlight_service
-        if (data.highlightService !== undefined) payload.highlight_service = data.highlightService
         if (data.tags !== undefined) payload.tags = data.tags
         if (data.notes !== undefined) payload.notes = sanitizeNotes(data.notes)
         if (

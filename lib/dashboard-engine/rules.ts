@@ -71,7 +71,7 @@ export function getChecklistItems(ctx: DashboardContext): DashboardChecklistItem
       id: "logistics",
       title: "Entregas e Logística",
       description: "Configure áreas de entrega, taxas, transportadoras e prazos para seus pedidos.",
-      completed: false, // TODO: verificar se já configurou logística
+      completed: ctx.hasDeliveryConfig,
       tabTarget: "entregas"
     });
   }

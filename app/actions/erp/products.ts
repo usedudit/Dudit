@@ -614,7 +614,6 @@ export async function createProductComprehensiveAction(data: {
             is_on_promotion: data.isOnPromotion || false,
             show_price_in_store: data.showPriceInStore !== false,
             images: data.images || [],
-            is_featured: data.featured || false,
             availability_value: data.availability_value || 0,
             availability_unit: data.availability_unit || "Dias",
             warranty: data.warranty || null,
@@ -1016,7 +1015,6 @@ export async function updateProductComprehensiveAction(productId: string, data: 
             payload.video_provider_id = videoMetadata.video_provider_id
         }
         if (data.technicalSpecs !== undefined) payload.technical_specs = data.technicalSpecs
-        if (data.featured !== undefined) payload.is_featured = data.featured
         if (data.deliveryFormat !== undefined) payload.delivery_format = data.deliveryFormat
         if (data.tags !== undefined) payload.tags = data.tags
         if (data.showInMarketplace !== undefined) payload.show_in_marketplace = data.showInMarketplace

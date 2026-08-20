@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useRef } from "react"
 import { useSearchParams } from "next/navigation"
 import { AnimatePresence } from "framer-motion"
 import { Tabs, TabsList, TabsTrigger, TabsContent, ListItem } from "@/components/reusable"
@@ -67,6 +67,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
   const searchParams = useSearchParams()
   const [activePage, setActivePage] = useState<ActivePage>("home")
   const [activeTab, setActiveTab] = useState("empresa")
+  const pendingUrlSyncRef = useRef(false)
   const [mpConnected] = useState(!!partner.mp_user_id)
   const { setHeaderOverride } = useSidebar()
   const { planSlug } = usePermissions()
@@ -106,6 +107,9 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
     }
 
     if (SLUG_TO_PAGE[tab]) {
+      // URL is already the source of truth: skip the state→URL sync
+      // so it doesn't run with stale state in the same flush (infinite loop).
+      pendingUrlSyncRef.current = true
       setActivePage(SLUG_TO_PAGE[tab])
       // Also set the correct category tab for when they go back
       if (["business-data", "team", "subscription"].includes(SLUG_TO_PAGE[tab])) {
@@ -116,6 +120,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
         setActiveTab("adicionais")
       }
     } else if (["empresa", "vendas", "adicionais"].includes(tab)) {
+      pendingUrlSyncRef.current = true
       setActiveTab(tab)
       setActivePage("home")
     }
@@ -123,6 +128,11 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
 
   // Sync URL from state changes
   React.useEffect(() => {
+    if (pendingUrlSyncRef.current) {
+      pendingUrlSyncRef.current = false
+      return
+    }
+
     const currentTab = searchParams.get("tab") || ""
     let newTab = ""
 

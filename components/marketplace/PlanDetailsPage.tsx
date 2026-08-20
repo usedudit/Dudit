@@ -19,8 +19,9 @@ import { useNotification } from "@/hooks/use-notification"
 import { getAddressesAction, createAddressAction } from "@/app/actions/shared/addresses"
 import { addSubscriptionToCartAction, checkCanUserBuyFromStoreAction } from "@/app/actions/marketplace/cart-extensions"
 import { invalidateCartCache } from "@/hooks/use-cart"
-import { getStoreUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
+import { getStoreUrl, getPlanUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
 import { fetchCSRFTokenSingleton } from "@/hooks/use-csrf-token"
+
 
 interface PlanDetailsPageClientProps {
     plan: any
@@ -1050,11 +1051,12 @@ export function PlanDetailsPageClient({
             <ShareModal
                 isOpen={showShareModal}
                 onClose={() => setShowShareModal(false)}
-                url={isMounted ? window.location.href : ""}
+                url={isMounted ? `${window.location.origin}${getPlanUrl(plan, partner)}` : ""}
                 title={plan.name}
                 shareMessage={`Gostou? Espalhe a novidade!\n\n*${plan.name}*\nAssinatura recorrente na Dudit:`}
                 label="Link do plano"
             />
+
         </div>
     )
 }

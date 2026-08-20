@@ -286,7 +286,20 @@ export async function getCachedCart(userId: string) {
 
 // --- ACTIONS DE ESCRITA (Adicionar/Remover/Checkout) ---
 
-export async function addToCartAction(productId: string, quantity = 1, csrf_token?: string, variantId?: string, storeId?: string) {
+export async function addToCartAction(
+  productId: string,
+  quantity = 1,
+  csrf_token?: string,
+  variantId?: string,
+  storeId?: string,
+  selectedAddons?: Array<{
+    groupId: string
+    groupName: string
+    optionId: string
+    optionName: string
+    price: number
+  }>
+) {
   // 1. Otimização Primeira Fase: Paralelizar carregamentos estáticos e Auth
   const [{ requireCSRF }] = await Promise.all([
     import("@/lib/security/csrf-action-wrapper"),
@@ -317,7 +330,7 @@ export async function addToCartAction(productId: string, quantity = 1, csrf_toke
   // 2.B - Verifica item existente usando a chave fornecida
   let existingQuery = supabase
     .from("cart_items")
-    .select("id, quantity")
+    .select("id, quantity, booking_metadata")
     .eq("user_id", user.id)
     .eq("product_id", productId)
 
@@ -398,7 +411,7 @@ export async function addToCartAction(productId: string, quantity = 1, csrf_toke
   if (variantId && resolvedProductId !== productId) {
     const { data: retryExisting } = await supabase
       .from("cart_items")
-      .select("id, quantity")
+      .select("id, quantity, booking_metadata")
       .eq("user_id", user.id)
       .eq("product_id", resolvedProductId)
       .eq("variant_id", variantId)
@@ -406,12 +419,17 @@ export async function addToCartAction(productId: string, quantity = 1, csrf_toke
     existingItem = retryExisting
   }
 
+  const bookingMetadataPayload = selectedAddons && selectedAddons.length > 0
+    ? { selectedAddons }
+    : null
+
   let error
   if (existingItem) {
     const { error: e } = await supabase
       .from("cart_items")
       .update({
         quantity: existingItem.quantity + quantity,
+        booking_metadata: bookingMetadataPayload || (existingItem as any).booking_metadata || null,
         updated_at: new Date().toISOString()
       })
       .eq("id", existingItem.id)
@@ -428,6 +446,7 @@ export async function addToCartAction(productId: string, quantity = 1, csrf_toke
         variant_id: variantId || null,
         quantity,
         selected: true,
+        booking_metadata: bookingMetadataPayload,
       })
     error = e
   }

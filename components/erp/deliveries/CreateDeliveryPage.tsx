@@ -309,6 +309,25 @@ export default function CreateDeliveryPage({
                 setPlanAccess(null)
             }
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [editDeliveryId, partnerId])
+
+    useEffect(() => {
+        let mounted = true
+        const run = async () => {
+            const res = await getERPDeliveryPlanAccessAction(partnerId)
+            if (!mounted) return
+            if (res.success) {
+                setPlanAccess({
+                    allowed: res.allowed,
+                    maxOrders: Number(res.maxOrders || 0),
+                    planSlug: String(res.planSlug || "free"),
+                    message: res.message,
+                })
+            } else {
+                setPlanAccess(null)
+            }
+        }
         run()
         return () => { mounted = false }
     }, [partnerId])
@@ -351,13 +370,9 @@ export default function CreateDeliveryPage({
 
     const loadDeliveryPeople = async () => {
         if (deliveryPeople.length > 0) return
-        const [legacy, platform] = await Promise.all([
-            fetchDeliveryPeopleBucketAction(partnerId),
-            fetchAvailablePlatformDeliveryDriversAction(partnerId, editDeliveryId).catch(() => []),
-        ])
+        const legacy = await fetchDeliveryPeopleBucketAction(partnerId).catch(() => [])
         setDeliveryPeople([
             ...(legacy as DeliveryPerson[]).map((person) => ({ ...person, source: "legacy" as const })),
-            ...(platform as DeliveryPerson[]).map((person) => ({ ...person, id: `platform:${person.id}`, source: "platform" as const })),
         ])
     }
 
@@ -1035,14 +1050,13 @@ export default function CreateDeliveryPage({
             <DeliveryDriverPickerSheet
                 isOpen={isDriverSheetOpen}
                 onClose={() => setIsDriverSheetOpen(false)}
-                drivers={deliveryPeople
-                    .filter((person) => person.source === "platform")
-                    .map((person) => ({
-                        id: person.id,
-                        fullName: person.fullName,
-                        vehicleType: person.vehicleType,
-                    }))}
-                onSelect={setSelectedDeliveryPersonId}
+                partnerId={partnerId}
+                deliveryId={editDeliveryId || undefined}
+                orderId={selectedOrderIds[0] || undefined}
+                destinationAddress={customerAddress ? `${customerAddress.street}, ${customerAddress.number || "S/N"} - ${customerAddress.neighborhood}, ${customerAddress.city}` : undefined}
+                deliveryFee={primaryOrder?.deliveryFee}
+                onDeliveryRequested={() => setSelectedDeliveryPersonId("platform:dudit_network")}
+                onSelect={(driverId) => setSelectedDeliveryPersonId(driverId)}
             />
 
             <AlertModal

@@ -161,7 +161,7 @@ export function LimitStatusWidget() {
                             <div className="px-5 py-4 border-t border-brand-border dark:border-dark-border bg-brand-gray/20 dark:bg-dark-border/20">
                                 <div className="flex items-center gap-3">
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-brand-inactive-text dark:text-dark-body font-semibold">
+                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold">
                                             Quer mais limites?
                                         </p>
                                     </div>

@@ -135,11 +135,8 @@ const ProductGridCard = React.memo(
                                     </span>
                                 ) : (
                                     <div className="flex flex-col items-start">
-                                        <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body">
-                                            De: {formatCurrency(product.variant_min_price!)}
-                                        </span>
-                                        <span className="text-[16px] font-bold text-brand-dark dark:text-dark-heading leading-tight">
-                                            Até: {formatCurrency(product.variant_max_price!)}
+                                        <span className="text-[16px] font-medium text-brand-inactive-text dark:text-dark-body">
+                                            De: {formatCurrency(product.variant_min_price!)} até <p className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(product.variant_max_price!)}</p>
                                         </span>
                                     </div>
                                 )
@@ -192,7 +189,7 @@ const ProductGridCard = React.memo(
                         <div className="flex flex-col gap-0.5">
                             <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Estoque</span>
                             <div className="flex items-center gap-2.5">
-                                        <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{effectiveStock}</span>
+                                <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{effectiveStock}</span>
                                 <Tooltip text={`Estoque: ${status.label}`}>
                                     <Badge variant={status.variant} className="whitespace-nowrap scale-90" />
                                 </Tooltip>

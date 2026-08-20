@@ -870,7 +870,7 @@ const Header: React.FC<HeaderProps> = ({
                 </BottomSheet>
             )}
 
-            <header className="hidden lg:flex flex-col w-full bg-brand-dark fixed top-0 left-0 right-0 z-[100] shadow-md">
+            <header className="hidden lg:flex flex-col w-full bg-brand-dark dark:bg-dark-surface border-b border-white/10 fixed top-0 left-0 right-0 z-[100] shadow-md">
                 <div className="w-full h-[68px] flex items-center justify-between max-w-[1400px] px-2 mx-auto gap-4">
                     <Link href="/" prefetch={false} className="cursor-pointer shrink-0 z-[110] pt-1">
                         <img
@@ -1061,7 +1061,7 @@ const Header: React.FC<HeaderProps> = ({
                     </div>
                 </div>
 
-                <div className="w-full h-[40px] bg-brand-dark flex items-center max-w-[1400px] mx-auto text-white text-[13px] border-t border-white/5">
+                <div className="w-full h-[40px] bg-brand-dark dark:bg-dark-surface flex items-center max-w-[1400px] mx-auto text-white text-[13px] border-t border-white/10">
                     <div className="flex items-center gap-1 h-full overflow-x-auto no-scrollbar">
                         {desktopNavigationLinks.map((link) => (
                             <Link

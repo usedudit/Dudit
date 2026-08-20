@@ -16,6 +16,7 @@ import { useSupabase } from "@/providers/supabase-provider"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { getLocationLabel, type LocationContext } from "@/lib/utils/location-label"
+import Button from "../reusable/Button"
 
 const HOME_BANNERS = [
     { id: 1, src: 'https://img.dudit.com.br/static/banners/Banner-1.png', alt: 'Venda aqui' },
@@ -417,28 +418,28 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
                             </div>
                         )}
                         {timeLeft && (
-                            <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[10px] font-semibold uppercase text-white shadow-sm tracking-wider whitespace-nowrap bg-[#ffa503]`}>
+                            <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[10px] font-semibold uppercase text-white tracking-wider whitespace-nowrap bg-[#ffa503]`}>
                                 <EnergyIcon className="w-3 h-3 shrink-0" />
                                 {timeLeft}
                             </div>
                         )}
                         {badgeLabel && badgeVariant === "green" && (
-                            <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[10px] font-semibold uppercase text-white shadow-sm tracking-wider whitespace-nowrap bg-brand-dark`}>
+                            <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[10px] font-semibold uppercase text-white tracking-wider whitespace-nowrap bg-brand-dark`}>
                                 {badgeLabel}
                             </div>
                         )}
                         {badgeLabel && badgeVariant === "purple" && (
-                            <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[10px] font-semibold uppercase text-white shadow-sm tracking-wider whitespace-nowrap bg-purple-600`}>
+                            <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[10px] font-semibold uppercase text-white tracking-wider whitespace-nowrap bg-purple-600`}>
                                 {badgeLabel}
                             </div>
                         )}
                         {badgeLabel && badgeVariant === "blue" && (
-                            <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[10px] font-semibold uppercase text-white shadow-sm tracking-wider whitespace-nowrap bg-[#2968c8]`}>
+                            <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[10px] font-semibold uppercase text-white tracking-wider whitespace-nowrap bg-[#2968c8]`}>
                                 {badgeLabel}
                             </div>
                         )}
                         {badgeLabel && badgeVariant === "red" && (
-                            <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[10px] font-semibold uppercase text-white shadow-sm tracking-wider whitespace-nowrap bg-[#e11d48]`}>
+                            <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[10px] font-semibold uppercase text-white tracking-wider whitespace-nowrap bg-[#e11d48]`}>
                                 <ClockIcon className="w-3 h-3 shrink-0" />
                                 {badgeLabel}
                             </div>
@@ -448,7 +449,7 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
                         <button
                             onClick={handleFavoriteClick}
                             className={`absolute top-2 right-2 z-10 transition-opacity w-8 h-8 rounded-full flex items-center justify-center
-                                ${favorited ? "opacity-100 bg-white shadow-md" : "opacity-0 group-hover/card:opacity-100 bg-white/90 hover:bg-white shadow-sm"}`}
+                                ${favorited ? "opacity-100 bg-white dark:bg-dark-border" : "opacity-0 group-hover/card:opacity-100 bg-white/90 hover:bg-white dark:bg-dark-border/90 dark:hover:bg-dark-border"}`}
                             aria-label={favorited ? "Remover dos favoritos" : "Adicionar aos favoritos"}
                             title={favorited ? "Remover dos favoritos" : "Adicionar aos favoritos"}
                         >
@@ -734,20 +735,22 @@ export const HorizontalCarousel = ({
                     )}
                     <div className="hidden lg:flex items-center gap-1.5">
                         {showLeftArrow && (
-                            <button
+                            <Button
                                 onClick={() => scroll('left')}
-                                className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center bg-white hover:bg-gray-50 transition-colors duration-200 shadow-sm cursor-pointer dark:border-dark-border dark:bg-dark-surface dark:hover:bg-dark-border/30"
+                                variant="filled"
+                                className="w-8 h-8"
                             >
                                 <ChevronLeftIcon className="w-4 h-4 text-brand-dark dark:text-dark-heading" />
-                            </button>
+                            </Button>
                         )}
                         {showRightArrow && (
-                            <button
+                            <Button
                                 onClick={() => scroll('right')}
-                                className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center bg-white hover:bg-gray-50 transition-colors duration-200 shadow-sm cursor-pointer dark:border-dark-border dark:bg-dark-surface dark:hover:bg-dark-border/30"
+                                variant="filled"
+                                className="w-8 h-8"
                             >
                                 <ChevronRightIcon className="w-4 h-4 text-brand-dark dark:text-dark-heading" />
-                            </button>
+                            </Button>
                         )}
                     </div>
                 </div>

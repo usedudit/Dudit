@@ -52,11 +52,14 @@ export function getNotificationHref(params: {
     if (audience === "seller" || audience === "admin") {
       return entityId ? `/erp/orcamentos?quote=${encodeURIComponent(entityId)}` : `/erp/orcamentos`
     }
-    const token = (data?.public_token as string) || (data?.token as string)
+    if (typeof data?.href === "string" && data.href.startsWith("/")) {
+      return data.href
+    }
+    const token = (data?.public_token as string) || (data?.token as string) || entityId
     if (token) {
       return `/quote/${encodeURIComponent(token)}`
     }
-    return "/"
+    return "/pedidos"
   }
 
   return "/"

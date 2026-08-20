@@ -210,11 +210,11 @@ export async function getUserFavoritesAction(params?: {
                     let q = admin
                         .from("products")
                         .select(`
-                            id, name, price, promotional_price, images, rating, is_active, show_in_marketplace,
+                            id, short_id, name, price, promotional_price, images, rating, is_active, show_in_marketplace,
                             stock_available, stock_quantity,
                             category_id, category:product_categories!category_id(name),
                             partners(id),
-                            stores!inner(id, name, description, logo_url, banner_url, phone, is_showcase_active, addresses!store_id!left(city, state, neighborhood)),
+                            stores!inner(id, short_id, name, slug, description, logo_url, banner_url, phone, is_showcase_active, addresses!store_id!left(city, state, neighborhood)),
                             product_variants(variant_options, price_adjustment, is_active),
                             show_price_in_store
                         `)
@@ -228,9 +228,9 @@ export async function getUserFavoritesAction(params?: {
                     let q = admin
                         .from("services")
                         .select(`
-                            id, name, price, images, rating, is_active, billing_unit, price_type,
+                            id, short_id, name, price, images, rating, is_active, billing_unit, price_type,
                             partners(id),
-                            stores!inner(id, name, description, logo_url, banner_url, phone, is_showcase_active, addresses!store_id!left(city, state, neighborhood)),
+                            stores!inner(id, short_id, name, slug, description, logo_url, banner_url, phone, is_showcase_active, addresses!store_id!left(city, state, neighborhood)),
                             show_price_in_store
                         `)
                         .in("id", serviceIds)
@@ -267,6 +267,8 @@ export async function getUserFavoritesAction(params?: {
                     ? {
                         ...rawPartner,
                         store_id: storeId,
+                        short_id: rawStore?.short_id || null,
+                        slug: rawStore?.slug || null,
                         store_name: storeName,
                         store_image_url: storeImage,
                         store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
@@ -297,6 +299,7 @@ export async function getUserFavoritesAction(params?: {
 
                 productsMap.set(p.id, {
                     ...rest,
+                    short_id: p.short_id || null,
                     category: (p.category as any)?.name || null,
                     itemType: "produto",
                     partners: partner,
@@ -322,6 +325,8 @@ export async function getUserFavoritesAction(params?: {
                     ? {
                         ...rawPartner,
                         store_id: storeId,
+                        short_id: rawStore?.short_id || null,
+                        slug: rawStore?.slug || null,
                         store_name: storeName,
                         store_image_url: storeImage,
                         store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
@@ -333,12 +338,14 @@ export async function getUserFavoritesAction(params?: {
 
                 servicesMap.set(s.id, {
                     ...s,
+                    short_id: s.short_id || null,
                     itemType: "servico",
                     partners: partner,
                     price: Number(s.price),
                 })
             }
         }
+
 
         // Merge favorites with item data, preserving order
         const items = favorites

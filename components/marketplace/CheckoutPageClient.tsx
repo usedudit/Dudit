@@ -1298,6 +1298,23 @@ export function CheckoutPageClient() {
                                                 {line.variantName}
                                             </div>
                                         )}
+                                        {Array.isArray(line.selectedAddons) && line.selectedAddons.length > 0 && (
+                                            <div className="mt-1 flex flex-wrap gap-1">
+                                                {line.selectedAddons.map((addon: any, aIdx: number) => (
+                                                    <span
+                                                        key={aIdx}
+                                                        className="inline-flex items-center gap-1 text-[11px] font-medium bg-brand-gray dark:bg-dark-border/40 text-brand-dark dark:text-dark-heading px-2 py-0.5 rounded-md border border-brand-border/60 dark:border-dark-border/60"
+                                                    >
+                                                        <span>{addon.optionName || addon.name}</span>
+                                                        {(Number(addon.price) || 0) > 0 && (
+                                                            <span className="text-brand-green font-semibold">
+                                                                (+{formatCurrency(Number(addon.price))})
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
                                         <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
                                             Qtd: {line.quantity}
                                         </div>
@@ -2351,7 +2368,7 @@ export function CheckoutPageClient() {
         <>
             <div className="min-h-screen flex flex-col bg-white dark:bg-dark-surface">
                 {/* Desktop Header */}
-                <header className="hidden lg:flex flex-col w-full bg-brand-dark sticky top-0 z-50 shadow-md">
+                <header className="hidden lg:flex flex-col w-full bg-brand-dark dark:bg-dark-surface border-b border-white/10 sticky top-0 z-50 shadow-md">
                     <div className="w-full h-[68px] flex items-center justify-between max-w-[1400px] px-2 mx-auto gap-4">
                         <Link href="/" prefetch={true} className="cursor-pointer shrink-0 z-[110] pt-1">
                             <img

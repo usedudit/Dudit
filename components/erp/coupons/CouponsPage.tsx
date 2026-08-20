@@ -1028,13 +1028,16 @@ export default function CouponsPage({
                     onClose={() => setSharingCoupon(null)}
                     url={typeof window !== 'undefined' ? `${window.location.origin}${getStoreUrl({
                         id: storeId || localPartner?.id,
+                        short_id: localPartner?.store?.short_id || localPartner?.short_id,
                         slug: localPartner?.slug,
+                        name: localPartner?.store?.name || localPartner?.store_name,
                         storeName: localPartner?.store?.name || localPartner?.store_name,
                         city: localPartner?.city,
                         state: localPartner?.state,
                         addresses: localPartner?.addresses
                     })}?cupom=${sharingCoupon.code}` : ""}
                     title={`Cupom ${sharingCoupon.code}`}
+
                     shareMessage={`🔥 Olha esse cupom especial na Dudit!\n\nUse o código *${sharingCoupon.code}* para obter *${getCouponValueLabel(sharingCoupon) === "Entrega gratis" ? "entrega grátis" : `${getCouponValueLabel(sharingCoupon)} de desconto`}* nas suas compras na loja *${localPartner?.store?.name || localPartner?.store_name || localPartner?.storeName || ""}*.\n\nConfira todos os produtos/serviços disponíveis aqui:`}
                     label="Link com cupom"
                 />

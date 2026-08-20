@@ -366,14 +366,14 @@ function applyTierSort<T>(
 
 // ─── Product query fields ───────────────────────────────────────────────────
 
-const BASE_FIELDS = `id, name, price, promotional_price, images, rating, stock_quantity, stock_available, marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)), product_variants(variant_options, price_adjustment, is_active)`
+const BASE_FIELDS = `id, short_id, name, price, promotional_price, images, rating, stock_quantity, stock_available, marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)), product_variants(variant_options, price_adjustment, is_active)`
 const STATS_FIELDS = `views_last_30_days, sales_last_7_days, sales_last_30_days, favorites_count`
 
 const PARTNER_JOIN = `partners!inner(
     id, is_showcase_active
 ),
 stores!left(
-    id, name, slug, description, logo_url, banner_url,
+    id, short_id, name, slug, description, logo_url, banner_url,
     phone, is_showcase_active,
     addresses!store_id!left(city, state, neighborhood, latitude, longitude)
 )`
@@ -411,6 +411,8 @@ function processProduct(item: RawProduct, extra?: Record<string, any>) {
         ? {
             id: rawPartner.id,
             store_id: rawStore?.id || rawPartner.id,
+            short_id: rawStore?.short_id || null,
+            slug: rawStore?.slug || null,
             store_name: storeName,
             store_image_url: storeImage,
             store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
@@ -421,6 +423,7 @@ function processProduct(item: RawProduct, extra?: Record<string, any>) {
             neighborhood: addr?.neighborhood ?? null,
         }
         : null
+
 
     const rawCategory: any = Array.isArray(item.marketplace_category)
         ? item.marketplace_category[0]
@@ -440,6 +443,7 @@ function processProduct(item: RawProduct, extra?: Record<string, any>) {
 
     return {
         id: item.id,
+        short_id: (item as any).short_id || null,
         name: item.name,
         price: effectivePrice,
         originalPrice,
@@ -504,7 +508,7 @@ const getSharedHomeServicesPool = cache(async (allIdsKey: string, allIds: string
     const supabase = getAdminClient()
     const { data, error } = await supabase
         .from("services")
-        .select(`id, name, price, images, rating, created_at, marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)), ${PARTNER_JOIN}`)
+        .select(`id, short_id, name, price, images, rating, created_at, marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)), ${PARTNER_JOIN}`)
         .eq("is_active", true)
         .eq("show_in_marketplace", true)
         .in("partner_id", allIds)
@@ -521,7 +525,7 @@ const getSharedHomeStoresPool = cache(async (allIdsKey: string, allIds: string[]
     const { data, error } = await supabase
         .from("stores")
         .select(`
-            id, name, description, logo_url, banner_url,
+            id, short_id, name, slug, description, logo_url, banner_url,
             phone, rating, is_showcase_active, partner_id,
             addresses!store_id!left(city, state, neighborhood, latitude, longitude),
             partners!inner(id, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), reviews(count))
@@ -530,6 +534,7 @@ const getSharedHomeStoresPool = cache(async (allIdsKey: string, allIds: string[]
         .in("partner_id", allIds)
         .order("rating", { ascending: false, nulls: "last" })
         .limit(30)
+
 
     if (error || !data) return []
     return data as any[]
@@ -883,9 +888,12 @@ async function fetchRecent(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
             const addr = Array.isArray(rawStore?.addresses) ? rawStore.addresses[0] : rawStore?.addresses
             const storeCity = addr?.city || rawStore?.city || null
             const storeState = addr?.state || rawStore?.state || null
+            const storeSlug = rawStore?.slug || null
             const partner = rawPartner ? {
                 id: rawPartner.id,
                 store_id: rawStore?.id || rawPartner.id,
+                short_id: rawStore?.short_id || null,
+                slug: storeSlug,
                 store_name: storeName,
                 store_image_url: storeImage,
                 store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
@@ -897,6 +905,7 @@ async function fetchRecent(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
             } : null
             return {
                 id: item.id,
+                short_id: item.short_id || null,
                 name: item.name,
                 price: Number(item.price || 0),
                 images: item.images || [],
@@ -908,6 +917,7 @@ async function fetchRecent(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
 
         return processProduct(item as RawProduct)
     }
+
 
     const items = scoped.slice(0, 20).map(recentMapper)
 
@@ -1366,10 +1376,13 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         const addr = Array.isArray(rawStore?.addresses) ? rawStore.addresses[0] : rawStore?.addresses
         const storeCity = addr?.city || rawStore?.city || null
         const storeState = addr?.state || rawStore?.state || null
+        const storeSlug = rawStore?.slug || null
         const partner = rawPartner
             ? {
                 id: rawPartner.id,
                 store_id: rawStore?.id || rawPartner.id,
+                short_id: rawStore?.short_id || null,
+                slug: storeSlug,
                 store_name: storeName,
                 store_image_url: storeImage,
                 store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
@@ -1389,6 +1402,7 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
 
         return {
             id: item.id,
+            short_id: item.short_id || null,
             name: item.name,
             price: Number(item.price || 0),
             images: item.images || [],
@@ -1463,6 +1477,8 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         const reviewsCount = p?.reviews?.[0]?.count || 0
         return {
             id: store.id,
+            short_id: store.short_id || null,
+            slug: store.slug || null,
             name: storeName,
             store_name: storeName,
             store_image_url: storeImage,
@@ -1474,6 +1490,8 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
             partners: {
                 id: store.id,
                 store_id: store.id,
+                short_id: store.short_id || null,
+                slug: store.slug || null,
                 store_name: storeName,
                 store_image_url: storeImage,
                 banner_url: store.banner_url || null,
@@ -1487,6 +1505,7 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
             itemType: "vitrine" as const,
         }
     }
+
 
     const items = scoped.slice(0, 15).map(vitrineMapper)
 

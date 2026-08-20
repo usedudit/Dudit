@@ -25,6 +25,7 @@ describe("Dashboard Engine - Rules Evaluation Tests", () => {
       hasPix: true,
       hasItems: true,
       hasLogoAndBanner: true,
+      hasDeliveryConfig: false,
       isWhatsAppConnected: true,
       isMercadoPagoConnected: true,
       stats: {

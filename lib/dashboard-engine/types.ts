@@ -14,6 +14,7 @@ export interface DashboardContext {
   hasPix: boolean;
   hasItems: boolean;
   hasLogoAndBanner: boolean;
+  hasDeliveryConfig: boolean;
   
   // Estados de Integração
   isWhatsAppConnected: boolean;

@@ -362,9 +362,9 @@ export async function getCollectionItems(collectionId: string, storeId?: string)
           let q = supabase
             .from("services")
             .select(`
-              id, name, price, images, rating, created_at, billing_unit, price_type,
+              id, short_id, name, price, images, rating, created_at, billing_unit, price_type,
               partners(id),
-              stores!inner(id, name, slug, logo_url, banner_url, addresses!store_id!left(city, state)),
+              stores!inner(id, short_id, name, slug, logo_url, banner_url, addresses!store_id!left(city, state)),
               show_price_in_store
             `)
             .in("id", serviceIds)
@@ -394,6 +394,7 @@ export async function getCollectionItems(collectionId: string, storeId?: string)
     const rawStore = p.store_id
       ? {
           id: p.store_id,
+          short_id: p.store_short_id || null,
           name: p.store_name,
           slug: p.store_slug,
           logo_url: p.store_logo_url,
@@ -408,6 +409,8 @@ export async function getCollectionItems(collectionId: string, storeId?: string)
     const partner = rawPartner
       ? {
           ...rawPartner,
+          short_id: rawStore?.short_id || null,
+          slug: rawStore?.slug || null,
           store_name: storeName,
           store_image_url: storeImage,
           store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
@@ -436,6 +439,7 @@ export async function getCollectionItems(collectionId: string, storeId?: string)
 
     productMap.set(p.id, {
       ...rest,
+      short_id: p.short_id || null,
       category: p.category_name || null,
       itemType: "produto",
       partners: partner,
@@ -458,6 +462,8 @@ export async function getCollectionItems(collectionId: string, storeId?: string)
     const partner = rawPartner
       ? {
           ...rawPartner,
+          short_id: rawStore?.short_id || null,
+          slug: rawStore?.slug || null,
           store_name: storeName,
           store_image_url: storeImage,
           store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
@@ -473,6 +479,7 @@ export async function getCollectionItems(collectionId: string, storeId?: string)
       price: Number(s.price),
     })
   }
+
 
   const items = links
     .map((link: any) => {

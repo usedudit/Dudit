@@ -271,6 +271,13 @@ export async function prepareProductBuyNowCheckoutAction(input: {
   variantId?: string
   csrf_token?: string
   storeId?: string
+  selectedAddons?: Array<{
+    groupId: string
+    groupName: string
+    optionId: string
+    optionName: string
+    price: number
+  }>
 }) {
   const addResult = await addToCartAction(
     input.productId,
@@ -278,6 +285,7 @@ export async function prepareProductBuyNowCheckoutAction(input: {
     input.csrf_token,
     input.variantId,
     input.storeId,
+    input.selectedAddons,
   )
   if (addResult.error) return { error: addResult.error }
 

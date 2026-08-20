@@ -301,12 +301,13 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { ord
 
                                                             let itemUrl = "";
                                                             if (isService) {
-                                                                itemUrl = getServiceUrl({ ...item.services, id: item.service_id }, storeObj);
+                                                                itemUrl = getServiceUrl({ ...item.services, id: item.service_id, short_id: item.services?.short_id }, storeObj);
                                                             } else if (isPlan) {
-                                                                itemUrl = getPlanUrl({ ...item.recurring_plans, id: item.recurring_plan_id }, storeObj);
+                                                                itemUrl = getPlanUrl({ ...item.recurring_plans, id: item.recurring_plan_id, short_id: item.recurring_plans?.short_id }, storeObj);
                                                             } else if (item.product_id) {
-                                                                itemUrl = getProductUrl({ ...item.products, id: item.product_id }, storeObj);
+                                                                itemUrl = getProductUrl({ ...item.products, id: item.product_id, short_id: item.products?.short_id }, storeObj);
                                                             }
+
 
                                                             const cardContent = (
                                                                 <>
@@ -331,6 +332,33 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { ord
                                                                                         {item.product_variants.variant_name}
                                                                                     </div>
                                                                                 )}
+
+                                                                                {(() => {
+                                                                                    const matchLine = Array.isArray(order.checkout_fulfillment?.lines)
+                                                                                        ? order.checkout_fulfillment.lines.find((l: any) =>
+                                                                                            (item.product_id && l.productId === item.product_id) ||
+                                                                                            (item.variant_id && l.variantId === item.variant_id)
+                                                                                        )
+                                                                                        : null
+                                                                                    if (!Array.isArray(matchLine?.selectedAddons) || matchLine.selectedAddons.length === 0) return null
+                                                                                    return (
+                                                                                        <div className="mt-1 flex flex-wrap gap-1">
+                                                                                            {matchLine.selectedAddons.map((addon: any, aIdx: number) => (
+                                                                                                <span
+                                                                                                    key={aIdx}
+                                                                                                    className="inline-flex items-center gap-1 text-[10px] font-medium bg-brand-gray dark:bg-dark-border/40 text-brand-dark dark:text-dark-heading px-1.5 py-0.5 rounded border border-brand-border/60 dark:border-dark-border/60"
+                                                                                                >
+                                                                                                    <span>{addon.optionName || addon.name}</span>
+                                                                                                    {(Number(addon.price) || 0) > 0 && (
+                                                                                                        <span className="text-brand-green font-semibold">
+                                                                                                            (+{formatCurrency(Number(addon.price))})
+                                                                                                        </span>
+                                                                                                    )}
+                                                                                                </span>
+                                                                                            ))}
+                                                                                        </div>
+                                                                                    )
+                                                                                })()}
 
                                                                                 <div className="flex items-center gap-2 text-xs mt-1">
                                                                                     <span className="text-brand-inactive-text dark:text-dark-body">{formatProductQuantity(item.quantity, item.products?.unit)}</span>

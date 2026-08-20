@@ -47,6 +47,13 @@ export type ResolvedCartLine = {
   imageUrl: string | null
   baseName: string
   variantName: string | null
+  selectedAddons?: Array<{
+    groupId: string
+    groupName: string
+    optionId: string
+    optionName: string
+    price: number
+  }> | null
 }
 
 export type ResolveCartResult =
@@ -163,6 +170,23 @@ export async function resolveCheckoutCartLines(
         unitPrice = promo > 0 && promo < base ? promo : base
       }
 
+      const selectedAddons: Array<{
+        groupId: string
+        groupName: string
+        optionId: string
+        optionName: string
+        price: number
+      }> | null = Array.isArray(row.booking_metadata?.selectedAddons)
+        ? row.booking_metadata.selectedAddons
+        : null
+
+      const addonsUnitPrice = (selectedAddons || []).reduce(
+        (sum: number, a: any) => sum + (Number(a.price) || 0),
+        0,
+      )
+      const baseUnitPrice = unitPrice
+      unitPrice = baseUnitPrice + addonsUnitPrice
+
       const caps = productCatalogCapabilities(product)
       const fulfillmentMode = resolveLineFulfillmentMode(
         caps.fulfillmentModes,
@@ -181,6 +205,7 @@ export async function resolveCheckoutCartLines(
         unitPrice,
         lineName,
         fulfillmentMode,
+        selectedAddons,
       }
 
       lines.push({
@@ -200,8 +225,8 @@ export async function resolveCheckoutCartLines(
           productId: row.product_id,
           unitPrice,
           quantity: qty,
-          promotionalPrice: variantId ? null : product.promotional_price,
-          basePrice: variantId ? unitPrice : Number(product.price) || 0,
+          promotionalPrice: variantId ? null : (product.promotional_price ? Number(product.promotional_price) + addonsUnitPrice : null),
+          basePrice: (variantId ? baseUnitPrice : Number(product.price) || 0) + addonsUnitPrice,
           categoryId: product.category_id,
         },
         orderItemRow: {
@@ -228,6 +253,7 @@ export async function resolveCheckoutCartLines(
         baseName: product.name,
         variantName: (variantId && row.product_variants) ? row.product_variants.variant_name : null,
         storeId: row.store_id || null,
+        selectedAddons,
       })
       continue
     }

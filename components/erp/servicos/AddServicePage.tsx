@@ -32,7 +32,7 @@ import { ServiceMetricsTab } from "./ServiceMetricsTab"
 import { normalizeBusinessInfo, isQuickMode } from "@/lib/business-info"
 
 const NUMERIC_FIELDS = new Set(["price", "cost_price", "duration_minutes", "buffer_minutes", "recurrence_interval_value"])
-const BOOLEAN_FIELDS = new Set(["is_active", "show_in_marketplace", "highlight_service", "show_price_in_store"])
+const BOOLEAN_FIELDS = new Set(["is_active", "show_in_marketplace", "show_price_in_store"])
 
 const REQUIRED_FIELDS = [
     { field: "name", tab: "general", validate: (v: any) => !!v?.trim(), message: "Nome é obrigatório" },
@@ -45,7 +45,7 @@ const getEmptyService = () => ({
     price: null as unknown as number, promotional_price: null as unknown as number, cost_price: null as unknown as number, price_type: "fixed", billing_unit: "per_service",
     duration_minutes: null as unknown as number, buffer_minutes: null as unknown as number, service_type: "in_person",
     images: [], primary_image_index: 0, video_type: null, video_url: "", video_thumbnail: null, video_duration: null, video_provider_id: null,
-    is_active: true, show_in_marketplace: true, highlight_service: false, show_price_in_store: true,
+    is_active: true, show_in_marketplace: true, show_price_in_store: true,
     fulfillment_modes: ["on_site"],
     warranty: "", technical_details: null,
     tags: [], resources: [], assigned_staff: { all: true, staff_ids: [] },
@@ -431,7 +431,6 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                 buffer_minutes: Number(serviceData.buffer_minutes) || 0,
                 service_type: serviceData.service_type,
                 show_in_marketplace: !!serviceData.show_in_marketplace,
-                highlight_service: !!serviceData.highlight_service,
                 show_price_in_store: serviceData.show_price_in_store !== false,
                 fulfillment_modes: serviceData.fulfillment_modes || ["on_site"],
                 recurrence_interval_value: serviceData.recurrence_interval_value ? Number(serviceData.recurrence_interval_value) : null,

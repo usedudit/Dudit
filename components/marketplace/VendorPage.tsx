@@ -20,6 +20,8 @@ import { ListItem } from "@/components/reusable/ListItem"
 import BottomSheet from "@/components/BottomSheet"
 import { Button, DefaultModal, Input, Spinner, MoneyInput, Separator, Checkbox } from "@/components/reusable"
 import { ItemCard, HorizontalCarousel } from "./shared-components"
+import { getStoreUrl } from "@/lib/utils/url-generator"
+
 import { ExplorarMobileControls } from "./ExplorarMobileControls"
 import { ExplorarFiltersBottomSheet } from "./ExplorarFiltersBottomSheet"
 import { ExplorarSortBottomSheet } from "./ExplorarSortBottomSheet"
@@ -783,20 +785,10 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         }))
     }, [filteredItems])
 
-    const featuredItems = useMemo(() => {
-        if (activeContext === "Planos") return []
-        const highlightedProducts = products.filter(item => item.is_featured || item.is_highlighted)
-        const highlightedServices = services.filter(item => item.highlight_service || item.is_featured || item.is_highlighted)
-        const filtered = (activeContext === "Produtos" ? highlightedProducts : highlightedServices)
-            .filter(item => !searchValue.trim() || item.name?.toLowerCase().includes(searchValue.trim().toLowerCase()))
-        return sortByVendorRelevance(filtered)
-    }, [products, services, activeContext, searchValue])
-
     const allTabs = useMemo(() => [
-        ...(featuredItems.length ? [{ id: "featured", label: "Itens destacados" }] : []),
         { id: "todos", label: "Todos" },
         ...groupedItems.map(group => ({ id: group.id, label: group.name })),
-    ], [featuredItems.length, groupedItems])
+    ], [groupedItems])
 
     const isCampaignView = categoryView?.startsWith("campaign-") || false
     const activeCampaignId = isCampaignView && categoryView ? categoryView.replace("campaign-", "") : null
@@ -858,7 +850,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
 
         document.querySelectorAll("[data-category-section]").forEach(el => observer.observe(el))
         return () => observer.disconnect()
-    }, [groupedItems, featuredItems.length, categoryView, activeContext])
+    }, [groupedItems, categoryView, activeContext])
 
     const updateTabsScrollState = useCallback(() => {
         const node = tabsScrollRef.current
@@ -1059,7 +1051,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                 <div className="flex flex-wrap items-center gap-2 mb-1">
                                     <h1 className="text-[24px] font-semibold text-brand-dark dark:text-dark-heading leading-tight truncate">{partner.storeName}</h1>
                                     {displayReviewsCount > 0 && (
-                                        <div className="flex items-center gap-1 text-[12px] text-brand-green bg-[#ecfdf5] border border-brand-green/20 px-2 py-0.5 rounded-full shrink-0">
+                                        <div className="flex items-center gap-1 text-[12px] text-brand-green bg-[#ecfdf5] dark:bg-brand-dark/10 border border-brand-green/20 px-2 py-0.5 rounded-full shrink-0">
                                             <StarIcon size={11} className="fill-brand-green text-brand-green" />
                                             <span className="font-bold">{formatNumber(displayRating || 0, 1, 1)}</span>
                                         </div>
@@ -1262,7 +1254,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                 <h3 className="font-normal text-brand-dark dark:text-dark-heading text-[16px] mb-3">Sobre {partner.storeName}</h3>
                                 <div className="flex flex-col gap-1">
                                     {([{ id: "info", label: "Informações" }, { id: "reviews", label: "Avaliações" }, { id: "gallery", label: "Galeria" }] as const).map(b => (
-                                        <button key={b.id} onClick={() => setActiveSection(b.id)} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeSection === b.id ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/50"}`}>
+                                        <button key={b.id} onClick={() => setActiveSection(b.id)} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeSection === b.id ? "bg-[#ecfdf5] dark:bg-brand-dark/10 text-brand-green font-semibold" : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/50"}`}>
                                             <span>{b.label}</span>
                                             {activeSection === b.id && <Check size={16} className="ml-auto" />}
                                         </button>
@@ -1277,18 +1269,18 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                 <div className="mb-8 border-t border-brand-border pt-6">
                                     <h3 className="font-normal text-brand-dark dark:text-dark-heading text-[16px] mb-3">Catálogo</h3>
                                     <div className="flex flex-col gap-1">
-                                        <button onClick={() => { setActiveContext("Produtos"); setActiveSection("products"); setActiveTag("todos"); setCategoryView(null) }} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeContext === "Produtos" && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/50"}`}>
+                                        <button onClick={() => { setActiveContext("Produtos"); setActiveSection("products"); setActiveTag("todos"); setCategoryView(null) }} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeContext === "Produtos" && activeSection === "products" ? "bg-[#ecfdf5] dark:bg-brand-dark/10 text-brand-green font-semibold" : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/50"}`}>
                                             <span>Produtos</span>
                                             {activeContext === "Produtos" && activeSection === "products" && <Check size={16} className="ml-auto" />}
                                         </button>
                                         {services.length > 0 && (
-                                            <button onClick={() => { setActiveContext("Servicos"); setActiveSection("products"); setActiveTag("todos"); setCategoryView(null) }} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeContext === "Servicos" && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/50"}`}>
+                                            <button onClick={() => { setActiveContext("Servicos"); setActiveSection("products"); setActiveTag("todos"); setCategoryView(null) }} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeContext === "Servicos" && activeSection === "products" ? "bg-[#ecfdf5] dark:bg-brand-dark/10 text-brand-green font-semibold" : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/50"}`}>
                                                 <span>Serviços</span>
                                                 {activeContext === "Servicos" && activeSection === "products" && <Check size={16} className="ml-auto" />}
                                             </button>
                                         )}
                                         {hasPlans && (
-                                            <button onClick={() => { setActiveContext("Planos"); setActiveSection("products"); setActiveTag("todos"); setCategoryView(null) }} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeContext === "Planos" && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/50"}`}>
+                                            <button onClick={() => { setActiveContext("Planos"); setActiveSection("products"); setActiveTag("todos"); setCategoryView(null) }} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeContext === "Planos" && activeSection === "products" ? "bg-[#ecfdf5] dark:bg-brand-dark/10 text-brand-green font-semibold" : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/50"}`}>
                                                 <span>Assinaturas</span>
                                                 {activeContext === "Planos" && activeSection === "products" && <Check size={16} className="ml-auto" />}
                                             </button>
@@ -1299,18 +1291,12 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
 
                             <h3 className="font-normal text-brand-dark dark:text-dark-heading text-[16px] mb-4">Seções</h3>
                             <div className="flex flex-col gap-1 mb-8">
-                                {featuredItems.length > 0 && (
-                                    <button onClick={() => selectTab("featured")} className={`text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center justify-between ${activeTag === "featured" && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/50"}`}>
-                                        <span>Itens destacados</span>
-                                        {activeTag === "featured" && activeSection === "products" && <Check size={16} />}
-                                    </button>
-                                )}
-                                <button onClick={() => selectTab("todos")} className={`text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center justify-between ${activeTag === "todos" && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/50"}`}>
+                                <button onClick={() => selectTab("todos")} className={`text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center justify-between ${activeTag === "todos" && activeSection === "products" ? "bg-[#ecfdf5] dark:bg-brand-dark/10 text-brand-green font-semibold" : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/50"}`}>
                                     <span>Todos</span>
                                     {activeTag === "todos" && activeSection === "products" && <Check size={16} />}
                                 </button>
                                 {groupedItems.map(group => (
-                                    <button key={group.id} onClick={() => selectTab(group.id)} className={`text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center justify-between ${activeTag === group.id && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/50"}`}>
+                                    <button key={group.id} onClick={() => selectTab(group.id)} className={`text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center justify-between ${activeTag === group.id && activeSection === "products" ? "bg-[#ecfdf5] dark:bg-brand-dark/10 text-brand-green font-semibold" : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/50"}`}>
                                         <span className="capitalize">{group.name}</span>
                                         {activeTag === group.id && activeSection === "products" && <Check size={16} />}
                                     </button>
@@ -1402,18 +1388,6 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                         )
                                     })()}
 
-                                    {featuredItems.length > 0 && (
-                                        <div id="featured" data-category-section="featured" className="scroll-mt-[150px]">
-                                            <HorizontalCarousel
-                                                title="Produtos destacados"
-                                                items={featuredItems}
-                                                renderItem={(item) => (
-                                                    <ItemCard product={normalizeItemForCard(item, partner)} showSeller={false} promotions={partnerPromotions} hideSalesCount />
-                                                )}
-                                                itemWidthClass="w-[200px] md:w-[230px]"
-                                            />
-                                        </div>
-                                    )}
                                     {groupedItems.map(group => (
                                         <div key={group.id} id={group.id} data-category-section={group.id} className="scroll-mt-[150px]">
                                             <HorizontalCarousel
@@ -1464,8 +1438,9 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                 </main>
             </div>
 
-            <ShareModal isOpen={showShareModal} onClose={() => setShowShareModal(false)} url={isMounted ? window.location.href : ""} title={partner.storeName} shareMessage={shareMessage} label="Link da vitrine" />
+            <ShareModal isOpen={showShareModal} onClose={() => setShowShareModal(false)} url={isMounted ? `${window.location.origin}${getStoreUrl(partner)}` : ""} title={partner.storeName} shareMessage={shareMessage} label="Link da vitrine" />
             <ReportModal isOpen={showReportModal} onClose={() => setShowReportModal(false)} targetType="partner" targetId={partner.id} targetName={partner.storeName} />
+
 
             <DefaultModal isOpen={!!selectedCoupon} onClose={() => setSelectedCoupon(null)} title={selectedCoupon?.code || "Cupom"} maxWidth="sm">
                 {selectedCoupon && (

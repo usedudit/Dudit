@@ -81,7 +81,7 @@ export default function HelpCenterPage() {
     if (!article && articleSlug) {
         return (
             <div className="flex flex-col min-h-screen">
-                <header className="lg:flex flex-col w-full bg-brand-dark sticky top-0 z-50 shadow-md">
+                <header className="lg:flex flex-col w-full bg-brand-dark dark:bg-dark-surface border-b border-white/10 sticky top-0 z-50 shadow-md">
                     <div className="w-full h-[68px] flex items-center justify-center max-w-[1400px] px-2 mx-auto gap-4">
                         <a href="/" className="cursor-pointer shrink-0 z-[110] pt-1">
                             <img
@@ -111,7 +111,7 @@ export default function HelpCenterPage() {
                     </div>
                 </main>
 
-                <footer className="w-full h-[68px] py-6 border-t border-white/10 bg-brand-dark">
+                <footer className="w-full h-[68px] py-6 border-t border-white/10 bg-brand-dark dark:bg-dark-surface">
                     <div className="max-w-[1400px] mx-auto px-6 flex flex-col md:flex-row justify-center items-center">
                         <p className="text-white text-xs sm:text-sm font-medium tracking-tight">
                             © {new Date().getFullYear()} Dudit Tecnologia Ltda. Todos os direitos reservados.

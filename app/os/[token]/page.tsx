@@ -1,6 +1,7 @@
 import { getServiceOrderByTokenAction } from "@/app/actions/erp/service-orders"
 import { headers } from "next/headers"
-import { notFound } from "next/navigation"
+import { notFound, permanentRedirect } from "next/navigation"
+import { isUuid } from "@/lib/utils/short-id"
 import PublicOSPortal from "@/components/public/PublicOSPortal"
 
 export const dynamic = "force-dynamic"
@@ -22,12 +23,18 @@ export default async function ClientPortalPage({ params }: PageProps) {
         notFound()
     }
 
+    const canonicalToken = result.data.serviceOrder?.public_token
+    if (canonicalToken && canonicalToken !== token && isUuid(token)) {
+        permanentRedirect(`/os/${canonicalToken}`)
+    }
+
     return (
         <PublicOSPortal
-            token={token}
+            token={canonicalToken || token}
             data={result.data}
             ip={ip}
             userAgent={userAgent}
         />
     )
 }
+

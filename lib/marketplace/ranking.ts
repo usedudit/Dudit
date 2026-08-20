@@ -144,10 +144,9 @@ export function calcVendorItemScore(item: any): number {
   if (!item) return 0
   const dbScore = Number(item.marketplace_score || 0)
   const trending = calcTrendingScore(item)
-  const isFeatured = (item.is_featured || item.is_highlighted || item.highlight_service) ? 0.3 : 0
   const hasPromo = (item.promotional_price || item.is_on_promotion) ? 0.1 : 0
 
-  return Math.max(dbScore, trending) + isFeatured + hasPromo
+  return Math.max(dbScore, trending) + hasPromo
 }
 
 /**

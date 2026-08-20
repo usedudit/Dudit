@@ -1109,6 +1109,23 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                         {item.product_variants?.variant_name && (
                                             <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">{item.product_variants.variant_name}</div>
                                         )}
+                                        {Array.isArray(fulfillmentLine?.selectedAddons) && fulfillmentLine.selectedAddons.length > 0 && (
+                                            <div className="mt-1 flex flex-wrap gap-1">
+                                                {fulfillmentLine.selectedAddons.map((addon: any, aIdx: number) => (
+                                                    <span
+                                                        key={aIdx}
+                                                        className="inline-flex items-center gap-1 text-[11px] font-medium bg-brand-gray dark:bg-dark-border/40 text-brand-dark dark:text-dark-heading px-2 py-0.5 rounded-md border border-brand-border/60 dark:border-dark-border/60"
+                                                    >
+                                                        <span>{addon.optionName || addon.name}</span>
+                                                        {(Number(addon.price) || 0) > 0 && (
+                                                            <span className="text-brand-green font-semibold">
+                                                                (+{formatCurrency(Number(addon.price))})
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
                                     </>
                                 )}
                                 <div className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-1">
@@ -1144,12 +1161,13 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
                     let itemUrl = "";
                     if (isService) {
-                        itemUrl = getServiceUrl({ ...item.services, id: item.service_id }, store);
+                        itemUrl = getServiceUrl({ ...item.services, id: item.service_id, short_id: item.services?.short_id }, store);
                     } else if (isPlan) {
-                        itemUrl = getPlanUrl({ ...item.recurring_plans, id: item.recurring_plan_id }, store);
+                        itemUrl = getPlanUrl({ ...item.recurring_plans, id: item.recurring_plan_id, short_id: item.recurring_plans?.short_id }, store);
                     } else if (item.product_id) {
-                        itemUrl = getProductUrl({ ...item.products, id: item.product_id }, store);
+                        itemUrl = getProductUrl({ ...item.products, id: item.product_id, short_id: item.products?.short_id }, store);
                     }
+
 
                     if (!itemUrl) {
                         return (
@@ -1381,12 +1399,13 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
                                                 let itemUrl = "";
                                                 if (isService) {
-                                                    itemUrl = getServiceUrl({ ...item.services, id: item.service_id }, store);
+                                                    itemUrl = getServiceUrl({ ...item.services, id: item.service_id, short_id: item.services?.short_id }, store);
                                                 } else if (isPlan) {
-                                                    itemUrl = getPlanUrl({ ...item.recurring_plans, id: item.recurring_plan_id }, store);
+                                                    itemUrl = getPlanUrl({ ...item.recurring_plans, id: item.recurring_plan_id, short_id: item.recurring_plans?.short_id }, store);
                                                 } else if (item.product_id) {
-                                                    itemUrl = getProductUrl({ ...item.products, id: item.product_id }, store);
+                                                    itemUrl = getProductUrl({ ...item.products, id: item.product_id, short_id: item.products?.short_id }, store);
                                                 }
+
 
                                                 if (!itemUrl) {
                                                     return (
@@ -1543,7 +1562,8 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                 </div>
                                             </div>
                                         ) : (
-                                            <Link href={getStoreUrl({ ...store, id: store?.store_id || store?.id || order.store_id || order.partner_id, name: store?.name || sellerName })} prefetch={true} className="flex items-center gap-4 block cursor-pointer">
+                                            <Link href={getStoreUrl({ ...store, id: store?.store_id || store?.id || order.store_id || order.partner_id, short_id: store?.short_id, name: store?.name || sellerName })} prefetch={true} className="flex items-center gap-4 block cursor-pointer">
+
                                                 <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border shrink-0">
                                                     <img src={storeImage} alt={sellerName} className="w-full h-full object-cover" />
                                                 </div>

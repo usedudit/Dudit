@@ -85,10 +85,12 @@ export const statusConfig: Record<
 interface DeliveryAssignmentListRowProps {
     assignment: DeliveryAssignmentItem
     onAdvanceStatus?: (assignment: DeliveryAssignmentItem) => void
+    onView?: (assignment: DeliveryAssignmentItem) => void
 }
 
 export default function DeliveryAssignmentListRow({
     assignment,
+    onView,
 }: DeliveryAssignmentListRowProps) {
     const router = useRouter()
     const statusMeta = statusConfig[assignment.status] || {
@@ -107,16 +109,24 @@ export default function DeliveryAssignmentListRow({
     )}`
     const whatsappUrl = cleanPhone ? `https://wa.me/55${cleanPhone}` : null
 
+    const handleView = () => {
+        if (onView) {
+            onView(assignment)
+        } else {
+            router.push(`/entregadores/entregas/${assignment.assignment_id}`)
+        }
+    }
+
     return (
-        <tr className="hover:bg-brand-gray/60 dark:hover:bg-dark-border/30 transition-colors border-b border-brand-border/60 dark:border-dark-border/40 group">
+        <tr
+            onClick={handleView}
+            className="hover:bg-brand-gray/60 dark:hover:bg-dark-border/30 transition-colors border-b border-brand-border/60 dark:border-dark-border/40 group cursor-pointer"
+        >
             {/* PEDIDO */}
             <td className="py-3.5 px-3 pl-6">
-                <Link
-                    href={`/entregadores/entregas/${assignment.assignment_id}`}
-                    className="font-bold text-sm text-brand-dark dark:text-dark-heading hover:text-brand-green transition-colors font-mono"
-                >
+                <span className="font-bold text-sm text-brand-dark dark:text-dark-heading group-hover:text-brand-green transition-colors font-mono">
                     {orderNumberDisplay}
-                </Link>
+                </span>
                 {assignment.assigned_at && (
                     <p className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-0.5">
                         {formatDate(assignment.assigned_at)}
@@ -133,7 +143,7 @@ export default function DeliveryAssignmentListRow({
             </td>
 
             {/* CLIENTE & CONTATO */}
-            <td className="py-3.5 px-3">
+            <td className="py-3.5 px-3" onClick={(e) => e.stopPropagation()}>
                 <div className="flex flex-col">
                     <span className="font-semibold text-sm text-brand-dark dark:text-dark-heading truncate max-w-[180px]">
                         {assignment.customer_name}
@@ -167,7 +177,7 @@ export default function DeliveryAssignmentListRow({
             </td>
 
             {/* ENDEREÇO DE ENTREGA */}
-            <td className="py-3.5 px-3">
+            <td className="py-3.5 px-3" onClick={(e) => e.stopPropagation()}>
                 <a
                     href={mapsUrl}
                     target="_blank"
@@ -200,7 +210,7 @@ export default function DeliveryAssignmentListRow({
             </td>
 
             {/* AÇÕES */}
-            <td className="py-3.5 px-3 pr-6 text-center">
+            <td className="py-3.5 px-3 pr-6 text-center" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center justify-center">
                     <Dropdown
                         align="right"
@@ -208,14 +218,14 @@ export default function DeliveryAssignmentListRow({
                         trigger={
                             <button
                                 type="button"
-                                className="w-8 h-8 rounded-full flex items-center justify-center text-brand-inactive-text hover:bg-brand-gray hover:text-brand-dark dark:hover:bg-dark-border dark:hover:text-dark-heading transition-colors"
+                                className="w-8 h-8 rounded-full flex items-center justify-center text-brand-inactive-text hover:bg-brand-gray hover:text-brand-dark dark:hover:bg-dark-border dark:hover:text-dark-heading transition-colors cursor-pointer"
                                 aria-label="Ações da entrega"
                             >
                                 <MoreHorizontalIcon size={18} />
                             </button>
                         }
                     >
-                        <DropdownItem onClick={() => router.push(`/entregadores/entregas/${assignment.assignment_id}`)}>
+                        <DropdownItem onClick={handleView}>
                             <EyeIcon size={16} /> Ver Detalhes
                         </DropdownItem>
 

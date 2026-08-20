@@ -17,6 +17,7 @@ import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import InsertImageModal from "./InsertImageModal"
 import { deleteImageFromR2Action } from "@/app/actions/shared/r2"
+import Input from "./Input"
 
 interface RichTextEditorProps {
   label: string
@@ -702,25 +703,25 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ label, value, on
       <DefaultModal isOpen={showTableModal} onClose={() => setShowTableModal(false)} title="Inserir tabela" maxWidth="sm">
         <div className="flex flex-col gap-4">
           <div>
-            <label className="block text-sm font-medium text-brand-dark/80 dark:text-dark-body mb-1">Linhas</label>
-            <input
+            <Input
+              label="Linhas"
               type="number"
               min={1}
               max={10}
               value={tableRows}
               onChange={(e) => setTableRows(Math.min(10, Math.max(1, Number(e.target.value))))}
-              className="w-full px-3 py-2 border border-brand-border dark:border-dark-border rounded-lg bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading text-sm"
+              className="w-full"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-brand-dark/80 dark:text-dark-body mb-1">Colunas</label>
-            <input
+            <Input
+              label="Colunas"
               type="number"
               min={1}
               max={10}
               value={tableCols}
               onChange={(e) => setTableCols(Math.min(10, Math.max(1, Number(e.target.value))))}
-              className="w-full px-3 py-2 border border-brand-border dark:border-dark-border rounded-lg bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading text-sm"
+              className="w-full"
             />
           </div>
           <Button onClick={handleInsertTable}>Inserir</Button>

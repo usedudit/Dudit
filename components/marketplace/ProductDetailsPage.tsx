@@ -4,12 +4,12 @@ import { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import { createPortal } from "react-dom"
 import { AnimatePresence, motion, useMotionValue, useSpring, useTransform } from "framer-motion"
 import { useSupabase } from "@/providers/supabase-provider"
-import { HeartIcon, ShareIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ChevronDownIcon, CheckCircleIcon, XIcon, ShoppingCartIcon, TruckIcon, FlagIcon, ArrowLeftRightIcon, PlusIcon, TagIcon, WhatsappIcon } from "@/lib/icons"
+import { HeartIcon, ShareIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ChevronDownIcon, CheckCircleIcon, XIcon, ShoppingCartIcon, TruckIcon, FlagIcon, ArrowLeftRightIcon, PlusIcon, TagIcon, WhatsappIcon, CalendarIcon, ClockIcon, MapPinIcon, BoxIcon, SparklesIcon, AwardIcon, ShieldIcon } from "@/lib/icons"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { Button, Input, FormDropdown, IconPlaceholder, DefaultModal, Separator, FormSection, CepInput, Spinner, StateComboBox, RadioButton, NumberInputWithCheckbox, Badge } from "@/components/reusable"
+import { Button, Input, FormDropdown, IconPlaceholder, DefaultModal, Separator, FormSection, CepInput, Spinner, StateComboBox, RadioButton, NumberInputWithCheckbox, Badge, ListItem } from "@/components/reusable"
 import { formatCurrency, formatQuantityWithUnit } from "@/lib/utils"
 import { ShareModal } from "./ShareModal"
 import { AddToCollectionModal } from "./AddToCollectionModal"
@@ -30,7 +30,7 @@ import { getAddressesAction, createAddressAction } from "@/app/actions/shared/ad
 import { useFavorites } from "@/providers/favorites-provider"
 import { VendorPaymentMethodsModal } from "./VendorPaymentMethodsModal"
 import { StorePoliciesModal } from "./StorePoliciesModal"
-import { getStoreUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
+import { getStoreUrl, getProductUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
 import { createSlug, createCategorySlug } from "@/lib/utils/slugify"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
@@ -313,20 +313,64 @@ export function ProductDetailsPageClient({
 
     // Addons & Classifieds (iFood & OLX / Marketplace style)
     const productAddons = useMemo<any[]>(() => {
-        if (Array.isArray(product.addon_groups) && product.addon_groups.length > 0) return product.addon_groups
-        if (Array.isArray(product.technical_specs?.addon_groups) && product.technical_specs.addon_groups.length > 0) return product.technical_specs.addon_groups
-        return []
+        const raw = (Array.isArray(product.addon_groups) && product.addon_groups.length > 0)
+            ? product.addon_groups
+            : (Array.isArray(product.technical_specs?.addon_groups) && product.technical_specs.addon_groups.length > 0)
+                ? product.technical_specs.addon_groups
+                : []
+        return raw.map((grp: any, gIdx: number) => {
+            const groupId = String(grp.id || `addon_grp_${gIdx}`)
+            const isRequired = grp.required === true || grp.required === "true"
+            const maxQty = Number(grp.max_quantity) || grp.options?.length || 1
+            const minQty = isRequired ? Math.max(1, Number(grp.min_quantity) || 1) : Math.max(0, Number(grp.min_quantity) || 0)
+            return {
+                ...grp,
+                id: groupId,
+                name: grp.name || "Adicionais",
+                required: isRequired,
+                min_quantity: minQty,
+                max_quantity: maxQty,
+                options: (grp.options || []).map((opt: any, oIdx: number) => ({
+                    ...opt,
+                    id: String(opt.id || `opt_${groupId}_${oIdx}`),
+                    name: opt.name || "Opção",
+                    price: Number(opt.price) || 0,
+                    available: opt.available !== false && opt.is_available !== false,
+                })),
+            }
+        })
     }, [product])
+
+    const [expandedAddonGroups, setExpandedAddonGroups] = useState<Record<string, boolean>>({})
+
+    // Initialize required groups open by default, optional closed by default
+    useEffect(() => {
+        if (productAddons.length > 0) {
+            setExpandedAddonGroups((prev) => {
+                const next = { ...prev }
+                productAddons.forEach((grp) => {
+                    if (next[grp.id] === undefined) {
+                        next[grp.id] = Boolean(grp.required)
+                    }
+                })
+                return next
+            })
+        }
+    }, [productAddons])
+
+    const toggleAddonGroup = useCallback((groupId: string) => {
+        setExpandedAddonGroups((prev) => ({ ...prev, [groupId]: !prev[groupId] }))
+    }, [])
 
     const desapegoInfo = useMemo(() => {
         const rawSpecs = typeof product.technical_specs === 'object' && product.technical_specs !== null ? product.technical_specs : {}
         return {
-            condition: product.condition || rawSpecs.condition || product.condicao || "Novo",
-            accepts_offers: product.accepts_offers ?? rawSpecs.accepts_offers ?? false,
-            accepts_trades: product.accepts_trades ?? rawSpecs.accepts_trades ?? false,
-            items_included: product.items_included || rawSpecs.items_included || "",
-            expiry_date: product.expiry_date || rawSpecs.expiry_date || null,
-            pickup_neighborhood: product.pickup_neighborhood || rawSpecs.pickup_neighborhood || "",
+            condition: product.condition || rawSpecs.condition || product.condicao || "",
+            brand: product.brand || rawSpecs.brand || "",
+            model: product.model || rawSpecs.model || "",
+            warranty: product.warranty || rawSpecs.warranty || "",
+            accepts_offers: Boolean(product.accepts_offers ?? rawSpecs.accepts_offers),
+            accepts_trades: Boolean(product.accepts_trades ?? rawSpecs.accepts_trades),
         }
     }, [product])
 
@@ -348,24 +392,42 @@ export function ProductDetailsPageClient({
         })
     }, [])
 
-    const addonsUnitPrice = useMemo(() => {
-        let sum = 0
+    const selectedAddonsList = useMemo(() => {
+        const list: Array<{
+            groupId: string
+            groupName: string
+            optionId: string
+            optionName: string
+            price: number
+        }> = []
         productAddons.forEach((grp) => {
-            const selected = selectedAddonOptionIds[grp.id] || []
+            const selectedIds = selectedAddonOptionIds[grp.id] || []
             grp.options?.forEach((opt: any) => {
-                if (selected.includes(opt.id)) {
-                    sum += Number(opt.price) || 0
+                if (selectedIds.includes(opt.id)) {
+                    list.push({
+                        groupId: grp.id,
+                        groupName: grp.name,
+                        optionId: opt.id,
+                        optionName: opt.name,
+                        price: Number(opt.price) || 0,
+                    })
                 }
             })
         })
-        return sum
+        return list
     }, [productAddons, selectedAddonOptionIds])
+
+    const addonsUnitPrice = useMemo(() => {
+        return selectedAddonsList.reduce((sum, item) => sum + (Number(item.price) || 0), 0)
+    }, [selectedAddonsList])
 
     const validateAddons = useCallback(() => {
         for (const grp of productAddons) {
             if (grp.required) {
                 const selected = selectedAddonOptionIds[grp.id] || []
-                if (selected.length < (grp.min_quantity || 1)) {
+                const minReq = grp.min_quantity || 1
+                if (selected.length < minReq) {
+                    setExpandedAddonGroups((prev) => ({ ...prev, [grp.id]: true }))
                     notifyError("Complemento obrigatório", `Por favor, selecione as opções obrigatórias no grupo: "${grp.name || "Adicionais"}".`)
                     return false
                 }
@@ -868,7 +930,7 @@ export function ProductDetailsPageClient({
         setLoading(true)
         try {
             const token = await fetchCSRFTokenSingleton() || ""
-            const result = await addToCartAction(product.id, quantity, token, selectedVariant?.id, product.store_id)
+            const result = await addToCartAction(product.id, quantity, token, selectedVariant?.id, product.store_id, selectedAddonsList)
             if (result.error) {
                 notifyError("Erro ao adicionar à sacola", result.error)
             } else {
@@ -881,7 +943,7 @@ export function ProductDetailsPageClient({
             setLoading(false)
             isActionInProgress.current = false
         }
-    }, [userId, router, product.id, quantity, selectedVariant, notifySuccess, notifyError])
+    }, [userId, router, product.id, quantity, selectedVariant, productAddons, validateAddons, selectedAddonsList, notifySuccess, notifyError])
 
     const handleBuyNow = useCallback(async () => {
         if (!userId) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname))
@@ -899,6 +961,7 @@ export function ProductDetailsPageClient({
                 variantId: selectedVariant?.id,
                 csrf_token: token,
                 storeId: product.store_id,
+                selectedAddons: selectedAddonsList,
             })
             if ("error" in prep && prep.error) {
                 notifyError("Erro", prep.error)
@@ -920,12 +983,13 @@ export function ProductDetailsPageClient({
                 products: [{
                     id: product.id,
                     name: `${product.name} ${selectedVariant?.variant_name || ""}`.trim(),
-                    price: pricing.current,
+                    price: pricing.total > 0 ? (pricing.total / quantity) : pricing.current,
                     quantity,
                     image: productImages[Math.max(0, activeImgIndex - videoOffset)] || productImages[0],
                     variant: selectedVariant?.variant_name,
                     availabilityValue: Number(product.availability_value || 0),
                     availabilityUnit: product.availability_unit || "Minutos",
+                    selectedAddons: selectedAddonsList,
                 }],
                 cartItems: [{
                     cartItemId,
@@ -933,6 +997,7 @@ export function ProductDetailsPageClient({
                     productId: product.id,
                     variantId: selectedVariant?.id,
                     quantity,
+                    selectedAddons: selectedAddonsList,
                 }],
                 partnerInfo: {
                     address: partner.address || {},
@@ -1311,74 +1376,141 @@ export function ProductDetailsPageClient({
 
             {VariantsSection}
 
-            {/* Addons / Complementos - estilo iFood */}
+            {/* Addons / Complementos - Design Inteligente e Compacto */}
             {productAddons.length > 0 && (
-                <div className="mb-6 space-y-4">
+                <div className="mb-6 space-y-3">
+                    <div className="flex items-center justify-between px-1">
+                        <span className="text-xs font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider">
+                            Complementos
+                        </span>
+                        {addonsUnitPrice > 0 && (
+                            <span className="text-xs font-bold text-brand-green">
+                                + {formatMoney(addonsUnitPrice)}
+                            </span>
+                        )}
+                    </div>
                     {productAddons.map((grp: any) => {
                         const selectedIds = selectedAddonOptionIds[grp.id] || []
                         const maxQty = grp.max_quantity || grp.options?.length || 1
                         const isRadio = maxQty === 1
+                        const isExpanded = expandedAddonGroups[grp.id] ?? grp.required
+                        const isSatisfied = grp.required ? selectedIds.length >= (grp.min_quantity || 1) : true
+                        const selectedOptions = (grp.options || []).filter((o: any) => selectedIds.includes(o.id))
+
                         return (
-                            <div key={grp.id} className="border border-brand-border dark:border-dark-border rounded-xl overflow-hidden">
-                                <div className="flex items-center justify-between px-4 py-3 bg-brand-gray/40 dark:bg-dark-border/30">
-                                    <div>
-                                        <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading">{grp.name || "Adicionais"}</h4>
+                            <div
+                                key={grp.id}
+                                className={`border rounded-xl overflow-hidden transition-all duration-200 ${grp.required && !isSatisfied
+                                    ? "border-amber-400/80 bg-amber-50/10 dark:border-amber-500/40"
+                                    : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface"
+                                    }`}
+                            >
+                                <button
+                                    type="button"
+                                    onClick={() => toggleAddonGroup(grp.id)}
+                                    className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-brand-gray/40 dark:hover:bg-dark-border/20 transition-colors"
+                                >
+                                    <div className="flex-1 min-w-0 pr-3">
+                                        <div className="flex items-center gap-2">
+                                            <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
+                                                {grp.name || "Adicionais"}
+                                            </h4>
+                                            {grp.required ? (
+                                                <span
+                                                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isSatisfied
+                                                        ? "bg-brand-green/10 text-brand-green border border-brand-green/20"
+                                                        : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-300 dark:border-amber-700/40"
+                                                        }`}
+                                                >
+                                                    {isSatisfied ? "✓ Selecionado" : "Obrigatório"}
+                                                </span>
+                                            ) : selectedIds.length > 0 ? (
+                                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand-green/10 text-brand-green border border-brand-green/20">
+                                                    {selectedIds.length} selecionado{selectedIds.length > 1 ? "s" : ""}
+                                                </span>
+                                            ) : (
+                                                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-gray-100 dark:bg-dark-border text-brand-inactive-text dark:text-dark-body">
+                                                    Opcional
+                                                </span>
+                                            )}
+                                        </div>
                                         <p className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                            {grp.required ? `Obrigatório · ` : "Opcional · "}
-                                            Escolha {isRadio ? "1 opção" : `até ${maxQty}`}
+                                            {grp.required ? `Escolha no mínimo ${grp.min_quantity || 1}` : "Opcional"} · {isRadio ? "1 opção" : `até ${maxQty} opções`}
+                                            {!isExpanded && selectedOptions.length > 0 && (
+                                                <span className="text-brand-dark dark:text-dark-heading font-medium ml-1.5">
+                                                    ({selectedOptions.map((o: any) => o.name).join(", ")})
+                                                </span>
+                                            )}
                                         </p>
                                     </div>
-                                    {grp.required && (
-                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${selectedIds.length >= (grp.min_quantity || 1) ? "bg-brand-green/10 text-brand-green border border-brand-green/20" : "bg-orange-50 text-orange-600 border border-orange-200"}`}>
-                                            {selectedIds.length >= (grp.min_quantity || 1) ? "✓ Selecionado" : "Obrigatório"}
-                                        </span>
-                                    )}
-                                </div>
-                                <div className="divide-y divide-brand-border/50 dark:divide-dark-border/50">
-                                    {(grp.options || []).filter((o: any) => o.available !== false).map((opt: any) => {
-                                        const isSelected = selectedIds.includes(opt.id)
-                                        return (
-                                            <button
-                                                key={opt.id}
-                                                type="button"
-                                                className={`w-full flex items-center justify-between px-4 py-3 text-left transition-colors hover:bg-brand-gray/30 dark:hover:bg-dark-border/20 ${isSelected ? "bg-brand-green/5 dark:bg-brand-green/10" : ""}`}
-                                                onClick={() => handleToggleAddonOption(grp.id, opt.id, maxQty)}
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <div className={`w-5 h-5 flex items-center justify-center shrink-0 border-2 transition-colors ${isRadio ? "rounded-full" : "rounded-md"} ${isSelected ? "border-brand-green bg-brand-green text-white" : "border-brand-border dark:border-dark-border"}`}>
-                                                        {isSelected && (
-                                                            <svg viewBox="0 0 12 12" fill="none" className="w-3 h-3">
-                                                                <path d="M2.5 6L5 8.5L9.5 3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                                            </svg>
+                                    <ChevronDownIcon
+                                        size={18}
+                                        className={`text-brand-inactive-text dark:text-dark-body shrink-0 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""
+                                            }`}
+                                    />
+                                </button>
+                                <AnimatePresence initial={false}>
+                                    {isExpanded && (
+                                        <motion.div
+                                            initial={{ height: 0, opacity: 0 }}
+                                            animate={{ height: "auto", opacity: 1 }}
+                                            exit={{ height: 0, opacity: 0 }}
+                                            transition={{ duration: 0.2, ease: "easeInOut" }}
+                                            className="overflow-hidden border-t border-brand-border/60 dark:border-dark-border/60 divide-y divide-brand-border/40 dark:divide-dark-border/40"
+                                        >
+                                            {(grp.options || []).filter((o: any) => o.available !== false).map((opt: any) => {
+                                                const isSelected = selectedIds.includes(opt.id)
+                                                return (
+                                                    <button
+                                                        key={opt.id}
+                                                        type="button"
+                                                        className={`w-full flex items-center justify-between px-4 py-2.5 text-left transition-colors hover:bg-brand-gray/30 dark:hover:bg-dark-border/20 ${isSelected ? "bg-brand-green/5 dark:bg-brand-green/10" : ""
+                                                            }`}
+                                                        onClick={() => handleToggleAddonOption(grp.id, opt.id, maxQty)}
+                                                    >
+                                                        <div className="flex items-center gap-3 min-w-0 pr-2">
+                                                            <div
+                                                                className={`w-4 h-4 flex items-center justify-center shrink-0 border-2 transition-colors ${isRadio ? "rounded-full" : "rounded"
+                                                                    } ${isSelected
+                                                                        ? "border-brand-green bg-brand-green text-white"
+                                                                        : "border-brand-border dark:border-dark-border"
+                                                                    }`}
+                                                            >
+                                                                {isSelected && (
+                                                                    <svg viewBox="0 0 12 12" fill="none" className="w-2.5 h-2.5">
+                                                                        <path
+                                                                            d="M2.5 6L5 8.5L9.5 3.5"
+                                                                            stroke="currentColor"
+                                                                            strokeWidth="2"
+                                                                            strokeLinecap="round"
+                                                                            strokeLinejoin="round"
+                                                                        />
+                                                                    </svg>
+                                                                )}
+                                                            </div>
+                                                            <span className="text-sm text-brand-dark dark:text-dark-heading truncate">
+                                                                {opt.name}
+                                                            </span>
+                                                        </div>
+                                                        {(Number(opt.price) || 0) > 0 && (
+                                                            <span className="text-xs font-bold text-brand-green shrink-0 ml-2">
+                                                                + {formatMoney(Number(opt.price))}
+                                                            </span>
                                                         )}
-                                                    </div>
-                                                    <span className="text-sm text-brand-dark dark:text-dark-heading">{opt.name}</span>
-                                                </div>
-                                                {(Number(opt.price) || 0) > 0 && (
-                                                    <span className="text-sm font-semibold text-brand-green shrink-0">
-                                                        + {formatMoney(Number(opt.price))}
-                                                    </span>
-                                                )}
-                                            </button>
-                                        )
-                                    })}
-                                </div>
+                                                    </button>
+                                                )
+                                            })}
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
                             </div>
                         )
                     })}
-
-                    {/* Subtotal com addons */}
-                    {addonsUnitPrice > 0 && (
-                        <div className="flex items-center justify-between px-1 py-2 text-sm">
-                            <span className="text-brand-inactive-text dark:text-dark-body">Adicionais selecionados</span>
-                            <span className="font-bold text-brand-green">+ {formatMoney(addonsUnitPrice)}</span>
-                        </div>
-                    )}
                 </div>
             )}
 
             {/* Badges de Desapego - estilo OLX/Marketplace */}
-            {(desapegoInfo.accepts_offers || desapegoInfo.accepts_trades || desapegoInfo.items_included || desapegoInfo.pickup_neighborhood || desapegoInfo.expiry_date) && (
+            {(desapegoInfo.accepts_offers || desapegoInfo.accepts_trades) && (
                 <div className="mb-6 flex flex-wrap gap-2">
                     {desapegoInfo.accepts_offers && (
                         <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700/30 px-2.5 py-1 rounded-full">
@@ -1390,24 +1522,6 @@ export function ProductDetailsPageClient({
                             🔄 Aceita trocas
                         </span>
                     )}
-                    {desapegoInfo.pickup_neighborhood && (
-                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700/30 px-2.5 py-1 rounded-full">
-                            📍 Retirada em {desapegoInfo.pickup_neighborhood}
-                        </span>
-                    )}
-                    {desapegoInfo.expiry_date && (
-                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/30 px-2.5 py-1 rounded-full">
-                            📅 Validade: {new Date(desapegoInfo.expiry_date).toLocaleDateString("pt-BR")}
-                        </span>
-                    )}
-                </div>
-            )}
-
-            {/* Itens Inclusos */}
-            {desapegoInfo.items_included && (
-                <div className="mb-6 p-3 bg-gray-50 dark:bg-dark-border/20 border border-brand-border dark:border-dark-border rounded-xl">
-                    <h4 className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider mb-1.5">O que está incluso</h4>
-                    <p className="text-sm text-brand-dark dark:text-dark-heading leading-relaxed">{desapegoInfo.items_included}</p>
                 </div>
             )}
 
@@ -1664,7 +1778,6 @@ export function ProductDetailsPageClient({
                     <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">Políticas da loja</span>
                     <ChevronRightIcon size={18} className="text-brand-inactive-text dark:text-dark-body" />
                 </button>
-                <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">Trocas, devoluções, prazos e condições do vendedor</p>
             </div>
 
             {/* Store (Reputation & Levels Card) */}
@@ -1833,13 +1946,14 @@ export function ProductDetailsPageClient({
             >
                 <div className="flex flex-col relative">
                     {/* Close X Button - Desktop Only */}
-                    <button
+                    <Button
+                        variant="filled"
                         onClick={() => setShowResponsibilityModal(false)}
-                        className="absolute top-3 right-3 z-10 w-10 h-10 rounded-full bg-black/5 hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/20 flex items-center justify-center text-brand-dark dark:text-dark-heading transition-colors hidden md:flex"
+                        className="absolute top-3 right-3 z-10 w-10 h-10 hidden md:flex"
                         title="Fechar"
                     >
                         <XIcon size={18} />
-                    </button>
+                    </Button>
                     {/* Header with Dual Squares */}
                     <div className="h-[200px] rounded-2xl flex items-end justify-center mb-8 relative overflow-hidden bg-[#eaf7f0]">
                         <img
@@ -1858,18 +1972,19 @@ export function ProductDetailsPageClient({
                             A responsabilidade por separar o produto, realizar a entrega, oferecer garantia e resolver trocas ou devoluções é exclusivamente do vendedor. Se tiver qualquer dúvida sobre o seu item, o melhor caminho é chamar o vendedor no WhatsApp para alinhar tudo, beleza?
                         </p>
                     </div>
-                    <Button onClick={() => setShowPaymentModal(false)} className="w-full mt-8 h-12">Entendi</Button>
+                    <Button onClick={() => setShowResponsibilityModal(false)} className="w-full mt-8 h-12">Entendi</Button>
                 </div>
             </DefaultModal>
 
             <ShareModal
                 isOpen={showShareModal}
                 onClose={() => setShowShareModal(false)}
-                url={isMounted ? window.location.href : ""}
+                url={isMounted ? `${window.location.origin}${getProductUrl(product, partner)}` : ""}
                 title={product.name}
                 shareMessage={shareMessage}
                 label="Link do produto"
             />
+
 
             <AddToCollectionModal
                 isOpen={showCollectionModal}
@@ -2342,6 +2457,114 @@ export function ProductDetailsPageClient({
                                     </button>
                                 )}
                             </div>
+
+                            {/* Detalhes do Produto - Estilo OLX com ListItem sem bordas */}
+                            {(() => {
+                                const detailsList: Array<{
+                                    key: string
+                                    label: string
+                                    value: React.ReactNode
+                                    icon: any
+                                }> = []
+
+                                const categoryName = product.marketplace_category?.parent?.name
+                                    ? `${product.marketplace_category.parent.name} > ${product.marketplace_category.name}`
+                                    : product.marketplace_category?.name || product.category || ""
+                                if (categoryName) {
+                                    detailsList.push({
+                                        key: "category",
+                                        label: "Categoria",
+                                        value: categoryName,
+                                        icon: TagIcon,
+                                    })
+                                }
+
+                                const brandName = desapegoInfo.brand || product.brand
+                                if (brandName) {
+                                    detailsList.push({
+                                        key: "brand",
+                                        label: "Marca",
+                                        value: brandName,
+                                        icon: AwardIcon,
+                                    })
+                                }
+
+                                const modelName = desapegoInfo.model || product.model
+                                if (modelName) {
+                                    detailsList.push({
+                                        key: "model",
+                                        label: "Modelo",
+                                        value: modelName,
+                                        icon: BoxIcon,
+                                    })
+                                }
+
+                                if (desapegoInfo.condition) {
+                                    detailsList.push({
+                                        key: "condition",
+                                        label: "Condição",
+                                        value: desapegoInfo.condition,
+                                        icon: SparklesIcon,
+                                    })
+                                }
+
+                                if (Number(product.availability_value || 0) > 0) {
+                                    const unit = product.availability_unit === "Minutos" ? "min" : product.availability_unit === "Horas" ? "h" : product.availability_unit === "Dias" ? "dias" : product.availability_unit || "dias"
+                                    detailsList.push({
+                                        key: "availability",
+                                        label: "Disponibilidade",
+                                        value: `${product.availability_value} ${unit}`,
+                                        icon: ClockIcon,
+                                    })
+                                }
+
+                                if (desapegoInfo.warranty) {
+                                    detailsList.push({
+                                        key: "warranty",
+                                        label: "Garantia",
+                                        value: desapegoInfo.warranty,
+                                        icon: ShieldIcon,
+                                    })
+                                }
+
+                                if (desapegoInfo.accepts_offers) {
+                                    detailsList.push({
+                                        key: "offers",
+                                        label: "Aceita ofertas",
+                                        value: "Sim",
+                                        icon: TagIcon,
+                                    })
+                                }
+
+                                if (desapegoInfo.accepts_trades) {
+                                    detailsList.push({
+                                        key: "trades",
+                                        label: "Aceita trocas",
+                                        value: "Sim",
+                                        icon: ArrowLeftRightIcon,
+                                    })
+                                }
+
+                                if (detailsList.length === 0) return null
+
+                                return (
+                                    <div className="mb-10">
+                                        <FormSection title="Detalhes" hasSeparator>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-y-4 gap-x-6 pt-2">
+                                                {detailsList.map((detail) => (
+                                                    <ListItem
+                                                        key={detail.key}
+                                                        icon={detail.icon}
+                                                        title={<span className="text-xs text-brand-inactive-text dark:text-dark-body font-normal">{detail.label}</span>}
+                                                        description={<span className="text-sm font-semibold text-brand-dark dark:text-dark-heading line-clamp-2">{detail.value}</span>}
+                                                        className="!border-none !bg-transparent !p-0 !shadow-none hover:!bg-transparent hover:!border-none !cursor-default"
+                                                    />
+                                                ))}
+                                            </div>
+                                        </FormSection>
+                                    </div>
+                                )
+                            })()}
 
                             {/* Technical specs */}
                             {Array.isArray(product.technical_specs) && product.technical_specs.length > 0 && (

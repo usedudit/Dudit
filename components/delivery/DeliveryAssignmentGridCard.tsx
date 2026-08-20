@@ -2,6 +2,7 @@
 
 import React from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Badge, Button } from "@/components/reusable"
 import {
     MapPinIcon,
@@ -18,9 +19,11 @@ import { type DeliveryAssignmentItem, statusConfig } from "./DeliveryAssignmentL
 
 interface DeliveryAssignmentGridCardProps {
     assignment: DeliveryAssignmentItem
+    onView?: (assignment: DeliveryAssignmentItem) => void
 }
 
-export default function DeliveryAssignmentGridCard({ assignment }: DeliveryAssignmentGridCardProps) {
+export default function DeliveryAssignmentGridCard({ assignment, onView }: DeliveryAssignmentGridCardProps) {
+    const router = useRouter()
     const statusMeta = statusConfig[assignment.status] || {
         label: assignment.status,
         variant: "gray" as const,
@@ -37,17 +40,25 @@ export default function DeliveryAssignmentGridCard({ assignment }: DeliveryAssig
     )}`
     const whatsappUrl = cleanPhone ? `https://wa.me/55${cleanPhone}` : null
 
+    const handleView = () => {
+        if (onView) {
+            onView(assignment)
+        } else {
+            router.push(`/entregadores/entregas/${assignment.assignment_id}`)
+        }
+    }
+
     return (
-        <article className="flex flex-col justify-between rounded-2xl border border-brand-border bg-white p-5 shadow-xs hover:shadow-md transition-all duration-200 dark:border-dark-border dark:bg-dark-surface hover:border-brand-dark/20 dark:hover:border-dark-border/80 group">
+        <article
+            onClick={handleView}
+            className="flex flex-col justify-between rounded-2xl border border-brand-border bg-white p-5 shadow-xs hover:shadow-md transition-all duration-200 dark:border-dark-border dark:bg-dark-surface hover:border-brand-dark/20 dark:hover:border-dark-border/80 group cursor-pointer"
+        >
             <div>
                 {/* TOP BAR: ORDER # & STATUS */}
                 <div className="flex items-center justify-between gap-2 mb-3">
-                    <Link
-                        href={`/entregadores/entregas/${assignment.assignment_id}`}
-                        className="font-bold text-base text-brand-dark dark:text-dark-heading hover:text-brand-green transition-colors font-mono"
-                    >
+                    <span className="font-bold text-base text-brand-dark dark:text-dark-heading group-hover:text-brand-green transition-colors font-mono">
                         {orderNumberDisplay}
-                    </Link>
+                    </span>
                     <Badge variant={statusMeta.variant} icon={statusMeta.icon}>
                         {statusMeta.label}
                     </Badge>

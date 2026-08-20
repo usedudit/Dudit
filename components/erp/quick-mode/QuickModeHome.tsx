@@ -1,50 +1,33 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
-    ShoppingCartIcon,
-    Package,
-    WrenchIcon,
     ChevronRightIcon,
     ChevronLeftIcon,
-    AlertTriangleIcon,
     CheckCircleIcon,
-    StoreIcon,
-    QRCodeIcon,
-    SettingsIcon,
-    ShareIcon,
     RocketIcon,
-    InfoIcon,
-    BriefcaseIcon,
-    WhatsappIcon,
-    CreditCardIcon,
-    UploadSheetIcon,
-    DownloadIcon,
     HelpCircleIcon,
+    MailIcon,
+    InfoIcon,
     LinkIcon,
     CopyIcon,
-    PlayIcon,
-    MailIcon,
-    PlusIcon,
+    ShareIcon,
+    SparklesIcon,
+    WhatsappIcon,
     FacebookIcon,
     XIcon,
     TelegramIcon,
     LinkedinIcon,
-    SparklesIcon,
 } from "@/lib/icons";
-import { Button, Badge, ListItem, FormSection, DefaultModal, InfoCard } from "@/components/reusable";
-import { Tooltip } from "@/components/reusable/Tooltip"
+import { Button, ListItem, FormSection, DefaultModal, InfoCard } from "@/components/reusable";
 import { useToast } from "@/hooks/use-toast";
-import QuickModeItemCard from "./QuickModeItemCard";
-import { deleteProductAction, duplicateProductAction } from "@/app/actions/erp/products";
-import { deleteServiceAction, duplicateServiceAction } from "@/app/actions/erp/servicos";
+import { deleteProductAction } from "@/app/actions/erp/products";
+import { deleteServiceAction } from "@/app/actions/erp/servicos";
 import AlertModal from "@/components/reusable/AlertModal";
 import { ERPPageHeader } from "@/components/erp/page-header-state";
 import { DashboardLayout } from "@/lib/dashboard-engine/types";
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal";
-import { PLAN_UPGRADE_MASCOTS } from "@/lib/subscription/plan-tier";
-import { getHardcodedPlan } from "@/lib/subscription/feature-labels";
 
 interface QuickModeHomeProps {
     data: DashboardLayout;
@@ -120,19 +103,19 @@ function QRCodeCard({ partnerUrl, storeName }: { partnerUrl: string; storeName: 
     };
 
     return (
-        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 min-h-[280px] h-full flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex-1 min-w-0 flex flex-col justify-between h-full w-full">
+        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-0 min-h-[240px] h-full flex flex-col md:flex-row overflow-hidden">
+            <div className="flex-1 min-w-0 bg-brand-gray/40 dark:bg-dark-border/20 p-6 flex flex-col justify-between">
                 <div>
                     <div className="flex items-start gap-4">
-                        <div className="bg-brand-gray/60 dark:bg-dark-border/40 p-2.5 rounded-2xl border border-brand-border/60 dark:border-dark-border/60 shrink-0">
+                        <div className="bg-white dark:bg-dark-surface p-2 rounded-xl border border-brand-border/60 dark:border-dark-border/60 shrink-0">
                             {qrCodeUrl ? (
                                 <img
                                     src={qrCodeUrl}
                                     alt="QR Code do perfil"
-                                    className="w-20 h-20 rounded-lg object-contain"
+                                    className="w-16 h-16 rounded-lg object-contain"
                                 />
                             ) : (
-                                <div className="w-20 h-20 bg-brand-gray dark:bg-dark-border rounded-lg animate-pulse" />
+                                <div className="w-16 h-16 bg-brand-gray dark:bg-dark-border rounded-lg animate-pulse" />
                             )}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -147,29 +130,29 @@ function QRCodeCard({ partnerUrl, storeName }: { partnerUrl: string; storeName: 
                 </div>
 
                 <div className="mt-4">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 flex-wrap">
                         <Button
                             variant="outline"
                             size="sm"
-                            className="gap-2 rounded-full font-semibold text-xs sm:text-sm"
+                            className="gap-2 rounded-full font-semibold text-xs"
                             onClick={copyLink}
                         >
-                            <CopyIcon className="w-4 h-4" />
+                            <CopyIcon className="w-3.5 h-3.5" />
                             {copied ? "Copiado!" : "Copiar Link"}
                         </Button>
                         <Button
                             variant="outline"
                             size="sm"
-                            className="gap-2 rounded-full font-semibold text-xs sm:text-sm"
+                            className="gap-2 rounded-full font-semibold text-xs"
                             onClick={shareProfile}
                         >
-                            <ShareIcon className="w-4 h-4" />
+                            <ShareIcon className="w-3.5 h-3.5" />
                             Compartilhar
                         </Button>
                     </div>
 
                     {showShareOptions && (
-                        <div className="mt-3 p-3 bg-brand-gray/30 dark:bg-dark-border/30 rounded-xl border border-brand-border dark:border-dark-border">
+                        <div className="mt-3 p-3 bg-white dark:bg-dark-surface rounded-xl border border-brand-border dark:border-dark-border">
                             <p className="text-xs font-medium text-brand-dark dark:text-dark-heading mb-2">Compartilhar via:</p>
                             <div className="flex gap-2 flex-wrap">
                                 <a
@@ -223,104 +206,12 @@ function QRCodeCard({ partnerUrl, storeName }: { partnerUrl: string; storeName: 
                 </div>
             </div>
 
-            <div className="shrink-0 flex flex-col items-center justify-center">
-                <div className="w-[130px] h-[130px] flex items-center justify-center">
-                    <img
-                        src="https://img.dudit.com.br/static/mascots/QRDino.png"
-                        alt="Perfil de Vendedor"
-                        className="w-full h-full object-contain"
-                    />
-                </div>
-            </div>
-        </div>
-    );
-}
-
-const shortcutIconMap: Record<string, React.ComponentType<any>> = {
-    PlusIcon,
-    WrenchIcon,
-    ShoppingCartIcon,
-    Package,
-    StoreIcon,
-    SettingsIcon,
-    HelpCircleIcon,
-    CreditCardIcon,
-};
-
-function ShortcutsCard({ shortcuts, sellsProducts, sellsServices }: {
-    shortcuts: DashboardLayout["shortcuts"];
-    sellsProducts: boolean;
-    sellsServices: boolean;
-}) {
-    const router = useRouter();
-
-    const allShortcuts = [
-        ...shortcuts,
-        {
-            id: "orders",
-            label: "Ver Pedidos",
-            description: "Acesse seus pedidos recebidos",
-            icon: "ShoppingCartIcon",
-            href: "/erp/pedidos"
-        },
-        {
-            id: "products",
-            label: "Meu Catálogo",
-            description: "Gerencie produtos e serviços",
-            icon: "Package",
-            href: "/erp/produtos"
-        },
-    ];
-
-    return (
-        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 min-h-[280px] h-full flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex-1 min-w-0 flex flex-col justify-between h-full w-full">
-                <div>
-                    <div className="flex items-center gap-3 mb-3">
-                        <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
-                            <RocketIcon size={20} className="text-brand-green" />
-                        </div>
-                        <div>
-                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading leading-tight">
-                                Atalhos Rápidos
-                            </h3>
-                            <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                Acesse as ações mais frequentes
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="space-y-1.5 overflow-y-auto max-h-[160px] pr-1">
-                        {allShortcuts.slice(0, 4).map((shortcut) => (
-                            <ListItem
-                                key={shortcut.id}
-                                icon={shortcutIconMap[shortcut.icon] || RocketIcon}
-                                title={shortcut.label}
-                                description={shortcut.description}
-                                onClick={() => router.push(shortcut.href)}
-                                className="border-0 bg-transparent hover:bg-brand-gray/30 dark:hover:bg-dark-border/30 p-2 rounded-xl"
-                            />
-                        ))}
-                    </div>
-                </div>
-            </div>
-
-            <div className="shrink-0 flex flex-col items-center gap-3">
-                <div className="w-[130px] h-[130px] flex items-center justify-center">
-                    <img
-                        src="https://img.dudit.com.br/static/mascots/PDV.png"
-                        alt="Atalhos Rápidos"
-                        className="w-full h-full object-contain"
-                    />
-                </div>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    className="rounded-full text-xs font-bold px-4"
-                    onClick={() => router.push("/erp/pedidos")}
-                >
-                    Ver pedidos
-                </Button>
+            <div className="shrink-0 w-[140px] flex items-center justify-center p-4">
+                <img
+                    src="https://img.dudit.com.br/static/mascots/QRDino.png"
+                    alt="Perfil de Vendedor"
+                    className="w-full h-full object-contain max-h-[160px]"
+                />
             </div>
         </div>
     );
@@ -342,24 +233,17 @@ function HelpCard() {
     ];
 
     return (
-        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 min-h-[280px] h-full flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex-1 min-w-0 flex flex-col justify-between h-full w-full">
+        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-0 min-h-[240px] h-full flex flex-col md:flex-row overflow-hidden">
+            <div className="flex-1 min-w-0 bg-brand-gray/40 dark:bg-dark-border/20 p-6 flex flex-col justify-between">
                 <div>
-                    <div className="flex items-center gap-3 mb-3">
-                        <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
-                            <HelpCircleIcon size={20} className="text-brand-green" />
-                        </div>
-                        <div>
-                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading leading-tight">
-                                Ajuda e Suporte
-                            </h3>
-                            <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                Conte com a nossa equipe
-                            </p>
-                        </div>
-                    </div>
+                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading leading-tight mb-2">
+                        Ajuda e Suporte
+                    </h3>
+                    <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed mb-4">
+                        Conte com a nossa equipe para tirar suas dúvidas.
+                    </p>
 
-                    <div className="space-y-1.5 overflow-y-auto max-h-[160px] pr-1">
+                    <div className="space-y-1.5">
                         {helpItems.map((item) => (
                             <ListItem
                                 key={item.label}
@@ -368,29 +252,19 @@ function HelpCard() {
                                 description={item.description}
                                 right={item.external ? <LinkIcon className="w-4 h-4 text-brand-inactive-text" /> : <ChevronRightIcon className="text-brand-inactive-text w-4 h-4" />}
                                 onClick={() => item.external ? window.open(item.href, "_blank") : router.push(item.href)}
-                                className="border-0 bg-transparent hover:bg-brand-gray/30 dark:hover:bg-dark-border/30 p-2 rounded-xl"
+                                className="border-0 bg-transparent hover:bg-white/60 dark:hover:bg-dark-surface/60 p-2 rounded-xl"
                             />
                         ))}
                     </div>
                 </div>
             </div>
 
-            <div className="shrink-0 flex flex-col items-center gap-3">
-                <div className="w-[130px] h-[130px] flex items-center justify-center">
-                    <img
-                        src="https://img.dudit.com.br/static/mascots/Notificacoes.png"
-                        alt="Ajuda e Suporte"
-                        className="w-full h-full object-contain"
-                    />
-                </div>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    className="rounded-full text-xs font-bold px-4"
-                    onClick={() => router.push("/ajuda")}
-                >
-                    Central de Ajuda
-                </Button>
+            <div className="shrink-0 w-[140px] flex items-center justify-center p-4">
+                <img
+                    src="https://img.dudit.com.br/static/mascots/Notificacoes.png"
+                    alt="Ajuda e Suporte"
+                    className="w-full h-full object-contain max-h-[160px]"
+                />
             </div>
         </div>
     );
@@ -435,95 +309,93 @@ function ProgressCard({
 
     const stages = buildStages(checklist.items);
     const currentStage = stages[currentStageIdx] || stages[0];
-    const firstIncompleteItem = currentStage?.items.find(i => !i.completed) || currentStage?.items[0];
+    const totalItems = checklist.items.length;
+    const completedItems = checklist.items.filter(i => i.completed).length;
+    const progressPercent = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
 
     return (
-        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 min-h-[280px] h-full flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex-1 min-w-0 flex flex-col justify-between h-full w-full">
+        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-0 min-h-[200px] h-full flex flex-col md:flex-row overflow-hidden">
+            <div className="flex-1 min-w-0 bg-brand-gray/40 dark:bg-dark-border/20 p-6 flex flex-col justify-between">
                 <div>
-                    <div className="flex items-center gap-3 mb-3">
-                        <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
-                            <RocketIcon size={20} className="text-brand-green" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading leading-tight">
-                                Primeiros Passos
-                            </h3>
-                            <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5 truncate">
-                                {currentStage.title}
-                            </p>
-                        </div>
+                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading leading-tight mb-2">
+                        Configurações iniciais
+                    </h3>
+                    <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed mb-4">
+                        Hora de dar o primeiro passo! Conclua as configurações obrigatórias para começar a usar o ERP.
+                    </p>
 
-                        <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                            <span className="text-[11px] font-bold text-brand-green bg-brand-green-light/70 dark:bg-dark-border/40 px-2.5 py-1 rounded-full uppercase tracking-wider">
-                                {currentStageIdx + 1}/{stages.length}
+                    {/* Barra de progresso geral */}
+                    <div className="mb-2">
+                        <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body">
+                                Progresso geral
                             </span>
-                            <button
-                                onClick={() => setCurrentStageIdx((p) => Math.max(0, p - 1))}
-                                disabled={currentStageIdx === 0}
-                                className="w-7 h-7 rounded-full flex items-center justify-center bg-brand-gray dark:bg-dark-border disabled:opacity-30 hover:bg-brand-gray/70 dark:hover:bg-dark-border/70 transition-colors"
-                                aria-label="Etapa anterior"
-                            >
-                                <ChevronLeftIcon size={14} className="text-brand-dark dark:text-dark-heading" />
-                            </button>
-                            <button
-                                onClick={() => setCurrentStageIdx((p) => Math.min(stages.length - 1, p + 1))}
-                                disabled={currentStageIdx === stages.length - 1}
-                                className="w-7 h-7 rounded-full flex items-center justify-center bg-brand-gray dark:bg-dark-border disabled:opacity-30 hover:bg-brand-gray/70 dark:hover:bg-dark-border/70 transition-colors"
-                                aria-label="Próxima etapa"
-                            >
-                                <ChevronRightIcon size={14} className="text-brand-dark dark:text-dark-heading" />
-                            </button>
+                            <span className="text-xs font-bold text-brand-green">
+                                {completedItems}/{totalItems} ({progressPercent}%)
+                            </span>
+                        </div>
+                        <div className="w-full h-2 bg-brand-border dark:bg-dark-border rounded-full overflow-hidden">
+                            <div
+                                className="h-full bg-brand-green rounded-full transition-all duration-500"
+                                style={{ width: `${progressPercent}%` }}
+                            />
                         </div>
                     </div>
+                </div>
 
-                    <div className="flex flex-col gap-2 overflow-y-auto max-h-[160px] pr-1">
-                        {currentStage.items.map((item) => (
-                            <div
-                                key={item.id}
-                                onClick={() => onItemClick(item)}
-                                className="flex items-center gap-3 px-3.5 py-2.5 rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all cursor-pointer"
-                            >
-                                {item.completed ? (
-                                    <CheckCircleIcon size={20} className="text-brand-green shrink-0" />
-                                ) : (
-                                    <div className="w-[20px] h-[20px] rounded-full border-2 border-brand-border dark:border-dark-border flex items-center justify-center shrink-0">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-brand-border dark:bg-dark-border" />
-                                    </div>
-                                )}
-                                <div className="flex-1 min-w-0">
-                                    <p className={`text-sm font-bold truncate ${item.completed ? 'line-through text-brand-inactive-text dark:text-dark-body' : 'text-brand-dark dark:text-dark-heading'}`}>
-                                        {item.title}
-                                    </p>
-                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate">
-                                        {item.description}
-                                    </p>
-                                </div>
-                                <ChevronRightIcon size={16} className="text-brand-inactive-text shrink-0" />
-                            </div>
-                        ))}
+                <div className="flex items-center gap-3 mt-4">
+                    <span className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body">
+                        Etapa {currentStageIdx + 1} de {stages.length}
+                    </span>
+                    <div className="flex items-center gap-1">
+                        <button
+                            onClick={() => setCurrentStageIdx((p) => Math.max(0, p - 1))}
+                            disabled={currentStageIdx === 0}
+                            className="w-8 h-8 rounded-full flex items-center justify-center border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface disabled:opacity-30 hover:bg-brand-gray/70 dark:hover:bg-dark-border/70 transition-colors"
+                            aria-label="Etapa anterior"
+                        >
+                            <ChevronLeftIcon size={14} className="text-brand-dark dark:text-dark-heading" />
+                        </button>
+                        <button
+                            onClick={() => setCurrentStageIdx((p) => Math.min(stages.length - 1, p + 1))}
+                            disabled={currentStageIdx === stages.length - 1}
+                            className="w-8 h-8 rounded-full flex items-center justify-center border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface disabled:opacity-30 hover:bg-brand-gray/70 dark:hover:bg-dark-border/70 transition-colors"
+                            aria-label="Próxima etapa"
+                        >
+                            <ChevronRightIcon size={14} className="text-brand-dark dark:text-dark-heading" />
+                        </button>
                     </div>
                 </div>
             </div>
 
-            <div className="shrink-0 flex flex-col items-center gap-3">
-                <div className="w-[130px] h-[130px] flex items-center justify-center">
-                    <img
-                        src="https://img.dudit.com.br/static/mascots/HappyDino.png"
-                        alt="Primeiros Passos"
-                        className="w-full h-full object-contain"
-                    />
-                </div>
-                {firstIncompleteItem && (
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        className="rounded-full text-xs font-bold px-4"
-                        onClick={() => onItemClick(firstIncompleteItem)}
+            <div className="flex-1 min-w-0 p-6 flex flex-col gap-2">
+                {currentStage.items.map((item, idx) => (
+                    <div
+                        key={item.id}
+                        onClick={() => onItemClick(item)}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-2xl border transition-all cursor-pointer ${
+                            item.completed
+                                ? 'border-brand-green/30 dark:border-brand-green/20 bg-brand-green-light/20 dark:bg-brand-green/5'
+                                : 'border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-dark/30 dark:hover:border-brand-gray/30'
+                        }`}
                     >
-                        Continuar etapa
-                    </Button>
-                )}
+                        <span className={`text-sm font-bold w-6 text-center shrink-0 ${
+                            item.completed ? 'text-brand-green' : 'text-brand-inactive-text dark:text-dark-body'
+                        }`}>
+                            {String(idx + 1).padStart(2, "0")}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                            <p className={`text-sm font-bold truncate ${item.completed ? 'line-through text-brand-inactive-text dark:text-dark-body' : 'text-brand-dark dark:text-dark-heading'}`}>
+                                {item.title}
+                            </p>
+                        </div>
+                        {item.completed ? (
+                            <CheckCircleIcon size={18} className="text-brand-green shrink-0" />
+                        ) : (
+                            <ChevronRightIcon size={16} className="text-brand-inactive-text shrink-0" />
+                        )}
+                    </div>
+                ))}
             </div>
         </div>
     );
@@ -655,64 +527,37 @@ function ImportOptionsModal({
 
 function PlanUpgradeCard({ planSlug, onUpgrade }: { planSlug: string; onUpgrade: (target: "crescer" | "escalar") => void }) {
     const nextSlug = planSlug === "free" ? "crescer" : planSlug === "crescer" ? "escalar" : null;
-    const [currentFeatureIdx, setCurrentFeatureIdx] = useState(0);
-
-    const planFeatures = nextSlug ? getHardcodedPlan(nextSlug).features : [];
-    const planName = nextSlug ? getHardcodedPlan(nextSlug).name : "";
-    const mascotSrc = nextSlug ? PLAN_UPGRADE_MASCOTS[nextSlug as "crescer" | "escalar"] : "";
 
     const descriptions: Record<string, string> = {
-        crescer: "Aumente seu limite de catálogo para 100 itens, receba pagamentos via Mercado Pago e ative cupons promocionais para vender mais.",
+        crescer: "Aumente seu limite de catálogo para 100 itens, receba pagamentos via Mercado Pago e ative cupons promocionais.",
         escalar: "Tenha itens e pedidos ilimitados, financeiro avançado com fluxo de caixa e DRE simplificado.",
     };
-
-    useEffect(() => {
-        if (planFeatures.length <= 1) return;
-        const interval = setInterval(() => {
-            setCurrentFeatureIdx((prev) => (prev + 1) % planFeatures.length);
-        }, 30000);
-        return () => clearInterval(interval);
-    }, [planFeatures.length]);
 
     if (!nextSlug) return null;
 
     return (
-        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 min-h-[280px] h-full flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex-1 min-w-0 flex flex-col justify-between h-full w-full">
-                <div>
-                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-1 leading-tight">
-                        Plano {planName}
-                    </h3>
-                    <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-4 leading-relaxed">
+        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 flex items-center gap-4">
+            <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center shrink-0">
+                <SparklesIcon className="w-5 h-5 text-brand-green" />
+            </div>
+            <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold text-brand-green bg-brand-green-light/70 dark:bg-dark-border/40 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                        Teste grátis
+                    </span>
+                    <p className="text-sm text-brand-dark dark:text-dark-heading">
                         {descriptions[nextSlug]}
                     </p>
-
-                    <div className="flex items-center gap-3 min-h-[44px]">
-                        <div className="w-8 h-8 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center shrink-0">
-                            <SparklesIcon className="w-4 h-4 text-brand-green" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
-                                {planFeatures[currentFeatureIdx]}
-                            </p>
-                        </div>
-                    </div>
                 </div>
             </div>
-
-            <div className="shrink-0 flex flex-col items-center gap-3">
-                <div className="w-[130px] h-[130px] flex items-center justify-center">
-                    <img src={mascotSrc} alt={planName} className="w-full h-full object-contain" />
-                </div>
-                <Button
-                    variant="default"
-                    size="sm"
-                    className="bg-brand-green hover:bg-brand-green/90 text-white border-none rounded-full px-6 text-xs font-bold"
-                    onClick={() => onUpgrade(nextSlug as "crescer" | "escalar")}
-                >
-                    Fazer upgrade
-                </Button>
-            </div>
+            <Button
+                variant="outline"
+                size="sm"
+                className="rounded-full text-xs font-bold px-4 shrink-0 text-brand-green border-brand-green hover:bg-brand-green-light/30"
+                onClick={() => onUpgrade(nextSlug as "crescer" | "escalar")}
+            >
+                ativar plano
+            </Button>
         </div>
     );
 }
@@ -743,47 +588,29 @@ function ModeCard({ partnerId, onSuccess }: { partnerId: string; onSuccess: () =
     };
 
     return (
-        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 min-h-[280px] h-full flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex-1 min-w-0 flex flex-col justify-between h-full w-full">
-                <div>
-                    <div className="flex items-center gap-3 mb-3">
-                        <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
-                            <RocketIcon size={20} className="text-brand-green" />
-                        </div>
-                        <div>
-                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading leading-tight">
-                                Desbloqueie o Modo ERP
-                            </h3>
-                            <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                Recursos corporativos avançados
-                            </p>
-                        </div>
-                    </div>
-
-                    <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                        Migre para o modo ERP completo com dashboard financeiro, fluxo de caixa, DRE, controle de estoque avançado e relatórios detalhados.
+        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 flex items-center gap-4">
+            <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center shrink-0">
+                <RocketIcon size={20} className="text-brand-green" />
+            </div>
+            <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold text-brand-green bg-brand-green-light/70 dark:bg-dark-border/40 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                        Modo ERP
+                    </span>
+                    <p className="text-sm text-brand-dark dark:text-dark-heading">
+                        Migre para o modo ERP completo com dashboard financeiro, fluxo de caixa e relatórios detalhados.
                     </p>
                 </div>
             </div>
-
-            <div className="shrink-0 flex flex-col items-center gap-3">
-                <div className="w-[130px] h-[130px] flex items-center justify-center">
-                    <img
-                        src="https://img.dudit.com.br/static/mascots/Metas.png"
-                        alt="Modo ERP"
-                        className="w-full h-full object-contain"
-                    />
-                </div>
-                <Button
-                    variant="default"
-                    size="sm"
-                    className="bg-brand-green hover:bg-brand-green/90 text-white border-none rounded-full px-6 text-xs font-bold"
-                    onClick={handleUpgrade}
-                    disabled={loading}
-                >
-                    {loading ? "Ativando..." : "Ativar Modo ERP"}
-                </Button>
-            </div>
+            <Button
+                variant="default"
+                size="sm"
+                className="bg-brand-green hover:bg-brand-green/90 text-white border-none rounded-full px-4 text-xs font-bold shrink-0"
+                onClick={handleUpgrade}
+                disabled={loading}
+            >
+                {loading ? "Ativando..." : "Ativar"}
+            </Button>
         </div>
     );
 }
@@ -827,54 +654,28 @@ function TipsCard() {
     }, []);
 
     return (
-        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 min-h-[280px] h-full flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex-1 min-w-0 flex flex-col justify-between h-full w-full">
-                <div>
-                    <div className="flex items-center gap-3 mb-3">
-                        <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
-                            <SparklesIcon size={20} className="text-brand-green" />
-                        </div>
-                        <div>
-                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading leading-tight">
-                                Dicas da Dudit
-                            </h3>
-                            <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                Boas práticas para vender mais
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="p-3.5 rounded-2xl bg-brand-gray/30 dark:bg-dark-border/20 border border-brand-border dark:border-dark-border my-2">
-                        <p className="text-sm text-brand-dark dark:text-dark-heading leading-relaxed font-medium">
-                            "{PLATFORM_TIPS[tipIdx]}"
-                        </p>
-                    </div>
-                </div>
-
-                <div className="flex items-center justify-between mt-2">
-                    <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider">
-                        Dica {tipIdx + 1} de {PLATFORM_TIPS.length}
+        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 flex items-center gap-4">
+            <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center shrink-0">
+                <SparklesIcon size={20} className="text-brand-green" />
+            </div>
+            <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold text-brand-green bg-brand-green-light/70 dark:bg-dark-border/40 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                        Dica {tipIdx + 1}/{PLATFORM_TIPS.length}
                     </span>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        className="gap-1 text-brand-green font-bold text-xs"
-                        onClick={() => setTipIdx((prev) => (prev + 1) % PLATFORM_TIPS.length)}
-                    >
-                        Próxima dica <ChevronRightIcon size={14} />
-                    </Button>
+                    <p className="text-sm text-brand-dark dark:text-dark-heading">
+                        {PLATFORM_TIPS[tipIdx]}
+                    </p>
                 </div>
             </div>
-
-            <div className="shrink-0 flex flex-col items-center justify-center">
-                <div className="w-[130px] h-[130px] flex items-center justify-center">
-                    <img
-                        src="https://img.dudit.com.br/static/mascots/Segmentos.png"
-                        alt="Dicas"
-                        className="w-full h-full object-contain"
-                    />
-                </div>
-            </div>
+            <Button
+                variant="ghost"
+                size="sm"
+                className="gap-1 text-brand-green font-bold text-xs shrink-0"
+                onClick={() => setTipIdx((prev) => (prev + 1) % PLATFORM_TIPS.length)}
+            >
+                Próxima <ChevronRightIcon size={14} />
+            </Button>
         </div>
     );
 }
@@ -909,20 +710,6 @@ export default function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
         }
         setIsDeleting(null);
         setShowDeleteModal(null);
-    }
-
-    const handleDuplicate = async (item: any) => {
-        toast({ title: "Duplicando item..." });
-        const res = item.itemType === 'product'
-            ? await duplicateProductAction(item.id)
-            : await duplicateServiceAction(item.id);
-
-        if (res.success) {
-            toast({ title: "Item duplicado com sucesso" });
-            router.refresh();
-        } else {
-            toast({ title: "Erro ao duplicar", description: (res as any).error, variant: "destructive" });
-        }
     }
 
     const getStepAction = (item: DashboardChecklistItem) => {
@@ -962,20 +749,6 @@ export default function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
                             {data.greeting.subtitle}
                         </p>
                     </div>
-
-                    <div className="flex items-center gap-3">
-                        <Tooltip text="Configurações">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="gap-2"
-                                onClick={() => router.push('/erp/configuracoes')}
-                            >
-                                <SettingsIcon className="w-4 h-4" />
-                                Configurações
-                            </Button>
-                        </Tooltip>
-                    </div>
                 </header>
 
                 {/* Alertas Críticos */}
@@ -1009,8 +782,9 @@ export default function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
                     </div>
                 )}
 
-                {/* Cards Grid - 2 columns */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Cards Grid */}
+                <div className="flex flex-col gap-6">
+                    {/* Onboarding - Full Width */}
                     {data.checklist && (
                         <ProgressCard
                             checklist={data.checklist}
@@ -1019,23 +793,20 @@ export default function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
                         />
                     )}
 
-                    <QRCodeCard partnerUrl={data.partnerUrl} storeName={data.storeName || "Sua Loja"} />
+                    {/* Perfil de Vendedor + Ajuda e Suporte - 2 columns */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <QRCodeCard partnerUrl={data.partnerUrl} storeName={data.storeName || "Sua Loja"} />
+                        <HelpCard />
+                    </div>
 
-                    <PlanUpgradeCard planSlug={data.planSlug} onUpgrade={openPlanUpgrade} />
-
-                    {data.isQuickMode && (
-                        <ModeCard partnerId={partnerId} onSuccess={() => router.refresh()} />
-                    )}
-
-                    <ShortcutsCard
-                        shortcuts={data.shortcuts}
-                        sellsProducts={data.sellsProducts}
-                        sellsServices={data.sellsServices}
-                    />
-
-                    <TipsCard />
-
-                    <HelpCard />
+                    {/* Plano + Modo ERP + Dicas - 2 columns banners */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <PlanUpgradeCard planSlug={data.planSlug} onUpgrade={openPlanUpgrade} />
+                        {data.isQuickMode && (
+                            <ModeCard partnerId={partnerId} onSuccess={() => router.refresh()} />
+                        )}
+                        <TipsCard />
+                    </div>
                 </div>
 
                 {/* Import Modal */}

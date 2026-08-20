@@ -189,7 +189,7 @@ export function ExplorarFiltersBottomSheet({
                                 key={option.value}
                                 onClick={() => handleTypeSelect(option.value)}
                                 className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${draftType === option.value
-                                    ? "bg-[#ecfdf5] text-brand-green"
+                                    ? "bg-[#ecfdf5] dark:bg-brand-dark/10 text-brand-green"
                                     : "text-brand-dark dark:text-dark-heading hover:bg-gray-50 dark:hover:bg-dark-border/30"
                                     }`}
                             >
@@ -215,7 +215,7 @@ export function ExplorarFiltersBottomSheet({
                                     key={cat.name}
                                     onClick={() => handleToggleCategory(cat.name)}
                                     className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-semibold transition-colors ${isSelected
-                                        ? "bg-[#ecfdf5] text-brand-green"
+                                        ? "bg-[#ecfdf5] dark:bg-brand-dark/10 text-brand-green"
                                         : "text-brand-dark dark:text-dark-heading hover:bg-gray-50 dark:hover:bg-dark-border/30"
                                         }`}
                                 >
@@ -275,7 +275,7 @@ export function ExplorarFiltersBottomSheet({
                     <button
                         onClick={() => setDraftPromo(!draftPromo)}
                         className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${draftPromo
-                            ? "bg-[#ecfdf5] text-brand-green"
+                            ? "bg-[#ecfdf5] dark:bg-brand-dark/10 text-brand-green"
                             : "text-brand-dark dark:text-dark-heading hover:bg-gray-50 dark:hover:bg-dark-border/30"
                             }`}
                     >

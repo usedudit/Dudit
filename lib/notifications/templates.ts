@@ -34,6 +34,8 @@ interface WhatsappMessageContext {
     amount?: string
     store_name?: string
     quote_number?: string
+    quote_url?: string
+    url?: string
     tracking_code?: string
     delivery_address?: string
     cancellation_note?: string
@@ -379,13 +381,16 @@ export function buildWhatsappMessage(
 
         // ── Orçamentos ──
         case "quote_shared":
+            const quoteLink = ctx.quote_url || ctx.url || ""
             return [
                 `📋 *Novo orçamento disponível!*`,
                 ``,
                 ``,
-                `Olá, ${customer}! Preparamos um orçamento especialmente para você.`,
-                ctx.quote_number ? `*Orçamento:* #${ctx.quote_number}` : "",
-                `*Vendedor:* ${store}`,
+                `Olá, ${customer}! Preparamos a sua proposta comercial.`,
+                ctx.service_name ? `*Serviço:* ${ctx.service_name}` : (ctx.quote_number ? `*Orçamento:* #${ctx.quote_number}` : ""),
+                `*Estabelecimento:* ${store}`,
+                amount ? `*Valor:* ${amount}` : "",
+                quoteLink ? `\n*Acesse a proposta online:* ${quoteLink}` : "",
                 ``,
                 ``,
                 `Dá uma olhada e nos diga o que acha! 😉`,

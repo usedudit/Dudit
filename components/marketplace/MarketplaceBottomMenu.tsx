@@ -63,10 +63,14 @@ export function MarketplaceBottomMenu() {
     const [citySlug, setCitySlug] = useState<string | null>(null)
     const collectionMenu = useCollectionDetailMenu()
 
-    // Detect city slug on client side for the Home tab
+    // Detect city slug on client side for the Home and Explorar tabs
     useEffect(() => {
         if (typeof window !== "undefined") {
-            const stored = localStorage.getItem("dudit_city")
+            let stored = localStorage.getItem("dudit_city")
+            if (!stored) {
+                const match = document.cookie.match(/(?:^|; )dudit_city=([^;]*)/)
+                if (match) stored = match[1]
+            }
             if (stored) {
                 setCitySlug(stored)
             }
@@ -84,6 +88,7 @@ export function MarketplaceBottomMenu() {
         pathname.startsWith("/print")
 
     const homePath = citySlug ? `/${citySlug}` : "/"
+    const explorePath = citySlug ? `/explorar/${citySlug}` : "/explorar/brasil"
 
     const isCollectionDetailOwner = !!collectionMenu?.isOwner && pathname?.startsWith("/colecoes/")
 
@@ -110,7 +115,7 @@ export function MarketplaceBottomMenu() {
             {/* Bottom Nav Bar */}
             {isCollectionDetailOwner ? (
                 <nav
-                    className="lg:hidden print:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-dark-background/95 border-t border-gray-100 dark:border-dark-border shadow-[0_-4px_24px_rgba(0,0,0,0.06)] backdrop-blur-md pb-[calc(env(safe-area-inset-bottom,0px))] h-[60px] flex items-center justify-center gap-3 px-4"
+                    className="lg:hidden print:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-white/10 pb-[calc(env(safe-area-inset-bottom,0px))] h-[60px] flex justify-around items-center"
                 >
                     <button
                         onClick={collectionMenu.onEdit}
@@ -129,12 +134,12 @@ export function MarketplaceBottomMenu() {
                 </nav>
             ) : (
                 <nav
-                    className="lg:hidden print:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-dark-background/95 border-t border-gray-100 dark:border-dark-border shadow-[0_-4px_24px_rgba(0,0,0,0.06)] backdrop-blur-md pb-[calc(env(safe-area-inset-bottom,0px))] h-[60px] flex justify-around items-center"
+                    className="lg:hidden print:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-white/10 pb-[calc(env(safe-area-inset-bottom,0px))] h-[60px] flex justify-around items-center"
                 >
                     <Link
                         href="/"
                         prefetch={false}
-                        className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all duration-200 ${isHomeActive ? "text-brand-green font-bold" : "text-brand-dark font-medium"
+                        className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all duration-200 ${isHomeActive ? "text-brand-green font-bold" : "text-brand-dark dark:text-dark-body font-medium"
                             }`}
                     >
                         <HomeIcon size={22} className={isHomeActive ? "text-brand-green" : "text-brand-dark"} />
@@ -142,9 +147,9 @@ export function MarketplaceBottomMenu() {
                     </Link>
 
                     <Link
-                        href="/explorar"
+                        href={explorePath}
                         prefetch={false}
-                        className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all duration-200 ${isExploreActive ? "text-brand-green font-bold" : "text-brand-dark font-medium"
+                        className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all duration-200 ${isExploreActive ? "text-brand-green font-bold" : "text-brand-dark dark:text-dark-body font-medium"
                             }`}
                     >
                         <SearchIcon size={22} className={isExploreActive ? "text-brand-green" : "text-brand-dark"} />
@@ -154,7 +159,7 @@ export function MarketplaceBottomMenu() {
                     <Link
                         href="/pedidos"
                         prefetch={false}
-                        className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all duration-200 ${isOrdersActive ? "text-brand-green font-bold" : "text-brand-dark font-medium"
+                        className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all duration-200 ${isOrdersActive ? "text-brand-green font-bold" : "text-brand-dark dark:text-dark-body font-medium"
                             }`}
                     >
                         <Package size={22} className={isOrdersActive ? "text-brand-green" : "text-brand-dark"} />
@@ -163,7 +168,7 @@ export function MarketplaceBottomMenu() {
 
                     <button
                         onClick={() => setIsMenuOpen(true)}
-                        className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all duration-200 ${isMenuOpen ? "text-brand-green font-bold" : "text-brand-dark font-medium"
+                        className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all duration-200 ${isMenuOpen ? "text-brand-green font-bold" : "text-brand-dark dark:text-dark-body font-medium"
                             }`}
                     >
                         <MenuIcon size={22} className={isMenuOpen ? "text-brand-green" : "text-brand-dark"} />

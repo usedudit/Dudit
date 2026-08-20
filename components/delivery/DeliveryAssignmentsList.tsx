@@ -9,6 +9,7 @@ import {
     listMyDeliveryAssignmentsAction,
     getDeliveryDashboardAction,
     setMyDeliveryAvailabilityAction,
+    getMyDeliveryAssignmentAction,
 } from "@/app/actions/delivery-drivers"
 import { toast } from "@/hooks/use-notification"
 import {
@@ -16,6 +17,7 @@ import {
     ArrowUpDownIcon,
 } from "@/lib/icons"
 import { useMediaQuery } from "@/components/erp/hooks"
+import { useEntityState } from "@/hooks/use-entity-state"
 import DeliveryPageControls, {
     type DeliveryTab,
     type DeliveryFilterState,
@@ -23,6 +25,7 @@ import DeliveryPageControls, {
 } from "./DeliveryPageControls"
 import DeliveryAssignmentListRow, { type DeliveryAssignmentItem } from "./DeliveryAssignmentListRow"
 import DeliveryAssignmentGridCard from "./DeliveryAssignmentGridCard"
+import DeliveryAssignmentDetail from "./DeliveryAssignmentDetail"
 
 type SortKey = "date" | "total" | "fee" | "order"
 type SortDirection = "asc" | "desc"
@@ -31,6 +34,9 @@ const ITEMS_PER_PAGE = 12
 
 export default function DeliveryAssignmentsList() {
     const isTabletOrMobile = useMediaQuery("(max-width: 1023px)")
+    const { state: entityState, open: openEntity, close: closeEntity, isViewing } = useEntityState()
+    const viewedId = isViewing ? entityState.entityId : null
+
     const [activeTab, setActiveTab] = useState<DeliveryTab>("todas")
     const [search, setSearch] = useState("")
     const [viewMode, setViewMode] = useState<"list" | "grid">("list")
@@ -39,6 +45,10 @@ export default function DeliveryAssignmentsList() {
     const [isLoading, setIsLoading] = useState(true)
     const [isRefreshing, setIsRefreshing] = useState(false)
     const [filters, setFilters] = useState<DeliveryFilterState>(INITIAL_DELIVERY_FILTERS)
+
+    // Detailed item state for ?view=id
+    const [viewedAssignment, setViewedAssignment] = useState<any | null>(null)
+    const [isLoadingViewed, setIsLoadingViewed] = useState(false)
 
     // Availability State
     const [availability, setAvailability] = useState<string>("available")
@@ -87,6 +97,33 @@ export default function DeliveryAssignmentsList() {
             setIsRefreshing(false)
         }
     }, [])
+
+    useEffect(() => {
+        if (!viewedId) {
+            setViewedAssignment(null)
+            return
+        }
+
+        const local = allItems.find((it) => it.assignment_id === viewedId)
+        if (local) {
+            setViewedAssignment(local)
+        }
+
+        async function fetchDetails() {
+            setIsLoadingViewed(true)
+            try {
+                const res = await getMyDeliveryAssignmentAction(viewedId!)
+                if (res.success && res.data) {
+                    setViewedAssignment(res.data)
+                }
+            } catch (err) {
+                console.error("Erro ao buscar detalhes da entrega:", err)
+            } finally {
+                setIsLoadingViewed(false)
+            }
+        }
+        void fetchDetails()
+    }, [viewedId, allItems])
 
     useEffect(() => {
         void loadData()
@@ -267,6 +304,25 @@ export default function DeliveryAssignmentsList() {
     // Effective view mode: on tablet/mobile it's always grid
     const effectiveViewMode = isTabletOrMobile ? "grid" : viewMode
 
+    if (isViewing && viewedId) {
+        if (isLoadingViewed && !viewedAssignment) {
+            return (
+                <div className="w-full h-full flex items-center justify-center min-h-[400px]">
+                    <ThreeDotsLoader />
+                </div>
+            )
+        }
+
+        if (viewedAssignment) {
+            return (
+                <DeliveryAssignmentDetail
+                    assignment={viewedAssignment}
+                    onBack={closeEntity}
+                />
+            )
+        }
+    }
+
     return (
         <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
             <style>{`
@@ -322,11 +378,12 @@ export default function DeliveryAssignmentsList() {
 
                         <Button
                             variant="outline"
+                            size="sm"
                             onClick={() => loadData(true)}
                             disabled={isRefreshing || isLoading}
-                            leftIcon={<ReloadIcon size={16} className={isRefreshing ? "animate-spin" : ""} />}
+                            className="shrink-0"
                         >
-                            {isRefreshing ? "Atualizando..." : "Atualizar"}
+                            <ReloadIcon size={15} className={isRefreshing ? "animate-spin" : ""} />
                         </Button>
                     </div>
                 </div>
@@ -367,22 +424,21 @@ export default function DeliveryAssignmentsList() {
                     </Button>
                 </div>
 
-                {/* CONTROLS (Tabs, Search, FilterSheet, View Mode) */}
                 <DeliveryPageControls
                     activeTab={activeTab}
                     setActiveTab={setActiveTab}
+                    tabCounts={tabCounts}
                     search={search}
                     onSearchChange={setSearch}
                     viewMode={viewMode}
                     onViewModeChange={setViewMode}
-                    tabCounts={tabCounts}
                     filters={filters}
                     setFilters={setFilters}
                     partnerOptions={partnerOptions}
                 />
 
                 {/* CONTENT AREA */}
-                <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-6 px-4 md:px-8">
+                <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-12">
                     <AnimatePresence mode="wait">
                         {isLoading ? (
                             <FadeIn key="loading" className="flex items-center justify-center min-h-[400px]">
@@ -435,6 +491,7 @@ export default function DeliveryAssignmentsList() {
                                         <DeliveryAssignmentGridCard
                                             key={assignment.assignment_id}
                                             assignment={assignment}
+                                            onView={(item) => openEntity("view", item.assignment_id)}
                                         />
                                     ))}
                                 </div>
@@ -516,6 +573,7 @@ export default function DeliveryAssignmentsList() {
                                                     <DeliveryAssignmentListRow
                                                         key={assignment.assignment_id}
                                                         assignment={assignment}
+                                                        onView={(item) => openEntity("view", item.assignment_id)}
                                                     />
                                                 ))}
                                             </tbody>

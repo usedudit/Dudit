@@ -29,7 +29,7 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
   const activeStoreId = await getActiveStoreId();
 
   // Store e queries de fallback
-  const STORE_SELECT = "id, name, slug, logo_url, banner_url, phone, is_showcase_active, partner_id, addresses!store_id!left(city, state)"
+  const STORE_SELECT = "id, name, slug, logo_url, banner_url, phone, is_showcase_active, partner_id, category_id, opening_hours, addresses!store_id!left(city, state)"
 
   // 1. Executa todas as consultas ao DB de forma paralela e agregada
   const [
@@ -38,6 +38,7 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
     storeByPartnerRes,
     addressRes,
     paymentMethodsRes,
+    deliverySettingsRes,
     productsCountRes,
     servicesCountRes,
     ordersCountRes,
@@ -74,6 +75,13 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
       .from("payment_methods")
       .select("id, type, is_active")
       .eq("partner_id", partnerId),
+
+    // Configurações de entrega
+    supabase
+      .from("delivery_settings")
+      .select("id, base_fee, included_km, extra_km_price, max_delivery_km, is_delivery_enabled, free_delivery_threshold, delivery_payer")
+      .eq("partner_id", partnerId)
+      .limit(1),
 
     // Contagem de produtos
     supabase
@@ -158,10 +166,16 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
   const sellsServices = isSystemResourceActive(businessInfo, "services");
 
   const hasPhone = !!store?.phone;
-  const hasCategory = !!partner.category_id;
+  const hasCategory = !!(store?.category_id || partner.category_id);
   const addressData = addressRes.data || [];
   const hasAddress = Array.isArray(addressData) ? addressData.length > 0 : !!addressData;
-  const hasHours = !!store?.opening_hours && Object.keys(store.opening_hours).length > 0;
+
+  // Verifica se pelo menos 1 dia está habilitado nos horários
+  const openingHours = store?.opening_hours;
+  const hasHours = !!openingHours && typeof openingHours === "object" && Object.values(openingHours).some(
+    (day: any) => day?.enabled === true
+  );
+
   const hasPix = (paymentMethodsRes.data || []).some(
     (m: any) => (m.type === "pix" || m.payment_type === "pix") && m.is_active
   );
@@ -172,10 +186,24 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
 
   const logoUrl = store?.logo_url
   const bannerUrl = store?.banner_url
-  const hasLogoAndBanner = !!logoUrl && !!bannerUrl && !bannerUrl.includes("default/");
+  // Considera completo se tem logo OU (banner e não é o default)
+  const hasLogo = !!logoUrl;
+  const hasCustomBanner = !!bannerUrl && !bannerUrl.includes("default/");
+  const hasLogoAndBanner = hasLogo || hasCustomBanner;
 
   const isWhatsAppConnected = (whatsappConnRes.data || []).length > 0;
   const isMercadoPagoConnected = !!partner.mp_user_id;
+
+  // Verifica se configurou entregas (baseFee, includedKm, etc.)
+  const deliverySettings = deliverySettingsRes.data?.[0];
+  const hasDeliveryConfig = !!deliverySettings && (
+    (deliverySettings.base_fee > 0) ||
+    (deliverySettings.included_km > 0) ||
+    (deliverySettings.extra_km_price > 0) ||
+    (deliverySettings.max_delivery_km > 0) ||
+    (deliverySettings.free_delivery_threshold > 0) ||
+    (deliverySettings.delivery_payer === "seller")
+  );
 
   const planSlug = (plan?.slug || "free") as "free" | "crescer" | "escalar";
 
@@ -203,6 +231,7 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
     hasPix,
     hasItems,
     hasLogoAndBanner,
+    hasDeliveryConfig,
     isWhatsAppConnected,
     isMercadoPagoConnected,
     stats: {
@@ -256,12 +285,14 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
   const partnerUrl = store && storeSlug && storeId
     ? getStoreUrl({
       id: storeId,
+      short_id: store.short_id,
       slug: storeSlug,
       name: store.name,
       city: storeCity,
       state: storeState,
     })
     : "/";
+
 
   if (!store && (addressData.length > 0 || partnerRes.data)) {
     console.warn("[DASHBOARD] Loja não encontrada, partnerUrl será '/'", { partnerId, storeSlug, storeId });

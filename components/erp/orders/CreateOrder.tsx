@@ -689,13 +689,9 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     useEffect(() => {
         if (deliveryMethod !== "delivery" || deliveryPeople.length > 0) return
         async function loadDeliveryPeople() {
-            const [legacy, platform] = await Promise.all([
-                fetchDeliveryPeopleBucketAction(partnerId),
-                fetchAvailablePlatformDeliveryDriversAction(partnerId).catch(() => []),
-            ])
+            const legacy = await fetchDeliveryPeopleBucketAction(partnerId).catch(() => [])
             setDeliveryPeople([
                 ...(legacy || []).map((person: any) => ({ ...person, source: "legacy" as const })),
-                ...(platform || []).map((person: any) => ({ ...person, id: `platform:${person.id}`, source: "platform" as const })),
             ])
         }
         void loadDeliveryPeople()
@@ -1993,14 +1989,13 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 <DeliveryDriverPickerSheet
                     isOpen={isDriverSheetOpen}
                     onClose={() => setIsDriverSheetOpen(false)}
-                    drivers={deliveryPeople
-                        .filter((person) => person.source === "platform")
-                        .map((person) => ({
-                            id: person.id,
-                            fullName: person.fullName,
-                            vehicleType: person.vehicleType,
-                        }))}
-                    onSelect={setSelectedDeliveryPersonId}
+                    partnerId={partnerId}
+                    orderId={editOrderId || (orderId !== "new" ? orderId : undefined)}
+                    orderNumber={editOrderId ? String(editOrderId).slice(0, 8) : undefined}
+                    destinationAddress={street ? `${street}, ${number || "S/N"} - ${neighborhood}, ${city}` : undefined}
+                    deliveryFee={Number(shippingFee) || 0}
+                    onDeliveryRequested={() => setSelectedDeliveryPersonId("platform:dudit_network")}
+                    onSelect={(driverId) => setSelectedDeliveryPersonId(driverId)}
                 />
 
                 <SelectCustomerSheet

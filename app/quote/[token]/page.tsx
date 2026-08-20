@@ -1,6 +1,7 @@
 import { getPublicQuoteAction } from "@/app/actions/erp/quotes"
 import { headers } from "next/headers"
-import { notFound } from "next/navigation"
+import { notFound, permanentRedirect } from "next/navigation"
+import { isUuid } from "@/lib/utils/short-id"
 import PublicQuotePortal from "@/components/public/PublicQuotePortal"
 
 interface PageProps {
@@ -21,12 +22,18 @@ export default async function PublicQuotePage({ params }: PageProps) {
         notFound()
     }
 
+    const canonicalToken = res.data.quote?.public_token
+    if (canonicalToken && canonicalToken !== token && isUuid(token)) {
+        permanentRedirect(`/quote/${canonicalToken}`)
+    }
+
     return (
         <PublicQuotePortal
-            token={token}
+            token={canonicalToken || token}
             initialData={res.data}
             ip={ip}
             userAgent={userAgent}
         />
     )
 }
+

@@ -166,12 +166,6 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
                     <SidebarCard hasTopStrip title="Configurações">
                         <div className="space-y-4">
                             <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
-                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Destacar Serviço</span>
-                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                    {serviceData?.highlight_service ? "Sim" : "Não"}
-                                </span>
-                            </div>
-                            <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
                                 <span className="text-sm text-brand-inactive-text dark:text-dark-body">Tipo de Serviço</span>
                                 <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
                                     {serviceTypeLabel}
@@ -358,18 +352,6 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
                     <h3 className="text-lg font-bold mb-6 mt-2 text-brand-dark dark:text-dark-heading">Configurações</h3>
 
                     <div className="space-y-5">
-                        <FormDropdown
-                            label="Destacar Serviço"
-                            options={[
-                                { value: "true", label: "Sim" },
-                                { value: "false", label: "Não" },
-                            ]}
-                            value={String(serviceData?.highlight_service || "false")}
-                            setValue={(v) => manualChange("highlight_service", v === "true")}
-                            disabled={!isEditing}
-                            width="w-full"
-                        />
-
                         <FormDropdown
                             label="Tipo de Serviço"
                             options={[

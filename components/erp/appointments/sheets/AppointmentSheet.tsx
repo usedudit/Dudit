@@ -506,8 +506,8 @@ export const AppointmentSheet = ({
     const needsRangePicker = useMemo(() => {
         if (selectedServices.length === 0) return false;
         // If ANY service is not 'Por Serviço' or duration >= 1440 min (1 day)
-        return selectedServices.some(s => 
-            (s.pricingUnit && s.pricingUnit !== 'Por Serviço') || 
+        return selectedServices.some(s =>
+            (s.pricingUnit && s.pricingUnit !== 'Por Serviço') ||
             (Number(s.duration || 0) >= 1440)
         );
     }, [selectedServices]);

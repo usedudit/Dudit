@@ -5,11 +5,15 @@ import { useState, useRef, useEffect, useCallback } from "react"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { Button } from "@/components/reusable/Button"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/reusable/Tabs"
-import { ImageOffIcon } from "@/lib/icons"
+import { ImageIcon, ImageOffIcon } from "@/lib/icons"
 import ImageCropperModal from "@/components/ImageCropperModal"
 import { useR2Upload } from "@/hooks/use-r2-upload"
 import { planStarIconForTarget } from "@/components/erp/subscription/PlanUpgradeModal"
 import { isGifFile } from "@/lib/security/file-validator"
+import { WebsiteInput } from "./Inputs/WebsiteInput"
+import Input from "./Input"
+import { InfoCard } from "./InfoCard"
+import IconPlaceholder from "./IconPlaceholder"
 
 interface EditImageData {
   url: string
@@ -163,13 +167,11 @@ export const InsertImageModal: React.FC<InsertImageModalProps> = ({
               )}
             </div>
             <div>
-              <label className="block text-sm font-medium text-brand-dark/80 dark:text-dark-body mb-1">Link da imagem</label>
-              <input
-                type="url"
+              <WebsiteInput
+                label="Link da imagem"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://..."
-                className="w-full px-3 py-2 border border-brand-border dark:border-dark-border rounded-lg bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading text-sm focus:outline-none focus:ring-2 focus:ring-brand-green/30"
+                className="w-full"
               />
             </div>
           </TabsContent>
@@ -190,13 +192,18 @@ export const InsertImageModal: React.FC<InsertImageModalProps> = ({
               </div>
             ) : (
               <div>
+                <IconPlaceholder
+                  icon={ImageIcon}
+                  title="Upload de imagem"
+                  subtitle="Selecione uma imagem para recortar e enviar."
+                />
                 <input
                   ref={fileInputRef}
                   type="file"
                   accept="image/png, image/jpeg, image/webp, image/avif"
                   onChange={handleFileSelect}
                   disabled={isUploading}
-                  className="block w-full text-sm text-brand-dark dark:text-dark-body file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-brand-green/10 file:text-brand-green hover:file:bg-brand-green/20 cursor-pointer file:cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="block w-full"
                 />
                 {uploadError && (
                   <div className="mt-2 text-sm text-red-500">{uploadError}</div>
@@ -214,48 +221,41 @@ export const InsertImageModal: React.FC<InsertImageModalProps> = ({
 
         <div className="flex flex-col gap-4 mt-4">
           <div>
-            <label className="block text-sm font-medium text-brand-dark/80 dark:text-dark-body mb-1">
-              Texto alternativo (alt)
-            </label>
-            <input
-              type="text"
+            <Input
+              label="Texto alternativo (alt)"
               value={alt}
               onChange={(e) => setAlt(e.target.value)}
               placeholder="Descrição da imagem"
-              className="w-full px-3 py-2 border border-brand-border dark:border-dark-border rounded-lg bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading text-sm focus:outline-none focus:ring-2 focus:ring-brand-green/30"
+              className="w-full"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-brand-dark/80 dark:text-dark-body mb-1">Largura (px)</label>
-              <input
-                type="number"
+              <Input
+                label="Largura (px)"
                 min={50}
                 max={MAX_DIMENSION}
                 value={width}
                 onChange={(e) => setWidth(String(Math.min(MAX_DIMENSION, Math.max(50, Number(e.target.value) || 50))))}
-                className="w-full px-3 py-2 border border-brand-border dark:border-dark-border rounded-lg bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading text-sm focus:outline-none focus:ring-2 focus:ring-brand-green/30"
+                className="w-full"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-brand-dark/80 dark:text-dark-body mb-1">Altura (px)</label>
-              <input
-                type="number"
+              <Input
+                label="Altura (px)"
                 min={0}
                 max={MAX_DIMENSION}
                 value={height}
                 onChange={(e) => setHeight(e.target.value ? String(Math.min(MAX_DIMENSION, Number(e.target.value))) : "")}
                 placeholder="Automático"
-                className="w-full px-3 py-2 border border-brand-border dark:border-dark-border rounded-lg bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading text-sm focus:outline-none focus:ring-2 focus:ring-brand-green/30"
+                className="w-full"
               />
             </div>
           </div>
 
           {atLimit && (
-            <div className="text-sm text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-2.5 rounded-lg">
-              Limite de {MAX_IMAGES} imagens atingido.
-            </div>
+            <InfoCard message={`Limite de ${MAX_IMAGES} imagens atingido.`} color="red" />
           )}
 
           <div className="flex justify-end gap-2 pt-2">

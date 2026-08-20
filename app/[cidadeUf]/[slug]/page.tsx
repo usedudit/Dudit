@@ -9,15 +9,15 @@ import { buildStoreCitySlug } from '@/app/actions/marketplace/stores-utils'
 import { StorePage, generateStoreMetadata } from './store-page'
 
 const CATEGORY_SLUG_MAP: { [key: string]: string } = {
-  "casa-e-utilidades": "Casa & Utilidades",
-  "moda-e-beleza": "Moda & Beleza",
-  "saude-e-bem-estar": "Saúde & Bem-estar",
-  "tecnologia-e-eletronicos": "Tecnologia & Eletrônicos",
-  "auto-e-moto": "Auto & Moto",
+  "alimentacao": "Alimentação",
+  "casa": "Casa",
+  "tecnologia": "Tecnologia",
+  "moda-e-beleza": "Moda e Beleza",
+  "saude": "Saúde",
+  "automotivo": "Automotivo",
   "pets": "Pets",
-  "construcao-e-ferramentas": "Construção & Ferramentas",
-  "agro-e-jardim": "Agro & Jardim",
-  "infantil-e-brinquedos": "Infantil & Brinquedos"
+  "servicos": "Serviços",
+  "outros": "Outros"
 }
 
 const revalidate = 86400
