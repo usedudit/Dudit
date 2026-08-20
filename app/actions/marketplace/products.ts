@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/lib/auth/server-user"
 import { MarketplaceSearchType } from "@/lib/types/marketplace"
 import { resolveProduct } from "@/lib/store-products"
 import { filterMarketplaceVisibleProducts } from "@/lib/resolve-marketplace-visibility"
+import { isUuid } from "@/lib/utils/short-id"
 
 // --- 1. PRODUTOS DA HOME (LISTAGEM) ---
 // NO unstable_cache - Redis is the single source of truth.
@@ -28,7 +29,7 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
   let query = supabase
     .from("products")
     .select(`
-      id, store_id, name, description, price, promotional_price, stock_quantity, stock_available, availability_value, availability_unit,
+      id, short_id, store_id, name, description, price, promotional_price, stock_quantity, stock_available, availability_value, availability_unit,
       is_active, status, moderation_status,
       category_id, category:product_categories!category_id(name),
       subcategory_id, subcategory:product_categories!subcategory_id(name),
@@ -53,7 +54,13 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
         addresses!store_id!left(city, state, latitude, longitude)
       )
     `)
-    .eq("id", id)
+
+  if (isUuid(id)) {
+    query = query.eq("id", id)
+  } else {
+    query = query.eq("short_id", id)
+  }
+
 
   if (storeId) {
     query = query.eq("store_id", storeId)
@@ -166,10 +173,15 @@ async function _getMarketplaceProduct(id: string, storeId?: string | null) {
 // --- VARIANTES (DIRECT - NO CACHE) ---
 async function _getProductVariants(productId: string) {
   const supabase = getAdminClient()
+  let resolvedId = productId
+  if (!isUuid(productId)) {
+    const { data: prod } = await supabase.from("products").select("id").eq("short_id", productId).maybeSingle()
+    if (prod?.id) resolvedId = prod.id
+  }
   const { data } = await supabase
     .from("product_variants")
     .select("*")
-    .eq("product_id", productId)
+    .eq("product_id", resolvedId)
     .eq("is_active", true)
     .order("price_adjustment", { ascending: true })
   return data || []
@@ -178,10 +190,15 @@ async function _getProductVariants(productId: string) {
 // --- REVIEWS (DIRECT - NO CACHE) ---
 async function _getProductReviews(productId: string, storeId?: string | null) {
   const supabase = getAdminClient()
+  let resolvedId = productId
+  if (!isUuid(productId)) {
+    const { data: prod } = await supabase.from("products").select("id").eq("short_id", productId).maybeSingle()
+    if (prod?.id) resolvedId = prod.id
+  }
   let query = supabase
     .from("reviews")
     .select("id, rating, comment, created_at, user_id, product_id, store_id")
-    .eq("product_id", productId)
+    .eq("product_id", resolvedId)
 
   if (storeId) {
     query = query.or(`store_id.eq.${storeId},store_id.is.null`)
@@ -190,6 +207,7 @@ async function _getProductReviews(productId: string, storeId?: string | null) {
   const { data: reviewsData, error } = await query
     .order("created_at", { ascending: false })
     .limit(20)
+
 
   if (error || !reviewsData) {
     console.error("[Reviews] Fetch error:", error?.message)

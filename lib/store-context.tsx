@@ -9,7 +9,9 @@ import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
 
 interface Store {
   id: string
+  short_id?: string | null
   partner_id: string
+
   name: string
   slug: string | null
   description: string | null

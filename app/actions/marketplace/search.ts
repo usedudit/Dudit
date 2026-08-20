@@ -731,12 +731,12 @@ async function hydrateMarketplaceSearchHits(
         _hydrateProdIdx = promises.length
         promises.push(
             supabase.from("products").select(`
-                id, status, name, description, price, promotional_price, stock_available, stock_quantity, images, rating,
+                id, short_id, status, name, description, price, promotional_price, stock_available, stock_quantity, images, rating,
                 category_id, category:product_categories!category_id(name), created_at,
                 marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
                 subcategory_id, subcategory:product_categories!subcategory_id(name),
                 partners(id, is_showcase_active),
-                stores!left(id, name, slug, logo_url, banner_url, addresses!store_id!left(city, state, neighborhood)),
+                stores!left(id, short_id, name, slug, logo_url, banner_url, addresses!store_id!left(city, state, neighborhood)),
                 product_variants(variant_options, price_adjustment, is_active),
                 show_price_in_store
             `)
@@ -749,10 +749,10 @@ async function hydrateMarketplaceSearchHits(
         _hydrateServIdx = promises.length
         promises.push(
             supabase.from("services").select(`
-                id, status, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
+                id, short_id, status, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
                 marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
                 partners(id, is_showcase_active),
-                stores!left(id, name, slug, logo_url, banner_url, addresses!store_id!left(city, state, neighborhood)),
+                stores!left(id, short_id, name, slug, logo_url, banner_url, addresses!store_id!left(city, state, neighborhood)),
                 show_price_in_store
             `)
                 .in("id", servicosIds)
@@ -763,7 +763,7 @@ async function hydrateMarketplaceSearchHits(
     if (lojasIds.length > 0) {
         promises.push(
             supabase.from("stores").select(`
-                id, name, slug, description, logo_url, banner_url, rating, created_at, is_showcase_active, partner_id, addresses!store_id!left(city, state, neighborhood),
+                id, short_id, name, slug, description, logo_url, banner_url, rating, created_at, is_showcase_active, partner_id, addresses!store_id!left(city, state, neighborhood),
                 partners!inner(id, created_at, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), reviews(count))
             `).in("id", lojasIds)
         )
@@ -771,9 +771,9 @@ async function hydrateMarketplaceSearchHits(
     if (planosIds.length > 0) {
         promises.push(
             supabase.from("recurring_plans").select(`
-                id, name, description, status, show_in_marketplace, partner_id, frequency_type, frequency_interval, created_at,
+                id, short_id, name, description, status, show_in_marketplace, partner_id, frequency_type, frequency_interval, created_at,
                 partners(id, is_showcase_active),
-                stores!left(id, name, logo_url, banner_url, addresses!store_id!left(city, state, neighborhood)),
+                stores!left(id, short_id, name, logo_url, banner_url, addresses!store_id!left(city, state, neighborhood)),
                 recurring_plan_items(
                     id, item_type, product_id, variant_id, service_id, quantity, unit_price,
                     products:product_id(id, name, price, images),
@@ -809,6 +809,7 @@ async function hydrateMarketplaceSearchHits(
             const storeImage = item.logo_url
             results.push({
                 id: storeId,
+                short_id: item.short_id,
                 name: storeName,
                 slug: item.slug,
                 description: item.description,
@@ -818,6 +819,7 @@ async function hydrateMarketplaceSearchHits(
                 category: item.partners?.category?.parent?.name || item.partners?.category?.name || "Loja Parceira",
                 partners: {
                     id: storeId,
+                    short_id: item.short_id,
                     store_id: storeId,
                     store_name: storeName,
                     slug: item.slug,
@@ -856,6 +858,7 @@ async function hydrateMarketplaceSearchHits(
         const partner = rawPartner ? {
             ...rawPartner,
             store_id: storeId,
+            short_id: rawStore?.short_id || rawPartner?.short_id,
             store_name: storeName,
             slug: rawStore?.slug,
             store_image_url: storeImage,
@@ -866,6 +869,7 @@ async function hydrateMarketplaceSearchHits(
             state: storeState,
             neighborhood: storeNeighborhood,
         } : null
+
 
         if (hit.item_type === "produto") {
             const variantFallback = extractFirstVariantFallback(item.product_variants, Number(item.price))
@@ -1113,12 +1117,12 @@ async function searchMarketplaceByCity(
             let pq = supabase
                 .from("products")
                 .select(`
-                    id, status, name, description, price, promotional_price, stock_available, stock_quantity, images, rating,
+                    id, short_id, status, name, description, price, promotional_price, stock_available, stock_quantity, images, rating,
                     category_id, category:product_categories!category_id(name), created_at,
                     marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
                     subcategory_id, subcategory:product_categories!subcategory_id(name),
                     partners!inner(id, is_showcase_active),
-                    stores!left(id, name, slug, logo_url, banner_url, addresses!store_id!left(city, state, neighborhood)),
+                    stores!left(id, short_id, name, slug, logo_url, banner_url, addresses!store_id!left(city, state, neighborhood)),
                     product_variants(variant_options, price_adjustment, is_active),
                     show_price_in_store
                 `)
@@ -1137,10 +1141,10 @@ async function searchMarketplaceByCity(
             let sq = supabase
                 .from("services")
                 .select(`
-                    id, status, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
+                    id, short_id, status, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
                     marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
                     partners!inner(id, is_showcase_active),
-                    stores!left(id, name, slug, logo_url, banner_url, addresses!store_id!left(city, state, neighborhood, latitude, longitude)),
+                    stores!left(id, short_id, name, slug, logo_url, banner_url, addresses!store_id!left(city, state, neighborhood, latitude, longitude)),
                     show_price_in_store
                 `)
                 .eq("status", "ativo")
@@ -1158,8 +1162,9 @@ async function searchMarketplaceByCity(
             let rq = supabase
                 .from("recurring_plans")
                 .select(`
-                    id, name, description, status, show_in_marketplace, partner_id, frequency_type, frequency_interval, created_at,
+                    id, short_id, name, description, status, show_in_marketplace, partner_id, frequency_type, frequency_interval, created_at,
                     partners!inner(id, is_showcase_active),
+                    stores!left(id, short_id, name, logo_url, banner_url, addresses!store_id!left(city, state, neighborhood)),
                     recurring_plan_items(
                         id, item_type, product_id, variant_id, service_id, quantity, unit_price,
                         products:product_id(id, name, price, images),
@@ -1171,6 +1176,7 @@ async function searchMarketplaceByCity(
                 .in("partner_id", partnerIds)
                 .order("created_at", { ascending: false })
                 .limit(type === 'planos' || type === 'tudo' ? limitCount : 0)
+
 
             if (limits.cursor) {
                 rq = rq.lt("created_at", new Date(limits.cursor).toISOString())

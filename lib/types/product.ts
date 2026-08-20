@@ -18,7 +18,9 @@ export interface ProductAddonGroup {
 
 export interface Product {
   id: string
+  short_id?: string | null
   name: string
+
   description: string | null
   price: number
   stock_quantity: number

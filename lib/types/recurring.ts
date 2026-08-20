@@ -20,6 +20,8 @@ export type RecurringPlanItem = {
 
 export type RecurringPlan = {
   id: string
+  shortId?: string | null
+  short_id?: string | null
   partnerId: string
   name: string
   description: string | null
@@ -92,8 +94,11 @@ export type RecurringListCursor = { createdAt: string; id: string }
 export function mapPlanRow(row: Record<string, unknown>): RecurringPlan {
   return {
     id: String(row.id),
+    shortId: row.short_id != null ? String(row.short_id) : undefined,
+    short_id: row.short_id != null ? String(row.short_id) : undefined,
     partnerId: String(row.partner_id),
     name: String(row.name || ""),
+
     description: row.description != null ? String(row.description) : null,
     status: row.status as RecurringPlanStatus,
     frequencyType: row.frequency_type as RecurringFrequencyType,

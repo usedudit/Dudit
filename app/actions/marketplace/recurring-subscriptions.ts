@@ -8,6 +8,8 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { sanitizeNotes } from "@/lib/input-validator"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { mapPlanRow, mapSubscriptionRow, getRecurringStatusLabel, getRecurringFrequencyLabel } from "@/lib/types/recurring"
+import { isUuid } from "@/lib/utils/short-id"
+
 
 export async function listMarketplaceRecurringPlansAction(partnerId: string) {
   try {
@@ -303,7 +305,7 @@ async function updateMySubscriptionStatus(
 export async function getMarketplaceRecurringPlanAction(planId: string) {
   try {
     const admin = getAdminClient()
-    const { data, error } = await admin
+    let query = admin
       .from("recurring_plans")
       .select(`
         *,
@@ -323,10 +325,18 @@ export async function getMarketplaceRecurringPlanAction(planId: string) {
           services:service_id(id, name, price, duration_minutes)
         )
       `)
-      .eq("id", planId)
+
+    if (isUuid(planId)) {
+      query = query.eq("id", planId)
+    } else {
+      query = query.eq("short_id", planId)
+    }
+
+    const { data, error } = await query
       .eq("status", "active")
       .eq("show_in_marketplace", true)
       .maybeSingle()
+
 
     if (error) throw error
 

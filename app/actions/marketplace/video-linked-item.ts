@@ -4,8 +4,9 @@ import { getAdminClient } from "@/lib/supabase/admin"
 import { cache } from "react"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
-import { getProductUrl, getServiceUrl } from "@/lib/utils/url-generator"
+import { getProductUrl, getServiceUrl, getCollectionUrl } from "@/lib/utils/url-generator"
 import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images"
+
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { filterMarketplaceVisibleProducts, filterMarketplaceVisibleServices } from "@/lib/resolve-marketplace-visibility"
 
@@ -151,9 +152,10 @@ async function _getLinkedItemData(type: string, id: string, storeId?: string): P
       id: collection.id,
       name: collection.name,
       imageUrl,
-      url: `/colecoes/${collection.id}`,
+      url: getCollectionUrl(collection),
       itemsCount: collection.items_count || 0,
     }
+
   }
 
   return null

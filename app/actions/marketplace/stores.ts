@@ -5,6 +5,7 @@ import { unstable_cache } from "next/cache"
 import { createAdminClient } from "@/lib/supabase/server"
 import { listStoreProducts } from "@/lib/store-products"
 import { listStoreServices } from "@/lib/store-services"
+import { isUuid } from "@/lib/utils/short-id"
 
 const storeBySlugCacheMap = new Map<string, any>()
 const storeByIdCacheMap = new Map<string, any>()
@@ -60,27 +61,48 @@ export const getCachedStoreById = async (storeId: string) => {
         fn = unstable_cache(
             async () => {
                 const supabase = createAdminClient()
-                let { data, error } = await supabase
+                const isIdentifierUuid = isUuid(storeId)
+
+                let query = supabase
                     .from("stores")
                     .select(`
                         *,
                         addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default, latitude, longitude),
                         partners!left(id, business_info, created_at, payment_methods(*))
                     `)
-                    .eq("id", storeId)
-                    .maybeSingle()
+
+                if (isIdentifierUuid) {
+                    query = query.eq("id", storeId)
+                } else {
+                    query = query.eq("short_id", storeId)
+                }
+
+                let { data, error } = await query.maybeSingle()
 
                 if (!data && !error) {
-                    const fallback = await supabase
-                        .from("stores")
-                        .select(`
-                            *,
-                            addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default, latitude, longitude),
-                            partners!left(id, business_info, created_at, payment_methods(*))
-                        `)
-                        .eq("partner_id", storeId)
-                        .maybeSingle()
-                    if (fallback.data) data = fallback.data
+                    if (isIdentifierUuid) {
+                        const fallback = await supabase
+                            .from("stores")
+                            .select(`
+                                *,
+                                addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default, latitude, longitude),
+                                partners!left(id, business_info, created_at, payment_methods(*))
+                            `)
+                            .eq("partner_id", storeId)
+                            .maybeSingle()
+                        if (fallback.data) data = fallback.data
+                    } else {
+                        const fallbackSlug = await supabase
+                            .from("stores")
+                            .select(`
+                                *,
+                                addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default, latitude, longitude),
+                                partners!left(id, business_info, created_at, payment_methods(*))
+                            `)
+                            .eq("slug", storeId)
+                            .maybeSingle()
+                        if (fallbackSlug.data) data = fallbackSlug.data
+                    }
                 }
 
                 if (error) console.error("[getCachedStoreById] Erro na query:", error.message, { storeId })
@@ -94,6 +116,7 @@ export const getCachedStoreById = async (storeId: string) => {
     }
     return fn()
 }
+
 
 export const getCachedStoreProducts = async (storeId: string, partnerId: string) => {
     const mapKey = `${storeId}:${partnerId}`

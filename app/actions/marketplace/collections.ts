@@ -10,12 +10,13 @@ import { safeRevalidateTag } from "@/lib/utils/revalidation"
 import { moderateProductContent } from "@/lib/moderation/product-moderation"
 import { filterMarketplaceVisibleProducts, filterMarketplaceVisibleServices } from "@/lib/resolve-marketplace-visibility"
 import { AVATAR_COLORS, getBannerUrlByColor } from "@/lib/utils/avatar"
+import { isUuid } from "@/lib/utils/short-id"
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 type ActionResult<T = void> = { success: true; data?: T } | { success: false; error: string }
 
-export async function createCollection(name: string, description?: string): Promise<ActionResult<{ id: string }>> {
+export async function createCollection(name: string, description?: string): Promise<ActionResult<{ id: string; short_id?: string }>> {
   try {
     await requireRateLimit(RateLimitCategory.COLLECTION_CREATE)
     const user = await requireUser()
@@ -43,17 +44,18 @@ export async function createCollection(name: string, description?: string): Prom
     const { data, error } = await supabase
       .from("collections")
       .insert({ name: name.trim(), description: description?.trim() || null, author_id: user.id, cover_url: bannerUrl, banner_color: randomColor })
-      .select("id")
+      .select("id, short_id")
       .single()
 
     if (error) return { success: false, error: error.message }
 
     await safeRevalidateTag(TAGS.colecoes)
-    return { success: true, data: { id: data.id } }
+    return { success: true, data: { id: data.id, short_id: data.short_id } }
   } catch (err: any) {
     return { success: false, error: err.message || "Erro ao criar coleção" }
   }
 }
+
 
 export async function updateCollection(id: string, name: string, description?: string): Promise<ActionResult> {
   try {
@@ -228,7 +230,7 @@ export async function getItemCollectionIds(userId: string, itemType: string, ite
 export async function getCollection(id: string) {
   const supabase = getAdminClient()
 
-  const { data: collection, error } = await supabase
+  let query = supabase
     .from("collections")
     .select(`
       *,
@@ -239,8 +241,15 @@ export async function getCollection(id: string) {
         sort_order
       )
     `)
-    .eq("id", id)
-    .single()
+
+  if (isUuid(id)) {
+    query = query.eq("id", id)
+  } else {
+    query = query.eq("short_id", id)
+  }
+
+  const { data: collection, error } = await query.maybeSingle()
+
 
   if (error) {
     console.error("getCollection error:", error)

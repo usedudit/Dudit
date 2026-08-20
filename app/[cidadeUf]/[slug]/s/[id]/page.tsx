@@ -107,8 +107,9 @@ export default async function ServiceDetailsPage({
     const resolvedPartnerId = partner?.id || service.partner_id
     const [staff, reviews, detailAds, partnerPlan] = await Promise.all([
         getServiceStaffMembers(resolvedPartnerId, storeId),
-        getServiceReviews(id, storeId),
+        getServiceReviews(service.id, storeId),
         getSponsoredAdsForSlot("detail", {
+
             lat: userProfile?.latitude ?? null,
             lng: userProfile?.longitude ?? null,
             citySlug: currentCidadeUf,

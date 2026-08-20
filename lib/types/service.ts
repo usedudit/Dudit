@@ -1,6 +1,8 @@
 export interface Service {
   id: string
+  short_id?: string | null
   partner_id: string
+
   store_id: string
   name: string
   description: string | null

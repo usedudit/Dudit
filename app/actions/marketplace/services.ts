@@ -8,6 +8,7 @@ import { resolveService } from "@/lib/store-services"
 import { filterMarketplaceVisibleServices } from "@/lib/resolve-marketplace-visibility"
 import { getSaoPauloDateComponents } from "@/lib/utils/formatters"
 import { startOfDay } from "@/lib/date"
+import { isUuid } from "@/lib/utils/short-id"
 
 // ─── Constants (mirrored from ERP appointments.ts) ─────────────────────────
 const DEFAULT_BUSINESS_HOURS = { startHour: 8, startMinute: 0, endHour: 19, endMinute: 0 }
@@ -28,7 +29,7 @@ async function _getMarketplaceService(serviceId: string, storeId?: string | null
   let query = supabase
     .from("services")
     .select(`
-      id, partner_id, store_id, name, description, price, duration_minutes,
+      id, short_id, partner_id, store_id, name, description, price, duration_minutes,
       images, is_active, status, rating, category_id, subcategory_id, sku, unit,
       show_in_marketplace, tags, price_type, billing_unit, video_url, video_type,
       video_thumbnail, video_duration, video_provider_id, service_type,
@@ -56,7 +57,13 @@ async function _getMarketplaceService(serviceId: string, storeId?: string | null
         addresses!store_id!left(city, state, latitude, longitude)
       )
     `)
-    .eq("id", serviceId)
+
+  if (isUuid(serviceId)) {
+    query = query.eq("id", serviceId)
+  } else {
+    query = query.eq("short_id", serviceId)
+  }
+
 
   if (storeId) {
     query = query.eq("store_id", storeId)
@@ -151,6 +158,11 @@ export const getMarketplaceService = cache(_getMarketplaceService)
  */
 export async function getServiceReviews(serviceId: string, storeId?: string | null) {
   const supabase = getAdminClient()
+  let resolvedId = serviceId
+  if (!isUuid(serviceId)) {
+    const { data: srv } = await supabase.from("services").select("id").eq("short_id", serviceId).maybeSingle()
+    if (srv?.id) resolvedId = srv.id
+  }
   let query = supabase
     .from("reviews")
     .select(`
@@ -158,11 +170,12 @@ id, rating, comment, created_at, product_id, service_id, store_id,
       products:product_id(name, images, unit),
       services:service_id(name, images, unit)
     `)
-    .eq("service_id", serviceId)
+    .eq("service_id", resolvedId)
 
   if (storeId) {
     query = query.or(`store_id.eq.${storeId},store_id.is.null`)
   }
+
 
   const { data: reviewsData, error } = await query
     .order("created_at", { ascending: false })

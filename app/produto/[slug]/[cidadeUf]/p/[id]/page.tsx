@@ -113,9 +113,10 @@ export default async function ProductDetailsPage({
 
   // 2. Fetch variants + reviews in parallel (Deduplicated but fresh)
   const [variants, reviews] = await Promise.all([
-    getProductVariants(id),
-    getProductReviews(id)
+    getProductVariants(product.id),
+    getProductReviews(product.id)
   ])
+
 
   // Lógica de Preço Mínimo para Variante
   const minPrice = variants && variants.length > 0

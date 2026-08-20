@@ -155,8 +155,11 @@ export function ProductDetailsPageClient({
     const router = useRouter()
     const showPrice = product.show_price_in_store !== false
     const { user, supabase, isLoading } = useSupabase()
+    const { success: notifySuccess, error: notifyError } = useNotification()
 
     const [userId, setUserId] = useState<string | null | undefined>(initialUserId || user?.id)
+
+
     const [activeImgIndex, setActiveImgIndex] = useState(product.primary_image_index || 0)
     const [slideDirection, setSlideDirection] = useState<1 | -1>(1)
     const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({})
@@ -855,9 +858,8 @@ export function ProductDetailsPageClient({
         setCep(raw.length > 5 ? `${raw.slice(0, 5)}-${raw.slice(5)}` : raw)
     }, [])
 
-    const { success: notifySuccess, error: notifyError } = useNotification()
-
     const handleAddToCart = useCallback(async () => {
+
         if (!userId) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname))
         if (isActionInProgress.current) return
         if (productAddons.length > 0 && !validateAddons()) return

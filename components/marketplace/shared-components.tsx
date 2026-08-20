@@ -569,7 +569,8 @@ export const ProductCarousel: React.FC<ProductCarouselProps> = ({
                 <div className="flex overflow-x-auto gap-4 md:gap-6 px-4 lg:px-0 scrollbar-hide pb-4 snap-x snap-mandatory">
                     {products.map((store: any) => {
                         const storeSlug = store.slug || store.store_name?.toLowerCase().replace(/\s+/g, "-") || store.id
-                        const storeUrl = getStoreUrl({ id: store.id, slug: store.slug, store_name: store.store_name, city: store.city, state: store.state })
+                        const storeUrl = getStoreUrl({ id: store.id, short_id: store.short_id, slug: store.slug, store_name: store.store_name, city: store.city, state: store.state })
+
                         const storeImage = store.store_avatar || store.store_image_url
                         const imgUrl = storeImage
                             ? (storeImage.includes("Placeholder.png") || storeImage.includes("dudit.com.br/static")

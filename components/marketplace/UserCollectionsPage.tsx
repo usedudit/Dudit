@@ -8,9 +8,11 @@ import { CollectionCard } from "@/components/marketplace/CollectionCard"
 import { createCollection } from "@/app/actions/marketplace/collections"
 import { Button, DefaultModal, Input, FormTextarea, IconPlaceholder } from "@/components/reusable"
 import { PlusIcon } from "@/lib/icons"
+import { getCollectionUrl } from "@/lib/utils/url-generator"
 
 interface Collection {
     id: string
+    short_id?: string | null
     name: string
     description?: string | null
     cover_url?: string | null
@@ -28,6 +30,7 @@ interface UserCollectionsPageProps {
 
 export function UserCollectionsPage({ collections: initialCollections }: UserCollectionsPageProps) {
     const router = useRouter()
+    const [collections, setCollections] = useState(initialCollections)
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
     const [name, setName] = useState("")
     const [description, setDescription] = useState("")
@@ -36,10 +39,11 @@ export function UserCollectionsPage({ collections: initialCollections }: UserCol
 
     const handleCreate = () => {
         setError(null)
-        if (!name.trim() || name.trim().length < 2) {
+        if (name.trim().length < 2) {
             setError("O nome da coleção deve ter pelo menos 2 caracteres.")
             return
         }
+
 
         startTransition(async () => {
             try {
@@ -48,7 +52,7 @@ export function UserCollectionsPage({ collections: initialCollections }: UserCol
                     setIsCreateModalOpen(false)
                     setName("")
                     setDescription("")
-                    router.push(`/colecoes/${result.data.id}`)
+                    router.push(getCollectionUrl(result.data))
                 } else if (!result.success) {
                     setError(result.error)
                 }
@@ -65,6 +69,7 @@ export function UserCollectionsPage({ collections: initialCollections }: UserCol
             <div className="container mx-auto px-4 max-w-[1300px] mt-12 lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">
                 <div className="hidden lg:block items-center mb-8">
                     {/* Header */}
+
                     <div className="flex items-center justify-between mb-8">
                         <div>
                             <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">

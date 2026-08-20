@@ -3,10 +3,12 @@
 import React from "react"
 import Link from "next/link"
 import { UserProfileImage, getAvatarColor } from "@/lib/utils/UserProfileImage"
+import { getCollectionUrl } from "@/lib/utils/url-generator"
 
 interface CollectionCardProps {
   collection: {
     id: string
+    short_id?: string | null
     name: string
     description?: string | null
     cover_url?: string | null
@@ -26,10 +28,11 @@ export function CollectionCard({ collection, className = "w-[270px] sm:w-[320px]
 
   return (
     <Link
-      href={`/colecoes/${collection.id}`}
+      href={getCollectionUrl(collection)}
       prefetch={false}
       className={`flex flex-col group cursor-pointer transition-all duration-300 ${className}`}
     >
+
       <div className="relative w-full aspect-[16/10] rounded-[16px] overflow-hidden bg-brand-gray dark:bg-dark-border/30 mb-3 shrink-0">
         {collection.cover_url ? (
           <img

@@ -116,9 +116,10 @@ export default async function ProductDetailsPage({
 
   // 2. Fetch variants + reviews in parallel (Deduplicated but fresh)
   const [variants, reviews, detailAds] = await Promise.all([
-    getProductVariants(id),
-    getProductReviews(id, storeId),
+    getProductVariants(product.id),
+    getProductReviews(product.id, storeId),
     getSponsoredAdsForSlot("detail", {
+
       lat: userProfile?.latitude ?? null,
       lng: userProfile?.longitude ?? null,
       citySlug: currentCidadeUf,

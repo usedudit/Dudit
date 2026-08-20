@@ -16,13 +16,13 @@ export function formatCityStateSlug(city?: string, state?: string): string {
 
 /**
  * Gera a URL canonica do produto utilizando o novo formato com cidade e estado
- * /[cidade-uf]/[slug-do-produto]/p/[id]
+ * /[cidade-uf]/[slug-do-produto]/p/[short_id-ou-id]
  */
 export function getProductUrl(product: any, partner?: any): string {
     if (!product) return "/"
 
     const prodSlug = product.slug || createSlug(product.name || "")
-    const prodId = product.id || ""
+    const prodId = product.short_id || product.id || ""
 
     // Se não passar partner explicitamente, tenta pegar do próprio produto
     const p = partner || (Array.isArray(product.partners) ? product.partners[0] : product.partners) || {}
@@ -48,13 +48,13 @@ export function getPartnerUrl(partner: any): string {
 
 /**
  * Gera a URL canonica da loja (store-based vitrine)
- * /[cidade-uf]/[slug-gerado-de-store.name]/v/[id-da-loja]
+ * /[cidade-uf]/[slug-gerado-de-store.name]/v/[short_id-ou-id-da-loja]
  */
 export function getStoreUrl(store: any): string {
     if (!store) return "/"
 
     const s = (Array.isArray(store?.stores) ? store.stores[0] : store?.stores) || (Array.isArray(store?.store) ? store.store[0] : store?.store) || store
-    const storeId = s?.id || store?.store_id || store?.id || ""
+    const storeId = s?.short_id || store?.short_id || s?.id || store?.store_id || store?.id || ""
     const storeName = s?.name || store?.name || ""
     const storeSlug = createSlug(storeName)
 
@@ -69,13 +69,13 @@ export function getStoreUrl(store: any): string {
 
 /**
  * Gera a URL canonica do serviço utilizando o novo formato com cidade e estado
- * /[cidade-uf]/[slug-do-servico]/s/[id]
+ * /[cidade-uf]/[slug-do-servico]/s/[short_id-ou-id]
  */
 export function getServiceUrl(service: any, partner?: any): string {
     if (!service) return "/"
 
     const serviceSlug = service.slug || createSlug(service.name || "")
-    const serviceId = service.id || ""
+    const serviceId = service.short_id || service.id || ""
 
     const p = partner || (Array.isArray(service.partners) ? service.partners[0] : service.partners) || {}
     const address = p.addresses?.[0] || p.address || p
@@ -89,13 +89,13 @@ export function getServiceUrl(service: any, partner?: any): string {
 
 /**
  * Gera a URL canonica do plano recorrente utilizando o formato com cidade e estado
- * /[cidade-uf]/[slug-do-plano]/sub/[id]
+ * /[cidade-uf]/[slug-do-plano]/sub/[short_id-ou-id]
  */
 export function getPlanUrl(plan: any, partner?: any): string {
     if (!plan) return "/"
 
     const planSlug = createSlug(plan.name || "")
-    const planId = plan.id || ""
+    const planId = plan.short_id || plan.id || ""
 
     const p = partner || (Array.isArray(plan.partners) ? plan.partners[0] : plan.partners) || plan.partner || {}
     const address = p.addresses?.[0] || p.address || p
@@ -106,5 +106,16 @@ export function getPlanUrl(plan: any, partner?: any): string {
 
     return `/${cityStateSlug}/${planSlug}/sub/${planId}`
 }
+
+/**
+ * Gera a URL canonica de uma coleção
+ * /colecoes/[short_id-ou-id]
+ */
+export function getCollectionUrl(collection: any): string {
+    if (!collection) return "/colecoes"
+    const colId = collection.short_id || collection.id || ""
+    return `/colecoes/${colId}`
+}
+
 
 
