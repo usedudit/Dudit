@@ -13,7 +13,7 @@ import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useRouter } from "next/navigation"
 import { useStore } from "@/lib/store-context"
-import { uploadXMLAction, confirmImportAction, getImportPreviewAction, listImportsAction, revertImportAction, getImportFinanceAction, getImportStockMovementsAction, getXmlImportTimelineAction } from "@/app/actions/erp/xml-import"
+import { uploadXMLAction, confirmImportAction, getImportPreviewAction, listImportsAction, revertImportAction, getImportFinanceAction, getImportStockMovementsAction, getXmlImportTimelineAction, getXmlImportDownloadUrlAction } from "@/app/actions/erp/xml-import"
 import { XmlImportHistoryTab } from "./XmlImportHistoryTab"
 import {
     UploadIcon, FileTextIcon, CheckCircleIcon, AlertTriangleIcon,
@@ -1017,11 +1017,35 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
     const [historyLoaded, setHistoryLoaded] = useState(false)
     const [itemsPage, setItemsPage] = useState(1)
     const [actionModal, setActionModal] = useState<{ itemId: string; kind: "stock" | "cost" | "decision" } | null>(null)
+    const [isDownloadingXml, setIsDownloadingXml] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const isTabletOrMobile = useMediaQuery("(max-width: 1023px)")
     const ITEMS_PER_PAGE = 10
     const { success: notifySuccess, error: notifyError } = useNotification()
     const { setHeaderOverride } = useSidebar()
+
+    const handleDownloadXml = async () => {
+        setIsDownloadingXml(true)
+        try {
+            const res = await getXmlImportDownloadUrlAction(importId, partnerId)
+            if (res.success && res.downloadUrl) {
+                const link = document.createElement("a")
+                link.href = res.downloadUrl
+                link.download = res.fileName || `NFe-${preview?.invoice?.numero || importId}.xml`
+                link.target = "_blank"
+                link.rel = "noopener noreferrer"
+                document.body.appendChild(link)
+                link.click()
+                document.body.removeChild(link)
+            } else {
+                notifyError("Erro", res.error || "Não foi possível baixar o XML")
+            }
+        } catch (err: any) {
+            notifyError("Erro", err.message || "Falha ao gerar link de download do XML")
+        } finally {
+            setIsDownloadingXml(false)
+        }
+    }
 
     useEffect(() => {
         const numero = preview?.invoice?.numero
@@ -1222,15 +1246,18 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
 
                                     {/* Desktop action buttons */}
                                     <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
+                                        <Button variant="outline" onClick={handleDownloadXml} disabled={isDownloadingXml} leftIcon={<FileIcon size={18} />}>
+                                            {isDownloadingXml ? "Baixando XML..." : "Baixar XML"}
+                                        </Button>
                                         {isPreview && (
-                                            <div className="flex items-center gap-3 shrink-0 ml-3">
+                                            <div className="flex items-center gap-3 shrink-0">
                                                 <Button onClick={handleConfirm} disabled={isConfirming}>
                                                     {isConfirming ? <span className="flex items-center gap-2"><Spinner size={18} /> Importando...</span> : "Confirmar Importação"}
                                                 </Button>
                                             </div>
                                         )}
                                         {isCompleted && !isReversed && (
-                                            <div className="flex items-center gap-3 shrink-0 ml-3">
+                                            <div className="flex items-center gap-3 shrink-0">
                                                 <Button variant="outlinered" onClick={() => setShowRevertModal(true)} leftIcon={<ReloadIcon size={18} />}>
                                                     Desfazer Importação
                                                 </Button>
@@ -1342,12 +1369,21 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                                                             </div>
                                                         </div>
                                                     </div>
-                                                    <div className="px-6 py-4">
-                                                        <div className="flex items-center gap-2">
+                                                    <div className="px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-brand-border/60 dark:border-dark-border/60">
+                                                        <div className="flex items-center gap-2 min-w-0">
                                                             <InfoIcon size={14} className="text-brand-inactive-text shrink-0" />
                                                             <span className="text-xs font-medium text-brand-inactive-text">Chave NF-e:</span>
                                                             <span className="text-xs text-brand-dark dark:text-dark-heading break-all">{preview.invoice.chave}</span>
                                                         </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleDownloadXml}
+                                                            disabled={isDownloadingXml}
+                                                            className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-blue dark:text-blue-400 hover:underline shrink-0 self-start sm:self-auto cursor-pointer"
+                                                        >
+                                                            <FileIcon size={14} />
+                                                            <span>{isDownloadingXml ? "Baixando..." : "Download do arquivo XML"}</span>
+                                                        </button>
                                                     </div>
                                                 </div>
                                             </div>
@@ -1596,9 +1632,12 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
             </div>
 
             {isPreview && (
-                <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
+                <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-2">
+                    <Button variant="outline" className="flex-1 h-12" onClick={handleDownloadXml} disabled={isDownloadingXml}>
+                        <FileIcon className="w-4 h-4" /> {isDownloadingXml ? "..." : "XML"}
+                    </Button>
                     <Button variant="outline" className="flex-1 h-12" onClick={onBack}>
-                        <ChevronLeftIcon className="w-5 h-5" /> Voltar
+                        <ChevronLeftIcon className="w-4 h-4" /> Voltar
                     </Button>
                     <Button className="flex-1 h-12" onClick={handleConfirm} disabled={isConfirming}>
                         {isConfirming ? <span className="flex items-center gap-2"><Spinner size={18} /> Importando...</span> : "Confirmar"}

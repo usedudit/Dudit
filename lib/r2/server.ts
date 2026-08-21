@@ -245,6 +245,45 @@ export async function deleteFileFromR2(key: string) {
 }
 
 /**
+ * Server-side upload of a buffer or string directly to R2 bucket.
+ * Used for system-generated files, documents, and imported XMLs.
+ */
+export async function uploadBufferToR2({
+  buffer,
+  key,
+  contentType = "application/xml",
+}: {
+  buffer: Buffer | Uint8Array | string
+  key: string
+  contentType?: string
+}): Promise<{ key: string; publicUrl: string }> {
+  if (!key || key.includes("..") || key.startsWith("/")) {
+    throw new Error("Chave de upload inválida")
+  }
+
+  const serverConfig = getR2ServerConfig()
+  const client = createR2Client()
+  try {
+    await client.send(
+      new PutObjectCommand({
+        Bucket: serverConfig.bucketName,
+        Key: key,
+        Body: typeof buffer === "string" ? Buffer.from(buffer, "utf-8") : buffer,
+        ContentType: contentType,
+      })
+    )
+
+    const baseUrl = getR2PublicUrl().replace(/\/+$/, "")
+    return {
+      key,
+      publicUrl: `${baseUrl}/${key}`,
+    }
+  } finally {
+    client.destroy()
+  }
+}
+
+/**
  * Server-side copy of an object within the same bucket.
  * Used to give duplicated products/services their own independent files,
  * so deleting the original's image/video doesn't break the duplicates.

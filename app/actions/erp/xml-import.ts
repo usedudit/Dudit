@@ -15,6 +15,8 @@ import { logAuditEvent } from "@/lib/services/timeline.service"
 import { getPartnerCapabilities } from "@/lib/services/partner-capabilities"
 import { enrichAddressData } from "@/lib/services/location.service"
 import { getTrustedClientIP } from "@/lib/security/client-ip"
+import { uploadBufferToR2, generateSignedDownloadUrl } from "@/lib/r2/server"
+import { R2_PREFIXES } from "@/lib/r2/config"
 
 interface ImportPreview {
   xml_import_id: string
@@ -39,6 +41,8 @@ interface ImportPreview {
     data_saida?: string
   }
   items: ImportItemPreview[]
+  file_key?: string | null
+  file_name?: string | null
   errors?: any[] | null
   created_at?: string
   duplicatas?: DuplicataFromXML[]
@@ -700,6 +704,19 @@ export async function uploadXMLAction(
       }
     }
 
+    // 10.5. Upload do XML para o Cloudflare R2
+    const fileKey = `users/${user.id}/${R2_PREFIXES.erpInvoices}${metadata.invoice.chave}.xml`
+    const fileName = `NFe-${metadata.invoice.numero || metadata.invoice.chave}.xml`
+    try {
+      await uploadBufferToR2({
+        buffer: xmlContent,
+        key: fileKey,
+        contentType: "application/xml",
+      })
+    } catch (r2Err) {
+      console.error("Erro ao salvar XML da NF-e no Cloudflare R2:", r2Err)
+    }
+
     // 11. Criar ou reabrir xml_imports
     let xmlImport: { id: string } | null = null
 
@@ -732,6 +749,8 @@ export async function uploadXMLAction(
           supplier_ie: metadata.emitente.ie || null,
           status: "preview",
           raw_xml: xmlContent,
+          file_key: fileKey,
+          file_name: fileName,
           xml_hash: xmlHash,
           xml_size: Buffer.byteLength(xmlContent, "utf-8"),
           fiscal_totals: metadata.fiscal_totals || null,
@@ -781,6 +800,8 @@ export async function uploadXMLAction(
           supplier_ie: metadata.emitente.ie || null,
           status: "preview",
           raw_xml: xmlContent,
+          file_key: fileKey,
+          file_name: fileName,
           xml_hash: xmlHash,
           xml_size: Buffer.byteLength(xmlContent, "utf-8"),
           fiscal_totals: metadata.fiscal_totals || null,
@@ -887,6 +908,8 @@ export async function uploadXMLAction(
     const preview: ImportPreview = {
       xml_import_id: xmlImport.id,
       status: "preview",
+      file_key: fileKey,
+      file_name: fileName,
       supplier: {
         id: supplierId,
         name: metadata.emitente.nome,
@@ -960,7 +983,7 @@ export async function confirmImportAction(
 
     const { data: xmlImport, error: fetchErr } = await supabase
       .from("xml_imports")
-      .select("id, status, total_value, supplier_id, duplicatas, partner_id, invoice_number")
+      .select("id, status, total_value, supplier_id, duplicatas, partner_id, invoice_number, access_key, raw_xml, xml_hash, xml_size, file_key, file_name")
       .eq("id", xmlImportId)
       .eq("partner_id", partnerId)
       .single()
@@ -971,6 +994,26 @@ export async function confirmImportAction(
 
     if (xmlImport.status !== "preview" && xmlImport.status !== "failed") {
       return { success: false, error: "Importação já foi processada" }
+    }
+
+    // Garante que o arquivo XML esteja no R2
+    let finalFileKey = xmlImport.file_key
+    const finalFileName = xmlImport.file_name || `NFe-${xmlImport.invoice_number || xmlImport.access_key}.xml`
+    const finalFileSize = xmlImport.xml_size || (xmlImport.raw_xml ? Buffer.byteLength(xmlImport.raw_xml, "utf-8") : 0)
+    const finalFileHash = xmlImport.xml_hash || (xmlImport.raw_xml ? crypto.createHash("sha256").update(xmlImport.raw_xml).digest("hex") : "")
+
+    if (!finalFileKey && xmlImport.raw_xml) {
+      try {
+        finalFileKey = `users/${user.id}/${R2_PREFIXES.erpInvoices}${xmlImport.access_key}.xml`
+        await uploadBufferToR2({
+          buffer: xmlImport.raw_xml,
+          key: finalFileKey,
+          contentType: "application/xml",
+        })
+        await supabase.from("xml_imports").update({ file_key: finalFileKey, file_name: finalFileName }).eq("id", xmlImportId)
+      } catch (r2Err) {
+        console.error("Erro ao subir XML pendente para R2:", r2Err)
+      }
     }
 
     // Build supplier_actions map for RPC
@@ -1005,6 +1048,44 @@ export async function confirmImportAction(
         imported: result.imported || 0,
         skipped: result.skipped || 0,
         errors: result.errors?.length > 0 ? result.errors.map((e: any) => e.error) : undefined,
+      }
+    }
+
+    // Vincular XML como anexo nas movimentações de estoque geradas
+    if (finalFileKey) {
+      try {
+        const { data: itemsWithMovements } = await supabase
+          .from("xml_import_items")
+          .select("stock_movement_id")
+          .eq("xml_import_id", xmlImportId)
+          .not("stock_movement_id", "is", null)
+
+        const movementIds = [...new Set((itemsWithMovements || []).map((i: any) => i.stock_movement_id).filter(Boolean))]
+        if (movementIds.length > 0) {
+          const admin = getAdminClient()
+          for (const movId of movementIds) {
+            const { data: existingAtt } = await admin
+              .from("stock_movement_attachments")
+              .select("id")
+              .eq("stock_movement_id", movId)
+              .eq("file_key", finalFileKey)
+              .maybeSingle()
+
+            if (!existingAtt) {
+              await admin.from("stock_movement_attachments").insert({
+                stock_movement_id: movId,
+                file_key: finalFileKey,
+                file_name: finalFileName,
+                file_type: "application/xml",
+                file_size: finalFileSize,
+                uploaded_by: user.id,
+                file_hash: finalFileHash,
+              })
+            }
+          }
+        }
+      } catch (attErr) {
+        console.error("Erro ao vincular anexo às movimentações de estoque:", attErr)
       }
     }
 
@@ -1073,11 +1154,28 @@ export async function confirmImportAction(
               created_by_user_id: user.id,
             }]
 
-          const { error: txErr } = await supabase.from("transactions").insert(transactions)
+          const { data: createdTxs, error: txErr } = await supabase.from("transactions").insert(transactions).select("id")
           if (txErr) {
             console.error("Erro ao criar contas a pagar:", txErr)
           } else {
             console.log(`Contas a pagar criadas: ${transactions.length} transacão(ões)`)
+            if (finalFileKey && createdTxs && createdTxs.length > 0) {
+              try {
+                const admin = getAdminClient()
+                const txAttachments = createdTxs.map((t: any) => ({
+                  transaction_id: t.id,
+                  file_key: finalFileKey,
+                  file_name: finalFileName,
+                  file_type: "application/xml",
+                  file_size: finalFileSize,
+                  uploaded_by: user.id,
+                  file_hash: finalFileHash,
+                }))
+                await admin.from("transaction_attachments").insert(txAttachments)
+              } catch (attErr) {
+                console.error("Erro ao vincular anexo às contas a pagar:", attErr)
+              }
+            }
           }
         }
       }
@@ -1174,6 +1272,8 @@ export async function getImportPreviewAction(
     const preview: ImportPreview & { errors?: any[]; created_at?: string; supplier_names?: Record<string, string> } = {
       xml_import_id: xmlImport.id,
       status: xmlImport.status,
+      file_key: xmlImport.file_key,
+      file_name: xmlImport.file_name,
       supplier: {
         id: xmlImport.supplier_id,
         name: xmlImport.supplier_name || "",
@@ -1464,5 +1564,53 @@ export async function getXmlImportTimelineAction(
     return { success: true, data }
   } catch (error: any) {
     return { success: false, error: friendlyError(error.message) }
+  }
+}
+
+export async function getXmlImportDownloadUrlAction(
+  xmlImportId: string,
+  partnerId: string
+): Promise<{ success: true; downloadUrl: string; fileName: string } | { success: false; error: string }> {
+  try {
+    const user = await requireUser()
+    await requirePermission(partnerId, "products", "view")
+
+    const supabase = await getSupabaseServerClient()
+    const { data: xmlImport, error } = await supabase
+      .from("xml_imports")
+      .select("file_key, file_name, access_key, invoice_number, raw_xml")
+      .eq("id", xmlImportId)
+      .eq("partner_id", partnerId)
+      .single()
+
+    if (error || !xmlImport) {
+      return { success: false, error: "Importação não encontrada" }
+    }
+
+    const fileName = xmlImport.file_name || `NFe-${xmlImport.invoice_number || xmlImport.access_key}.xml`
+
+    let fileKey = xmlImport.file_key
+    if (!fileKey && xmlImport.raw_xml) {
+      fileKey = `users/${user.id}/${R2_PREFIXES.erpInvoices}${xmlImport.access_key}.xml`
+      try {
+        await uploadBufferToR2({
+          buffer: xmlImport.raw_xml,
+          key: fileKey,
+          contentType: "application/xml",
+        })
+        await supabase.from("xml_imports").update({ file_key: fileKey, file_name: fileName }).eq("id", xmlImportId)
+      } catch (err) {
+        console.error("Erro ao subir XML tardio para R2:", err)
+      }
+    }
+
+    if (!fileKey) {
+      return { success: false, error: "Arquivo XML não disponível no R2" }
+    }
+
+    const downloadUrl = await generateSignedDownloadUrl(fileKey)
+    return { success: true, downloadUrl, fileName }
+  } catch (err: any) {
+    return { success: false, error: friendlyError(err.message) }
   }
 }

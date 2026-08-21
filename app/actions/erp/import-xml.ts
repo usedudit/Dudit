@@ -8,6 +8,8 @@ import { requirePermission } from "@/lib/permissions/access"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { UNITS } from "@/lib/constants/product-constants"
+import { uploadBufferToR2 } from "@/lib/r2/server"
+import { R2_PREFIXES } from "@/lib/r2/config"
 
 interface CPFCNPJValidationResult {
   isValid: boolean
@@ -106,6 +108,21 @@ export async function importProductsFromXMLAction(xmlContent: string, partnerId:
     }
 
     if (produtosBrutos.length === 0) return { success: false, error: "Nenhum produto encontrado no XML" }
+
+    // Upload do XML da NF-e para o Cloudflare R2
+    try {
+      const cleanXml = xmlContent.replace(/xmlns[^=]*="[^"]*"/g, "")
+      const chNFeMatch = cleanXml.match(/<chNFe>(.*?)<\/chNFe>/) || cleanXml.match(/Id="NFe(.*?)["\s>]/)
+      const chNFe = chNFeMatch?.[1] ? chNFeMatch[1].replace(/\D/g, "") : `${Date.now()}`
+      const fileKey = `users/${user.id}/${R2_PREFIXES.erpInvoices}${chNFe}.xml`
+      await uploadBufferToR2({
+        buffer: xmlContent,
+        key: fileKey,
+        contentType: "application/xml",
+      })
+    } catch (r2Err) {
+      console.error("Erro ao salvar XML da NF-e no R2:", r2Err)
+    }
 
     const productsToProcess = produtosBrutos.map((p) => mapNFeToProductData(p))
 

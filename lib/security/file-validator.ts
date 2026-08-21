@@ -272,6 +272,36 @@ export function validateMagicBytes(
     }
   }
 
+  // 2.1 XML Validation: Scan contents to reject scripts and dangerous HTML tags
+  if (declaredMimeType === "application/xml" || declaredMimeType === "text/xml") {
+    try {
+      const text = new TextDecoder("utf-8", { fatal: false }).decode(buffer)
+      const lowerText = text.toLowerCase()
+      const maliciousPatterns = [
+        "<script",
+        "javascript:",
+        "<html",
+        "onload=",
+        "onerror=",
+        "<iframe>",
+      ]
+      for (const pattern of maliciousPatterns) {
+        if (lowerText.includes(pattern)) {
+          return {
+            valid: false,
+            error: `Conteúdo XML suspeito ou malicioso detectado (${pattern})`,
+          }
+        }
+      }
+      return { valid: true }
+    } catch {
+      return {
+        valid: false,
+        error: "Falha ao decodificar conteúdo XML",
+      }
+    }
+  }
+
   // 3. AVIF check: bytes 4-7 should be "ftyp"
   if (declaredMimeType === "image/avif") {
     if (buffer.length >= 8) {

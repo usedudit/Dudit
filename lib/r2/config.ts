@@ -50,6 +50,8 @@ export const ALLOWED_DOCUMENT_MIME_TYPES = [
   "application/vnd.oasis.opendocument.text", // .odt
   "application/vnd.ms-powerpoint", // .ppt
   "application/vnd.openxmlformats-officedocument.presentationml.presentation", // .pptx
+  "application/xml",
+  "text/xml",
 ] as const
 
 export const ALLOWED_DOCUMENT_EXTENSIONS = [
@@ -63,6 +65,7 @@ export const ALLOWED_DOCUMENT_EXTENSIONS = [
   ".odt",
   ".ppt",
   ".pptx",
+  ".xml",
 ] as const
 
 /** Combined lists for all supported uploads */
@@ -139,6 +142,8 @@ export const DOCUMENT_MIME_TO_EXT: Record<string, string> = {
   "application/vnd.oasis.opendocument.text": "odt",
   "application/vnd.ms-powerpoint": "ppt",
   "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+  "application/xml": "xml",
+  "text/xml": "xml",
 }
 
 export const ALL_MIME_TO_EXT: Record<string, string> = {
