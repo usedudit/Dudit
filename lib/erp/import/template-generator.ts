@@ -228,21 +228,22 @@ export async function generateImportTemplate(
     })
   }
 
-  // Configure Data Validation dropdowns for enum fields on the first 500 rows
+  // Configure Data Validation dropdowns for enum fields on the first 100 rows
   fields.forEach((field, colIdx) => {
     if (field.options && field.options.length > 0) {
-      const colLetter = String.fromCharCode(65 + colIdx)
       const optionsList = `"${field.options.join(",")}"`
+      const colNumber = colIdx + 1
 
-      for (let r = 2; r <= 500; r++) {
-        const cell = worksheet.getCell(`${colLetter}${r}`)
+      for (let r = 2; r <= 100; r++) {
+        const row = worksheet.getRow(r)
+        const cell = row.getCell(colNumber)
         cell.dataValidation = {
           type: "list",
           allowBlank: !field.required,
           formulae: [optionsList],
           showErrorMessage: true,
           errorTitle: "Valor inválido",
-          error: `Selecione um dos valores permitidos: ${field.options.join(", ")}`,
+          error: `Selecione: ${field.options.slice(0, 5).join(", ")}`,
         }
       }
     }

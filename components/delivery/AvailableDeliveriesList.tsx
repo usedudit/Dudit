@@ -341,11 +341,10 @@ export default function AvailableDeliveriesList() {
                             <div className="flex items-center bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-full p-1 h-[42px] shrink-0 ml-auto">
                                 <button
                                     onClick={() => setViewMode("list")}
-                                    className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${
-                                        viewMode === "list"
-                                            ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading"
-                                            : "text-gray-400 hover:text-gray-600 dark:text-dark-body"
-                                    }`}
+                                    className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "list"
+                                        ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading"
+                                        : "text-gray-400 hover:text-gray-600 dark:text-dark-body"
+                                        }`}
                                     title="Visualização em lista/tabela"
                                     aria-label="Visualização em lista"
                                 >
@@ -353,11 +352,10 @@ export default function AvailableDeliveriesList() {
                                 </button>
                                 <button
                                     onClick={() => setViewMode("grid")}
-                                    className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${
-                                        viewMode === "grid"
-                                            ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading"
-                                            : "text-gray-400 hover:text-gray-600 dark:text-dark-body"
-                                    }`}
+                                    className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "grid"
+                                        ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading"
+                                        : "text-gray-400 hover:text-gray-600 dark:text-dark-body"
+                                        }`}
                                     title="Visualização em cards/grid"
                                     aria-label="Visualização em grid"
                                 >
@@ -382,7 +380,7 @@ export default function AvailableDeliveriesList() {
                             >
                                 <IconPlaceholder
                                     placeholderType="image"
-                                    imageSrc="https://img.dudit.com.br/static/mascots/Entrega.png"
+                                    imageSrc="https://img.dudit.com.br/static/mascots/Entregas.png"
                                     imageAlt="Nenhuma oferta disponível"
                                     title="Nenhuma entrega disponível no momento"
                                     subtitle="Novas solicitações de entrega enviadas pelos lojistas parceiros aparecerão aqui automaticamente."
@@ -429,14 +427,12 @@ export default function AvailableDeliveriesList() {
                             <FadeIn key="list" className="w-full">
                                 <div className="w-full overflow-hidden rounded-xl relative">
                                     <div
-                                        className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${
-                                            scrollState.left ? "opacity-100" : "opacity-0"
-                                        }`}
+                                        className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"
+                                            }`}
                                     />
                                     <div
-                                        className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${
-                                            scrollState.right ? "opacity-100" : "opacity-0"
-                                        }`}
+                                        className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"
+                                            }`}
                                     />
 
                                     <div
@@ -457,11 +453,9 @@ export default function AvailableDeliveriesList() {
                                                         return (
                                                             <th
                                                                 key={col.id}
-                                                                className={`py-3 px-2 pl-6 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${
-                                                                    col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"
-                                                                } cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors ${
-                                                                    col.id === "actions" ? "rounded-r-lg" : col.id === "order" ? "rounded-l-lg" : ""
-                                                                }`}
+                                                                className={`py-3 px-2 pl-6 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"
+                                                                    } cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors ${col.id === "actions" ? "rounded-r-lg" : col.id === "order" ? "rounded-l-lg" : ""
+                                                                    }`}
                                                                 style={{ width: col.width }}
                                                                 onClick={() => {
                                                                     if (col.id === "actions") return

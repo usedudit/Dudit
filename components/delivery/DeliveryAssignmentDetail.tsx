@@ -4,8 +4,9 @@ import React, { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { AnimatePresence } from "framer-motion"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { Badge, Button, DefaultModal } from "@/components/reusable"
+import { Badge, Button, DefaultModal, FormSection, InfoCard, Pagination } from "@/components/reusable"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
+import { HistoryTimeline, type HistoryEntry } from "@/components/erp/shared/HistoryTimeline"
 import { useSidebar } from "@/lib/sidebar-context"
 import { toast } from "@/hooks/use-notification"
 import {
@@ -21,23 +22,17 @@ import {
     PhoneIcon,
     WhatsappIcon,
     MapPinIcon,
-    StoreIcon,
     Package,
-    MoneyIcon,
-    CreditCardIcon,
-    InfoIcon,
-    ListIcon,
-    HistoryIcon,
 } from "@/lib/icons"
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils"
 import { statusConfig, type DeliveryAssignmentItem } from "./DeliveryAssignmentListRow"
 
 const STEPS = [
-    { key: "assigned", label: "Atribuída", icon: ClockIcon },
-    { key: "accepted", label: "Aceita", icon: CheckCircleIcon },
-    { key: "picked_up", label: "Retirada", icon: Package },
-    { key: "out_for_delivery", label: "Em Rota", icon: TruckIcon },
-    { key: "delivered", label: "Entregue", icon: CheckCircleIcon },
+    { key: "assigned", label: "Atribuída" },
+    { key: "accepted", label: "Aceita" },
+    { key: "picked_up", label: "Retirada" },
+    { key: "out_for_delivery", label: "Em Rota" },
+    { key: "delivered", label: "Entregue" },
 ]
 
 const NEXT_STATUS: Record<
@@ -49,6 +44,8 @@ const NEXT_STATUS: Record<
     picked_up: { status: "out_for_delivery", label: "Iniciar Rota para o Cliente", shortLabel: "Iniciar Rota" },
     out_for_delivery: { status: "delivered", label: "Confirmar Entrega ao Cliente", shortLabel: "Entregar" },
 }
+
+const ITEMS_PER_PAGE = 10
 
 export default function DeliveryAssignmentDetail({
     assignment: initial,
@@ -72,6 +69,7 @@ export default function DeliveryAssignmentDetail({
     const [failureReason, setFailureReason] = useState("")
 
     const [activeTab, setActiveTab] = useState("resumo")
+    const [itemsPage, setItemsPage] = useState(1)
 
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -82,7 +80,6 @@ export default function DeliveryAssignmentDetail({
     const statusMeta = statusConfig[assignment.status] || {
         label: assignment.status,
         variant: "gray" as const,
-        icon: (<ClockIcon size={12} />) as React.ReactElement<{ className?: string }>,
     }
 
     const orderNumberDisplay = assignment.order_number
@@ -198,6 +195,61 @@ export default function DeliveryAssignmentDetail({
     const isCashPayment = /dinheiro|cash|money|especie/i.test(String(assignment.payment_method || ""))
     const currentStepIndex = STEPS.findIndex((s) => s.key === assignment.status)
     const isTerminalFailed = ["failed", "cancelled"].includes(assignment.status)
+    const totalActiveSteps = isTerminalFailed ? currentStepIndex + 1 : currentStepIndex + 1
+
+    // Build history entries for HistoryTimeline
+    const historyEntries: HistoryEntry[] = [
+        assignment.assigned_at && {
+            id: "assigned",
+            actor_name: "Sistema",
+            change_lines: ["Entrega atribuída ao entregador"],
+            created_at: assignment.assigned_at,
+            entry_type: "status",
+        },
+        assignment.accepted_at && {
+            id: "accepted",
+            actor_name: "Você",
+            change_lines: ["Aceitou a entrega"],
+            created_at: assignment.accepted_at,
+            entry_type: "status",
+        },
+        assignment.picked_up_at && {
+            id: "picked_up",
+            actor_name: "Você",
+            change_lines: ["Retirou o pedido no estabelecimento"],
+            created_at: assignment.picked_up_at,
+            entry_type: "status",
+        },
+        assignment.out_for_delivery_at && {
+            id: "out_for_delivery",
+            actor_name: "Você",
+            change_lines: ["Iniciou rota de entrega"],
+            created_at: assignment.out_for_delivery_at,
+            entry_type: "status",
+        },
+        assignment.delivered_at && {
+            id: "delivered",
+            actor_name: "Você",
+            change_lines: ["Entrega confirmada com sucesso"],
+            created_at: assignment.delivered_at,
+            entry_type: "status",
+        },
+        assignment.failed_at && {
+            id: "failed",
+            actor_name: "Você",
+            change_lines: [`Falha registrada: ${assignment.failure_reason || "Não informado"}`],
+            created_at: assignment.failed_at,
+            entry_type: "cancel",
+        },
+    ].filter(Boolean) as HistoryEntry[]
+
+    // Items pagination
+    const items = assignment.items || []
+    const totalItemPages = Math.ceil(items.length / ITEMS_PER_PAGE) || 1
+    const paginatedItems = items.slice(
+        (itemsPage - 1) * ITEMS_PER_PAGE,
+        itemsPage * ITEMS_PER_PAGE
+    )
 
     return (
         <FadeIn>
@@ -220,8 +272,8 @@ export default function DeliveryAssignmentDetail({
                                 <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
                                     <div className="flex flex-col gap-1 overflow-hidden min-w-0">
                                         <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
-                                            <span className="hidden md:inline truncate font-mono">{pageTitle}</span>
-                                            <Badge variant={statusMeta.variant} icon={statusMeta.icon} className="shrink-0">
+                                            <span className="hidden md:inline truncate">{pageTitle}</span>
+                                            <Badge variant={statusMeta.variant} className="shrink-0">
                                                 {statusMeta.label}
                                             </Badge>
                                         </h1>
@@ -251,7 +303,7 @@ export default function DeliveryAssignmentDetail({
                                                 onClick={advance}
                                                 disabled={loading}
                                                 isLoading={loading}
-                                                className="font-bold shadow-xs"
+                                                className="font-bold"
                                             >
                                                 {NEXT_STATUS[assignment.status].label}
                                             </Button>
@@ -262,15 +314,9 @@ export default function DeliveryAssignmentDetail({
                                 {/* Tabs */}
                                 <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
                                     <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
-                                        <TabsTrigger value="resumo" icon={InfoIcon}>
-                                            Resumo
-                                        </TabsTrigger>
-                                        <TabsTrigger value="itens" icon={ListIcon}>
-                                            Itens do Pedido
-                                        </TabsTrigger>
-                                        <TabsTrigger value="historico" icon={HistoryIcon}>
-                                            Histórico
-                                        </TabsTrigger>
+                                        <TabsTrigger value="resumo">Resumo</TabsTrigger>
+                                        <TabsTrigger value="itens">Itens do Pedido</TabsTrigger>
+                                        <TabsTrigger value="historico">Histórico</TabsTrigger>
                                     </TabsList>
                                 </div>
                             </div>
@@ -282,108 +328,84 @@ export default function DeliveryAssignmentDetail({
                                 {activeTab === "resumo" && (
                                     <FadeIn key="resumo" className="block">
                                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                                            {/* LEFT MAIN COLUMN (lg:col-span-8) */}
+                                            {/* LEFT MAIN COLUMN */}
                                             <div className="lg:col-span-8 space-y-6">
-                                                {/* STEPPER PROGRESS */}
+                                                {/* STEPPER PROGRESS - matching OrderDetailView pattern */}
                                                 {!isTerminalFailed ? (
-                                                    <div className="rounded-2xl border border-brand-border bg-white p-6 shadow-xs dark:border-dark-border dark:bg-dark-surface overflow-x-auto">
-                                                        <h2 className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text mb-5">
-                                                            Progresso da Entrega
-                                                        </h2>
-                                                        <div className="flex items-center justify-between min-w-[480px] relative px-4">
-                                                            {STEPS.map((step, idx) => {
-                                                                const isPassed = currentStepIndex >= idx
-                                                                const isCurrent = currentStepIndex === idx
-                                                                const Icon = step.icon
-
-                                                                return (
-                                                                    <div key={step.key} className="flex-1 flex flex-col items-center relative group">
-                                                                        {idx < STEPS.length - 1 && (
-                                                                            <div
-                                                                                className={`absolute top-4 left-1/2 w-full h-1 -z-0 transition-colors ${
-                                                                                    currentStepIndex > idx
-                                                                                        ? "bg-brand-green"
-                                                                                        : "bg-gray-200 dark:bg-dark-border"
-                                                                                }`}
-                                                                            />
-                                                                        )}
-
-                                                                        <div
-                                                                            className={`relative z-10 w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs transition-all duration-200 ${
-                                                                                isCurrent
-                                                                                    ? "bg-brand-green text-white ring-4 ring-brand-green/20"
-                                                                                    : isPassed
-                                                                                    ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400"
-                                                                                    : "bg-gray-100 dark:bg-dark-border text-gray-400"
-                                                                            }`}
-                                                                        >
-                                                                            <Icon size={16} />
-                                                                        </div>
-
-                                                                        <span
-                                                                            className={`text-xs mt-2 font-semibold text-center ${
-                                                                                isCurrent
-                                                                                    ? "text-brand-dark dark:text-dark-heading font-bold"
-                                                                                    : isPassed
-                                                                                    ? "text-emerald-700 dark:text-emerald-400"
-                                                                                    : "text-brand-inactive-text"
-                                                                            }`}
-                                                                        >
-                                                                            {step.label}
-                                                                        </span>
+                                                    <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden">
+                                                        <div className="bg-brand-gray dark:bg-dark-border/50 p-6 border-b border-brand-border dark:border-dark-border">
+                                                            <div className="flex justify-between items-center">
+                                                                <div className="flex items-center gap-1">
+                                                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
+                                                                        Responsável pela entrega:
+                                                                    </span>
+                                                                    <div className="flex items-center gap-1.5 font-bold text-brand-dark dark:text-dark-heading text-sm">
+                                                                        {assignment.store_name || assignment.partner_name || "Loja"}
                                                                     </div>
-                                                                )
-                                                            })}
+                                                                </div>
+                                                                <div className="hidden md:block text-sm text-brand-inactive-text dark:text-dark-body font-medium">
+                                                                    Status: <strong className="text-brand-dark dark:text-dark-heading">{statusMeta.label}</strong>
+                                                                </div>
+                                                            </div>
                                                         </div>
 
-                                                        {/* NEXT ACTION BANNER INSIDE CARD */}
-                                                        {NEXT_STATUS[assignment.status] && (
-                                                            <div className="mt-6 pt-5 border-t border-brand-border dark:border-dark-border flex flex-col sm:flex-row items-center justify-between gap-3 bg-brand-gray/40 dark:bg-dark-border/20 -mx-6 -mb-6 p-4 px-6 rounded-b-2xl">
-                                                                <div className="text-xs text-brand-dark dark:text-dark-heading">
-                                                                    <span className="font-bold">Próximo passo: </span>
-                                                                    <span className="text-brand-inactive-text dark:text-dark-body">
-                                                                        {NEXT_STATUS[assignment.status].label}
-                                                                    </span>
+                                                        <div className="bg-white dark:bg-dark-surface px-12 pt-12 pb-12">
+                                                            <div className="relative px-4">
+                                                                <div className="relative h-1.5 w-full bg-gray-100 dark:bg-dark-border/50 rounded-full flex items-center justify-between">
+                                                                    <div
+                                                                        className={`absolute left-0 h-full rounded-full transition-all duration-500 ${isTerminalFailed ? "bg-brand-red" : "bg-brand-dark dark:bg-dark-heading"}`}
+                                                                        style={{ width: `${STEPS.length <= 1 ? 0 : ((totalActiveSteps - 1) / (STEPS.length - 1)) * 100}%` }}
+                                                                    ></div>
+
+                                                                    {STEPS.map((step, idx) => {
+                                                                        const isPassed = currentStepIndex >= idx
+                                                                        const isCurrent = currentStepIndex === idx
+                                                                        const isLastFailed = isTerminalFailed && idx === STEPS.length - 1
+                                                                        const isFailed = isTerminalFailed && idx >= currentStepIndex + 1
+
+                                                                        return (
+                                                                            <div key={step.key} className="relative flex flex-col items-center">
+                                                                                <div className="absolute bottom-6 whitespace-nowrap flex flex-col items-center">
+                                                                                    <span className={`text-xs font-medium ${isPassed && !isFailed ? (isLastFailed ? "text-brand-red" : "text-brand-dark dark:text-dark-heading") : "text-gray-400 dark:text-dark-body"}`}>
+                                                                                        {step.label}
+                                                                                    </span>
+                                                                                </div>
+                                                                                <div className={`w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${isPassed && !isFailed ? (isLastFailed ? "bg-brand-red border-brand-red" : "bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading") : "bg-white dark:bg-dark-surface border-gray-300 dark:border-dark-border"}`}>
+                                                                                    {isPassed && !isFailed && <div className="w-1.5 h-1.5 bg-white dark:bg-dark-surface rounded-full"></div>}
+                                                                                </div>
+                                                                                <div className="absolute top-6 whitespace-nowrap flex flex-col items-center">
+                                                                                    {isPassed && !isFailed ? (
+                                                                                        <div className="text-xs font-medium text-gray-300 dark:text-dark-body/50">✓</div>
+                                                                                    ) : (
+                                                                                        <div className="text-xs font-medium text-gray-300 dark:text-dark-body/50">-</div>
+                                                                                    )}
+                                                                                </div>
+                                                                            </div>
+                                                                        )
+                                                                    })}
                                                                 </div>
-                                                                <Button
-                                                                    variant="default"
-                                                                    size="sm"
-                                                                    onClick={advance}
-                                                                    disabled={loading}
-                                                                    isLoading={loading}
-                                                                    className="w-full sm:w-auto font-bold px-5"
-                                                                >
-                                                                    {NEXT_STATUS[assignment.status].label}
-                                                                </Button>
                                                             </div>
-                                                        )}
+                                                        </div>
                                                     </div>
                                                 ) : (
-                                                    <div className="rounded-2xl border border-red-200 bg-red-50/70 p-5 dark:border-red-900/40 dark:bg-red-950/20 flex items-center gap-3">
-                                                        <AlertTriangleIcon className="text-red-600 dark:text-red-400 shrink-0" size={24} />
-                                                        <div>
-                                                            <p className="font-bold text-sm text-red-800 dark:text-red-300">
-                                                                {assignment.status === "failed" ? "Entrega com Falha/Problema" : "Entrega Cancelada"}
-                                                            </p>
-                                                            <p className="text-xs text-red-700/80 dark:text-red-400 mt-0.5">
-                                                                Esta rota não está mais em andamento. Caso tenha dúvidas, entre em contato com o estabelecimento.
-                                                            </p>
-                                                        </div>
-                                                    </div>
+                                                    <InfoCard
+                                                        title={assignment.status === "failed" ? "Entrega com Falha/Problema" : "Entrega Cancelada"}
+                                                        message="Esta rota não está mais em andamento. Caso tenha dúvidas, entre em contato com o estabelecimento."
+                                                        color="red"
+                                                    />
                                                 )}
 
-                                                {/* STORE CARD (LOCAL DE RETIRADA) */}
-                                                <div className="rounded-2xl border border-brand-border bg-white p-6 shadow-xs dark:border-dark-border dark:bg-dark-surface space-y-4">
-                                                    <div className="flex items-center justify-between border-b border-brand-border dark:border-dark-border pb-3">
-                                                        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-brand-green">
-                                                            <StoreIcon size={16} />
-                                                            <span>1. Local de Coleta (Estabelecimento)</span>
-                                                        </div>
-                                                        <span className="text-[11px] font-semibold text-brand-inactive-text dark:text-dark-body">
-                                                            Retirada
-                                                        </span>
-                                                    </div>
+                                                {/* Order Instructions */}
+                                                {assignment.notes && (
+                                                    <InfoCard
+                                                        title="Instruções do Pedido"
+                                                        message={assignment.notes}
+                                                        color="orange"
+                                                    />
+                                                )}
 
+                                                {/* Store Section - Local de Coleta */}
+                                                <FormSection title="Local de Coleta (Estabelecimento)">
                                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                                         <div className="space-y-1">
                                                             <h3 className="font-bold text-base text-brand-dark dark:text-dark-heading">
@@ -405,8 +427,7 @@ export default function DeliveryAssignmentDetail({
                                                                     rel="noopener noreferrer"
                                                                     className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-brand-border dark:border-dark-border text-xs font-bold text-brand-dark dark:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border transition"
                                                                 >
-                                                                    <MapPinIcon size={13} className="text-red-500" />
-                                                                    Rota Coleta
+                                                                    Maps
                                                                 </a>
                                                             )}
                                                             {cleanStorePhone && (
@@ -414,7 +435,6 @@ export default function DeliveryAssignmentDetail({
                                                                     href={`tel:${cleanStorePhone}`}
                                                                     className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-brand-border dark:border-dark-border text-xs font-bold text-brand-dark dark:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border transition"
                                                                 >
-                                                                    <PhoneIcon size={13} className="text-brand-green" />
                                                                     Ligar
                                                                 </a>
                                                             )}
@@ -425,26 +445,15 @@ export default function DeliveryAssignmentDetail({
                                                                     rel="noopener noreferrer"
                                                                     className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 text-xs font-bold hover:bg-emerald-100 transition"
                                                                 >
-                                                                    <WhatsappIcon size={14} />
                                                                     WhatsApp
                                                                 </a>
                                                             )}
                                                         </div>
                                                     </div>
-                                                </div>
+                                                </FormSection>
 
-                                                {/* CUSTOMER CARD (LOCAL DE ENTREGA) */}
-                                                <div className="rounded-2xl border border-brand-border bg-white p-6 shadow-xs dark:border-dark-border dark:bg-dark-surface space-y-4">
-                                                    <div className="flex items-center justify-between border-b border-brand-border dark:border-dark-border pb-3">
-                                                        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
-                                                            <MapPinIcon size={16} />
-                                                            <span>2. Local de Entrega (Cliente)</span>
-                                                        </div>
-                                                        <span className="text-[11px] font-semibold text-brand-inactive-text dark:text-dark-body">
-                                                            Destino
-                                                        </span>
-                                                    </div>
-
+                                                {/* Customer Section - Local de Entrega */}
+                                                <FormSection title="Local de Entrega (Cliente)">
                                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                                         <div className="space-y-1">
                                                             <h3 className="font-bold text-base text-brand-dark dark:text-dark-heading">
@@ -463,7 +472,6 @@ export default function DeliveryAssignmentDetail({
                                                                 rel="noopener noreferrer"
                                                                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-brand-border dark:border-dark-border text-xs font-bold text-brand-dark dark:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border transition"
                                                             >
-                                                                <MapPinIcon size={13} className="text-red-500" />
                                                                 Maps
                                                             </a>
                                                             <a
@@ -472,7 +480,6 @@ export default function DeliveryAssignmentDetail({
                                                                 rel="noopener noreferrer"
                                                                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-brand-border dark:border-dark-border text-xs font-bold text-brand-dark dark:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border transition"
                                                             >
-                                                                <TruckIcon size={13} className="text-blue-500" />
                                                                 Waze
                                                             </a>
                                                             {cleanCustomerPhone && (
@@ -480,7 +487,6 @@ export default function DeliveryAssignmentDetail({
                                                                     href={`tel:${cleanCustomerPhone}`}
                                                                     className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-brand-border dark:border-dark-border text-xs font-bold text-brand-dark dark:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border transition"
                                                                 >
-                                                                    <PhoneIcon size={13} className="text-brand-green" />
                                                                     Ligar
                                                                 </a>
                                                             )}
@@ -491,76 +497,73 @@ export default function DeliveryAssignmentDetail({
                                                                     rel="noopener noreferrer"
                                                                     className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 text-xs font-bold hover:bg-emerald-100 transition"
                                                                 >
-                                                                    <WhatsappIcon size={14} />
                                                                     WhatsApp
                                                                 </a>
                                                             )}
                                                         </div>
                                                     </div>
-                                                </div>
+                                                </FormSection>
                                             </div>
 
-                                            {/* RIGHT SIDEBAR COLUMN (lg:col-span-4) */}
+                                            {/* RIGHT SIDEBAR COLUMN */}
                                             <div className="lg:col-span-4 space-y-6">
-                                                {/* FINANCIAL / FEE CARD */}
-                                                <div className="rounded-2xl border border-brand-border bg-white p-6 shadow-xs dark:border-dark-border dark:bg-dark-surface space-y-4">
-                                                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-brand-inactive-text border-b border-brand-border dark:border-dark-border pb-3">
-                                                        <MoneyIcon size={16} className="text-brand-green" />
-                                                        <span>Remuneração & Valores</span>
+                                                {/* Remuneração & Valores */}
+                                                <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden">
+                                                    <div className="px-5 py-3 border-b border-brand-border dark:border-dark-border">
+                                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading">Remuneração & Valores</h3>
                                                     </div>
+                                                    <div className="p-5 space-y-4">
+                                                        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 dark:border-emerald-900/40 dark:bg-emerald-950/30">
+                                                            <span className="text-xs text-emerald-700 dark:text-emerald-400 font-bold">
+                                                                Sua Taxa de Entrega
+                                                            </span>
+                                                            <p className="text-2xl font-extrabold text-emerald-700 dark:text-emerald-400 mt-1">
+                                                                {formatCurrency(assignment.delivery_fee || 0)}
+                                                            </p>
+                                                        </div>
 
-                                                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 dark:border-emerald-900/40 dark:bg-emerald-950/30">
-                                                        <span className="text-xs text-emerald-700 dark:text-emerald-400 font-bold">
-                                                            Sua Taxa de Entrega
-                                                        </span>
-                                                        <p className="text-2xl font-extrabold text-emerald-700 dark:text-emerald-400 mt-1">
-                                                            {formatCurrency(assignment.delivery_fee || 0)}
-                                                        </p>
+                                                        <div className="space-y-3 text-xs">
+                                                            <div className="flex items-center justify-between text-brand-dark dark:text-dark-heading">
+                                                                <span className="text-brand-inactive-text dark:text-dark-body">Valor do Pedido:</span>
+                                                                <span className="font-bold text-sm">{formatCurrency(assignment.total_amount || 0)}</span>
+                                                            </div>
+                                                            <div className="flex items-center justify-between text-brand-dark dark:text-dark-heading">
+                                                                <span className="text-brand-inactive-text dark:text-dark-body">Forma de Pagamento:</span>
+                                                                <span className="font-semibold">{assignment.payment_method || "Não informada"}</span>
+                                                            </div>
+                                                            <div className="flex items-center justify-between text-brand-dark dark:text-dark-heading">
+                                                                <span className="text-brand-inactive-text dark:text-dark-body">Status do Pagamento:</span>
+                                                                <span className="font-semibold">{assignment.payment_status || "Pendente"}</span>
+                                                            </div>
+                                                        </div>
+
+                                                        {isCashPayment && (
+                                                            <div className="pt-3 border-t border-brand-border dark:border-dark-border">
+                                                                {assignment.payment_confirmed_at ? (
+                                                                    <div className="rounded-xl bg-emerald-50 p-3 text-center text-xs font-semibold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
+                                                                        Recebimento em dinheiro confirmado
+                                                                    </div>
+                                                                ) : (
+                                                                    <Button
+                                                                        variant="outline"
+                                                                        onClick={confirmPayment}
+                                                                        disabled={loading}
+                                                                        className="w-full text-xs font-bold"
+                                                                    >
+                                                                        Confirmar Recebimento em Dinheiro
+                                                                    </Button>
+                                                                )}
+                                                            </div>
+                                                        )}
                                                     </div>
-
-                                                    <div className="space-y-3 text-xs pt-1">
-                                                        <div className="flex items-center justify-between text-brand-dark dark:text-dark-heading">
-                                                            <span className="text-brand-inactive-text dark:text-dark-body">Valor do Pedido:</span>
-                                                            <span className="font-bold text-sm">{formatCurrency(assignment.total_amount || 0)}</span>
-                                                        </div>
-                                                        <div className="flex items-center justify-between text-brand-dark dark:text-dark-heading">
-                                                            <span className="text-brand-inactive-text dark:text-dark-body">Forma de Pagamento:</span>
-                                                            <span className="font-semibold">{assignment.payment_method || "Não informada"}</span>
-                                                        </div>
-                                                        <div className="flex items-center justify-between text-brand-dark dark:text-dark-heading">
-                                                            <span className="text-brand-inactive-text dark:text-dark-body">Status do Pagamento:</span>
-                                                            <span className="font-semibold">{assignment.payment_status || "Pendente"}</span>
-                                                        </div>
-                                                    </div>
-
-                                                    {isCashPayment && (
-                                                        <div className="pt-3 border-t border-brand-border dark:border-dark-border">
-                                                            {assignment.payment_confirmed_at ? (
-                                                                <div className="rounded-xl bg-emerald-50 p-3 text-center text-xs font-semibold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
-                                                                    ✓ Recebimento em dinheiro confirmado
-                                                                </div>
-                                                            ) : (
-                                                                <Button
-                                                                    variant="outline"
-                                                                    onClick={confirmPayment}
-                                                                    disabled={loading}
-                                                                    className="w-full text-xs font-bold"
-                                                                >
-                                                                    Confirmar Recebimento em Dinheiro
-                                                                </Button>
-                                                            )}
-                                                        </div>
-                                                    )}
                                                 </div>
 
-                                                {/* METADATA TIMELINE CARD */}
-                                                <div className="rounded-2xl border border-brand-border bg-white p-6 shadow-xs dark:border-dark-border dark:bg-dark-surface space-y-3 text-xs">
-                                                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-brand-inactive-text border-b border-brand-border dark:border-dark-border pb-3">
-                                                        <ClockIcon size={16} className="text-brand-green" />
-                                                        <span>Histórico da Corrida</span>
+                                                {/* Histórico da Corrida */}
+                                                <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden">
+                                                    <div className="px-5 py-3 border-b border-brand-border dark:border-dark-border">
+                                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading">Histórico da Corrida</h3>
                                                     </div>
-
-                                                    <div className="space-y-2.5 pt-1 text-brand-inactive-text dark:text-dark-body">
+                                                    <div className="p-5 space-y-2.5 text-xs text-brand-inactive-text dark:text-dark-body">
                                                         {assignment.assigned_at && (
                                                             <div className="flex justify-between">
                                                                 <span>Atribuída:</span>
@@ -612,57 +615,53 @@ export default function DeliveryAssignmentDetail({
                                     <FadeIn key="itens" className="block">
                                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                                             <div className="lg:col-span-8 space-y-6">
-                                                <div className="rounded-2xl border border-brand-border bg-white p-6 shadow-xs dark:border-dark-border dark:bg-dark-surface space-y-4">
-                                                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-brand-inactive-text border-b border-brand-border dark:border-dark-border pb-3">
-                                                        <Package size={16} className="text-brand-green" />
-                                                        <span>Itens do Pedido ({assignment.items?.length || 0})</span>
-                                                    </div>
-
-                                                    {assignment.items && assignment.items.length > 0 ? (
-                                                        <div className="divide-y divide-brand-border/60 dark:divide-dark-border/40">
-                                                            {assignment.items.map((it: any, idx: number) => (
-                                                                <div key={idx} className="py-2.5 flex items-center justify-between text-sm">
-                                                                    <span className="font-medium text-brand-dark dark:text-dark-heading">
-                                                                        {it.quantity || 1}x {it.name || "Item"}
-                                                                    </span>
-                                                                    {it.price ? (
-                                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                                            {formatCurrency(it.price)}
+                                                <FormSection title={`Itens do Pedido (${items.length})`}>
+                                                    {items.length > 0 ? (
+                                                        <div className="space-y-4">
+                                                            <div className="divide-y divide-brand-border/60 dark:divide-dark-border/40">
+                                                                {paginatedItems.map((it: any, idx: number) => (
+                                                                    <div key={idx} className="py-2.5 flex items-center justify-between text-sm">
+                                                                        <span className="font-medium text-brand-dark dark:text-dark-heading">
+                                                                            {it.quantity || 1}x {it.name || "Item"}
                                                                         </span>
-                                                                    ) : null}
+                                                                        {it.price ? (
+                                                                            <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                                                {formatCurrency(it.price)}
+                                                                            </span>
+                                                                        ) : null}
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+
+                                                            {totalItemPages > 1 && (
+                                                                <div className="pt-2">
+                                                                    <Pagination
+                                                                        currentPage={itemsPage}
+                                                                        totalPages={totalItemPages}
+                                                                        onPageChange={setItemsPage}
+                                                                    />
                                                                 </div>
-                                                            ))}
+                                                            )}
+
+                                                            <div className="flex items-center justify-between border-t border-brand-border dark:border-dark-border pt-3">
+                                                                <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Total do Pedido</span>
+                                                                <span className="text-lg font-extrabold text-brand-dark dark:text-dark-heading">
+                                                                    {formatCurrency(assignment.total_amount || 0)}
+                                                                </span>
+                                                            </div>
                                                         </div>
                                                     ) : (
                                                         <p className="text-xs text-brand-inactive-text">Nenhum item listado.</p>
                                                     )}
-
-                                                    <div className="flex items-center justify-between border-t border-brand-border dark:border-dark-border pt-3">
-                                                        <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Total do Pedido</span>
-                                                        <span className="text-lg font-extrabold text-brand-dark dark:text-dark-heading">
-                                                            {formatCurrency(assignment.total_amount || 0)}
-                                                        </span>
-                                                    </div>
-                                                </div>
-
-                                                {assignment.notes && (
-                                                    <div className="rounded-xl bg-amber-50/70 p-4 border border-amber-200/60 dark:bg-amber-950/20 dark:border-amber-900/40 text-xs">
-                                                        <span className="font-bold text-amber-800 dark:text-amber-300">
-                                                            Instruções do Pedido:
-                                                        </span>
-                                                        <p className="mt-1 text-amber-900 dark:text-amber-200 leading-relaxed">{assignment.notes}</p>
-                                                    </div>
-                                                )}
+                                                </FormSection>
                                             </div>
 
                                             <div className="lg:col-span-4 space-y-6">
-                                                <div className="rounded-2xl border border-brand-border bg-white p-6 shadow-xs dark:border-dark-border dark:bg-dark-surface space-y-4">
-                                                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-brand-inactive-text border-b border-brand-border dark:border-dark-border pb-3">
-                                                        <CreditCardIcon size={16} className="text-brand-green" />
-                                                        <span>Pagamento</span>
+                                                <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden">
+                                                    <div className="px-5 py-3 border-b border-brand-border dark:border-dark-border">
+                                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading">Pagamento</h3>
                                                     </div>
-
-                                                    <div className="space-y-3 text-xs">
+                                                    <div className="p-5 space-y-3 text-xs">
                                                         <div className="flex items-center justify-between text-brand-dark dark:text-dark-heading">
                                                             <span className="text-brand-inactive-text dark:text-dark-body">Forma:</span>
                                                             <span className="font-semibold">{assignment.payment_method || "Não informada"}</span>
@@ -684,52 +683,21 @@ export default function DeliveryAssignmentDetail({
 
                                 {activeTab === "historico" && (
                                     <FadeIn key="historico" className="block">
-                                        <div className="rounded-2xl border border-brand-border bg-white p-6 shadow-xs dark:border-dark-border dark:bg-dark-surface space-y-4">
-                                            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-brand-inactive-text border-b border-brand-border dark:border-dark-border pb-3">
-                                                <HistoryIcon size={16} className="text-brand-green" />
-                                                <span>Linha do Tempo da Entrega</span>
-                                            </div>
+                                        <HistoryTimeline
+                                            entries={historyEntries}
+                                            emptyMessage="Nenhum registro de histórico encontrado para esta entrega."
+                                        />
 
-                                            <div className="space-y-0">
-                                                {[
-                                                    { label: "Atribuída", time: assignment.assigned_at, icon: ClockIcon, color: "text-brand-green bg-brand-green/10" },
-                                                    { label: "Aceita", time: assignment.accepted_at, icon: CheckCircleIcon, color: "text-blue-500 bg-blue-500/10" },
-                                                    { label: "Retirada no Local", time: assignment.picked_up_at, icon: Package, color: "text-purple-500 bg-purple-500/10" },
-                                                    { label: "Em Rota de Entrega", time: assignment.out_for_delivery_at, icon: TruckIcon, color: "text-amber-500 bg-amber-500/10" },
-                                                    { label: "Entregue", time: assignment.delivered_at, icon: CheckCircleIcon, color: "text-emerald-600 bg-emerald-500/10" },
-                                                ].map((item, idx, arr) => {
-                                                    const Icon = item.icon
-                                                    const isLast = idx === arr.length - 1
-                                                    return (
-                                                        <div key={item.label} className="relative flex gap-4 pb-6">
-                                                            {!isLast && (
-                                                                <div className="absolute left-[15px] top-8 bottom-0 w-px bg-brand-border dark:bg-dark-border" />
-                                                            )}
-                                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 z-10 ${item.color}`}>
-                                                                <Icon size={15} />
-                                                            </div>
-                                                            <div className="pt-1">
-                                                                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">{item.label}</p>
-                                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                                                    {item.time ? formatDateTime(item.time) : "Pendente"}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                    )
-                                                })}
+                                        {isTerminalFailed && (
+                                            <div className="mt-4 rounded-xl bg-red-50/70 p-4 border border-red-200/60 dark:bg-red-950/20 dark:border-red-900/40 text-xs">
+                                                <span className="font-bold text-red-800 dark:text-red-300">
+                                                    {assignment.status === "failed" ? "Falha registrada" : "Entrega cancelada"}:
+                                                </span>
+                                                <p className="mt-1 text-red-700/80 dark:text-red-400">
+                                                    {assignment.failure_reason || "Não informado."}
+                                                </p>
                                             </div>
-
-                                            {isTerminalFailed && (
-                                                <div className="rounded-xl bg-red-50/70 p-4 border border-red-200/60 dark:bg-red-950/20 dark:border-red-900/40 text-xs">
-                                                    <span className="font-bold text-red-800 dark:text-red-300">
-                                                        {assignment.status === "failed" ? "Falha registrada" : "Entrega cancelada"}:
-                                                    </span>
-                                                    <p className="mt-1 text-red-700/80 dark:text-red-400">
-                                                        {assignment.failure_reason || "Não informado."}
-                                                    </p>
-                                                </div>
-                                            )}
-                                        </div>
+                                        )}
                                     </FadeIn>
                                 )}
                             </AnimatePresence>

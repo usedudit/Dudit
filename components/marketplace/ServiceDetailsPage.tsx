@@ -1518,23 +1518,20 @@ export function ServiceDetailsPageClient({
                                         <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Quem cuida do seu pedido?</span>
                                         <span className="text-xs text-brand-inactive-text dark:text-dark-body">Entenda sobre a entrega, garantia e pós-venda</span>
                                     </button>
+                                    {/* Item 3 */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPoliciesModal(true)}
+                                        className="w-full text-left py-2 px-1 hover:bg-brand-gray/50 dark:hover:bg-dark-border/30 transition-colors flex flex-col gap-0.5"
+                                    >
+                                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Políticas da loja</span>
+                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body">Informações sobre devoluções, trocas e cancelamentos</span>
+                                    </button>
                                 </div>
                             </motion.div>
                         )}
                     </AnimatePresence>
                 </div>
-            </div>
-
-            {/* Políticas da loja */}
-            <div className="mb-6">
-                <button
-                    type="button"
-                    onClick={() => setShowPoliciesModal(true)}
-                    className="w-full flex items-center justify-between py-2 text-left hover:text-brand-green transition-colors"
-                >
-                    <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">Políticas da loja</span>
-                    <ChevronRightIcon size={18} className="text-brand-inactive-text dark:text-dark-body" />
-                </button>
             </div>
 
             {/* Store (Reputation & Levels Card) */}

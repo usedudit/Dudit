@@ -62,7 +62,8 @@ interface DashboardChecklistItem {
 // SUB-COMPONENTS
 // ============================================
 
-const DINO_CAVALERE_URL = "https://img.dudit.com.br/static/mascots/QRDino.png";
+// Same-origin proxy is required because this image is drawn into a canvas.
+const DINO_CAVALERE_URL = "/api/assets/qr-dino";
 
 function QRCodePoster({ profileUrl, storeName }: { profileUrl: string; storeName: string }) {
     const canvasRef = React.useRef<HTMLCanvasElement>(null);

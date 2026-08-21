@@ -195,6 +195,8 @@ export async function listAvailableDeliveryOffersAction(params?: { limit?: numbe
   return { success: true as const, items }
 }
 
+import { revalidateOrderHistory } from "@/lib/utils/revalidation"
+
 export async function acceptDeliveryOfferAction(assignmentId: string) {
   await requireDeliveryDriver()
   if (!assignmentId) return { success: false as const, error: "Oferta inválida." }
@@ -233,11 +235,20 @@ export async function acceptDeliveryOfferAction(assignmentId: string) {
       return { success: false as const, error: "Não foi possível aceitar a entrega. Ela pode ter sido aceita por outro entregador." }
     }
 
+    if (updated.order_id) {
+      await revalidateOrderHistory(updated.order_id)
+    }
+
     revalidatePath("/entregadores")
     revalidatePath("/entregadores/disponiveis")
     revalidatePath("/erp/logistica")
     revalidatePath("/erp/pedidos")
     return { success: true as const, data: updated }
+  }
+
+  const orderId = (data as any)?.order_id
+  if (orderId) {
+    await revalidateOrderHistory(orderId)
   }
 
   revalidatePath("/entregadores")
@@ -260,6 +271,12 @@ export async function transitionMyDeliveryAssignmentAction(params: {
     p_failure_reason: params.failureReason?.trim() || null,
   })
   if (error) return { success: false as const, error: normalizeError(error, "Não foi possível atualizar a entrega.") }
+
+  const orderId = (data as any)?.order_id
+  if (orderId) {
+    await revalidateOrderHistory(orderId)
+  }
+
   revalidatePath("/entregadores")
   revalidatePath("/entregadores/disponiveis")
   revalidatePath(`/entregadores/entregas/${params.assignmentId}`)
@@ -285,7 +302,15 @@ export async function confirmDeliveryPaymentReceivedAction(assignmentId: string,
     p_note: note?.trim() || null,
   })
   if (error) return { success: false as const, error: normalizeError(error, "Não foi possível registrar a confirmação.") }
+
+  const orderId = (data as any)?.order_id
+  if (orderId) {
+    await revalidateOrderHistory(orderId)
+  }
+
   revalidatePath(`/entregadores/entregas/${assignmentId}`)
+  revalidatePath("/erp/pedidos")
+  revalidatePath("/erp/logistica")
   return { success: true as const, data }
 }
 

@@ -289,7 +289,7 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                             showChevron={false}
                             width="w-64"
                         >
-                            <div className="px-4 py-3 border-b border-brand-border dark:border-dark-border">
+                            <div className="py-3 border-b border-brand-border dark:border-dark-border">
                                 <div className="flex items-center space-x-3 mb-4">
                                     <div
                                         className={`w-10 h-10 rounded-full ${avatarColor || getAvatarColor(userName)} flex items-center justify-center text-white font-bold text-sm border border-brand-border dark:border-dark-border`}
@@ -351,7 +351,7 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                 </div>
             </div>
             <BottomSheet isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)}>
-                <div className="px-4 py-3 border-b border-brand-border dark:border-dark-border">
+                <div className="py-3 border-b border-brand-border dark:border-dark-border">
                     <div className="flex items-center space-x-3 mb-4">
                         <div
                             className={`w-10 h-10 rounded-full ${avatarColor || getAvatarColor(userName)} flex items-center justify-center text-white font-bold text-sm border border-brand-border dark:border-dark-border`}
@@ -384,7 +384,7 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                                 <ItemWrapper
                                     key={idx}
                                     {...wrapProps}
-                                    className="px-6 py-2.5 hover:bg-brand-gray dark:hover:bg-dark-border/30 cursor-pointer transition-colors block w-full text-left"
+                                    className="py-2.5 hover:bg-brand-gray dark:hover:bg-dark-border/30 cursor-pointer transition-colors block w-full text-left"
                                     onClick={() => {
                                         if (wrapProps.onClick) wrapProps.onClick();
                                     }}

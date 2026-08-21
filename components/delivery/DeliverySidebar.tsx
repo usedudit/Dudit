@@ -8,8 +8,6 @@ import { TruckIcon, Package, XIcon, ChevronRightIcon } from "@/lib/icons"
 import * as TooltipPrimitive from "@radix-ui/react-tooltip"
 import { useSidebar } from "@/lib/sidebar-context"
 import { Drawer } from "vaul"
-import { setMyDeliveryAvailabilityAction } from "@/app/actions/delivery-drivers"
-import { toast } from "@/hooks/use-notification"
 
 interface NavItem {
     icon: any
@@ -32,10 +30,8 @@ const navItems: NavItem[] = [
 
 export function DeliverySidebar({
     userProfile,
-    initialOnline = true,
 }: {
     userProfile?: { fullName: string; email: string }
-    initialOnline?: boolean
 }) {
     const pathname = usePathname()
     const { isExpanded, toggleSidebar, isMobileOpen, setIsMobileOpen } = useSidebar()
@@ -48,10 +44,6 @@ export function DeliverySidebar({
     const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
     const sidebarRef = useRef<HTMLDivElement>(null)
-
-    // Disponibilidade do entregador
-    const [isOnline, setIsOnline] = useState(initialOnline)
-    const [isTogglingAvailability, setIsTogglingAvailability] = useState(false)
 
     const isActivePath = useCallback((href: string) => {
         if (!pathname) return false
@@ -86,25 +78,6 @@ export function DeliverySidebar({
         }, 150) // 150ms de tolerância
     }
 
-    const handleToggleAvailability = async () => {
-        if (isTogglingAvailability) return
-        setIsTogglingAvailability(true)
-        const nextStatus = isOnline ? "offline" : "available"
-        try {
-            const res = await setMyDeliveryAvailabilityAction(nextStatus)
-            if (res.success) {
-                setIsOnline(!isOnline)
-                toast.success(isOnline ? "Você está offline agora." : "Você está online e pronto para receber entregas!")
-            } else {
-                toast.error(res.error || "Não foi possível alterar status.")
-            }
-        } catch {
-            toast.error("Erro ao alterar disponibilidade.")
-        } finally {
-            setIsTogglingAvailability(false)
-        }
-    }
-
     if (!isMounted) return null
 
     // Cores Forçadas do Dark Mode
@@ -134,7 +107,7 @@ export function DeliverySidebar({
                 )}
             >
                 <div className="h-[65px] flex items-center px-3 overflow-hidden shrink-0 relative transition-all duration-300">
-                    <Link href="/entregadores" prefetch={false} className="flex items-center gap-3 w-full h-full relative">
+                    <Link href="/" prefetch={false} className="flex items-center gap-3 w-full h-full relative">
                         <div className="flex items-center justify-center shrink-0 w-[44px]">
                             <img
                                 src="https://img.dudit.com.br/static/Icon.png"
@@ -239,34 +212,6 @@ export function DeliverySidebar({
                         })}
                     </ul>
                 </nav>
-
-                {/* STATUS / DISPONIBILIDADE DO ENTREGADOR */}
-                <div className="px-3 pb-3 shrink-0">
-                    <button
-                        onClick={handleToggleAvailability}
-                        disabled={isTogglingAvailability}
-                        className={cn(
-                            "w-full flex items-center rounded-lg transition-colors duration-200 relative min-h-[44px]",
-                            "text-brand-inactive-text hover:bg-white/5",
-                            isCollapsed ? "justify-center" : "justify-start px-1",
-                        )}
-                        title={isOnline ? "Você está Online (recebendo entregas)" : "Você está Offline (pausado)"}
-                    >
-                        <div className="w-[44px] h-[44px] flex items-center justify-center shrink-0">
-                            <span className={cn("w-3 h-3 rounded-full shrink-0", isOnline ? "bg-emerald-500 animate-pulse" : "bg-gray-400")} />
-                        </div>
-                        {!isCollapsed && (
-                            <span className="flex-1 flex flex-col text-left min-w-0">
-                                <span className="text-[13px] font-semibold text-white truncate">
-                                    {isOnline ? "Online (Recebendo)" : "Offline (Pausado)"}
-                                </span>
-                                <span className="text-[11px] text-brand-inactive-text truncate">
-                                    {isOnline ? "Disponível para novas entregas" : "Toque para ficar disponível"}
-                                </span>
-                            </span>
-                        )}
-                    </button>
-                </div>
             </div>
 
             {/* MOBILE BOTTOM SHEET (VAUL) */}
@@ -299,24 +244,6 @@ export function DeliverySidebar({
                                     )
                                 })}
                             </nav>
-
-                            {/* STATUS MOBILE */}
-                            <div className="mt-4 pt-4 border-t border-dark-border">
-                                <button
-                                    onClick={handleToggleAvailability}
-                                    disabled={isTogglingAvailability}
-                                    className={cn(
-                                        "w-full flex items-center gap-3 p-3 rounded-xl transition-colors",
-                                        "text-brand-inactive-text hover:bg-white/5",
-                                        isOnline ? "bg-emerald-500/10 text-emerald-300" : ""
-                                    )}
-                                >
-                                    <span className={cn("w-3 h-3 rounded-full shrink-0", isOnline ? "bg-emerald-500 animate-pulse" : "bg-gray-400")} />
-                                    <span className="text-[15px] font-medium flex-1 text-left">
-                                        {isOnline ? "Online (Recebendo entregas)" : "Offline (Pausado)"}
-                                    </span>
-                                </button>
-                            </div>
                         </div>
                     </Drawer.Content>
                 </Drawer.Portal>

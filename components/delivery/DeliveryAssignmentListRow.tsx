@@ -4,16 +4,14 @@ import React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
-import { Badge, BadgeVariant, Dropdown, DropdownItem } from "@/components/reusable"
+import { Badge, BadgeVariant, ActionsDropdown, DropdownItem } from "@/components/reusable"
 import {
     TruckIcon,
     PhoneIcon,
     MapPinIcon,
-    MoreHorizontalIcon,
     CheckCircleIcon,
     ClockIcon,
     AlertTriangleIcon,
-    EyeIcon,
     WhatsappIcon,
     StoreIcon,
 } from "@/lib/icons"
@@ -218,39 +216,31 @@ export default function DeliveryAssignmentListRow({
             {/* AÇÕES */}
             <td className="py-2.5 pr-6 pl-2 border-b border-brand-border dark:border-dark-border text-center w-[70px] rounded-r-lg" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center justify-center action-btn">
-                    <Dropdown
-                        align="right"
-                        showChevron={false}
+                    <ActionsDropdown
                         trigger={
                             <button
                                 type="button"
                                 className="w-8 h-8 rounded-full flex items-center justify-center text-brand-inactive-text hover:bg-brand-gray hover:text-brand-dark dark:hover:bg-dark-border dark:hover:text-dark-heading transition-colors cursor-pointer"
                                 aria-label="Ações da entrega"
                             >
-                                <MoreHorizontalIcon size={18} />
+                                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
                             </button>
                         }
                     >
-                        <DropdownItem onClick={handleView}>
-                            <EyeIcon size={16} /> Ver Detalhes
-                        </DropdownItem>
-
                         <DropdownItem onClick={() => window.open(mapsUrl, "_blank")}>
                             <MapPinIcon size={16} /> Abrir Rota no Maps
                         </DropdownItem>
-
                         {cleanPhone && (
                             <DropdownItem onClick={() => window.open(`tel:${cleanPhone}`, "_self")}>
                                 <PhoneIcon size={16} /> Ligar para Cliente
                             </DropdownItem>
                         )}
-
                         {whatsappUrl && (
                             <DropdownItem onClick={() => window.open(whatsappUrl, "_blank")}>
                                 <WhatsappIcon size={16} /> Chamar no WhatsApp
                             </DropdownItem>
                         )}
-                    </Dropdown>
+                    </ActionsDropdown>
                 </div>
             </td>
         </motion.tr>

@@ -85,7 +85,8 @@ export function MarketplaceBottomMenu() {
         pathname.startsWith("/auth") ||
         pathname.startsWith("/checkout") ||
         pathname.startsWith("/quote") ||
-        pathname.startsWith("/print")
+        pathname.startsWith("/print") ||
+        pathname.startsWith("/entregadores")
 
     const homePath = citySlug ? `/${citySlug}` : "/"
     const explorePath = citySlug ? `/explorar/${citySlug}` : "/explorar/brasil"

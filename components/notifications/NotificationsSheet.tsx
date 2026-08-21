@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect } from "react"
+import { motion, AnimatePresence } from "framer-motion"
 import { XIcon } from "@/lib/icons"
 import { Button } from "@/components/reusable"
 import Portal from "@/components/Portal"
@@ -74,17 +75,29 @@ export function NotificationsSheet({ isOpen, onClose }: NotificationsSheetProps)
 
   return (
     <Portal>
-      <div
-        className={`fixed inset-0 z-50 bg-black/50 transition-opacity ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
-        onClick={onClose}
-      >
-        <div
-          className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-all duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0 opacity-100" : "translate-x-[120%]"}`}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {content}
-        </div>
-      </div>
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            className="fixed inset-0 z-[110] bg-black/50"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={onClose}
+          >
+            <motion.div
+              className="fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-dark-surface"
+              initial={{ x: "120%", opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: "120%", opacity: 0 }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {content}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </Portal>
   )
 }

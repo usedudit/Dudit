@@ -764,7 +764,7 @@ export async function notifyMarketplaceQuoteReady(quoteId: string, partnerId: st
 
         await createNotification({
             userId: marketplaceUserId,
-            title: `Orçamento pronto: ${partnerName}`,
+            title: `🧾 Orçamento pronto: ${partnerName}`,
             message: `Seu orçamento para "${serviceName}" foi preparado com os valores e prazos! Clique para visualizar a proposta.`,
             type: "message_received",
             entityType: "quote",

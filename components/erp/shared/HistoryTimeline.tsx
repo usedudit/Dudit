@@ -3,7 +3,7 @@
 import { motion } from "framer-motion"
 import { formatDistanceToNow } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import { MoneyIcon, ClockIcon, FileIcon, BlockedIcon, InfoIcon } from "@/lib/icons"
+import { MoneyIcon, ClockIcon, FileIcon, BlockedIcon, InfoIcon, CheckCircleIcon, RouteIcon } from "@/lib/icons"
 import { formatDateTime, cn } from "@/lib/utils"
 import { IconPlaceholder } from "@/components/reusable"
 
@@ -30,31 +30,46 @@ function getEntryIcon(entry: HistoryEntry) {
     const type = (entry.entry_type || "").toLowerCase()
     const content = entry.change_lines.join(" ").toLowerCase()
 
-    // If more than one change, use InfoIcon
-    if (entry.change_lines.length > 1) return InfoIcon
-
-    // Priority 1: Cancellation/Rejection
-    if (type.includes("cancel") || content.includes("cancel") || type.includes("reject") || content.includes("rejeit")) {
+    // Priority 1: Cancellation, Failure or Rejection
+    if (
+        type.includes("cancel") || content.includes("cancel") ||
+        type.includes("failed") || content.includes("falh") ||
+        type.includes("reject") || content.includes("rejeit")
+    ) {
         return BlockedIcon
     }
 
-    // Priority 2: Money related
+    // Priority 2: Delivered / Completed
+    if (type.includes("delivered") || content.includes("entregue com sucesso") || content.includes("pedido entregue")) {
+        return CheckCircleIcon
+    }
+
+    // Priority 3: Delivery route / Driver assignment / Picked up
+    if (
+        type.includes("delivery") || type.includes("driver") || type.includes("sent") || type.includes("picked_up") ||
+        content.includes("entregador") || content.includes("rota") || content.includes("saiu para entrega") ||
+        content.includes("retirou o pedido") || content.includes("aceitou a entrega")
+    ) {
+        return RouteIcon
+    }
+
+    // Priority 4: Money / Payment related
     if (
         type.includes("paid") || type.includes("payment") || type.includes("price") ||
         type.includes("money") || type.includes("total") || type.includes("discount") ||
         type.includes("shipping") || content.includes("valor") || content.includes("pago") ||
         content.includes("preço") || content.includes("desconto") || content.includes("frete") ||
-        content.includes("entrega")
+        content.includes("pagamento")
     ) {
         return MoneyIcon
     }
 
-    // Priority 3: Time/Duration related
+    // Priority 5: Time / Duration related
     if (type.includes("duration") || type.includes("date") || type.includes("time") || content.includes("duração") || content.includes("data") || content.includes("horário")) {
         return ClockIcon
     }
 
-    // Priority 4: Notes/Observations
+    // Priority 6: Notes / Observations
     if (type.includes("note") || type.includes("internal_notes") || type.includes("observation") || content.includes("nota") || content.includes("observação")) {
         return FileIcon
     }

@@ -25,6 +25,7 @@ const PUBLIC_PATHS = [
 // but we keep the header for any edge cases where dynamic routing might reach here.
 // Rotas da API que possuem seu próprio rate limit interno e devem ser isentas do rate limit global no middleware
 const RATE_LIMIT_EXEMPT_PATHS = [
+  "/api/assets/qr-dino",
   "/api/upload-image",
   "/api/r2/video-upload",
   "/api/mercadopago/webhook/subscription",

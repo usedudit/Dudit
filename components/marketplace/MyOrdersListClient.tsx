@@ -336,28 +336,26 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { ord
                                                                                 {(() => {
                                                                                     const matchLine = Array.isArray(order.checkout_fulfillment?.lines)
                                                                                         ? order.checkout_fulfillment.lines.find((l: any) =>
-                                                                                            (item.product_id && l.productId === item.product_id) ||
-                                                                                            (item.variant_id && l.variantId === item.variant_id)
+                                                                                            (item.id && l.orderItemId === item.id) ||
+                                                                                            (item.product_id && l.productId === item.product_id && (l.variantId || null) === (item.variant_id || null)) ||
+                                                                                            (item.service_id && l.serviceId === item.service_id)
                                                                                         )
                                                                                         : null
-                                                                                    if (!Array.isArray(matchLine?.selectedAddons) || matchLine.selectedAddons.length === 0) return null
-                                                                                    return (
-                                                                                        <div className="mt-1 flex flex-wrap gap-1">
-                                                                                            {matchLine.selectedAddons.map((addon: any, aIdx: number) => (
-                                                                                                <span
-                                                                                                    key={aIdx}
-                                                                                                    className="inline-flex items-center gap-1 text-[10px] font-medium bg-brand-gray dark:bg-dark-border/40 text-brand-dark dark:text-dark-heading px-1.5 py-0.5 rounded border border-brand-border/60 dark:border-dark-border/60"
-                                                                                                >
-                                                                                                    <span>{addon.optionName || addon.name}</span>
-                                                                                                    {(Number(addon.price) || 0) > 0 && (
-                                                                                                        <span className="text-brand-green font-semibold">
-                                                                                                            (+{formatCurrency(Number(addon.price))})
-                                                                                                        </span>
-                                                                                                    )}
-                                                                                                </span>
-                                                                                            ))}
+                                                                                    const selectedAddons = item.booking_metadata?.selectedAddons || matchLine?.selectedAddons
+                                                                                    if (!Array.isArray(selectedAddons) || selectedAddons.length === 0) return null
+
+                                                                                    const groupsMap: Record<string, any[]> = {}
+                                                                                    selectedAddons.forEach((a: any) => {
+                                                                                        const gTitle = a.groupTitle || (selectedAddons.length === 1 ? "Complemento" : "Complementos")
+                                                                                        if (!groupsMap[gTitle]) groupsMap[gTitle] = []
+                                                                                        groupsMap[gTitle].push(a)
+                                                                                    })
+
+                                                                                    return Object.entries(groupsMap).map(([title, groupList], gIdx) => (
+                                                                                        <div key={gIdx} className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                                                                            {title}: <span className="font-medium text-brand-dark dark:text-dark-heading">{groupList.map((a: any) => `${a.optionName || a.name || a.title || "Adicional"}${(Number(a.price) || 0) > 0 ? ` (+${formatCurrency(Number(a.price))})` : ""}`).join(", ")}</span>
                                                                                         </div>
-                                                                                    )
+                                                                                    ))
                                                                                 })()}
 
                                                                                 <div className="flex items-center gap-2 text-xs mt-1">

@@ -1,11 +1,9 @@
 "use client"
 
-import type React from "react"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useTheme } from "next-themes"
 import { MenuIcon, MoonIcon, LogoutIcon, ChevronDownIcon, ChevronLeftIcon, UserIcon, HelpCircleIcon, TruckIcon } from "@/lib/icons"
-import Dropdown, { DropdownItem } from "@/components/reusable/Dropdown"
+import Dropdown from "@/components/reusable/Dropdown"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import Link from "next/link"
@@ -13,6 +11,9 @@ import { getUserInitials, getAvatarColor } from "@/lib/utils/UserProfileImage"
 import { useSidebar } from "@/lib/sidebar-context"
 import BottomSheet from "@/components/BottomSheet"
 import { NotificationBell } from "@/components/notifications/NotificationBell"
+import { Switch } from "../reusable/Switch"
+import { setMyDeliveryAvailabilityAction } from "@/app/actions/delivery-drivers"
+import { toast } from "@/hooks/use-notification"
 
 const ChevronRight = ({ className }: { className?: string }) => (
     <svg
@@ -42,6 +43,7 @@ interface DeliveryPortalHeaderProps {
     onBack?: () => void // Custom back logic (e.g. discard changes)
     isSubPage?: boolean // Force ChevronLeftIcon even without backHref
     userProfile?: UserProfileData
+    initialOnline?: boolean
 }
 
 export function DeliveryPortalHeader({
@@ -50,11 +52,14 @@ export function DeliveryPortalHeader({
     onBack,
     isSubPage,
     userProfile,
+    initialOnline = false,
 }: DeliveryPortalHeaderProps) {
     const { theme, setTheme } = useTheme()
     const router = useRouter()
     const pathname = usePathname()
     const [isTransitioning, setIsTransitioning] = useState(false)
+    const [isOnline, setIsOnline] = useState(initialOnline)
+    const [isTogglingAvailability, setIsTogglingAvailability] = useState(false)
 
     const userName = userProfile?.fullName || "Entregador"
     const userEmail = userProfile?.email || ""
@@ -108,6 +113,25 @@ export function DeliveryPortalHeader({
         window.location.href = "/auth/login"
     }
 
+    const handleToggleAvailability = async () => {
+        if (isTogglingAvailability) return
+        setIsTogglingAvailability(true)
+        const nextStatus = isOnline ? "offline" : "available"
+        try {
+            const res = await setMyDeliveryAvailabilityAction(nextStatus)
+            if (res.success) {
+                setIsOnline(!isOnline)
+                toast.success(isOnline ? "Você está offline agora." : "Você está online e pronto para receber entregas!")
+            } else {
+                toast.error(res.error || "Não foi possível alterar status.")
+            }
+        } catch {
+            toast.error("Erro ao alterar disponibilidade.")
+        } finally {
+            setIsTogglingAvailability(false)
+        }
+    }
+
     const isAutoInnerPage = pathname.startsWith("/entregadores/entregas/")
 
     const hasEntityParam = searchParams.has("create") || searchParams.has("view") || searchParams.has("edit") || searchParams.has("duplicate")
@@ -153,19 +177,9 @@ export function DeliveryPortalHeader({
 
                         {/* --- ÁREA DO BREADCRUMB (IGUAL AO ERP) --- */}
                         <div className="hidden md:flex items-center gap-2">
-                            {/* Botão Unificado (Ícone + Nome) */}
-                            <Link
-                                href="/entregadores"
-                                prefetch={false}
-                                className="group flex items-center gap-2 pl-1 pr-2 py-1 rounded-full hover:bg-gray-100 dark:hover:bg-dark-border transition-colors cursor-pointer select-none"
-                            >
-                                <div className="flex items-center gap-1.5 h-full">
-                                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-brand-green/10 text-brand-green text-xs font-bold leading-none">
-                                        <TruckIcon size={12} />
-                                        <span>Portal do Entregador</span>
-                                    </div>
-                                </div>
-                            </Link>
+                            <h1 className="text-sm font-normal text-brand-inactive-text dark:text-dark-body px-1">
+                                Portal do Entregador
+                            </h1>
 
                             {/* Separador Chevron Right */}
                             <ChevronRight className="w-4 h-4 text-brand-inactive-text/50 dark:text-dark-body/50" />
@@ -202,7 +216,7 @@ export function DeliveryPortalHeader({
                             trigger={
                                 <div className="hidden md:flex items-center space-x-2 p-1 cursor-pointer hover:bg-brand-gray dark:hover:bg-dark-border rounded-full transition-colors group">
                                     <div
-                                        className={`w-8 h-8 rounded-full ${avatarColor || getAvatarColor(userName)} flex items-center justify-center text-white font-bold text-sm border border-brand-border dark:border-dark-border group-hover:shadow-sm transition-all relative`}
+                                        className={`w-8 h-8 rounded-full ${avatarColor || getAvatarColor(userName)} flex items-center justify-center text-white font-bold text-sm border border-brand-border dark:border-dark-border transition-all relative`}
                                     >
                                         {userInitials || getUserInitials(userName)}
                                     </div>
@@ -215,10 +229,10 @@ export function DeliveryPortalHeader({
                             showChevron={false}
                             width="w-64"
                         >
-                            <div className="px-4 py-3 border-b border-brand-border dark:border-dark-border">
+                            <div className="py-3 border-b border-brand-border dark:border-dark-border">
                                 <div className="flex items-center space-x-3 mb-4">
                                     <div
-                                        className={`w-10 h-10 rounded-full ${avatarColor || getAvatarColor(userName)} flex items-center justify-center text-white font-bold text-sm border border-brand-border dark:border-dark-border shadow-sm`}
+                                        className={`w-10 h-10 rounded-full ${avatarColor || getAvatarColor(userName)} flex items-center justify-center text-white font-bold text-sm border border-brand-border dark:border-dark-border`}
                                     >
                                         {userInitials || getUserInitials(userName)}
                                     </div>
@@ -232,39 +246,60 @@ export function DeliveryPortalHeader({
                                     </div>
                                 </div>
 
-                                <div className="py-1 border-y border-brand-border dark:border-dark-border">
-                                    <DropdownItem className="flex items-center gap-3 w-full" onClick={() => handleThemeButtonClick(theme === "dark" ? "light" : "dark")}>
-                                        <MoonIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
-                                        <span className="text-sm font-normal text-brand-inactive-text">Modo escuro</span>
-                                    </DropdownItem>
-                                </div>
-
                                 <div className="py-2">
-                                    <DropdownItem>
-                                        <Link href="/perfil" prefetch={false} className="flex items-center gap-3 w-full">
-                                            <UserIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
-                                            <span className="text-sm font-normal text-brand-inactive-text">Meu perfil</span>
-                                        </Link>
-                                    </DropdownItem>
-                                    <DropdownItem>
-                                        <Link href="/ajuda" prefetch={false} className="flex items-center gap-3 w-full">
-                                            <HelpCircleIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
-                                            <span className="text-sm font-normal text-brand-inactive-text">Central de ajuda</span>
-                                        </Link>
-                                    </DropdownItem>
+                                    {([
+                                        { label: "Meu Perfil", href: "/perfil", icon: <UserIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" /> },
+                                        { label: "Central de Ajuda", href: "/ajuda", icon: <HelpCircleIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" /> },
+                                        { label: "Sair da sessão", onClick: handleSignOut, icon: <LogoutIcon className="w-4 h-4 text-brand-red dark:text-brand-red" /> }
+                                    ] as any[]).map((item, idx) => {
+                                        const ItemWrapper: any = item.href ? Link : "div";
+                                        const wrapProps = item.href
+                                            ? { href: item.href, prefetch: false }
+                                            : { onClick: item.onClick };
+
+                                        return (
+                                            <ItemWrapper
+                                                key={idx}
+                                                {...wrapProps}
+                                                className="py-2.5 hover:bg-brand-gray dark:hover:bg-dark-border/30 cursor-pointer transition-colors block w-full text-left"
+                                                onClick={() => {
+                                                    if (wrapProps.onClick) wrapProps.onClick();
+                                                }}
+                                            >
+                                                <span className="flex items-center gap-3">
+                                                    {item.icon}
+                                                    <span className="text-[14px] font-normal text-brand-inactive-text dark:text-dark-body">{item.label}</span>
+                                                </span>
+                                            </ItemWrapper>
+                                        )
+                                    })}
                                 </div>
 
-                                <div className="py-1 border-t border-brand-border dark:border-dark-border mt-1">
-                                    <DropdownItem className="flex items-center gap-3 w-full hover:bg-brand-red/10" onClick={handleSignOut}>
-                                        <LogoutIcon className="w-4 h-4 text-brand-red" />
-                                        <span className="text-sm font-normal text-brand-red">Sair da sessão</span>
-                                    </DropdownItem>
+                                <div className="border-t border-brand-border dark:border-dark-border py-2">
+                                    <div className="px-6 py-2.5 flex items-center justify-between">
+                                        <span className="flex items-center gap-3">
+                                            <MoonIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
+                                            <span className="text-[14px] font-normal text-brand-inactive-text dark:text-dark-body">Disponível</span>
+                                        </span>
+                                        <Switch checked={isOnline} onCheckedChange={handleToggleAvailability} disabled={isTogglingAvailability} />
+                                    </div>
+                                </div>
+
+                                <div className="border-t border-brand-border dark:border-dark-border py-2">
+                                    <div className="px-6 py-2.5 flex items-center justify-between">
+                                        <span className="flex items-center gap-3">
+                                            <MoonIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
+                                            <span className="text-[14px] font-normal text-brand-inactive-text dark:text-dark-body">Modo escuro</span>
+                                        </span>
+                                        <Switch checked={theme === "dark"} onCheckedChange={() => handleThemeButtonClick(theme === "dark" ? "light" : "dark")} />
+                                    </div>
                                 </div>
                             </div>
                         </Dropdown>
                     </div>
                 </div>
             </div>
+
             <BottomSheet isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)}>
                 <div className="flex flex-col py-1">
                     <div className="flex items-center space-x-4 mb-6 px-2 mt-4">
@@ -302,6 +337,14 @@ export function DeliveryPortalHeader({
                                         }`}
                                 />
                             </button>
+                        </div>
+
+                        <div className="flex items-center justify-between p-4 rounded-2xl bg-gray-50 dark:bg-dark-border/30 border border-transparent hover:border-brand-border/30 dark:hover:border-dark-border/50 transition-all">
+                            <div className="flex items-center gap-3">
+                                <span className={`w-5 h-5 rounded-full ${isOnline ? "bg-emerald-500" : "bg-gray-300 dark:bg-dark-border"}`} />
+                                <span className="text-[16px] font-medium text-brand-dark dark:text-dark-heading">Disponível</span>
+                            </div>
+                            <Switch checked={isOnline} onCheckedChange={handleToggleAvailability} disabled={isTogglingAvailability} />
                         </div>
 
                         <Link

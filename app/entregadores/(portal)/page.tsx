@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import DeliveryAssignmentsList from "@/components/delivery/DeliveryAssignmentsList"
+import { FadeIn } from "@/components/animations/FadeIn"
 
 export const metadata: Metadata = {
   title: "Minhas Entregas",
@@ -12,5 +13,9 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic"
 
 export default function DeliveryPortalPage() {
-  return <DeliveryAssignmentsList />
+  return (
+    <FadeIn className="p-4">
+      <DeliveryAssignmentsList />
+    </FadeIn>
+  )
 }

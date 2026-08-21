@@ -53,7 +53,7 @@ export default function QuoteSkeleton({ count = 5, viewMode = "list" }: QuoteSke
                         <thead>
                             <tr className="bg-brand-gray dark:bg-dark-surface/50">
                                 {Array.from({ length: 6 }).map((_, i) => (
-                                    <th key={i} className="px-4 py-3 border-b border-brand-border dark:border-dark-border">
+                                    <th key={i} className="py-3 border-b border-brand-border dark:border-dark-border">
                                         <div className="h-4 bg-brand-gray dark:bg-dark-border rounded w-[60%] animate-pulse" />
                                     </th>
                                 ))}

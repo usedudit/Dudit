@@ -1299,20 +1299,21 @@ export function CheckoutPageClient() {
                                             </div>
                                         )}
                                         {Array.isArray(line.selectedAddons) && line.selectedAddons.length > 0 && (
-                                            <div className="mt-1 flex flex-wrap gap-1">
-                                                {line.selectedAddons.map((addon: any, aIdx: number) => (
-                                                    <span
-                                                        key={aIdx}
-                                                        className="inline-flex items-center gap-1 text-[11px] font-medium bg-brand-gray dark:bg-dark-border/40 text-brand-dark dark:text-dark-heading px-2 py-0.5 rounded-md border border-brand-border/60 dark:border-dark-border/60"
-                                                    >
-                                                        <span>{addon.optionName || addon.name}</span>
-                                                        {(Number(addon.price) || 0) > 0 && (
-                                                            <span className="text-brand-green font-semibold">
-                                                                (+{formatCurrency(Number(addon.price))})
-                                                            </span>
-                                                        )}
-                                                    </span>
-                                                ))}
+                                            <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5 space-y-0.5">
+                                                {(() => {
+                                                    const addons = line.selectedAddons || []
+                                                    const groupsMap: Record<string, any[]> = {}
+                                                    addons.forEach((a: any) => {
+                                                        const gTitle = a.groupTitle || (addons.length === 1 ? "Complemento" : "Complementos")
+                                                        if (!groupsMap[gTitle]) groupsMap[gTitle] = []
+                                                        groupsMap[gTitle].push(a)
+                                                    })
+                                                    return Object.entries(groupsMap).map(([title, groupList], gIdx) => (
+                                                        <div key={gIdx}>
+                                                            {title}: <span className="font-medium text-brand-dark dark:text-dark-heading">{groupList.map((a: any) => `${a.optionName || a.name || a.title || "Adicional"}${(Number(a.price) || 0) > 0 ? ` (+${formatCurrency(Number(a.price))})` : ""}`).join(", ")}</span>
+                                                        </div>
+                                                    ))
+                                                })()}
                                             </div>
                                         )}
                                         <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">

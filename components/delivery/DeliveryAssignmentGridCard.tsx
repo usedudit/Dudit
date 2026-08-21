@@ -4,16 +4,14 @@ import React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
-import { Badge, Button, Dropdown, DropdownItem } from "@/components/reusable"
+import { Badge, Button, ActionsDropdown, DropdownItem } from "@/components/reusable"
 import {
     MapPinIcon,
     PhoneIcon,
     WhatsappIcon,
     StoreIcon,
-    MoreHorizontalIcon,
     Package,
     ClockIcon,
-    EyeIcon,
     TruckIcon,
 } from "@/lib/icons"
 import { formatCurrency, formatDate } from "@/lib/utils"
@@ -83,22 +81,17 @@ export default function DeliveryAssignmentGridCard({ assignment, onView }: Deliv
 
                         {/* Ações */}
                         <div className="shrink-0 -mt-1 -mr-1" onClick={(e) => e.stopPropagation()}>
-                            <Dropdown
-                                align="right"
-                                showChevron={false}
+                            <ActionsDropdown
                                 trigger={
                                     <button
                                         type="button"
                                         className="w-8 h-8 rounded-full flex items-center justify-center text-brand-inactive-text hover:bg-brand-gray hover:text-brand-dark dark:hover:bg-dark-border dark:hover:text-dark-heading transition-colors cursor-pointer"
                                         aria-label="Ações da entrega"
                                     >
-                                        <MoreHorizontalIcon size={18} />
+                                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
                                     </button>
                                 }
                             >
-                                <DropdownItem onClick={handleView}>
-                                    <EyeIcon size={16} /> Ver Detalhes
-                                </DropdownItem>
                                 <DropdownItem onClick={() => window.open(mapsUrl, "_blank")}>
                                     <MapPinIcon size={16} /> Abrir Rota no Maps
                                 </DropdownItem>
@@ -112,7 +105,7 @@ export default function DeliveryAssignmentGridCard({ assignment, onView }: Deliv
                                         <WhatsappIcon size={16} /> Chamar no WhatsApp
                                     </DropdownItem>
                                 )}
-                            </Dropdown>
+                            </ActionsDropdown>
                         </div>
                     </div>
 
@@ -189,8 +182,8 @@ export default function DeliveryAssignmentGridCard({ assignment, onView }: Deliv
             )}
 
             {/* Área do Rodapé */}
-            <div className="mt-auto pt-3 border-t border-brand-border dark:border-dark-border flex flex-col gap-2">
-                <div className="flex items-end justify-between mt-1">
+            <div className="mt-auto pt-3 border-t border-brand-border dark:border-dark-border">
+                <div className="flex items-end justify-between">
                     {/* Valores */}
                     <div className="flex flex-col gap-0.5">
                         <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Pedido</span>
@@ -202,19 +195,6 @@ export default function DeliveryAssignmentGridCard({ assignment, onView }: Deliv
                         <span className="text-xs font-bold text-brand-green">
                             Taxa: {formatCurrency(assignment.delivery_fee || 0)}
                         </span>
-                    </div>
-
-                    {/* Botão de Detalhes */}
-                    <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={handleView}
-                            className="text-xs h-8 px-3"
-                            leftIcon={<TruckIcon size={14} />}
-                        >
-                            Detalhes
-                        </Button>
                     </div>
                 </div>
             </div>

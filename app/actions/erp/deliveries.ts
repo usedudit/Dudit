@@ -16,6 +16,7 @@ import { DASHBOARD_TAGS } from "@/lib/data/dashboard"
 import { sanitizeNotes } from "@/lib/input-validator"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { requireActivePartnerContext } from "@/lib/services/authorized-customer-access"
+import { revalidateOrderHistory } from "@/lib/utils/revalidation"
 
 export type ERPDeliveryListCursor = { createdAt: string; id: string }
 
@@ -51,6 +52,128 @@ function revalidateDeliveryDashboard(partnerId: string) {
   revalidateTag(DASHBOARD_TAGS.operations(partnerId), "max")
   revalidatePath("/erp/painel")
   revalidatePath("/erp/inicio")
+}
+
+function getDeliveryStatusHumanLabel(status: string): string {
+  switch (status) {
+    case "pending":
+    case "not_sent":
+      return "Pendente"
+    case "preparing":
+      return "Em preparo"
+    case "sent":
+      return "Saiu para entrega (Em rota)"
+    case "delivered":
+      return "Entregue"
+    case "pickup_available":
+      return "Pronto para retirada"
+    case "delivery_failed":
+      return "Falha na entrega"
+    case "cancelled":
+      return "Cancelada"
+    default:
+      return status
+  }
+}
+
+async function logOrderDeliveryEvent(input: {
+  partnerId: string
+  actorUserId: string | null
+  orderId: string
+  actionType: string
+  changeLines: string[]
+  metadata?: Record<string, unknown> | null
+}) {
+  try {
+    await logAuditEvent({
+      partnerId: input.partnerId,
+      actorUserId: input.actorUserId,
+      entityType: "order",
+      entityId: input.orderId,
+      actionType: input.actionType,
+      changeLines: input.changeLines,
+      metadata: input.metadata || null,
+      source: "manual",
+    })
+    await revalidateOrderHistory(input.orderId)
+  } catch (err) {
+    console.warn("[logOrderDeliveryEvent] error:", err)
+  }
+}
+
+function resolveDeliveryLimitByPlanSlug(slug: string) {
+  const normalized = String(slug || "").toLowerCase()
+  if (normalized === "free") return { blocked: true, maxOrders: 0 as const }
+  if (normalized === "crescer") return { blocked: false, maxOrders: 1 as const }
+  return { blocked: false, maxOrders: Number.MAX_SAFE_INTEGER }
+}
+
+async function enforceDeliveryPlanAccess(partnerId: string, orderCount: number) {
+  const plan = await getPartnerPlan(partnerId)
+  const rule = resolveDeliveryLimitByPlanSlug(plan.slug)
+
+  if (rule.blocked) {
+    return {
+      allowed: false as const,
+      error: "Seu plano atual não possui acesso ao módulo de entregas.",
+      maxOrders: rule.maxOrders,
+      planSlug: plan.slug,
+    }
+  }
+
+  if (orderCount > rule.maxOrders) {
+    return {
+      allowed: false as const,
+      error: "Seu plano permite apenas 1 pedido por entrega. Faça upgrade para entregas com múltiplos pedidos.",
+      maxOrders: rule.maxOrders,
+      planSlug: plan.slug,
+    }
+  }
+
+  return { allowed: true as const, maxOrders: rule.maxOrders, planSlug: plan.slug }
+}
+
+async function enforcePlanOnExistingDelivery(partnerId: string, deliveryId: string, fallbackOrderCount = 1) {
+  const supabase = await getSupabaseServerClient()
+  const { data: links } = await supabase
+    .from("delivery_orders")
+    .select("id")
+    .eq("delivery_id", deliveryId)
+
+  const currentOrderCount = (links || []).length || fallbackOrderCount
+  return enforceDeliveryPlanAccess(partnerId, currentOrderCount)
+}
+
+function normalizeDeliveryStatus(status: string | null | undefined): DeliveryStatusValue {
+  const raw = String(status || "").trim().toLowerCase()
+  if (!raw) return "pending"
+  if (raw === "pendente") return "pending"
+  if (raw === "em preparação" || raw === "em preparacao") return "preparing"
+  if (raw === "saiu para entrega") return "sent"
+  if (raw === "concluída" || raw === "concluida") return "delivered"
+  if (raw === "cancelada") return "cancelled"
+  if (raw === "not_sent") return "pending"
+  return raw as DeliveryStatusValue
+}
+
+async function logDeliveryEvent(input: {
+  partnerId: string
+  actorUserId: string | null
+  deliveryId: string
+  actionType: string
+  changeLines: string[]
+  metadata?: Record<string, unknown> | null
+}) {
+  await logAuditEvent({
+    partnerId: input.partnerId,
+    actorUserId: input.actorUserId,
+    entityType: "delivery",
+    entityId: input.deliveryId,
+    actionType: input.actionType,
+    changeLines: input.changeLines,
+    metadata: input.metadata || null,
+    source: "manual",
+  })
 }
 
 type SmartDeliverySuggestionOrder = {
@@ -139,87 +262,10 @@ async function getPartnerUserNameByIdMap(
   const nameByPartnerUserId = new Map<string, string>()
   for (const id of uniqueIds) {
     const userId = userIdByPartnerUserId.get(id) || id
-    nameByPartnerUserId.set(id, nameByUserId.get(userId) || nameByUserId.get(id) || "Entregador")
+    nameByPartnerUserId.set(id, nameByUserId.get(userId) || nameByPartnerUserId.get(id) || "Entregador")
   }
 
   return nameByPartnerUserId
-}
-
-function resolveDeliveryLimitByPlanSlug(slug: string) {
-  const normalized = String(slug || "").toLowerCase()
-  if (normalized === "free") return { blocked: true, maxOrders: 0 as const }
-  if (normalized === "crescer") return { blocked: false, maxOrders: 1 as const }
-  return { blocked: false, maxOrders: Number.MAX_SAFE_INTEGER }
-}
-
-async function enforceDeliveryPlanAccess(partnerId: string, orderCount: number) {
-  const plan = await getPartnerPlan(partnerId)
-  const rule = resolveDeliveryLimitByPlanSlug(plan.slug)
-
-  if (rule.blocked) {
-    return {
-      allowed: false as const,
-      error: "Seu plano atual não possui acesso ao módulo de entregas.",
-      maxOrders: rule.maxOrders,
-      planSlug: plan.slug,
-    }
-  }
-
-  if (orderCount > rule.maxOrders) {
-    return {
-      allowed: false as const,
-      error: "Seu plano permite apenas 1 pedido por entrega. Faça upgrade para entregas com múltiplos pedidos.",
-      maxOrders: rule.maxOrders,
-      planSlug: plan.slug,
-    }
-  }
-
-  return { allowed: true as const, maxOrders: rule.maxOrders, planSlug: plan.slug }
-}
-
-async function enforcePlanOnExistingDelivery(partnerId: string, deliveryId: string, fallbackOrderCount = 1) {
-  const supabase = await getSupabaseServerClient()
-  const { data: links } = await supabase
-    .from("delivery_orders")
-    .select("id")
-    .eq("delivery_id", deliveryId)
-
-  const currentOrderCount = (links || []).length || fallbackOrderCount
-  return enforceDeliveryPlanAccess(partnerId, currentOrderCount)
-}
-
-function normalizeDeliveryStatus(status: string | null | undefined): DeliveryStatusValue {
-  const raw = String(status || "").trim().toLowerCase()
-  if (!raw) return "pending"
-  // Portuguese inputs (future UI)
-  if (raw === "pendente") return "pending"
-  if (raw === "em preparação" || raw === "em preparacao") return "preparing"
-  if (raw === "saiu para entrega") return "sent"
-  if (raw === "concluída" || raw === "concluida") return "delivered"
-  if (raw === "cancelada") return "cancelled"
-  // Legacy normalization
-  if (raw === "not_sent") return "pending"
-  return raw as DeliveryStatusValue
-}
-
-async function logDeliveryEvent(input: {
-  partnerId: string
-  actorUserId: string | null
-  deliveryId: string
-  actionType: string
-  changeLines: string[]
-  metadata?: Record<string, unknown> | null
-}) {
-  await logAuditEvent({
-    partnerId: input.partnerId,
-    actorUserId: input.actorUserId,
-    entityType: "delivery",
-    entityId: input.deliveryId,
-    actionType: input.actionType,
-    changeLines: input.changeLines,
-    metadata: input.metadata || null,
-    source: "manual",
-  })
 }
 
 async function getOrCreateCachedCoords(params: {
@@ -1582,6 +1628,8 @@ export async function getERPDeliveryDetailsAction(deliveryId: string, partnerId:
         .eq("address_type", "primary"),
     ])
 
+
+
     const addressMap = new Map<string, any>()
     for (const addr of addressRows || []) {
       addressMap.set(String(addr.customer_id), addr)
@@ -1719,6 +1767,28 @@ export async function updateERPDeliveryStatusAction(params: {
         orderPatch.delivery_completed_at = nowIso
       }
       await supabase.from("orders").update(orderPatch).in("id", orderIds).eq("partner_id", params.partnerId)
+
+      for (const oid of orderIds) {
+        const orderStatusMsg = nextStatus === "sent"
+          ? "Pedido saiu para entrega (Em rota)"
+          : nextStatus === "delivered"
+            ? "Pedido entregue ao destinatário com sucesso"
+            : nextStatus === "cancelled"
+              ? "Entrega do pedido cancelada"
+              : `Status de entrega alterado para ${getDeliveryStatusHumanLabel(nextStatus)}`
+        const orderChangeLines = [orderStatusMsg]
+        if (params.changeReason?.trim()) {
+          orderChangeLines.push(`Motivo: ${params.changeReason.trim()}`)
+        }
+        await logOrderDeliveryEvent({
+          partnerId: params.partnerId,
+          actorUserId: user?.id || null,
+          orderId: oid,
+          actionType: `delivery_${nextStatus}`,
+          changeLines: orderChangeLines,
+          metadata: { deliveryId: params.deliveryId, status: nextStatus },
+        })
+      }
     }
   } catch (err) {
     console.warn("[updateERPDeliveryStatusAction] order patch failed:", err)
@@ -2072,6 +2142,7 @@ export async function updateERPSingleOrderDeliveryStatusAction(params: {
   status: DeliveryStatusValue
   changeReason?: string
 }) {
+
   const user = await requireUser()
   const actor = await getDeliveryActorScope(params.partnerId)
   await requirePartnerRouteAccess(params.partnerId, "logistics", { specificPermission: "can_update_delivery_status" })
@@ -2137,13 +2208,13 @@ export async function updateERPSingleOrderDeliveryStatusAction(params: {
 
   const orderLabel = `#${String(params.orderId).slice(0, 8).toUpperCase()}`
   let changeMsg = nextStatus === "delivered"
-    ? `Pedido ${orderLabel} entregue`
+    ? `Pedido ${orderLabel} entregue ao destinatário com sucesso`
     : nextStatus === "delivery_failed"
-      ? `Falha na entrega do pedido ${orderLabel}`
-      : `Status de entrega do pedido ${orderLabel} alterado para ${nextStatus}`
+      ? `Tentativa de entrega do pedido ${orderLabel} falhou`
+      : `Status de entrega do pedido ${orderLabel} alterado para ${getDeliveryStatusHumanLabel(nextStatus)}`
 
   if (params.changeReason?.trim()) {
-    changeMsg += ` (Motivo da alteração: ${params.changeReason.trim()})`
+    changeMsg += ` (Motivo: ${params.changeReason.trim()})`
   }
 
   // Log on delivery audit
@@ -2156,21 +2227,15 @@ export async function updateERPSingleOrderDeliveryStatusAction(params: {
     metadata: { orderId: params.orderId, newStatus: nextStatus },
   })
 
-  // Log on order timeline
-  try {
-    await logAuditEvent({
-      partnerId: params.partnerId,
-      actorUserId: user?.id || null,
-      entityType: "order",
-      entityId: params.orderId,
-      actionType: "delivery_status_changed",
-      changeLines: [changeMsg],
-      metadata: { deliveryId: params.deliveryId, status: nextStatus },
-      source: "manual",
-    })
-  } catch (err) {
-    console.warn("[updateERPSingleOrderDeliveryStatusAction] order logAuditEvent failed:", err)
-  }
+  // Log on order timeline & revalidate order history
+  await logOrderDeliveryEvent({
+    partnerId: params.partnerId,
+    actorUserId: user?.id || null,
+    orderId: params.orderId,
+    actionType: `delivery_${nextStatus}`,
+    changeLines: [changeMsg],
+    metadata: { deliveryId: params.deliveryId, status: nextStatus },
+  })
 
   // Check if all delivery_orders are now completed
   const { data: allLinks } = await supabase

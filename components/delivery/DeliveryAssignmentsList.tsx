@@ -365,13 +365,12 @@ export default function DeliveryAssignmentsList() {
                         <div className="flex items-center gap-2 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl p-1 shadow-xs">
                             <div className="flex items-center gap-2 pl-2 pr-1">
                                 <span
-                                    className={`h-2.5 w-2.5 rounded-full shrink-0 ${
-                                        isOccupied
-                                            ? "bg-amber-500 animate-pulse"
-                                            : isAvailable
+                                    className={`h-2.5 w-2.5 rounded-full shrink-0 ${isOccupied
+                                        ? "bg-amber-500 animate-pulse"
+                                        : isAvailable
                                             ? "bg-emerald-500 animate-pulse"
                                             : "bg-gray-400"
-                                    }`}
+                                        }`}
                                 />
                             </div>
                             <div className="w-36">
@@ -404,13 +403,12 @@ export default function DeliveryAssignmentsList() {
                 <div className="md:hidden flex items-center justify-between gap-2 px-4 mb-3">
                     <div className="flex-1 flex items-center gap-2 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl p-1 shadow-xs">
                         <span
-                            className={`h-2.5 w-2.5 rounded-full shrink-0 ml-2 ${
-                                isOccupied
-                                    ? "bg-amber-500 animate-pulse"
-                                    : isAvailable
+                            className={`h-2.5 w-2.5 rounded-full shrink-0 ml-2 ${isOccupied
+                                ? "bg-amber-500 animate-pulse"
+                                : isAvailable
                                     ? "bg-emerald-500 animate-pulse"
                                     : "bg-gray-400"
-                            }`}
+                                }`}
                         />
                         <div className="flex-1">
                             <FormDropdown
@@ -515,14 +513,12 @@ export default function DeliveryAssignmentsList() {
                             <FadeIn key={`list-${activeTab}`} className="w-full">
                                 <div className="w-full overflow-hidden rounded-xl relative">
                                     <div
-                                        className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${
-                                            scrollState.left ? "opacity-100" : "opacity-0"
-                                        }`}
+                                        className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"
+                                            }`}
                                     />
                                     <div
-                                        className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${
-                                            scrollState.right ? "opacity-100" : "opacity-0"
-                                        }`}
+                                        className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"
+                                            }`}
                                     />
 
                                     <div
@@ -538,11 +534,9 @@ export default function DeliveryAssignmentsList() {
                                                         return (
                                                             <th
                                                                 key={col.id}
-                                                                className={`py-3 px-2 pl-6 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${
-                                                                    col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"
-                                                                } cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors ${
-                                                                    col.id === "actions" ? "rounded-r-lg" : col.id === "order" ? "rounded-l-lg" : ""
-                                                                }`}
+                                                                className={`py-3 px-2 pl-6 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"
+                                                                    } cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors ${col.id === "actions" ? "rounded-r-lg" : col.id === "order" ? "rounded-l-lg" : ""
+                                                                    }`}
                                                                 style={{ width: col.width }}
                                                                 onClick={() => {
                                                                     if (col.id === "actions") return

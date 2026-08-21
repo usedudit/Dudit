@@ -183,8 +183,10 @@ const getItemKindLabel = (item: any) => {
 const findFulfillmentLine = (order: any, item: any) => {
     const lines = order.checkout_fulfillment?.lines || [];
     return lines.find((line: any) => {
+        if (item.id && line.orderItemId === item.id) return true;
         if (item.service_id && line.serviceId === item.service_id) return true;
         if (item.recurring_plan_id && line.recurringPlanId === item.recurring_plan_id) return true;
+        if (item.product_id && line.productId === item.product_id && (line.variantId || null) === (item.variant_id || null)) return true;
         return line.lineName === item.product_name;
     });
 };
@@ -1115,23 +1117,23 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                         {item.product_variants?.variant_name && (
                                             <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">{item.product_variants.variant_name}</div>
                                         )}
-                                        {Array.isArray(fulfillmentLine?.selectedAddons) && fulfillmentLine.selectedAddons.length > 0 && (
-                                            <div className="mt-1 flex flex-wrap gap-1">
-                                                {fulfillmentLine.selectedAddons.map((addon: any, aIdx: number) => (
-                                                    <span
-                                                        key={aIdx}
-                                                        className="inline-flex items-center gap-1 text-[11px] font-medium bg-brand-gray dark:bg-dark-border/40 text-brand-dark dark:text-dark-heading px-2 py-0.5 rounded-md border border-brand-border/60 dark:border-dark-border/60"
-                                                    >
-                                                        <span>{addon.optionName || addon.name}</span>
-                                                        {(Number(addon.price) || 0) > 0 && (
-                                                            <span className="text-brand-green font-semibold">
-                                                                (+{formatCurrency(Number(addon.price))})
-                                                            </span>
-                                                        )}
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        )}
+                                        {(() => {
+                                            const selectedAddons = item.booking_metadata?.selectedAddons || fulfillmentLine?.selectedAddons
+                                            if (!Array.isArray(selectedAddons) || selectedAddons.length === 0) return null
+
+                                            const groupsMap: Record<string, any[]> = {}
+                                            selectedAddons.forEach((a: any) => {
+                                                const gTitle = a.groupTitle || (selectedAddons.length === 1 ? "Complemento" : "Complementos")
+                                                if (!groupsMap[gTitle]) groupsMap[gTitle] = []
+                                                groupsMap[gTitle].push(a)
+                                            })
+
+                                            return Object.entries(groupsMap).map(([title, groupList], gIdx) => (
+                                                <div key={gIdx} className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                                    {title}: <span className="font-medium text-brand-dark dark:text-dark-heading">{groupList.map((a: any) => `${a.optionName || a.name || a.title || "Adicional"}${(Number(a.price) || 0) > 0 ? ` (+${formatCurrency(Number(a.price))})` : ""}`).join(", ")}</span>
+                                                </div>
+                                            ))
+                                        })()}
                                     </>
                                 )}
                                 <div className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-1">
@@ -1370,6 +1372,23 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                                     {item.product_variants?.variant_name && (
                                                                         <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">{item.product_variants.variant_name}</div>
                                                                     )}
+                                                                    {(() => {
+                                                                        const selectedAddons = item.booking_metadata?.selectedAddons || fulfillmentLine?.selectedAddons
+                                                                        if (!Array.isArray(selectedAddons) || selectedAddons.length === 0) return null
+
+                                                                        const groupsMap: Record<string, any[]> = {}
+                                                                        selectedAddons.forEach((a: any) => {
+                                                                            const gTitle = a.groupTitle || (selectedAddons.length === 1 ? "Complemento" : "Complementos")
+                                                                            if (!groupsMap[gTitle]) groupsMap[gTitle] = []
+                                                                            groupsMap[gTitle].push(a)
+                                                                        })
+
+                                                                        return Object.entries(groupsMap).map(([title, groupList], gIdx) => (
+                                                                            <div key={gIdx} className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                                                                {title}: <span className="font-medium text-brand-dark dark:text-dark-heading">{groupList.map((a: any) => `${a.optionName || a.name || a.title || "Adicional"}${(Number(a.price) || 0) > 0 ? ` (+${formatCurrency(Number(a.price))})` : ""}`).join(", ")}</span>
+                                                                            </div>
+                                                                        ))
+                                                                    })()}
                                                                 </>
                                                             )}
                                                             <div className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-1">

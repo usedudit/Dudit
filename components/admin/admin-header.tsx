@@ -198,7 +198,7 @@ export function AdminHeader({
                             showChevron={false}
                             width="w-64"
                         >
-                            <div className="px-4 py-3 border-b border-brand-border dark:border-dark-border">
+                            <div className="py-3 border-b border-brand-border dark:border-dark-border">
                                 <div className="flex items-center space-x-3">
                                     <div
                                         className={`w-10 h-10 rounded-full ${avatarColor} flex items-center justify-center text-white font-bold text-sm`}
@@ -219,7 +219,7 @@ export function AdminHeader({
                                 </div>
                             </div>
 
-                            <div className="px-4 py-3 border-b border-brand-border dark:border-dark-border">
+                            <div className="py-3 border-b border-brand-border dark:border-dark-border">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                         <MoonIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />

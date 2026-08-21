@@ -39,11 +39,13 @@ export default async function DeliveryPortalLayout({ children }: { children: Rea
             {isDriver && (
               <DeliverySidebar
                 userProfile={userProfile}
-                initialOnline={driverData?.availability_status === "available"}
               />
             )}
             <div className="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-              <DeliveryPortalHeader userProfile={userProfile} />
+              <DeliveryPortalHeader
+                userProfile={userProfile}
+                initialOnline={driverData?.availability_status === "available"}
+              />
               {isDriver ? children : <DeliveryAccessDenied userEmail={user.email || ""} />}
             </div>
           </div>
