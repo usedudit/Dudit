@@ -30,7 +30,17 @@ import DeliveryAssignmentDetail from "./DeliveryAssignmentDetail"
 type SortKey = "date" | "total" | "fee" | "order"
 type SortDirection = "asc" | "desc"
 
-const ITEMS_PER_PAGE = 12
+const ITEMS_PER_PAGE = 8
+
+const FIXED_COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; width: string }[] = [
+    { id: "order", label: "Pedido", align: "left" as const, width: "180px" },
+    { id: "partner", label: "Estabelecimento", align: "left" as const, width: "180px" },
+    { id: "customer", label: "Cliente", align: "left" as const, width: "200px" },
+    { id: "address", label: "Endereço", align: "left" as const, width: "240px" },
+    { id: "values", label: "Valores", align: "left" as const, width: "130px" },
+    { id: "status", label: "Status", align: "center" as const, width: "160px" },
+    { id: "actions", label: "Ações", align: "center" as const, width: "70px" },
+]
 
 export default function DeliveryAssignmentsList() {
     const isTabletOrMobile = useMediaQuery("(max-width: 1023px)")
@@ -338,10 +348,12 @@ export default function DeliveryAssignmentsList() {
             <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
                 {/* DESKTOP HEADER */}
                 <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
-                    <div className="flex flex-col gap-1 pt-1">
-                        <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
-                            Minhas Entregas
-                        </h1>
+                    <div className="flex flex-col gap-2 pt-1">
+                        <div className="flex items-center gap-3">
+                            <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
+                                Minhas Entregas
+                            </h1>
+                        </div>
                         <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
                             Gerencie e acompanhe todos os pedidos e rotas atribuídos a você.
                         </p>
@@ -424,21 +436,23 @@ export default function DeliveryAssignmentsList() {
                     </Button>
                 </div>
 
-                <DeliveryPageControls
-                    activeTab={activeTab}
-                    setActiveTab={setActiveTab}
-                    tabCounts={tabCounts}
-                    search={search}
-                    onSearchChange={setSearch}
-                    viewMode={viewMode}
-                    onViewModeChange={setViewMode}
-                    filters={filters}
-                    setFilters={setFilters}
-                    partnerOptions={partnerOptions}
-                />
+                {hasAnyDeliveries && (
+                    <DeliveryPageControls
+                        activeTab={activeTab}
+                        setActiveTab={setActiveTab}
+                        tabCounts={tabCounts}
+                        search={search}
+                        onSearchChange={setSearch}
+                        viewMode={viewMode}
+                        onViewModeChange={setViewMode}
+                        filters={filters}
+                        setFilters={setFilters}
+                        partnerOptions={partnerOptions}
+                    />
+                )}
 
                 {/* CONTENT AREA */}
-                <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-12">
+                <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-0 px-4 md:px-8">
                     <AnimatePresence mode="wait">
                         {isLoading ? (
                             <FadeIn key="loading" className="flex items-center justify-center min-h-[400px]">
@@ -447,7 +461,7 @@ export default function DeliveryAssignmentsList() {
                         ) : !hasAnyDeliveries ? (
                             <FadeIn
                                 key="empty-no-data"
-                                className="w-full h-full flex items-center justify-center min-h-[450px]"
+                                className="flex flex-col items-center justify-center h-[600px] text-center p-8 w-full"
                             >
                                 <IconPlaceholder
                                     placeholderType="image"
@@ -464,7 +478,7 @@ export default function DeliveryAssignmentsList() {
                         ) : paginatedItems.length === 0 ? (
                             <FadeIn
                                 key="empty-search"
-                                className="w-full h-full flex items-center justify-center min-h-[450px]"
+                                className="flex flex-col items-center justify-center h-[600px] text-center p-8 w-full"
                             >
                                 <IconPlaceholder
                                     placeholderType="image"
@@ -486,7 +500,7 @@ export default function DeliveryAssignmentsList() {
                         ) : effectiveViewMode === "grid" ? (
                             /* GRID VIEW */
                             <FadeIn key={`grid-${activeTab}`} className="w-full">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-6">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
                                     {paginatedItems.map((assignment) => (
                                         <DeliveryAssignmentGridCard
                                             key={assignment.assignment_id}
@@ -499,73 +513,61 @@ export default function DeliveryAssignmentsList() {
                         ) : (
                             /* LIST / TABLE VIEW */
                             <FadeIn key={`list-${activeTab}`} className="w-full">
-                                <div className="w-full overflow-hidden rounded-2xl border border-brand-border dark:border-dark-border relative bg-white dark:bg-dark-surface shadow-xs">
+                                <div className="w-full overflow-hidden rounded-xl relative">
                                     <div
-                                        className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-surface to-transparent z-10 pointer-events-none transition-opacity duration-300 ${
+                                        className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${
                                             scrollState.left ? "opacity-100" : "opacity-0"
                                         }`}
                                     />
                                     <div
-                                        className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-surface to-transparent z-10 pointer-events-none transition-opacity duration-300 ${
+                                        className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${
                                             scrollState.right ? "opacity-100" : "opacity-0"
                                         }`}
                                     />
 
                                     <div
-                                        className="overflow-x-auto custom-scrollbar"
+                                        className="overflow-x-auto pb-4 custom-scrollbar"
                                         ref={tableContainerRef}
                                         onScroll={handleScroll}
                                     >
-                                        <table className="w-full text-left border-collapse min-w-[1000px]">
+                                        <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
                                             <thead>
-                                                <tr className="bg-brand-gray/80 dark:bg-dark-border/40 border-b border-brand-border dark:border-dark-border">
-                                                    <th
-                                                        className="py-3 px-3 pl-6 text-xs font-semibold text-brand-inactive-text dark:text-dark-body cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading select-none w-[180px]"
-                                                        onClick={() => handleSort("order")}
-                                                    >
-                                                        <div className="flex items-center gap-1.5">
-                                                            <span>Pedido</span>
-                                                            <ArrowUpDownIcon
-                                                                size={13}
-                                                                className={
-                                                                    sortConfig.key === "order"
-                                                                        ? "text-brand-green"
-                                                                        : "opacity-40"
-                                                                }
-                                                            />
-                                                        </div>
-                                                    </th>
-                                                    <th className="py-3 px-3 text-xs font-semibold text-brand-inactive-text dark:text-dark-body w-[180px]">
-                                                        Estabelecimento
-                                                    </th>
-                                                    <th className="py-3 px-3 text-xs font-semibold text-brand-inactive-text dark:text-dark-body w-[220px]">
-                                                        Cliente
-                                                    </th>
-                                                    <th className="py-3 px-3 text-xs font-semibold text-brand-inactive-text dark:text-dark-body w-[240px]">
-                                                        Endereço
-                                                    </th>
-                                                    <th
-                                                        className="py-3 px-3 text-xs font-semibold text-brand-inactive-text dark:text-dark-body cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading select-none w-[140px]"
-                                                        onClick={() => handleSort("fee")}
-                                                    >
-                                                        <div className="flex items-center gap-1.5">
-                                                            <span>Valores</span>
-                                                            <ArrowUpDownIcon
-                                                                size={13}
-                                                                className={
-                                                                    sortConfig.key === "fee"
-                                                                        ? "text-brand-green"
-                                                                        : "opacity-40"
-                                                                }
-                                                            />
-                                                        </div>
-                                                    </th>
-                                                    <th className="py-3 px-3 text-xs font-semibold text-brand-inactive-text dark:text-dark-body text-center w-[160px]">
-                                                        Status
-                                                    </th>
-                                                    <th className="py-3 px-3 pr-6 text-xs font-semibold text-brand-inactive-text dark:text-dark-body text-center w-[80px]">
-                                                        Ações
-                                                    </th>
+                                                <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                    {FIXED_COLUMNS.map((col) => {
+                                                        const isSorted = sortConfig.key === col.id
+                                                        return (
+                                                            <th
+                                                                key={col.id}
+                                                                className={`py-3 px-2 pl-6 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${
+                                                                    col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"
+                                                                } cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors ${
+                                                                    col.id === "actions" ? "rounded-r-lg" : col.id === "order" ? "rounded-l-lg" : ""
+                                                                }`}
+                                                                style={{ width: col.width }}
+                                                                onClick={() => {
+                                                                    if (col.id === "actions") return
+                                                                    const keyMap: Record<string, SortKey> = {
+                                                                        order: "order",
+                                                                        values: "fee",
+                                                                        status: "date",
+                                                                    }
+                                                                    handleSort(keyMap[col.id] || "date")
+                                                                }}
+                                                            >
+                                                                <div className={`relative flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
+                                                                    <span>{col.label}</span>
+                                                                    {col.id !== "actions" && (
+                                                                        <div className={`flex items-center ${col.align === "center" ? "absolute -right-5" : "ml-1.5"}`}>
+                                                                            <ArrowUpDownIcon
+                                                                                size={14}
+                                                                                className={`transition-all duration-200 ${isSorted ? "text-brand-dark dark:text-dark-heading opacity-100 block" : "text-brand-inactive-text hidden group-hover:block opacity-40"} ${isSorted && sortConfig.direction === "desc" ? "rotate-180" : ""}`}
+                                                                            />
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </th>
+                                                        )
+                                                    })}
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -585,13 +587,12 @@ export default function DeliveryAssignmentsList() {
                     </AnimatePresence>
 
                     {/* PAGINATION */}
-                    {!isLoading && totalPages > 1 && (
+                    {!isLoading && hasAnyDeliveries && paginatedItems.length > 0 && totalPages > 1 && (
                         <div className="pt-4">
                             <Pagination
                                 currentPage={currentPage}
                                 totalPages={totalPages}
                                 onPageChange={setCurrentPage}
-                                inline
                             />
                         </div>
                     )}

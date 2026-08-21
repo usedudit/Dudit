@@ -12,15 +12,14 @@ import "server-only"
 import { headers } from "next/headers"
 import { getAdminClient } from "@/lib/supabase/admin"
 import type { AdminAuditLogEntry } from "@/lib/admin/types"
+import { getTrustedClientIP } from "@/lib/security/client-ip"
 
 // ─── IP / UA Resolution ────────────────────────────────────────────────────
 
 async function getClientIP(): Promise<string> {
     try {
         const headersList = await headers()
-        const forwarded = headersList.get("x-forwarded-for")
-        if (forwarded) return forwarded.split(",")[0].trim()
-        return headersList.get("x-real-ip") || "unknown"
+        return getTrustedClientIP(headersList)
     } catch {
         return "unknown"
     }

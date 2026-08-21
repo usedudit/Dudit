@@ -13,6 +13,9 @@ function hashInviteToken(token: string) {
 
 function normalizeError(error: any, fallback: string) {
   const message = String(error?.message || "")
+  if (message.includes("delivery_driver_busy")) return "Você já possui 2 entregas em andamento. Conclua uma para aceitar novas."
+  if (message.includes("delivery_assignment_already_accepted")) return "Esta entrega acabou de ser aceita por outro entregador."
+  if (message.includes("delivery_assignment_not_available")) return "Esta entrega não está mais disponível."
   if (message.includes("delivery_assignment_invalid_transition")) return "Essa transição de status não é permitida."
   if (message.includes("delivery_failure_reason_required")) return "Informe o motivo da falha."
   if (message.includes("delivery_assignment_not_owned")) return "Entrega não encontrada ou sem permissão."

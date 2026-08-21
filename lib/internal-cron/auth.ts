@@ -2,6 +2,7 @@ import "server-only"
 
 import { NextResponse } from "next/server"
 import { cronLogger } from "./logger"
+import { getTrustedClientIP } from "@/lib/security/client-ip"
 
 /**
  * Result of cron request validation.
@@ -54,7 +55,7 @@ export function validateCronRequest(req: Request, jobName: string): CronAuthResu
   if (!authHeader || authHeader !== `Bearer ${secret}`) {
     cronLogger.warn(jobName, "Unauthorized cron request", {
       hasHeader: !!authHeader,
-      ip: req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown",
+      ip: getTrustedClientIP(req.headers),
     })
     return {
       ok: false,

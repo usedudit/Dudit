@@ -304,7 +304,7 @@ export default function DeliveryDetailPage({
 
     const statusMeta = getDeliveryStatusMeta(delivery.status)
     const canEdit = ["pending", "not_sent", "preparing"].includes(delivery.status)
-    const links = (delivery.delivery_orders || []).filter((l: any) => l?.orders)
+    const links = (delivery.delivery_orders || []).filter((l: any) => l?.orders && l.orders.situation !== "cancelled")
 
     const allItems = links.flatMap((link: any) => {
         const order = link.orders
@@ -442,7 +442,6 @@ export default function DeliveryDetailPage({
                         Editar
                     </Button>
                 )}
-                <Badge variant={statusMeta.variant} icon={getDeliveryStatusIcon(delivery?.status)}>{statusMeta.label}</Badge>
                 <ActionsDropdown
                     onEdit={canEdit && onEdit ? () => onEdit(delivery.id) : undefined}
                     onCancel={delivery?.status !== "cancelled" ? handleCancelDelivery : undefined}

@@ -1,9 +1,9 @@
 "use client"
 
-import { useState } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import { MapPinIcon, TrashIcon, CheckCircleIcon, PlusIcon, EditIcon, HomeIcon, BriefcaseIcon, ThreeDotsIcon } from "@/lib/icons"
-import { Button, Input, CepInput, StateComboBox, NumberInputWithCheckbox, DefaultModal, Dropdown, DropdownItem, IconPlaceholder } from "@/components/reusable"
+import { useState, useMemo } from "react"
+import { motion } from "framer-motion"
+import { MapPinIcon, TrashIcon, CheckCircleIcon, EditIcon, HomeIcon, BriefcaseIcon, PlusIcon } from "@/lib/icons"
+import { Button, Input, CepInput, StateComboBox, NumberInputWithCheckbox, DefaultModal, ActionsDropdown, DropdownItem, IconPlaceholder } from "@/components/reusable"
 import { Feedback, PageHeader, fade, View } from "./profile-shared"
 import { createAddressAction, updateAddressAction, deleteAddressAction, setDefaultAddressAction } from "@/app/actions/shared/addresses"
 import { useNotification } from "@/hooks/use-notification"
@@ -13,16 +13,6 @@ const ADDRESS_TYPE_OPTIONS = [
     { value: "trabalho", label: "Trabalho" },
     { value: "outro", label: "Outro" },
 ]
-
-function formatAddressSummary(addr: any): string {
-    if (!addr) return ""
-    return [
-        addr.street && addr.number ? `${addr.street}, ${addr.number}` : addr.street,
-        addr.complement, addr.neighborhood,
-        addr.city && addr.state ? `${addr.city} - ${addr.state}` : addr.city || addr.state,
-        addr.zip_code,
-    ].filter(Boolean).join(", ")
-}
 
 function getAddressTypeLabel(type: string | null | undefined): string {
     const found = ADDRESS_TYPE_OPTIONS.find(o => o.value === type)
@@ -67,6 +57,14 @@ export const AddressView = ({
     const { success: notifySuccess, error: notifyError } = useNotification()
     const [editingId, setEditingId] = useState<string | null>(null) // null = not editing, "new" = creating
     const [form, setForm] = useState({ ...emptyForm })
+
+    const sortedAddresses = useMemo(() => {
+        return [...addresses].sort((a, b) => {
+            if (a.is_default && !b.is_default) return -1
+            if (!a.is_default && b.is_default) return 1
+            return 0
+        })
+    }, [addresses])
 
     const startCreate = () => {
         clearMessages()
@@ -275,24 +273,33 @@ export const AddressView = ({
     )
 
     return (
-        <motion.div key="address" {...fade} className="max-w-[800px] mx-auto space-y-6">
-            <PageHeader title="Endereços" subtitle="Gerencie seus endereços de entrega." onBack={() => navigate("main")} />
+        <motion.div key="address" {...fade} className="w-full">
+            <PageHeader
+                title="Endereços"
+                subtitle="Gerencie seus endereços de entrega."
+                onBack={() => navigate("main")}
+                action={addresses.length < 5 ? (
+                    <Button onClick={startCreate} className="flex items-center gap-1.5 font-semibold text-xs sm:text-sm">
+                        <PlusIcon size={16} /> Adicionar endereço
+                    </Button>
+                ) : undefined}
+            />
 
             {/* Address list */}
-            {addresses.length === 0 && (
+            {sortedAddresses.length === 0 && (
                 <IconPlaceholder
                     icon={MapPinIcon}
                     title="Nenhum endereço cadastrado"
                     subtitle="Adicione um endereço clicando no botão + abaixo."
-                    buttons={addresses.length < 5 ? [
+                    buttons={sortedAddresses.length < 5 ? [
                         { text: "Adicionar endereço", action: startCreate }
                     ] : undefined}
                 />
             )}
 
-            {addresses.length > 0 && (
+            {sortedAddresses.length > 0 && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {addresses.map((addr: any) => (
+                    {sortedAddresses.map((addr: any) => (
                         <div
                             key={addr.id}
                             className={`p-5 rounded-2xl border bg-white dark:bg-dark-surface transition-all flex flex-col justify-between ${addr.is_default
@@ -312,38 +319,17 @@ export const AddressView = ({
                                     {addr.is_default && (
                                         <CheckCircleIcon size={18} className="text-brand-green" />
                                     )}
-                                    <Dropdown
-                                        trigger={
-                                            <button
-                                                type="button"
-                                                className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-dark-border text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
-                                            >
-                                                <ThreeDotsIcon size={18} />
-                                            </button>
-                                        }
-                                        align="right"
-                                        showChevron={false}
-                                        fullWidth={false}
-                                        width="w-44"
+                                    <ActionsDropdown
+                                        onEdit={() => startEdit(addr)}
+                                        onDelete={() => handleDelete(addr.id)}
                                     >
                                         {!addr.is_default && (
                                             <DropdownItem onClick={() => handleSetDefault(addr.id)}>
-                                                <CheckCircleIcon size={14} className="text-brand-inactive-text dark:text-dark-body mr-1" />
+                                                <CheckCircleIcon size={18} />
                                                 Tornar padrão
                                             </DropdownItem>
                                         )}
-                                        <DropdownItem onClick={() => startEdit(addr)}>
-                                            <EditIcon size={14} className="text-brand-inactive-text dark:text-dark-body mr-1" />
-                                            Editar
-                                        </DropdownItem>
-                                        <DropdownItem
-                                            onClick={() => handleDelete(addr.id)}
-                                            className="text-brand-red"
-                                        >
-                                            <TrashIcon size={14} className="text-brand-red mr-1" />
-                                            Excluir
-                                        </DropdownItem>
-                                    </Dropdown>
+                                    </ActionsDropdown>
                                 </div>
                             </div>
 
@@ -363,7 +349,7 @@ export const AddressView = ({
                                 <div className="shrink-0">
                                     <img
                                         src="https://img.dudit.com.br/static/Map.png"
-                                        alt="Mapa do local"
+                                        alt="Mapa"
                                         className="w-14 h-14 object-cover rounded-xl border border-brand-border dark:border-dark-border"
                                     />
                                 </div>
@@ -379,6 +365,14 @@ export const AddressView = ({
                 onClose={cancel}
                 title={editingId === "new" ? "Adicionar endereço" : "Editar endereço"}
                 maxWidth="xl"
+                footer={
+                    <>
+                        <Button onClick={handleSave} disabled={isLoading}>
+                            {isLoading ? "Salvando..." : editingId === "new" ? "Adicionar" : "Salvar"}
+                        </Button>
+                        <Button variant="outline" onClick={cancel}>Cancelar</Button>
+                    </>
+                }
             >
                 {editingId !== null && renderForm()}
             </DefaultModal>

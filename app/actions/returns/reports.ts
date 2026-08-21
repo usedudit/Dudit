@@ -16,6 +16,7 @@ import {
 } from "@/lib/security/csrf-action-wrapper"
 import { captureError, addMonitoringBreadcrumb } from "@/lib/monitoring/sentry"
 import { logAuditEvent } from "@/lib/services/timeline.service"
+import { getTrustedClientIP } from "@/lib/security/client-ip"
 
 const reportSchema = z.object({
   returnRequestId: z.string().uuid(),
@@ -40,8 +41,7 @@ function sha256(input: string): string {
 async function getRequestHeadersSafe(): Promise<{ ip: string; ua: string }> {
   try {
     const h = await headers()
-    const fwd = h.get("x-forwarded-for")
-    const ip = fwd ? fwd.split(",")[0].trim() : h.get("x-real-ip") || "unknown"
+    const ip = getTrustedClientIP(h)
     const ua = h.get("user-agent") || "unknown"
     return { ip, ua }
   } catch {

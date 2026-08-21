@@ -16,6 +16,7 @@ import { invalidateProductCache } from "@/lib/cache/invalidation"
 import { revalidatePath } from "next/cache"
 import { syncToExploreRedis, removeFromExploreRedis } from "@/lib/redis-sync"
 import { normalizeBusinessInfo } from "@/lib/business-info"
+import { getTrustedClientIP } from "@/lib/security/client-ip"
 import { EMPTY_VIDEO_METADATA, normalizeVideoMetadata } from "@/lib/video/shared"
 import { ALLOWED_VIDEO_MIME_TYPES, MAX_FILE_SIZE, MAX_VIDEO_FILE_SIZE, R2_PREFIXES } from "@/lib/r2/config"
 import { buildSoftDeletePayload, buildRestorePayload, buildArchivePayload, scopeActiveOnly, scopeArchivedOnly, scopeWithArchived } from "@/lib/supabase/query-helpers"
@@ -433,7 +434,7 @@ export async function deleteServiceAction(serviceId: string, reason?: string | n
 
         // 2. Fetch IP and write to audit logs (logAuditEvent)
         const reqHeaders = await headers()
-        const ip = reqHeaders.get("x-forwarded-for") || "127.0.0.1"
+        const ip = getTrustedClientIP(reqHeaders)
 
         await logAuditEvent({
             partnerId: existing.partner_id,
@@ -477,7 +478,7 @@ export async function restoreServiceAction(serviceId: string): Promise<ActionRes
         await syncToExploreRedis({ id: serviceId, type: "servico", data: {}, silent: true })
 
         const reqHeaders = await headers()
-        const ip = reqHeaders.get("x-forwarded-for") || "127.0.0.1"
+        const ip = getTrustedClientIP(reqHeaders)
 
         await logAuditEvent({
             partnerId: existing.partner_id,
@@ -520,7 +521,7 @@ export async function archiveServiceAction(serviceId: string): Promise<ActionRes
         await syncToExploreRedis({ id: serviceId, type: "servico", data: {}, silent: true })
 
         const reqHeaders = await headers()
-        const ip = reqHeaders.get("x-forwarded-for") || "127.0.0.1"
+        const ip = getTrustedClientIP(reqHeaders)
 
         await logAuditEvent({
             partnerId: existing.partner_id,
@@ -563,7 +564,7 @@ export async function unarchiveServiceAction(serviceId: string): Promise<ActionR
         if (error) return errorResponse(error.message)
 
         const reqHeaders = await headers()
-        const ip = reqHeaders.get("x-forwarded-for") || "127.0.0.1"
+        const ip = getTrustedClientIP(reqHeaders)
 
         await logAuditEvent({
             partnerId: existing.partner_id,
@@ -609,7 +610,7 @@ export async function deleteServicesInBatchAction(serviceIds: string[], reason?:
 
         // 2. Log audit event for each service in batch
         const reqHeaders = await headers()
-        const ip = reqHeaders.get("x-forwarded-for") || "127.0.0.1"
+        const ip = getTrustedClientIP(reqHeaders)
 
         for (const s of existing) {
             await logAuditEvent({

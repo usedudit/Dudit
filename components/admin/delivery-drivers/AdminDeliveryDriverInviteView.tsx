@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useTransition, useEffect, useCallback } from "react"
-import { Button, FormSection, Input, FormDropdown } from "@/components/reusable"
+import { Button, FormSection, Input, FormDropdown, CepInput } from "@/components/reusable"
 import { ChevronLeftIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { toast } from "@/hooks/use-notification"
@@ -19,8 +19,15 @@ export function AdminDeliveryDriverInviteView({ onBack, onSuccess }: AdminDelive
         email: "",
         fullName: "",
         phone: "",
-        city: "",
+        zipCode: "",
+        street: "",
+        number: "",
+        complement: "",
         neighborhood: "",
+        city: "",
+        state: "SP",
+        latitude: null as number | null,
+        longitude: null as number | null,
         vehicleType: "moto" as "moto" | "carro",
         notes: "",
     })
@@ -43,15 +50,29 @@ export function AdminDeliveryDriverInviteView({ onBack, onSuccess }: AdminDelive
         return () => setHeaderOverride(null)
     }, [handleBack, setHeaderOverride])
 
-    const update = (key: keyof typeof form, value: string) => {
+    const update = (key: keyof typeof form, value: any) => {
         setForm((current) => ({ ...current, [key]: value }))
+    }
+
+    const handleAddressFetched = (addr: any) => {
+        setForm((prev) => ({
+            ...prev,
+            street: addr.street || prev.street,
+            neighborhood: addr.neighborhood || prev.neighborhood,
+            city: addr.city || prev.city,
+            state: addr.state || prev.state || "SP",
+            latitude: addr.latitude ?? prev.latitude,
+            longitude: addr.longitude ?? prev.longitude,
+            number: addr.number && addr.number !== "S/N" ? addr.number : prev.number,
+            complement: addr.complement || prev.complement,
+        }))
     }
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()
 
         if (!form.fullName.trim() || !form.email.trim() || !form.phone.trim() || !form.city.trim() || !form.neighborhood.trim()) {
-            toast.error("Por favor, preencha todos os campos obrigatórios.")
+            toast.error("Por favor, preencha todos os campos obrigatórios (nome, e-mail, telefone, cidade e bairro).")
             return
         }
 
@@ -63,6 +84,13 @@ export function AdminDeliveryDriverInviteView({ onBack, onSuccess }: AdminDelive
                     phone: form.phone.trim(),
                     city: form.city.trim(),
                     neighborhood: form.neighborhood.trim(),
+                    zipCode: form.zipCode.trim() || undefined,
+                    street: form.street.trim() || undefined,
+                    number: form.number.trim() || undefined,
+                    complement: form.complement.trim() || undefined,
+                    state: form.state.trim() || undefined,
+                    latitude: form.latitude,
+                    longitude: form.longitude,
                     vehicleType: form.vehicleType,
                     notes: form.notes.trim() || undefined,
                 })
@@ -145,22 +173,61 @@ export function AdminDeliveryDriverInviteView({ onBack, onSuccess }: AdminDelive
                         </div>
                     </FormSection>
 
-                    <FormSection title="Área de Atuação & Localização" hasSeparator>
+                    <FormSection title="Endereço & Área de Atuação" hasSeparator>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="md:col-span-2">
+                                <CepInput
+                                    value={form.zipCode}
+                                    onChange={(v) => update("zipCode", v)}
+                                    onAddressFetched={handleAddressFetched}
+                                />
+                            </div>
+                            <div className="md:col-span-2">
+                                <Input
+                                    label="Rua / Logradouro"
+                                    value={form.street}
+                                    onChange={(e) => update("street", e.target.value)}
+                                    placeholder="Rua, Avenida, Travessa..."
+                                />
+                            </div>
                             <Input
-                                label="Cidade"
-                                required
-                                value={form.city}
-                                onChange={(e) => update("city", e.target.value)}
-                                placeholder="Ex: Lucélia"
+                                label="Número"
+                                value={form.number}
+                                onChange={(e) => update("number", e.target.value)}
+                                placeholder="123 ou S/N"
                             />
                             <Input
-                                label="Bairro Principal"
+                                label="Complemento"
+                                value={form.complement}
+                                onChange={(e) => update("complement", e.target.value)}
+                                placeholder="Apto, Bloco, Casa..."
+                            />
+                            <Input
+                                label="Bairro"
                                 required
                                 value={form.neighborhood}
                                 onChange={(e) => update("neighborhood", e.target.value)}
                                 placeholder="Ex: Centro"
                             />
+                            <div className="grid grid-cols-3 gap-2">
+                                <div className="col-span-2">
+                                    <Input
+                                        label="Cidade"
+                                        required
+                                        value={form.city}
+                                        onChange={(e) => update("city", e.target.value)}
+                                        placeholder="Ex: Lucélia"
+                                    />
+                                </div>
+                                <div>
+                                    <Input
+                                        label="UF"
+                                        value={form.state}
+                                        onChange={(e) => update("state", e.target.value.toUpperCase().slice(0, 2))}
+                                        placeholder="SP"
+                                    />
+                                </div>
+                            </div>
                         </div>
                     </FormSection>
 

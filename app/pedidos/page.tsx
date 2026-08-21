@@ -84,6 +84,134 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
     }
   }
 
+  if (orders.length > 0) {
+    const orderIds = orders.map((o: any) => o.id).filter(Boolean)
+    try {
+      const [{ data: assignments }, { data: deliveryLinks }] = await Promise.all([
+        adminClient
+          .from("delivery_assignments")
+          .select("id, order_id, driver_id, status, assigned_at, accepted_at, picked_up_at, out_for_delivery_at, completed_at")
+          .in("order_id", orderIds)
+          .in("status", ["assigned", "accepted", "picked_up", "out_for_delivery", "delivered"])
+          .order("assigned_at", { ascending: false }),
+        adminClient
+          .from("delivery_orders")
+          .select("order_id, delivery_id, deliveries(id, delivery_person_id, status)")
+          .in("order_id", orderIds),
+      ])
+
+      const assignmentByOrderId = new Map<string, any>()
+      for (const a of assignments || []) {
+        if (!assignmentByOrderId.has(String(a.order_id))) {
+          assignmentByOrderId.set(String(a.order_id), a)
+        }
+      }
+
+      const deliveryByOrderId = new Map<string, any>()
+      for (const dl of deliveryLinks || []) {
+        if (!deliveryByOrderId.has(String(dl.order_id)) && dl.deliveries) {
+          deliveryByOrderId.set(String(dl.order_id), dl.deliveries)
+        }
+      }
+
+      const platformDriverIds = Array.from(new Set(
+        (assignments || [])
+          .map((a: any) => a.driver_id ? String(a.driver_id) : null)
+          .filter(Boolean)
+      )) as string[]
+
+      const legacyDriverUserIds = Array.from(new Set(
+        (deliveryLinks || [])
+          .map((dl: any) => dl.deliveries?.delivery_person_id ? String(dl.deliveries.delivery_person_id) : null)
+          .filter(Boolean)
+      )) as string[]
+
+      const allUserIds = Array.from(new Set([...platformDriverIds, ...legacyDriverUserIds]))
+
+      let profileMap = new Map<string, any>()
+      let driverDetailsMap = new Map<string, any>()
+      let totalDeliveriesMap = new Map<string, number>()
+
+      if (allUserIds.length > 0) {
+        const [{ data: profiles }, { data: driversData }, { data: deliveredRows }] = await Promise.all([
+          adminClient
+            .from("user_profiles")
+            .select("user_id, full_name, phone, avatar_url")
+            .in("user_id", allUserIds),
+          platformDriverIds.length > 0
+            ? adminClient
+                .from("delivery_drivers")
+                .select("user_id, vehicle_type, city")
+                .in("user_id", platformDriverIds)
+            : Promise.resolve({ data: [] }),
+          platformDriverIds.length > 0
+            ? adminClient
+                .from("delivery_assignments")
+                .select("driver_id")
+                .in("driver_id", platformDriverIds)
+                .eq("status", "delivered")
+            : Promise.resolve({ data: [] }),
+        ])
+
+        for (const p of profiles || []) {
+          profileMap.set(String(p.user_id), p)
+        }
+        for (const d of driversData || []) {
+          driverDetailsMap.set(String(d.user_id), d)
+        }
+        for (const row of deliveredRows || []) {
+          const did = String(row.driver_id)
+          totalDeliveriesMap.set(did, (totalDeliveriesMap.get(did) || 0) + 1)
+        }
+      }
+
+      orders = orders.map((order: any) => {
+        const assignment = assignmentByOrderId.get(String(order.id))
+        const legacyDel = deliveryByOrderId.get(String(order.id))
+
+        if (assignment && assignment.driver_id) {
+          const driverId = String(assignment.driver_id)
+          const profile = profileMap.get(driverId)
+          const driverRow = driverDetailsMap.get(driverId)
+          const vehicleType = driverRow?.vehicle_type === "moto" ? "Moto" : driverRow?.vehicle_type === "carro" ? "Carro" : null
+
+          return {
+            ...order,
+            delivery_driver: {
+              id: driverId,
+              name: profile?.full_name || "Entregador Dudit",
+              phone: profile?.phone || null,
+              avatarUrl: profile?.avatar_url || null,
+              vehicleType,
+              totalDeliveries: totalDeliveriesMap.get(driverId) || 0,
+              status: assignment.status,
+              isPlatformDriver: true,
+            },
+          }
+        } else if (legacyDel && legacyDel.delivery_person_id) {
+          const driverId = String(legacyDel.delivery_person_id)
+          const profile = profileMap.get(driverId)
+          return {
+            ...order,
+            delivery_driver: {
+              id: driverId,
+              name: profile?.full_name || "Entregador da Loja",
+              phone: profile?.phone || null,
+              avatarUrl: profile?.avatar_url || null,
+              vehicleType: null,
+              totalDeliveries: 0,
+              status: legacyDel.status,
+              isPlatformDriver: false,
+            },
+          }
+        }
+        return order
+      })
+    } catch (e) {
+      console.error("[MY_ORDERS_PAGE] Error hydrating delivery drivers:", e)
+    }
+  }
+
   const reviewedItemsArray = reviewsResult.data || []
 
   const userProfile = sessionData?.profile

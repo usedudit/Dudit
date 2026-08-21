@@ -286,17 +286,28 @@ export function AdminDeliveryDriverDetailView({
                                                     {driver.email || "Não informado"}
                                                 </span>
                                             </div>
-                                            <div>
-                                                <span className="text-xs font-semibold text-brand-inactive-text block">Cidade</span>
+                                            <div className="sm:col-span-2">
+                                                <span className="text-xs font-semibold text-brand-inactive-text block">Endereço de Atuação</span>
                                                 <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5 block">
-                                                    {driver.city}
+                                                    {driver.street
+                                                        ? `${driver.street}, ${driver.number || "S/N"}${driver.complement ? ` - ${driver.complement}` : ""} - ${driver.neighborhood}, ${driver.city} - ${driver.state || "SP"}`
+                                                        : `${driver.neighborhood}, ${driver.city}${driver.state ? ` - ${driver.state}` : ""}`}
                                                 </span>
-                                            </div>
-                                            <div>
-                                                <span className="text-xs font-semibold text-brand-inactive-text block">Bairro</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5 block">
-                                                    {driver.neighborhood}
-                                                </span>
+                                                {driver.zip_code && (
+                                                    <span className="text-xs text-brand-inactive-text block mt-0.5">
+                                                        CEP: {driver.zip_code}
+                                                    </span>
+                                                )}
+                                                {driver.latitude && driver.longitude && (
+                                                    <a
+                                                        href={`https://www.google.com/maps/search/?api=1&query=${driver.latitude},${driver.longitude}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-1 text-xs text-brand-primary hover:underline mt-1 font-medium"
+                                                    >
+                                                        Ver coordenadas no Google Maps ({Number(driver.latitude).toFixed(5)}, {Number(driver.longitude).toFixed(5)})
+                                                    </a>
+                                                )}
                                             </div>
                                             <div>
                                                 <span className="text-xs font-semibold text-brand-inactive-text block">Veículo</span>

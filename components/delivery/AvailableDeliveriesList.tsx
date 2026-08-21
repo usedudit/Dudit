@@ -17,16 +17,62 @@ import {
     SearchIcon,
     GridIcon,
     ListIcon,
-    StoreIcon,
-    MapPinIcon,
-    TruckIcon,
-    Package,
+    XIcon,
 } from "@/lib/icons"
-import { formatCurrency, formatDate } from "@/lib/utils"
 import { useMediaQuery } from "@/components/erp/hooks"
 import AvailableDeliveryGridCard from "./AvailableDeliveryGridCard"
+import AvailableDeliveryListRow, { type AvailableDeliveryOffer } from "./AvailableDeliveryListRow"
 
-const ITEMS_PER_PAGE = 12
+type SortKey = "date" | "fee" | "order"
+type SortDirection = "asc" | "desc"
+
+const ITEMS_PER_PAGE = 8
+
+const FIXED_COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; width: string }[] = [
+    { id: "order", label: "Pedido", align: "left" as const, width: "180px" },
+    { id: "partner", label: "Estabelecimento", align: "left" as const, width: "220px" },
+    { id: "dest", label: "Destino da Entrega", align: "left" as const, width: "300px" },
+    { id: "fee", label: "Taxa do Entregador", align: "left" as const, width: "150px" },
+    { id: "actions", label: "Ação", align: "right" as const, width: "150px" },
+]
+
+function playNewOfferSound() {
+    try {
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
+        if (!AudioContextClass) return
+        const ctx = new AudioContextClass()
+        if (ctx.state === "suspended") {
+            ctx.resume()
+        }
+        const now = ctx.currentTime
+
+        // Primeiro tom (C5)
+        const osc1 = ctx.createOscillator()
+        const gain1 = ctx.createGain()
+        osc1.type = "sine"
+        osc1.frequency.setValueAtTime(523.25, now)
+        gain1.gain.setValueAtTime(0.15, now)
+        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.22)
+        osc1.connect(gain1)
+        gain1.connect(ctx.destination)
+        osc1.start(now)
+        osc1.stop(now + 0.22)
+
+        // Segundo tom ascendente (G5 - aviso claro de nova corrida)
+        const osc2 = ctx.createOscillator()
+        const gain2 = ctx.createGain()
+        osc2.type = "sine"
+        osc2.frequency.setValueAtTime(783.99, now + 0.12)
+        gain2.gain.setValueAtTime(0.2, now + 0.12)
+        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.45)
+        osc2.connect(gain2)
+        gain2.connect(ctx.destination)
+        osc2.start(now + 0.12)
+        osc2.stop(now + 0.45)
+    } catch {
+        // Silencioso se áudio bloqueado pelo navegador
+    }
+}
 
 export default function AvailableDeliveriesList() {
     const router = useRouter()
@@ -34,10 +80,16 @@ export default function AvailableDeliveriesList() {
     const [search, setSearch] = useState("")
     const [viewMode, setViewMode] = useState<"list" | "grid">("list")
     const [currentPage, setCurrentPage] = useState(1)
-    const [offers, setOffers] = useState<any[]>([])
+    const [offers, setOffers] = useState<AvailableDeliveryOffer[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [isRefreshing, setIsRefreshing] = useState(false)
     const [acceptingId, setAcceptingId] = useState<string | null>(null)
+    const knownOfferIdsRef = useRef<Set<string>>(new Set())
+
+    const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection }>({
+        key: "date",
+        direction: "desc",
+    })
 
     const tableContainerRef = useRef<HTMLDivElement>(null)
     const [scrollState, setScrollState] = useState({ left: false, right: false })
@@ -58,7 +110,17 @@ export default function AvailableDeliveriesList() {
         try {
             const res = await listAvailableDeliveryOffersAction({ limit: 50 })
             if (res.success) {
-                setOffers(res.items || [])
+                const incoming = res.items || []
+                // Se for refresh e chegaram novos IDs, toca som de notificação
+                if (isRefresh && knownOfferIdsRef.current.size > 0) {
+                    const hasNew = incoming.some((item) => !knownOfferIdsRef.current.has(item.id))
+                    if (hasNew) {
+                        playNewOfferSound()
+                        toast.info("Nova entrega disponível na sua região!")
+                    }
+                }
+                knownOfferIdsRef.current = new Set(incoming.map((item) => item.id))
+                setOffers(incoming)
             } else {
                 toast.error(res.error || "Não foi possível carregar entregas disponíveis.")
             }
@@ -72,10 +134,10 @@ export default function AvailableDeliveriesList() {
 
     useEffect(() => {
         void loadOffers()
-        // Auto-poll available offers every 10 seconds
+        // Auto-poll available offers every 6 seconds
         const interval = setInterval(() => {
             void loadOffers(true)
-        }, 10000)
+        }, 6000)
         return () => clearInterval(interval)
     }, [loadOffers])
 
@@ -108,32 +170,79 @@ export default function AvailableDeliveriesList() {
             const store = String(item.store_name || item.partner_name || "").toLowerCase()
             const customer = String(item.customer_name || "").toLowerCase()
             const address = String(item.delivery_address || "").toLowerCase()
-            return (
+            const phone = String(item.customer_phone || "").replace(/\D/g, "")
+            const qPhone = q.replace(/\D/g, "")
+
+            const matchesText =
                 orderNum.includes(q) ||
                 store.includes(q) ||
                 customer.includes(q) ||
                 address.includes(q)
-            )
+            const matchesPhone = qPhone && phone.includes(qPhone)
+
+            return matchesText || matchesPhone
         })
     }, [offers, search])
 
+    // Sorted offers
+    const sortedOffers = useMemo(() => {
+        const list = [...filteredOffers]
+        const { key, direction } = sortConfig
+
+        list.sort((a, b) => {
+            let res = 0
+            if (key === "date") {
+                const dateA = new Date(a.assigned_at || 0).getTime()
+                const dateB = new Date(b.assigned_at || 0).getTime()
+                res = dateA - dateB
+            } else if (key === "fee") {
+                res = (a.delivery_fee || 0) - (b.delivery_fee || 0)
+            } else if (key === "order") {
+                const numA = Number(a.order_number) || 0
+                const numB = Number(b.order_number) || 0
+                res = numA - numB
+            }
+            return direction === "asc" ? res : -res
+        })
+
+        return list
+    }, [filteredOffers, sortConfig])
+
     // Paginated slice
-    const totalPages = Math.ceil(filteredOffers.length / ITEMS_PER_PAGE) || 1
+    const totalPages = Math.ceil(sortedOffers.length / ITEMS_PER_PAGE) || 1
     const paginatedOffers = useMemo(() => {
         const start = (currentPage - 1) * ITEMS_PER_PAGE
-        return filteredOffers.slice(start, start + ITEMS_PER_PAGE)
-    }, [filteredOffers, currentPage])
+        return sortedOffers.slice(start, start + ITEMS_PER_PAGE)
+    }, [sortedOffers, currentPage])
 
+    const handleSort = (key: SortKey) => {
+        setSortConfig((prev) => ({
+            key,
+            direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc",
+        }))
+    }
+
+    const hasAnyOffers = offers.length > 0
     const effectiveViewMode = isTabletOrMobile ? "grid" : viewMode
 
     return (
         <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
+            <style>{`
+                .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; } 
+                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
+                .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; border: 2px solid #fff; }
+                .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border: 2px solid #1f2937; }
+                .dark .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+                .hide-scrollbar::-webkit-scrollbar { display: none; }
+                .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+            `}</style>
+
             <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
-                {/* HEADER */}
-                <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-6 flex-none px-4 md:px-8">
-                    <div className="flex flex-col gap-1 pt-1">
-                        <div className="flex items-center gap-2">
-                            <h1 className="text-[28px] md:text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
+                {/* DESKTOP HEADER */}
+                <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
+                    <div className="flex flex-col gap-2 pt-1">
+                        <div className="flex items-center gap-3">
+                            <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
                                 Entregas Disponíveis
                             </h1>
                             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
@@ -141,231 +250,261 @@ export default function AvailableDeliveriesList() {
                                 {offers.length} {offers.length === 1 ? "oferta" : "ofertas"}
                             </span>
                         </div>
-                        <p className="text-brand-inactive-text dark:text-dark-body text-sm md:text-[15px] font-medium">
+                        <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
                             Ofertas de entrega em tempo real aguardando aceite na sua região.
                         </p>
                     </div>
 
-                    {/* TOP ACTIONS */}
+                    {/* TOP CONTROLS: REFRESH */}
                     <div className="flex items-center gap-3">
                         <Button
                             variant="outline"
+                            size="sm"
                             onClick={() => loadOffers(true)}
                             disabled={isRefreshing || isLoading}
-                            leftIcon={<ReloadIcon size={16} className={isRefreshing ? "animate-spin" : ""} />}
+                            className="shrink-0"
                         >
-                            {isRefreshing ? "Atualizando..." : "Atualizar"}
+                            <ReloadIcon size={15} className={isRefreshing ? "animate-spin" : ""} />
                         </Button>
                     </div>
                 </div>
 
                 {/* CONTROLS BAR: SEARCH & VIEW SWITCHER */}
-                <div className="px-4 md:px-8 mb-6 flex items-center justify-between gap-4">
-                    <div className="relative w-full max-w-md">
-                        <SearchIcon size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-brand-inactive-text pointer-events-none z-10" />
-                        <Input
-                            placeholder="Buscar por loja, cliente, endereço ou pedido..."
-                            value={search}
-                            onChange={(e: any) => {
-                                setSearch(e.target.value)
-                                setCurrentPage(1)
-                            }}
-                            className="pl-10 bg-white dark:bg-dark-surface"
-                        />
+                <div className="w-full flex-none px-4 md:px-8 mb-4">
+                    {/* MOBILE CONTROLS */}
+                    <div className="flex md:hidden items-center gap-2 mb-3">
+                        <div className="flex-1 relative">
+                            <Input
+                                name="search"
+                                placeholder="Buscar ofertas..."
+                                value={search}
+                                onChange={(e) => {
+                                    setSearch(e.target.value)
+                                    setCurrentPage(1)
+                                }}
+                                className="h-[42px] w-full"
+                                variant="full-rounded"
+                                prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
+                                label=""
+                            />
+                            {search && (
+                                <button
+                                    onClick={() => setSearch("")}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
+                                >
+                                    <XIcon size={14} />
+                                </button>
+                            )}
+                        </div>
+
+                        <Button
+                            variant="outline"
+                            onClick={() => loadOffers(true)}
+                            disabled={isRefreshing || isLoading}
+                            className="w-[42px] h-[42px] p-0 flex items-center justify-center shrink-0"
+                            aria-label="Atualizar ofertas"
+                        >
+                            <ReloadIcon size={16} className={isRefreshing ? "animate-spin" : ""} />
+                        </Button>
                     </div>
 
-                    {/* VIEW TOGGLE */}
-                    <div className="hidden lg:flex items-center gap-1 bg-brand-gray/60 dark:bg-dark-surface border border-brand-border dark:border-dark-border p-1 rounded-xl">
-                        <button
-                            type="button"
-                            onClick={() => setViewMode("list")}
-                            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                                viewMode === "list"
-                                    ? "bg-white dark:bg-dark-border text-brand-dark dark:text-dark-heading shadow-xs font-bold"
-                                    : "text-brand-inactive-text hover:text-brand-dark dark:hover:text-white"
-                            }`}
-                            title="Visualização em Lista"
-                        >
-                            <ListIcon size={18} />
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setViewMode("grid")}
-                            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                                viewMode === "grid"
-                                    ? "bg-white dark:bg-dark-border text-brand-dark dark:text-dark-heading shadow-xs font-bold"
-                                    : "text-brand-inactive-text hover:text-brand-dark dark:hover:text-white"
-                            }`}
-                            title="Visualização em Grade"
-                        >
-                            <GridIcon size={18} />
-                        </button>
+                    {/* DESKTOP CONTROLS */}
+                    <div className="hidden md:flex items-center w-full gap-4">
+                        <div className="flex items-center gap-3 shrink-0">
+                            <div className="w-80 relative">
+                                <Input
+                                    name="search"
+                                    placeholder="Buscar por loja, cliente, endereço ou pedido..."
+                                    prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
+                                    value={search}
+                                    onChange={(e) => {
+                                        setSearch(e.target.value)
+                                        setCurrentPage(1)
+                                    }}
+                                    className="h-[42px]"
+                                    variant="full-rounded"
+                                    label=""
+                                />
+                                {search && (
+                                    <button
+                                        onClick={() => setSearch("")}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
+                                    >
+                                        <XIcon size={14} />
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* View Mode Toggles (ONLY VISIBLE ON DESKTOP) */}
+                        {!isTabletOrMobile && (
+                            <div className="flex items-center bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-full p-1 h-[42px] shrink-0 ml-auto">
+                                <button
+                                    onClick={() => setViewMode("list")}
+                                    className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${
+                                        viewMode === "list"
+                                            ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading"
+                                            : "text-gray-400 hover:text-gray-600 dark:text-dark-body"
+                                    }`}
+                                    title="Visualização em lista/tabela"
+                                    aria-label="Visualização em lista"
+                                >
+                                    <ListIcon className="w-[18px] h-[18px]" />
+                                </button>
+                                <button
+                                    onClick={() => setViewMode("grid")}
+                                    className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${
+                                        viewMode === "grid"
+                                            ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading"
+                                            : "text-gray-400 hover:text-gray-600 dark:text-dark-body"
+                                    }`}
+                                    title="Visualização em cards/grid"
+                                    aria-label="Visualização em grid"
+                                >
+                                    <GridIcon className="w-[18px] h-[18px]" />
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
 
                 {/* CONTENT AREA */}
-                <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-12">
-                    {isLoading ? (
-                        <div className="w-full h-full flex items-center justify-center min-h-[400px]">
-                            <ThreeDotsLoader />
-                        </div>
-                    ) : offers.length === 0 ? (
-                        <FadeIn key="empty" className="w-full h-full flex items-center justify-center min-h-[400px]">
-                            <IconPlaceholder
-                                placeholderType="image"
-                                imageSrc="https://img.dudit.com.br/static/mascots/SemItens.png"
-                                imageAlt="Nenhuma oferta disponível"
-                                title="Nenhuma entrega disponível no momento"
-                                subtitle="Novas solicitações de entrega enviadas pelos lojistas parceiros aparecerão aqui automaticamente."
-                                itemButton={{
-                                    text: "Verificar agora",
-                                    action: () => loadOffers(true),
-                                }}
-                            />
-                        </FadeIn>
-                    ) : filteredOffers.length === 0 ? (
-                        <FadeIn key="empty-search" className="w-full h-full flex items-center justify-center min-h-[400px]">
-                            <IconPlaceholder
-                                placeholderType="image"
-                                imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
-                                imageAlt="Nenhum resultado"
-                                title="Nenhuma entrega encontrada para a busca"
-                                subtitle="Tente alterar os termos pesquisados."
-                                itemButton={{
-                                    text: "Limpar busca",
-                                    action: () => setSearch(""),
-                                    variant: "outline",
-                                }}
-                            />
-                        </FadeIn>
-                    ) : effectiveViewMode === "grid" ? (
-                        /* GRID VIEW */
-                        <FadeIn key="grid" className="w-full">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-6">
-                                {paginatedOffers.map((offer) => (
-                                    <AvailableDeliveryGridCard
-                                        key={offer.assignment_id}
-                                        offer={offer}
-                                        onAccept={handleAccept}
-                                        isAccepting={acceptingId === offer.assignment_id}
-                                    />
-                                ))}
-                            </div>
-                        </FadeIn>
-                    ) : (
-                        /* LIST / TABLE VIEW */
-                        <FadeIn key="list" className="w-full">
-                            <div className="w-full overflow-hidden rounded-2xl border border-brand-border dark:border-dark-border relative bg-white dark:bg-dark-surface shadow-xs">
-                                <div
-                                    className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-surface to-transparent z-10 pointer-events-none transition-opacity duration-300 ${
-                                        scrollState.left ? "opacity-100" : "opacity-0"
-                                    }`}
+                <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-0 px-4 md:px-8">
+                    <AnimatePresence mode="wait">
+                        {isLoading ? (
+                            <FadeIn key="loading" className="flex items-center justify-center min-h-[400px]">
+                                <ThreeDotsLoader />
+                            </FadeIn>
+                        ) : !hasAnyOffers ? (
+                            <FadeIn
+                                key="empty-no-data"
+                                className="flex flex-col items-center justify-center h-[600px] text-center p-8 w-full"
+                            >
+                                <IconPlaceholder
+                                    placeholderType="image"
+                                    imageSrc="https://img.dudit.com.br/static/mascots/Entrega.png"
+                                    imageAlt="Nenhuma oferta disponível"
+                                    title="Nenhuma entrega disponível no momento"
+                                    subtitle="Novas solicitações de entrega enviadas pelos lojistas parceiros aparecerão aqui automaticamente."
+                                    itemButton={{
+                                        text: "Verificar agora",
+                                        action: () => loadOffers(true),
+                                    }}
                                 />
-                                <div
-                                    className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-surface to-transparent z-10 pointer-events-none transition-opacity duration-300 ${
-                                        scrollState.right ? "opacity-100" : "opacity-0"
-                                    }`}
+                            </FadeIn>
+                        ) : paginatedOffers.length === 0 ? (
+                            <FadeIn
+                                key="empty-search"
+                                className="flex flex-col items-center justify-center h-[600px] text-center p-8 w-full"
+                            >
+                                <IconPlaceholder
+                                    placeholderType="image"
+                                    imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                                    imageAlt="Nenhuma entrega encontrada"
+                                    title="Nenhuma entrega encontrada para a busca"
+                                    subtitle="Tente ajustar os termos pesquisados."
+                                    itemButton={{
+                                        text: "Limpar busca",
+                                        action: () => setSearch(""),
+                                        variant: "outline",
+                                    }}
                                 />
-
-                                <div
-                                    className="overflow-x-auto"
-                                    ref={tableContainerRef}
-                                    onScroll={handleScroll}
-                                >
-                                    <table className="w-full text-left border-collapse min-w-[900px]">
-                                        <thead>
-                                            <tr className="bg-brand-gray/80 dark:bg-dark-border/40 border-b border-brand-border dark:border-dark-border">
-                                                <th className="py-3 px-3 pl-6 text-xs font-semibold text-brand-inactive-text dark:text-dark-body w-[140px]">
-                                                    Pedido
-                                                </th>
-                                                <th className="py-3 px-3 text-xs font-semibold text-brand-inactive-text dark:text-dark-body w-[200px]">
-                                                    Estabelecimento
-                                                </th>
-                                                <th className="py-3 px-3 text-xs font-semibold text-brand-inactive-text dark:text-dark-body w-[280px]">
-                                                    Destino da Entrega
-                                                </th>
-                                                <th className="py-3 px-3 text-xs font-semibold text-brand-inactive-text dark:text-dark-body w-[140px]">
-                                                    Taxa do Entregador
-                                                </th>
-                                                <th className="py-3 px-3 pr-6 text-xs font-semibold text-brand-inactive-text dark:text-dark-body text-right w-[160px]">
-                                                    Ação
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {paginatedOffers.map((offer) => {
-                                                const orderNum = offer.order_number
-                                                    ? `#${offer.order_number}`
-                                                    : `#${String(offer.order_id).slice(0, 8)}`
-
-                                                return (
-                                                    <tr
-                                                        key={offer.assignment_id}
-                                                        className="hover:bg-brand-gray/60 dark:hover:bg-dark-border/30 transition-colors border-b border-brand-border/60 dark:border-dark-border/40 group"
-                                                    >
-                                                        <td className="py-3.5 px-3 pl-6">
-                                                            <span className="font-bold text-sm text-brand-dark dark:text-dark-heading font-mono">
-                                                                {orderNum}
-                                                            </span>
-                                                            {offer.assigned_at && (
-                                                                <p className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                                                    {formatDate(offer.assigned_at)}
-                                                                </p>
-                                                            )}
-                                                        </td>
-                                                        <td className="py-3.5 px-3">
-                                                            <div className="flex items-center gap-1.5 text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                                                <StoreIcon size={14} className="text-brand-green shrink-0" />
-                                                                <span className="truncate max-w-[180px]">
-                                                                    {offer.store_name || offer.partner_name || "Loja"}
-                                                                </span>
-                                                            </div>
-                                                            {offer.store_address && (
-                                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate max-w-[180px] mt-0.5">
-                                                                    {offer.store_address}
-                                                                </p>
-                                                            )}
-                                                        </td>
-                                                        <td className="py-3.5 px-3">
-                                                            <div className="flex flex-col">
-                                                                <span className="font-semibold text-xs text-brand-dark dark:text-dark-heading">
-                                                                    {offer.customer_name || "Cliente"}
-                                                                </span>
-                                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body line-clamp-1 mt-0.5">
-                                                                    {offer.delivery_address || "Endereço não informado"}
-                                                                </span>
-                                                            </div>
-                                                        </td>
-                                                        <td className="py-3.5 px-3">
-                                                            <span className="font-bold text-sm text-emerald-600 dark:text-emerald-400">
-                                                                {formatCurrency(offer.delivery_fee || 0)}
-                                                            </span>
-                                                        </td>
-                                                        <td className="py-3.5 px-3 pr-6 text-right">
-                                                            <Button
-                                                                variant="default"
-                                                                size="sm"
-                                                                onClick={() => handleAccept(offer.assignment_id)}
-                                                                disabled={acceptingId === offer.assignment_id}
-                                                                isLoading={acceptingId === offer.assignment_id}
-                                                                className="font-bold px-4"
-                                                            >
-                                                                Aceitar
-                                                            </Button>
-                                                        </td>
-                                                    </tr>
-                                                )
-                                            })}
-                                        </tbody>
-                                    </table>
+                            </FadeIn>
+                        ) : effectiveViewMode === "grid" ? (
+                            /* GRID VIEW */
+                            <FadeIn key="grid" className="w-full">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                                    {paginatedOffers.map((offer) => (
+                                        <AvailableDeliveryGridCard
+                                            key={offer.assignment_id}
+                                            offer={offer}
+                                            onAccept={handleAccept}
+                                            isAccepting={acceptingId === offer.assignment_id}
+                                        />
+                                    ))}
                                 </div>
-                            </div>
-                        </FadeIn>
-                    )}
+                            </FadeIn>
+                        ) : (
+                            /* LIST / TABLE VIEW */
+                            <FadeIn key="list" className="w-full">
+                                <div className="w-full overflow-hidden rounded-xl relative">
+                                    <div
+                                        className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${
+                                            scrollState.left ? "opacity-100" : "opacity-0"
+                                        }`}
+                                    />
+                                    <div
+                                        className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${
+                                            scrollState.right ? "opacity-100" : "opacity-0"
+                                        }`}
+                                    />
+
+                                    <div
+                                        className="overflow-x-auto pb-4 custom-scrollbar"
+                                        ref={tableContainerRef}
+                                        onScroll={handleScroll}
+                                    >
+                                        <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
+                                            <thead>
+                                                <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                    {FIXED_COLUMNS.map((col) => {
+                                                        const isSorted = sortConfig.key === col.id
+                                                        const keyMap: Record<string, SortKey> = {
+                                                            order: "order",
+                                                            dest: "date",
+                                                            fee: "fee",
+                                                        }
+                                                        return (
+                                                            <th
+                                                                key={col.id}
+                                                                className={`py-3 px-2 pl-6 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${
+                                                                    col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"
+                                                                } cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors ${
+                                                                    col.id === "actions" ? "rounded-r-lg" : col.id === "order" ? "rounded-l-lg" : ""
+                                                                }`}
+                                                                style={{ width: col.width }}
+                                                                onClick={() => {
+                                                                    if (col.id === "actions") return
+                                                                    const sortKey = keyMap[col.id]
+                                                                    if (sortKey) handleSort(sortKey)
+                                                                }}
+                                                            >
+                                                                <div className={`relative flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
+                                                                    <span>{col.label}</span>
+                                                                    {col.id !== "actions" && keyMap[col.id] && (
+                                                                        <div className={`flex items-center ${col.align === "center" ? "absolute -right-5" : "ml-1.5"}`}>
+                                                                            <ArrowUpDownIcon
+                                                                                size={14}
+                                                                                className={`transition-all duration-200 ${isSorted ? "text-brand-dark dark:text-dark-heading opacity-100 block" : "text-brand-inactive-text hidden group-hover:block opacity-40"} ${isSorted && sortConfig.direction === "desc" ? "rotate-180" : ""}`}
+                                                                            />
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </th>
+                                                        )
+                                                    })}
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {paginatedOffers.map((offer) => (
+                                                    <AvailableDeliveryListRow
+                                                        key={offer.assignment_id}
+                                                        offer={offer}
+                                                        onAccept={handleAccept}
+                                                        isAccepting={acceptingId === offer.assignment_id}
+                                                    />
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </FadeIn>
+                        )}
+                    </AnimatePresence>
 
                     {/* PAGINATION */}
-                    {totalPages > 1 && (
-                        <div className="flex justify-center pt-6">
+                    {!isLoading && hasAnyOffers && paginatedOffers.length > 0 && totalPages > 1 && (
+                        <div className="pt-4">
                             <Pagination
                                 currentPage={currentPage}
                                 totalPages={totalPages}

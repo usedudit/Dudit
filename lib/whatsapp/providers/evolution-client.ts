@@ -28,6 +28,56 @@ const BLOCKED_HOSTNAMES = new Set([
   "169.254.169.254",
 ])
 
+function isPrivateIPAddress(ip: string): boolean {
+  const normalized = ip.toLowerCase().trim().replace(/^\[|\]$/g, "").replace(/%.*$/, "")
+
+  // IPv4-mapped IPv6 addresses must be evaluated as their IPv4 address.
+  const mappedIPv4 = normalized.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/)?.[1]
+  const ipv4 = mappedIPv4 || (normalized.includes(":") ? null : normalized)
+
+  if (ipv4) {
+    const parts = ipv4.split(".").map(Number)
+    if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
+      return false
+    }
+
+    const [first, second] = parts
+    return (
+      first === 0 ||
+      first === 10 ||
+      first === 127 ||
+      (first === 100 && second >= 64 && second <= 127) ||
+      (first === 169 && second === 254) ||
+      (first === 172 && second >= 16 && second <= 31) ||
+      (first === 192 && second === 168) ||
+      first >= 224
+    )
+  }
+
+  // IPv6 loopback, unspecified, link-local, and unique-local ranges.
+  return (
+    normalized === "::" ||
+    normalized === "::1" ||
+    /^fe[89ab]/.test(normalized) ||
+    normalized.startsWith("fc") ||
+    normalized.startsWith("fd")
+  )
+}
+
+function isRFC1918IPv4(ip: string): boolean {
+  const parts = ip.split(".").map(Number)
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
+    return false
+  }
+
+  const [first, second] = parts
+  return (
+    first === 10 ||
+    (first === 172 && second >= 16 && second <= 31) ||
+    (first === 192 && second === 168)
+  )
+}
+
 /**
  * Normalizes and validates an Evolution API URL.
  *
@@ -68,14 +118,11 @@ function validateEvolutionUrl(url: string): URL {
   if (BLOCKED_HOSTNAMES.has(parsed.hostname)) {
     throw new Error("URL não permitida por segurança (endereço local/reservado)")
   }
-  // Block private IP ranges
-  const ipParts = parsed.hostname.split(".")
-  if (ipParts.length === 4) {
-    const first = Number(ipParts[0])
-    const second = Number(ipParts[1])
-    if (first === 10) throw new Error("URL não permitida (rede privada)")
-    if (first === 172 && second >= 16 && second <= 31) throw new Error("URL não permitida (rede privada)")
-    if (first === 192 && second === 168) throw new Error("URL não permitida (rede privada)")
+  if (isPrivateIPAddress(parsed.hostname)) {
+    if (isRFC1918IPv4(parsed.hostname)) {
+      throw new Error("URL não permitida (rede privada)")
+    }
+    throw new Error("URL não permitida por segurança (endereço local/reservado)")
   }
   return parsed
 }
@@ -92,19 +139,9 @@ async function validateHostnameNotPrivate(hostname: string): Promise<void> {
     }
   }
 
-  // Block loopback and reserved IPv4/IPv6 IPs
-  if (ip === "127.0.0.1" || ip === "0.0.0.0" || ip === "::1" || ip === "::") {
+  // Block loopback, private, link-local, metadata, and reserved IPv4/IPv6 IPs.
+  if (isPrivateIPAddress(ip)) {
     throw classifyEvolutionError(400, "URL não permitida por segurança (endereço local/reservado)")
-  }
-
-  const parts = ip.split(".")
-  if (parts.length === 4) {
-    const first = Number(parts[0])
-    const second = Number(parts[1])
-    if (first === 10) throw classifyEvolutionError(400, "URL não permitida (rede privada)")
-    if (first === 172 && second >= 16 && second <= 31) throw classifyEvolutionError(400, "URL não permitida (rede privada)")
-    if (first === 192 && second === 168) throw classifyEvolutionError(400, "URL não permitida (rede privada)")
-    if (first === 169 && second === 254) throw classifyEvolutionError(400, "URL não permitida (rede link-local)")
   }
 }
 

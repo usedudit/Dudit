@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Button, Badge, Spinner } from "@/components/reusable"
+import { Button, Badge, Spinner, ThreeDotsLoader } from "@/components/reusable"
 import { useToast } from "@/hooks/use-toast"
 import {
   cancelMyRecurringSubscriptionAction,
@@ -77,10 +77,10 @@ export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] 
       prev.map((item) =>
         item.id === updated.id
           ? {
-              ...item,
-              ...updated,
-              statusLabel: updated.status === "active" ? "Ativa" : updated.status === "paused" ? "Pausada" : "Cancelada",
-            }
+            ...item,
+            ...updated,
+            statusLabel: updated.status === "active" ? "Ativa" : updated.status === "paused" ? "Pausada" : "Cancelada",
+          }
           : item
       )
     )
@@ -195,11 +195,10 @@ export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] 
       <div className="flex border-b border-brand-border dark:border-dark-border mb-6">
         <button
           onClick={() => setActiveTab("subscriptions")}
-          className={`py-3 px-6 text-sm font-semibold border-b-2 transition-all relative ${
-            activeTab === "subscriptions"
-              ? "border-brand-primary text-brand-primary"
-              : "border-transparent text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading"
-          }`}
+          className={`py-3 px-6 text-sm font-semibold border-b-2 transition-all relative ${activeTab === "subscriptions"
+            ? "border-brand-primary text-brand-primary"
+            : "border-transparent text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading"
+            }`}
         >
           Minhas Assinaturas
           {activeTab === "subscriptions" && (
@@ -211,11 +210,10 @@ export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] 
         </button>
         <button
           onClick={() => setActiveTab("credits")}
-          className={`py-3 px-6 text-sm font-semibold border-b-2 transition-all relative ${
-            activeTab === "credits"
-              ? "border-brand-primary text-brand-primary"
-              : "border-transparent text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading"
-          }`}
+          className={`py-3 px-6 text-sm font-semibold border-b-2 transition-all relative ${activeTab === "credits"
+            ? "border-brand-primary text-brand-primary"
+            : "border-transparent text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading"
+            }`}
         >
           Meus Créditos
           {activeTab === "credits" && (
@@ -294,7 +292,7 @@ export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] 
                         </p>
                       )}
 
-                      
+
                       <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-brand-inactive-text dark:text-dark-body font-medium">
                         <div className="flex items-center gap-1.5">
                           <CalendarIcon size={14} className="text-brand-primary" />
@@ -323,7 +321,7 @@ export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] 
                     <Button variant="outline" size="sm" onClick={() => openHistory(sub.id)}>
                       {selectedId === sub.id ? "Ocultar histórico" : "Histórico de Ciclos"}
                     </Button>
-                    
+
                     {sub.status !== "cancelled" && sub.status !== "expired" && (
                       <>
                         <Button
@@ -340,7 +338,7 @@ export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] 
                         <Button variant="outline" size="sm" className="text-brand-orange" onClick={() => handleSkip(sub.id)}>
                           Pular Ciclo
                         </Button>
-                        
+
                         <div className="flex items-center gap-1">
                           <select
                             value={postponeDays[sub.id] || 7}
@@ -396,7 +394,7 @@ export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] 
                         <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading">
                           Editar Detalhes de Entrega
                         </h4>
-                        
+
                         <div className="space-y-3">
                           {sub.deliveryType === "delivery" && (
                             <div>
@@ -451,11 +449,10 @@ export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] 
                         <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading">
                           Histórico de Execuções Recorrentes
                         </h4>
-                        
+
                         {loadingHistory ? (
-                          <div className="flex items-center gap-2 py-4">
-                            <Spinner size={16} className="text-brand-primary" />
-                            <span className="text-xs text-brand-inactive-text dark:text-dark-body">Carregando histórico...</span>
+                          <div className="flex items-center">
+                            <ThreeDotsLoader />
                           </div>
                         ) : executions.length === 0 ? (
                           <p className="text-xs text-brand-inactive-text dark:text-dark-body">Nenhuma execução registrada.</p>

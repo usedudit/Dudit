@@ -4,9 +4,9 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { useTheme } from "next-themes"
-import { MenuIcon, MoonIcon, LogoutIcon, ChevronDownIcon, ChevronLeftIcon, UserIcon, CreditCardIcon, HelpCircleIcon, AlertTriangleIcon } from "@/lib/icons"
-import { Button, DefaultModal, InfoCard } from "@/components/reusable"
-import Dropdown, { DropdownItem } from "../reusable/Dropdown"
+import { MenuIcon, MoonIcon, LogoutIcon, ChevronDownIcon, ChevronLeftIcon, UserIcon, CreditCardIcon, HelpCircleIcon, AlertTriangleIcon, ChevronsUpDown, ChevronRightIcon } from "@/lib/icons"
+import { Button } from "@/components/reusable"
+import Dropdown from "../reusable/Dropdown"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import Link from "next/link"
@@ -16,38 +16,7 @@ import { useSidebar } from "@/lib/sidebar-context"
 import { useUserProfile } from "@/hooks/use-user-profile"
 import BottomSheet from "../BottomSheet"
 import { NotificationBell } from "@/components/notifications/NotificationBell"
-
-// Ícone selector (duas setas)
-const ChevronsUpDown = ({ className }: { className?: string }) => (
-    <svg
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className={className}
-    >
-        <path d="m7 15 5 5 5-5" />
-        <path d="m7 9 5-5 5 5" />
-    </svg>
-)
-
-const ChevronRight = ({ className }: { className?: string }) => (
-    <svg
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className={className}
-    >
-        <path d="m9 18 6-6-6-6" />
-    </svg>
-)
+import { Switch } from "../reusable/Switch"
 
 interface ERPHeaderProps {
     sidebarOpen?: boolean
@@ -175,8 +144,9 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
     const segments = pathname.split("/").filter(Boolean)
     const isAutoInnerPage = segments.length > 2 && !segments.includes("cadastros") && !segments.includes("cadastros-financeiro")
 
-    const hasEntityParam = searchParams.has("create") || searchParams.has("view") || searchParams.has("edit") || searchParams.has("duplicate")
-    const isSettingsSubTab = searchParams.has("tab") && !["empresa", "vendas", "adicionais"].includes(searchParams.get("tab") || "")
+    const currentParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : searchParams
+    const hasEntityParam = currentParams.has("create") || currentParams.has("view") || currentParams.has("edit") || currentParams.has("duplicate")
+    const isSettingsSubTab = currentParams.has("tab") && !["empresa", "vendas", "adicionais"].includes(currentParams.get("tab") || "")
     const isQueryOrTabInnerPage = hasEntityParam || isSettingsSubTab
 
     const isPDV = pathname === "/erp/pdv"
@@ -201,10 +171,13 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                                         displayOnBack()
                                     } else if (displayBackHref) {
                                         router.push(displayBackHref)
-                                    } else if (searchParams.has("create") || searchParams.has("view") || searchParams.has("edit") || searchParams.has("duplicate")) {
-                                        window.dispatchEvent(new CustomEvent('erp-sidebar-reset'))
                                     } else {
-                                        router.back()
+                                        const nowParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : searchParams
+                                        if (nowParams.has("create") || nowParams.has("view") || nowParams.has("edit") || nowParams.has("duplicate")) {
+                                            window.dispatchEvent(new CustomEvent('erp-sidebar-reset'))
+                                        } else {
+                                            router.back()
+                                        }
                                     }
                                 }}
                             >
@@ -245,7 +218,7 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                             </button>
 
                             {/* Separador Chevron Right */}
-                            <ChevronRight className="w-4 h-4 text-brand-inactive-text/50 dark:text-dark-body/50" />
+                            <ChevronRightIcon className="w-4 h-4 text-brand-inactive-text/50 dark:text-dark-body/50" />
 
                             {/* Título da Página */}
                             <h1 className="text-sm font-normal text-brand-inactive-text dark:text-dark-body px-1">
@@ -303,7 +276,7 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                             trigger={
                                 <div className="hidden md:flex items-center space-x-2 p-1 cursor-pointer hover:bg-brand-gray dark:hover:bg-dark-border rounded-full transition-colors group">
                                     <div
-                                        className={`w-8 h-8 rounded-full ${avatarColor || getAvatarColor(userName)} flex items-center justify-center text-white font-bold text-sm border border-brand-border dark:border-dark-border group-hover:shadow-sm transition-all relative`}
+                                        className={`w-8 h-8 rounded-full ${avatarColor || getAvatarColor(userName)} flex items-center justify-center text-white font-bold text-sm border border-brand-border dark:border-dark-border transition-all relative`}
                                     >
                                         {userInitials || getUserInitials(userName)}
                                     </div>
@@ -319,7 +292,7 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                             <div className="px-4 py-3 border-b border-brand-border dark:border-dark-border">
                                 <div className="flex items-center space-x-3 mb-4">
                                     <div
-                                        className={`w-10 h-10 rounded-full ${avatarColor || getAvatarColor(userName)} flex items-center justify-center text-white font-bold text-sm border border-brand-border dark:border-dark-border shadow-sm`}
+                                        className={`w-10 h-10 rounded-full ${avatarColor || getAvatarColor(userName)} flex items-center justify-center text-white font-bold text-sm border border-brand-border dark:border-dark-border`}
                                     >
                                         {userInitials || getUserInitials(userName)}
                                     </div>
@@ -333,39 +306,44 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                                     </div>
                                 </div>
 
-                                <div className="py-1 border-y border-brand-border dark:border-dark-border">
-                                    <DropdownItem className="flex items-center gap-3 w-full" onClick={() => handleThemeButtonClick(theme === "dark" ? "light" : "dark")}>
-                                        <MoonIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
-                                        <span className="text-sm font-normal text-brand-inactive-text">Modo escuro</span>
-                                    </DropdownItem>
-                                </div>
-
                                 <div className="py-2">
-                                    <DropdownItem>
-                                        <Link href="/perfil" prefetch={false} className="flex items-center gap-3 w-full">
-                                            <UserIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
-                                            <span className="text-sm font-normal text-brand-inactive-text">Meu perfil</span>
-                                        </Link>
-                                    </DropdownItem>
-                                    <DropdownItem>
-                                        <Link href="/erp/configuracoes?tab=assinatura" prefetch={false} className="flex items-center gap-3 w-full">
-                                            <CreditCardIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
-                                            <span className="text-sm font-normal text-brand-inactive-text">Meu plano</span>
-                                        </Link>
-                                    </DropdownItem>
-                                    <DropdownItem>
-                                        <Link href="/ajuda" prefetch={false} className="flex items-center gap-3 w-full">
-                                            <HelpCircleIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
-                                            <span className="text-sm font-normal text-brand-inactive-text">Central de ajuda</span>
-                                        </Link>
-                                    </DropdownItem>
+                                    {([
+                                        { label: "Meu Perfil", href: "/perfil", icon: <UserIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" /> },
+                                        { label: "Minha Assinatura", href: "/erp/configuracoes?tab=assinatura", icon: <CreditCardIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" /> },
+                                        { label: "Central de Ajuda", href: "/ajuda", icon: <HelpCircleIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" /> },
+                                        { label: "Sair da sessão", onClick: handleSignOut, icon: <LogoutIcon className="w-4 h-4 text-brand-red dark:text-brand-red" /> }
+                                    ] as any[]).map((item, idx) => {
+                                        const ItemWrapper: any = item.href ? Link : "div";
+                                        const wrapProps = item.href
+                                            ? { href: item.href, prefetch: false }
+                                            : { onClick: item.onClick };
+
+                                        return (
+                                            <ItemWrapper
+                                                key={idx}
+                                                {...wrapProps}
+                                                className="px-6 py-2.5 hover:bg-brand-gray dark:hover:bg-dark-border/30 cursor-pointer transition-colors block w-full text-left"
+                                                onClick={() => {
+                                                    if (wrapProps.onClick) wrapProps.onClick();
+                                                }}
+                                            >
+                                                <span className="flex items-center gap-3">
+                                                    {item.icon}
+                                                    <span className="text-[14px] font-normal text-brand-inactive-text dark:text-dark-body">{item.label}</span>
+                                                </span>
+                                            </ItemWrapper>
+                                        )
+                                    })}
                                 </div>
 
-                                <div className="py-1 border-t border-brand-border dark:border-dark-border mt-1">
-                                    <DropdownItem className="flex items-center gap-3 w-full hover:bg-brand-red/10" onClick={handleSignOut}>
-                                        <LogoutIcon className="w-4 h-4 text-brand-red" />
-                                        <span className="text-sm font-normal text-brand-red">Sair da sessão</span>
-                                    </DropdownItem>
+                                <div className="border-t border-brand-border dark:border-dark-border py-2">
+                                    <div className="px-6 py-2.5 flex items-center justify-between">
+                                        <span className="flex items-center gap-3">
+                                            <MoonIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
+                                            <span className="text-[14px] font-normal text-brand-inactive-text dark:text-dark-body">Modo escuro</span>
+                                        </span>
+                                        <Switch checked={theme === "dark"} onCheckedChange={() => handleThemeButtonClick(theme === "dark" ? "light" : "dark")} />
+                                    </div>
                                 </div>
                             </div>
                         </Dropdown>
@@ -373,82 +351,62 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                 </div>
             </div>
             <BottomSheet isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)}>
-                <div className="flex flex-col py-1">
-                    <div className="flex items-center space-x-4 mb-6 px-2 mt-4">
+                <div className="px-4 py-3 border-b border-brand-border dark:border-dark-border">
+                    <div className="flex items-center space-x-3 mb-4">
                         <div
-                            className={`w-14 h-14 rounded-full ${avatarColor || getAvatarColor(userName)} flex items-center justify-center text-white font-bold text-xl border border-brand-border dark:border-dark-border shadow-md`}
+                            className={`w-10 h-10 rounded-full ${avatarColor || getAvatarColor(userName)} flex items-center justify-center text-white font-bold text-sm border border-brand-border dark:border-dark-border`}
                         >
                             {userInitials || getUserInitials(userName)}
                         </div>
                         <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                                <p className="font-bold text-lg text-brand-dark dark:text-dark-heading truncate">
+                                <p className="font-semibold text-sm text-brand-dark dark:text-dark-heading truncate">
                                     {userName}
                                 </p>
-                                <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-green-500 text-white whitespace-nowrap">
-                                    PRO
-                                </span>
                             </div>
-                            <p className="text-sm text-brand-inactive-text dark:text-dark-body truncate">{userEmail}</p>
+                            <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate mt-0.5">{userEmail}</p>
                         </div>
                     </div>
 
-                    <nav className="flex flex-col gap-1">
-                        <div className="flex items-center justify-between p-4 rounded-2xl bg-gray-50 dark:bg-dark-border/30 border border-transparent hover:border-brand-border/30 dark:hover:border-dark-border/50 transition-all">
-                            <div className="flex items-center gap-3">
-                                <MoonIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                <span className="text-[16px] font-medium text-brand-dark dark:text-dark-heading">Modo escuro</span>
-                            </div>
-                            <button
-                                onClick={() => handleThemeButtonClick(theme === "dark" ? "light" : "dark")}
-                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${theme === "dark" ? "bg-brand-green" : "bg-gray-300 dark:bg-dark-border"
-                                    }`}
-                            >
-                                <span
-                                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${theme === "dark" ? "translate-x-5" : "translate-x-1"
-                                        }`}
-                                />
-                            </button>
+                    <div className="py-2">
+                        {([
+                            { label: "Meu Perfil", href: "/perfil", icon: <UserIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" /> },
+                            { label: "Minha Assinatura", href: "/erp/configuracoes?tab=assinatura", icon: <CreditCardIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" /> },
+                            { label: "Central de Ajuda", href: "/ajuda", icon: <HelpCircleIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" /> },
+                            { label: "Sair da sessão", onClick: handleSignOut, icon: <LogoutIcon className="w-4 h-4 text-brand-red dark:text-brand-red" /> }
+                        ] as any[]).map((item, idx) => {
+                            const ItemWrapper: any = item.href ? Link : "div";
+                            const wrapProps = item.href
+                                ? { href: item.href, prefetch: false }
+                                : { onClick: item.onClick };
+
+                            return (
+                                <ItemWrapper
+                                    key={idx}
+                                    {...wrapProps}
+                                    className="px-6 py-2.5 hover:bg-brand-gray dark:hover:bg-dark-border/30 cursor-pointer transition-colors block w-full text-left"
+                                    onClick={() => {
+                                        if (wrapProps.onClick) wrapProps.onClick();
+                                    }}
+                                >
+                                    <span className="flex items-center gap-3">
+                                        {item.icon}
+                                        <span className="text-[14px] font-normal text-brand-inactive-text dark:text-dark-body">{item.label}</span>
+                                    </span>
+                                </ItemWrapper>
+                            )
+                        })}
+                    </div>
+
+                    <div className="border-t border-brand-border dark:border-dark-border py-2">
+                        <div className="px-6 py-2.5 flex items-center justify-between">
+                            <span className="flex items-center gap-3">
+                                <MoonIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
+                                <span className="text-[14px] font-normal text-brand-inactive-text dark:text-dark-body">Modo escuro</span>
+                            </span>
+                            <Switch checked={theme === "dark"} onCheckedChange={() => handleThemeButtonClick(theme === "dark" ? "light" : "dark")} />
                         </div>
-
-                        <Link
-                            href="/perfil"
-                            onClick={() => setIsProfileOpen(false)}
-                            prefetch={false}
-                            className="flex items-center gap-4 p-4 rounded-2xl hover:bg-gray-50 dark:hover:bg-dark-border/30 transition-all w-full text-left"
-                        >
-                            <UserIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                            <span className="text-[16px] font-medium text-brand-dark dark:text-dark-heading">Meu perfil</span>
-                        </Link>
-
-                        <button
-                            onClick={() => setIsProfileOpen(false)}
-                            className="flex items-center gap-4 p-4 rounded-2xl hover:bg-gray-50 dark:hover:bg-dark-border/30 transition-all w-full text-left"
-                        >
-                            <CreditCardIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                            <span className="text-[16px] font-medium text-brand-dark dark:text-dark-heading">Meu plano</span>
-                        </button>
-
-                        <button
-                            onClick={() => setIsProfileOpen(false)}
-                            className="flex items-center gap-4 p-4 rounded-2xl hover:bg-gray-50 dark:hover:bg-dark-border/30 transition-all w-full text-left"
-                        >
-                            <HelpCircleIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                            <span className="text-[16px] font-medium text-brand-dark dark:text-dark-heading">Central de ajuda</span>
-                        </button>
-
-                        <div className="h-px bg-brand-border dark:bg-dark-border my-2 mx-2 opacity-50" />
-
-                        <button
-                            onClick={handleSignOut}
-                            className="flex items-center gap-4 p-4 rounded-2xl bg-red-50/50 dark:bg-red-900/10 text-brand-red w-full text-left transition-all hover:bg-red-50 dark:hover:bg-red-900/20"
-                        >
-                            <div className="w-5 h-5 bg-red-500 rounded flex items-center justify-center shadow-sm">
-                                <LogoutIcon className="w-3.5 h-3.5 text-white" />
-                            </div>
-                            <span className="text-[16px] font-bold">Sair da sessão</span>
-                        </button>
-                    </nav>
+                    </div>
                 </div>
             </BottomSheet>
 

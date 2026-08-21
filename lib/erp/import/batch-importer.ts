@@ -3,17 +3,11 @@ import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { generateSKUBase, generateSKUWithSuffix } from "@/lib/utils/code-generators"
 import { encryptCPF } from "@/lib/crypto"
-import { createAddressAction } from "@/app/actions/shared/addresses"
 import { enrichAddressData } from "@/lib/services/location.service"
-import type { ColumnMapping, EntityType, ImportResult, ImportSession } from "./types"
+import { parseNumber } from "./validators"
+import type { ColumnMapping, FailedRow, ImportOptions, ImportResult, ImportSession } from "./types"
 
-const BATCH_SIZE = 500
-
-function cleanNumber(v: string): number | null {
-  const cleaned = v.replace(",", ".").replace(/[^0-9.\-]/g, "")
-  const n = parseFloat(cleaned)
-  return isNaN(n) ? null : n
-}
+const BATCH_SIZE = 250
 
 function mapRowToObject(
   row: string[],
@@ -35,41 +29,45 @@ function mapRowToObject(
   return result
 }
 
+function mapRowToRawHeaderObject(
+  row: string[],
+  headers: string[],
+): Record<string, string> {
+  const result: Record<string, string> = {}
+  for (let i = 0; i < headers.length; i++) {
+    result[headers[i]] = row[i]?.trim() ?? ""
+  }
+  return result
+}
+
 export async function executeImport(
   session: ImportSession,
   mapping: ColumnMapping[],
-  options: { skipDuplicates: boolean; skipErrors: boolean },
+  options: ImportOptions = {},
 ): Promise<ImportResult> {
   const startTime = Date.now()
   const supabase = await getSupabaseServerClient()
   const admin = getAdminClient()
-  const { partnerId, storeId, entityType, rows, fileName } = session
+  const { partnerId, storeId, entityType, rows, headers } = session
+
+  const duplicateStrategy = options.duplicateStrategy || (options.skipDuplicates ? "skip" : "update")
+  const autoCreateCategories = options.autoCreateCategories !== false
+  const autoCreateBrands = options.autoCreateBrands !== false
+  const autoCreateSuppliers = options.autoCreateSuppliers !== false
 
   const mappedRows = rows.map((row) => mapRowToObject(row, mapping))
+  const rawRowsObjects = rows.map((row) => mapRowToRawHeaderObject(row, headers))
+
   let successRows = 0
+  let createdRows = 0
+  let updatedRows = 0
   let errorRows = 0
   let duplicateRows = 0
   let warningRows = 0
+  const failedRows: FailedRow[] = []
+  const errorMessages: string[] = []
 
-  const hasSupplierCol = mapping.some((m) => m.field === "supplier")
-  const supplierCache = new Map<string, string>()
-
-  if (hasSupplierCol) {
-    const allSupplierNames = [
-      ...new Set(mappedRows.map((r) => r["supplier"]?.trim()).filter(Boolean)),
-    ]
-    if (allSupplierNames.length > 0) {
-      const { data: existing } = await supabase
-        .from("suppliers")
-        .select("id, name")
-        .eq("partner_id", partnerId)
-        .in("name", allSupplierNames)
-      for (const s of existing || []) {
-        supplierCache.set(s.name.trim().toLowerCase(), s.id)
-      }
-    }
-  }
-
+  // Pre-load / Auto-create categories
   const hasCategoryCol = mapping.some((m) => m.field === "category")
   const categoryCache = new Map<string, string>()
 
@@ -78,21 +76,45 @@ export async function executeImport(
     const allCatNames = [
       ...new Set(mappedRows.map((r) => r["category"]?.trim()).filter(Boolean)),
     ]
+
     if (allCatNames.length > 0) {
       const { data: existing } = await supabase
         .from(catTable)
         .select("id, name")
         .eq("partner_id", partnerId)
+
       for (const c of existing || []) {
         categoryCache.set(c.name.trim().toLowerCase(), c.id)
+      }
+
+      if (autoCreateCategories) {
+        const missingCats = allCatNames.filter(
+          (name) => !categoryCache.has(name.toLowerCase())
+        )
+        if (missingCats.length > 0) {
+          const toInsertCats = missingCats.map((name) => ({
+            partner_id: partnerId,
+            name,
+            is_active: true,
+          }))
+          const { data: createdCats } = await supabase
+            .from(catTable)
+            .insert(toInsertCats)
+            .select("id, name")
+
+          for (const c of createdCats || []) {
+            categoryCache.set(c.name.trim().toLowerCase(), c.id)
+          }
+        }
       }
     }
   }
 
+  // Pre-load / Auto-create brands for products
   const hasBrandCol = mapping.some((m) => m.field === "brand")
   const brandCache = new Map<string, string>()
 
-  if (hasBrandCol) {
+  if (hasBrandCol && entityType === "products") {
     const allBrandNames = [
       ...new Set(mappedRows.map((r) => r["brand"]?.trim()).filter(Boolean)),
     ]
@@ -101,76 +123,138 @@ export async function executeImport(
         .from("brands")
         .select("id, name")
         .eq("partner_id", partnerId)
+
       for (const b of existing || []) {
         brandCache.set(b.name.trim().toLowerCase(), b.id)
+      }
+
+      if (autoCreateBrands) {
+        const missingBrands = allBrandNames.filter(
+          (name) => !brandCache.has(name.toLowerCase())
+        )
+        if (missingBrands.length > 0) {
+          const toInsertBrands = missingBrands.map((name) => ({
+            partner_id: partnerId,
+            name,
+            is_active: true,
+          }))
+          const { data: createdBrands } = await supabase
+            .from("brands")
+            .insert(toInsertBrands)
+            .select("id, name")
+
+          for (const b of createdBrands || []) {
+            brandCache.set(b.name.trim().toLowerCase(), b.id)
+          }
+        }
       }
     }
   }
 
-  let errorMessages: string[] = []
+  // Pre-load / Auto-create suppliers for products
+  const hasSupplierCol = mapping.some((m) => m.field === "supplier")
+  const supplierCache = new Map<string, string>()
 
+  if (hasSupplierCol && entityType === "products") {
+    const allSupplierNames = [
+      ...new Set(mappedRows.map((r) => r["supplier"]?.trim()).filter(Boolean)),
+    ]
+    if (allSupplierNames.length > 0) {
+      const { data: existing } = await supabase
+        .from("suppliers")
+        .select("id, name")
+        .eq("partner_id", partnerId)
+
+      for (const s of existing || []) {
+        supplierCache.set(s.name.trim().toLowerCase(), s.id)
+      }
+
+      if (autoCreateSuppliers) {
+        const missingSuppliers = allSupplierNames.filter(
+          (name) => !supplierCache.has(name.toLowerCase())
+        )
+        if (missingSuppliers.length > 0) {
+          const toInsertSuppliers = missingSuppliers.map((name) => ({
+            partner_id: partnerId,
+            name,
+            is_active: true,
+          }))
+          const { data: createdSuppliers } = await supabase
+            .from("suppliers")
+            .insert(toInsertSuppliers)
+            .select("id, name")
+
+          for (const s of createdSuppliers || []) {
+            supplierCache.set(s.name.trim().toLowerCase(), s.id)
+          }
+        }
+      }
+    }
+  }
+
+  // Execute in batches
   for (let i = 0; i < mappedRows.length; i += BATCH_SIZE) {
     const batch = mappedRows.slice(i, i + BATCH_SIZE)
+    const rawBatch = rawRowsObjects.slice(i, i + BATCH_SIZE)
     const startIndex = i
-
-    const toProcess = batch.filter((_r, idx) => {
-      const rowNum = startIndex + idx + 1
-      if (options.skipErrors && hasErrors) return false
-      return true
-    })
 
     if (entityType === "products") {
       const result = await importProductBatch(
-        admin,
         supabase,
         partnerId,
         storeId,
         batch,
+        rawBatch,
         startIndex,
         supplierCache,
         categoryCache,
         brandCache,
-        options,
+        duplicateStrategy,
       )
       successRows += result.success
+      createdRows += result.created
+      updatedRows += result.updated
       errorRows += result.errors
       duplicateRows += result.duplicates
       warningRows += result.warnings
-      if (result.errorMessage) {
-        errorMessages.push(result.errorMessage)
-      }
+      failedRows.push(...result.failedRows)
+      if (result.errorMessage) errorMessages.push(result.errorMessage)
     } else if (entityType === "customers") {
       const result = await importCustomerBatch(
         admin,
         partnerId,
         batch,
+        rawBatch,
         startIndex,
-        options,
+        duplicateStrategy,
       )
       successRows += result.success
+      createdRows += result.created
+      updatedRows += result.updated
       errorRows += result.errors
       duplicateRows += result.duplicates
       warningRows += result.warnings
-      if (result.errorMessage) {
-        errorMessages.push(result.errorMessage)
-      }
+      failedRows.push(...result.failedRows)
+      if (result.errorMessage) errorMessages.push(result.errorMessage)
     } else if (entityType === "services") {
       const result = await importServiceBatch(
         supabase,
         partnerId,
         storeId,
         batch,
+        rawBatch,
         startIndex,
         categoryCache,
-        options,
+        duplicateStrategy,
       )
       successRows += result.success
+      createdRows += result.created
+      updatedRows += result.updated
       errorRows += result.errors
       duplicateRows += result.duplicates
       warningRows += result.warnings
-      if (result.errorMessage) {
-        errorMessages.push(result.errorMessage)
-      }
+      failedRows.push(...result.failedRows)
+      if (result.errorMessage) errorMessages.push(result.errorMessage)
     }
   }
 
@@ -179,78 +263,105 @@ export async function executeImport(
   return {
     importId: "",
     successRows,
+    createdRows,
+    updatedRows,
     errorRows,
     duplicateRows,
     warningRows,
     durationMs,
     errorMessage: errorMessages.length > 0 ? errorMessages.join(" | ") : undefined,
+    failedRows,
   }
 }
 
-const hasErrors = false
+/* ========================================================================= */
+/* PRODUCTS BATCH IMPORT                                                     */
+/* ========================================================================= */
 
 async function importProductBatch(
-  admin: any,
   supabase: any,
   partnerId: string,
   storeId: string,
   batch: Record<string, string>[],
+  rawBatch: Record<string, string>[],
   startIndex: number,
   supplierCache: Map<string, string>,
   categoryCache: Map<string, string>,
   brandCache: Map<string, string>,
-  options: { skipDuplicates: boolean; skipErrors: boolean },
-): Promise<{ success: number; errors: number; duplicates: number; warnings: number; errorMessage?: string }> {
-  let success = 0
+  duplicateStrategy: "skip" | "update",
+): Promise<{
+  success: number
+  created: number
+  updated: number
+  errors: number
+  duplicates: number
+  warnings: number
+  errorMessage?: string
+  failedRows: FailedRow[]
+}> {
+  let created = 0
+  let updated = 0
   let errors = 0
   let duplicates = 0
   let warnings = 0
+  const failedRows: FailedRow[] = []
   let errorMessage: string | undefined = undefined
 
   const skus = batch.map((r) => r["sku"]?.trim()).filter(Boolean) as string[]
-  let existingSkus = new Set<string>()
+  const existingProductMap = new Map<string, any>()
 
   if (skus.length > 0) {
     const { data: existing } = await supabase
       .from("products")
-      .select("sku")
+      .select("id, sku, name")
       .eq("partner_id", partnerId)
       .in("sku", skus)
-    existingSkus = new Set((existing || []).map((p: any) => p.sku))
+
+    for (const p of existing || []) {
+      existingProductMap.set(p.sku, p)
+    }
   }
 
   const toInsert: any[] = []
+  const toUpdate: { id: string; data: any; sku: string }[] = []
   const productProfiles: Record<string, { fiscal: any; logistics: any }> = {}
 
   for (let i = 0; i < batch.length; i++) {
     const row = batch[i]
-
-    if (row["sku"] && existingSkus.has(row["sku"].trim())) {
-      duplicates++
-      continue
-    }
+    const rawRow = rawBatch[i]
+    const rowNum = startIndex + i + 1
 
     let name = row["name"]?.trim() || ""
     if (!name) {
       errors++
+      failedRows.push({
+        rowIndex: rowNum,
+        data: rawRow,
+        errorMessage: "Nome do produto é obrigatório e está em branco.",
+      })
       continue
     }
 
     if (name.length > 150) {
-      name = name.substring(0, 147) + "..."
+      name = name.substring(0, 150)
+      warnings++
     }
 
-    let rawSku = row["sku"]?.trim() || generateSKUBase(name)
-    if (rawSku.length > 100) {
-      rawSku = rawSku.substring(0, 100)
+    let sku = row["sku"]?.trim() || generateSKUBase(name)
+    if (sku.length > 100) {
+      sku = sku.substring(0, 100)
     }
 
-    let finalSku = rawSku
-    if (existingSkus.has(finalSku)) {
-      finalSku = generateSKUWithSuffix(rawSku, 1)
+    const price = parseNumber(row["price"])
+    if (price === null) {
+      errors++
+      failedRows.push({
+        rowIndex: rowNum,
+        data: rawRow,
+        errorMessage: `Preço de venda inválido ("${row["price"] || ""}"). Deve ser numérico.`,
+      })
+      continue
     }
-
-    const price = cleanNumber(row["price"] ?? "0") ?? 0
 
     let status = "ativo"
     const rawStatus = row["status"]?.trim().toLowerCase()
@@ -264,28 +375,25 @@ async function importProductBatch(
 
     let showInMarketplace = true
     const rawVis = row["show_in_marketplace"]?.trim().toLowerCase()
-    if (rawVis) {
-      if (["oculto", "privado", "unpublished", "inativo", "0", "false", "nao", "não"].includes(rawVis)) {
-        showInMarketplace = false
-      }
+    if (rawVis && ["oculto", "privado", "unpublished", "inativo", "0", "false", "nao", "não"].includes(rawVis)) {
+      showInMarketplace = false
     }
 
-    const specs: Record<string, string> = {}
     const productData: any = {
       partner_id: partnerId,
       store_id: storeId || undefined,
       name,
-      sku: finalSku,
+      sku,
       description: row["description"] || null,
       price,
-      stock_quantity: cleanNumber(row["stock_quantity"] ?? "0") ?? 0,
-      cost_price: cleanNumber(row["cost_price"] ?? ""),
-      min_stock: cleanNumber(row["min_stock"] ?? ""),
+      stock_quantity: parseNumber(row["stock_quantity"]) ?? 0,
+      cost_price: parseNumber(row["cost_price"]),
+      min_stock: parseNumber(row["min_stock"]),
       unit: row["unit"] || "UN",
       gtin: row["gtin"] || null,
-      product_type: row["product_type"] || null,
-      condition: row["condition"] || null,
-      promotional_price: cleanNumber(row["promotional_price"] ?? ""),
+      product_type: row["product_type"] || "Físico",
+      condition: row["condition"] || "Novo",
+      promotional_price: parseNumber(row["promotional_price"]),
       status,
       show_in_marketplace: showInMarketplace,
       is_active: status === "ativo",
@@ -313,28 +421,10 @@ async function importProductBatch(
     }
 
     if (row["tags"]) {
-      productData.tags = row["tags"].split(",").map(t => t.trim()).filter(Boolean)
+      productData.tags = row["tags"].split(",").map((t) => t.trim()).filter(Boolean)
     }
 
-    const knownFields = new Set([
-      "name", "sku", "description", "price", "stock_quantity", "cost_price",
-      "unit", "gtin", "product_type", "condition", "min_stock", "max_stock",
-      "promotional_price", "ncm", "cest", "origin", "weight_gross", "weight_net",
-      "width", "height", "length", "category", "brand", "supplier", "tags",
-      "fci_code", "packaging_type", "preparation_days",
-    ])
-
-    for (const [key, value] of Object.entries(row)) {
-      if (!knownFields.has(key) && value) {
-        specs[key] = value
-      }
-    }
-
-    if (Object.keys(specs).length > 0) {
-      productData.technical_specs = specs
-    }
-
-    productProfiles[finalSku] = {
+    productProfiles[sku] = {
       fiscal: {
         ncm: row["ncm"] || null,
         cest: row["cest"] || null,
@@ -350,19 +440,29 @@ async function importProductBatch(
         ipi_cst: "99",
       },
       logistics: {
-        weight_gross: cleanNumber(row["weight_gross"] ?? "") ?? 0,
-        weight_net: cleanNumber(row["weight_net"] ?? "") ?? 0,
-        width: cleanNumber(row["width"] ?? "") ?? 0,
-        height: cleanNumber(row["height"] ?? "") ?? 0,
-        length: cleanNumber(row["length"] ?? "") ?? 0,
-        packaging_type: "package",
-        preparation_days: 0,
-      }
+        weight_gross: parseNumber(row["weight_gross"]) ?? 0,
+        weight_net: parseNumber(row["weight_net"]) ?? 0,
+        width: parseNumber(row["width"]) ?? 0,
+        height: parseNumber(row["height"]) ?? 0,
+        length: parseNumber(row["length"]) ?? 0,
+        packaging_type: row["packaging_type"] || "Pacote/Caixa",
+        preparation_days: parseNumber(row["preparation_days"]) ?? 0,
+      },
     }
 
-    toInsert.push(productData)
+    const existing = existingProductMap.get(sku)
+    if (existing) {
+      if (duplicateStrategy === "update") {
+        toUpdate.push({ id: existing.id, data: productData, sku })
+      } else {
+        duplicates++
+      }
+    } else {
+      toInsert.push(productData)
+    }
   }
 
+  // Perform inserts
   if (toInsert.length > 0) {
     const { data: inserted, error } = await supabase
       .from("products")
@@ -374,164 +474,178 @@ async function importProductBatch(
       errors += toInsert.length
       errorMessage = error.message
     } else {
-      success = inserted?.length ?? 0
+      created += inserted?.length ?? 0
 
-      // Now insert profiles!
+      // Insert fiscal & logistics profiles
       const fiscalToInsert: any[] = []
       const logisticsToInsert: any[] = []
 
       for (const item of inserted || []) {
         if (item.sku && item.id) {
-          const profiles = productProfiles[item.sku]
-          if (profiles) {
-            fiscalToInsert.push({
-              product_id: item.id,
-              ...profiles.fiscal
-            })
-            logisticsToInsert.push({
-              product_id: item.id,
-              ...profiles.logistics
-            })
+          const prof = productProfiles[item.sku]
+          if (prof) {
+            fiscalToInsert.push({ product_id: item.id, ...prof.fiscal })
+            logisticsToInsert.push({ product_id: item.id, ...prof.logistics })
           }
         }
       }
 
       if (fiscalToInsert.length > 0) {
-        const { error: fiscalError } = await supabase
-          .from("product_fiscal_profiles")
-          .insert(fiscalToInsert)
-        if (fiscalError) {
-          console.error("[BatchImport] Erro ao inserir perfis fiscais:", fiscalError)
-          errorMessage = fiscalError.message
-        }
+        await supabase.from("product_fiscal_profiles").insert(fiscalToInsert)
       }
-
       if (logisticsToInsert.length > 0) {
-        const { error: logisticsError } = await supabase
-          .from("product_logistics")
-          .insert(logisticsToInsert)
-        if (logisticsError) {
-          console.error("[BatchImport] Erro ao inserir perfis logísticos:", logisticsError)
-          errorMessage = logisticsError.message
-        }
+        await supabase.from("product_logistics").insert(logisticsToInsert)
       }
-
     }
   }
 
-  return { success, errors, duplicates, warnings, errorMessage }
+  // Perform updates
+  if (toUpdate.length > 0) {
+    for (const item of toUpdate) {
+      const { error } = await supabase
+        .from("products")
+        .update(item.data)
+        .eq("id", item.id)
+        .eq("partner_id", partnerId)
+
+      if (error) {
+        errors++
+        errorMessage = error.message
+      } else {
+        updated++
+        const prof = productProfiles[item.sku]
+        if (prof) {
+          await supabase
+            .from("product_fiscal_profiles")
+            .upsert({ product_id: item.id, ...prof.fiscal }, { onConflict: "product_id" })
+          await supabase
+            .from("product_logistics")
+            .upsert({ product_id: item.id, ...prof.logistics }, { onConflict: "product_id" })
+        }
+      }
+    }
+  }
+
+  return {
+    success: created + updated,
+    created,
+    updated,
+    errors,
+    duplicates,
+    warnings,
+    errorMessage,
+    failedRows,
+  }
 }
+
+/* ========================================================================= */
+/* CUSTOMERS BATCH IMPORT                                                    */
+/* ========================================================================= */
 
 async function importCustomerBatch(
   supabase: any,
   partnerId: string,
   batch: Record<string, string>[],
+  rawBatch: Record<string, string>[],
   startIndex: number,
-  options: { skipDuplicates: boolean; skipErrors: boolean },
-): Promise<{ success: number; errors: number; duplicates: number; warnings: number; errorMessage?: string }> {
-  let success = 0
+  duplicateStrategy: "skip" | "update",
+): Promise<{
+  success: number
+  created: number
+  updated: number
+  errors: number
+  duplicates: number
+  warnings: number
+  errorMessage?: string
+  failedRows: FailedRow[]
+}> {
+  let created = 0
+  let updated = 0
   let errors = 0
   let duplicates = 0
   let warnings = 0
+  const failedRows: FailedRow[] = []
   let errorMessage: string | undefined = undefined
 
-  // Collect all unique emails and CPFs to check in bulk
-  const emails = [...new Set(batch.map((r) => r["email"]?.trim()).filter(Boolean))] as string[]
-  const rawCpfs = [...new Set(batch.map((r) => r["cpf"]?.replace(/\D/g, "")).filter((c): c is string => !!c && c.length === 11))]
+  const emails = [...new Set(batch.map((r) => r["email"]?.trim().toLowerCase()).filter(Boolean))] as string[]
+  const existingCustomersByEmail = new Map<string, any>()
 
-  const existingEmails = new Set<string>()
   if (emails.length > 0) {
     const { data: existing } = await supabase
       .from("customers")
-      .select("email")
+      .select("id, email, name")
       .eq("partner_id", partnerId)
       .in("email", emails)
-    for (const e of existing || []) {
-      if (e.email) existingEmails.add(e.email)
-    }
-  }
 
-  const existingCpfs = new Set<string>()
-  if (rawCpfs.length > 0) {
-    const { data: allCpfs } = await supabase
-      .from("customers")
-      .select("cpf")
-      .eq("partner_id", partnerId)
-      .not("cpf", "is", null)
-
-    if (allCpfs?.length) {
-      const { decryptCPF } = await import("@/lib/crypto")
-      for (const row of allCpfs) {
-        try {
-          const decrypted = await decryptCPF(row.cpf)
-          if (rawCpfs.includes(decrypted)) {
-            existingCpfs.add(decrypted)
-          }
-        } catch {
-          continue
-        }
-      }
+    for (const c of existing || []) {
+      if (c.email) existingCustomersByEmail.set(c.email.toLowerCase(), c)
     }
   }
 
   const toInsert: any[] = []
+  const toUpdate: { id: string; data: any }[] = []
   const addressBatch: { customer_name: string; street: string; number: string; complement: string; neighborhood: string; city: string; state: string; zip_code: string }[] = []
 
-  for (const row of batch) {
+  for (let i = 0; i < batch.length; i++) {
+    const row = batch[i]
+    const rawRow = rawBatch[i]
+    const rowNum = startIndex + i + 1
+
     let name = row["name"]?.trim() || ""
     if (!name) {
       errors++
+      failedRows.push({
+        rowIndex: rowNum,
+        data: rawRow,
+        errorMessage: "Nome do cliente é obrigatório e está em branco.",
+      })
       continue
     }
 
     if (name.length > 150) {
-      name = name.substring(0, 147) + "..."
+      name = name.substring(0, 150)
+      warnings++
     }
 
-    let email = row["email"]?.trim() || null
+    let email = row["email"]?.trim().toLowerCase() || null
     if (email) {
       const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
       if (!emailRegex.test(email)) {
-        email = null
+        errors++
+        failedRows.push({
+          rowIndex: rowNum,
+          data: rawRow,
+          errorMessage: `E-mail inválido ("${email}").`,
+        })
+        continue
       }
     }
 
-    if (email && existingEmails.has(email)) {
-      duplicates++
-      continue
-    }
-
-    const rawCpf = row["cpf"]?.replace(/\D/g, "")
-    if (rawCpf && rawCpf.length === 11 && existingCpfs.has(rawCpf)) {
-      duplicates++
-      continue
-    }
-
+    const rawCpf = row["cpf"]?.replace(/\D/g, "") || null
     let cpfEncrypted = null
     if (rawCpf && rawCpf.length === 11) {
       try {
         cpfEncrypted = await encryptCPF(rawCpf)
       } catch {
-        // continue without CPF
+        // continue
       }
     }
 
-    let cnpj = row["cnpj"]?.replace(/\D/g, "") || null
-    if (cnpj && cnpj.length !== 14) {
-      cnpj = null
-    }
-    const personType = rawCpf && rawCpf.length === 11 ? "pf" : cnpj ? "pj" : "pf"
+    let cnpj = row["cnpj"]?.replace(/[^0-9A-Z]/gi, "") || null
+    if (cnpj && cnpj.length !== 14) cnpj = null
+
+    const personType = row["person_type"]?.toLowerCase().includes("jur") || cnpj ? "pj" : "pf"
 
     let status = "ativo"
     const rawStatus = row["status"]?.trim().toLowerCase()
-    if (rawStatus && ["inativo", "inactive", "0", "false", "desativado"].includes(rawStatus)) {
-      status = "inativo"
+    if (rawStatus && ["inativo", "inactive", "0", "false", "desativado", "bloqueado"].includes(rawStatus)) {
+      status = rawStatus === "bloqueado" ? "bloqueado" : "inativo"
     }
 
     const customerData: any = {
       partner_id: partnerId,
       name,
-      email: email,
+      email,
       phone: row["phone"]?.trim() || null,
       phone_fixed: row["phone_fixed"]?.trim() || null,
       person_type: personType,
@@ -539,22 +653,33 @@ async function importCustomerBatch(
       cnpj,
       birth_date: row["birth_date"] || null,
       notes: row["notes"] || null,
+      inscricao_estadual: row["inscricao_estadual"]?.trim() || null,
       status,
     }
 
-    toInsert.push(customerData)
-    addressBatch.push({
-      customer_name: name,
-      street: row["street"]?.trim() || "",
-      number: row["number"]?.trim() || "",
-      complement: row["complement"]?.trim() || "",
-      neighborhood: row["neighborhood"]?.trim() || "",
-      city: row["city"]?.trim() || "",
-      state: row["state"]?.trim() || "",
-      zip_code: row["zip_code"]?.trim() || "",
-    })
+    const existing = email ? existingCustomersByEmail.get(email) : null
+    if (existing) {
+      if (duplicateStrategy === "update") {
+        toUpdate.push({ id: existing.id, data: customerData })
+      } else {
+        duplicates++
+      }
+    } else {
+      toInsert.push(customerData)
+      addressBatch.push({
+        customer_name: name,
+        street: row["street"]?.trim() || "",
+        number: row["number"]?.trim() || "",
+        complement: row["complement"]?.trim() || "",
+        neighborhood: row["neighborhood"]?.trim() || "",
+        city: row["city"]?.trim() || "",
+        state: row["state"]?.trim() || "",
+        zip_code: row["zip_code"]?.trim() || "",
+      })
+    }
   }
 
+  // Inserts
   if (toInsert.length > 0) {
     const { data: inserted, error } = await supabase
       .from("customers")
@@ -566,13 +691,13 @@ async function importCustomerBatch(
       errors += toInsert.length
       errorMessage = error.message
     } else {
-      success = inserted?.length ?? 0
+      created += inserted?.length ?? 0
 
       for (let i = 0; i < inserted.length; i++) {
         const addr = addressBatch[i]
-        if (addr.street || addr.city) {
+        if (addr && (addr.street || addr.city)) {
           try {
-            const enrichedImportedAddr = await enrichAddressData({
+            const enriched = await enrichAddressData({
               customer_id: inserted[i].id,
               street: addr.street,
               number: addr.number,
@@ -585,66 +710,128 @@ async function importCustomerBatch(
               address_type: "primary",
               is_default: true,
             })
-            await supabase.from("addresses").insert(enrichedImportedAddr)
+            await supabase.from("addresses").insert(enriched)
           } catch {
-            // non-critical error for address
+            // non-critical address enrichment error
           }
         }
       }
     }
   }
 
-  return { success, errors, duplicates, warnings, errorMessage }
+  // Updates
+  if (toUpdate.length > 0) {
+    for (const item of toUpdate) {
+      const { error } = await supabase
+        .from("customers")
+        .update(item.data)
+        .eq("id", item.id)
+        .eq("partner_id", partnerId)
+
+      if (error) {
+        errors++
+        errorMessage = error.message
+      } else {
+        updated++
+      }
+    }
+  }
+
+  return {
+    success: created + updated,
+    created,
+    updated,
+    errors,
+    duplicates,
+    warnings,
+    errorMessage,
+    failedRows,
+  }
 }
+
+/* ========================================================================= */
+/* SERVICES BATCH IMPORT                                                     */
+/* ========================================================================= */
 
 async function importServiceBatch(
   supabase: any,
   partnerId: string,
   storeId: string,
   batch: Record<string, string>[],
+  rawBatch: Record<string, string>[],
   startIndex: number,
   categoryCache: Map<string, string>,
-  options: { skipDuplicates: boolean; skipErrors: boolean },
-): Promise<{ success: number; errors: number; duplicates: number; warnings: number; errorMessage?: string }> {
-  let success = 0
+  duplicateStrategy: "skip" | "update",
+): Promise<{
+  success: number
+  created: number
+  updated: number
+  errors: number
+  duplicates: number
+  warnings: number
+  errorMessage?: string
+  failedRows: FailedRow[]
+}> {
+  let created = 0
+  let updated = 0
   let errors = 0
   let duplicates = 0
   let warnings = 0
+  const failedRows: FailedRow[] = []
   let errorMessage: string | undefined = undefined
 
   const skus = batch.map((r) => r["sku"]?.trim()).filter(Boolean) as string[]
-  let existingSkus = new Set<string>()
+  const existingServiceMap = new Map<string, any>()
+
   if (skus.length > 0) {
     const { data: existing } = await supabase
       .from("services")
-      .select("sku")
+      .select("id, sku, name")
       .eq("partner_id", partnerId)
       .in("sku", skus)
-    existingSkus = new Set((existing || []).map((s: any) => s.sku))
+
+    for (const s of existing || []) {
+      existingServiceMap.set(s.sku, s)
+    }
   }
 
   const toInsert: any[] = []
+  const toUpdate: { id: string; data: any }[] = []
 
-  for (const row of batch) {
+  for (let i = 0; i < batch.length; i++) {
+    const row = batch[i]
+    const rawRow = rawBatch[i]
+    const rowNum = startIndex + i + 1
+
     let name = row["name"]?.trim() || ""
     if (!name) {
       errors++
+      failedRows.push({
+        rowIndex: rowNum,
+        data: rawRow,
+        errorMessage: "Nome do serviço é obrigatório e está em branco.",
+      })
       continue
     }
 
     if (name.length > 150) {
-      name = name.substring(0, 147) + "..."
+      name = name.substring(0, 150)
+      warnings++
+    }
+
+    const price = parseNumber(row["price"])
+    if (price === null) {
+      errors++
+      failedRows.push({
+        rowIndex: rowNum,
+        data: rawRow,
+        errorMessage: `Preço do serviço inválido ("${row["price"] || ""}"). Deve ser numérico.`,
+      })
+      continue
     }
 
     let sku = row["sku"]?.trim() || null
-    if (sku && sku.length > 100) {
-      sku = sku.substring(0, 100)
-    }
-
-    if (sku && existingSkus.has(sku)) {
-      duplicates++
-      continue
-    }
+    if (sku && sku.length > 100) sku = sku.substring(0, 100)
 
     let status = "ativo"
     const rawStatus = row["status"]?.trim().toLowerCase()
@@ -652,14 +839,12 @@ async function importServiceBatch(
       status = "inativo"
     }
 
-    let visibilityScope: 'all' | 'selected' | 'exclusive' = "all"
-    const rawVis = row["visibility_scope"]?.trim().toLowerCase()
-    if (rawVis) {
-      if (["privado", "selecionado", "selected"].includes(rawVis)) {
-        visibilityScope = "selected"
-      } else if (["exclusivo", "exclusive"].includes(rawVis)) {
-        visibilityScope = "exclusive"
-      }
+    const rawType = row["service_type"]?.trim().toLowerCase()
+    let serviceType = "in_person"
+    if (rawType && (rawType.includes("online") || rawType.includes("remoto"))) {
+      serviceType = "online"
+    } else if (rawType && rawType.includes("hibrid")) {
+      serviceType = "hybrid"
     }
 
     const serviceData: any = {
@@ -667,13 +852,14 @@ async function importServiceBatch(
       store_id: storeId || undefined,
       name,
       description: row["description"] || null,
-      price: cleanNumber(row["price"] ?? "0") ?? 0,
-      cost_price: cleanNumber(row["cost_price"] ?? ""),
-      duration_minutes: Math.min(525600, Math.max(1, cleanNumber(row["duration_minutes"] ?? "60") ?? 60)),
-      sku: sku || null,
+      price,
+      cost_price: parseNumber(row["cost_price"]),
+      duration_minutes: Math.min(525600, Math.max(1, parseNumber(row["duration_minutes"]) ?? 60)),
+      sku,
       unit: row["unit"] || "Serviço",
+      service_type: serviceType,
       status,
-      visibility_scope: visibilityScope,
+      is_active: status === "ativo",
     }
 
     if (row["category"]) {
@@ -683,9 +869,19 @@ async function importServiceBatch(
       }
     }
 
-    toInsert.push(serviceData)
+    const existing = sku ? existingServiceMap.get(sku) : null
+    if (existing) {
+      if (duplicateStrategy === "update") {
+        toUpdate.push({ id: existing.id, data: serviceData })
+      } else {
+        duplicates++
+      }
+    } else {
+      toInsert.push(serviceData)
+    }
   }
 
+  // Inserts
   if (toInsert.length > 0) {
     const { data: inserted, error } = await supabase
       .from("services")
@@ -697,9 +893,36 @@ async function importServiceBatch(
       errors += toInsert.length
       errorMessage = error.message
     } else {
-      success = inserted?.length ?? 0
+      created += inserted?.length ?? 0
     }
   }
 
-  return { success, errors, duplicates, warnings, errorMessage }
+  // Updates
+  if (toUpdate.length > 0) {
+    for (const item of toUpdate) {
+      const { error } = await supabase
+        .from("services")
+        .update(item.data)
+        .eq("id", item.id)
+        .eq("partner_id", partnerId)
+
+      if (error) {
+        errors++
+        errorMessage = error.message
+      } else {
+        updated++
+      }
+    }
+  }
+
+  return {
+    success: created + updated,
+    created,
+    updated,
+    errors,
+    duplicates,
+    warnings,
+    errorMessage,
+    failedRows,
+  }
 }

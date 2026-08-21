@@ -1,39 +1,23 @@
 "use client"
 
 import React from "react"
-import Link from "next/link"
-import { Badge, Button } from "@/components/reusable"
+import { motion } from "framer-motion"
+import { Button, Dropdown, DropdownItem } from "@/components/reusable"
 import {
     MapPinIcon,
     PhoneIcon,
     WhatsappIcon,
     StoreIcon,
+    MoreHorizontalIcon,
     Package,
-    ClockIcon,
     TruckIcon,
-    CheckCircleIcon,
 } from "@/lib/icons"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
+import { type AvailableDeliveryOffer } from "./AvailableDeliveryListRow"
 
 interface AvailableDeliveryGridCardProps {
-    offer: {
-        assignment_id: string
-        order_id: string
-        order_number?: string | number
-        store_name?: string
-        partner_name?: string
-        store_phone?: string
-        store_address?: string
-        customer_name?: string
-        customer_phone?: string
-        delivery_address?: string
-        delivery_fee: number
-        total_amount: number
-        assigned_at?: string
-        notes?: string
-        items?: Array<{ name: string; quantity: number }>
-    }
+    offer: AvailableDeliveryOffer
     onAccept: (assignmentId: string) => void
     isAccepting?: boolean
 }
@@ -47,92 +31,180 @@ export default function AvailableDeliveryGridCard({
         ? `#${offer.order_number}`
         : `#${String(offer.order_id).slice(0, 8)}`
 
+    const cleanPhone = (offer.customer_phone || "").replace(/\D/g, "")
     const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
         offer.delivery_address || ""
     )}`
+    const whatsappUrl = cleanPhone ? `https://wa.me/55${cleanPhone}` : null
 
     return (
-        <article className="flex flex-col justify-between rounded-2xl border border-brand-border bg-white p-5 shadow-xs hover:shadow-md transition-all duration-200 dark:border-dark-border dark:bg-dark-surface hover:border-emerald-500/30 dark:hover:border-emerald-500/30 group">
-            <div>
-                {/* TOP BAR: ORDER # & STATUS */}
-                <div className="flex items-center justify-between gap-2 mb-3">
-                    <span className="font-bold text-base text-brand-dark dark:text-dark-heading font-mono">
-                        {orderNumberDisplay}
-                    </span>
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-900/40">
-                        <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                        Disponível
-                    </span>
+        <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all duration-300 group flex flex-col h-full relative"
+        >
+            <div className="flex gap-4 mb-2">
+                {/* Avatar / Estabelecimento */}
+                <div className="w-[52px] h-[52px] rounded-full bg-brand-gray dark:bg-dark-border shrink-0 overflow-hidden flex items-center justify-center border border-brand-border dark:border-dark-border">
+                    <StoreIcon size={24} className="text-brand-inactive-text" />
                 </div>
 
-                {/* STORE / ESTABELECIMENTO */}
-                <div className="flex items-center gap-2 mb-4 pb-3 border-b border-brand-border/60 dark:border-dark-border/40 text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                    <StoreIcon size={14} className="shrink-0 text-brand-green" />
-                    <span className="truncate font-semibold text-brand-dark dark:text-dark-heading">
-                        {offer.store_name || offer.partner_name || "Estabelecimento"}
-                    </span>
-                    {offer.assigned_at && (
-                        <span className="ml-auto shrink-0 text-[11px] opacity-75">
-                            {formatDate(offer.assigned_at)}
+                <div className="flex-1 min-w-0 flex flex-col justify-center">
+                    {/* Linha 1: Pedido + Status */}
+                    <div className="flex justify-between items-start gap-1">
+                        <div className="flex items-center gap-2 min-w-0 pr-1">
+                            <h3
+                                className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate font-mono"
+                                title={String(orderNumberDisplay)}
+                            >
+                                <span className="truncate">{orderNumberDisplay}</span>
+                            </h3>
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/40 dark:text-amber-300 whitespace-nowrap scale-90 shrink-0">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                Disponível
+                            </span>
+                        </div>
+
+                        {/* Ações */}
+                        <div className="shrink-0 -mt-1 -mr-1">
+                            <Dropdown
+                                align="right"
+                                showChevron={false}
+                                trigger={
+                                    <button
+                                        type="button"
+                                        className="w-8 h-8 rounded-full flex items-center justify-center text-brand-inactive-text hover:bg-brand-gray hover:text-brand-dark dark:hover:bg-dark-border dark:hover:text-dark-heading transition-colors cursor-pointer"
+                                        aria-label="Ações da oferta"
+                                    >
+                                        <MoreHorizontalIcon size={18} />
+                                    </button>
+                                }
+                            >
+                                <DropdownItem onClick={() => window.open(mapsUrl, "_blank")}>
+                                    <MapPinIcon size={16} /> Abrir Rota no Maps
+                                </DropdownItem>
+                                {cleanPhone && (
+                                    <DropdownItem onClick={() => window.open(`tel:${cleanPhone}`, "_self")}>
+                                        <PhoneIcon size={16} /> Ligar para Cliente
+                                    </DropdownItem>
+                                )}
+                                {whatsappUrl && (
+                                    <DropdownItem onClick={() => window.open(whatsappUrl, "_blank")}>
+                                        <WhatsappIcon size={16} /> Chamar no WhatsApp
+                                    </DropdownItem>
+                                )}
+                            </Dropdown>
+                        </div>
+                    </div>
+
+                    {/* Linha 2: Estabelecimento • Data */}
+                    <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate flex items-center">
+                        <span className="truncate">{offer.store_name || offer.partner_name || "Estabelecimento"}</span>
+                        {offer.assigned_at && (
+                            <>
+                                <span className="mx-1.5">•</span>
+                                <span className="truncate">{formatDate(offer.assigned_at)}</span>
+                            </>
+                        )}
+                    </div>
+
+                    {/* Linha 3: Cliente */}
+                    <div className="flex items-center gap-2 mt-1.5 min-w-0">
+                        <UserProfileImage
+                            fullName={offer.customer_name || "Cliente"}
+                            className="h-6 w-6 text-[10px] shrink-0"
+                        />
+                        <span className="text-[13px] font-semibold text-brand-dark dark:text-dark-heading truncate">
+                            {offer.customer_name || "Cliente"}
                         </span>
-                    )}
+                        {cleanPhone && (
+                            <div className="flex items-center gap-1 shrink-0 ml-auto">
+                                <a
+                                    href={`tel:${cleanPhone}`}
+                                    className="w-6 h-6 rounded-full flex items-center justify-center text-brand-inactive-text hover:bg-brand-green hover:text-white transition-colors"
+                                    title="Ligar para cliente"
+                                >
+                                    <PhoneIcon size={12} />
+                                </a>
+                                {whatsappUrl && (
+                                    <a
+                                        href={whatsappUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="w-6 h-6 rounded-full flex items-center justify-center text-emerald-600 dark:text-emerald-400 hover:bg-emerald-600 hover:text-white transition-colors"
+                                        title="Chamar no WhatsApp"
+                                    >
+                                        <WhatsappIcon size={12} />
+                                    </a>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </div>
-
-                {/* STORE ADDRESS */}
-                {offer.store_address && (
-                    <div className="flex items-start gap-1.5 text-xs text-brand-inactive-text dark:text-dark-body mb-3">
-                        <MapPinIcon size={13} className="shrink-0 text-brand-green mt-0.5" />
-                        <span className="line-clamp-1">Retirada: {offer.store_address}</span>
-                    </div>
-                )}
-
-                {/* CUSTOMER & DESTINATION */}
-                <div className="rounded-xl bg-brand-gray/80 dark:bg-dark-border/30 p-3 mb-4 text-xs space-y-1.5">
-                    <div className="flex items-center justify-between font-semibold text-brand-dark dark:text-dark-heading">
-                        <span>Cliente: {offer.customer_name || "Cliente"}</span>
-                    </div>
-                    <div className="flex items-start gap-1.5 text-brand-inactive-text dark:text-dark-body">
-                        <MapPinIcon size={13} className="shrink-0 text-purple-500 mt-0.5" />
-                        <span className="line-clamp-2 leading-relaxed">
-                            Entrega: {offer.delivery_address || "Endereço não informado"}
-                        </span>
-                    </div>
-                </div>
-
-                {/* ITEMS COUNT SUMMARY */}
-                {offer.items && offer.items.length > 0 && (
-                    <div className="flex items-center gap-1.5 text-xs text-brand-inactive-text mb-4">
-                        <Package size={13} className="shrink-0" />
-                        <span className="truncate">
-                            {offer.items.reduce((acc, it) => acc + (it.quantity || 1), 0)} itens (
-                            {offer.items.map((it) => it.name).join(", ")})
-                        </span>
-                    </div>
-                )}
             </div>
 
-            {/* CARD FOOTER */}
-            <div className="pt-3 border-t border-brand-border/60 dark:border-dark-border/40 flex items-center justify-between gap-3">
-                <div className="flex flex-col">
-                    <span className="text-[11px] uppercase font-bold text-brand-inactive-text">
-                        Sua Taxa
-                    </span>
-                    <span className="text-base font-extrabold text-emerald-600 dark:text-emerald-400">
-                        {formatCurrency(offer.delivery_fee || 0)}
-                    </span>
-                </div>
-
-                <Button
-                    variant="default"
-                    size="sm"
-                    onClick={() => onAccept(offer.assignment_id)}
-                    disabled={isAccepting}
-                    isLoading={isAccepting}
-                    className="font-bold px-4"
+            {/* Endereço de entrega */}
+            <div className="rounded-xl bg-brand-gray/80 dark:bg-dark-border/30 p-3 mb-2 text-xs">
+                <a
+                    href={mapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-start gap-2 text-brand-dark/90 dark:text-dark-body hover:text-brand-green transition-colors"
                 >
-                    Aceitar Entrega
-                </Button>
+                    <MapPinIcon size={14} className="text-brand-green shrink-0 mt-0.5" />
+                    <span className="line-clamp-2 leading-relaxed">
+                        {offer.delivery_address || "Endereço de entrega não informado"}
+                    </span>
+                </a>
             </div>
-        </article>
+
+            {/* Itens */}
+            {offer.items && offer.items.length > 0 && (
+                <div className="flex items-center gap-1.5 text-xs text-brand-inactive-text mb-2">
+                    <Package size={13} className="shrink-0" />
+                    <span className="truncate">
+                        {offer.items.reduce((acc, it) => acc + (it.quantity || 1), 0)} itens (
+                        {offer.items.map((it) => it.name).join(", ")})
+                    </span>
+                </div>
+            )}
+
+            {/* Área do Rodapé */}
+            <div className="mt-auto pt-3 border-t border-brand-border dark:border-dark-border flex flex-col gap-2">
+                <div className="flex items-end justify-between mt-1">
+                    {/* Valores */}
+                    <div className="flex flex-col gap-0.5">
+                        <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Sua Taxa</span>
+                        <div className="flex items-center gap-2.5">
+                            <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading">
+                                {formatCurrency(offer.delivery_fee || 0)}
+                            </span>
+                        </div>
+                        {!!offer.total_amount && (
+                            <span className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body">
+                                Pedido: {formatCurrency(offer.total_amount)}
+                            </span>
+                        )}
+                    </div>
+
+                    {/* Botão de Aceitar */}
+                    <div className="shrink-0">
+                        <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => onAccept(offer.assignment_id)}
+                            disabled={isAccepting}
+                            isLoading={isAccepting}
+                            className="text-xs h-8 px-3 font-bold"
+                            leftIcon={<TruckIcon size={14} />}
+                        >
+                            Aceitar
+                        </Button>
+                    </div>
+                </div>
+            </div>
+        </motion.div>
     )
 }

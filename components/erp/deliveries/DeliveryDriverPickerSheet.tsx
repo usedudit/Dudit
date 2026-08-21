@@ -37,7 +37,7 @@ export interface DeliveryDriverPickerSheetProps {
     onDeliveryCancelled?: () => void
     /** Backward compatibility */
     drivers?: any[]
-    onSelect?: (driverId: string) => void
+    onSelect?: (driverId: string, driver?: any) => void
 }
 
 export default function DeliveryDriverPickerSheet({

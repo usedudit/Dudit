@@ -1123,12 +1123,15 @@ select:disabled,
 .mapboxgl-popup-anchor-top .mapboxgl-popup-tip {
   border-bottom-color: #ffffff !important;
 }
+
 .mapboxgl-popup-anchor-bottom .mapboxgl-popup-tip {
   border-top-color: #ffffff !important;
 }
+
 .mapboxgl-popup-anchor-left .mapboxgl-popup-tip {
   border-right-color: #ffffff !important;
 }
+
 .mapboxgl-popup-anchor-right .mapboxgl-popup-tip {
   border-left-color: #ffffff !important;
 }
@@ -1136,12 +1139,15 @@ select:disabled,
 .dark .mapboxgl-popup-anchor-top .mapboxgl-popup-tip {
   border-bottom-color: #18181b !important;
 }
+
 .dark .mapboxgl-popup-anchor-bottom .mapboxgl-popup-tip {
   border-top-color: #18181b !important;
 }
+
 .dark .mapboxgl-popup-anchor-left .mapboxgl-popup-tip {
   border-right-color: #18181b !important;
 }
+
 .dark .mapboxgl-popup-anchor-right .mapboxgl-popup-tip {
   border-left-color: #18181b !important;
 }
@@ -1152,9 +1158,9 @@ select:disabled,
   width: 22px !important;
   height: 22px !important;
   border-radius: 9999px !important;
-  background: transparent !important;
-  color: #9ca3af !important;
-  font-size: 13px !important;
+  background: #f3f4f6 !important;
+  color: #374151 !important;
+  font-size: 20px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -1164,11 +1170,8 @@ select:disabled,
   outline: none !important;
   border: none !important;
 }
-.mapboxgl-popup-close-button:hover {
-  background: #f3f4f6 !important;
-  color: #374151 !important;
-}
-.dark .mapboxgl-popup-close-button:hover {
+
+.dark .mapboxgl-popup-close-button {
   background: #27272a !important;
   color: #f3f4f6 !important;
 }
@@ -1185,7 +1188,6 @@ select:disabled,
 .dmp-header {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
   gap: 8px;
   padding: 10px 12px 8px 12px;
   background: #ffffff;
@@ -1244,6 +1246,7 @@ select:disabled,
   color: #15803d;
   border: 1px solid #dcfce7;
 }
+
 .dark .dmp-badge-green {
   background: rgba(20, 83, 45, 0.3);
   color: #4ade80;
@@ -1255,6 +1258,7 @@ select:disabled,
   color: #7e22ce;
   border: 1px solid #f3e8ff;
 }
+
 .dark .dmp-badge-purple {
   background: rgba(88, 28, 135, 0.3);
   color: #c084fc;
@@ -1266,6 +1270,7 @@ select:disabled,
   color: #374151;
   border: 1px solid #ebebeb;
 }
+
 .dark .dmp-badge-gray {
   background: rgba(36, 37, 43, 0.5);
   color: #d4d4d8;
@@ -1320,6 +1325,7 @@ select:disabled,
   color: #d1d5db;
   font-size: 10px;
 }
+
 .dark .dmp-dot {
   color: #3f3f46;
 }
@@ -1354,4 +1360,4 @@ select:disabled,
 
 .dark .dmp-button:hover {
   background: #047857;
-}
+}

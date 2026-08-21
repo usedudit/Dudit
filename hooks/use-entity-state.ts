@@ -98,6 +98,7 @@ export function useEntityState() {
         const handlePopState = () => {
             if (window.location.pathname !== pathname) return
             const urlState = stateFromCurrentUrl()
+            localStateRef.current = urlState
             setLocalState(urlState)
         }
         window.addEventListener("popstate", handlePopState)

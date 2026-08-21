@@ -1,11 +1,25 @@
 export type EntityType = "products" | "customers" | "services"
 
+export type SemanticFieldType =
+  | "string"
+  | "number"
+  | "boolean"
+  | "email"
+  | "cpf_cnpj"
+  | "phone"
+  | "date"
+  | "enum"
+
 export interface FieldDef {
   name: string
   label: string
-  type: "string" | "number" | "boolean"
+  type: SemanticFieldType
   required?: boolean
   synonyms: string[]
+  options?: string[]
+  example?: string
+  description?: string
+  isIdentifier?: boolean
 }
 
 export interface ColumnMapping {
@@ -16,6 +30,7 @@ export interface ColumnMapping {
   confidence: number
   isCustom: boolean
   sampleValues?: string[]
+  typeMismatchWarning?: string
 }
 
 export interface ReadResult {
@@ -66,14 +81,32 @@ export interface PreviewSummary {
   sampleRows: Record<string, string>[]
 }
 
+export interface FailedRow {
+  rowIndex: number
+  data: Record<string, string>
+  errorMessage: string
+}
+
+export interface ImportOptions {
+  duplicateStrategy?: "skip" | "update"
+  skipDuplicates?: boolean
+  skipErrors?: boolean
+  autoCreateCategories?: boolean
+  autoCreateBrands?: boolean
+  autoCreateSuppliers?: boolean
+}
+
 export interface ImportResult {
   importId: string
   successRows: number
+  createdRows: number
+  updatedRows: number
   errorRows: number
   duplicateRows: number
   warningRows: number
   durationMs: number
   errorMessage?: string
+  failedRows?: FailedRow[]
 }
 
 export interface ImportSession {

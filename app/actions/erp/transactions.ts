@@ -1740,6 +1740,7 @@ export async function recordInstallmentPaymentAction(input: {
     interestAmount?: number
     discountAmount?: number
     paymentMethodId?: string | null
+    accountId?: string | null
 }) {
     try {
         const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -1829,7 +1830,10 @@ export async function recordInstallmentPaymentAction(input: {
         }
 
         let resolvedAccountId = tx.account_id
-        if (effectivePaymentMethodId) {
+        // Prefer explicit accountId from user, then fallback to payment method default
+        if (input.accountId) {
+            resolvedAccountId = input.accountId
+        } else if (effectivePaymentMethodId) {
             const { data: pm } = await supabase
                 .from("payment_methods")
                 .select("default_finance_account_id")
@@ -1874,12 +1878,38 @@ export async function recordInstallmentPaymentAction(input: {
         if (resolvedAccountId) {
             updatePayload.account_id = resolvedAccountId
         }
-        const installmentNewPmLabel = effectivePaymentMethodId
+
+        // Derive payment_type from ALL transaction_payments (not just the latest)
+        // This ensures split payments (e.g. PIX + Dinheiro) show all methods used
+        const { data: allPayments } = await supabase
+            .from("transaction_payments")
+            .select("payment_method_id, amount")
+            .eq("partner_id", input.partnerId)
+            .eq("transaction_id", input.transactionId)
+
+        const allPaymentLabels: string[] = []
+        for (const p of allPayments || []) {
+            const pmLabel = p.payment_method_id
+                ? await paymentMethodDisplayLabel(supabase, input.partnerId, p.payment_method_id).catch(() => null)
+                : null
+            if (pmLabel) allPaymentLabels.push(pmLabel)
+        }
+        // Add current payment if not yet in the list
+        const currentLabel = effectivePaymentMethodId
             ? await paymentMethodDisplayLabel(supabase, input.partnerId, effectivePaymentMethodId).catch(() => null)
-            : (rawMethodName || tx.payment_type || null)
+            : (rawMethodName || null)
+        if (currentLabel && !allPaymentLabels.includes(currentLabel)) {
+            allPaymentLabels.push(currentLabel)
+        }
+
         if (input.paymentMethodId !== undefined) {
             updatePayload.payment_method_id = effectivePaymentMethodId
-            updatePayload.payment_type = installmentNewPmLabel || null
+        }
+        // Use comma-separated list if multiple methods, otherwise single label
+        if (allPaymentLabels.length > 1) {
+            updatePayload.payment_type = [...new Set(allPaymentLabels)].join(", ")
+        } else if (currentLabel) {
+            updatePayload.payment_type = currentLabel
         }
         if (fullyPaid) {
             updatePayload.status = "paid"
@@ -1899,8 +1929,7 @@ export async function recordInstallmentPaymentAction(input: {
         if (updateErr) throw updateErr
 
         const installmentDir = tx.transaction_type === "income" ? "Recebido" : "Pago"
-        const installmentPmLabel = installmentNewPmLabel
-        const methodLabel = installmentPmLabel || tx.payment_type || null
+        const methodLabel = updatePayload.payment_type || tx.payment_type || null
 
         const { total: groupTotal, paidPrincipal: groupPaidPrincipal } = await getInstallmentGroupPrincipal(
             supabase,
@@ -1984,6 +2013,7 @@ export async function recordRegularTransactionPaymentAction(input: {
     interestAmount?: number
     discountAmount?: number
     paymentMethodId?: string | null
+    accountId?: string | null
 }) {
     try {
         const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -2060,7 +2090,10 @@ export async function recordRegularTransactionPaymentAction(input: {
         }
 
         let resolvedAccountId = tx.account_id
-        if (validPaymentMethodId) {
+        // Prefer explicit accountId from user, then fallback to payment method default
+        if (input.accountId) {
+            resolvedAccountId = input.accountId
+        } else if (validPaymentMethodId) {
             const { data: pm } = await supabase
                 .from("payment_methods")
                 .select("default_finance_account_id")
@@ -2099,9 +2132,35 @@ export async function recordRegularTransactionPaymentAction(input: {
         if (resolvedAccountId) {
             updatePayload.account_id = resolvedAccountId
         }
+
+        // Derive payment_type from ALL transaction_payments (not just the latest)
+        // This ensures split payments (e.g. PIX + Dinheiro) show all methods used
+        const { data: allPayments } = await supabase
+            .from("transaction_payments")
+            .select("payment_method_id, amount")
+            .eq("partner_id", input.partnerId)
+            .eq("transaction_id", input.transactionId)
+
+        const allPaymentLabels: string[] = []
+        for (const p of allPayments || []) {
+            const pLabel = p.payment_method_id
+                ? await paymentMethodDisplayLabel(supabase, input.partnerId, p.payment_method_id).catch(() => null)
+                : null
+            if (pLabel) allPaymentLabels.push(pLabel)
+        }
+        // Add current payment if not yet in the list
+        if (pmTypeLabel && !allPaymentLabels.includes(pmTypeLabel)) {
+            allPaymentLabels.push(pmTypeLabel)
+        }
+
         if (input.paymentMethodId !== undefined) {
             updatePayload.payment_method_id = validPaymentMethodId
-            updatePayload.payment_type = pmTypeLabel || null
+        }
+        // Use comma-separated list if multiple methods, otherwise single label
+        if (allPaymentLabels.length > 1) {
+            updatePayload.payment_type = [...new Set(allPaymentLabels)].join(", ")
+        } else if (pmTypeLabel) {
+            updatePayload.payment_type = pmTypeLabel
         }
         if (fullyPaid) {
             updatePayload.status = "paid"

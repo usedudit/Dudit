@@ -186,7 +186,7 @@ const AlertModal: React.FC<AlertModalProps> = ({
   if (isMobile) {
     return (
       <BottomSheet isOpen={isAnimating} onClose={handleClose}>
-        <div className="flex flex-col items-center text-center gap-4 pt-4 pb-4 relative">
+        <div className="flex flex-col items-center text-center gap-4 pt-4 relative">
           <div
             className={`relative flex shrink-0 items-center justify-center h-16 w-16 rounded-full ${styles.bgLight} mb-2`}
           >
@@ -200,26 +200,38 @@ const AlertModal: React.FC<AlertModalProps> = ({
               <div className="text-sm text-brand-inactive-text dark:text-dark-body text-left">{displayMessage}</div>
             )}
           </div>
-          <div className="z-10 w-full flex flex-col gap-3 pt-4">
+          <footer className="shrink-0 border-t border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface flex gap-3 -mx-4 -mb-6 mt-2 self-stretch">
             {isConfirmation ? (
               <>
-                <Button variant={styles.button} onClick={() => handleButtonClick(handleConfirm)} className="w-full" isLoading={isLoading}>
-                  {confirmText}
-                </Button>
-                <Button variant="outline" onClick={() => handleButtonClick(handleClose)} className="w-full bg-transparent">
+                <Button
+                  variant="outline"
+                  onClick={() => handleButtonClick(handleClose)}
+                  className="h-12 w-full"
+                  disabled={disabled}
+                >
                   {cancelText}
+                </Button>
+                <Button
+                  variant={styles.button}
+                  onClick={() => handleButtonClick(handleConfirm)}
+                  className="h-12 w-full"
+                  disabled={disabled}
+                  isLoading={isLoading}
+                >
+                  {confirmText}
                 </Button>
               </>
             ) : (
               <Button
                 variant={styles.button}
                 onClick={() => handleButtonClick(handleClose)}
-                className="w-full"
+                className="h-12 w-full"
+                disabled={disabled}
               >
                 {confirmText === "Confirmar" ? "Ok, entendi" : confirmText}
               </Button>
             )}
-          </div>
+          </footer>
         </div>
       </BottomSheet>
     )

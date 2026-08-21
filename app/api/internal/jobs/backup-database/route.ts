@@ -29,7 +29,9 @@ export async function POST(req: Request) {
   const authError = validateBackupCronRequest(req)
   if (authError) return authError
 
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown"
+  // The bearer secret authenticates the caller; do not key this limit by a
+  // client-controlled forwarding header.
+  const ip = `job:${JOB_NAME}`
   try {
     const limiter = getLimiter(RateLimitCategory.INTERNAL_CRON)
     const { success } = await limiter.limit(`database-backup:${ip}`)

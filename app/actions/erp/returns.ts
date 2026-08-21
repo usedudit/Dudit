@@ -16,6 +16,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { getPartnerCapabilities } from "@/lib/services/partner-capabilities"
 import { logAuditEvent } from "@/lib/services/timeline.service"
+import { getTrustedClientIP } from "@/lib/security/client-ip"
 import { syncCancelledOrderAppointmentsAndTransactions } from "@/lib/services/sync-cancellation"
 import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
 import type { ReturnRequestListItem } from "@/lib/returns/types"
@@ -188,7 +189,7 @@ function toNumber(value: unknown) {
 async function getClientIP(): Promise<string> {
     try {
         const h = await headers()
-        return h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown"
+        return getTrustedClientIP(h)
     } catch {
         return "unknown"
     }

@@ -42,9 +42,14 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
     const [currentView, setCurrentView] = useState<View>(initialTab || "main")
 
     useEffect(() => {
-        const tabFromUrl = searchParams.get("tab") as View | null
-        setCurrentView(tabFromUrl || "main")
-    }, [searchParams])
+        const handlePopState = () => {
+            const params = new URLSearchParams(window.location.search)
+            const tab = params.get("tab") as View | null
+            setCurrentView(tab || "main")
+        }
+        window.addEventListener("popstate", handlePopState)
+        return () => window.removeEventListener("popstate", handlePopState)
+    }, [])
 
     const [isLoading, setIsLoading] = useState(false)
     const [success, setSuccess] = useState<string | null>(null)
@@ -195,7 +200,9 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
         setCurrentView(view)
 
         const url = view === "main" ? "/perfil" : `/perfil?tab=${view}`
-        router.push(url)
+        if (typeof window !== "undefined") {
+            window.history.pushState(null, "", url)
+        }
     }
 
     const startTimer = (

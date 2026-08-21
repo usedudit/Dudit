@@ -6,6 +6,7 @@ import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { cookies, headers } from "next/headers"
 import { AccountDeletionService } from "@/lib/services/account-deletion.service"
+import { getTrustedClientIP } from "@/lib/security/client-ip"
 
 export async function deleteAccountAction(
   userId: string,
@@ -31,8 +32,7 @@ export async function deleteAccountAction(
     // 2. Fetch IP, User-Agent, and Country from headers
     const reqHeaders = await headers()
     const userAgent = reqHeaders.get("user-agent")
-    const forwarded = reqHeaders.get("x-forwarded-for")
-    const ip = forwarded ? forwarded.split(",")[0].trim() : reqHeaders.get("x-real-ip") || "unknown"
+    const ip = getTrustedClientIP(reqHeaders)
     const country = reqHeaders.get("cf-ipcountry") || "BR"
 
     // 3. Delegate execution to AccountDeletionService

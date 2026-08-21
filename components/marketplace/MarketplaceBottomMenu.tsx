@@ -142,7 +142,7 @@ export function MarketplaceBottomMenu() {
                         className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all duration-200 ${isHomeActive ? "text-brand-green font-bold" : "text-brand-dark dark:text-dark-body font-medium"
                             }`}
                     >
-                        <HomeIcon size={22} className={isHomeActive ? "text-brand-green" : "text-brand-dark"} />
+                        <HomeIcon size={22} className={isHomeActive ? "text-brand-green" : "text-brand-dark dark:text-dark-body"} />
                         <span className="text-[11px] mt-1">Início</span>
                     </Link>
 
@@ -152,7 +152,7 @@ export function MarketplaceBottomMenu() {
                         className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all duration-200 ${isExploreActive ? "text-brand-green font-bold" : "text-brand-dark dark:text-dark-body font-medium"
                             }`}
                     >
-                        <SearchIcon size={22} className={isExploreActive ? "text-brand-green" : "text-brand-dark"} />
+                        <SearchIcon size={22} className={isExploreActive ? "text-brand-green" : "text-brand-dark dark:text-dark-body"} />
                         <span className="text-[11px] mt-1">Explorar</span>
                     </Link>
 
@@ -162,7 +162,7 @@ export function MarketplaceBottomMenu() {
                         className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all duration-200 ${isOrdersActive ? "text-brand-green font-bold" : "text-brand-dark dark:text-dark-body font-medium"
                             }`}
                     >
-                        <Package size={22} className={isOrdersActive ? "text-brand-green" : "text-brand-dark"} />
+                        <Package size={22} className={isOrdersActive ? "text-brand-green" : "text-brand-dark dark:text-dark-body"} />
                         <span className="text-[11px] mt-1">Pedidos</span>
                     </Link>
 
@@ -171,7 +171,7 @@ export function MarketplaceBottomMenu() {
                         className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all duration-200 ${isMenuOpen ? "text-brand-green font-bold" : "text-brand-dark dark:text-dark-body font-medium"
                             }`}
                     >
-                        <MenuIcon size={22} className={isMenuOpen ? "text-brand-green" : "text-brand-dark"} />
+                        <MenuIcon size={22} className={isMenuOpen ? "text-brand-green" : "text-brand-dark dark:text-dark-body"} />
                         <span className="text-[11px] mt-1">Menu</span>
                     </button>
                 </nav>

@@ -37,6 +37,7 @@ import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { adminAuditLog } from "@/lib/admin/audit"
 import { AdminActionType } from "@/lib/admin/types"
+import { getTrustedClientIP } from "@/lib/security/client-ip"
 import type { CursorPaginatedResult } from "@/lib/admin/types"
 import { sanitizeString, sanitizeUUID } from "@/lib/security/input-sanitizer"
 import {
@@ -113,8 +114,7 @@ function sha256(input: string): string {
 async function getRequestHeadersSafe(): Promise<{ ip: string; ua: string }> {
     try {
         const h = await headers()
-        const fwd = h.get("x-forwarded-for")
-        const ip = fwd ? fwd.split(",")[0].trim() : h.get("x-real-ip") || "unknown"
+        const ip = getTrustedClientIP(h)
         const ua = h.get("user-agent") || "unknown"
         return { ip, ua }
     } catch {

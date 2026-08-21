@@ -1,8 +1,8 @@
 "use client"
 
 import React from "react"
-import { Input, FormDropdown, Checkbox, FormSection, Badge } from "@/components/reusable"
-import { TagIcon, MapPinIcon, CalendarIcon, CheckCircleIcon } from "@/lib/icons"
+import { Input, FormDropdown, Checkbox, Badge } from "@/components/reusable"
+import { MapPinIcon } from "@/lib/icons"
 
 interface ProductUsedConditionsSectionProps {
     condition: string

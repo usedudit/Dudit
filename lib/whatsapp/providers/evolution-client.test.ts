@@ -62,6 +62,22 @@ describe("EvolutionWhatsappClient URL Validation", () => {
         instanceName: "test-instance",
       })
     }).toThrow("URL não permitida (rede privada)")
+
+    expect(() => {
+      new EvolutionWhatsappClient({
+        apiUrl: "http://127.0.0.2",
+        apiKey: "test-api-key",
+        instanceName: "test-instance",
+      })
+    }).toThrow("URL não permitida por segurança")
+
+    expect(() => {
+      new EvolutionWhatsappClient({
+        apiUrl: "http://[fd00::1]",
+        apiKey: "test-api-key",
+        instanceName: "test-instance",
+      })
+    }).toThrow("URL não permitida por segurança")
   })
 })
 

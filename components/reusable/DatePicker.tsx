@@ -30,11 +30,19 @@ import {
 
 // --- Local Calendar Component (Using Reusable Button and Brand Icons) ---
 
+function CalendarChevron({ orientation }: { orientation?: "left" | "right" | "up" | "down" }) {
+    if (orientation === "left") return <ChevronLeftIcon size={18} />
+    if (orientation === "right") return <ChevronRightIcon size={18} />
+    return <ChevronDownIcon size={18} />
+}
+
 function CalendarDayButton({ className, day, modifiers, ...props }: React.ComponentProps<typeof DayButton>) {
     const ref = React.useRef<HTMLButtonElement>(null)
 
     React.useEffect(() => {
-        if (modifiers?.focused) ref.current?.focus()
+        if (modifiers?.focused && ref.current && document.activeElement !== ref.current) {
+            ref.current.focus()
+        }
     }, [modifiers?.focused])
 
     const isSelected = modifiers?.selected || props['aria-selected'] === true || props['aria-selected'] === "true" || ('data-selected' in props)
@@ -63,41 +71,45 @@ function CalendarDayButton({ className, day, modifiers, ...props }: React.Compon
     )
 }
 
+const calendarComponents = {
+    Chevron: CalendarChevron,
+    DayButton: CalendarDayButton,
+}
+
+const defaultCalendarClassNames = getDefaultClassNames()
+
+const calendarClassNames = {
+    root: cn("w-fit", defaultCalendarClassNames.root),
+    months: cn("flex gap-4 flex-col md:flex-row relative", defaultCalendarClassNames.months),
+    month: cn("flex flex-col w-full gap-4", defaultCalendarClassNames.month),
+    nav: cn("flex items-center gap-1 w-full absolute top-0 inset-x-0 justify-between", defaultCalendarClassNames.nav),
+    month_caption: "flex items-center justify-center h-8 w-full px-8 text-sm font-bold text-brand-dark dark:text-dark-heading",
+    dropdowns: "w-full flex items-center text-xs font-medium justify-center h-8 gap-1.5",
+    table: "w-full border-collapse",
+    weekdays: "flex mb-1",
+    weekday: "text-brand-inactive-text rounded-md flex-1 font-medium text-[0.75rem] select-none text-center",
+    week: "flex w-full mt-1.5",
+    day: "relative w-full h-full p-0 text-center group/day aspect-square select-none",
+}
+
 function LocalCalendar({
     className,
     classNames,
     showOutsideDays = true,
     ...props
 }: React.ComponentProps<typeof DayPicker>) {
-    const defaultClassNames = getDefaultClassNames()
+    const mergedClassNames = React.useMemo(() => ({
+        ...calendarClassNames,
+        ...classNames,
+    }), [classNames])
 
     return (
         <DayPicker
             showOutsideDays={showOutsideDays}
             className={cn("p-3", className)}
             locale={ptBR}
-            classNames={{
-                root: cn("w-fit", defaultClassNames.root),
-                months: cn("flex gap-4 flex-col md:flex-row relative", defaultClassNames.months),
-                month: cn("flex flex-col w-full gap-4", defaultClassNames.month),
-                nav: cn("flex items-center gap-1 w-full absolute top-0 inset-x-0 justify-between", defaultClassNames.nav),
-                month_caption: "flex items-center justify-center h-8 w-full px-8 text-sm font-bold text-brand-dark dark:text-dark-heading",
-                dropdowns: "w-full flex items-center text-xs font-medium justify-center h-8 gap-1.5",
-                table: "w-full border-collapse",
-                weekdays: "flex mb-1",
-                weekday: "text-brand-inactive-text rounded-md flex-1 font-medium text-[0.75rem] select-none text-center",
-                week: "flex w-full mt-1.5",
-                day: "relative w-full h-full p-0 text-center group/day aspect-square select-none",
-                ...classNames,
-            }}
-            components={{
-                Chevron: ({ orientation }) => {
-                    if (orientation === "left") return <ChevronLeftIcon size={18} />
-                    if (orientation === "right") return <ChevronRightIcon size={18} />
-                    return <ChevronDownIcon size={18} />
-                },
-                DayButton: CalendarDayButton,
-            }}
+            classNames={mergedClassNames}
+            components={calendarComponents}
             {...props}
         />
     )
@@ -172,14 +184,16 @@ export const DatePicker: React.FC<DatePickerProps> = ({
         return value as DateRange
     }, [value, mode])
 
+    const handleSelect = React.useCallback((val: any) => {
+        onChange?.(val)
+        if (mode === "single") setOpen(false)
+    }, [onChange, mode])
+
     const CalendarContent = (
         <LocalCalendar
             mode={mode as any}
             selected={calendarValue as any}
-            onSelect={(val: any) => {
-                onChange?.(val)
-                if (mode === "single") setOpen(false)
-            }}
+            onSelect={handleSelect}
             initialFocus
         />
     )

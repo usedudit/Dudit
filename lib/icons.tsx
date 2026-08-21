@@ -114,6 +114,7 @@ import {
     SmartPhone01Icon,
     FavouriteIcon,
     Clock01Icon,
+    HistoryIcon as HistoryIcon01,
     IdentityCardIcon as IdentityCard,
     TextBoldIcon,
     Download01Icon,
@@ -202,9 +203,7 @@ export const ArrowUpDownIcon = CreateIcon(ArrowUpDown)
 export const ArrowLeftDoubleIcon = CreateIcon(ArrowLeftDoubleIcon01)
 export const ArrowRightDoubleIcon = CreateIcon(ArrowRightDoubleIcon01)
 export const ArrowLeftRightIcon = CreateIcon(ArrowLeftRightIcon01)
-
-export const UnfoldMoreIcon = CreateIcon(UnfoldMore01Icon)
-export const ChevronsUpDown = CreateIcon(MenuSquare01)
+export const ChevronsUpDown = CreateIcon(UnfoldMore01Icon)
 
 export const AdjustIcon = CreateIcon(PlusMinus01Icon)
 export const ReturnIcon = CreateIcon(ArrowTurnBackwardIcon01)
@@ -386,6 +385,7 @@ export const SunIcon = CreateIcon(Sun03Icon)
 export const TextFirstlineRightIcon = CreateIcon(TextFirstlineRightIcon01)
 
 export const ClockIcon = CreateIcon(Clock01Icon)
+export const HistoryIcon = CreateIcon(HistoryIcon01)
 export const ClockCheckIcon = CreateIcon(ClockCheckIcon01)
 export const ClockArrowUpIcon = CreateIcon(ClockArrowUpIcon01)
 export const EstimateTimeIcon = CreateIcon(Clock04Icon)

@@ -28,6 +28,7 @@ import {
     AlertModal,
     FormTextarea,
     ThreeDotsLoader,
+    IconPlaceholder,
 } from "@/components/reusable"
 import {
     createERPDeliveryAction,
@@ -47,6 +48,7 @@ import {
     InfoIcon,
     XIcon,
     TruckIcon,
+    BoxIcon,
 } from "@/lib/icons"
 import { getDeliveryStatusMeta, getPaymentStatusMeta } from "@/lib/orders/status"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
@@ -200,6 +202,7 @@ export default function CreateDeliveryPage({
     const handleBack = useCallback(() => handleNavigation(onBack), [handleNavigation, onBack])
     const searchRef = useRef<HTMLDivElement>(null)
     const [deliveryPeople, setDeliveryPeople] = useState<DeliveryPerson[]>([])
+    const [platformDriver, setPlatformDriver] = useState<any>(null)
     const [isDriverSheetOpen, setIsDriverSheetOpen] = useState(false)
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -251,6 +254,7 @@ export default function CreateDeliveryPage({
                     const del = res.data
                     const orderIds = (del.delivery_orders || []).map((l: any) => l.order_id || l.orders?.id).filter(Boolean)
                     setSelectedOrderIds(orderIds)
+                    if (del.platform_driver) setPlatformDriver(del.platform_driver)
                     setSelectedDeliveryPersonId(del.delivery_person_id || (del.platform_driver_id ? `platform:${del.platform_driver_id}` : ""))
                     setStatus(del.status || "pending")
                     const startedDate = del.started_at || del.departure_time || del.created_at
@@ -376,11 +380,36 @@ export default function CreateDeliveryPage({
         ])
     }
 
-    useEffect(() => {
-        if (deliveryPeople.length === 0) void loadDeliveryPeople()
-        // The loader is intentionally called once when the delivery editor opens.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [partnerId, deliveryPeople.length])
+    const deliveryPeopleOptions = useMemo(() => {
+        const baseOptions = [
+            { value: "none", label: "Entrega própria" },
+            ...deliveryPeople.map((person) => ({
+                value: person.id,
+                label: `${person.source === "platform" ? "Dudit · " : ""}${person.fullName}${person.vehicleType ? ` · ${person.vehicleType}` : ""}`,
+            })),
+        ]
+
+        if (selectedDeliveryPersonId?.startsWith("platform:")) {
+            const rawId = selectedDeliveryPersonId.slice("platform:".length)
+            const exists = baseOptions.some(opt => opt.value === selectedDeliveryPersonId)
+            if (!exists) {
+                if (rawId === "dudit_network" || platformDriver?.id === "dudit_network") {
+                    baseOptions.push({
+                        value: "platform:dudit_network",
+                        label: "Dudit · Rede de Entregadores (Aguardando aceite)",
+                    })
+                } else {
+                    const driverName = platformDriver?.fullName || "Entregador Parceiro"
+                    const vehicleType = platformDriver?.vehicleType ? ` (${platformDriver.vehicleType})` : ""
+                    baseOptions.push({
+                        value: selectedDeliveryPersonId,
+                        label: `Dudit · ${driverName}${vehicleType}`,
+                    })
+                }
+            }
+        }
+        return baseOptions
+    }, [deliveryPeople, selectedDeliveryPersonId, platformDriver])
 
     const handleSave = async () => {
         if (selectedOrderIds.length === 0 || !date || !time) return
@@ -715,13 +744,7 @@ export default function CreateDeliveryPage({
                                                                     label="Entregador"
                                                                     value={selectedDeliveryPersonId || "none"}
                                                                     setValue={(value) => setSelectedDeliveryPersonId(value === "none" ? "" : value)}
-                                                                    options={[
-                                                                        { value: "none", label: "Entrega própria" },
-                                                                        ...deliveryPeople.map((person) => ({
-                                                                            value: person.id,
-                                                                            label: `${person.fullName}${person.source === "platform" ? " · Dudit" : ""}`,
-                                                                        })),
-                                                                    ]}
+                                                                    options={deliveryPeopleOptions}
                                                                     onFocus={() => {
                                                                         void loadDeliveryPeople()
                                                                     }}
@@ -773,13 +796,7 @@ export default function CreateDeliveryPage({
                                                             label="Entregador"
                                                             value={selectedDeliveryPersonId || "none"}
                                                             setValue={(value) => setSelectedDeliveryPersonId(value === "none" ? "" : value)}
-                                                            options={[
-                                                                { value: "none", label: "Entrega própria" },
-                                                                ...deliveryPeople.map((person) => ({
-                                                                    value: person.id,
-                                                                    label: `${person.fullName}${person.source === "platform" ? " · Dudit" : ""}`,
-                                                                })),
-                                                            ]}
+                                                            options={deliveryPeopleOptions}
                                                             onFocus={() => {
                                                                 void loadDeliveryPeople()
                                                             }}
@@ -969,8 +986,12 @@ export default function CreateDeliveryPage({
                                         })
                                         if (filteredItems.length === 0) {
                                             return (
-                                                <div className="p-5 text-sm text-brand-inactive-text border border-brand-border dark:border-dark-border rounded-2xl">
-                                                    Nenhum item detalhado foi retornado para o pedido selecionado.
+                                                <div className="flex items-center justify-center">
+                                                    <IconPlaceholder
+                                                        icon={BoxIcon}
+                                                        title="Sem itens por aqui"
+                                                        subtitle="Nenhum item detalhado foi retornado para o pedido selecionado."
+                                                    />
                                                 </div>
                                             )
                                         }
@@ -1055,8 +1076,14 @@ export default function CreateDeliveryPage({
                 orderId={selectedOrderIds[0] || undefined}
                 destinationAddress={customerAddress ? `${customerAddress.street}, ${customerAddress.number || "S/N"} - ${customerAddress.neighborhood}, ${customerAddress.city}` : undefined}
                 deliveryFee={primaryOrder?.deliveryFee}
-                onDeliveryRequested={() => setSelectedDeliveryPersonId("platform:dudit_network")}
-                onSelect={(driverId) => setSelectedDeliveryPersonId(driverId)}
+                onDeliveryRequested={() => {
+                    setPlatformDriver({ id: "dudit_network", fullName: "Rede de Entregadores Dudit", isPlatformDriver: true })
+                    setSelectedDeliveryPersonId("platform:dudit_network")
+                }}
+                onSelect={(driverId: string, driver?: any) => {
+                    if (driver) setPlatformDriver(driver)
+                    setSelectedDeliveryPersonId(driverId)
+                }}
             />
 
             <AlertModal

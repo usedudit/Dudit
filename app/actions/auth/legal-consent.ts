@@ -15,6 +15,7 @@ import {
   type LegalConsentOrigin,
   type LegalDocumentType,
 } from "@/lib/legal/constants"
+import { getTrustedClientIP } from "@/lib/security/client-ip"
 
 const recordConsentSchema = z.object({
   tipo: z.enum(["terms", "privacy"]),
@@ -85,10 +86,7 @@ export async function recordLegalConsent(input: {
   }
 
   const headerList = await headers()
-  const ip =
-    headerList.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    headerList.get("x-real-ip") ||
-    null
+  const ip = getTrustedClientIP(headerList)
   const userAgent = headerList.get("user-agent") || null
 
   const { error } = await admin.from("user_legal_consents").insert({
@@ -183,10 +181,7 @@ export async function ensureLegalConsents(
   const docByKey = new Map((documents ?? []).map((d) => [`${d.tipo}:${d.versao}`, d]))
 
   const headerList = await headers()
-  const ip =
-    headerList.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    headerList.get("x-real-ip") ||
-    null
+  const ip = getTrustedClientIP(headerList)
   const userAgent = headerList.get("user-agent") || null
 
   const rows = pending.map((p) => {

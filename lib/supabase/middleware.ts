@@ -2,6 +2,8 @@ import "server-only"
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 import { RateLimitCategory, getLimiter, RATE_LIMIT_CONFIGS } from "@/lib/rate-limiter"
+import { isAllowedServerActionOrigin } from "@/lib/security/origin-validation"
+import { getTrustedClientIP } from "@/lib/security/client-ip"
 
 // ============================================================================
 // CONFIGURAÇÃO DE ROTAS
@@ -48,20 +50,6 @@ export async function middleware(request: NextRequest) {
   // Remove hardcoded host overrides to prevent routing inconsistencies
   // request.headers.set("host", "dudit.com.br")
   // request.headers.set("x-forwarded-host", "dudit.com.br")
-
-  // 🚀 EARLY EXIT pra HEAD requests
-  if (request.method === "HEAD") {
-    return NextResponse.next()
-  }
-
-  // 🚀 Ignora prefetch (Next.js)
-  const isPrefetch =
-    request.headers.get("purpose") === "prefetch" ||
-    request.headers.get("next-router-prefetch")
-
-  if (isPrefetch) {
-    return NextResponse.next()
-  }
 
   // ============================================================================
   // CUSTOM EXPLORE REDIRECTS (SEO & Navigation Simplification)
@@ -139,13 +127,10 @@ export async function middleware(request: NextRequest) {
     const origin = request.headers.get("origin")
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br"
 
-    // In development, allow localhost origins
-    const isDev = process.env.NODE_ENV === "development"
-
     if (!origin) {
       // Missing Origin on a POST = suspicious (browsers always send it).
       // Block unless it's a same-origin non-browser call (e.g., test runners in dev).
-      if (!isDev) {
+      if (process.env.NODE_ENV !== "development") {
         console.warn(`[MIDDLEWARE] CSRF: Blocked server action without Origin header on ${pathname}`)
         return new NextResponse(
           JSON.stringify({ error: "Requisição bloqueada: cabeçalho Origin ausente." }),
@@ -154,20 +139,14 @@ export async function middleware(request: NextRequest) {
       }
     } else {
       try {
-        const originHost = new URL(origin).host
-        const expectedHost = new URL(appUrl).host
-        const requestHost = request.headers.get("x-forwarded-host") || request.headers.get("host")
-        const isLoopbackOrigin = originHost.startsWith("localhost") || originHost.startsWith("127.0.0.1") || originHost.startsWith("0.0.0.0")
-        const isAllowedOrigin =
-          originHost === expectedHost ||
-          (!!requestHost && originHost === requestHost) ||
-          (!!requestHost && originHost.replace(/^www\./, '') === requestHost.replace(/^www\./, '')) ||
-          (!!expectedHost && originHost.replace(/^www\./, '') === expectedHost.replace(/^www\./, '')) ||
-          isLoopbackOrigin ||
-          (isDev && isLoopbackOrigin)
+        const isAllowedOrigin = isAllowedServerActionOrigin(
+          origin,
+          appUrl,
+          process.env.NODE_ENV === "development",
+        )
 
         if (!isAllowedOrigin) {
-          console.warn(`[MIDDLEWARE] CSRF: Blocked cross-origin server action. Origin: ${origin}, Expected: ${expectedHost}, RequestHost: ${requestHost}`)
+          console.warn(`[MIDDLEWARE] CSRF: Blocked cross-origin server action. Origin: ${origin}`)
           return new NextResponse(
             JSON.stringify({ error: "Requisição bloqueada: origem não autorizada." }),
             { status: 403, headers: { "Content-Type": "application/json" } }
@@ -187,10 +166,7 @@ export async function middleware(request: NextRequest) {
   // Platform-provided request.ip is preferred; proxy headers are accepted
   // only when the deployment explicitly sits behind a trusted proxy.
   const platformIp = (request as NextRequest & { ip?: string }).ip
-  const trustedProxyIp = process.env.TRUSTED_PROXY_HEADERS === "true"
-    ? request.headers.get("cf-connecting-ip") || request.headers.get("x-real-ip")
-    : null
-  const ip = platformIp || trustedProxyIp || "unknown"
+  const ip = getTrustedClientIP(request.headers, platformIp)
 
   // 1. RATE LIMITING (APIs e Auth POST)
   // Uses category-based system with explicit limits. Exempts routes with custom rate limits.

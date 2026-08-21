@@ -130,6 +130,13 @@ export async function createDeliveryDriverInvitationAdminAction(input: {
   neighborhood: string
   vehicleType: DeliveryDriverVehicle
   notes?: string
+  zipCode?: string
+  street?: string
+  number?: string
+  complement?: string
+  state?: string
+  latitude?: number | null
+  longitude?: number | null
 }) {
   const adminUser = await requireAdmin("admin")
   const email = clean(input.email, 254).toLowerCase()
@@ -138,6 +145,14 @@ export async function createDeliveryDriverInvitationAdminAction(input: {
   const city = clean(input.city, 100)
   const neighborhood = clean(input.neighborhood, 100)
   const notes = clean(input.notes, 500) || null
+  const zipCode = clean(input.zipCode, 20) || null
+  const street = clean(input.street, 255) || null
+  const number = clean(input.number, 50) || null
+  const complement = clean(input.complement, 100) || null
+  const state = clean(input.state, 10) || null
+  const latitude = typeof input.latitude === "number" && !isNaN(input.latitude) ? input.latitude : null
+  const longitude = typeof input.longitude === "number" && !isNaN(input.longitude) ? input.longitude : null
+
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { success: false as const, error: "Email inválido." }
   if (!fullName || !phone || !city || !neighborhood) return { success: false as const, error: "Preencha nome, telefone, cidade e bairro." }
   if (!(["moto", "carro"] as string[]).includes(input.vehicleType)) return { success: false as const, error: "Veículo inválido." }
@@ -164,6 +179,13 @@ export async function createDeliveryDriverInvitationAdminAction(input: {
     neighborhood,
     vehicle_type: input.vehicleType,
     notes,
+    zip_code: zipCode,
+    street,
+    number,
+    complement,
+    state,
+    latitude,
+    longitude,
     created_by: adminUser.userId,
     expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
   }).select("id").single()
@@ -203,10 +225,25 @@ export async function updateDeliveryDriverAdminAction(input: {
   vehicleType: DeliveryDriverVehicle
   isActive: boolean
   notes?: string
+  zipCode?: string
+  street?: string
+  number?: string
+  complement?: string
+  state?: string
+  latitude?: number | null
+  longitude?: number | null
 }) {
   const adminUser = await requireAdmin("admin")
   const city = clean(input.city, 100)
   const neighborhood = clean(input.neighborhood, 100)
+  const zipCode = clean(input.zipCode, 20) || null
+  const street = clean(input.street, 255) || null
+  const number = clean(input.number, 50) || null
+  const complement = clean(input.complement, 100) || null
+  const state = clean(input.state, 10) || null
+  const latitude = typeof input.latitude === "number" && !isNaN(input.latitude) ? input.latitude : null
+  const longitude = typeof input.longitude === "number" && !isNaN(input.longitude) ? input.longitude : null
+
   if (!input.driverId || !city || !neighborhood || !(["moto", "carro"] as string[]).includes(input.vehicleType)) {
     return { success: false as const, error: "Dados do entregador inválidos." }
   }
@@ -217,6 +254,13 @@ export async function updateDeliveryDriverAdminAction(input: {
     vehicle_type: input.vehicleType,
     is_active: !!input.isActive,
     notes: clean(input.notes, 500) || null,
+    zip_code: zipCode,
+    street,
+    number,
+    complement,
+    state,
+    latitude,
+    longitude,
     updated_at: new Date().toISOString(),
   }
   if (!input.isActive) patch.availability_status = "offline"

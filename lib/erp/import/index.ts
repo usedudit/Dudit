@@ -1,10 +1,12 @@
 export { readSpreadsheet, ImportReadError } from "./reader"
-export { suggestMapping } from "./mapper"
+export { suggestMapping, validateMappingCompatibility } from "./mapper"
 export { detectEntity } from "./entity-detector"
 export { generatePreview } from "./preview"
 export { executeImport } from "./batch-importer"
 export { createImportSession, getImportSession, deleteImportSession } from "./session"
-export { getFieldsForEntity } from "./field-registry"
+export { getFieldsForEntity, getFieldByName, getRequiredFields } from "./field-registry"
+export { generateImportTemplate } from "./template-generator"
+export { generateFailedRowsReport } from "./error-reporter"
 export type {
   EntityType,
   FieldDef,
@@ -14,4 +16,7 @@ export type {
   PreviewSummary,
   ImportResult,
   ImportSession,
+  ImportOptions,
+  FailedRow,
+  SemanticFieldType,
 } from "./types"

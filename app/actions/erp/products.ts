@@ -16,6 +16,7 @@ import {
 import { TAGS } from "@/lib/utils/revalidation-tags"
 import { AUTH_MESSAGES } from "@/lib/constants/messages"
 import { errorResponse, successResponse } from "@/lib/utils/action-helpers"
+import { getTrustedClientIP } from "@/lib/security/client-ip"
 import type { ActionResponse } from "@/lib/types/action-response"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
@@ -208,7 +209,7 @@ export async function deleteProductAction(productId: string, reason?: string | n
 
         // 2. Fetch IP and write to audit logs (logAuditEvent)
         const reqHeaders = await headers()
-        const ip = reqHeaders.get("x-forwarded-for") || "127.0.0.1"
+        const ip = getTrustedClientIP(reqHeaders)
 
         await logAuditEvent({
             partnerId: product.partner_id,
@@ -248,7 +249,7 @@ export async function restoreProductAction(productId: string) {
 
         // 2. Fetch IP and write to audit logs
         const reqHeaders = await headers()
-        const ip = reqHeaders.get("x-forwarded-for") || "127.0.0.1"
+        const ip = getTrustedClientIP(reqHeaders)
 
         await logAuditEvent({
             partnerId: product.partner_id,
@@ -285,7 +286,7 @@ export async function archiveProductAction(productId: string) {
         if (error) return { error: error.message }
 
         const reqHeaders = await headers()
-        const ip = reqHeaders.get("x-forwarded-for") || "127.0.0.1"
+        const ip = getTrustedClientIP(reqHeaders)
 
         await logAuditEvent({
             partnerId: product.partner_id,
@@ -321,7 +322,7 @@ export async function unarchiveProductAction(productId: string) {
         if (error) return { error: error.message }
 
         const reqHeaders = await headers()
-        const ip = reqHeaders.get("x-forwarded-for") || "127.0.0.1"
+        const ip = getTrustedClientIP(reqHeaders)
 
         await logAuditEvent({
             partnerId: product.partner_id,
@@ -1988,7 +1989,7 @@ export async function deleteProductsInBatchAction(productIds: string[], reason?:
 
         // 2. Log audit event for each product in batch
         const reqHeaders = await headers()
-        const ip = reqHeaders.get("x-forwarded-for") || "127.0.0.1"
+        const ip = getTrustedClientIP(reqHeaders)
 
         if (products?.length) {
             for (const p of products) {

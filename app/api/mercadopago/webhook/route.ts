@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/server"
 import { createHmac, timingSafeEqual } from "crypto"
 import { SecureLogger } from "@/lib/secure-logger"
 import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
+import { getMpPlatformAccessToken } from "@/lib/services/mercadopago/subscriptions"
 import { formatPaymentMethodLabel } from "@/lib/payments/payment-method"
 import { captureError } from "@/lib/monitoring/sentry"
 
@@ -307,8 +308,29 @@ async function processWebhookWithRetry(
       }
     }
 
-    if (!paymentInfo || !partnerId) {
-      console.error("[WEBHOOK] Could not fetch payment data or resolve partner")
+    // Fallback: SaaS subscription manual payments (PIX) are created with the
+    // PLATFORM token, so no partner token can fetch them. Try the platform token
+    // so the SaaS subscription reactivation path below can match by external_reference.
+    if (!paymentInfo) {
+      try {
+        const platformToken = await getMpPlatformAccessToken()
+        const mpResponse = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+          headers: { Authorization: `Bearer ${platformToken}` },
+        })
+
+        if (mpResponse.ok) {
+          paymentInfo = await mpResponse.json()
+          console.log(`[WEBHOOK] Payment data fetched via platform token, MP status: ${paymentInfo.status}`)
+        } else {
+          console.warn(`[WEBHOOK] Platform token fetch returned ${mpResponse.status} for payment ${paymentId}`)
+        }
+      } catch (err: any) {
+        console.warn("[WEBHOOK] Failed to fetch payment via platform token:", err.message)
+      }
+    }
+
+    if (!paymentInfo) {
+      console.error("[WEBHOOK] Could not fetch payment data from Mercado Pago")
       if (attempt < MAX_RETRIES - 1) {
         await new Promise((resolve) => setTimeout(resolve, 2000))
         return processWebhookWithRetry(body, requestId, attempt + 1)
@@ -320,16 +342,18 @@ async function processWebhookWithRetry(
     }
 
     // Check if partner is undergoing account deletion
-    const { data: deletion } = await supabase
-      .from("account_deletions")
-      .select("status")
-      .eq("partner_id", partnerId)
-      .not("status", "eq", "completed")
-      .maybeSingle()
+    if (partnerId) {
+      const { data: deletion } = await supabase
+        .from("account_deletions")
+        .select("status")
+        .eq("partner_id", partnerId)
+        .not("status", "eq", "completed")
+        .maybeSingle()
 
-    if (deletion) {
-      console.log(`[WEBHOOK] Partner ${partnerId} is in deletion phase (${deletion.status}) - ignoring webhook payment processing`)
-      return
+      if (deletion) {
+        console.log(`[WEBHOOK] Partner ${partnerId} is in deletion phase (${deletion.status}) - ignoring webhook payment processing`)
+        return
+      }
     }
 
     // Intercept subscription preapproval payments
@@ -396,8 +420,11 @@ async function processWebhookWithRetry(
       if (saasSubscription) {
         console.log(`[WEBHOOK] Found SaaS subscription ${saasSubscription.id} for payment ${paymentId}`)
         
-        // Verify partner matches
-        if (saasSubscription.partner_id !== partnerId) {
+        // Platform-created PIX payments have no partner token, so the partner
+        // is only known after resolving the subscription. Verify match when
+        // partnerId was resolved from a partner token, otherwise trust the subscription.
+        const effectivePartnerId = partnerId || saasSubscription.partner_id
+        if (effectivePartnerId !== saasSubscription.partner_id) {
           console.warn(`[WEBHOOK] Partner mismatch for SaaS subscription payment`)
         } else if (paymentInfo.status === "approved" && saasSubscription.status === "past_due") {
           // Reactivate subscription
@@ -469,6 +496,19 @@ async function processWebhookWithRetry(
         }
         return
       }
+    }
+
+    // Not a SaaS subscription payment: the order flow requires a resolved partner.
+    if (!partnerId) {
+      console.error("[WEBHOOK] Could not resolve partner for payment")
+      if (attempt < MAX_RETRIES - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 2000))
+        return processWebhookWithRetry(body, requestId, attempt + 1)
+      }
+      SecureLogger.error("[WEBHOOK] Failed to resolve partner after all retries", {
+        paymentId: paymentId.toString(),
+      })
+      return
     }
 
     // ── Find order in DB ──

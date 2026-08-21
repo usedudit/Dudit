@@ -1,26 +1,13 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
-import { usePathname, useRouter } from "next/navigation"
+import { useState, useEffect, useRef, useCallback } from "react"
+import { usePathname } from "next/navigation"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
-import {
-    TruckIcon,
-    Package,
-    CheckCircleIcon,
-    MoonIcon,
-    SunIcon,
-    LogoutIcon,
-    UserIcon,
-    ChevronLeftIcon,
-    MenuIcon,
-    XIcon,
-} from "@/lib/icons"
+import { TruckIcon, Package, XIcon, ChevronRightIcon } from "@/lib/icons"
 import * as TooltipPrimitive from "@radix-ui/react-tooltip"
-import { motion, AnimatePresence } from "framer-motion"
-import { useTheme } from "next-themes"
-import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
-import { getUserInitials, getAvatarColor } from "@/lib/utils/UserProfileImage"
+import { useSidebar } from "@/lib/sidebar-context"
+import { Drawer } from "vaul"
 import { setMyDeliveryAvailabilityAction } from "@/app/actions/delivery-drivers"
 import { toast } from "@/hooks/use-notification"
 
@@ -28,7 +15,6 @@ interface NavItem {
     icon: any
     label: string
     href: string
-    badge?: string
 }
 
 const navItems: NavItem[] = [
@@ -52,19 +38,56 @@ export function DeliverySidebar({
     initialOnline?: boolean
 }) {
     const pathname = usePathname()
-    const router = useRouter()
-    const { theme, setTheme } = useTheme()
-    const [isCollapsed, setIsCollapsed] = useState(false)
-    const [isMobileOpen, setIsMobileOpen] = useState(false)
+    const { isExpanded, toggleSidebar, isMobileOpen, setIsMobileOpen } = useSidebar()
+    const isCollapsed = !isExpanded
+
+    const [isMounted, setIsMounted] = useState(false)
+
+    // Controle de Hover com Delay
+    const [hoveredItem, setHoveredItem] = useState<string | null>(null)
+    const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+    const sidebarRef = useRef<HTMLDivElement>(null)
+
+    // Disponibilidade do entregador
     const [isOnline, setIsOnline] = useState(initialOnline)
     const [isTogglingAvailability, setIsTogglingAvailability] = useState(false)
 
-    const userName = userProfile?.fullName || "Entregador"
-    const userEmail = userProfile?.email || ""
-    const userInitials = getUserInitials(userName)
-    const avatarColor = getAvatarColor(userName)
+    const isActivePath = useCallback((href: string) => {
+        if (!pathname) return false
+        if (pathname === href) return true
+        return pathname.startsWith(href + "/")
+    }, [pathname])
+
+    useEffect(() => {
+        setIsMounted(true)
+    }, [])
+
+    useEffect(() => {
+        if (isCollapsed) {
+            setHoveredItem(null)
+        }
+    }, [isCollapsed])
+
+    // Lógica de Hover com Delay
+    const handleMouseEnter = (label: string) => {
+        if (!isCollapsed) return
+        if (hoverTimeoutRef.current) {
+            clearTimeout(hoverTimeoutRef.current)
+            hoverTimeoutRef.current = null
+        }
+        setHoveredItem(label)
+    }
+
+    const handleMouseLeave = () => {
+        if (!isCollapsed) return
+        hoverTimeoutRef.current = setTimeout(() => {
+            setHoveredItem(null)
+        }, 150) // 150ms de tolerância
+    }
 
     const handleToggleAvailability = async () => {
+        if (isTogglingAvailability) return
         setIsTogglingAvailability(true)
         const nextStatus = isOnline ? "offline" : "available"
         try {
@@ -82,249 +105,222 @@ export function DeliverySidebar({
         }
     }
 
-    const handleSignOut = async () => {
-        document.cookie = "dudit_city=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;"
-        localStorage.removeItem("dudit_city")
-        await supabase.auth.signOut({ scope: "local" })
-        window.location.href = "/auth/login"
-    }
+    if (!isMounted) return null
 
-    const isActiveRoute = (href: string) => {
-        if (href === "/entregadores") {
-            return pathname === "/entregadores" || pathname.startsWith("/entregadores/entregas")
-        }
-        return pathname === href || pathname.startsWith(href)
-    }
+    // Cores Forçadas do Dark Mode
+    const activeClasses = "bg-brand-green/10 text-brand-green font-medium"
+    const inactiveClasses = "text-brand-inactive-text hover:text-white hover:bg-white/5"
 
-    const sidebarContent = (
-        <div className="flex h-full flex-col justify-between overflow-hidden bg-white dark:bg-dark-surface border-r border-brand-border dark:border-dark-border select-none">
-            {/* TOP HEADER / BRAND */}
-            <div>
-                <div className={cn("flex items-center justify-between border-b border-brand-border px-4 py-3.5 dark:border-dark-border", isCollapsed ? "justify-center px-2" : "px-4")}>
-                    <Link
-                        href="/entregadores"
-                        className={cn("flex items-center gap-2.5 overflow-hidden transition-all", isCollapsed && "justify-center")}
-                    >
-                        <img
-                            src="https://img.dudit.com.br/static/Logo.png"
-                            alt="Dudit"
-                            className="h-7 w-auto shrink-0"
-                        />
-                        {!isCollapsed && (
-                            <div className="flex flex-col">
-                                <span className="font-bold text-sm text-brand-dark dark:text-dark-heading leading-tight">
-                                    Dudit Entregas
-                                </span>
-                                <span className="text-[11px] font-semibold text-brand-green">
-                                    Portal do Entregador
-                                </span>
-                            </div>
-                        )}
+    return (
+        <TooltipPrimitive.Provider delayDuration={0}>
+            <div
+                className={cn(
+                    "fixed inset-0 bg-slate-900/50 z-40 md:hidden transition-opacity duration-200",
+                    isMobileOpen ? "opacity-100" : "opacity-0 pointer-events-none",
+                )}
+                aria-hidden="true"
+                onClick={() => setIsMobileOpen(false)}
+            />
+
+            <div
+                ref={sidebarRef}
+                className={cn(
+                    "flex flex-col fixed z-[120] left-0 top-0 h-screen border-r hidden md:flex",
+                    "bg-brand-dark border-dark-border",
+                    "transition-[width] duration-300 ease-in-out",
+                    "md:relative md:translate-x-0 md:z-[100]", // Ensure z-index works on desktop by changing from static to relative
+                    isCollapsed ? "md:w-[68px]" : "md:w-64",
+                    isMobileOpen ? "translate-x-0 w-64" : "-translate-x-full w-64",
+                )}
+            >
+                <div className="h-[65px] flex items-center px-3 overflow-hidden shrink-0 relative transition-all duration-300">
+                    <Link href="/entregadores" prefetch={false} className="flex items-center gap-3 w-full h-full relative">
+                        <div className="flex items-center justify-center shrink-0 w-[44px]">
+                            <img
+                                src="https://img.dudit.com.br/static/Icon.png"
+                                alt="Dudit"
+                                className="h-8 w-auto object-contain transition-all duration-300"
+                            />
+                        </div>
+                        <div
+                            className={cn(
+                                "transition-all duration-300 ease-in-out overflow-hidden flex items-center",
+                                isCollapsed ? "max-w-0 opacity-0" : "max-w-[150px] opacity-100"
+                            )}
+                        >
+                            <img
+                                src="https://img.dudit.com.br/static/Logo.png"
+                                alt="Dudit Logo"
+                                className="h-8 w-auto object-contain"
+                            />
+                        </div>
                     </Link>
 
-                    {/* COLLAPSE TOGGLE (DESKTOP) */}
-                    <button
-                        type="button"
-                        onClick={() => setIsCollapsed(!isCollapsed)}
-                        className="hidden md:flex h-7 w-7 items-center justify-center rounded-lg text-brand-inactive-text hover:bg-brand-gray hover:text-brand-dark dark:hover:bg-dark-border dark:hover:text-white transition-colors cursor-pointer"
-                        title={isCollapsed ? "Expandir menu" : "Recolher menu"}
-                    >
-                        <ChevronLeftIcon className={cn("w-4 h-4 transition-transform duration-200", isCollapsed && "rotate-180")} />
+                    <button className="md:hidden absolute right-2" onClick={() => setIsMobileOpen(false)}>
+                        <XIcon className="w-6 h-6 text-brand-inactive-text dark:text-dark-body" />
                     </button>
                 </div>
 
-                {/* DRIVER PROFILE / AVAILABILITY STATUS */}
-                <div className={cn("p-3 border-b border-brand-border dark:border-dark-border bg-gray-50/50 dark:bg-dark-border/10", isCollapsed && "p-2")}>
-                    {!isCollapsed ? (
-                        <div className="space-y-2.5">
-                            <div className="flex items-center gap-3">
-                                <div className={cn("w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-xs shrink-0 shadow-xs", avatarColor)}>
-                                    {userInitials}
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                    <p className="font-bold text-xs text-brand-dark dark:text-dark-heading truncate">
-                                        {userName}
-                                    </p>
-                                    <p className="text-[11px] text-brand-inactive-text dark:text-dark-body truncate">
-                                        {userEmail}
-                                    </p>
-                                </div>
-                            </div>
-
-                            {/* ONLINE / OFFLINE TOGGLE */}
-                            <button
-                                type="button"
-                                onClick={handleToggleAvailability}
-                                disabled={isTogglingAvailability}
-                                className={cn(
-                                    "w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border shadow-2xs",
-                                    isOnline
-                                        ? "bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-950/20 dark:border-emerald-800 dark:text-emerald-300"
-                                        : "bg-gray-100 border-gray-200 text-gray-600 dark:bg-dark-border/40 dark:border-dark-border dark:text-dark-body"
-                                )}
-                            >
-                                <div className="flex items-center gap-2">
-                                    <span className={cn("w-2.5 h-2.5 rounded-full shrink-0", isOnline ? "bg-emerald-500 animate-pulse" : "bg-gray-400")} />
-                                    <span>{isOnline ? "Online (Recebendo)" : "Offline (Pausado)"}</span>
-                                </div>
-                                <span className="text-[10px] uppercase font-extrabold opacity-75">
-                                    {isOnline ? "Ativo" : "Inativo"}
-                                </span>
-                            </button>
-                        </div>
-                    ) : (
-                        <button
-                            type="button"
-                            onClick={handleToggleAvailability}
-                            disabled={isTogglingAvailability}
-                            className="w-full flex justify-center py-2 cursor-pointer"
-                            title={isOnline ? "Status: Online" : "Status: Offline"}
-                        >
-                            <span className={cn("w-3 h-3 rounded-full", isOnline ? "bg-emerald-500 ring-4 ring-emerald-100 dark:ring-emerald-900/40" : "bg-gray-400")} />
-                        </button>
-                    )}
+                <div className="px-3 mb-2">
+                    <div className="h-px w-full bg-dark-border" />
                 </div>
 
-                {/* NAVIGATION ITEMS */}
-                <nav className="p-2 space-y-1">
-                    <TooltipPrimitive.Provider delayDuration={100}>
+                <button
+                    onClick={toggleSidebar}
+                    className={cn(
+                        "hidden md:flex items-center justify-center absolute -right-3 top-8 z-50 w-6 h-6",
+                        "bg-dark-surface border border-dark-border rounded-full shadow-sm hover:bg-dark-border",
+                        "transition-transform duration-300",
+                    )}
+                >
+                    <ChevronRightIcon
+                        className={cn("w-3 h-3 transition-transform duration-300 text-brand-inactive-text dark:text-dark-body", isCollapsed ? "rotate-0" : "rotate-180")}
+                    />
+                </button>
+
+                <nav
+                    className={cn(
+                        "grow py-2 px-3",
+                        isCollapsed
+                            ? "overflow-visible"
+                            : "overflow-y-auto overflow-x-hidden scrollbar-hide"
+                    )}
+                    style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+                >
+                    <ul className="space-y-1">
                         {navItems.map((item) => {
-                            const active = isActiveRoute(item.href)
-                            const IconComponent = item.icon
+                            const Icon = item.icon
+                            const isDirectActive = isActivePath(item.href)
+                            const isActiveGroup = isDirectActive
 
-                            const linkElement = (
-                                <Link
-                                    key={item.href}
-                                    href={item.href}
-                                    className={cn(
-                                        "flex items-center gap-3 px-3 py-2.5 rounded-xl font-semibold text-sm transition-all duration-150 group relative cursor-pointer",
-                                        active
-                                            ? "bg-brand-green/10 text-brand-green font-bold dark:bg-brand-green/15 dark:text-emerald-400"
-                                            : "text-brand-inactive-text hover:bg-brand-gray hover:text-brand-dark dark:text-dark-body dark:hover:bg-dark-border dark:hover:text-white",
-                                        isCollapsed && "justify-center px-2"
-                                    )}
+                            return (
+                                <li
+                                    key={item.label}
+                                    className="relative group w-full"
+                                    onMouseEnter={() => handleMouseEnter(item.label)}
+                                    onMouseLeave={handleMouseLeave}
                                 >
-                                    <IconComponent className={cn("w-5 h-5 shrink-0 transition-transform duration-150 group-hover:scale-105", active && "text-brand-green dark:text-emerald-400")} />
-                                    {!isCollapsed && (
-                                        <span className="truncate">{item.label}</span>
-                                    )}
-                                    {active && (
-                                        <motion.div
-                                            layoutId="active-pill"
-                                            className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-brand-green rounded-r-full"
-                                        />
-                                    )}
-                                </Link>
-                            )
+                                    <div className="w-full">
+                                        <Link
+                                            href={item.href}
+                                            prefetch={false}
+                                            onClick={() => {
+                                                setIsMobileOpen(false)
+                                                setHoveredItem(null)
+                                            }}
+                                            className={cn(
+                                                "flex items-center rounded-lg transition-colors duration-200 group relative min-h-[44px] w-full justify-start",
+                                                isActiveGroup ? activeClasses : inactiveClasses
+                                            )}
+                                        >
+                                            <div className="w-[44px] h-[44px] flex items-center justify-center shrink-0">
+                                                <Icon
+                                                    className={cn(
+                                                        "w-[20px] h-[20px] transition-colors",
+                                                        isActiveGroup ? "text-brand-green" : "text-current"
+                                                    )}
+                                                />
+                                            </div>
 
-                            if (isCollapsed) {
-                                return (
-                                    <TooltipPrimitive.Root key={item.href}>
-                                        <TooltipPrimitive.Trigger asChild>
-                                            {linkElement}
-                                        </TooltipPrimitive.Trigger>
-                                        <TooltipPrimitive.Portal>
-                                            <TooltipPrimitive.Content
-                                                side="right"
-                                                sideOffset={8}
-                                                className="z-50 rounded-lg bg-brand-dark px-3 py-1.5 text-xs font-bold text-white shadow-md dark:bg-dark-surface dark:text-white border border-brand-border/20"
+                                            <span
+                                                className={cn(
+                                                    "text-[14px] font-medium whitespace-nowrap overflow-hidden transition-all duration-300 ease-in-out origin-left flex-1 text-left",
+                                                    isCollapsed
+                                                        ? "max-w-0 md:opacity-0 translate-x-[-10px] md:block hidden"
+                                                        : "max-w-[150px] opacity-100 translate-x-0",
+                                                )}
                                             >
                                                 {item.label}
-                                                <TooltipPrimitive.Arrow className="fill-brand-dark dark:fill-dark-surface" />
-                                            </TooltipPrimitive.Content>
-                                        </TooltipPrimitive.Portal>
-                                    </TooltipPrimitive.Root>
-                                )
-                            }
-
-                            return linkElement
+                                            </span>
+                                        </Link>
+                                    </div>
+                                </li>
+                            )
                         })}
-                    </TooltipPrimitive.Provider>
+                    </ul>
                 </nav>
-            </div>
 
-            {/* BOTTOM / FOOTER ACTIONS */}
-            <div className={cn("p-2 border-t border-brand-border dark:border-dark-border space-y-1", isCollapsed && "p-1.5")}>
-                {/* THEME TOGGLE */}
-                <button
-                    type="button"
-                    onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                    className={cn(
-                        "w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium text-brand-inactive-text hover:bg-brand-gray hover:text-brand-dark dark:text-dark-body dark:hover:bg-dark-border dark:hover:text-white transition-colors cursor-pointer",
-                        isCollapsed && "justify-center px-2"
-                    )}
-                    title="Alternar tema claro/escuro"
-                >
-                    {theme === "dark" ? <SunIcon className="w-4 h-4 text-amber-400 shrink-0" /> : <MoonIcon className="w-4 h-4 shrink-0" />}
-                    {!isCollapsed && <span>{theme === "dark" ? "Modo claro" : "Modo escuro"}</span>}
-                </button>
-
-                {/* SIGN OUT */}
-                <button
-                    type="button"
-                    onClick={handleSignOut}
-                    className={cn(
-                        "w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium text-brand-red hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors cursor-pointer",
-                        isCollapsed && "justify-center px-2"
-                    )}
-                    title="Sair da sessão"
-                >
-                    <LogoutIcon className="w-4 h-4 shrink-0 text-brand-red" />
-                    {!isCollapsed && <span>Sair da conta</span>}
-                </button>
-            </div>
-        </div>
-    )
-
-    return (
-        <>
-            {/* DESKTOP SIDEBAR */}
-            <aside
-                className={cn(
-                    "hidden md:block h-screen shrink-0 transition-all duration-300 ease-in-out sticky top-0 z-40",
-                    isCollapsed ? "w-16" : "w-64"
-                )}
-            >
-                {sidebarContent}
-            </aside>
-
-            {/* MOBILE FLOATING MENU TRIGGER */}
-            <div className="md:hidden fixed bottom-4 right-4 z-40">
-                <button
-                    type="button"
-                    onClick={() => setIsMobileOpen(true)}
-                    className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-green text-white shadow-lg hover:bg-brand-green/90 transition-transform active:scale-95 cursor-pointer"
-                    aria-label="Abrir menu"
-                >
-                    <MenuIcon size={22} />
-                </button>
-            </div>
-
-            {/* MOBILE DRAWER */}
-            {isMobileOpen && (
-                <div
-                    className="md:hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-xs transition-opacity"
-                    onClick={() => setIsMobileOpen(false)}
-                >
-                    <div
-                        className="fixed left-0 top-0 bottom-0 w-72 bg-white dark:bg-dark-surface shadow-2xl transition-transform"
-                        onClick={(e) => e.stopPropagation()}
+                {/* STATUS / DISPONIBILIDADE DO ENTREGADOR */}
+                <div className="px-3 pb-3 shrink-0">
+                    <button
+                        onClick={handleToggleAvailability}
+                        disabled={isTogglingAvailability}
+                        className={cn(
+                            "w-full flex items-center rounded-lg transition-colors duration-200 relative min-h-[44px]",
+                            "text-brand-inactive-text hover:bg-white/5",
+                            isCollapsed ? "justify-center" : "justify-start px-1",
+                        )}
+                        title={isOnline ? "Você está Online (recebendo entregas)" : "Você está Offline (pausado)"}
                     >
-                        <div className="flex justify-end p-2 border-b border-brand-border dark:border-dark-border">
-                            <button
-                                type="button"
-                                onClick={() => setIsMobileOpen(false)}
-                                className="p-2 text-brand-inactive-text hover:bg-brand-gray dark:hover:bg-dark-border rounded-lg cursor-pointer"
-                            >
-                                <XIcon size={20} />
-                            </button>
+                        <div className="w-[44px] h-[44px] flex items-center justify-center shrink-0">
+                            <span className={cn("w-3 h-3 rounded-full shrink-0", isOnline ? "bg-emerald-500 animate-pulse" : "bg-gray-400")} />
                         </div>
-                        <div className="h-[calc(100%-48px)]">
-                            {sidebarContent}
-                        </div>
-                    </div>
+                        {!isCollapsed && (
+                            <span className="flex-1 flex flex-col text-left min-w-0">
+                                <span className="text-[13px] font-semibold text-white truncate">
+                                    {isOnline ? "Online (Recebendo)" : "Offline (Pausado)"}
+                                </span>
+                                <span className="text-[11px] text-brand-inactive-text truncate">
+                                    {isOnline ? "Disponível para novas entregas" : "Toque para ficar disponível"}
+                                </span>
+                            </span>
+                        )}
+                    </button>
                 </div>
-            )}
-        </>
+            </div>
+
+            {/* MOBILE BOTTOM SHEET (VAUL) */}
+            <Drawer.Root open={isMobileOpen} onOpenChange={setIsMobileOpen}>
+                <Drawer.Portal>
+                    <Drawer.Overlay className="fixed inset-0 bg-black/40 z-50" />
+                    <Drawer.Content className="bg-brand-dark border-t border-dark-border flex flex-col rounded-t-[20px] h-[85vh] fixed bottom-0 left-0 right-0 z-60 outline-none">
+                        <div className="mx-auto w-12 h-1.5 shrink-0 rounded-full bg-dark-border mt-3 mb-2" />
+                        <div className="p-4 flex-1 overflow-y-auto no-scrollbar">
+                            <nav className="flex flex-col gap-1">
+                                {navItems.map((item) => {
+                                    const Icon = item.icon
+                                    const isActive = item.href ? isActivePath(item.href) : false
+
+                                    return (
+                                        <div key={item.label} className="flex flex-col">
+                                            <Link
+                                                href={item.href}
+                                                prefetch={false}
+                                                className={cn(
+                                                    "flex items-center gap-3 p-3 rounded-xl transition-colors relative",
+                                                    isActive ? activeClasses : inactiveClasses
+                                                )}
+                                                onClick={() => setIsMobileOpen(false)}
+                                            >
+                                                <Icon size={20} className={isActive ? "text-brand-green" : ""} />
+                                                <span className="text-[15px] font-medium flex-1 text-left">{item.label}</span>
+                                            </Link>
+                                        </div>
+                                    )
+                                })}
+                            </nav>
+
+                            {/* STATUS MOBILE */}
+                            <div className="mt-4 pt-4 border-t border-dark-border">
+                                <button
+                                    onClick={handleToggleAvailability}
+                                    disabled={isTogglingAvailability}
+                                    className={cn(
+                                        "w-full flex items-center gap-3 p-3 rounded-xl transition-colors",
+                                        "text-brand-inactive-text hover:bg-white/5",
+                                        isOnline ? "bg-emerald-500/10 text-emerald-300" : ""
+                                    )}
+                                >
+                                    <span className={cn("w-3 h-3 rounded-full shrink-0", isOnline ? "bg-emerald-500 animate-pulse" : "bg-gray-400")} />
+                                    <span className="text-[15px] font-medium flex-1 text-left">
+                                        {isOnline ? "Online (Recebendo entregas)" : "Offline (Pausado)"}
+                                    </span>
+                                </button>
+                            </div>
+                        </div>
+                    </Drawer.Content>
+                </Drawer.Portal>
+            </Drawer.Root>
+        </TooltipPrimitive.Provider>
     )
 }

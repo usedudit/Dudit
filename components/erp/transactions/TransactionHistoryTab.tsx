@@ -1,8 +1,8 @@
 "use client"
 
-import React from "react"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { HistoryTimeline, type HistoryEntry } from "@/components/erp/shared/HistoryTimeline"
+import { ThreeDotsLoader } from "@/components/reusable"
 
 interface TransactionHistoryTabProps {
     entries: HistoryEntry[]
@@ -12,9 +12,7 @@ interface TransactionHistoryTabProps {
 export function TransactionHistoryTab({ entries, loading = false }: TransactionHistoryTabProps) {
     if (loading) {
         return (
-            <div className="rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface p-6 text-sm text-brand-inactive-text dark:text-dark-body">
-                Carregando histórico...
-            </div>
+            <ThreeDotsLoader />
         )
     }
 

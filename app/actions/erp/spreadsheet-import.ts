@@ -15,9 +15,65 @@ import {
   executeImport,
   deleteImportSession,
   getFieldsForEntity,
+  generateImportTemplate,
+  generateFailedRowsReport,
+  validateMappingCompatibility,
 } from "@/lib/erp/import"
-import type { EntityType, ColumnMapping } from "@/lib/erp/import/types"
+import type { EntityType, ColumnMapping, ImportOptions, FailedRow } from "@/lib/erp/import/types"
 import { requireActivePartnerContext, requireAuthorizedPartnerContext } from "@/lib/services/authorized-customer-access"
+
+export async function downloadImportTemplateAction(
+  entityType: EntityType,
+): Promise<{
+  success: boolean
+  filename?: string
+  mimeType?: string
+  base64?: string
+  error?: string
+}> {
+  try {
+    await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+    const template = await generateImportTemplate(entityType)
+    return {
+      success: true,
+      filename: template.filename,
+      mimeType: template.mimeType,
+      base64: template.buffer.toString("base64"),
+    }
+  } catch (err: any) {
+    console.error("[downloadImportTemplateAction]", err)
+    return { success: false, error: err.message || "Erro ao gerar planilha modelo." }
+  }
+}
+
+export async function downloadFailedRowsAction(
+  entityType: EntityType,
+  headers: string[],
+  failedRows: FailedRow[],
+): Promise<{
+  success: boolean
+  filename?: string
+  mimeType?: string
+  base64?: string
+  error?: string
+}> {
+  try {
+    await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+    if (!failedRows || failedRows.length === 0) {
+      return { success: false, error: "Nenhuma linha com falha para exportar." }
+    }
+    const report = await generateFailedRowsReport(entityType, headers, failedRows)
+    return {
+      success: true,
+      filename: report.filename,
+      mimeType: report.mimeType,
+      base64: report.buffer.toString("base64"),
+    }
+  } catch (err: any) {
+    console.error("[downloadFailedRowsAction]", err)
+    return { success: false, error: err.message || "Erro ao gerar relatório de falhas." }
+  }
+}
 
 export async function uploadPlanilhaAction(
   formData: FormData,
@@ -29,7 +85,7 @@ export async function uploadPlanilhaAction(
   totalRows?: number
   fileName?: string
   suggestedMapping?: ColumnMapping[]
-  availableFields?: { name: string; label: string; required?: boolean }[]
+  availableFields?: { name: string; label: string; required?: boolean; type?: string; example?: string }[]
   previewProducts?: any[]
   error?: string
 }> {
@@ -58,9 +114,13 @@ export async function uploadPlanilhaAction(
     partnerId = access.partnerId
     const mapping = suggestMapping(readResult.headers, detectedEntity, readResult.rows)
     const fields = getFieldsForEntity(detectedEntity)
-    const availableFields = fields
-      .filter((f) => f.name !== "technical_specs")
-      .map((f) => ({ name: f.name, label: f.label, required: f.required }))
+    const availableFields = fields.map((f) => ({
+      name: f.name,
+      label: f.label,
+      required: f.required,
+      type: f.type,
+      example: f.example,
+    }))
 
     const sessionId = await createImportSession(partnerId, {
       entityType: detectedEntity,
@@ -107,6 +167,7 @@ export async function previewImportAction(
 ): Promise<{
   success: boolean
   preview?: any
+  validation?: { warnings: string[]; errors: string[]; missingRequired: string[] }
   error?: string
 }> {
   try {
@@ -119,9 +180,10 @@ export async function previewImportAction(
 
     await requirePermission(access.partnerId, session.entityType as any, "create", access.user)
 
+    const validation = validateMappingCompatibility(mapping, session.entityType, session.rows)
     const preview = await generatePreview(session, mapping)
 
-    return { success: true, preview }
+    return { success: true, preview, validation }
   } catch (err: any) {
     console.error("[previewImportAction]", err)
     return { success: false, error: err.message || "Erro ao gerar preview." }
@@ -132,7 +194,7 @@ export async function confirmImportAction(
   sessionId: string,
   partnerId: string,
   mapping: ColumnMapping[],
-  options: { skipDuplicates: boolean; skipErrors: boolean },
+  options: ImportOptions = {},
 ): Promise<{
   success: boolean
   result?: any
@@ -178,7 +240,7 @@ export async function confirmImportAction(
     await deleteImportSession(canonicalPartnerId, sessionId)
 
     if (status === "failed") {
-      return { success: false, error: result.errorMessage || "Nenhum dado pôde ser importado. Verifique os erros na planilha." }
+      return { success: false, error: result.errorMessage || "Nenhum dado pôde ser importado. Verifique os erros na planilha.", result }
     }
 
     return { success: true, result }
@@ -217,6 +279,7 @@ export async function applyMappingAction(
 ): Promise<{
   success: boolean
   previewProducts?: any[]
+  validation?: { warnings: string[]; errors: string[]; missingRequired: string[] }
   error?: string
 }> {
   try {
@@ -229,11 +292,13 @@ export async function applyMappingAction(
 
     await requirePermission(access.partnerId, session.entityType as any, "create", access.user)
 
+    const validation = validateMappingCompatibility(mapping, session.entityType, session.rows)
+
     const previewProducts = session.rows.slice(0, 50).map((row, i) =>
       rowToPreviewEntity(session.entityType, row, mapping, i)
     )
 
-    return { success: true, previewProducts }
+    return { success: true, previewProducts, validation }
   } catch (err: any) {
     console.error("[applyMappingAction]", err)
     return { success: false, error: err.message || "Erro ao aplicar mapeamento." }
@@ -308,6 +373,7 @@ function rowToPreviewEntity(
       city: get("city"),
       state: get("state"),
       zip_code: get("zip_code"),
+      inscricao_estadual: get("inscricao_estadual"),
       status,
       is_active: status === "ativo",
       created_at: new Date().toISOString(),
@@ -315,7 +381,8 @@ function rowToPreviewEntity(
   }
 
   if (entityType === "services") {
-    const price = get("price") ? parseFloat(get("price")!.replace(",", ".").replace(/[^0-9.\-]/g, "")) || 0 : 0
+    const priceStr = get("price")
+    const price = priceStr ? parseFloat(priceStr.replace(/R\$/gi, "").replace(/\./g, "").replace(",", ".").replace(/[^0-9.\-]/g, "")) || 0 : 0
     const rawVis = get("visibility_scope")?.toLowerCase()
     let visibility_scope = "all"
     if (rawVis && ["privado", "selecionado", "selected"].includes(rawVis)) visibility_scope = "selected"
@@ -326,11 +393,12 @@ function rowToPreviewEntity(
       name,
       sku: get("sku"),
       price,
-      cost_price: get("cost_price") ? parseFloat(get("cost_price")!.replace(",", ".").replace(/[^0-9.\-]/g, "")) : null,
+      cost_price: get("cost_price") ? parseFloat(get("cost_price")!.replace(/R\$/gi, "").replace(/\./g, "").replace(",", ".").replace(/[^0-9.\-]/g, "")) : null,
       description: get("description"),
       category: get("category"),
       duration_minutes: get("duration_minutes") ? parseInt(get("duration_minutes")!.replace(/\D/g, "")) : 60,
       unit: get("unit") || "Serviço",
+      service_type: get("service_type") || "Presencial",
       status,
       visibility_scope,
       is_active: status === "ativo",
@@ -339,7 +407,7 @@ function rowToPreviewEntity(
   }
 
   const rawPrice = get("price")
-  const price = rawPrice ? parseFloat(rawPrice.replace(",", ".").replace(/[^0-9.\-]/g, "")) || 0 : 0
+  const price = rawPrice ? parseFloat(rawPrice.replace(/R\$/gi, "").replace(/\./g, "").replace(",", ".").replace(/[^0-9.\-]/g, "")) || 0 : 0
   const rawStock = get("stock_quantity")
   const stock = rawStock ? parseInt(rawStock.replace(/\D/g, "")) || 0 : 0
   const rawVis = get("show_in_marketplace")?.toLowerCase()
@@ -351,10 +419,12 @@ function rowToPreviewEntity(
     sku: get("sku"),
     price,
     stock_quantity: stock,
-    cost_price: get("cost_price") ? parseFloat(get("cost_price")!.replace(",", ".").replace(/[^0-9.\-]/g, "")) : null,
+    cost_price: get("cost_price") ? parseFloat(get("cost_price")!.replace(/R\$/gi, "").replace(/\./g, "").replace(",", ".").replace(/[^0-9.\-]/g, "")) : null,
     gtin: get("gtin"),
     category: get("category"),
+    subcategory: get("subcategory"),
     brand: get("brand"),
+    supplier: get("supplier"),
     unit: get("unit") || "UN",
     description: get("description"),
     ncm: get("ncm"),

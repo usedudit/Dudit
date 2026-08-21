@@ -34,7 +34,6 @@ export interface Service {
   service_type: "in_person" | "online" | "hybrid" | null
   warranty: string | null
   technical_details: any | null
-  highlight_service: boolean
   assigned_staff: any | null
   buffer_minutes: number
   marketplace_category_id: string | null

@@ -98,58 +98,79 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
     "recibo-devolucao": "trocas", // Legacy fallback compatibility
   }
 
-  // Sync state from URL searchParams
-  React.useEffect(() => {
-    const tab = searchParams.get("tab")
-    if (!tab) {
-      setActivePage("home")
-      return
-    }
-
-    if (SLUG_TO_PAGE[tab]) {
-      // URL is already the source of truth: skip the state→URL sync
-      // so it doesn't run with stale state in the same flush (infinite loop).
-      pendingUrlSyncRef.current = true
-      setActivePage(SLUG_TO_PAGE[tab])
-      // Also set the correct category tab for when they go back
-      if (["business-data", "team", "subscription"].includes(SLUG_TO_PAGE[tab])) {
-        setActiveTab("empresa")
-      } else if (["payment-methods", "crediario", "comissao", "trocas"].includes(SLUG_TO_PAGE[tab])) {
-        setActiveTab("vendas")
-      } else {
-        setActiveTab("adicionais")
-      }
-    } else if (["empresa", "vendas", "adicionais"].includes(tab)) {
-      pendingUrlSyncRef.current = true
-      setActiveTab(tab)
-      setActivePage("home")
-    }
-  }, [searchParams])
-
-  // Sync URL from state changes
-  React.useEffect(() => {
-    if (pendingUrlSyncRef.current) {
-      pendingUrlSyncRef.current = false
-      return
-    }
-
-    const currentTab = searchParams.get("tab") || ""
-    let newTab = ""
-
-    if (activePage !== "home") {
-      newTab = PAGE_TO_SLUG[activePage] || activePage
-    }
-
-    if (newTab !== currentTab) {
+  const navigateToSubpage = (page: ActivePage) => {
+    setActivePage(page)
+    const slug = PAGE_TO_SLUG[page] || (page === "home" ? "" : page)
+    if (typeof window !== "undefined") {
       const url = new URL(window.location.href)
-      if (newTab) {
-        url.searchParams.set("tab", newTab)
+      if (slug) {
+        url.searchParams.set("tab", slug)
+        window.history.pushState(null, "", url.toString())
       } else {
         url.searchParams.delete("tab")
+        window.history.pushState(null, "", url.toString())
       }
+    }
+  }
+
+  const handleCategoryTabChange = (tab: string) => {
+    setActiveTab(tab)
+    if (activePage === "home" && typeof window !== "undefined") {
+      const url = new URL(window.location.href)
+      url.searchParams.set("tab", tab)
       window.history.replaceState(null, "", url.toString())
     }
-  }, [activePage, searchParams])
+  }
+
+  // Handle popstate for browser back / forward navigation
+  React.useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search)
+      const tab = params.get("tab")
+      if (!tab) {
+        setActivePage("home")
+        return
+      }
+
+      if (SLUG_TO_PAGE[tab]) {
+        setActivePage(SLUG_TO_PAGE[tab])
+        if (["business-data", "team", "subscription"].includes(SLUG_TO_PAGE[tab])) {
+          setActiveTab("empresa")
+        } else if (["payment-methods", "crediario", "comissao", "trocas"].includes(SLUG_TO_PAGE[tab])) {
+          setActiveTab("vendas")
+        } else {
+          setActiveTab("adicionais")
+        }
+      } else if (["empresa", "vendas", "adicionais"].includes(tab)) {
+        setActiveTab(tab)
+        setActivePage("home")
+      } else {
+        setActivePage("home")
+      }
+    }
+
+    // Initial check from current window URL
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search)
+      const tab = params.get("tab")
+      if (tab && SLUG_TO_PAGE[tab]) {
+        setActivePage(SLUG_TO_PAGE[tab])
+        if (["business-data", "team", "subscription"].includes(SLUG_TO_PAGE[tab])) {
+          setActiveTab("empresa")
+        } else if (["payment-methods", "crediario", "comissao", "trocas"].includes(SLUG_TO_PAGE[tab])) {
+          setActiveTab("vendas")
+        } else {
+          setActiveTab("adicionais")
+        }
+      } else if (tab && ["empresa", "vendas", "adicionais"].includes(tab)) {
+        setActiveTab(tab)
+        setActivePage("home")
+      }
+    }
+
+    window.addEventListener("popstate", handlePopState)
+    return () => window.removeEventListener("popstate", handlePopState)
+  }, [])
 
   React.useEffect(() => {
     if (activePage !== "home") {
@@ -169,7 +190,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
       }
       setHeaderOverride({
         title: titles[activePage] || "Configurações",
-        onBack: () => setActivePage("home"),
+        onBack: () => navigateToSubpage("home"),
         isSubPage: true
       })
     } else {
@@ -239,7 +260,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                 </div>
               </div>
 
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full px-4 md:px-8">
+              <Tabs value={activeTab} onValueChange={handleCategoryTabChange} className="flex flex-col h-full px-4 md:px-8">
                 <TabsList className="bg-transparent p-0 gap-8 w-full justify-start border-b border-brand-border dark:border-dark-border mb-8">
                   <TabsTrigger value="empresa">
                     Configurações do negócio
@@ -266,7 +287,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                               icon={Store}
                               title="Dados do Negócio"
                               description="Gerencie informações da empresa, endereço e contatos comerciais."
-                              onClick={() => setActivePage("business-data")}
+                              onClick={() => navigateToSubpage("business-data")}
                               showChevron
                               className="px-4 py-3 gap-4"
                             />
@@ -276,7 +297,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                               icon={Store}
                               title="Minha Vitrine"
                               description="Personalize o banner, logo e o status de exibição da sua vitrine online."
-                              onClick={() => setActivePage("vitrine")}
+                              onClick={() => navigateToSubpage("vitrine")}
                               showChevron
                               className="px-4 py-3 gap-4"
                             />
@@ -291,7 +312,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                                 </span>
                               ) : "Equipe e Acessos"}
                               description="Convide membros, defina funções e gerencie permissões de acesso."
-                              onClick={() => teamPlanBlocked ? openPlanUpgrade("crescer") : setActivePage("team")}
+                              onClick={() => teamPlanBlocked ? openPlanUpgrade("crescer") : navigateToSubpage("team")}
                               showChevron
                               className="px-4 py-3 gap-4"
                             />
@@ -301,7 +322,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                               icon={CreditCardIcon}
                               title="Minha Assinatura"
                               description="Visualize seu plano atual, faturas e métodos de pagamento."
-                              onClick={() => setActivePage("subscription")}
+                              onClick={() => navigateToSubpage("subscription")}
                               showChevron
                               className="px-4 py-3 gap-4"
                             />
@@ -324,7 +345,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                                   </span>
                                 ) : "Formas de Pagamentos"}
                                 description="Configure os métodos de pagamento aceitos e as taxas de operadoras."
-                                onClick={() => setActivePage("payment-methods")}
+                                onClick={() => navigateToSubpage("payment-methods")}
                                 showChevron
                                 className="px-4 py-3 gap-4"
                               />
@@ -333,7 +354,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                               icon={CreditCardIcon}
                               title="Crediário"
                               description="Gerencie as regras de parcelamento e limites para vendas no fiado."
-                              onClick={() => setActivePage("crediario")}
+                              onClick={() => navigateToSubpage("crediario")}
                               showChevron
                               className="px-4 py-3 gap-4"
                             />
@@ -347,7 +368,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                                   </span>
                                 ) : "Comissão"}
                                 description="Defina regras de comissão para vendedores e entregadores."
-                                onClick={() => setActivePage("comissao")}
+                                onClick={() => navigateToSubpage("comissao")}
                                 showChevron
                                 className="px-4 py-3 gap-4"
                               />
@@ -357,7 +378,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                                 icon={PackageReceiveIcon}
                                 title="Trocas e Devoluções"
                                 description="Defina as políticas de troca e devoluções do seu negócio."
-                                onClick={() => setActivePage("trocas")}
+                                onClick={() => navigateToSubpage("trocas")}
                                 showChevron
                                 className="px-4 py-3 gap-4"
                               />
@@ -376,7 +397,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                                 icon={CadastrosIcon}
                                 title="Gerenciar recursos"
                                 description="Ative ou desative modulos do sistema para limpar o menu."
-                                onClick={() => setActivePage("resources")}
+                                onClick={() => navigateToSubpage("resources")}
                                 showChevron
                                 className="px-4 py-3 gap-4"
                               />
@@ -386,7 +407,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                                 icon={WrenchIcon}
                                 title="Configurações do Sistema"
                                 description="Fuso horário e configurações gerais do sistema."
-                                onClick={() => setActivePage("system-settings")}
+                                onClick={() => navigateToSubpage("system-settings")}
                                 showChevron
                                 className="px-4 py-3 gap-4"
                               />
@@ -401,7 +422,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                                   </span>
                                 ) : "Logística e Entrega"}
                                 description="Configure taxas de entrega, raios de atendimento e horários."
-                                onClick={() => setActivePage("delivery")}
+                                onClick={() => navigateToSubpage("delivery")}
                                 showChevron
                                 className="px-4 py-3 gap-4"
                               />
@@ -416,7 +437,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                                   </span>
                                 ) : "Integrações"}
                                 description="Conecte-se com plataformas externas e APIs de terceiros."
-                                onClick={() => setActivePage("integrations")}
+                                onClick={() => navigateToSubpage("integrations")}
                                 showChevron
                                 className="px-4 py-3 gap-4"
                               />
@@ -426,7 +447,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                                 icon={ClockIcon}
                                 title="Histórico de Atividades"
                                 description="Visualize o registro de ações realizadas no sistema."
-                                onClick={() => setActivePage("logs")}
+                                onClick={() => navigateToSubpage("logs")}
                                 showChevron
                                 className="px-4 py-3 gap-4"
                               />
@@ -447,7 +468,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
               partner={partner}
               store={selectedStore}
               paymentMethods={paymentMethods}
-              onBack={() => setActivePage("home")}
+              onBack={() => navigateToSubpage("home")}
             />
           )}
 
@@ -456,7 +477,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
               key="payment-methods"
               partner={partner}
               paymentMethods={paymentMethods}
-              onBack={() => setActivePage("home")}
+              onBack={() => navigateToSubpage("home")}
               planGate={paymentsPlanBlocked ? { requiredPlanSlug: "crescer" as const } : undefined}
               storeId={selectedStore?.id}
             />
@@ -467,22 +488,22 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
               key="integrations"
               partner={partner}
               mpConnected={mpConnected}
-              onBack={() => setActivePage("home")}
+              onBack={() => navigateToSubpage("home")}
             />
           )}
 
-          {activePage === "team" && <TeamSubPage key="team" partnerId={partner.id} onBack={() => setActivePage("home")} teamPlanBlocked={teamPlanBlocked} />}
-          {activePage === "subscription" && canAccessSubscription && <SubscriptionSubPage key="subscription" partnerId={partner.id} onBack={() => setActivePage("home")} />}
-          {activePage === "crediario" && <SimpleSettingsSubPage key="crediario" title="Crediário" onBack={() => setActivePage("home")} />}
-          {activePage === "comissao" && canAccessCommissions && <CommissionsSubPage key="comissao" partnerId={partner.id} onBack={() => setActivePage("home")} planGate={commissionsPlanBlocked ? { requiredPlanSlug: "crescer" as const } : undefined} />}
-          {activePage === "trocas" && <ReturnPolicySubPage key="trocas" partnerId={partner.id} onBack={() => setActivePage("home")} />}
-          {activePage === "vitrine" && selectedStore && <ShowcaseSubPage key="vitrine" store={selectedStore} partnerId={partner.id} onBack={() => setActivePage("home")} />}
-          {activePage === "delivery" && <DeliverySettingsSubPage key="delivery" partnerId={partner.id} storeId={selectedStore?.id} onBack={() => setActivePage("home")} planGate={deliveryPlanBlocked ? { requiredPlanSlug: "crescer" as const } : undefined} />}
+          {activePage === "team" && <TeamSubPage key="team" partnerId={partner.id} onBack={() => navigateToSubpage("home")} teamPlanBlocked={teamPlanBlocked} />}
+          {activePage === "subscription" && canAccessSubscription && <SubscriptionSubPage key="subscription" partnerId={partner.id} onBack={() => navigateToSubpage("home")} />}
+          {activePage === "crediario" && <SimpleSettingsSubPage key="crediario" title="Crediário" onBack={() => navigateToSubpage("home")} />}
+          {activePage === "comissao" && canAccessCommissions && <CommissionsSubPage key="comissao" partnerId={partner.id} onBack={() => navigateToSubpage("home")} planGate={commissionsPlanBlocked ? { requiredPlanSlug: "crescer" as const } : undefined} />}
+          {activePage === "trocas" && <ReturnPolicySubPage key="trocas" partnerId={partner.id} onBack={() => navigateToSubpage("home")} />}
+          {activePage === "vitrine" && selectedStore && <ShowcaseSubPage key="vitrine" store={selectedStore} partnerId={partner.id} onBack={() => navigateToSubpage("home")} />}
+          {activePage === "delivery" && <DeliverySettingsSubPage key="delivery" partnerId={partner.id} storeId={selectedStore?.id} onBack={() => navigateToSubpage("home")} planGate={deliveryPlanBlocked ? { requiredPlanSlug: "crescer" as const } : undefined} />}
           {activePage === "system-settings" && canAccessSystemSettings && (
-            <SystemSettingsSubPage key="system-settings" partnerId={partner.id} onBack={() => setActivePage("home")} />
+            <SystemSettingsSubPage key="system-settings" partnerId={partner.id} onBack={() => navigateToSubpage("home")} />
           )}
-          {activePage === "resources" && <SystemResourcesSubPage key="resources" businessInfo={businessInfo} planSlug={planSlug} onBack={() => setActivePage("home")} />}
-          {activePage === "logs" && canAccessLogs && <AuditLogsSubPage key="logs" onBack={() => setActivePage("home")} />}
+          {activePage === "resources" && <SystemResourcesSubPage key="resources" businessInfo={businessInfo} planSlug={planSlug} onBack={() => navigateToSubpage("home")} />}
+          {activePage === "logs" && canAccessLogs && <AuditLogsSubPage key="logs" onBack={() => navigateToSubpage("home")} />}
         </AnimatePresence>
       </div>
     </FadeIn>

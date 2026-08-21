@@ -3,19 +3,26 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button, Checkbox, Spinner, SelectionBanner, Pagination, IconPlaceholder, Badge, Input, Combobox } from "@/components/reusable"
-import { ChevronLeftIcon, UploadIcon, CheckCircleIcon, SearchIcon } from "@/lib/icons"
+import { ChevronLeftIcon, UploadIcon, CheckCircleIcon, SearchIcon, DownloadIcon, AlertCircleIcon } from "@/lib/icons"
 import { useDropzone } from "react-dropzone"
 import { useNotification } from "@/hooks/use-notification"
-import { useSidebar } from "@/lib/sidebar-context"
-import { uploadPlanilhaAction, confirmImportAction, applyMappingAction } from "@/app/actions/erp/spreadsheet-import"
+import {
+    uploadPlanilhaAction,
+    confirmImportAction,
+    applyMappingAction,
+    downloadImportTemplateAction,
+    downloadFailedRowsAction,
+} from "@/app/actions/erp/spreadsheet-import"
 import { formatBrazilPhone } from "@/lib/utils/phone-utils"
-import type { ColumnMapping } from "@/lib/erp/import/types"
+import type { ColumnMapping, FailedRow } from "@/lib/erp/import/types"
 import { FadeIn } from "@/components/animations/FadeIn"
 
 interface FieldOption {
     name: string
     label: string
     required?: boolean
+    type?: string
+    example?: string
 }
 
 interface ImportCustomersPageProps {
@@ -35,11 +42,13 @@ const ITEMS_PER_PAGE = 25
 function MappingRow({
     col,
     availableFields,
-    onMappingChange
+    onMappingChange,
+    mappedFieldCounts,
 }: {
-    col: any
+    col: ColumnMapping
     availableFields: FieldOption[]
     onMappingChange: (headerIndex: number, newField: string | null) => void
+    mappedFieldCounts: Map<string, number>
 }) {
     const confidenceKey = col.confidence.toFixed(2)
     const confidenceVal = parseFloat(confidenceKey)
@@ -60,6 +69,8 @@ function MappingRow({
         badgeVariant = "red"
         badgeLabel = "Baixo"
     }
+
+    const isDuplicateTarget = col.field ? (mappedFieldCounts.get(col.field) || 0) > 1 : false
 
     const comboboxOptions = useMemo(() => [
         { value: "", label: "- Não importar -" },
@@ -91,7 +102,7 @@ function MappingRow({
                 </div>
             </td>
             <td className="py-4 px-4 align-middle">
-                <div className="w-full max-w-xs">
+                <div className="flex flex-col gap-1 w-full max-w-xs">
                     <Combobox
                         value={col.field || ""}
                         onChange={(newVal) => onMappingChange(col.headerIndex, newVal || null)}
@@ -99,6 +110,16 @@ function MappingRow({
                         placeholder="- Não importar -"
                         searchPlaceholder="Buscar campo..."
                     />
+                    {isDuplicateTarget && (
+                        <span className="text-[11px] text-red-500 font-medium">
+                            Campo duplicado! Selecione apenas uma vez.
+                        </span>
+                    )}
+                    {col.typeMismatchWarning && (
+                        <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+                            {col.typeMismatchWarning}
+                        </span>
+                    )}
                 </div>
             </td>
             <td className="py-4 px-4 align-middle">
@@ -115,31 +136,15 @@ function MappingRow({
 function MappingMobileItem({
     col,
     availableFields,
-    onMappingChange
+    onMappingChange,
+    mappedFieldCounts,
 }: {
-    col: any
+    col: ColumnMapping
     availableFields: FieldOption[]
     onMappingChange: (headerIndex: number, newField: string | null) => void
+    mappedFieldCounts: Map<string, number>
 }) {
-    const confidenceKey = col.confidence.toFixed(2)
-    const confidenceVal = parseFloat(confidenceKey)
-
-    let badgeVariant: "green" | "blue" | "orange" | "red" | "gray" = "gray"
-    let badgeLabel = "Baixo"
-
-    if (confidenceVal >= 0.9) {
-        badgeVariant = "green"
-        badgeLabel = "Exato"
-    } else if (confidenceVal >= 0.8) {
-        badgeVariant = "blue"
-        badgeLabel = "Alto"
-    } else if (confidenceVal >= 0.6) {
-        badgeVariant = "orange"
-        badgeLabel = "Médio"
-    } else if (col.field) {
-        badgeVariant = "red"
-        badgeLabel = "Baixo"
-    }
+    const isDuplicateTarget = col.field ? (mappedFieldCounts.get(col.field) || 0) > 1 : false
 
     const comboboxOptions = useMemo(() => [
         { value: "", label: "- Não importar -" },
@@ -150,98 +155,73 @@ function MappingMobileItem({
     ], [availableFields])
 
     return (
-        <div className="p-4 space-y-3 border-b border-brand-border dark:border-dark-border last:border-0">
-            <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-6 h-6 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
-                        <span className="text-[10px] font-bold text-brand-dark dark:text-dark-heading">
-                            {col.headerIndex + 1}
-                        </span>
+        <div className="border-b border-brand-border dark:border-dark-border p-4 flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-full bg-brand-gray dark:bg-dark-border flex items-center justify-center text-[11px] font-bold">
+                        {col.headerIndex + 1}
                     </div>
-                    <div className="flex flex-col min-w-0">
-                        <h4 className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">
-                            {col.header}
-                        </h4>
-                        {col.sampleValues && col.sampleValues.length > 0 && (
-                            <span className="text-[10px] text-brand-inactive-text dark:text-dark-body truncate max-w-[200px]">
-                                Ex: {col.sampleValues.slice(0, 2).join(", ")}
-                            </span>
-                        )}
-                    </div>
+                    <span className="font-bold text-brand-dark dark:text-dark-heading text-[13px]">{col.header}</span>
                 </div>
-                {col.field ? (
-                    <Badge variant={badgeVariant}>{badgeLabel}</Badge>
-                ) : (
-                    <span className="text-[11px] text-brand-inactive-text dark:text-dark-body italic">Ignorado</span>
-                )}
             </div>
-
-            <div className="flex flex-col gap-1">
-                <span className="text-[10px] text-brand-inactive-text dark:text-dark-body uppercase font-bold tracking-wider">Campo no Sistema</span>
-                <Combobox
-                    value={col.field || ""}
-                    onChange={(newVal) => onMappingChange(col.headerIndex, newVal || null)}
-                    options={comboboxOptions}
-                    placeholder="- Não importar -"
-                    searchPlaceholder="Buscar campo..."
-                />
-            </div>
+            {col.sampleValues && col.sampleValues.length > 0 && (
+                <div className="text-[11px] text-brand-inactive-text dark:text-dark-body">
+                    Amostra: {col.sampleValues.slice(0, 2).join(", ")}
+                </div>
+            )}
+            <Combobox
+                value={col.field || ""}
+                onChange={(newVal) => onMappingChange(col.headerIndex, newVal || null)}
+                options={comboboxOptions}
+                placeholder="- Não importar -"
+                searchPlaceholder="Buscar campo..."
+            />
+            {isDuplicateTarget && (
+                <span className="text-[11px] text-red-500 font-medium">
+                    Campo duplicado! Selecione apenas uma vez.
+                </span>
+            )}
+            {col.typeMismatchWarning && (
+                <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+                    {col.typeMismatchWarning}
+                </span>
+            )}
         </div>
     )
 }
 
-function CustomerPreviewRow({
-    customer,
-    selected,
-    onSelect,
-}: {
-    customer: any
-    selected: boolean
-    onSelect: (id: string) => void
-}) {
+function CustomerPreviewRow({ customer, selected, onSelect }: { customer: any; selected: boolean; onSelect: (id: string) => void }) {
+    const doc = customer.cpf || customer.cnpj || "-"
+    const location = [customer.city, customer.state].filter(Boolean).join(" - ") || "-"
+
     return (
-        <tr className="border-b border-brand-border dark:border-dark-border hover:bg-brand-gray/30 dark:hover:bg-dark-border/10 transition-colors">
-            <td className="py-4 pl-6 pr-3 align-middle w-12">
+        <tr className="hover:bg-brand-gray/30 dark:hover:bg-dark-border/10 transition-colors">
+            <td className="py-3 pl-6 pr-3 w-12 align-middle">
                 <Checkbox
                     checked={selected}
                     onCheckedChange={() => onSelect(customer.id)}
                     className="bg-white dark:bg-dark-background"
                 />
             </td>
-            <td className="py-4 px-3 align-middle">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border font-bold text-brand-dark dark:text-dark-heading text-sm">
-                        {customer.name?.charAt(0).toUpperCase() || "C"}
-                    </div>
-                    <div className="flex flex-col min-w-0">
-                        <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate max-w-[200px]">
-                            {customer.name}
-                        </span>
-                        {customer.email && (
-                            <span className="text-[11px] text-brand-inactive-text dark:text-dark-body truncate max-w-[200px]">
-                                {customer.email}
-                            </span>
-                        )}
-                    </div>
+            <td className="py-3 px-2 align-middle" style={{ width: "300px" }}>
+                <div className="flex flex-col gap-0.5">
+                    <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{customer.name}</span>
+                    <span className="text-[11px] text-brand-inactive-text dark:text-dark-body">{customer.email || "-"}</span>
                 </div>
             </td>
-            <td className="py-4 px-3 align-middle">
-                <span className="text-[13px] text-brand-dark dark:text-dark-heading font-medium">
-                    {formatBrazilPhone(customer.phone || "") || "-"}
-                </span>
+            <td className="py-3 px-2 text-[13px] text-brand-dark dark:text-dark-heading align-middle" style={{ width: "150px" }}>
+                {customer.phone ? formatBrazilPhone(customer.phone) : "-"}
             </td>
-            <td className="py-4 px-3 align-middle">
-                <span className="text-[13px] text-brand-dark dark:text-dark-heading font-medium">
-                    {customer.cpf || customer.cnpj || "-"}
-                </span>
+            <td className="py-3 px-2 text-[13px] text-brand-dark dark:text-dark-heading align-middle" style={{ width: "150px" }}>
+                {doc}
             </td>
-            <td className="py-4 px-3 align-middle">
-                <span className="text-[13px] text-brand-inactive-text dark:text-dark-body">
-                    {customer.city ? `${customer.city}${customer.state ? ` / ${customer.state}` : ""}` : "-"}
-                </span>
+            <td className="py-3 px-2 text-[13px] text-brand-dark dark:text-dark-heading align-middle" style={{ width: "200px" }}>
+                {location}
             </td>
-            <td className="py-4 px-3 align-middle text-center">
-                <Badge variant="green">Ativo</Badge>
+            <td className="py-3 px-2 text-center align-middle" style={{ width: "90px" }}>
+                <Badge variant={customer.status === "inativo" ? "gray" : customer.status === "bloqueado" ? "red" : "green"}>
+                    {customer.status === "inativo" ? "Inativo" : customer.status === "bloqueado" ? "Bloqueado" : "Ativo"}
+                </Badge>
             </td>
         </tr>
     )
@@ -249,55 +229,63 @@ function CustomerPreviewRow({
 
 export function ImportCustomersPage({ partnerId }: ImportCustomersPageProps) {
     const router = useRouter()
-    const { error: notifyError, success: notifySuccess } = useNotification()
+    const { success: notifySuccess, error: notifyError } = useNotification()
 
     const [step, setStep] = useState<"upload" | "mapping" | "preview">("upload")
     const [uploading, setUploading] = useState(false)
     const [importing, setImporting] = useState(false)
-    const [sessionId, setSessionId] = useState<string | null>(null)
-    const [parsedCustomers, setParsedCustomers] = useState<any[]>([])
-    const [totalRows, setTotalRows] = useState(0)
-    const [mapping, setMapping] = useState<ColumnMapping[]>([])
-    const [fileName, setFileName] = useState("")
-    const [availableFields, setAvailableFields] = useState<FieldOption[]>([])
-    const [headers, setHeaders] = useState<string[]>([])
+    const [downloadingTemplate, setDownloadingTemplate] = useState(false)
+    const [downloadingFailedRows, setDownloadingFailedRows] = useState(false)
 
+    // Data from upload
+    const [sessionId, setSessionId] = useState<string | null>(null)
+    const [headers, setHeaders] = useState<string[]>([])
+    const [totalRows, setTotalRows] = useState(0)
+    const [fileName, setFileName] = useState("")
+    const [mapping, setMapping] = useState<ColumnMapping[]>([])
+    const [availableFields, setAvailableFields] = useState<FieldOption[]>([])
+    const [parsedCustomers, setParsedCustomers] = useState<any[]>([])
+
+    // Options
+    const [duplicateStrategy, setDuplicateStrategy] = useState<"update" | "skip">("update")
+
+    // Import stats
+    const [importDone, setImportDone] = useState(false)
+    const [importStats, setImportStats] = useState<{
+        successRows: number
+        createdRows: number
+        updatedRows: number
+        duplicateRows: number
+        errorRows: number
+        durationMs: number
+        failedRows: FailedRow[]
+    } | null>(null)
+
+    // Preview Page Controls State
     const [page, setPage] = useState(1)
     const [search, setSearch] = useState("")
     const [selection, setSelection] = useState<Set<string>>(new Set())
-    const [importDone, setImportDone] = useState(false)
-    const [importCount, setImportCount] = useState(0)
 
-    const [scrollState, setScrollState] = useState({ left: false, right: false })
-    const tableContainerRef = useRef<HTMLDivElement>(null)
+    // UI Scroll States
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
+    const tableContainerRef = useRef<HTMLDivElement>(null)
+    const [scrollState, setScrollState] = useState({ left: false, right: false })
 
     const handleScroll = useCallback(() => {
-        if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5)
+        if (scrollContainerRef.current) {
+            setIsScrolled(scrollContainerRef.current.scrollTop > 20)
+        }
     }, [])
 
-    const { setHeaderOverride } = useSidebar()
-
-    useEffect(() => {
-        const title = step === "upload" ? "Importar Clientes" : step === "mapping" ? "Revisar Mapeamento" : fileName
-        setHeaderOverride({
-            title,
-            onBack: () => step === "upload" ? router.push("/erp/produtos") : setStep("upload"),
-            isSubPage: true
-        })
-        return () => setHeaderOverride(null)
-    }, [step, fileName, router, setHeaderOverride])
-
     const checkScroll = useCallback(() => {
-        if (!tableContainerRef.current) return
-        const { scrollLeft, scrollWidth, clientWidth } = tableContainerRef.current
-        setScrollState((prev) => {
-            const nextLeft = scrollLeft > 0
-            const nextRight = scrollLeft < scrollWidth - clientWidth - 2
-            if (prev.left === nextLeft && prev.right === nextRight) return prev
-            return { left: nextLeft, right: nextRight }
-        })
+        if (tableContainerRef.current) {
+            const { scrollLeft, scrollWidth, clientWidth } = tableContainerRef.current
+            setScrollState({
+                left: scrollLeft > 0,
+                right: scrollLeft < scrollWidth - clientWidth - 1,
+            })
+        }
     }, [])
 
     useEffect(() => {
@@ -311,37 +299,92 @@ export function ImportCustomersPage({ partnerId }: ImportCustomersPageProps) {
         }
     }, [checkScroll, step, parsedCustomers])
 
-    const onDrop = useCallback(async (accepted: File[]) => {
-        const file = accepted[0]
-        if (!file) return
-        setUploading(true)
-
-        const formData = new FormData()
-        formData.append("file", file)
-        formData.append("partnerId", partnerId)
-        formData.append("entityType", "customers")
-
-        const result = await uploadPlanilhaAction(formData)
-
-        if (!result.success) {
-            notifyError(result.error || "Erro ao processar arquivo")
-            setUploading(false)
-            return
+    // Download template
+    const handleDownloadTemplate = useCallback(async () => {
+        try {
+            setDownloadingTemplate(true)
+            const res = await downloadImportTemplateAction("customers")
+            if (!res.success || !res.base64) {
+                notifyError(res.error || "Erro ao baixar planilha modelo.")
+                return
+            }
+            const binary = atob(res.base64)
+            const bytes = new Uint8Array(binary.length)
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+            const blob = new Blob([bytes], { type: res.mimeType || "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
+            const url = URL.createObjectURL(blob)
+            const anchor = document.createElement("a")
+            anchor.href = url
+            anchor.download = res.filename || "modelo-importacao-clientes.xlsx"
+            anchor.click()
+            URL.revokeObjectURL(url)
+            notifySuccess("Planilha modelo baixada com sucesso!")
+        } catch {
+            notifyError("Erro ao baixar planilha modelo.")
+        } finally {
+            setDownloadingTemplate(false)
         }
+    }, [notifyError, notifySuccess])
 
-        setSessionId(result.sessionId!)
-        setTotalRows(result.totalRows!)
-        setFileName(result.fileName!)
-        setHeaders(result.headers!)
-        setMapping(structuredClone(result.suggestedMapping!))
-        setAvailableFields(result.availableFields || [])
-        setParsedCustomers(result.previewProducts || []) // Generic preview list returned in action
-        setSelection(new Set())
-        setPage(1)
-        setSearch("")
-        setUploading(false)
-        setStep("mapping")
-    }, [partnerId, notifyError])
+    // Download failed rows
+    const handleDownloadFailedRows = useCallback(async () => {
+        if (!importStats?.failedRows || importStats.failedRows.length === 0) return
+        try {
+            setDownloadingFailedRows(true)
+            const res = await downloadFailedRowsAction("customers", headers, importStats.failedRows)
+            if (!res.success || !res.base64) {
+                notifyError(res.error || "Erro ao baixar relatório de falhas.")
+                return
+            }
+            const binary = atob(res.base64)
+            const bytes = new Uint8Array(binary.length)
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+            const blob = new Blob([bytes], { type: res.mimeType || "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
+            const url = URL.createObjectURL(blob)
+            const anchor = document.createElement("a")
+            anchor.href = url
+            anchor.download = res.filename || "falhas-importacao-clientes.xlsx"
+            anchor.click()
+            URL.revokeObjectURL(url)
+        } catch {
+            notifyError("Erro ao baixar relatório de falhas.")
+        } finally {
+            setDownloadingFailedRows(false)
+        }
+    }, [importStats, headers, notifyError])
+
+    // Dropzone upload handler
+    const onDrop = useCallback(
+        async (acceptedFiles: File[]) => {
+            const file = acceptedFiles[0]
+            if (!file) return
+
+            setUploading(true)
+            const formData = new FormData()
+            formData.append("file", file)
+            formData.append("entityType", "customers")
+            formData.append("partnerId", partnerId)
+
+            const result = await uploadPlanilhaAction(formData)
+
+            if (!result.success || !result.sessionId) {
+                notifyError(result.error || "Erro ao processar planilha.")
+                setUploading(false)
+                return
+            }
+
+            setSessionId(result.sessionId)
+            setHeaders(result.headers || [])
+            setTotalRows(result.totalRows || 0)
+            setFileName(result.fileName || file.name)
+            setMapping(result.suggestedMapping || [])
+            setAvailableFields(result.availableFields || [])
+            setParsedCustomers(result.previewProducts || [])
+            setUploading(false)
+            setStep("mapping")
+        },
+        [partnerId, notifyError],
+    )
 
     const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
         onDrop,
@@ -361,45 +404,84 @@ export function ImportCustomersPage({ partnerId }: ImportCustomersPageProps) {
         setMapping((prev) =>
             prev.map((m) =>
                 m.headerIndex === headerIndex
-                    ? { ...m, field: newField, fieldLabel: availableFields.find((f) => f.name === newField)?.label || newField || undefined, isCustom: false, confidence: newField ? 1.0 : 0 }
+                    ? {
+                        ...m,
+                        field: newField,
+                        fieldLabel: availableFields.find((f) => f.name === newField)?.label || newField || undefined,
+                        isCustom: false,
+                        confidence: newField ? 1.0 : 0,
+                    }
                     : m,
             ),
         )
     }, [availableFields])
 
+    const mappedFieldCounts = useMemo(() => {
+        const counts = new Map<string, number>()
+        for (const m of mapping) {
+            if (m.field) {
+                counts.set(m.field, (counts.get(m.field) || 0) + 1)
+            }
+        }
+        return counts
+    }, [mapping])
+
+    const hasDuplicateMapping = useMemo(() => {
+        return Array.from(mappedFieldCounts.values()).some((c) => c > 1)
+    }, [mappedFieldCounts])
+
     const handleMappingConfirm = useCallback(async () => {
         if (!sessionId) return
+        if (hasDuplicateMapping) {
+            notifyError("Existem campos vinculados a múltiplas colunas. Corrija antes de continuar.")
+            return
+        }
+
         setUploading(true)
         const result = await applyMappingAction(sessionId, partnerId, mapping)
         if (!result.success) {
-            notifyError(result.error || "Erro ao aplicar mapeamento")
+            notifyError(result.error || "Erro ao aplicar mapeamento.")
             setUploading(false)
             return
         }
+
         setParsedCustomers(result.previewProducts || [])
         setPage(1)
         setSearch("")
         setSelection(new Set())
         setUploading(false)
         setStep("preview")
-    }, [sessionId, partnerId, mapping, notifyError])
+    }, [sessionId, partnerId, mapping, hasDuplicateMapping, notifyError])
 
     const handleImport = useCallback(async () => {
         if (!sessionId) return
         setImporting(true)
+
         const result = await confirmImportAction(sessionId, partnerId, mapping, {
-            skipDuplicates: true,
+            duplicateStrategy,
             skipErrors: true,
         })
-        if (!result.success) {
-            notifyError(result.error || "Erro ao importar")
+
+        if (!result.success && !result.result) {
+            notifyError(result.error || "Erro ao importar clientes.")
             setImporting(false)
             return
         }
-        setImportCount(result.result.successRows)
+
+        const res = result.result || {}
+        setImportStats({
+            successRows: res.successRows ?? 0,
+            createdRows: res.createdRows ?? 0,
+            updatedRows: res.updatedRows ?? 0,
+            duplicateRows: res.duplicateRows ?? 0,
+            errorRows: res.errorRows ?? 0,
+            durationMs: res.durationMs ?? 0,
+            failedRows: res.failedRows || [],
+        })
+
         setImportDone(true)
         setImporting(false)
-    }, [sessionId, partnerId, mapping, notifyError])
+    }, [sessionId, partnerId, mapping, duplicateStrategy, notifyError])
 
     const filteredCustomers = useMemo(() => {
         let items = parsedCustomers
@@ -416,23 +498,81 @@ export function ImportCustomersPage({ partnerId }: ImportCustomersPageProps) {
     }, [filteredCustomers, page])
 
     const totalPages = Math.ceil(filteredCustomers.length / ITEMS_PER_PAGE)
-
     const mappedCount = mapping.filter((m) => m.field).length
 
-    if (importDone) {
+    if (importDone && importStats) {
         return (
             <div className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
-                <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
-                    <div className="flex-1 flex flex-col items-center justify-center text-center px-4">
-                        <IconPlaceholder
-                            icon={CheckCircleIcon}
-                            title="Importação concluída!"
-                            subtitle={`${importCount} de ${totalRows} clientes importados com sucesso.`}
-                            buttons={[
-                                { text: "Ver Clientes", action: () => router.push("/erp/clientes"), variant: "outline" },
-                                { text: "Nova Importação", action: () => { setStep("upload"); setImportDone(false); setParsedCustomers([]); setMapping([]) } }
-                            ]}
-                        />
+                <div className="mx-auto w-full pt-8 flex flex-col h-full overflow-y-auto px-4 max-w-[800px]">
+                    <div className="flex-1 flex flex-col items-center justify-center text-center">
+                        <div className="w-16 h-16 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 flex items-center justify-center mb-4">
+                            <CheckCircleIcon size={36} />
+                        </div>
+                        <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading mb-2">
+                            Importação Processada!
+                        </h2>
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-6">
+                            Processamos {totalRows} linhas da sua planilha em {(importStats.durationMs / 1000).toFixed(1)}s.
+                        </p>
+
+                        {/* Breakdown Cards */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full mb-8">
+                            <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 flex flex-col items-center">
+                                <span className="text-2xl font-bold text-emerald-600">{importStats.createdRows}</span>
+                                <span className="text-xs text-emerald-700 dark:text-emerald-300 font-medium">Novos Criados</span>
+                            </div>
+                            <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 flex flex-col items-center">
+                                <span className="text-2xl font-bold text-blue-600">{importStats.updatedRows}</span>
+                                <span className="text-xs text-blue-700 dark:text-blue-300 font-medium">Atualizados</span>
+                            </div>
+                            <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 flex flex-col items-center">
+                                <span className="text-2xl font-bold text-amber-600">{importStats.duplicateRows}</span>
+                                <span className="text-xs text-amber-700 dark:text-amber-300 font-medium">Ignorados</span>
+                            </div>
+                            <div className="p-4 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 flex flex-col items-center">
+                                <span className="text-2xl font-bold text-red-600">{importStats.errorRows}</span>
+                                <span className="text-xs text-red-700 dark:text-red-300 font-medium">Com Erro</span>
+                            </div>
+                        </div>
+
+                        {/* Error Download if any */}
+                        {importStats.failedRows.length > 0 && (
+                            <div className="w-full p-4 mb-6 rounded-xl bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 flex flex-col sm:flex-row items-center justify-between gap-3 text-left">
+                                <div>
+                                    <h4 className="text-sm font-bold text-red-900 dark:text-red-300">
+                                        {importStats.failedRows.length} linhas não puderam ser importadas
+                                    </h4>
+                                    <p className="text-xs text-red-700 dark:text-red-400">
+                                        Baixe a planilha com as linhas rejeitadas e o motivo exato de cada erro para corrigir e reimportar.
+                                    </p>
+                                </div>
+                                <Button
+                                    variant="outline"
+                                    onClick={handleDownloadFailedRows}
+                                    disabled={downloadingFailedRows}
+                                    leftIcon={downloadingFailedRows ? <Spinner /> : <DownloadIcon size={16} />}
+                                    className="shrink-0 text-red-600 border-red-300 hover:bg-red-100"
+                                >
+                                    {downloadingFailedRows ? "Gerando..." : "Baixar Relatório de Falhas (.xlsx)"}
+                                </Button>
+                            </div>
+                        )}
+
+                        {/* Action Buttons */}
+                        <div className="flex gap-3">
+                            <Button variant="outline" onClick={() => router.push("/erp/clientes")}>
+                                Ver Clientes no ERP
+                            </Button>
+                            <Button onClick={() => {
+                                setStep("upload")
+                                setImportDone(false)
+                                setImportStats(null)
+                                setParsedCustomers([])
+                                setMapping([])
+                            }}>
+                                Nova Importação
+                            </Button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -450,7 +590,7 @@ export function ImportCustomersPage({ partnerId }: ImportCustomersPageProps) {
 
                             {/* Back button - desktop only */}
                             <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
-                                <Button variant="filled" onClick={() => step === "upload" ? router.push("/erp/produtos") : setStep("upload")} className="w-10 h-10 p-0 flex items-center justify-center">
+                                <Button variant="filled" onClick={() => step === "upload" ? router.push("/erp/clientes") : setStep("upload")} className="w-10 h-10 p-0 flex items-center justify-center">
                                     <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                 </Button>
                             </div>
@@ -459,7 +599,7 @@ export function ImportCustomersPage({ partnerId }: ImportCustomersPageProps) {
                             <div className="hidden md:flex items-start justify-between">
                                 <div className="flex flex-col gap-1 overflow-hidden min-w-0">
                                     <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
-                                        {step === "upload" ? "Importar Clientes" : step === "mapping" ? "Revisar Mapeamento" : fileName}
+                                        {step === "upload" ? "Importar Clientes" : step === "mapping" ? "Revisar Mapeamento de Colunas" : fileName}
                                     </h1>
 
                                     <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
@@ -467,18 +607,28 @@ export function ImportCustomersPage({ partnerId }: ImportCustomersPageProps) {
                                             ? "Faça upload de uma planilha .xlsx, .xls ou .csv com clientes."
                                             : step === "mapping"
                                                 ? `${totalRows} cliente(s) encontrados - ${mappedCount} de ${headers.length} colunas mapeadas`
-                                                : `${totalRows} cliente(s) encontrados`}
+                                                : `${totalRows} cliente(s) prontos para importar`}
                                     </div>
                                 </div>
 
                                 {/* Desktop action buttons */}
                                 <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
+                                    {step === "upload" && (
+                                        <Button
+                                            variant="outline"
+                                            leftIcon={downloadingTemplate ? <Spinner /> : <DownloadIcon size={16} />}
+                                            onClick={handleDownloadTemplate}
+                                            disabled={downloadingTemplate}
+                                        >
+                                            {downloadingTemplate ? "Baixando..." : "Baixar Planilha Modelo (.xlsx)"}
+                                        </Button>
+                                    )}
                                     {step === "mapping" && (
                                         <>
                                             <Button variant="outline" leftIcon={<UploadIcon size={18} />} onClick={() => { setStep("upload"); setParsedCustomers([]); setMapping([]) }}>
                                                 Nova planilha
                                             </Button>
-                                            <Button onClick={handleMappingConfirm} disabled={uploading || mappedCount === 0}>
+                                            <Button onClick={handleMappingConfirm} disabled={uploading || mappedCount === 0 || hasDuplicateMapping}>
                                                 {uploading ? <><Spinner /> Aplicando...</> : `Continuar (${mappedCount} campos)`}
                                             </Button>
                                         </>
@@ -501,7 +651,7 @@ export function ImportCustomersPage({ partnerId }: ImportCustomersPageProps) {
                     {/* Content Area */}
                     <div className="max-w-[1300px] mx-auto w-full px-4 md:px-6 py-6 min-h-[400px]">
                         {step === "upload" && (
-                            <div className="max-w-[800px] mx-auto w-full pt-8">
+                            <div className="max-w-[800px] mx-auto w-full pt-8 flex flex-col gap-6">
                                 <div
                                     {...getRootProps()}
                                     className={`cursor-pointer transition-opacity ${uploading ? "opacity-60 pointer-events-none" : ""}`}
@@ -512,8 +662,8 @@ export function ImportCustomersPage({ partnerId }: ImportCustomersPageProps) {
                                         <IconPlaceholder
                                             placeholderType="default"
                                             icon={Spinner}
-                                            title="Lendo Planilha..."
-                                            subtitle="Processando os dados da sua planilha de clientes. Aguarde um instante."
+                                            title="Lendo e Validando Planilha..."
+                                            subtitle="Processando os dados da sua planilha de clientes com alta velocidade. Aguarde um instante."
                                         />
                                     ) : (
                                         <IconPlaceholder
@@ -521,28 +671,50 @@ export function ImportCustomersPage({ partnerId }: ImportCustomersPageProps) {
                                             icon={UploadIcon}
                                             title={isDragActive ? "Solte a planilha aqui..." : "Importar Planilha de Clientes"}
                                             subtitle="Arraste o arquivo ou clique para selecionar. Suporta .xlsx, .xls ou .csv (até 10 MB e 2.000 linhas)."
-                                            itemButton={{
-                                                text: "Selecionar Planilha",
-                                                type: "button",
-                                                action: open,
-                                                variant: "default"
-                                            }}
+                                            buttons={[
+                                                { text: "Selecionar Planilha", type: "button", action: open },
+                                                {
+                                                    text: downloadingTemplate ? "Baixando Modelo..." : "Baixar Planilha Modelo (.xlsx)",
+                                                    type: "button",
+                                                    variant: "outline",
+                                                    action: () => handleDownloadTemplate()
+                                                }
+                                            ]}
                                         />
                                     )}
+                                </div>
+
+                                {/* Template Guidelines Card */}
+                                <div className="p-5 rounded-2xl bg-brand-gray/50 dark:bg-dark-surface border border-brand-border dark:border-dark-border">
+                                    <h3 className="font-bold text-sm text-brand-dark dark:text-dark-heading mb-2 flex items-center gap-2">
+                                        💡 Dicas para uma importação perfeita:
+                                    </h3>
+                                    <ul className="text-xs text-brand-inactive-text dark:text-dark-body space-y-1.5 list-disc list-inside">
+                                        <li><strong>Campo obrigatório:</strong> Nome do Cliente / Razão Social.</li>
+                                        <li><strong>Identificadores:</strong> O e-mail, CPF ou CNPJ são usados para evitar duplicidades e atualizar clientes existentes.</li>
+                                        <li><strong>Endereço atômico:</strong> O modelo separa CEP, Logradouro, Número, Complemento, Bairro, Cidade e UF para cadastrar endereços completos.</li>
+                                    </ul>
                                 </div>
                             </div>
                         )}
 
                         {step === "mapping" && (
-                            <div>
+                            <div className="flex flex-col gap-4">
+                                {hasDuplicateMapping && (
+                                    <div className="p-4 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-300 dark:border-red-800 text-red-700 dark:text-red-300 text-sm flex items-center gap-2">
+                                        <AlertCircleIcon size={18} className="shrink-0" />
+                                        <span>Existem campos do sistema atribuídos a mais de uma coluna da planilha. Por favor, desmarque as duplicadas para prosseguir.</span>
+                                    </div>
+                                )}
+
                                 {/* Desktop Table View */}
-                                <div className="hidden md:block overflow-hidden bg-white dark:bg-dark-surface">
+                                <div className="hidden md:block overflow-hidden bg-white dark:bg-dark-surface rounded-xl border border-brand-border dark:border-dark-border">
                                     <table className="w-full text-left border-separate border-spacing-0">
                                         <thead>
                                             <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                <th className="py-3 px-4 text-[13px] font-bold text-brand-dark dark:text-dark-heading rounded-l-lg bg-brand-gray dark:bg-dark-border/50">Coluna da Planilha</th>
-                                                <th className="py-3 px-4 text-[13px] font-bold text-brand-dark dark:text-dark-heading bg-brand-gray dark:bg-dark-border/50">Campo no Sistema</th>
-                                                <th className="py-3 px-4 text-[13px] font-bold text-brand-dark dark:text-dark-heading rounded-r-lg bg-brand-gray dark:bg-dark-border/50">Confiança</th>
+                                                <th className="py-3 px-4 text-[13px] font-bold text-brand-dark dark:text-dark-heading">Coluna da Planilha</th>
+                                                <th className="py-3 px-4 text-[13px] font-bold text-brand-dark dark:text-dark-heading">Campo no Sistema</th>
+                                                <th className="py-3 px-4 text-[13px] font-bold text-brand-dark dark:text-dark-heading">Confiança</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -552,6 +724,7 @@ export function ImportCustomersPage({ partnerId }: ImportCustomersPageProps) {
                                                     col={col}
                                                     availableFields={availableFields}
                                                     onMappingChange={updateMapping}
+                                                    mappedFieldCounts={mappedFieldCounts}
                                                 />
                                             ))}
                                         </tbody>
@@ -559,13 +732,14 @@ export function ImportCustomersPage({ partnerId }: ImportCustomersPageProps) {
                                 </div>
 
                                 {/* Mobile Card List View */}
-                                <div className="md:hidden bg-white dark:bg-dark-surface">
+                                <div className="md:hidden bg-white dark:bg-dark-surface rounded-xl border border-brand-border dark:border-dark-border">
                                     {mapping.map((col) => (
                                         <MappingMobileItem
                                             key={col.headerIndex}
                                             col={col}
                                             availableFields={availableFields}
                                             onMappingChange={updateMapping}
+                                            mappedFieldCounts={mappedFieldCounts}
                                         />
                                     ))}
                                 </div>
@@ -573,8 +747,41 @@ export function ImportCustomersPage({ partnerId }: ImportCustomersPageProps) {
                         )}
 
                         {step === "preview" && (
-                            <div className="flex flex-col overflow-hidden">
-                                <div className="flex-none mb-6">
+                            <div className="flex flex-col gap-6">
+                                {/* Import Options Bar */}
+                                <div className="p-4 rounded-2xl bg-brand-gray/40 dark:bg-dark-surface border border-brand-border dark:border-dark-border flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                    <div className="flex flex-col gap-1">
+                                        <span className="text-xs font-bold text-brand-dark dark:text-dark-heading uppercase tracking-wider">
+                                            Estratégia para clientes existentes (mesmo E-mail / CPF / CNPJ):
+                                        </span>
+                                        <div className="flex items-center gap-4 mt-1">
+                                            <label className="flex items-center gap-2 text-xs font-medium text-brand-dark dark:text-dark-heading cursor-pointer">
+                                                <input
+                                                    type="radio"
+                                                    name="duplicateStrategyCustomer"
+                                                    value="update"
+                                                    checked={duplicateStrategy === "update"}
+                                                    onChange={() => setDuplicateStrategy("update")}
+                                                    className="text-brand-primary"
+                                                />
+                                                <span>Atualizar dados existentes</span>
+                                            </label>
+                                            <label className="flex items-center gap-2 text-xs font-medium text-brand-dark dark:text-dark-heading cursor-pointer">
+                                                <input
+                                                    type="radio"
+                                                    name="duplicateStrategyCustomer"
+                                                    value="skip"
+                                                    checked={duplicateStrategy === "skip"}
+                                                    onChange={() => setDuplicateStrategy("skip")}
+                                                    className="text-brand-primary"
+                                                />
+                                                <span>Ignorar existentes</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex-none">
                                     <div className="w-80">
                                         <Input
                                             name="search"
@@ -591,7 +798,7 @@ export function ImportCustomersPage({ partnerId }: ImportCustomersPageProps) {
 
                                 {filteredCustomers.length === 0 ? (
                                     <div className="flex-1 flex items-center justify-center text-brand-inactive-text dark:text-dark-body text-sm py-12">
-                                        Nenhum cliente encontrado
+                                        Nenhum cliente encontrado no preview
                                     </div>
                                 ) : (
                                     <div className="flex-1">
@@ -679,49 +886,64 @@ export function ImportCustomersPage({ partnerId }: ImportCustomersPageProps) {
             </div>
 
             {/* Mobile Bottom Action Bar */}
-            {
-                step === "mapping" && (
-                    <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
-                        <Button
-                            variant="outline"
-                            className="flex-1 h-12"
-                            onClick={() => { setStep("upload"); setParsedCustomers([]); setMapping([]) }}
-                            leftIcon={<UploadIcon size={18} />}
-                        >
-                            Nova planilha
-                        </Button>
-                        <Button
-                            onClick={handleMappingConfirm}
-                            disabled={uploading || mappedCount === 0}
-                            className="flex-1 h-12"
-                        >
-                            {uploading ? <><Spinner /> Aplicando...</> : `Continuar (${mappedCount} campos)`}
-                        </Button>
-                    </div>
-                )
-            }
+            {step === "upload" && (
+                <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
+                    <Button
+                        variant="outline"
+                        className="flex-1 h-12"
+                        onClick={handleDownloadTemplate}
+                        disabled={downloadingTemplate}
+                    >
+                        <DownloadIcon className="w-[18px] h-[18px]" /> {downloadingTemplate ? "Baixando..." : "Baixar Modelo"}
+                    </Button>
+                    <Button
+                        onClick={open}
+                        className="flex-1 h-12"
+                    >
+                        <UploadIcon className="w-[18px] h-[18px]" /> Selecionar
+                    </Button>
+                </div>
+            )}
 
-            {
-                step === "preview" && (
-                    <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
-                        <Button
-                            variant="outline"
-                            className="flex-1 h-12"
-                            onClick={() => setStep("mapping")}
-                        >
-                            Voltar
-                        </Button>
-                        <Button
-                            onClick={handleImport}
-                            disabled={importing || parsedCustomers.length === 0}
-                            className="flex-1 h-12"
-                        >
-                            {importing ? <><Spinner /> Importando...</> : `Importar ${parsedCustomers.length} cli.`}
-                        </Button>
-                    </div>
-                )
-            }
-        </FadeIn >
+            {step === "mapping" && (
+                <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
+                    <Button
+                        variant="outline"
+                        className="flex-1 h-12"
+                        onClick={() => { setStep("upload"); setParsedCustomers([]); setMapping([]) }}
+                    >
+                        <UploadIcon className="w-[18px] h-[18px]" /> Nova planilha
+                    </Button>
+                    <Button
+                        onClick={handleMappingConfirm}
+                        disabled={uploading || mappedCount === 0 || hasDuplicateMapping}
+                        className="flex-1 h-12"
+                    >
+                        {uploading ? <><Spinner /> Aplicando...</> : `Continuar (${mappedCount} campos)`}
+                    </Button>
+                </div>
+            )}
+
+            {step === "preview" && (
+                <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
+                    <Button
+                        variant="outline"
+                        className="flex-1 h-12"
+                        onClick={() => setStep("mapping")}
+                    >
+                        Voltar
+                    </Button>
+                    <Button
+                        onClick={handleImport}
+                        disabled={importing || parsedCustomers.length === 0}
+                        className="flex-1 h-12"
+                    >
+                        {importing ? <><Spinner /> Importando...</> : `Importar ${parsedCustomers.length} cli.`}
+                    </Button>
+                </div>
+            )}
+        </FadeIn>
     )
 }
 
+export default ImportCustomersPage

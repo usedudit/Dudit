@@ -1,7 +1,7 @@
 import "server-only"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getAdminClient } from "@/lib/supabase/admin"
-import type { ColumnMapping, EntityType, PreviewSummary, ImportSession } from "./types"
+import type { ColumnMapping, PreviewSummary, ImportSession } from "./types"
 import { validateRows } from "./validators"
 import { resolveCategories } from "./category-resolver"
 import { resolveSuppliers } from "./supplier-resolver"
@@ -32,14 +32,13 @@ export async function generatePreview(
   session: ImportSession,
   mapping: ColumnMapping[],
 ): Promise<PreviewSummary> {
-  const { rows, headers, entityType, totalRows, partnerId } = session
+  const { rows, entityType, totalRows, partnerId } = session
 
   const mappedRows = rows.map((row) => mapRow(row, mapping))
-
   const { errors, warnings } = validateRows(mappedRows, entityType)
 
-  const errorRows = new Set(errors.map((e) => e.row))
-  const warningRows = new Set(warnings.map((w) => w.row))
+  const errorRowIndices = new Set(errors.map((e) => e.row))
+  const warningRowIndices = new Set(warnings.map((w) => w.row))
 
   let unknownCategories: string[] = []
   let unknownSuppliers: { name: string; rows: number[] }[] = []
@@ -62,17 +61,14 @@ export async function generatePreview(
     }
   }
 
-  const duplicateRows = await detectDuplicates(session, mappedRows)
+  const duplicateRowIndices = await detectDuplicates(session, mappedRows)
+  const validRowsCount = Math.max(0, totalRows - errorRowIndices.size - duplicateRowIndices.size)
 
-  const validRows = totalRows - errorRows.size - duplicateRows.size
-
-  const sampleRows = mappedRows.slice(0, 5).map((row) => {
+  const sampleRows = mappedRows.slice(0, 10).map((row) => {
     const sample: Record<string, string> = {}
     for (const col of mapping) {
       if (col.field) {
         sample[col.fieldLabel ?? col.field] = row[col.field] ?? ""
-      } else {
-        sample[col.header] = ""
       }
     }
     return sample
@@ -80,19 +76,19 @@ export async function generatePreview(
 
   return {
     totalRows,
-    validRows,
-    errorRows: errorRows.size,
-    warningRows: warningRows.size,
-    duplicateRows: duplicateRows.size,
+    validRows: validRowsCount,
+    errorRows: errorRowIndices.size,
+    warningRows: warningRowIndices.size,
+    duplicateRows: duplicateRowIndices.size,
     errors,
     warnings,
-    duplicates: [...duplicateRows].map((row) => {
-      const mapped = mappedRows[row - 1] || {}
+    duplicates: [...duplicateRowIndices].map((rowNum) => {
+      const mapped = mappedRows[rowNum - 1] || {}
       const field = entityType === "customers"
         ? (mapped["email"] ? "E-mail" : "CPF")
         : "SKU"
       const value = mapped["email"] || mapped["cpf"] || mapped["sku"] || ""
-      return { row, field, value }
+      return { row: rowNum, field, value }
     }),
     unknownCategories,
     unknownSuppliers,
@@ -114,17 +110,22 @@ async function detectDuplicates(
 
     if (skus.length > 0) {
       const uniqueSkus = [...new Set(skus.map((s) => s.sku))]
-      const { data: existing } = await supabase
-        .from("products")
-        .select("sku")
-        .eq("partner_id", session.partnerId)
-        .in("sku", uniqueSkus)
+      const chunkSize = 200
 
-      if (existing && existing.length > 0) {
-        const existingSet = new Set(existing.map((p: any) => p.sku))
-        for (const s of skus) {
-          if (existingSet.has(s.sku)) {
-            duplicates.add(s.index + 1)
+      for (let i = 0; i < uniqueSkus.length; i += chunkSize) {
+        const chunk = uniqueSkus.slice(i, i + chunkSize)
+        const { data: existing } = await supabase
+          .from("products")
+          .select("sku")
+          .eq("partner_id", session.partnerId)
+          .in("sku", chunk)
+
+        if (existing && existing.length > 0) {
+          const existingSet = new Set(existing.map((p: any) => p.sku))
+          for (const s of skus) {
+            if (existingSet.has(s.sku)) {
+              duplicates.add(s.index + 1)
+            }
           }
         }
       }
@@ -134,56 +135,27 @@ async function detectDuplicates(
   if (session.entityType === "customers") {
     const customerDb = getAdminClient()
     const emails = mappedRows
-      .map((r, i) => ({ email: r["email"]?.trim(), index: i }))
+      .map((r, i) => ({ email: r["email"]?.trim().toLowerCase(), index: i }))
       .filter((e): e is { email: string; index: number } => !!e.email)
 
     if (emails.length > 0) {
       const uniqueEmails = [...new Set(emails.map((e) => e.email))]
-      const { data: existing } = await customerDb
-        .from("customers")
-        .select("email")
-        .eq("partner_id", session.partnerId)
-        .in("email", uniqueEmails)
+      const chunkSize = 200
 
-      if (existing && existing.length > 0) {
-        const existingSet = new Set(existing.map((c: any) => c.email))
-        for (const e of emails) {
-          if (e.email && existingSet.has(e.email)) {
-            duplicates.add(e.index + 1)
-          }
-        }
-      }
-    }
+      for (let i = 0; i < uniqueEmails.length; i += chunkSize) {
+        const chunk = uniqueEmails.slice(i, i + chunkSize)
+        const { data: existing } = await customerDb
+          .from("customers")
+          .select("email")
+          .eq("partner_id", session.partnerId)
+          .in("email", chunk)
 
-    // Also check CPF duplicates
-    const rawCpfs = mappedRows
-      .map((r, i) => ({ cpf: r["cpf"]?.replace(/\D/g, ""), index: i }))
-      .filter((c): c is { cpf: string; index: number } => !!c.cpf && c.cpf.length === 11)
-
-    if (rawCpfs.length > 0) {
-      const uniqueCpfs = [...new Set(rawCpfs.map((c) => c.cpf))]
-      const { data: allCpfs } = await customerDb
-        .from("customers")
-        .select("cpf")
-        .eq("partner_id", session.partnerId)
-        .not("cpf", "is", null)
-
-      if (allCpfs?.length) {
-        const { decryptCPF } = await import("@/lib/crypto")
-        const existingCpfSet = new Set<string>()
-        for (const row of allCpfs) {
-          try {
-            const decrypted = await decryptCPF(row.cpf)
-            if (uniqueCpfs.includes(decrypted)) {
-              existingCpfSet.add(decrypted)
+        if (existing && existing.length > 0) {
+          const existingSet = new Set(existing.map((c: any) => c.email?.toLowerCase()))
+          for (const e of emails) {
+            if (e.email && existingSet.has(e.email)) {
+              duplicates.add(e.index + 1)
             }
-          } catch {
-            continue
-          }
-        }
-        for (const c of rawCpfs) {
-          if (existingCpfSet.has(c.cpf)) {
-            duplicates.add(c.index + 1)
           }
         }
       }
@@ -197,17 +169,22 @@ async function detectDuplicates(
 
     if (skus.length > 0) {
       const uniqueSkus = [...new Set(skus.map((s) => s.sku))]
-      const { data: existing } = await supabase
-        .from("services")
-        .select("sku")
-        .eq("partner_id", session.partnerId)
-        .in("sku", uniqueSkus)
+      const chunkSize = 200
 
-      if (existing && existing.length > 0) {
-        const existingSet = new Set(existing.map((s: any) => s.sku))
-        for (const s of skus) {
-          if (existingSet.has(s.sku)) {
-            duplicates.add(s.index + 1)
+      for (let i = 0; i < uniqueSkus.length; i += chunkSize) {
+        const chunk = uniqueSkus.slice(i, i + chunkSize)
+        const { data: existing } = await supabase
+          .from("services")
+          .select("sku")
+          .eq("partner_id", session.partnerId)
+          .in("sku", chunk)
+
+        if (existing && existing.length > 0) {
+          const existingSet = new Set(existing.map((s: any) => s.sku))
+          for (const s of skus) {
+            if (existingSet.has(s.sku)) {
+              duplicates.add(s.index + 1)
+            }
           }
         }
       }

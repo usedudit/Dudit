@@ -74,13 +74,13 @@ export async function POST(
     // Get platform access token for MP Subscriptions API
     const accessToken = await getMpPlatformAccessToken()
 
-    // Create a payment linked to the preapproval (subscription)
-    // This will generate a PIX QR code for the current due installment
+    // Create a one-off PIX payment for the past-due invoice.
+    // NOTE: MP rejects a top-level `preapproval_id` on /v1/payments for PIX.
+    // The webhook matches this payment to the subscription via `external_reference`.
     const paymentPayload = {
       transaction_amount: planPrice,
       currency_id: "BRL",
       payment_method_id: "pix",
-      preapproval_id: subscription.mercado_pago_subscription_id,
       description: `Fatura atrasada - ${subscription.plan?.name}`,
       payer: {
         email: subscription.billing_email || user.email,

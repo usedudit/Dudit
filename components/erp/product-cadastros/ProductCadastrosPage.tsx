@@ -88,17 +88,22 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId, planG
         return () => clearTimeout(timer)
     }, [search])
 
-    // Sync activeTab with URL searchParams
+    // Handle browser back/forward navigation
     React.useEffect(() => {
-        const tab = searchParams.get("tab") as any
-        if (validTabs.includes(tab) && tab !== activeTab) {
-            setActiveTab(tab)
-            setPage(1)
-        } else if (!tab && activeTab !== "categories") {
-            setActiveTab("categories")
+        const handlePopState = () => {
+            const params = new URLSearchParams(window.location.search)
+            const tab = params.get("tab") as any
+            if (validTabs.includes(tab)) {
+                setActiveTab(tab)
+            } else {
+                setActiveTab("categories")
+            }
             setPage(1)
         }
-    }, [searchParams])
+
+        window.addEventListener("popstate", handlePopState)
+        return () => window.removeEventListener("popstate", handlePopState)
+    }, [])
 
     // Refresh Data
     const refreshData = useCallback(async () => {
@@ -132,10 +137,15 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId, planG
         setActiveTab(tab)
         setPage(1)
 
-        // Update URL
-        const params = new URLSearchParams(searchParams.toString())
-        params.set("tab", tab)
-        router.replace(`?${params.toString()}`, { scroll: false })
+        if (typeof window !== "undefined") {
+            const url = new URL(window.location.href)
+            if (tab === "categories") {
+                url.searchParams.delete("tab")
+            } else {
+                url.searchParams.set("tab", tab)
+            }
+            window.history.pushState(null, "", url.toString())
+        }
     }
 
     const getAddButtonLabel = () => {

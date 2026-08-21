@@ -129,10 +129,17 @@ const OrderGridCard = React.memo(
                             <div className="flex items-center">
                                 {(() => {
                                     const breakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : []
-                                    const paymentEntry = breakdown.find((b: any) => b?.method && !b?.checkoutPricing)
-                                    let pmLabel = paymentEntry?.method || order.payment_method || null
-                                    if (paymentEntry?.installmentNumber > 1) {
-                                        pmLabel = `${pmLabel} - ${paymentEntry.installmentNumber}x`
+                                    const methodEntries = breakdown.filter((b: any) => b?.method && !b?.checkoutPricing)
+                                    let pmLabel: string | null = null
+
+                                    if (methodEntries.length > 1) {
+                                        pmLabel = "Múltiplos meios"
+                                    } else {
+                                        pmLabel = methodEntries[0]?.method || order.payment_method || null
+                                    }
+
+                                    if (methodEntries.length === 1 && methodEntries[0]?.installmentNumber > 1) {
+                                        pmLabel = `${pmLabel} - ${methodEntries[0].installmentNumber}x`
                                     }
                                     if (order.payment_provider === "Mercado Pago" && pmLabel) {
                                         pmLabel = `Mercado Pago (${pmLabel})`

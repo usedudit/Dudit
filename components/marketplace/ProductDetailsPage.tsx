@@ -1509,22 +1509,6 @@ export function ProductDetailsPageClient({
                 </div>
             )}
 
-            {/* Badges de Desapego - estilo OLX/Marketplace */}
-            {(desapegoInfo.accepts_offers || desapegoInfo.accepts_trades) && (
-                <div className="mb-6 flex flex-wrap gap-2">
-                    {desapegoInfo.accepts_offers && (
-                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700/30 px-2.5 py-1 rounded-full">
-                            💬 Aceita ofertas
-                        </span>
-                    )}
-                    {desapegoInfo.accepts_trades && (
-                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/30 px-2.5 py-1 rounded-full">
-                            🔄 Aceita trocas
-                        </span>
-                    )}
-                </div>
-            )}
-
             {
                 isProductOwner ? (
                     <InfoCard

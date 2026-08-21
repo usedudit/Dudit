@@ -480,6 +480,11 @@ BEGIN
       updated_at = v_now
   WHERE id = v_assignment.id;
 
+  -- Ao aceitar a entrega, garante que o pedido esteja em status de preparo
+  UPDATE public.orders
+  SET delivery_status = CASE WHEN delivery_status IN ('pending', 'not_sent') THEN 'preparing' ELSE delivery_status END
+  WHERE id = v_assignment.order_id AND partner_id = v_assignment.partner_id;
+
   INSERT INTO public.audit_logs (
     table_name, action, user_id, actor_user_id, partner_id,
     entity_type, entity_id, action_type, change_lines, metadata, source

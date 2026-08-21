@@ -19,6 +19,7 @@ import {
     getLimiter,
     RateLimitError,
 } from "@/lib/rate-limiter"
+import { getTrustedClientIP } from "@/lib/security/client-ip"
 
 // ============================================================================
 // IDENTIFIER RESOLUTION
@@ -32,10 +33,7 @@ import {
 async function getClientIP(): Promise<string> {
     try {
         const headersList = await headers()
-        if (process.env.TRUSTED_PROXY_HEADERS === "true") {
-            return headersList.get("cf-connecting-ip") || headersList.get("x-real-ip") || "unknown"
-        }
-        return "unknown"
+        return getTrustedClientIP(headersList)
     } catch {
         return "unknown"
     }

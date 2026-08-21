@@ -56,6 +56,9 @@ DECLARE
     store_doc TEXT;
     store_rec RECORD;
     owner_email TEXT;
+    cust_name TEXT;
+    cust_phone TEXT;
+    cust_address TEXT;
 BEGIN
     IF EXISTS (SELECT 1 FROM billing_invoices WHERE purchase_id = p_purchase_id) THEN
         RETURN jsonb_build_object('status', 'exists');
@@ -81,6 +84,22 @@ BEGIN
     SELECT s.billing_email INTO owner_email
     FROM subscriptions s WHERE s.id = p.subscription_id;
 
+    -- Dados do cliente (dono do ERP) para o campo customer da fatura.
+    SELECT COALESCE(up.full_name, '') INTO cust_name
+    FROM user_profiles up WHERE up.user_id = p.user_id LIMIT 1;
+
+    SELECT COALESCE(st.phone, '') INTO cust_phone
+    FROM stores st WHERE st.partner_id = p.partner_id AND st.is_headquarters = true LIMIT 1;
+
+    SELECT COALESCE(
+        a.street || ', ' || a.number ||
+        CASE WHEN a.complement IS NOT NULL AND a.complement <> '' THEN ' - ' || a.complement ELSE '' END ||
+        ' - ' || a.neighborhood || ', ' || a.city || '/' || a.state ||
+        CASE WHEN a.zip_code IS NOT NULL AND a.zip_code <> '' THEN ' - ' || a.zip_code ELSE '' END,
+        ''
+    ) INTO cust_address
+    FROM addresses a WHERE a.user_id = p.user_id AND a.is_default = true LIMIT 1;
+
     SELECT name INTO plan_name FROM plans WHERE id = p.purchaseable_id;
 
     inv_number := 'INV-' || EXTRACT(YEAR FROM now())::TEXT || '-' ||
@@ -103,7 +122,12 @@ BEGIN
             'phone', COALESCE(store_rec.phone, ''),
             'image_url', COALESCE(store_rec.logo_url, '')
         ),
-        'customer', null,
+        'customer', jsonb_build_object(
+            'name', cust_name,
+            'email', COALESCE(owner_email, ''),
+            'phone', cust_phone,
+            'address', cust_address
+        ),
         'purchase', jsonb_build_object(
             'id', p.id,
             'type', p.purchase_type,
@@ -180,8 +204,8 @@ DECLARE
     plan_price NUMERIC;
     descr TEXT;
     mp_sub_id TEXT;
-    current_inv RECORD;
-    next_inv RECORD;
+    current_inv TEXT;
+    next_inv TEXT;
 BEGIN
     SELECT s.*, p.id AS plan_id, p.name AS plan_name, p.price AS plan_price, p.slug AS plan_slug
     INTO sub_record
@@ -213,7 +237,7 @@ BEGIN
 
         -- Atualizar a assinatura no banco com o status requisitado
         UPDATE subscriptions
-        SET status = target_sub_status,
+        SET status = target_sub_status::subscription_status,
             current_period_start = COALESCE(p_period_start, current_period_start, v_now),
             current_period_end = COALESCE(p_period_end, current_period_end, v_now + interval '1 month'),
             past_due_at = CASE WHEN target_sub_status = 'past_due' THEN COALESCE(past_due_at, v_now) ELSE NULL END,
@@ -467,10 +491,10 @@ BEGIN
         'current_purchase_status', purchase_status,
         'current_period_start', period_start,
         'current_period_end', period_end,
-        'current_invoice_number', current_inv.invoice_number,
+        'current_invoice_number', current_inv,
         'next_purchase_id', next_purchase_id,
         'next_due_date', CASE WHEN next_purchase_id IS NOT NULL THEN next_start ELSE NULL END,
-        'next_invoice_number', next_inv.invoice_number
+        'next_invoice_number', next_inv
     );
 END;
 $$;

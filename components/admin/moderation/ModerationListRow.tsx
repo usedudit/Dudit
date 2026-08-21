@@ -8,11 +8,10 @@ import {
     RemoveImageIcon,
     StoreIcon,
     CancelCircleIcon,
-    UnfoldMoreIcon,
+    ChevronsUpDown,
 } from "@/lib/icons"
 import type { ModerationItem } from "@/lib/admin/types"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { FadeIn } from "@/components/animations/FadeIn"
 
 interface ModerationListRowProps {
     item: ModerationItem
@@ -77,7 +76,7 @@ const ModerationListRow = React.memo(({
                             )}
                             {item.images && item.images.length > 1 && (
                                 <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                                    <UnfoldMoreIcon className="w-5 h-5 text-white" />
+                                    <ChevronsUpDown className="w-5 h-5 text-white" />
                                     <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs bg-black/80 text-white px-1.5 py-0.5 rounded whitespace-nowrap">
                                         {item.images.length} imagens - clique para ver
                                     </span>

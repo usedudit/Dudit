@@ -56,7 +56,7 @@ export const AccountView = ({
   handleSaveCpf,
   clearMessages,
 }: AccountViewProps) => (
-  <motion.div key="account" {...fade} className="max-w-[800px] mx-auto space-y-6">
+  <motion.div key="account" {...fade} className="w-full">
     <PageHeader title="Informações da conta" subtitle="Gerencie seus dados pessoais e de contato." onBack={() => navigate("main")} />
 
     <SectionCard title="Dados da conta">

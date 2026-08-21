@@ -1,23 +1,18 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
-import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import type React from "react"
+
+import { useState } from "react"
 import { useTheme } from "next-themes"
-import {
-    TruckIcon,
-    HelpCircleIcon,
-    ChevronLeftIcon,
-    ChevronDownIcon,
-    MoonIcon,
-    SunIcon,
-    UserIcon,
-    LogoutIcon,
-} from "@/lib/icons"
-import { Dropdown, DropdownItem } from "@/components/reusable"
-import BottomSheet from "@/components/BottomSheet"
-import { getUserInitials, getAvatarColor } from "@/lib/utils/UserProfileImage"
+import { MenuIcon, MoonIcon, LogoutIcon, ChevronDownIcon, ChevronLeftIcon, UserIcon, HelpCircleIcon, TruckIcon } from "@/lib/icons"
+import Dropdown, { DropdownItem } from "@/components/reusable/Dropdown"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
+import { useRouter, usePathname, useSearchParams } from "next/navigation"
+import Link from "next/link"
+import { getUserInitials, getAvatarColor } from "@/lib/utils/UserProfileImage"
+import { useSidebar } from "@/lib/sidebar-context"
+import BottomSheet from "@/components/BottomSheet"
+import { NotificationBell } from "@/components/notifications/NotificationBell"
 
 const ChevronRight = ({ className }: { className?: string }) => (
     <svg
@@ -41,25 +36,33 @@ interface UserProfileData {
     avatarColor: string
 }
 
-export function DeliveryPortalHeader({ userProfile }: { userProfile?: UserProfileData }) {
+interface DeliveryPortalHeaderProps {
+    pageTitle?: string
+    backHref?: string // Link to go back (e.g., /entregadores)
+    onBack?: () => void // Custom back logic (e.g. discard changes)
+    isSubPage?: boolean // Force ChevronLeftIcon even without backHref
+    userProfile?: UserProfileData
+}
+
+export function DeliveryPortalHeader({
+    pageTitle = "",
+    backHref,
+    onBack,
+    isSubPage,
+    userProfile,
+}: DeliveryPortalHeaderProps) {
     const { theme, setTheme } = useTheme()
     const router = useRouter()
     const pathname = usePathname()
     const [isTransitioning, setIsTransitioning] = useState(false)
-    const [isProfileOpen, setIsProfileOpen] = useState(false)
 
     const userName = userProfile?.fullName || "Entregador"
     const userEmail = userProfile?.email || ""
     const userInitials = userProfile?.initials || getUserInitials(userName)
     const avatarColor = userProfile?.avatarColor || getAvatarColor(userName)
-
-    const getPageTitle = () => {
-        if (pathname.startsWith("/entregadores/entregas/")) return "Detalhes da Entrega"
-        return "Minhas Entregas"
-    }
-
-    const isSubPage = pathname.startsWith("/entregadores/entregas/")
-    const displayTitle = getPageTitle()
+    const [isProfileOpen, setIsProfileOpen] = useState(false)
+    const { setIsMobileOpen, headerOverride } = useSidebar()
+    const searchParams = useSearchParams()
 
     const handleThemeButtonClick = (newTheme: string) => {
         if (isTransitioning) return
@@ -89,7 +92,7 @@ export function DeliveryPortalHeader({ userProfile }: { userProfile?: UserProfil
                     duration: 500,
                     easing: "ease-in-out",
                     pseudoElement: "::view-transition-new(root)",
-                }
+                },
             )
         })
 
@@ -105,81 +108,101 @@ export function DeliveryPortalHeader({ userProfile }: { userProfile?: UserProfil
         window.location.href = "/auth/login"
     }
 
+    const isAutoInnerPage = pathname.startsWith("/entregadores/entregas/")
+
+    const hasEntityParam = searchParams.has("create") || searchParams.has("view") || searchParams.has("edit") || searchParams.has("duplicate")
+
+    const displayTitle = headerOverride?.title || pageTitle || "Minhas Entregas"
+    const displayBackHref = headerOverride?.backHref || backHref
+    const displayOnBack = headerOverride?.onBack || onBack
+    const displayIsSubPage = headerOverride?.isSubPage || isSubPage || isAutoInnerPage || hasEntityParam
+    const showBackButton = !!(displayBackHref || displayOnBack || displayIsSubPage)
+
     return (
         <header className="sticky top-0 bg-brand-page-bg dark:bg-dark-background z-30 border-b border-brand-border dark:border-dark-border">
             <div className="px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-14 relative">
-                    {/* LEFT / LOGO & BREADCRUMB */}
                     <div className="flex items-center gap-3">
-                        {isSubPage ? (
+                        {showBackButton ? (
                             <button
-                                className="text-brand-dark dark:text-dark-heading p-1.5 -ml-1.5 rounded-lg hover:bg-brand-gray dark:hover:bg-dark-border transition-colors cursor-pointer"
-                                onClick={() => router.push("/entregadores")}
-                                aria-label="Voltar para entregas"
+                                className="text-brand-dark dark:text-dark-heading md:hidden"
+                                onClick={() => {
+                                    if (displayOnBack) {
+                                        displayOnBack()
+                                    } else if (displayBackHref) {
+                                        router.push(displayBackHref)
+                                    } else {
+                                        router.back()
+                                    }
+                                }}
                             >
                                 <ChevronLeftIcon className="w-6 h-6" />
                             </button>
-                        ) : null}
+                        ) : (
+                            <button
+                                className="text-brand-dark dark:text-dark-heading md:hidden"
+                                aria-controls="sidebar"
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    setIsMobileOpen(true)
+                                }}
+                            >
+                                <MenuIcon className="w-6 h-6" />
+                            </button>
+                        )}
 
-                        {/* DESKTOP BREADCRUMB */}
-                        <div className="flex items-center gap-2">
+                        {/* --- ÁREA DO BREADCRUMB (IGUAL AO ERP) --- */}
+                        <div className="hidden md:flex items-center gap-2">
+                            {/* Botão Unificado (Ícone + Nome) */}
                             <Link
                                 href="/entregadores"
+                                prefetch={false}
                                 className="group flex items-center gap-2 pl-1 pr-2 py-1 rounded-full hover:bg-gray-100 dark:hover:bg-dark-border transition-colors cursor-pointer select-none"
                             >
-                                <img
-                                    src="https://img.dudit.com.br/static/Logo.png"
-                                    alt="Dudit"
-                                    className="h-6 w-auto mr-1"
-                                />
-                                <div className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-brand-green/10 text-brand-green text-xs font-bold">
-                                    <TruckIcon size={12} />
-                                    <span>Portal do Entregador</span>
+                                <div className="flex items-center gap-1.5 h-full">
+                                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-brand-green/10 text-brand-green text-xs font-bold leading-none">
+                                        <TruckIcon size={12} />
+                                        <span>Portal do Entregador</span>
+                                    </div>
                                 </div>
                             </Link>
 
+                            {/* Separador Chevron Right */}
                             <ChevronRight className="w-4 h-4 text-brand-inactive-text/50 dark:text-dark-body/50" />
 
-                            <h1 className="text-sm font-medium text-brand-inactive-text dark:text-dark-body px-1">
+                            {/* Título da Página */}
+                            <h1 className="text-sm font-normal text-brand-inactive-text dark:text-dark-body px-1">
                                 {displayTitle}
                             </h1>
                         </div>
+                        {/* ------------------------------------ */}
                     </div>
 
-                    {/* RIGHT ACTIONS */}
+                    {/* Mobile centered title */}
+                    <div className="absolute top-1/2 left-1/2 -translate-y-1/2 -translate-x-1/2 md:hidden">
+                        <h1 className="text-lg sm:text-xl font-bold text-brand-dark dark:text-dark-heading whitespace-nowrap">
+                            {displayTitle}
+                        </h1>
+                    </div>
+
                     <div className="flex items-center gap-3">
-                        {/* THEME TOGGLE BUTTON */}
-                        <button
-                            type="button"
-                            onClick={() => handleThemeButtonClick(theme === "dark" ? "light" : "dark")}
-                            aria-label="Alternar tema claro/escuro"
-                            className="hidden sm:flex h-9 w-9 items-center justify-center rounded-full border border-brand-border bg-white text-brand-dark hover:bg-brand-gray dark:border-dark-border dark:bg-dark-surface dark:text-dark-heading dark:hover:bg-dark-border transition-colors cursor-pointer shrink-0"
-                            title="Alternar tema"
-                        >
-                            {theme === "dark" ? (
-                                <SunIcon className="w-4 h-4 text-amber-400" />
-                            ) : (
-                                <MoonIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
-                            )}
-                        </button>
+                        <NotificationBell variant="erp" />
 
-                        <div className="hidden sm:block h-6 w-px bg-brand-border dark:border-dark-border" />
+                        <div className="h-6 w-px bg-brand-border dark:border-dark-border" />
 
-                        {/* MOBILE PROFILE AVATAR TRIGGER */}
-                        <div className="md:hidden flex items-center cursor-pointer" onClick={() => setIsProfileOpen(true)}>
+                        <div className="md:hidden flex items-center" onClick={() => setIsProfileOpen(true)}>
                             <div
-                                className={`w-8 h-8 rounded-full ${avatarColor || getAvatarColor(userName)} flex items-center justify-center text-white font-bold text-sm border border-brand-border dark:border-dark-border shadow-xs relative`}
+                                className={`w-8 h-8 rounded-full ${avatarColor || getAvatarColor(userName)} flex items-center justify-center text-white font-bold text-sm cursor-pointer border border-brand-border dark:border-dark-border shadow-sm relative`}
                             >
                                 {userInitials || getUserInitials(userName)}
                             </div>
                         </div>
 
-                        {/* DESKTOP PROFILE DROPDOWN (IDENTICAL TO ERPHEADER) */}
                         <Dropdown
                             trigger={
                                 <div className="hidden md:flex items-center space-x-2 p-1 cursor-pointer hover:bg-brand-gray dark:hover:bg-dark-border rounded-full transition-colors group">
                                     <div
-                                        className={`w-8 h-8 rounded-full ${avatarColor || getAvatarColor(userName)} flex items-center justify-center text-white font-bold text-sm border border-brand-border dark:border-dark-border group-hover:shadow-xs transition-all relative`}
+                                        className={`w-8 h-8 rounded-full ${avatarColor || getAvatarColor(userName)} flex items-center justify-center text-white font-bold text-sm border border-brand-border dark:border-dark-border group-hover:shadow-sm transition-all relative`}
                                     >
                                         {userInitials || getUserInitials(userName)}
                                     </div>
@@ -195,7 +218,7 @@ export function DeliveryPortalHeader({ userProfile }: { userProfile?: UserProfil
                             <div className="px-4 py-3 border-b border-brand-border dark:border-dark-border">
                                 <div className="flex items-center space-x-3 mb-4">
                                     <div
-                                        className={`w-10 h-10 rounded-full ${avatarColor || getAvatarColor(userName)} flex items-center justify-center text-white font-bold text-sm border border-brand-border dark:border-dark-border shadow-xs`}
+                                        className={`w-10 h-10 rounded-full ${avatarColor || getAvatarColor(userName)} flex items-center justify-center text-white font-bold text-sm border border-brand-border dark:border-dark-border shadow-sm`}
                                     >
                                         {userInitials || getUserInitials(userName)}
                                     </div>
@@ -205,17 +228,12 @@ export function DeliveryPortalHeader({ userProfile }: { userProfile?: UserProfil
                                                 {userName}
                                             </p>
                                         </div>
-                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate mt-0.5">
-                                            {userEmail}
-                                        </p>
+                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate mt-0.5">{userEmail}</p>
                                     </div>
                                 </div>
 
                                 <div className="py-1 border-y border-brand-border dark:border-dark-border">
-                                    <DropdownItem
-                                        className="flex items-center gap-3 w-full"
-                                        onClick={() => handleThemeButtonClick(theme === "dark" ? "light" : "dark")}
-                                    >
+                                    <DropdownItem className="flex items-center gap-3 w-full" onClick={() => handleThemeButtonClick(theme === "dark" ? "light" : "dark")}>
                                         <MoonIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
                                         <span className="text-sm font-normal text-brand-inactive-text">Modo escuro</span>
                                     </DropdownItem>
@@ -247,8 +265,6 @@ export function DeliveryPortalHeader({ userProfile }: { userProfile?: UserProfil
                     </div>
                 </div>
             </div>
-
-            {/* MOBILE BOTTOMSHEET (IDENTICAL TO ERPHEADER) */}
             <BottomSheet isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)}>
                 <div className="flex flex-col py-1">
                     <div className="flex items-center space-x-4 mb-6 px-2 mt-4">
@@ -262,8 +278,8 @@ export function DeliveryPortalHeader({ userProfile }: { userProfile?: UserProfil
                                 <p className="font-bold text-lg text-brand-dark dark:text-dark-heading truncate">
                                     {userName}
                                 </p>
-                                <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-green-500 text-white whitespace-nowrap">
-                                    Entregador
+                                <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-brand-green text-white whitespace-nowrap">
+                                    ENTREGADOR
                                 </span>
                             </div>
                             <p className="text-sm text-brand-inactive-text dark:text-dark-body truncate">{userEmail}</p>
@@ -282,7 +298,7 @@ export function DeliveryPortalHeader({ userProfile }: { userProfile?: UserProfil
                                     }`}
                             >
                                 <span
-                                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-xs transition-transform ${theme === "dark" ? "translate-x-5" : "translate-x-1"
+                                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${theme === "dark" ? "translate-x-5" : "translate-x-1"
                                         }`}
                                 />
                             </button>
@@ -314,7 +330,7 @@ export function DeliveryPortalHeader({ userProfile }: { userProfile?: UserProfil
                             onClick={handleSignOut}
                             className="flex items-center gap-4 p-4 rounded-2xl bg-red-50/50 dark:bg-red-900/10 text-brand-red w-full text-left transition-all hover:bg-red-50 dark:hover:bg-red-900/20"
                         >
-                            <div className="w-5 h-5 bg-red-500 rounded flex items-center justify-center shadow-xs">
+                            <div className="w-5 h-5 bg-red-500 rounded flex items-center justify-center shadow-sm">
                                 <LogoutIcon className="w-3.5 h-3.5 text-white" />
                             </div>
                             <span className="text-[16px] font-bold">Sair da sessão</span>
@@ -322,6 +338,7 @@ export function DeliveryPortalHeader({ userProfile }: { userProfile?: UserProfil
                     </nav>
                 </div>
             </BottomSheet>
+
         </header>
     )
 }

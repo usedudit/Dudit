@@ -3,6 +3,7 @@ import { headers } from "next/headers"
 import { notFound, permanentRedirect } from "next/navigation"
 import { isUuid } from "@/lib/utils/short-id"
 import PublicOSPortal from "@/components/public/PublicOSPortal"
+import { getTrustedClientIP } from "@/lib/security/client-ip"
 
 export const dynamic = "force-dynamic"
 
@@ -14,7 +15,7 @@ export default async function ClientPortalPage({ params }: PageProps) {
     const { token } = await params
 
     const headerList = await headers()
-    const ip = headerList.get("x-forwarded-for")?.split(",")[0]?.trim() || "127.0.0.1"
+    const ip = getTrustedClientIP(headerList)
     const userAgent = headerList.get("user-agent") || "unknown"
 
     const result = await getServiceOrderByTokenAction(token)
@@ -37,4 +38,3 @@ export default async function ClientPortalPage({ params }: PageProps) {
         />
     )
 }
-

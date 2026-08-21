@@ -1,8 +1,9 @@
 "use client";
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/reusable/Button';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
     ArrowRight,
     PieChart,
@@ -17,6 +18,11 @@ import {
     Calendar,
     Wrench,
     Search,
+    ChevronDown,
+    Star,
+    Shield,
+    Zap,
+    Link2,
 } from 'lucide-react';
 import { GridLines, SectionHeader, Navbar, Footer, CTA } from '../../../components/InstitucionalShared';
 
@@ -177,7 +183,7 @@ const BentoFeaturesComoAjuda = () => {
                         >
                             <div className="bg-brand-slate border border-gray-100 h-64 rounded-xl overflow-hidden relative p-6 flex items-center justify-center">
                                 {card.type === 'buy' && (
-                                    <div className="bg-white p-4 w-full max-w-[220px] rounded-lg border border-gray-100 text-xs shadow-sm">
+                                    <div className="bg-white p-4 w-full max-w-[220px] rounded-lg border border-gray-100 text-xs">
                                         <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-50">
                                             <Search className="w-3.5 h-3.5 text-brand-green" />
                                             <span className="text-[10px] font-bold text-brand-dark">Buscar na sua cidade</span>
@@ -196,7 +202,7 @@ const BentoFeaturesComoAjuda = () => {
                                 )}
 
                                 {card.type === 'sell' && (
-                                    <div className="bg-white p-4 w-full max-w-[220px] rounded-lg border border-gray-100 text-xs shadow-sm">
+                                    <div className="bg-white p-4 w-full max-w-[220px] rounded-lg border border-gray-100 text-xs">
                                         <div className="flex justify-between mb-3 border-b border-gray-50 pb-2">
                                             <span className="text-[10px] font-bold text-brand-inactive-text uppercase">Novo anúncio</span>
                                             <div className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded text-[8px] font-bold">Ativo</div>
@@ -210,7 +216,7 @@ const BentoFeaturesComoAjuda = () => {
                                 )}
 
                                 {card.type === 'store' && (
-                                    <div className="bg-white p-4 w-full max-w-[220px] rounded-lg border border-gray-100 text-xs shadow-sm">
+                                    <div className="bg-white p-4 w-full max-w-[220px] rounded-lg border border-gray-100 text-xs">
                                         <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-50">
                                             <Store className="w-4 h-4 text-brand-dark" />
                                             <span className="text-[10px] font-bold text-brand-dark">Sua Vitrine Online</span>
@@ -225,7 +231,7 @@ const BentoFeaturesComoAjuda = () => {
                                 )}
 
                                 {card.type === 'schedule' && (
-                                    <div className="bg-white p-4 w-full max-w-[220px] rounded-lg border border-gray-100 text-xs shadow-sm">
+                                    <div className="bg-white p-4 w-full max-w-[220px] rounded-lg border border-gray-100 text-xs">
                                         <div className="flex justify-between items-center mb-3 border-b border-gray-50 pb-2">
                                             <span className="text-[10px] font-bold text-brand-inactive-text uppercase">Agenda Hoje</span>
                                             <Calendar size={12} className="text-brand-inactive-text" />
@@ -258,11 +264,21 @@ const BentoFeaturesComoAjuda = () => {
 
 const ParaQuemCompra = () => {
     const items = [
-        { icon: Search, title: "Encontre produtos", desc: "Comprar novos ou usados perto de você" },
-        { icon: Wrench, title: "Descubra serviços", desc: "Profissionais e técnicos da sua região" },
-        { icon: ShoppingBag, title: "Comida & Doces", desc: "Confeitarias, marmitas e lanches locais" },
-        { icon: Calendar, title: "Agende fácil", desc: "Horários sem burocracia e sem espera" },
-        { icon: MessageCircle, title: "Converse direto", desc: "Tire dúvidas no WhatsApp de quem vende" },
+        {
+            icon: Search,
+            title: "Encontre o que precisa",
+            desc: "Comprar novos ou usados, encontrar serviços, descobrir negócios próximos ou resolver uma necessidade do dia a dia. Quando precisar de alguma coisa, dê uma olhada na Dudit.",
+        },
+        {
+            icon: ShoppingBag,
+            title: "Produtos & Serviços",
+            desc: "De eletrônicos a roupas, de marmitas a encanadores. Tudo organizado para você encontrar rápido o que precisa, perto de você.",
+        },
+        {
+            icon: MessageCircle,
+            title: "Contato direto",
+            desc: "Tire dúvidas no WhatsApp de quem vende, compare opções e feche o negócio sem burocracia. Direto com o vendedor.",
+        },
     ];
 
     return (
@@ -273,25 +289,26 @@ const ParaQuemCompra = () => {
                     subtitle="PARA QUEM PROCURA"
                     title="O que você procura?"
                 />
-                <p className="text-brand-inactive-text max-w-3xl mb-12 text-lg -mt-8 leading-relaxed">
-                    Comprar algo novo ou usado, encontrar um serviço, descobrir negócios próximos ou resolver uma necessidade do dia a dia. <strong className="text-brand-dark font-semibold">Quando precisar de alguma coisa, dê uma olhada na Dudit.</strong>
-                </p>
 
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-8">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-0 mt-8">
                     {items.map((item, idx) => (
                         <motion.div
                             key={idx}
                             initial={{ opacity: 0, y: 20 }}
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true }}
-                            transition={{ delay: idx * 0.08 }}
-                            className="bg-white border border-gray-100 rounded-xl p-5 text-center hover:border-brand-green/30 hover:shadow-sm transition-all group"
+                            transition={{ delay: idx * 0.1 }}
+                            className={`py-8 px-8 ${idx < items.length - 1 ? 'md:border-r md:border-dashed md:border-gray-200' : ''} ${idx < items.length - 1 ? 'border-b md:border-b-0 border-dashed border-gray-200' : ''}`}
                         >
-                            <div className="w-10 h-10 bg-brand-green/10 rounded-xl flex items-center justify-center mx-auto mb-3 group-hover:bg-brand-green/20 transition-colors">
-                                <item.icon className="w-5 h-5 text-brand-dark" />
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="w-10 h-10 bg-brand-dark rounded-xl flex items-center justify-center">
+                                    <item.icon className="w-5 h-5 text-white" />
+                                </div>
+                                <h4 className="text-lg font-bold text-brand-dark">{item.title}</h4>
                             </div>
-                            <h4 className="text-sm font-bold text-brand-dark mb-0.5">{item.title}</h4>
-                            <p className="text-xs text-brand-inactive-text">{item.desc}</p>
+                            <p className="text-brand-inactive-text text-sm leading-relaxed">
+                                {item.desc}
+                            </p>
                         </motion.div>
                     ))}
                 </div>
@@ -301,42 +318,126 @@ const ParaQuemCompra = () => {
 };
 
 const ParaQuemVende = () => {
+    const [openIndex, setOpenIndex] = useState<number | null>(0);
+
     const items = [
-        { icon: Store, title: "Mais uma vitrine", desc: "Chegue até mais pessoas da sua cidade" },
-        { icon: MessageCircle, title: "Contato direto", desc: "Clientes chamam no WhatsApp ou compram na vitrine" },
-        { icon: TrendingUp, title: "Sem comissão", desc: "100% do lucro da venda fica com você" },
-        { icon: Layout, title: "Link na bio", desc: "Catálogo limpo para compartilhar nas redes" },
+        {
+            num: "01",
+            title: "Mais uma vitrine",
+            desc: "Chegue até mais pessoas da sua cidade. Sua loja aparece para quem está procurando exatamente o que você vende.",
+        },
+        {
+            num: "02",
+            title: "Contato direto",
+            desc: "Clientes chamam no WhatsApp ou compram direto na sua vitrine. Sem intermediários, sem complicação.",
+        },
+        {
+            num: "03",
+            title: "Sem comissão",
+            desc: "100% do lucro da venda fica com você. A Dudit cobra apenas uma taxa fixa mensal, sem surpresas.",
+        },
+        {
+            num: "04",
+            title: "Link na bio",
+            desc: "Tenha um catálogo limpo e profissional para compartilhar nas suas redes sociais. Seu link único para usar no Instagram.",
+        },
     ];
 
     return (
         <section className="relative py-24 bg-white overflow-hidden border-t border-gray-100">
             <GridLines />
             <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
-                <SectionHeader
-                    subtitle="MAIS UMA PORTA ABERTA"
-                    title="Seu negócio também pode ser encontrado na Dudit"
-                />
-                <p className="text-brand-inactive-text max-w-3xl mb-12 text-lg -mt-8 leading-relaxed">
-                    Você já usa Instagram e WhatsApp? Continue usando. A Dudit é mais uma vitrine para seus produtos e serviços chegarem até mais pessoas. <strong className="text-brand-dark font-semibold">A Dudit é mais uma porta para clientes encontrarem você.</strong>
-                </p>
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
-                    {items.map((item, idx) => (
-                        <motion.div
-                            key={idx}
-                            initial={{ opacity: 0, y: 20 }}
-                            whileInView={{ opacity: 1, y: 0 }}
-                            viewport={{ once: true }}
-                            transition={{ delay: idx * 0.1 }}
-                            className="bg-white border border-gray-100 rounded-xl p-6 text-center hover:border-brand-green/30 hover:shadow-sm transition-all group"
-                        >
-                            <div className="w-12 h-12 bg-brand-green/10 rounded-xl flex items-center justify-center mx-auto mb-3 group-hover:bg-brand-green/20 transition-colors">
-                                <item.icon className="w-6 h-6 text-brand-dark" />
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+                    {/* Lado esquerdo: Imagem */}
+                    <motion.div
+                        initial={{ opacity: 0, x: -30 }}
+                        whileInView={{ opacity: 1, x: 0 }}
+                        viewport={{ once: true }}
+                        transition={{ duration: 0.5 }}
+                        className="relative"
+                    >
+                        <div className="bg-brand-green-light rounded-3xl p-6 md:p-10">
+                            <div className="rounded-2xl overflow-hidden shadow-lg">
+                                <img
+                                    src="https://img.dudit.com.br/static/institucional/vendedor.jpg"
+                                    alt="Vendedor usando a Dudit"
+                                    className="w-full h-auto object-cover aspect-[4/5]"
+                                    onError={(e) => {
+                                        const target = e.target as HTMLImageElement;
+                                        target.style.display = 'none';
+                                        const parent = target.parentElement;
+                                        if (parent) {
+                                            parent.innerHTML = '<div class="w-full aspect-[4/5] bg-brand-green/20 rounded-2xl flex items-center justify-center"><div class="text-center"><div class="w-16 h-16 bg-brand-green/30 rounded-2xl flex items-center justify-center mx-auto mb-4"><svg class="w-8 h-8 text-brand-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg></div><p class="text-brand-dark font-medium">Sua loja na Dudit</p></div></div>';
+                                        }
+                                    }}
+                                />
                             </div>
-                            <h4 className="text-base font-bold text-brand-dark mb-1">{item.title}</h4>
-                            <p className="text-sm text-brand-inactive-text">{item.desc}</p>
-                        </motion.div>
-                    ))}
+                        </div>
+                    </motion.div>
+
+                    {/* Lado direito: Título + Accordion */}
+                    <motion.div
+                        initial={{ opacity: 0, x: 30 }}
+                        whileInView={{ opacity: 1, x: 0 }}
+                        viewport={{ once: true }}
+                        transition={{ duration: 0.5, delay: 0.1 }}
+                    >
+                        <span className="text-sm font-medium tracking-wider uppercase mb-4 block text-brand-inactive-text">
+                            MAIS UMA PORTA ABERTA
+                        </span>
+                        <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-brand-dark mb-6">
+                            Seu negócio também pode ser encontrado na Dudit
+                        </h2>
+                        <p className="text-brand-inactive-text text-lg leading-relaxed mb-10">
+                            Você já usa Instagram e WhatsApp? Continue usando. A Dudit é mais uma vitrine para seus produtos e serviços chegarem até mais pessoas.
+                        </p>
+
+                        <div className="space-y-0">
+                            {items.map((item, idx) => {
+                                const isOpen = openIndex === idx;
+                                return (
+                                    <motion.div
+                                        key={idx}
+                                        initial={{ opacity: 0, y: 10 }}
+                                        whileInView={{ opacity: 1, y: 0 }}
+                                        viewport={{ once: true }}
+                                        transition={{ delay: idx * 0.08 }}
+                                        className={`border-t border-gray-200 ${idx === items.length - 1 ? 'border-b' : ''}`}
+                                    >
+                                        <button
+                                            onClick={() => setOpenIndex(isOpen ? null : idx)}
+                                            className="w-full flex items-center gap-4 py-5 text-left group cursor-pointer"
+                                        >
+                                            <span className="text-sm font-medium text-brand-inactive-text w-8 shrink-0">
+                                                {item.num}.
+                                            </span>
+                                            <span className={`text-lg font-bold flex-1 transition-colors ${isOpen ? 'text-brand-dark' : 'text-brand-dark group-hover:text-brand-green'}`}>
+                                                {item.title}
+                                            </span>
+                                            <ChevronDown
+                                                className={`w-5 h-5 text-brand-inactive-text transition-transform duration-300 shrink-0 ${isOpen ? 'rotate-180' : ''}`}
+                                            />
+                                        </button>
+                                        <AnimatePresence initial={false}>
+                                            {isOpen && (
+                                                <motion.div
+                                                    initial={{ height: 0, opacity: 0 }}
+                                                    animate={{ height: "auto", opacity: 1 }}
+                                                    exit={{ height: 0, opacity: 0 }}
+                                                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                                                    className="overflow-hidden"
+                                                >
+                                                    <p className="text-brand-inactive-text text-sm leading-relaxed pb-5 pl-12 pr-8">
+                                                        {item.desc}
+                                                    </p>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </motion.div>
+                                );
+                            })}
+                        </div>
+                    </motion.div>
                 </div>
             </div>
         </section>

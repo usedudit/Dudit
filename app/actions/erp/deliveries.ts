@@ -239,6 +239,12 @@ async function getOrCreateCachedCoords(params: {
       .maybeSingle()
 
     if (cached?.latitude != null && cached?.longitude != null) {
+      await params.supabase
+        .from("address_coordinates_cache")
+        .update({ last_accessed_at: new Date().toISOString() })
+        .eq("partner_id", params.partnerId)
+        .eq("address_text", normalized)
+
       return { lat: Number(cached.latitude), lng: Number(cached.longitude) }
     }
 
@@ -253,8 +259,7 @@ async function getOrCreateCachedCoords(params: {
           address_text: normalized,
           latitude: coords.lat,
           longitude: coords.lng,
-          provider: "nominatim",
-          updated_at: new Date().toISOString(),
+          last_accessed_at: new Date().toISOString(),
         },
         { onConflict: "partner_id,address_text" },
       )
@@ -1490,12 +1495,13 @@ export async function getERPDeliveryDetailsAction(deliveryId: string, partnerId:
 
   if (error) return { success: false as const, error: error.message }
 
-  const [{ data: platformAssignment }, deliveryPersonNameById] = await Promise.all([
+  const deliveryOrderIds = (data?.delivery_orders || []).map((doItem: any) => doItem?.order_id).filter(Boolean)
+  let [{ data: platformAssignment }, deliveryPersonNameById] = await Promise.all([
     getAdminClient()
       .from("delivery_assignments")
-      .select("driver_id")
+      .select("id, driver_id, status, assigned_at, accepted_at, picked_up_at, out_for_delivery_at, completed_at")
       .eq("delivery_id", deliveryId)
-      .in("status", ["assigned", "accepted", "picked_up", "out_for_delivery"])
+      .in("status", ["available", "requested", "assigned", "accepted", "picked_up", "out_for_delivery", "delivered"])
       .order("assigned_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
@@ -1505,6 +1511,57 @@ export async function getERPDeliveryDetailsAction(deliveryId: string, partnerId:
       data?.delivery_person_id ? [String(data.delivery_person_id)] : [],
     ),
   ])
+
+  if (!platformAssignment && deliveryOrderIds.length > 0) {
+    const { data: orderAssignment } = await getAdminClient()
+      .from("delivery_assignments")
+      .select("id, driver_id, status, assigned_at, accepted_at, picked_up_at, out_for_delivery_at, completed_at")
+      .in("order_id", deliveryOrderIds)
+      .in("status", ["available", "requested", "assigned", "accepted", "picked_up", "out_for_delivery", "delivered"])
+      .order("assigned_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    platformAssignment = orderAssignment
+  }
+
+  let platformDriver: any = null
+  let resolvedPlatformDriverId: string | null = null
+
+  if (platformAssignment) {
+    if (!platformAssignment.driver_id) {
+      resolvedPlatformDriverId = "dudit_network"
+      platformDriver = {
+        id: "dudit_network",
+        fullName: "Rede de Entregadores Dudit",
+        status: platformAssignment.status,
+        isPlatformDriver: true,
+        isPendingAcceptance: true,
+      }
+    } else {
+      const driverUserId = String(platformAssignment.driver_id)
+      resolvedPlatformDriverId = driverUserId
+      const [{ data: profile }, { data: driverRow }, { count: totalDeliveries }] = await Promise.all([
+        getAdminClient().from("user_profiles").select("full_name, phone, avatar_url").eq("user_id", driverUserId).maybeSingle(),
+        getAdminClient().from("delivery_drivers").select("vehicle_type, city").eq("user_id", driverUserId).maybeSingle(),
+        getAdminClient().from("delivery_assignments").select("id", { count: "exact", head: true }).eq("driver_id", driverUserId).eq("status", "delivered"),
+      ])
+
+      const fullName = profile?.full_name || "Entregador Dudit"
+      const vehicleType = driverRow?.vehicle_type === "moto" ? "Moto" : driverRow?.vehicle_type === "carro" ? "Carro" : null
+
+      platformDriver = {
+        id: driverUserId,
+        fullName,
+        phone: profile?.phone || null,
+        avatarUrl: profile?.avatar_url || null,
+        vehicleType,
+        totalDeliveries: totalDeliveries || 0,
+        status: platformAssignment.status,
+        isPlatformDriver: true,
+        isPendingAcceptance: false,
+      }
+    }
+  }
 
   const buyerIds = Array.from(new Set((data?.delivery_orders || [])
     .map((doItem: any) => doItem?.orders?.buyer_id)
@@ -1538,7 +1595,8 @@ export async function getERPDeliveryDetailsAction(deliveryId: string, partnerId:
 
   const hydrated = {
     ...data,
-    platform_driver_id: platformAssignment?.driver_id ? String(platformAssignment.driver_id) : null,
+    platform_driver_id: resolvedPlatformDriverId,
+    platform_driver: platformDriver,
     delivery_orders: (data?.delivery_orders || []).map((doItem: any) => {
       const order = doItem.orders
       if (!order) return doItem

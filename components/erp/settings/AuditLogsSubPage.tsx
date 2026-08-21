@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Button } from "@/components/reusable"
+import { Button, ThreeDotsLoader } from "@/components/reusable"
 import { ChevronLeftIcon, ClockIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { getAuditLogsAction } from "@/app/actions/erp/audit-logs"
@@ -112,9 +112,7 @@ export function AuditLogsSubPage({ onBack }: { onBack: () => void }) {
   if (loading) {
     return (
       <FadeIn className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
-        <div className="flex items-center justify-center h-full text-brand-inactive-text">
-          Carregando histórico de atividades...
-        </div>
+        <ThreeDotsLoader />
       </FadeIn>
     )
   }

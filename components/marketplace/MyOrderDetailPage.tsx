@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { ChevronRightIcon, CreditCardIcon, XIcon, CheckCircleIcon, ClockIcon, AlertCircleIcon, MoneyIcon, WhatsappIcon } from '@/lib/icons';
+import { ChevronRightIcon, CreditCardIcon, XIcon, CheckCircleIcon, ClockIcon, AlertCircleIcon, MoneyIcon, WhatsappIcon, TruckIcon } from '@/lib/icons';
 import { motion } from 'framer-motion';
 import { Button, Spinner, FormSection, ListItem, Tabs, TabsList, TabsTrigger, TabsContent, Input, FormDropdown, Checkbox, Badge, DefaultModal, QuantitySelector, ThreeDotsLoader, IconPlaceholder, Tooltip, InfoCard } from '@/components/reusable';
 import ProductImagesSection from '@/components/erp/product/ProductImagesSection';
@@ -662,15 +662,19 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const getPaymentTypeLabel = () => {
         let baseLabel = "Pix";
         const breakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : [];
-        const breakdownMethod = breakdown.find((e: any) => e?.method)?.method;
-        if (breakdownMethod) {
-            const m = breakdownMethod.toLowerCase();
+        const methodEntries = breakdown.filter((e: any) => e?.method);
+        const hasMultipleMethods = methodEntries.length > 1;
+
+        if (hasMultipleMethods) {
+            baseLabel = "Múltiplos meios";
+        } else if (methodEntries.length === 1) {
+            const m = methodEntries[0].method.toLowerCase();
             if (m === "pix" || m === "bank_transfer") baseLabel = "Pix";
             else if (m.includes("crédito") || m.includes("credito") || m.includes("credit")) baseLabel = "Cartão de Crédito";
             else if (m.includes("débito") || m.includes("debito") || m.includes("debit")) baseLabel = "Cartão de Débito";
             else if (m.includes("dinheiro") || m.includes("cash") || m.includes("money")) baseLabel = "Dinheiro";
             else if (m.includes("boleto")) baseLabel = "Boleto";
-            else baseLabel = breakdownMethod;
+            else baseLabel = methodEntries[0].method;
         } else {
             const pm = String(order.payment_method || "").toLowerCase();
             if (pm === "pix" || pm === "bank_transfer") baseLabel = "Pix";
@@ -680,10 +684,12 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
             else if (pm.includes("boleto")) baseLabel = "Boleto";
             else baseLabel = order.payment_method || order.payment_provider || "Pix";
         }
-        const paymentEntry = breakdown.find((e: any) => e?.method && !e?.checkoutPricing);
-        const installmentCount = paymentEntry?.installmentNumber || order.installments || 1;
-        if (installmentCount > 1) {
-            baseLabel = `${baseLabel} - ${installmentCount}x`;
+        if (!hasMultipleMethods) {
+            const paymentEntry = methodEntries[0] || null;
+            const installmentCount = paymentEntry?.installmentNumber || order.installments || 1;
+            if (installmentCount > 1) {
+                baseLabel = `${baseLabel} - ${installmentCount}x`;
+            }
         }
         if (order.payment_provider === "Mercado Pago") {
             return `Mercado Pago (${baseLabel})`;
@@ -1544,7 +1550,64 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                         </div>
                                     </FormSection>
 
-                                    {/* Section 4: Vendedor */}
+                                    {/* Section 4: Entregador */}
+                                    {isDelivery && order.delivery_driver && (
+                                        <FormSection title="Entregador">
+                                            <div className="flex items-center justify-between gap-4">
+                                                <div className="flex items-center gap-3.5 min-w-0">
+                                                    <div className="w-10 h-10 rounded-full bg-brand-primary/10 dark:bg-brand-primary/20 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border shrink-0 text-brand-primary">
+                                                        {order.delivery_driver.avatarUrl ? (
+                                                            <img
+                                                                src={order.delivery_driver.avatarUrl}
+                                                                alt={order.delivery_driver.name}
+                                                                className="w-full h-full object-cover"
+                                                            />
+                                                        ) : (
+                                                            <TruckIcon size={20} className="text-brand-dark dark:text-dark-heading" />
+                                                        )}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <span className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading truncate">
+                                                                {order.delivery_driver.name}
+                                                            </span>
+                                                            {order.delivery_driver.isPlatformDriver && (
+                                                                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-brand-primary/10 text-brand-primary dark:bg-brand-primary/20 dark:text-brand-primary">
+                                                                    Dudit
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-xs lg:text-sm text-brand-inactive-text dark:text-dark-body mt-0.5 flex items-center gap-1.5 flex-wrap">
+                                                            {order.delivery_driver.isPlatformDriver ? (
+                                                                <span>
+                                                                    {order.delivery_driver.totalDeliveries > 0
+                                                                        ? `${order.delivery_driver.totalDeliveries} entregas realizadas`
+                                                                        : "Entregador Parceiro"}
+                                                                    {order.delivery_driver.vehicleType ? ` • ${order.delivery_driver.vehicleType}` : ""}
+                                                                </span>
+                                                            ) : (
+                                                                <span>Entrega própria do estabelecimento</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                {order.delivery_driver.phone && ["sent", "out_for_delivery"].includes(order.delivery_status) && (
+                                                    <a
+                                                        href={`https://wa.me/55${String(order.delivery_driver.phone).replace(/\D/g, '')}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="shrink-0 p-2 rounded-xl border border-brand-border dark:border-dark-border hover:bg-brand-surface dark:hover:bg-dark-surface transition-colors flex items-center gap-1.5 text-xs font-semibold text-brand-dark dark:text-dark-heading"
+                                                        title="Conversar no WhatsApp"
+                                                    >
+                                                        <WhatsappIcon size={16} className="text-[#25D366]" />
+                                                        <span className="hidden sm:inline">Contato</span>
+                                                    </a>
+                                                )}
+                                            </div>
+                                        </FormSection>
+                                    )}
+
+                                    {/* Section 5: Vendedor */}
                                     <FormSection title="Vendedor">
                                         {storeDeleted ? (
                                             <div className="flex items-center gap-4 block">

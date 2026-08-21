@@ -1214,9 +1214,7 @@ const PaymentModal = ({
                 } else {
                     const otherPaid = payments.reduce((acc, p, idx) => {
                         if (idx === editingPaymentIndex) return acc;
-                        const base = Math.max(0, Number(p.amount || 0));
-                        const disc = Math.max(0, Number((p as any).paymentMethodDiscountAmount || 0));
-                        return acc + base + disc;
+                        return acc + Math.max(0, Number(p.amount || 0));
                     }, 0);
                     const needed = Math.max(0, netChargeTarget - otherPaid);
                     initialAmt = needed > 0 ? needed : 0;
@@ -1401,15 +1399,12 @@ const PaymentModal = ({
     // Compara o valor base que o operador digitou contra o valor total com a precificação do método aplicado
     const isAllocationUnderpaid = paymentBaseAmount < finalTotalWithMethodPricing - 0.005;
     const isUnderpaid = view === 'split'
-        ? ((splitPreview && 'success' in splitPreview && splitPreview.success ? splitPreview.finalTotal : splitBaseSum) < chargeTarget - 0.005)
+        ? splitBaseSum < chargeTarget - 0.005
         : isAllocationUnderpaid;
 
     const splitTotalAbated = useMemo(() => {
-        if (splitPreview && 'success' in splitPreview && splitPreview.success) {
-            return splitPreview.finalTotal;
-        }
-        return payments.reduce((acc, p) => acc + (p.method && p.amount > 0.009 ? p.amount + Number((p as any).paymentMethodDiscountAmount || 0) : 0), 0);
-    }, [payments, splitPreview]);
+        return splitBaseSum;
+    }, [splitBaseSum]);
 
     const isOverpaid = view === 'split'
         ? splitTotalAbated > chargeTarget + 0.005
@@ -1423,9 +1418,6 @@ const PaymentModal = ({
 
     /** Valor efetivo pago / a registrar (líquido do método quando houver cálculo). */
     const totalPaidCalculated = useMemo(() => {
-        if (view === 'split' && splitPreview && 'success' in splitPreview && splitPreview.success) {
-            return splitPreview.finalTotal;
-        }
         if (view === 'split') {
             return splitBaseSum;
         }
@@ -1445,10 +1437,7 @@ const PaymentModal = ({
 
     const { compactAlertPaid, compactAlertNeed } = useMemo(() => {
         if (view === 'split') {
-            const paid = splitPreview && 'success' in splitPreview && splitPreview.success
-                ? splitPreview.finalTotal
-                : splitBaseSum;
-            return { compactAlertPaid: paid, compactAlertNeed: chargeTarget };
+            return { compactAlertPaid: splitBaseSum, compactAlertNeed: chargeTarget };
         }
         if (editingPaymentIndex !== null) {
             return { compactAlertPaid: allocationTotal, compactAlertNeed: chargeTarget };
@@ -1498,7 +1487,7 @@ const PaymentModal = ({
     const displayTransactionTotal = paymentStatus === "success" && successSnapshot
         ? successSnapshot.displayOrderTotal
         : view === 'split'
-            ? chargeTarget
+            ? (splitPreview && 'success' in splitPreview && splitPreview.success ? splitPreview.finalTotal : chargeTarget)
             : (view === 'money' || view === 'card' || view === 'pix' || view === 'store_credit')
                 ? finalTotalWithMethodPricing
                 : total;

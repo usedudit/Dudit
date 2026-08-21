@@ -363,8 +363,23 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
     const getPaymentTypeLabel = () => {
         const breakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : [];
-        const breakdownMethod = breakdown.find((e: any) => e?.method)?.method;
-        const rawMethod = breakdownMethod || order.payment_method;
+        const hasMultipleMethods = breakdown.filter((e: any) => e?.method).length > 1;
+
+        if (hasMultipleMethods) {
+            const labels = Array.from(new Set(
+                breakdown
+                    .filter((e: any) => e?.method)
+                    .map((e: any) => formatPaymentMethodLabel(e.method, null))
+                    .filter(Boolean)
+            ));
+            let label = labels.length > 1 ? "Múltiplos meios" : (labels[0] || order.payment_method || "Não informado");
+            if (installmentCount && installmentCount > 1) {
+                label = `${label} - ${installmentCount}x`;
+            }
+            return label;
+        }
+
+        const rawMethod = breakdown.find((e: any) => e?.method)?.method || order.payment_method;
 
         let label = formatPaymentMethodLabel(rawMethod, null);
         if (!label) label = "Não informado";
@@ -383,8 +398,8 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const isMercadoPago = order.payment_provider === "Mercado Pago";
     const getPaymentIcon = () => {
         const breakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : [];
-        const breakdownMethod = breakdown.find((e: any) => e?.method)?.method;
-        const subMethod = String(breakdownMethod || order.payment_method || "").toLowerCase();
+        const methodEntries = breakdown.filter((e: any) => e?.method);
+        const hasMultipleMethods = methodEntries.length > 1;
 
         const icons: React.ReactNode[] = [];
         if (isMercadoPago) {
@@ -393,25 +408,33 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
             );
         }
 
-        let iconName = null;
-        if (subMethod.includes("pix") || subMethod.includes("bank_transfer")) {
-            iconName = "Pix.png";
-        } else if (subMethod.includes("crédito") || subMethod.includes("credito") || subMethod.includes("credit")) {
-            iconName = "CreditCard.png";
-        } else if (subMethod.includes("débito") || subMethod.includes("debito") || subMethod.includes("debit")) {
-            iconName = "DebitCard.png";
-        } else if (subMethod.includes("boleto")) {
-            iconName = "Boleto.png";
-        }
+        if (hasMultipleMethods) {
+            icons.push(
+                <span key="multi" className="text-brand-dark dark:text-dark-heading shrink-0 text-sm">💳</span>
+            );
+        } else {
+            const subMethod = String(methodEntries[0]?.method || order.payment_method || "").toLowerCase();
 
-        if (iconName) {
-            icons.push(
-                <img key="sub" src={`https://img.dudit.com.br/static/icons/payments/${iconName}`} alt="Sub method" className="w-5 h-5 object-contain shrink-0" />
-            );
-        } else if (!isMercadoPago) {
-            icons.push(
-                <span key="default" className="text-brand-dark dark:text-dark-heading shrink-0 text-sm">💳</span>
-            );
+            let iconName = null;
+            if (subMethod.includes("pix") || subMethod.includes("bank_transfer")) {
+                iconName = "Pix.png";
+            } else if (subMethod.includes("crédito") || subMethod.includes("credito") || subMethod.includes("credit")) {
+                iconName = "CreditCard.png";
+            } else if (subMethod.includes("débito") || subMethod.includes("debito") || subMethod.includes("debit")) {
+                iconName = "DebitCard.png";
+            } else if (subMethod.includes("boleto")) {
+                iconName = "Boleto.png";
+            }
+
+            if (iconName) {
+                icons.push(
+                    <img key="sub" src={`https://img.dudit.com.br/static/icons/payments/${iconName}`} alt="Sub method" className="w-5 h-5 object-contain shrink-0" />
+                );
+            } else if (!isMercadoPago) {
+                icons.push(
+                    <span key="default" className="text-brand-dark dark:text-dark-heading shrink-0 text-sm">💳</span>
+                );
+            }
         }
 
         return <div className="flex items-center gap-1">{icons}</div>;

@@ -3,6 +3,7 @@
 import React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { motion } from "framer-motion"
 import { Badge, BadgeVariant, Dropdown, DropdownItem } from "@/components/reusable"
 import {
     TruckIcon,
@@ -118,34 +119,39 @@ export default function DeliveryAssignmentListRow({
     }
 
     return (
-        <tr
+        <motion.tr
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="group hover:bg-brand-gray/60 dark:hover:bg-dark-border/20 transition-colors cursor-pointer bg-white dark:bg-dark-background"
             onClick={handleView}
-            className="hover:bg-brand-gray/60 dark:hover:bg-dark-border/30 transition-colors border-b border-brand-border/60 dark:border-dark-border/40 group cursor-pointer"
         >
             {/* PEDIDO */}
-            <td className="py-3.5 px-3 pl-6">
-                <span className="font-bold text-sm text-brand-dark dark:text-dark-heading group-hover:text-brand-green transition-colors font-mono">
-                    {orderNumberDisplay}
-                </span>
-                {assignment.assigned_at && (
-                    <p className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-0.5">
-                        {formatDate(assignment.assigned_at)}
-                    </p>
-                )}
+            <td className="py-2.5 pl-6 pr-2 border-b border-brand-border dark:border-dark-border w-[180px]">
+                <div className="flex flex-col">
+                    <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading group-hover:text-brand-green transition-colors font-mono">
+                        {orderNumberDisplay}
+                    </span>
+                    {assignment.assigned_at && (
+                        <span className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-0.5">
+                            {formatDate(assignment.assigned_at)}
+                        </span>
+                    )}
+                </div>
             </td>
 
-            {/* LOJA / PARCEIRO */}
-            <td className="py-3.5 px-3">
-                <div className="flex items-center gap-1.5 text-sm font-medium text-brand-dark dark:text-dark-heading">
+            {/* ESTABELECIMENTO */}
+            <td className="p-2 border-b border-brand-border dark:border-dark-border w-[180px]">
+                <div className="flex items-center gap-1.5 text-[13px] font-medium text-brand-dark dark:text-dark-heading">
                     <StoreIcon size={14} className="text-brand-inactive-text shrink-0" />
                     <span className="truncate max-w-[160px]">{assignment.partner_name || "Loja Parceira"}</span>
                 </div>
             </td>
 
-            {/* CLIENTE & CONTATO */}
-            <td className="py-3.5 px-3" onClick={(e) => e.stopPropagation()}>
+            {/* CLIENTE */}
+            <td className="p-2 border-b border-brand-border dark:border-dark-border w-[200px]" onClick={(e) => e.stopPropagation()}>
                 <div className="flex flex-col">
-                    <span className="font-semibold text-sm text-brand-dark dark:text-dark-heading truncate max-w-[180px]">
+                    <span className="font-semibold text-[13px] text-brand-dark dark:text-dark-heading truncate max-w-[180px]">
                         {assignment.customer_name}
                     </span>
                     {assignment.customer_phone ? (
@@ -176,8 +182,8 @@ export default function DeliveryAssignmentListRow({
                 </div>
             </td>
 
-            {/* ENDEREÇO DE ENTREGA */}
-            <td className="py-3.5 px-3" onClick={(e) => e.stopPropagation()}>
+            {/* ENDEREÇO */}
+            <td className="p-2 border-b border-brand-border dark:border-dark-border w-[240px]" onClick={(e) => e.stopPropagation()}>
                 <a
                     href={mapsUrl}
                     target="_blank"
@@ -191,9 +197,9 @@ export default function DeliveryAssignmentListRow({
             </td>
 
             {/* VALORES */}
-            <td className="py-3.5 px-3">
+            <td className="p-2 border-b border-brand-border dark:border-dark-border w-[130px]">
                 <div className="flex flex-col">
-                    <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">
+                    <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading">
                         {formatCurrency(assignment.total_amount || 0)}
                     </span>
                     <span className="text-[11px] font-semibold text-brand-green">
@@ -203,15 +209,15 @@ export default function DeliveryAssignmentListRow({
             </td>
 
             {/* STATUS */}
-            <td className="py-3.5 px-3 text-center">
+            <td className="p-2 border-b border-brand-border dark:border-dark-border text-center w-[160px]">
                 <Badge variant={statusMeta.variant} icon={statusMeta.icon} className="justify-center">
                     {statusMeta.label}
                 </Badge>
             </td>
 
             {/* AÇÕES */}
-            <td className="py-3.5 px-3 pr-6 text-center" onClick={(e) => e.stopPropagation()}>
-                <div className="flex items-center justify-center">
+            <td className="py-2.5 pr-6 pl-2 border-b border-brand-border dark:border-dark-border text-center w-[70px] rounded-r-lg" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-center action-btn">
                     <Dropdown
                         align="right"
                         showChevron={false}
@@ -247,6 +253,6 @@ export default function DeliveryAssignmentListRow({
                     </Dropdown>
                 </div>
             </td>
-        </tr>
+        </motion.tr>
     )
 }

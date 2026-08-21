@@ -1018,8 +1018,8 @@ const Header: React.FC<HeaderProps> = ({
                                         })}
                                     </div>
 
-                                    <div className="border-t border-gray-100 dark:border-dark-border py-2">
-                                        <div className="px-6 py-2.5 flex items-center justify-between hover:bg-brand-gray dark:hover:bg-dark-border/30 cursor-pointer transition-colors">
+                                    <div className="border-t border-brand-border dark:border-dark-border py-2">
+                                        <div className="px-6 py-2.5 flex items-center justify-between">
                                             <span className="flex items-center gap-3">
                                                 <MoonIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
                                                 <span className="text-[14px] font-normal text-brand-inactive-text dark:text-dark-body">Modo escuro</span>
@@ -1028,7 +1028,7 @@ const Header: React.FC<HeaderProps> = ({
                                         </div>
                                     </div>
 
-                                    <div className="border-t border-gray-100 dark:border-dark-border py-2 mt-auto">
+                                    <div className="border-t border-brand-border dark:border-dark-border py-2 mt-auto">
                                         <div
                                             className="px-6 py-3 hover:bg-brand-gray dark:hover:bg-dark-border/30 cursor-pointer transition-colors"
                                             onClick={handleSignOut}

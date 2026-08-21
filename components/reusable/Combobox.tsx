@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useState, useRef, useEffect, useCallback } from "react"
-import { CancelIcon, UnfoldMoreIcon, CheckCircleIcon } from "@/lib/icons"
+import { CancelIcon, ChevronsUpDown, CheckCircleIcon } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 import { useMediaQuery } from "@/components/erp/hooks"
 import BottomSheet from "@/components/BottomSheet"
@@ -281,7 +281,7 @@ export function Combobox({
                     <span className={cn("truncate", !selectedOption && "text-brand-inactive-text")}>
                         {selectedOption ? selectedOption.label : placeholder}
                     </span>
-                    <UnfoldMoreIcon
+                    <ChevronsUpDown
                         className={cn(
                             "ml-2 h-4 w-4 text-brand-inactive-text shrink-0 transition-transform duration-200",
                             isOpen && "rotate-180",

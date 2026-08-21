@@ -13,6 +13,7 @@ import {
     LinkIcon,
     CopyIcon,
     ShareIcon,
+    DownloadIcon,
     SparklesIcon,
     WhatsappIcon,
     FacebookIcon,
@@ -60,6 +61,163 @@ interface DashboardChecklistItem {
 // ============================================
 // SUB-COMPONENTS
 // ============================================
+
+const DINO_CAVALERE_URL = "https://img.dudit.com.br/static/mascots/QRDino.png";
+
+function QRCodePoster({ profileUrl, storeName }: { profileUrl: string; storeName: string }) {
+    const canvasRef = React.useRef<HTMLCanvasElement>(null);
+    const [generating, setGenerating] = useState(false);
+    const [previewUrl, setPreviewUrl] = useState<string>("");
+    const { toast } = useToast();
+
+    // Posições do QR code no cavalete (proporcionais à imagem)
+    // Ajuste conforme a imagem real do Dino cavalete
+    const QR_POSITION = {
+        x: 0.175,      // 17.5% da largura (início do espaço branco)
+        y: 0.53,       // 53% da altura (início do espaço branco)
+        width: 0.22,   // 22% da largura da imagem
+        height: 0.27,  // 27% da altura da imagem
+    };
+
+    const generatePoster = React.useCallback(async () => {
+        setGenerating(true);
+        try {
+            const canvas = canvasRef.current;
+            if (!canvas) return;
+
+            const ctx = canvas.getContext("2d");
+            if (!ctx) return;
+
+            // Carrega a imagem do Dino cavalete
+            const dinoImg = new Image();
+            dinoImg.crossOrigin = "anonymous";
+            await new Promise<void>((resolve, reject) => {
+                dinoImg.onload = () => resolve();
+                dinoImg.onerror = reject;
+                dinoImg.src = DINO_CAVALERE_URL;
+            });
+
+            // Carrega o QR code em tamanho maior para melhor resolução
+            const qrSize = 500;
+            const qrImg = new Image();
+            qrImg.crossOrigin = "anonymous";
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${qrSize}x${qrSize}&data=${encodeURIComponent(profileUrl)}`;
+            await new Promise<void>((resolve, reject) => {
+                qrImg.onload = () => resolve();
+                qrImg.onerror = reject;
+                qrImg.src = qrUrl;
+            });
+
+            // Configura o canvas com as dimensões da imagem original
+            canvas.width = dinoImg.naturalWidth;
+            canvas.height = dinoImg.naturalHeight;
+
+            // Desenha o Dino cavalete
+            ctx.drawImage(dinoImg, 0, 0);
+
+            // Calcula a posição do QR code no cavalete
+            const qrX = canvas.width * QR_POSITION.x;
+            const qrY = canvas.height * QR_POSITION.y;
+            const qrWidth = canvas.width * QR_POSITION.width;
+            const qrHeight = canvas.height * QR_POSITION.height;
+
+            // Desenha um fundo branco arredondado para o QR code
+            const padding = qrWidth * 0.08;
+            const borderRadius = qrWidth * 0.06;
+            ctx.fillStyle = "#FFFFFF";
+            ctx.beginPath();
+            ctx.roundRect(
+                qrX - padding,
+                qrY - padding,
+                qrWidth + padding * 2,
+                qrHeight + padding * 2,
+                borderRadius
+            );
+            ctx.fill();
+
+            // Desenha o QR code centralizado no espaço
+            ctx.drawImage(qrImg, qrX, qrY, qrWidth, qrHeight);
+
+            // Converte para blob e cria URL para preview/download
+            canvas.toBlob((blob) => {
+                if (blob) {
+                    const url = URL.createObjectURL(blob);
+                    setPreviewUrl(url);
+                }
+                setGenerating(false);
+            }, "image/png");
+
+        } catch (err) {
+            console.error("Erro ao gerar poster:", err);
+            toast({ title: "Erro ao gerar imagem", description: "Tente novamente.", variant: "destructive" });
+            setGenerating(false);
+        }
+    }, [profileUrl, toast]);
+
+    const downloadPoster = React.useCallback(() => {
+        if (!previewUrl) return;
+        const link = document.createElement("a");
+        link.href = previewUrl;
+        link.download = `perfil-vendedor-dudit-${storeName.replace(/\s+/g, "-").toLowerCase()}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast({ title: "Imagem baixada!", description: "Use para imprimir, colar na porta ou compartilhar." });
+    }, [previewUrl, storeName, toast]);
+
+    return (
+        <div className="flex flex-col items-center gap-3">
+            <canvas ref={canvasRef} className="hidden" />
+
+            {!previewUrl ? (
+                <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 rounded-full font-semibold text-xs"
+                    onClick={generatePoster}
+                    disabled={generating}
+                >
+                    <DownloadIcon className="w-3.5 h-3.5" />
+                    {generating ? "Gerando..." : "Baixar Poster"}
+                </Button>
+            ) : (
+                <div className="flex flex-col items-center gap-2">
+                    <div className="relative group cursor-pointer" onClick={downloadPoster}>
+                        <img
+                            src={previewUrl}
+                            alt="Poster do perfil"
+                            className="w-32 h-auto rounded-lg border border-brand-border dark:border-dark-border shadow-sm group-hover:shadow-md transition-shadow"
+                        />
+                        <div className="absolute inset-0 bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <span className="text-white text-xs font-bold flex items-center gap-1">
+                                <DownloadIcon className="w-4 h-4" /> Baixar
+                            </span>
+                        </div>
+                    </div>
+                    <div className="flex gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1 rounded-full font-semibold text-xs"
+                            onClick={downloadPoster}
+                        >
+                            <DownloadIcon className="w-3 h-3" />
+                            Salvar
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs font-semibold"
+                            onClick={() => { setPreviewUrl(""); }}
+                        >
+                            Gerar novamente
+                        </Button>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
 
 function QRCodeCard({ partnerUrl, storeName }: { partnerUrl: string; storeName: string }) {
     const [qrCodeUrl, setQrCodeUrl] = useState<string>("");
@@ -203,6 +361,14 @@ function QRCodeCard({ partnerUrl, storeName }: { partnerUrl: string; storeName: 
                             </div>
                         </div>
                     )}
+                </div>
+
+                {/* Poster para download */}
+                <div className="mt-3 pt-3 border-t border-brand-border/40 dark:border-dark-border/40">
+                    <p className="text-xs text-brand-inactive-text dark:text-dark-body mb-2">
+                        Imprima e coloque na porta da sua loja:
+                    </p>
+                    <QRCodePoster profileUrl={profileUrl} storeName={storeName} />
                 </div>
             </div>
 
@@ -373,15 +539,13 @@ function ProgressCard({
                     <div
                         key={item.id}
                         onClick={() => onItemClick(item)}
-                        className={`flex items-center gap-3 px-4 py-3 rounded-2xl border transition-all cursor-pointer ${
-                            item.completed
-                                ? 'border-brand-green/30 dark:border-brand-green/20 bg-brand-green-light/20 dark:bg-brand-green/5'
-                                : 'border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-dark/30 dark:hover:border-brand-gray/30'
-                        }`}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-2xl border transition-all cursor-pointer ${item.completed
+                            ? 'border-brand-green/30 dark:border-brand-green/20 bg-brand-green-light/20 dark:bg-brand-green/5'
+                            : 'border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-dark/30 dark:hover:border-brand-gray/30'
+                            }`}
                     >
-                        <span className={`text-sm font-bold w-6 text-center shrink-0 ${
-                            item.completed ? 'text-brand-green' : 'text-brand-inactive-text dark:text-dark-body'
-                        }`}>
+                        <span className={`text-sm font-bold w-6 text-center shrink-0 ${item.completed ? 'text-brand-green' : 'text-brand-inactive-text dark:text-dark-body'
+                            }`}>
                             {String(idx + 1).padStart(2, "0")}
                         </span>
                         <div className="flex-1 min-w-0">

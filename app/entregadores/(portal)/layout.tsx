@@ -6,6 +6,8 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { DeliveryPortalHeader } from "@/components/delivery/DeliveryPortalChrome"
 import { DeliverySidebar } from "@/components/delivery/DeliverySidebar"
 import { DeliveryAccessDenied } from "@/components/delivery/DeliveryAccessDenied"
+import { SidebarProvider } from "@/lib/sidebar-context"
+import { NotificationsRealtimeProvider } from "@/providers/notifications-realtime-provider"
 
 export default async function DeliveryPortalLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser()
@@ -31,20 +33,22 @@ export default async function DeliveryPortalLayout({ children }: { children: Rea
 
   return (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
-      <div className="flex h-screen w-screen overflow-hidden bg-brand-page-bg dark:bg-dark-background text-brand-dark dark:text-white transition-colors duration-200">
-        {isDriver && (
-          <DeliverySidebar
-            userProfile={userProfile}
-            initialOnline={driverData?.availability_status === "available"}
-          />
-        )}
-        <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-brand-page-bg dark:bg-dark-background">
-          <DeliveryPortalHeader userProfile={userProfile} />
-          <main className="flex-1 overflow-y-auto min-h-0 bg-brand-page-bg dark:bg-dark-background">
-            {isDriver ? children : <DeliveryAccessDenied userEmail={user.email || ""} />}
-          </main>
-        </div>
-      </div>
+      <NotificationsRealtimeProvider>
+        <SidebarProvider initialExpanded={true}>
+          <div className="flex h-screen bg-brand-page-bg dark:bg-brand-page-bg text-brand-dark dark:text-white transition-colors duration-200">
+            {isDriver && (
+              <DeliverySidebar
+                userProfile={userProfile}
+                initialOnline={driverData?.availability_status === "available"}
+              />
+            )}
+            <div className="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
+              <DeliveryPortalHeader userProfile={userProfile} />
+              {isDriver ? children : <DeliveryAccessDenied userEmail={user.email || ""} />}
+            </div>
+          </div>
+        </SidebarProvider>
+      </NotificationsRealtimeProvider>
     </ThemeProvider>
   )
 }

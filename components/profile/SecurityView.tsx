@@ -64,7 +64,7 @@ export const SecurityView = ({
     clearMessages,
     onDeleteClick,
 }: SecurityViewProps) => (
-    <motion.div key="password" {...fade} className="max-w-[800px] mx-auto space-y-6">
+    <motion.div key="password" {...fade} className="w-full">
         <PageHeader title="Segurança" subtitle="Gerencie seu acesso e segurança da conta." onBack={() => navigate("main")} />
 
         <SectionCard title="Acesso e segurança">

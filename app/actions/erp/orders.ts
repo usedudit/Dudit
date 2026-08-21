@@ -2315,27 +2315,87 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
             return sellerProfile?.full_name || null
         }
 
-        const resolvePlatformDriverId = async () => {
-            const { data: link } = await supabase
-                .from("delivery_orders")
-                .select("delivery_id")
-                .eq("order_id", data.id)
-                .limit(1)
-                .maybeSingle()
-            if (!link?.delivery_id) return null
-            const { data: assignment } = await supabase
+        const resolvePlatformDriver = async () => {
+            const { data: directAssignment } = await supabase
                 .from("delivery_assignments")
-                .select("driver_id")
-                .eq("delivery_id", link.delivery_id)
+                .select("id, driver_id, status, assigned_at, accepted_at, picked_up_at, out_for_delivery_at, completed_at")
                 .eq("order_id", data.id)
-                .in("status", ["assigned", "accepted", "picked_up", "out_for_delivery"])
+                .in("status", ["available", "requested", "assigned", "accepted", "picked_up", "out_for_delivery", "delivered"])
                 .order("assigned_at", { ascending: false })
                 .limit(1)
                 .maybeSingle()
-            return assignment?.driver_id ? String(assignment.driver_id) : null
+
+            let targetAssignment = directAssignment
+
+            if (!targetAssignment) {
+                const { data: link } = await supabase
+                    .from("delivery_orders")
+                    .select("delivery_id")
+                    .eq("order_id", data.id)
+                    .limit(1)
+                    .maybeSingle()
+
+                if (link?.delivery_id) {
+                    const { data: linkedAssignment } = await supabase
+                        .from("delivery_assignments")
+                        .select("id, driver_id, status, assigned_at, accepted_at, picked_up_at, out_for_delivery_at, completed_at")
+                        .eq("delivery_id", link.delivery_id)
+                        .in("status", ["available", "requested", "assigned", "accepted", "picked_up", "out_for_delivery", "delivered"])
+                        .order("assigned_at", { ascending: false })
+                        .limit(1)
+                        .maybeSingle()
+                    targetAssignment = linkedAssignment
+                }
+            }
+
+            if (!targetAssignment) {
+                return { platformDriverId: null, platformDriver: null }
+            }
+
+            if (!targetAssignment.driver_id) {
+                return {
+                    platformDriverId: "dudit_network",
+                    platformDriver: {
+                        id: "dudit_network",
+                        fullName: "Rede de Entregadores Dudit",
+                        status: targetAssignment.status,
+                        isPlatformDriver: true,
+                        isPendingAcceptance: true,
+                    }
+                }
+            }
+
+            const driverUserId = String(targetAssignment.driver_id)
+            const [{ data: profile }, { data: driverRow }, { count: totalDeliveries }] = await Promise.all([
+                supabase.from("user_profiles").select("full_name, phone, avatar_url").eq("user_id", driverUserId).maybeSingle(),
+                supabase.from("delivery_drivers").select("vehicle_type, city").eq("user_id", driverUserId).maybeSingle(),
+                supabase.from("delivery_assignments").select("id", { count: "exact", head: true }).eq("driver_id", driverUserId).eq("status", "delivered"),
+            ])
+
+            const fullName = profile?.full_name || "Entregador Dudit"
+            const vehicleType = driverRow?.vehicle_type === "moto" ? "Moto" : driverRow?.vehicle_type === "carro" ? "Carro" : null
+
+            return {
+                platformDriverId: driverUserId,
+                platformDriver: {
+                    id: driverUserId,
+                    fullName,
+                    phone: profile?.phone || null,
+                    avatarUrl: profile?.avatar_url || null,
+                    vehicleType,
+                    totalDeliveries: totalDeliveries || 0,
+                    status: targetAssignment.status,
+                    isPlatformDriver: true,
+                    isPendingAcceptance: false,
+                }
+            }
         }
 
-        const [customers, sellerName, platformDriverId] = await Promise.all([resolveCustomer(), resolveSellerName(), resolvePlatformDriverId()])
+        const [customers, sellerName, { platformDriverId, platformDriver }] = await Promise.all([
+            resolveCustomer(),
+            resolveSellerName(),
+            resolvePlatformDriver(),
+        ])
 
         const subtotalValue = Number((data.order_items || []).reduce((acc: number, item: any) => {
             return acc + Number(item?.subtotal ?? (Number(item?.quantity || 0) * Number(item?.product_price || 0)))
@@ -2384,6 +2444,7 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
                 is_refunded: isRefunded,
                 refunded_amount: refundedAmount,
                 platform_driver_id: platformDriverId,
+                platform_driver: platformDriver,
             },
         }
     }

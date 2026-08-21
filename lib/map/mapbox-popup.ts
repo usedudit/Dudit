@@ -180,7 +180,6 @@ export function buildVendorLocationPopupHtml(opt: VendorLocationPopupOptions): s
         <div class="dmp-header-text">
           <span class="dmp-title">${escapeHtml(name)}</span>
         </div>
-        <span class="dmp-badge dmp-badge-green">Parceiro</span>
       </div>
 
       <div class="dmp-body">

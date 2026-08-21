@@ -247,16 +247,19 @@ export const CUSTOMER_EXPORT_COLUMNS: ExportColumnDef[] = [
 
 export const CUSTOMER_EXPORT_ALL_COLUMNS: ExportColumnDef[] = [
   ...CUSTOMER_EXPORT_COLUMNS,
-  { header: "CPF/CNPJ", key: "document", width: 18 },
-  { header: "Pessoa", key: "personType", width: 8 },
+  { header: "Tipo Pessoa", key: "personType", width: 12 },
+  { header: "CPF", key: "cpf", width: 18 },
+  { header: "CNPJ", key: "cnpj", width: 20 },
   { header: "Status", key: "status", width: 12 },
   { header: "Telefone Fixo", key: "phoneFixed", width: 18 },
   { header: "Data de Nascimento", key: "birthDate", width: 16 },
-  { header: "E-mail Marketing", key: "website", width: 24 },
   { header: "CEP", key: "zipCode", width: 12 },
-  { header: "Endereço", key: "address", width: 40 },
+  { header: "Logradouro (Rua/Av)", key: "street", width: 30 },
+  { header: "Número", key: "number", width: 10 },
+  { header: "Complemento", key: "complement", width: 16 },
+  { header: "Bairro", key: "neighborhood", width: 20 },
   { header: "Cidade", key: "city", width: 20 },
-  { header: "UF", key: "state", width: 6 },
+  { header: "Estado (UF)", key: "state", width: 10 },
   { header: "Inscrição Estadual", key: "stateInscription", width: 18 },
   { header: "Crédito na Loja", key: "storeCredit", width: 16 },
   { header: "Observações", key: "notes", width: 30 },
@@ -279,18 +282,20 @@ export function mapCustomerRow(
   if (!includeAllColumns) return base
 
   const isPJ = String(row.person_type || "").toLowerCase() === "pj"
-  const addressParts = [row.street, row.number, row.complement, row.neighborhood].filter(Boolean)
 
   return {
     ...base,
-    document: row.cnpj || row.cpf || "-",
-    personType: isPJ ? "PJ" : "PF",
+    personType: isPJ ? "Jurídica" : "Física",
+    cpf: row.cpf || "-",
+    cnpj: row.cnpj || "-",
     status: row.status === "inativo" ? "Inativo" : row.status === "bloqueado" ? "Bloqueado" : "Ativo",
     phoneFixed: row.phone_fixed || "-",
     birthDate: row.birth_date ? formatDate(row.birth_date) : "-",
-    website: row.website || "-",
     zipCode: row.zip_code || "-",
-    address: addressParts.join(", ") || "-",
+    street: row.street || "-",
+    number: row.number || "-",
+    complement: row.complement || "-",
+    neighborhood: row.neighborhood || "-",
     city: row.city || "-",
     state: row.state || "-",
     stateInscription: row.inscricao_estadual || "-",

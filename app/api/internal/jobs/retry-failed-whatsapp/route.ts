@@ -30,8 +30,8 @@ export async function POST(req: Request) {
   const auth = validateCronRequest(req, JOB_NAME)
   if (!auth.ok) return auth.error
 
-  // 2. Rate limit by IP
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "cron"
+  // 2. Rate limit by job (the bearer secret authenticates the caller)
+  const ip = `job:${JOB_NAME}`
   try {
     const limiter = getLimiter(RateLimitCategory.WEBHOOK)
     const { success } = await limiter.limit(`internal-cron:${ip}`)

@@ -14,6 +14,7 @@ import { validateCPF, validateCNPJ, sanitizeInput } from "@/lib/input-validator"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { getPartnerCapabilities } from "@/lib/services/partner-capabilities"
 import { enrichAddressData } from "@/lib/services/location.service"
+import { getTrustedClientIP } from "@/lib/security/client-ip"
 
 interface ImportPreview {
   xml_import_id: string
@@ -644,7 +645,7 @@ export async function uploadXMLAction(
     let ip: string | null = null
     try {
       const h = await headers()
-      ip = h.get("x-forwarded-for") || h.get("x-real-ip") || null
+      ip = getTrustedClientIP(h)
     } catch {
       // headers() pode falhar em alguns ambientes
     }

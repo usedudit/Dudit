@@ -2,11 +2,11 @@ import "server-only"
 import type { EntityType, RowValidation, RowWarning } from "./types"
 import { getFieldsForEntity, getRequiredFields } from "./field-registry"
 
-function validateEmail(v: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
+export function validateEmail(v: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim())
 }
 
-function validateCPF(v: string): boolean {
+export function validateCPF(v: string): boolean {
   const digits = v.replace(/\D/g, "")
   if (digits.length !== 11) return false
   if (/^(\d)\1{10}$/.test(digits)) return false
@@ -22,7 +22,7 @@ function validateCPF(v: string): boolean {
   return r === parseInt(digits[10])
 }
 
-function validateCNPJ(v: string): boolean {
+export function validateCNPJ(v: string): boolean {
   const chars = v.replace(/[^0-9A-Z]/gi, "").toUpperCase()
   if (chars.length !== 14) return false
   if (/^([0-9A-Z])\1{13}$/.test(chars)) return false
@@ -41,13 +41,35 @@ function validateCNPJ(v: string): boolean {
   return r === parseInt(chars[13])
 }
 
-function toNumber(v: string): number | null {
-  const clean = v.replace(",", ".").replace(/[^0-9.\-]/g, "")
+export function parseNumber(v: string | number | null | undefined): number | null {
+  if (v === null || v === undefined) return null
+  if (typeof v === "number") return isNaN(v) ? null : v
+
+  let str = String(v).trim().replace(/R\$/gi, "").trim()
+  if (!str) return null
+
+  // Check if Brazilian format with dot thousand and comma decimal: "1.500,50"
+  if (str.includes(",") && str.includes(".")) {
+    const lastComma = str.lastIndexOf(",")
+    const lastDot = str.lastIndexOf(".")
+    if (lastComma > lastDot) {
+      // 1.500,50 -> 1500.50
+      str = str.replace(/\./g, "").replace(",", ".")
+    } else {
+      // 1,500.50 -> 1500.50
+      str = str.replace(/,/g, "")
+    }
+  } else if (str.includes(",")) {
+    // 50,00 -> 50.00
+    str = str.replace(",", ".")
+  }
+
+  const clean = str.replace(/[^0-9.\-]/g, "")
   const n = parseFloat(clean)
   return isNaN(n) ? null : n
 }
 
-function validateRow(
+export function validateRow(
   rowData: Record<string, string>,
   rowIndex: number,
   entityType: EntityType,
@@ -59,9 +81,7 @@ function validateRow(
 
   for (const field of fields) {
     const value = rowData[field.name]
-    if (value === undefined || value === null) continue
-
-    const trimmed = value.trim()
+    const trimmed = value ? String(value).trim() : ""
 
     if (required.includes(field.name) && !trimmed) {
       errors.push({
@@ -72,24 +92,24 @@ function validateRow(
     }
 
     if (field.type === "number" && trimmed) {
-      const num = toNumber(trimmed)
+      const num = parseNumber(trimmed)
       if (num === null) {
         errors.push({
           row: rowIndex + 1,
           field: field.label,
-          message: `${field.label} deve ser um número`,
+          message: `${field.label} deve ser um número válido`,
         })
       }
     }
   }
 
-  // Length & Truncation warnings
+  // Length & format specific checks
   const nameVal = rowData["name"]?.trim()
-  if (nameVal && nameVal.length > 255) {
+  if (nameVal && nameVal.length > 150) {
     warnings.push({
       row: rowIndex + 1,
       field: "Nome",
-      message: `Nome muito longo (${nameVal.length} caracteres). Será truncado para 255 caracteres.`,
+      message: `Nome muito longo (${nameVal.length} caracteres). Será ajustado para 150 caracteres.`,
     })
   }
 
@@ -98,36 +118,76 @@ function validateRow(
     warnings.push({
       row: rowIndex + 1,
       field: "SKU",
-      message: `SKU muito longo. Será truncado para 100 caracteres.`,
+      message: `SKU muito longo (${skuVal.length} caracteres). Será ajustado para 100 caracteres.`,
     })
   }
 
   if (entityType === "customers") {
-    const email = rowData["email"]
+    const email = rowData["email"]?.trim()
     if (email && !validateEmail(email)) {
-      errors.push({ row: rowIndex + 1, field: "E-mail", message: "E-mail inválido" })
+      errors.push({ row: rowIndex + 1, field: "E-mail", message: "E-mail com formato inválido" })
     }
 
-    const cpf = rowData["cpf"]
-    if (cpf && cpf.replace(/\D/g, "").length === 11 && !validateCPF(cpf)) {
-      errors.push({ row: rowIndex + 1, field: "CPF", message: "CPF inválido" })
+    const cpf = rowData["cpf"]?.trim()
+    if (cpf) {
+      const digits = cpf.replace(/\D/g, "")
+      if (digits.length > 0 && !validateCPF(digits)) {
+        errors.push({ row: rowIndex + 1, field: "CPF", message: "CPF inválido" })
+      }
     }
 
-    const cnpj = rowData["cnpj"]
-    if (cnpj && cnpj.replace(/\D/g, "").length === 14 && !validateCNPJ(cnpj)) {
-      errors.push({ row: rowIndex + 1, field: "CNPJ", message: "CNPJ inválido" })
+    const cnpj = rowData["cnpj"]?.trim()
+    if (cnpj) {
+      const digits = cnpj.replace(/[^0-9A-Z]/gi, "")
+      if (digits.length > 0 && !validateCNPJ(digits)) {
+        errors.push({ row: rowIndex + 1, field: "CNPJ", message: "CNPJ inválido" })
+      }
+    }
+
+    const cep = rowData["zip_code"]?.trim()
+    if (cep) {
+      const cleanCep = cep.replace(/\D/g, "")
+      if (cleanCep.length > 0 && cleanCep.length !== 8) {
+        warnings.push({ row: rowIndex + 1, field: "CEP", message: "CEP deve conter 8 dígitos" })
+      }
     }
   }
 
   if (entityType === "products") {
     const price = rowData["price"]
     if (price) {
-      const num = toNumber(price)
+      const num = parseNumber(price)
       if (num !== null && num <= 0) {
         warnings.push({
           row: rowIndex + 1,
-          field: "Preço Venda",
-          message: "Preço igual ou abaixo de zero",
+          field: "Preço de Venda",
+          message: "Preço igual ou menor que zero",
+        })
+      }
+    }
+
+    const gtin = rowData["gtin"]?.trim()
+    if (gtin) {
+      const cleanGtin = gtin.replace(/\D/g, "")
+      if (cleanGtin.length > 0 && ![8, 12, 13, 14].includes(cleanGtin.length)) {
+        warnings.push({
+          row: rowIndex + 1,
+          field: "Código de Barras",
+          message: "GTIN/EAN geralmente possui 8, 12, 13 ou 14 dígitos",
+        })
+      }
+    }
+  }
+
+  if (entityType === "services") {
+    const price = rowData["price"]
+    if (price) {
+      const num = parseNumber(price)
+      if (num !== null && num <= 0) {
+        warnings.push({
+          row: rowIndex + 1,
+          field: "Preço",
+          message: "Preço igual ou menor que zero",
         })
       }
     }

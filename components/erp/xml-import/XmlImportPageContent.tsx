@@ -1497,20 +1497,66 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                                                         {/* Finance data for completed/reversed imports */}
                                                         {(isCompleted || isReversed) && financeData && financeData.length > 0 && (
                                                             <div className="pt-2 border-t border-brand-border dark:border-dark-border">
-                                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-2">Contas a Pagar</span>
-                                                                <div className="space-y-1">
-                                                                    {financeData.map((t: any, i: number) => (
-                                                                        <div key={i} className="flex items-center justify-between text-xs">
-                                                                            <div className="flex items-center gap-1">
-                                                                                <span className="text-brand-dark dark:text-dark-heading font-medium">R$ {Number(t.amount || 0).toFixed(2)}</span>
-                                                                                <Badge variant={t.status === "paid" ? "green" : t.status === "cancelled" ? "gray" : "orange"}>
-                                                                                    {t.status === "paid" ? "Pago" : t.status === "cancelled" ? "Cancelado" : "Pendente"}
-                                                                                </Badge>
-                                                                            </div>
-                                                                            <span className="text-brand-inactive-text">{t.due_date ? safeDate(t.due_date) : ""}</span>
+                                                                {isReversed ? (
+                                                                    <>
+                                                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-2">Resumo Financeiro</span>
+                                                                        <div className="space-y-1">
+                                                                            {(() => {
+                                                                                const originals = financeData.filter((t: any) => t.transaction_type !== 'refund')
+                                                                                const refunds = financeData.filter((t: any) => t.transaction_type === 'refund')
+                                                                                const totalOriginal = originals.reduce((sum: number, t: any) => sum + Number(t.original_amount || t.amount || 0), 0)
+                                                                                const totalPaid = originals.reduce((sum: number, t: any) => sum + Number(t.paid_amount || (t.status === 'paid' ? t.amount : 0) || 0), 0)
+                                                                                const totalRefunded = refunds.reduce((sum: number, t: any) => sum + Number(t.amount || 0), 0)
+                                                                                return (
+                                                                                    <>
+                                                                                        <div className="flex items-center justify-between text-xs">
+                                                                                            <span className="text-brand-inactive-text">Valor original</span>
+                                                                                            <span className="text-brand-dark dark:text-dark-heading font-medium">R$ {totalOriginal.toFixed(2)}</span>
+                                                                                        </div>
+                                                                                        {totalPaid > 0 && (
+                                                                                            <div className="flex items-center justify-between text-xs">
+                                                                                                <span className="text-brand-inactive-text">Pago</span>
+                                                                                                <span className="text-green-600 dark:text-green-400 font-medium">R$ {totalPaid.toFixed(2)}</span>
+                                                                                            </div>
+                                                                                        )}
+                                                                                        {totalRefunded > 0 && (
+                                                                                            <div className="flex items-center justify-between text-xs">
+                                                                                                <span className="text-brand-inactive-text">Reembolsado</span>
+                                                                                                <span className="text-blue-600 dark:text-blue-400 font-medium">R$ {totalRefunded.toFixed(2)}</span>
+                                                                                            </div>
+                                                                                        )}
+                                                                                        {refunds.filter((t: any) => t.status === 'pending').map((t: any, i: number) => (
+                                                                                            <div key={i} className="flex items-center justify-between text-xs">
+                                                                                                <div className="flex items-center gap-1">
+                                                                                                    <span className="text-brand-inactive-text">Estorno aguardando</span>
+                                                                                                    <Badge variant="orange">Pendente</Badge>
+                                                                                                </div>
+                                                                                                <span className="text-brand-inactive-text">{t.due_date ? safeDate(t.due_date) : ""}</span>
+                                                                                            </div>
+                                                                                        ))}
+                                                                                    </>
+                                                                                )
+                                                                            })()}
                                                                         </div>
-                                                                    ))}
-                                                                </div>
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-2">Contas a Pagar</span>
+                                                                        <div className="space-y-1">
+                                                                            {financeData.map((t: any, i: number) => (
+                                                                                <div key={i} className="flex items-center justify-between text-xs">
+                                                                                    <div className="flex items-center gap-1">
+                                                                                        <span className="text-brand-dark dark:text-dark-heading font-medium">R$ {Number(t.amount || 0).toFixed(2)}</span>
+                                                                                        <Badge variant={t.status === "paid" ? "green" : t.status === "cancelled" ? "gray" : "orange"}>
+                                                                                            {t.status === "paid" ? "Pago" : t.status === "cancelled" ? "Cancelado" : "Pendente"}
+                                                                                        </Badge>
+                                                                                    </div>
+                                                                                    <span className="text-brand-inactive-text">{t.due_date ? safeDate(t.due_date) : ""}</span>
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    </>
+                                                                )}
                                                             </div>
                                                         )}
                                                         {/* Stock movements for completed/reversed imports */}
@@ -1642,20 +1688,66 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                     )}
                     {(isCompleted || isReversed) && financeData && financeData.length > 0 && (
                         <div className="pt-2 border-t border-brand-border dark:border-dark-border">
-                            <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-2">Contas a Pagar</span>
-                            <div className="space-y-1">
-                                {financeData.map((t: any, i: number) => (
-                                    <div key={i} className="flex items-center justify-between text-xs">
-                                        <div className="flex items-center gap-1">
-                                            <span className="text-brand-dark dark:text-dark-heading font-medium">R$ {Number(t.amount || 0).toFixed(2)}</span>
-                                            <Badge variant={t.status === "paid" ? "green" : t.status === "cancelled" ? "gray" : "orange"}>
-                                                {t.status === "paid" ? "Pago" : t.status === "cancelled" ? "Cancelado" : "Pendente"}
-                                            </Badge>
-                                        </div>
-                                        <span className="text-brand-inactive-text">{t.due_date ? safeDate(t.due_date) : ""}</span>
+                            {isReversed ? (
+                                <>
+                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-2">Resumo Financeiro</span>
+                                    <div className="space-y-1">
+                                        {(() => {
+                                            const originals = financeData.filter((t: any) => t.transaction_type !== 'refund')
+                                            const refunds = financeData.filter((t: any) => t.transaction_type === 'refund')
+                                            const totalOriginal = originals.reduce((sum: number, t: any) => sum + Number(t.original_amount || t.amount || 0), 0)
+                                            const totalPaid = originals.reduce((sum: number, t: any) => sum + Number(t.paid_amount || (t.status === 'paid' ? t.amount : 0) || 0), 0)
+                                            const totalRefunded = refunds.reduce((sum: number, t: any) => sum + Number(t.amount || 0), 0)
+                                            return (
+                                                <>
+                                                    <div className="flex items-center justify-between text-xs">
+                                                        <span className="text-brand-inactive-text">Valor original</span>
+                                                        <span className="text-brand-dark dark:text-dark-heading font-medium">R$ {totalOriginal.toFixed(2)}</span>
+                                                    </div>
+                                                    {totalPaid > 0 && (
+                                                        <div className="flex items-center justify-between text-xs">
+                                                            <span className="text-brand-inactive-text">Pago</span>
+                                                            <span className="text-green-600 dark:text-green-400 font-medium">R$ {totalPaid.toFixed(2)}</span>
+                                                        </div>
+                                                    )}
+                                                    {totalRefunded > 0 && (
+                                                        <div className="flex items-center justify-between text-xs">
+                                                            <span className="text-brand-inactive-text">Reembolsado</span>
+                                                            <span className="text-blue-600 dark:text-blue-400 font-medium">R$ {totalRefunded.toFixed(2)}</span>
+                                                        </div>
+                                                    )}
+                                                    {refunds.filter((t: any) => t.status === 'pending').map((t: any, i: number) => (
+                                                        <div key={i} className="flex items-center justify-between text-xs">
+                                                            <div className="flex items-center gap-1">
+                                                                <span className="text-brand-inactive-text">Estorno aguardando</span>
+                                                                <Badge variant="orange">Pendente</Badge>
+                                                            </div>
+                                                            <span className="text-brand-inactive-text">{t.due_date ? safeDate(t.due_date) : ""}</span>
+                                                        </div>
+                                                    ))}
+                                                </>
+                                            )
+                                        })()}
                                     </div>
-                                ))}
-                            </div>
+                                </>
+                            ) : (
+                                <>
+                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-2">Contas a Pagar</span>
+                                    <div className="space-y-1">
+                                        {financeData.map((t: any, i: number) => (
+                                            <div key={i} className="flex items-center justify-between text-xs">
+                                                <div className="flex items-center gap-1">
+                                                    <span className="text-brand-dark dark:text-dark-heading font-medium">R$ {Number(t.amount || 0).toFixed(2)}</span>
+                                                    <Badge variant={t.status === "paid" ? "green" : t.status === "cancelled" ? "gray" : "orange"}>
+                                                        {t.status === "paid" ? "Pago" : t.status === "cancelled" ? "Cancelado" : "Pendente"}
+                                                    </Badge>
+                                                </div>
+                                                <span className="text-brand-inactive-text">{t.due_date ? safeDate(t.due_date) : ""}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
                         </div>
                     )}
                     {(isCompleted || isReversed) && stockData && stockData.length > 0 && (

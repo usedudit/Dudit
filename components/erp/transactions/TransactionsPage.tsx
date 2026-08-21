@@ -29,6 +29,7 @@ import { settleInstallmentGroupAction } from "@/app/actions/erp/transactions"
 import { getFinancialTransactionsAction, getTransactionDetailsAction, type TransactionDetailPayload } from "@/app/actions/erp/transactions"
 import { cancelPendingTransactionAction } from "@/app/actions/erp/transactions"
 import { getPaymentMethodsAction } from "@/app/actions/erp/payment-methods"
+import { getFinanceAccountsAction } from "@/app/actions/erp/finance-accounts"
 import { GenericAttachmentsTab } from "../shared/GenericAttachmentsTab"
 import { STANDARD_PAYMENT_METHODS, resolveStandardPaymentMethod } from "@/lib/finance-utils"
 import { sanitizeUUID } from "@/lib/security/input-sanitizer"
@@ -202,6 +203,8 @@ export default function TransactionsPage({
     const [interestAmount, setInterestAmount] = useState("0")
     const [discountAmount, setDiscountAmount] = useState("0")
     const [paymentMethodId, setPaymentMethodId] = useState("Pix")
+    const [financeAccountId, setFinanceAccountId] = useState<string>("")
+    const [financeAccounts, setFinanceAccounts] = useState<any[]>([])
     const [fallbackPaymentMethods, setFallbackPaymentMethods] = useState<any[]>([])
     const [confirmRecurringPayment, setConfirmRecurringPayment] = useState<ERPTransaction | null>(null)
     const [confirmSettleGroup, setConfirmSettleGroup] = useState<ERPTransaction | null>(null)
@@ -365,6 +368,18 @@ export default function TransactionsPage({
             active = false
         }
     }, [paymentMethods, partnerId])
+
+    useEffect(() => {
+        let active = true
+        ;(async () => {
+            const res = await getFinanceAccountsAction(partnerId)
+            if (!active) return
+            if (res.success && res.data?.accounts) {
+                setFinanceAccounts(res.data.accounts.filter((a: any) => a.is_active))
+            }
+        })()
+        return () => { active = false }
+    }, [partnerId])
 
     // ── Search debounce (300ms) ──────────────────────────────────────
     useEffect(() => {
@@ -767,10 +782,11 @@ export default function TransactionsPage({
                 else if (forcedTab === "A receber" && (t as any).ledgerDirection === "in") cancelados++
                 else if (forcedTab !== "A pagar" && forcedTab !== "A receber") cancelados++
             } else {
-                if ((t as any).ledgerDirection === "out") pagar++
-                else if ((t as any).ledgerDirection === "in") receber++
-
                 const isPaid = String(t.rawStatus || "").toLowerCase() === "paid" || t.status.toLowerCase() === "recebido" || t.status.toLowerCase() === "pago"
+                const isPrevisto = t.isRecurringOccurrence || t.status === "Pendente" || t.isOverdue || t.status === "Atrasado" || (t.transactionType !== 'adjustment' && t.transactionType !== 'transfer' && !['recebido', 'pago', 'paid'].includes(t.status.toLowerCase()))
+                if ((t as any).ledgerDirection === "out" && isPrevisto) pagar++
+                else if ((t as any).ledgerDirection === "in" && isPrevisto) receber++
+
                 const isSettled = !t.isRecurringOccurrence && t.status !== "Pendente" && !t.isOverdue && t.status !== "Atrasado" && (t.transactionType === "adjustment" || t.transactionType === "transfer" || isPaid)
                 if (isSettled) {
                     if ((t as any).ledgerDirection === "in") entradas++
@@ -945,7 +961,7 @@ export default function TransactionsPage({
 
     const handleClearFilters = () => {
         setSearch("")
-        setActiveTab("Transações")
+        setActiveTab(forcedTab || "Transações")
         setFilters(INITIAL_FILTERS)
     }
 
@@ -1026,6 +1042,7 @@ export default function TransactionsPage({
         setInterestAmount("0")
         setDiscountAmount("0")
         setPaymentMethodId(transaction.paymentType && transaction.paymentType !== "Não informado" ? transaction.paymentType : "Pix")
+        setFinanceAccountId(transaction.accountId || "")
         setPaymentModalOpen(true)
     }, [])
 
@@ -1195,6 +1212,7 @@ export default function TransactionsPage({
         setInterestAmount("0")
         setDiscountAmount("0")
         setPaymentMethodId(row.paymentType && row.paymentType !== "Não informado" ? row.paymentType : (row.paymentMethodId || "Pix"))
+        setFinanceAccountId(row.accountId || "")
         setPaymentModalOpen(true)
     }, [installmentDetail, notifyError])
 
@@ -1216,7 +1234,7 @@ export default function TransactionsPage({
                     partnerId,
                     recurringId: selectedInstallmentForPayment.recurringTemplateId as string,
                     occurrenceDate: selectedInstallmentForPayment.occurrenceDate as string,
-                    accountId: selectedInstallmentForPayment.accountId,
+                    accountId: financeAccountId || selectedInstallmentForPayment.accountId,
                     paymentMethodId: paymentMethodId || null,
                     paymentAmount: paid,
                     interestAmount: interest,
@@ -1235,6 +1253,7 @@ export default function TransactionsPage({
                     interestAmount: interest,
                     discountAmount: discount,
                     paymentMethodId: paymentMethodId || null,
+                    accountId: financeAccountId || null,
                 })
                 if (!res.success) {
                     notifyError(res.error || "Erro ao registrar pagamento")
@@ -1250,6 +1269,7 @@ export default function TransactionsPage({
                     interestAmount: interest,
                     discountAmount: discount,
                     paymentMethodId: paymentMethodId || null,
+                    accountId: financeAccountId || null,
                 })
                 if (!res.success) {
                     notifyError(res.error || "Erro ao registrar pagamento")
@@ -1275,6 +1295,7 @@ export default function TransactionsPage({
         discountAmount,
         partnerId,
         paymentMethodId,
+        financeAccountId,
         notifyError,
         notifySuccess,
         refreshTransactionsNow,
@@ -1482,6 +1503,15 @@ export default function TransactionsPage({
                                             placeholder="Selecione"
                                             disabled={lockedPaymentMethod}
                                         />
+                                        <div>
+                                            <FormDropdown
+                                                label="Conta bancária"
+                                                value={financeAccountId}
+                                                setValue={setFinanceAccountId}
+                                                options={financeAccounts.map((a: any) => ({ value: a.id, label: a.name }))}
+                                                placeholder="Auto (via método)"
+                                            />
+                                        </div>
                                         <div>
                                             <MoneyInput
                                                 label="Juros"

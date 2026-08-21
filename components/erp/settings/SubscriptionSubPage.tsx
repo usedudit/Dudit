@@ -8,6 +8,7 @@ import {
     CheckCircleIcon,
     ChevronLeftIcon,
     AlertTriangleIcon,
+    CopyIcon,
     XIcon,
 } from "@/lib/icons"
 import {
@@ -1093,48 +1094,61 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                     </p>
                                 </div>
                             ) : manualPaymentModal.pixQrCodeBase64 ? (
-                                <div className="space-y-4">
-                                    <div className="flex flex-col items-center gap-3">
-                                        <div className="relative">
+                                <div className="flex flex-col items-center px-2 pt-4">
+                                    <div className="text-center mb-6">
+                                        <div className="w-16 h-16 rounded-full bg-[#00b1ea]/10 flex items-center justify-center mx-auto mb-4">
                                             <img
-                                                src={`data:image/png;base64,${manualPaymentModal.pixQrCodeBase64}`}
-                                                alt="QR Code PIX"
-                                                className="w-64 h-64 rounded-lg border border-brand-border dark:border-dark-border"
+                                                src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png"
+                                                alt="Mercado Pago"
+                                                className="w-8 h-8 object-contain"
                                             />
                                         </div>
-                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body text-center">
-                                            Valor: <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(manualPaymentModal.amount)}</span>
+                                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-1">
+                                            Pix gerado via Mercado Pago
+                                        </h3>
+                                        <p className="text-sm text-brand-inactive-text">
+                                            Escaneie o QR Code ou copie o código
                                         </p>
                                     </div>
 
+                                    <div className="bg-white p-5 rounded-2xl border border-brand-border dark:border-dark-border mb-6 shadow-sm">
+                                        <img
+                                            src={`data:image/png;base64,${manualPaymentModal.pixQrCodeBase64}`}
+                                            alt="QR Code Pix"
+                                            className="w-48 h-48 mx-auto"
+                                        />
+                                    </div>
+
+                                    <div className="text-center mb-4">
+                                        <span className="text-3xl font-black text-brand-dark dark:text-dark-heading">
+                                            {formatCurrency(manualPaymentModal.amount)}
+                                        </span>
+                                    </div>
+
                                     {manualPaymentModal.pixQrCode && (
-                                        <div className="p-3 rounded-lg bg-gray-50 dark:bg-zinc-900/50">
-                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body mb-1">Código PIX (copia e cola)</p>
-                                            <div className="flex gap-2">
-                                                <input
-                                                    type="text"
-                                                    readOnly
-                                                    value={manualPaymentModal.pixQrCode}
-                                                    className="flex-1 text-xs font-mono bg-white dark:bg-zinc-800 border border-brand-border dark:border-dark-border rounded px-2 py-1"
-                                                />
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => {
-                                                        navigator.clipboard.writeText(manualPaymentModal.pixQrCode || "")
-                                                        toast.success("Código PIX copiado!")
-                                                    }}
-                                                >
-                                                    Copiar
-                                                </Button>
-                                            </div>
+                                        <div className="w-full max-w-sm relative mb-6">
+                                            <input
+                                                type="text"
+                                                readOnly
+                                                value={manualPaymentModal.pixQrCode}
+                                                className="w-full pl-4 pr-12 py-4 rounded-xl bg-gray-100 dark:bg-dark-border/30 text-sm text-brand-inactive-text border border-transparent focus:border-brand-green outline-none font-medium truncate"
+                                            />
+                                            <button
+                                                onClick={() => {
+                                                    navigator.clipboard.writeText(manualPaymentModal.pixQrCode || "")
+                                                    toast.success("Código PIX copiado!")
+                                                }}
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 hover:bg-gray-200 dark:hover:bg-dark-border/50 rounded-lg transition-colors text-brand-dark dark:text-dark-heading"
+                                            >
+                                                <CopyIcon size={18} />
+                                            </button>
                                         </div>
                                     )}
 
                                     {manualPaymentModal.ticketUrl && (
                                         <Button
                                             variant="outline"
-                                            className="w-full"
+                                            className="w-full max-w-sm h-12"
                                             onClick={() => window.open(manualPaymentModal.ticketUrl!, "_blank")}
                                         >
                                             Abrir no Mercado Pago
@@ -1142,7 +1156,7 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                     )}
 
                                     {manualPaymentModal.polling && (
-                                        <div className="flex items-center justify-center gap-2 p-3 rounded-lg bg-brand-green/10 dark:bg-brand-green/20">
+                                        <div className="flex items-center justify-center gap-2 p-3 rounded-lg bg-brand-green/10 dark:bg-brand-green/20 mt-4">
                                             <Loader2 size={16} className="animate-spin text-brand-green" />
                                             <span className="text-sm font-medium text-brand-green dark:text-brand-green">
                                                 Aguardando pagamento... Verificando a cada 5 segundos

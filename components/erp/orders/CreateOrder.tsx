@@ -307,6 +307,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     const [originalDeliveryStatus, setOriginalDeliveryStatus] = useState('not_sent')
     const [deliveryStatus, setDeliveryStatus] = useState('not_sent')
     const [selectedDeliveryPersonId, setSelectedDeliveryPersonId] = useState("")
+    const [platformDriver, setPlatformDriver] = useState<any>(null)
     const [deliveryDate, setDeliveryDate] = useState(formatLocalISODate(new Date()))
     const [deliveryTime, setDeliveryTime] = useState(formatCurrentLocalTime())
     const [financeAccounts, setFinanceAccounts] = useState<FinanceAccountOption[]>([])
@@ -573,6 +574,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 setOriginalPaymentBreakdown(loadedPaymentBreakdown)
                 setDeliveryStatus(order.delivery_status || "not_sent")
                 setOriginalDeliveryStatus(order.delivery_status || "not_sent")
+                if (order.platform_driver) setPlatformDriver(order.platform_driver)
                 if (order.platform_driver_id) setSelectedDeliveryPersonId(`platform:${order.platform_driver_id}`)
                 setDeliveryDate(order.created_at.split('T')[0])
                 setDeliveryTime(formatCurrentLocalTime(new Date(order.created_at)))
@@ -1533,10 +1535,33 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         { value: "delivery_failed", label: "Entrega não realizada" }
     ]
 
-    const deliveryPeopleOptions = deliveryPeople.map((person) => ({
-        value: person.id,
-        label: `${person.source === "platform" ? "Dudit · " : ""}${person.fullName}${person.vehicleType ? ` · ${person.vehicleType}` : ""}`,
-    }))
+    const deliveryPeopleOptions = useMemo(() => {
+        const baseOptions = deliveryPeople.map((person) => ({
+            value: person.id,
+            label: `${person.source === "platform" ? "Dudit · " : ""}${person.fullName}${person.vehicleType ? ` · ${person.vehicleType}` : ""}`,
+        }))
+
+        if (selectedDeliveryPersonId?.startsWith("platform:")) {
+            const rawId = selectedDeliveryPersonId.slice("platform:".length)
+            const exists = baseOptions.some(opt => opt.value === selectedDeliveryPersonId)
+            if (!exists) {
+                if (rawId === "dudit_network" || platformDriver?.id === "dudit_network") {
+                    baseOptions.unshift({
+                        value: "platform:dudit_network",
+                        label: "Dudit · Rede de Entregadores (Aguardando aceite)",
+                    })
+                } else {
+                    const driverName = platformDriver?.fullName || "Entregador Parceiro"
+                    const vehicleType = platformDriver?.vehicleType ? ` (${platformDriver.vehicleType})` : ""
+                    baseOptions.unshift({
+                        value: selectedDeliveryPersonId,
+                        label: `Dudit · ${driverName}${vehicleType}`,
+                    })
+                }
+            }
+        }
+        return baseOptions
+    }, [deliveryPeople, selectedDeliveryPersonId, platformDriver])
 
     if (isLoadingData) {
         return (
@@ -1994,8 +2019,14 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                     orderNumber={editOrderId ? String(editOrderId).slice(0, 8) : undefined}
                     destinationAddress={street ? `${street}, ${number || "S/N"} - ${neighborhood}, ${city}` : undefined}
                     deliveryFee={Number(shippingFee) || 0}
-                    onDeliveryRequested={() => setSelectedDeliveryPersonId("platform:dudit_network")}
-                    onSelect={(driverId) => setSelectedDeliveryPersonId(driverId)}
+                    onDeliveryRequested={() => {
+                        setPlatformDriver({ id: "dudit_network", fullName: "Rede de Entregadores Dudit", isPlatformDriver: true })
+                        setSelectedDeliveryPersonId("platform:dudit_network")
+                    }}
+                    onSelect={(driverId: string, driver?: any) => {
+                        if (driver) setPlatformDriver(driver)
+                        setSelectedDeliveryPersonId(driverId)
+                    }}
                 />
 
                 <SelectCustomerSheet

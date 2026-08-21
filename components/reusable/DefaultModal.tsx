@@ -7,6 +7,7 @@ import { XIcon } from "@/lib/icons"
 import { useMediaQuery } from "@/components/erp/hooks"
 import BottomSheet from "@/components/BottomSheet"
 import { Button } from "@/components/reusable"
+import { cn } from "@/lib/utils"
 
 interface DefaultModalProps {
     isOpen: boolean
@@ -20,6 +21,35 @@ interface DefaultModalProps {
     hideHeader?: boolean
     className?: string
     leftAction?: ReactNode
+}
+
+const renderMobileFooter = (node: ReactNode): ReactNode => {
+    return React.Children.map(node, (child) => {
+        if (!React.isValidElement(child)) {
+            return child
+        }
+
+        if (child.type === React.Fragment) {
+            return (
+                <React.Fragment key={child.key}>
+                    {renderMobileFooter((child.props as { children?: ReactNode }).children)}
+                </React.Fragment>
+            )
+        }
+
+        const childProps = child.props as { className?: string; children?: ReactNode }
+
+        if (childProps.children && typeof child.type === "string" && child.type !== "button" && child.type !== "a") {
+            return React.cloneElement(child, {
+                className: cn("w-full", childProps.className),
+                children: renderMobileFooter(childProps.children),
+            } as any)
+        }
+
+        return React.cloneElement(child, {
+            className: cn(childProps.className, "h-12 w-full"),
+        } as any)
+    })
 }
 
 const DefaultModal: React.FC<DefaultModalProps> = ({
@@ -53,7 +83,7 @@ const DefaultModal: React.FC<DefaultModalProps> = ({
     if (isMobile) {
         return (
             <BottomSheet isOpen={isOpen} onClose={handleClose}>
-                <div className="flex flex-col gap-4 pt-2 pb-4">
+                <div className="flex flex-col gap-4 pt-2">
                     {!hideHeader && (
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
@@ -63,7 +93,11 @@ const DefaultModal: React.FC<DefaultModalProps> = ({
                         </div>
                     )}
                     <div className="flex flex-col gap-4">{children}</div>
-                    {footer && <div className="flex flex-col gap-3 pt-2">{footer}</div>}
+                    {footer && (
+                        <footer className="shrink-0 border-t border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface flex gap-3 -mx-4 -mb-6 mt-2">
+                            {renderMobileFooter(footer)}
+                        </footer>
+                    )}
                 </div>
             </BottomSheet>
         )
