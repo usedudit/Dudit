@@ -133,7 +133,7 @@ export default async function PrintReciboPage({ params, searchParams }: PageProp
     return (
         <PrintLayout paperSize={format === "thermal" ? "thermal" : "a4"}>
             {format === "thermal" ? (
-                <div className="w-[80mm] max-w-[80mm] print:w-[80mm] print:max-w-[80mm]">
+                <div className="w-[80mm] max-w-[80mm] print:w-[80mm] print:max-w-[80mm] mx-auto">
                     <SaleReceiptThermalPreview
                         data={receiptData}
                         footerMessage={footerMessage}

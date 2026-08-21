@@ -1845,6 +1845,10 @@ export async function recordInstallmentPaymentAction(input: {
             }
         }
 
+        if (!resolvedAccountId) {
+            throw new Error("É obrigatório selecionar uma conta bancária para registrar o pagamento.")
+        }
+
         if (resolvedAccountId) {
             await applyFinanceAccountBalanceDelta(supabase, input.partnerId, resolvedAccountId, {
                 transaction_type: tx.transaction_type,
@@ -2105,6 +2109,10 @@ export async function recordRegularTransactionPaymentAction(input: {
             }
         }
 
+        if (!resolvedAccountId) {
+            throw new Error("É obrigatório selecionar uma conta bancária para registrar o pagamento.")
+        }
+
         if (resolvedAccountId) {
             await applyFinanceAccountBalanceDelta(supabase, input.partnerId, resolvedAccountId, {
                 transaction_type: tx.transaction_type,
@@ -2122,80 +2130,125 @@ export async function recordRegularTransactionPaymentAction(input: {
         )
         const totalPaidAmount = existingTotalPaid + finalPaid
 
-        const updatePayload: Record<string, unknown> = {
-            updated_at: nowIso,
-            payment_date: nowIso,
-            interest_amount: interestAmount > 0 ? interestAmount : (tx.interest_amount || null),
-            discount_amount: discountAmount > 0 ? discountAmount : (tx.discount_amount || null),
-            paid_amount: totalPaidAmount > 0 ? totalPaidAmount : (tx.paid_amount || null),
-        }
-        if (resolvedAccountId) {
-            updatePayload.account_id = resolvedAccountId
-        }
-
-        // Derive payment_type from ALL transaction_payments (not just the latest)
-        // This ensures split payments (e.g. PIX + Dinheiro) show all methods used
-        const { data: allPayments } = await supabase
-            .from("transaction_payments")
-            .select("payment_method_id, amount")
-            .eq("partner_id", input.partnerId)
-            .eq("transaction_id", input.transactionId)
-
-        const allPaymentLabels: string[] = []
-        for (const p of allPayments || []) {
-            const pLabel = p.payment_method_id
-                ? await paymentMethodDisplayLabel(supabase, input.partnerId, p.payment_method_id).catch(() => null)
-                : null
-            if (pLabel) allPaymentLabels.push(pLabel)
-        }
-        // Add current payment if not yet in the list
-        if (pmTypeLabel && !allPaymentLabels.includes(pmTypeLabel)) {
-            allPaymentLabels.push(pmTypeLabel)
-        }
-
-        if (input.paymentMethodId !== undefined) {
-            updatePayload.payment_method_id = validPaymentMethodId
-        }
-        // Use comma-separated list if multiple methods, otherwise single label
-        if (allPaymentLabels.length > 1) {
-            updatePayload.payment_type = [...new Set(allPaymentLabels)].join(", ")
-        } else if (pmTypeLabel) {
-            updatePayload.payment_type = pmTypeLabel
-        }
-        if (fullyPaid) {
-            updatePayload.status = "paid"
-            if (totalPaidAmount > 0) {
-                updatePayload.amount = totalPaidAmount
-            }
-        }
-
-        const { error: updateErr } = await supabase
-            .from("transactions")
-            .update(updatePayload)
-            .eq("id", input.transactionId)
-            .eq("partner_id", input.partnerId)
-        if (updateErr) throw updateErr
-
         const dir = tx.transaction_type === "income" ? "recebido" : "pago"
         const pmLabel = pmTypeLabel || tx.payment_type || ""
         let historyLine = `Pagou R$ ${finalPaid.toFixed(2)}`
         if (pmLabel) historyLine += ` utilizando ${pmLabel}`
         if (interestAmount > 0) historyLine += ` (Juros: R$ ${interestAmount.toFixed(2)})`
         if (discountAmount > 0) historyLine += ` (Desconto: R$ ${discountAmount.toFixed(2)})`
-        if (!fullyPaid) historyLine += ` - saldo restante: R$ ${Math.max(0, originalAmount - paidAfter).toFixed(2)}`
 
-        await logAuditEvent({
-            partnerId: input.partnerId,
-            actorUserId: userId,
-            entityType: "transaction",
-            entityId: input.transactionId,
-            actionType: fullyPaid ? "paid" : "partial_paid",
-            changeLines: [historyLine],
-            metadata: fullyPaid
-                ? { oldStatus: "Pendente", newStatus: "Pago" }
-                : { oldStatus: "Pendente", paidSoFar: totalPaidAmount, remaining: Math.max(0, originalAmount - paidAfter) },
-            source: "manual",
-        })
+        if (!fullyPaid) {
+            // Pagamento PARCIAL: cria uma transação PAGA separada para este pagamento e mantém a original pendente com o saldo restante.
+            const remainingPrincipalAfter = Math.max(0, Math.round((originalAmount - paidAfter) * 100) / 100)
+            historyLine += ` - saldo restante: R$ ${remainingPrincipalAfter.toFixed(2)}`
+
+            const { data: newPaidTx, error: newTxErr } = await supabase
+                .from("transactions")
+                .insert({
+                    partner_id: input.partnerId,
+                    store_id: tx.store_id || null,
+                    description: tx.description,
+                    category: tx.category,
+                    category_id: tx.category_id || null,
+                    subcategory_id: tx.subcategory_id || null,
+                    amount: finalPaid,
+                    original_amount: baseApplied,
+                    due_date: null,
+                    payment_date: nowIso,
+                    status: "paid",
+                    payment_type: pmTypeLabel,
+                    payment_method_id: validPaymentMethodId,
+                    account_id: resolvedAccountId,
+                    transaction_type: tx.transaction_type,
+                    contact_id: tx.contact_id || null,
+                    customer_id: tx.customer_id || null,
+                    contact_type: tx.contact_type || null,
+                    origin: tx.origin || "manual",
+                    kind: tx.kind || "settlement",
+                    interest_amount: interestAmount > 0 ? interestAmount : null,
+                    discount_amount: discountAmount > 0 ? discountAmount : null,
+                    paid_amount: finalPaid,
+                    notes: tx.notes || null,
+                    reference_note: tx.reference_note ? `${tx.reference_note}:part:${nowIso}` : `partial-tx:${tx.id}:${nowIso}`,
+                })
+                .select("id")
+                .single()
+
+            if (newTxErr) throw newTxErr
+
+            // Atualiza a transação original pendente para refletir o saldo restante
+            const { error: updateErr } = await supabase
+                .from("transactions")
+                .update({
+                    amount: remainingPrincipalAfter,
+                    original_amount: originalAmount,
+                    paid_amount: 0,
+                    updated_at: nowIso,
+                })
+                .eq("id", input.transactionId)
+                .eq("partner_id", input.partnerId)
+
+            if (updateErr) throw updateErr
+
+            if (newPaidTx?.id) {
+                await logAuditEvent({
+                    partnerId: input.partnerId,
+                    actorUserId: userId,
+                    entityType: "transaction",
+                    entityId: newPaidTx.id,
+                    actionType: "paid",
+                    changeLines: [historyLine],
+                    metadata: { oldStatus: "Pendente", newStatus: "Pago" },
+                    source: "manual",
+                })
+                await revalidateEntityTimeline("transaction", newPaidTx.id)
+            }
+
+            await logAuditEvent({
+                partnerId: input.partnerId,
+                actorUserId: userId,
+                entityType: "transaction",
+                entityId: input.transactionId,
+                actionType: "partial_paid",
+                changeLines: [historyLine],
+                metadata: { oldStatus: "Pendente", paidSoFar: totalPaidAmount, remaining: remainingPrincipalAfter },
+                source: "manual",
+            })
+        } else {
+            // Pagamento TOTAL (Quitação)
+            const updatePayload: Record<string, unknown> = {
+                updated_at: nowIso,
+                payment_date: nowIso,
+                interest_amount: interestAmount > 0 ? interestAmount : (tx.interest_amount || null),
+                discount_amount: discountAmount > 0 ? discountAmount : (tx.discount_amount || null),
+                paid_amount: finalPaid,
+                amount: finalPaid,
+                original_amount: paidPrincipalSoFar > 0.0001 ? baseApplied : originalAmount,
+                status: "paid",
+                account_id: resolvedAccountId,
+                payment_method_id: validPaymentMethodId,
+                payment_type: pmTypeLabel,
+            }
+
+            const { error: updateErr } = await supabase
+                .from("transactions")
+                .update(updatePayload)
+                .eq("id", input.transactionId)
+                .eq("partner_id", input.partnerId)
+
+            if (updateErr) throw updateErr
+
+            await logAuditEvent({
+                partnerId: input.partnerId,
+                actorUserId: userId,
+                entityType: "transaction",
+                entityId: input.transactionId,
+                actionType: "paid",
+                changeLines: [historyLine],
+                metadata: { oldStatus: "Pendente", newStatus: "Pago" },
+                source: "manual",
+            })
+        }
 
         await revalidateEntityTimeline("transaction", input.transactionId)
         await revalidateTransactions(input.partnerId)
@@ -2452,11 +2505,28 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
             if (cat?.name) categoryName = cat.name
         }
 
-        const accountId = input.accountId || rec.account_id || null
-        const nowIso = new Date().toISOString()
         const validRecPmId = sanitizeUUID(rec.payment_method_id)
         const validResolvedPmId = sanitizeUUID(input.paymentMethodId) || validRecPmId
         const rawMethodName = (typeof input.paymentMethodId === "string" && !sanitizeUUID(input.paymentMethodId)) ? input.paymentMethodId : null
+
+        let accountId = input.accountId || rec.account_id || null
+        if (!accountId && validResolvedPmId) {
+            const { data: pm } = await supabase
+                .from("payment_methods")
+                .select("default_finance_account_id")
+                .eq("id", validResolvedPmId)
+                .eq("partner_id", input.partnerId)
+                .maybeSingle()
+            if (pm?.default_finance_account_id) {
+                accountId = pm.default_finance_account_id
+            }
+        }
+
+        if (!accountId) {
+            throw new Error("É obrigatório selecionar uma conta bancária para registrar o pagamento.")
+        }
+
+        const nowIso = new Date().toISOString()
         const paymentTypeLabel = validResolvedPmId
             ? await paymentMethodDisplayLabel(supabase, input.partnerId, validResolvedPmId)
             : (rawMethodName || null)

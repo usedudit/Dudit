@@ -16,6 +16,7 @@ import { useNotification } from "@/hooks/use-notification"
 import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { formatCurrency, formatQuantityWithUnit } from "@/lib/utils"
+import { optimizeImageForUpload } from "@/lib/utils/variant-image-optimizer"
 import {
     getProductVariantsAction,
     deleteProductVariantAction,
@@ -592,9 +593,15 @@ export const ProductVariationsTab: React.FC<ProductVariationsTabProps> = ({
         let uploadedImageId: string | undefined = undefined
         if (payload.type === 'image' && payload.imageFile) {
             try {
+                const optimized = await optimizeImageForUpload(payload.imageFile, {
+                    maxWidth: 1200,
+                    maxHeight: 1200,
+                    quality: 0.85,
+                    preferredFormat: "image/webp"
+                })
                 const formData = new FormData()
-                const extension = payload.imageFile.type === "image/png" ? "png" : payload.imageFile.type === "image/webp" ? "webp" : "jpg"
-                formData.append("file", payload.imageFile, `variant-image.${extension}`)
+                const extension = optimized.type === "image/png" ? "png" : optimized.type === "image/webp" ? "webp" : "jpg"
+                formData.append("file", optimized, `variant-image.${extension}`)
 
                 const uploadUrlObj = new URL("/api/upload-image", window.location.origin)
                 if (productData?.id) {

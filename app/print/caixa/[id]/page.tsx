@@ -104,7 +104,7 @@ export default async function PrintCaixaPage({ params, searchParams }: PageProps
 
     return (
         <PrintLayout paperSize="thermal">
-            <div className="w-[80mm] max-w-[80mm] print:w-[80mm] print:max-w-[80mm]">
+            <div className="w-[80mm] max-w-[80mm] print:w-[80mm] print:max-w-[80mm] mx-auto">
                 <CashSessionCouponPreview
                     data={couponData}
                     type={couponType}

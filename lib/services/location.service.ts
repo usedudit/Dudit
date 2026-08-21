@@ -9,8 +9,17 @@ const EARTH_RADIUS_KM = 6371
 const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 const NOMINATIM_USER_AGENT =
     process.env.NOMINATIM_USER_AGENT || "Dudit/1.0 (contato@dudit.com.br)"
-const DEFAULT_TIMEOUT_MS = 8000
-const DEFAULT_RETRIES = 2
+const DEFAULT_TIMEOUT_MS = 3500
+const DEFAULT_RETRIES = 1
+
+interface CachedGeocode {
+    result: GeocodeResult
+    expiresAt: number
+}
+
+const GEOCODE_CACHE_TTL_MS = 24 * 60 * 60 * 1000 // 24 hours
+const geocodeCache = new Map<string, CachedGeocode>()
+const inFlightGeocodes = new Map<string, Promise<GeocodeResult>>()
 
 function isFiniteNumber(value: unknown): value is number {
     return typeof value === "number" && Number.isFinite(value)
@@ -101,6 +110,39 @@ export function buildBoundingBox(center: LocationPoint, radiusKm: number) {
 }
 
 export async function geocodeAddress(address: string): Promise<GeocodeResult> {
+  const raw = String(address || "").trim().toLowerCase()
+  if (!raw) return null
+
+  // 1. Check in-memory cache
+  const cached = geocodeCache.get(raw)
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.result
+  }
+
+  // 2. Check in-flight promise to deduplicate concurrent calls
+  const inFlight = inFlightGeocodes.get(raw)
+  if (inFlight) {
+    return inFlight
+  }
+
+  const promise = (async () => {
+    try {
+      const result = await _executeGeocode(address)
+      geocodeCache.set(raw, {
+        result,
+        expiresAt: Date.now() + GEOCODE_CACHE_TTL_MS,
+      })
+      return result
+    } finally {
+      inFlightGeocodes.delete(raw)
+    }
+  })()
+
+  inFlightGeocodes.set(raw, promise)
+  return promise
+}
+
+async function _executeGeocode(address: string): Promise<GeocodeResult> {
   const raw = String(address || "").trim()
   if (!raw) return null
 
@@ -134,7 +176,6 @@ export async function geocodeAddress(address: string): Promise<GeocodeResult> {
     .trim()
 
   if (withoutNumber !== query) {
-    console.log(`[Geocode] Retry without number: "${withoutNumber}"`)
     const r2 = await _geocodeFetch(withoutNumber)
     if (r2) return r2
   }
@@ -143,9 +184,7 @@ export async function geocodeAddress(address: string): Promise<GeocodeResult> {
   // Pattern: "Street, Neighborhood, City, State" → "Street, City, State"
   const parts = (withoutNumber || query).split(",").map(s => s.trim()).filter(Boolean)
   if (parts.length >= 4) {
-    // Remove the segment right after the street (index 1 = neighborhood)
     const withoutNeighborhood = [parts[0], ...parts.slice(2)].join(", ")
-    console.log(`[Geocode] Retry without neighborhood: "${withoutNeighborhood}"`)
     const r3 = await _geocodeFetch(withoutNeighborhood)
     if (r3) return r3
   }
@@ -153,7 +192,6 @@ export async function geocodeAddress(address: string): Promise<GeocodeResult> {
   // Attempt 4: just city + state (last resort)
   if (parts.length >= 2) {
     const cityState = parts.slice(-2).join(", ")
-    console.log(`[Geocode] Retry with city+state only: "${cityState}"`)
     return _geocodeFetch(cityState)
   }
 

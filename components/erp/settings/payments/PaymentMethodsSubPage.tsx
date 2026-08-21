@@ -52,12 +52,14 @@ const LIST_COLUMNS = [
 export function PaymentMethodsSubPage({ partner, paymentMethods, handleBack, onEdit, onCreate, planGate, storeId, embedded }: PaymentMethodsSubPageProps) {
     const { openPlanUpgrade } = usePlanUpgrade()
     const { success: notifySuccess, error: notifyError } = useNotification()
-    const isMobile = useMediaQuery("(max-width: 1024px)")
+    const isMobile = useMediaQuery("(max-width: 767px)")
+    const isTablet = useMediaQuery("(max-width: 1024px)")
 
     const [methods, setMethods] = useState<PaymentMethodListItem[]>(paymentMethods || [])
     const [search, setSearch] = useState("")
     const [debouncedSearch, setDebouncedSearch] = useState("")
     const [viewMode, setViewMode] = useState<"list" | "grid">(isMobile ? "grid" : "list")
+    const effectiveViewMode = isTablet ? "grid" : viewMode
     const [filters, setFilters] = useState<PaymentFilters>(INITIAL_FILTERS)
     const [page, setPage] = useState(1)
     const [selection, setSelection] = useState<{ ids: Set<string> }>({ ids: new Set() })
@@ -455,12 +457,12 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, handleBack, onE
         checkScroll()
         window.addEventListener("resize", checkScroll)
         return () => window.removeEventListener("resize", checkScroll)
-    }, [checkScroll, viewMode, methods])
+    }, [checkScroll, effectiveViewMode, methods])
 
     const renderListContent = () => {
         if (paginatedMethods.length === 0) return renderEmptyState()
 
-        if (viewMode === "grid") {
+        if (effectiveViewMode === "grid") {
             return (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
                     {paginatedMethods.map((method) => (
@@ -582,30 +584,31 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, handleBack, onE
                         onOpenFilter={() => setModals({ filter: true })}
                         filters={filters}
                         setFilters={setFilters}
-                        viewMode={viewMode}
+                        viewMode={effectiveViewMode}
                         onViewModeChange={setViewMode}
                         hasActiveFilters={hasActiveFilters}
+                        onCreate={onCreate}
                     />
 
                     <div className="mt-4">
                         <AnimatePresence mode="wait">
                             <FadeIn
-                                key={`${viewMode}-${debouncedSearch}-${filters.type.join(",")}-${filters.status.join(",")}-${page}`}
+                                key={`${effectiveViewMode}-${debouncedSearch}-${filters.type.join(",")}-${filters.status.join(",")}-${page}`}
                                 className="w-full"
                             >
                                 {renderListContent()}
-
-                                {totalPages > 1 ? (
-                                    <div className="mt-6">
-                                        <Pagination
-                                            currentPage={page}
-                                            totalPages={totalPages}
-                                            onPageChange={setPage}
-                                        />
-                                    </div>
-                                ) : null}
                             </FadeIn>
                         </AnimatePresence>
+
+                        {totalPages > 1 ? (
+                            <div className="mt-6 pb-4">
+                                <Pagination
+                                    currentPage={page}
+                                    totalPages={totalPages}
+                                    onPageChange={setPage}
+                                />
+                            </div>
+                        ) : null}
                     </div>
                 </>
             ) : (
@@ -647,46 +650,46 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, handleBack, onE
                                         </div>
                                     </div>
                                 </div>
+                            </div>
 
-                                <div className="px-3 md:px-0 py-2 max-w-[1300px] mx-auto mt-8 w-full">
-                                    <PaymentMethodPageControls
-                                        search={search}
-                                        onSearchChange={setSearch}
-                                        onOpenFilter={() => setModals({ filter: true })}
-                                        filters={filters}
-                                        setFilters={setFilters}
-                                        viewMode={viewMode}
-                                        onViewModeChange={setViewMode}
-                                        hasActiveFilters={hasActiveFilters}
-                                    />
+                            <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto w-full">
+                                <PaymentMethodPageControls
+                                    search={search}
+                                    onSearchChange={setSearch}
+                                    onOpenFilter={() => setModals({ filter: true })}
+                                    filters={filters}
+                                    setFilters={setFilters}
+                                    viewMode={effectiveViewMode}
+                                    onViewModeChange={setViewMode}
+                                    hasActiveFilters={hasActiveFilters}
+                                    onCreate={onCreate}
+                                />
 
-                                    <div className="mt-4">
-                                        <AnimatePresence mode="wait">
-                                            <FadeIn
-                                                key={`${viewMode}-${debouncedSearch}-${filters.type.join(",")}-${filters.status.join(",")}-${page}`}
-                                                className="w-full"
-                                            >
-                                                {renderListContent()}
+                                <div className="mt-4">
+                                    <AnimatePresence mode="wait">
+                                        <FadeIn
+                                            key={`${effectiveViewMode}-${debouncedSearch}-${filters.type.join(",")}-${filters.status.join(",")}-${page}`}
+                                            className="w-full"
+                                        >
+                                            {renderListContent()}
+                                        </FadeIn>
+                                    </AnimatePresence>
 
-                                                {totalPages > 1 ? (
-                                                    <div className="mt-6">
-                                                        <Pagination
-                                                            currentPage={page}
-                                                            totalPages={totalPages}
-                                                            onPageChange={setPage}
-                                                        />
-                                                    </div>
-                                                ) : null}
-                                            </FadeIn>
-                                        </AnimatePresence>
-                                    </div>
+                                    {totalPages > 1 ? (
+                                        <div className="mt-6 pb-4">
+                                            <Pagination
+                                                currentPage={page}
+                                                totalPages={totalPages}
+                                                onPageChange={setPage}
+                                            />
+                                        </div>
+                                    ) : null}
                                 </div>
                             </div>
                         </div>
                     </div>
                 </FadeIn>
-            )
-            }
+            )}
 
             <FilterSheet
                 isOpen={modals.filter}

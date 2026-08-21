@@ -789,7 +789,9 @@ export async function checkoutCartAction(
       .eq("user_id", user.id)
       .single(),
     productIds.length
-      ? adminClient.from("products").select("*").in("id", productIds).eq("store_id", targetStoreId)
+      ? (targetStoreId
+          ? adminClient.from("products").select("*").in("id", productIds).eq("store_id", targetStoreId)
+          : adminClient.from("products").select("*").in("id", productIds))
       : Promise.resolve({ data: [] as any[] }),
     adminClient
       .from("stores")

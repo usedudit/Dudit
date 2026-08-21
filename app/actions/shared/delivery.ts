@@ -346,7 +346,32 @@ export async function quoteDeliveryFeeAction(input: {
 
     let destinationCoords = input.destinationCoords;
     if (!destinationCoords && input.destinationAddress) {
-      destinationCoords = await geocodeAddress(input.destinationAddress)
+      // 1. Fast local DB lookup: check if this address string matches an existing saved address with coordinates
+      const cleanAddr = input.destinationAddress.trim()
+      const cepMatch = cleanAddr.match(/\b\d{5}-?\d{3}\b/)
+      if (cepMatch) {
+        const cleanCep = cepMatch[0].replace(/\D/g, "")
+        const { data: matchedDbAddr } = await supabase
+          .from("addresses")
+          .select("latitude, longitude")
+          .eq("zip_code", cleanCep)
+          .not("latitude", "is", null)
+          .not("longitude", "is", null)
+          .limit(1)
+          .maybeSingle()
+
+        if (matchedDbAddr?.latitude != null && matchedDbAddr?.longitude != null) {
+          destinationCoords = {
+            lat: Number(matchedDbAddr.latitude),
+            lng: Number(matchedDbAddr.longitude),
+          }
+        }
+      }
+
+      // 2. Fallback to cached geocoding
+      if (!destinationCoords) {
+        destinationCoords = await geocodeAddress(input.destinationAddress)
+      }
     }
 
     if (!destinationCoords) {

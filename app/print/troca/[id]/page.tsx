@@ -90,7 +90,7 @@ export default async function PrintTrocaPage({ params, searchParams }: PageProps
     return (
         <PrintLayout paperSize={format === "thermal" ? "thermal" : "a4"}>
             {format === "thermal" ? (
-                <div className="w-[80mm] max-w-[80mm] print:w-[80mm] print:max-w-[80mm]">
+                <div className="w-[80mm] max-w-[80mm] print:w-[80mm] print:max-w-[80mm] mx-auto">
                     <ReturnReceiptThermalPreview
                         returnRequest={returnRequest}
                         partnerHeader={partnerHeader}

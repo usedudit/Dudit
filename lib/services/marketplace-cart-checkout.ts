@@ -43,19 +43,23 @@ export async function priceMarketplaceCartCheckout(
     cartItemIds: string[]
     deliveryType: "delivery" | "pickup"
     deliveryAddress: string
+    destinationCoords?: { lat: number; lng: number } | null
     couponCode?: string | null
     /** Payment method configuration for discount/interest/fee computation */
     paymentMethod?: PricingInput["paymentMethod"]
+    skipCartUpdate?: boolean
   },
 ): Promise<{ success: true; data: MarketplaceCartCheckoutPricing } | { success: false; error: string }> {
   // Ensure cart fulfillment mode for products matches the requested deliveryType
-  const targetFulfillmentMode = params.deliveryType === "delivery" ? "delivery" : "pickup"
-  await adminClient
-    .from("cart_items")
-    .update({ fulfillment_mode: targetFulfillmentMode, updated_at: new Date().toISOString() })
-    .in("id", params.cartItemIds)
-    .eq("user_id", params.userId)
-    .or("item_type.eq.product,item_type.is.null,product_id.not.is.null")
+  if (!params.skipCartUpdate) {
+    const targetFulfillmentMode = params.deliveryType === "delivery" ? "delivery" : "pickup"
+    await adminClient
+      .from("cart_items")
+      .update({ fulfillment_mode: targetFulfillmentMode, updated_at: new Date().toISOString() })
+      .in("id", params.cartItemIds)
+      .eq("user_id", params.userId)
+      .or("item_type.eq.product,item_type.is.null,product_id.not.is.null")
+  }
 
   const resolved = await resolveCheckoutCartLines(adminClient, params.userId, params.cartItemIds)
   if (!resolved.success) return { success: false, error: resolved.error }
@@ -88,6 +92,7 @@ export async function priceMarketplaceCartCheckout(
       partnerId,
       storeId: targetStoreId,
       destinationAddress: params.deliveryAddress,
+      destinationCoords: params.destinationCoords,
       freeDeliveryCoupon: false,
       orderSubtotal: subtotal,
     })
@@ -147,6 +152,7 @@ export async function priceMarketplaceCartCheckout(
       partnerId,
       storeId: targetStoreId,
       destinationAddress: params.deliveryAddress,
+      destinationCoords: params.destinationCoords,
       freeDeliveryCoupon: true,
       orderSubtotal: subtotal,
     })

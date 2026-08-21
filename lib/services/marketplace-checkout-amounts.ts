@@ -15,6 +15,8 @@ export type MarketplaceCheckoutAmounts = {
   usesDeposit: boolean
   remainingAfterDeposit: number
   deliveryFee: number
+  distanceKm: number | null
+  deliveryBreakdown: Record<string, unknown> | null
   couponDiscountAmount: number
   /** Amount to charge based on payDepositOnly flag */
   chargeTotal: number
@@ -27,6 +29,7 @@ export async function computeMarketplaceCheckoutAmounts(
     cartItemIds: string[]
     deliveryType: "delivery" | "pickup"
     deliveryAddress: string
+    destinationCoords?: { lat: number; lng: number } | null
     couponCode?: string | null
     payDepositOnly: boolean
     depositPercent: number
@@ -35,83 +38,64 @@ export async function computeMarketplaceCheckoutAmounts(
 ): Promise<{ success: true; data: MarketplaceCheckoutAmounts } | { success: false; error: string }> {
   const serviceCartIds = params.cartItemIds
 
-  // Ensure cart fulfillment mode matches the selected delivery type
-  // (cart items may still have pickup/default mode from when they were added)
-  const fulfillmentMode = params.deliveryType === "delivery" ? "delivery" : "pickup"
-  await adminClient
-    .from("cart_items")
-    .update({ fulfillment_mode: fulfillmentMode, updated_at: new Date().toISOString() })
-    .in("id", params.cartItemIds)
-    .eq("user_id", params.userId)
-
-  // Ensure cart reflects payDepositOnly for deposit pricing
-  if (params.depositAvailable) {
-    await adminClient
-      .from("cart_items")
-      .update({
-        pay_deposit_only: Boolean(params.payDepositOnly),
-        updated_at: new Date().toISOString(),
-      })
-      .in("id", serviceCartIds)
-      .eq("user_id", params.userId)
-      .eq("item_type", "service_booking")
-  }
-
-  const depositPriced = await priceMarketplaceCartCheckout(adminClient, {
+  // Single fast pricing run without modifying database rows
+  const priced = await priceMarketplaceCartCheckout(adminClient, {
     userId: params.userId,
     cartItemIds: serviceCartIds,
     deliveryType: params.deliveryType,
     deliveryAddress: params.deliveryAddress,
+    destinationCoords: params.destinationCoords,
     couponCode: params.couponCode,
+    skipCartUpdate: true,
   })
 
-  if (!depositPriced.success) {
-    return { success: false, error: depositPriced.error }
+  if (!priced.success) {
+    return { success: false, error: priced.error }
   }
 
-  // Full order pricing (all services at full price)
-  await adminClient
-    .from("cart_items")
-    .update({ pay_deposit_only: false, updated_at: new Date().toISOString() })
-    .in("id", serviceCartIds)
-    .eq("user_id", params.userId)
-    .eq("item_type", "service_booking")
+  const resolvedLines = priced.data.resolvedLines || []
 
-  const fullPriced = await priceMarketplaceCartCheckout(adminClient, {
-    userId: params.userId,
-    cartItemIds: serviceCartIds,
-    deliveryType: params.deliveryType,
-    deliveryAddress: params.deliveryAddress,
-    couponCode: params.couponCode,
-  })
+  // Compute service deposit differences in-memory
+  let serviceFullTotal = 0
+  let serviceDepositAmount = 0
 
-  // Restore cart pay_deposit_only state
-  if (params.depositAvailable) {
-    await adminClient
-      .from("cart_items")
-      .update({
-        pay_deposit_only: Boolean(params.payDepositOnly),
-        updated_at: new Date().toISOString(),
-      })
-      .in("id", serviceCartIds)
-      .eq("user_id", params.userId)
-      .eq("item_type", "service_booking")
+  for (const line of resolvedLines) {
+    if (line.itemType === "service_booking") {
+      const qty = Number(line.quantity || 1)
+      const full = Number(line.fullPrice || line.unitPrice || 0)
+      const dep = Number(line.depositAmount != null ? line.depositAmount : full)
+      serviceFullTotal += full * qty
+      serviceDepositAmount += dep * qty
+    }
   }
 
-  if (!fullPriced.success) {
-    return { success: false, error: fullPriced.error }
+  const serviceDepositDelta = Math.max(0, serviceFullTotal - serviceDepositAmount)
+
+  // Full order total based on pricing calculation
+  const calculatedTotal = Number(priced.data.totalAmount || 0)
+  
+  // If the line items in cart currently had pay_deposit_only active in DB,
+  // calculatedTotal is the deposit amount. Otherwise, it is the full order total.
+  const hasActiveDepositInLines = resolvedLines.some(
+    (l) => l.itemType === "service_booking" && l.payDepositOnly,
+  )
+
+  let fullOrderTotal = calculatedTotal
+  let depositChargeTotal = calculatedTotal
+
+  if (params.depositAvailable && serviceDepositDelta > 0) {
+    if (hasActiveDepositInLines) {
+      depositChargeTotal = calculatedTotal
+      fullOrderTotal = Number((calculatedTotal + serviceDepositDelta).toFixed(2))
+    } else {
+      fullOrderTotal = calculatedTotal
+      depositChargeTotal = Math.max(0, Number((calculatedTotal - serviceDepositDelta).toFixed(2)))
+    }
   }
 
-  const fullOrderTotal = fullPriced.data.totalAmount
-  const depositChargeTotal = depositPriced.data.totalAmount
-
-  const serviceDepositAmount = (depositPriced.data.resolvedLines || [])
-    .filter((line) => line.itemType === "service_booking" && line.depositAmount != null)
-    .reduce((sum, line) => sum + Number(line.depositAmount || 0) * Number(line.quantity || 1), 0)
-
-  const usesDeposit = params.depositAvailable && params.payDepositOnly
+  const usesDeposit = Boolean(params.depositAvailable && params.payDepositOnly)
   const chargeTotal = usesDeposit ? depositChargeTotal : fullOrderTotal
-  const remainingAfterDeposit = Math.max(0, fullOrderTotal - depositChargeTotal)
+  const remainingAfterDeposit = Math.max(0, Number((fullOrderTotal - depositChargeTotal).toFixed(2)))
 
   return {
     success: true,
@@ -122,8 +106,10 @@ export async function computeMarketplaceCheckoutAmounts(
       depositPercent: params.depositPercent,
       usesDeposit,
       remainingAfterDeposit,
-      deliveryFee: fullPriced.data.deliveryFee,
-      couponDiscountAmount: fullPriced.data.couponDiscountAmount,
+      deliveryFee: priced.data.deliveryFee,
+      distanceKm: priced.data.distanceKm,
+      deliveryBreakdown: priced.data.deliveryBreakdown,
+      couponDiscountAmount: priced.data.couponDiscountAmount,
       chargeTotal,
     },
   }

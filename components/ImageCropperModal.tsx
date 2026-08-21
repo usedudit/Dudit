@@ -449,7 +449,24 @@ const ImageCropperModal = memo(({
       out.height
     )
 
-    const result = out.toDataURL("image/png", 1)
+    let finalCanvas = out
+    const maxDim = 1200
+    if (out.width > maxDim || out.height > maxDim) {
+      const scale = Math.min(maxDim / out.width, maxDim / out.height)
+      const targetWidth = Math.round(out.width * scale)
+      const targetHeight = Math.round(out.height * scale)
+
+      const resizedCanvas = document.createElement("canvas")
+      resizedCanvas.width = targetWidth
+      resizedCanvas.height = targetHeight
+      resizedCanvas.getContext("2d")!.drawImage(out, 0, 0, targetWidth, targetHeight)
+      finalCanvas = resizedCanvas
+    }
+
+    let result = finalCanvas.toDataURL("image/webp", 0.88)
+    if (!result.startsWith("data:image/webp")) {
+      result = finalCanvas.toDataURL("image/jpeg", 0.88)
+    }
 
     onConfirm?.(result)
     onCropComplete?.(result)

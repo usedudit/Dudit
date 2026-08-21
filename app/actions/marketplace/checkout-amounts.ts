@@ -8,6 +8,7 @@ export async function getMarketplaceCheckoutAmountsAction(input: {
   cartItemIds: string[]
   deliveryType: "delivery" | "pickup"
   deliveryAddress: string
+  destinationCoords?: { lat: number; lng: number } | null
   couponCode?: string | null
   payDepositOnly: boolean
   depositPercent: number
@@ -25,6 +26,7 @@ export async function getMarketplaceCheckoutAmountsAction(input: {
     cartItemIds: input.cartItemIds,
     deliveryType: input.deliveryType,
     deliveryAddress: input.deliveryAddress || "",
+    destinationCoords: input.destinationCoords,
     couponCode: input.couponCode,
     payDepositOnly: input.payDepositOnly,
     depositPercent: input.depositPercent,

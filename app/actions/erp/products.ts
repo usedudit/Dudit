@@ -1191,23 +1191,25 @@ export async function createProductVariantsBatchAction(data: {
     }
 
     try {
-        const csrf = await validateCSRF(data as Record<string, unknown>)
+        const [csrf, product] = await Promise.all([
+            validateCSRF(data as Record<string, unknown>),
+            fetchProductAndVerifyOwnership(data.productId, "edit", "id, partner_id, images, sku, name, promotional_price")
+        ])
         if (!csrf.valid) return errorResponse(csrf.error || "CSRF inválido")
-
-        const product = await fetchProductAndVerifyOwnership(data.productId, "edit", "id, partner_id, images, sku, name, promotional_price")
-
-        // Check subscription feature
-        if (!await canUseFeature(product.partner_id, "product_variants")) {
-            return errorResponse("Seu plano não permite o uso de variantes. Faça upgrade para desbloquear.")
-        }
 
         const supabase = await getSupabaseServerClient()
 
-        // 1. Buscar variantes existentes
-        const { data: existingVariants } = await supabase
-            .from("product_variants")
-            .select("*")
-            .eq("product_id", data.productId)
+        // 1. Validar plano e buscar variantes existentes em paralelo
+        const [isVariantsAllowed, existingVariantsRes] = await Promise.all([
+            canUseFeature(product.partner_id, "product_variants"),
+            supabase.from("product_variants").select("*").eq("product_id", data.productId)
+        ])
+
+        if (!isVariantsAllowed) {
+            return errorResponse("Seu plano não permite o uso de variantes. Faça upgrade para desbloquear.")
+        }
+
+        const existingVariants = existingVariantsRes.data
 
         // 2. Preparar dados para upsert
         const variantsToInsert = data.variants.map(v => ({
@@ -1222,7 +1224,7 @@ export async function createProductVariantsBatchAction(data: {
             is_active: v.isActive,
         }))
 
-        // 3. Fazer upsert ao invés de delete + insert
+        // 3. Fazer upsert em lote
         const { data: inserted, error } = await supabase
             .from("product_variants")
             .upsert(
@@ -1240,7 +1242,7 @@ export async function createProductVariantsBatchAction(data: {
             }).eq("id", data.productId)
         }
 
-        // 4+5. Fire-and-forget: Deletar imagens removidas em paralelo
+        // 4+5. Deletar imagens removidas em paralelo e atualizar contadores
         const imagesToCleanup: string[] = []
         if (existingVariants) {
             const newSkus = new Set(data.variants.map(v => v.sku))
@@ -1250,10 +1252,13 @@ export async function createProductVariantsBatchAction(data: {
         }
         if (data.deletedImages?.length) imagesToCleanup.push(...data.deletedImages)
 
-        let newImagesCount = 0;
+        const uniqueNewImages = new Set<string>()
         data.variants.forEach(v => {
-            if (v.image && (!existingVariants?.some((ev: any) => ev.variant_options?.image === v.image))) newImagesCount++;
+            if (v.image && (!existingVariants?.some((ev: any) => ev.variant_options?.image === v.image))) {
+                uniqueNewImages.add(v.image)
+            }
         })
+        const newImagesCount = uniqueNewImages.size
 
         if (imagesToCleanup.length > 0) {
             Promise.all(imagesToCleanup.map(img => _deleteFromR2(img))).catch(console.error)

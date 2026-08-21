@@ -31,7 +31,7 @@ import { cancelPendingTransactionAction } from "@/app/actions/erp/transactions"
 import { getPaymentMethodsAction } from "@/app/actions/erp/payment-methods"
 import { getFinanceAccountsAction } from "@/app/actions/erp/finance-accounts"
 import { GenericAttachmentsTab } from "../shared/GenericAttachmentsTab"
-import { STANDARD_PAYMENT_METHODS, resolveStandardPaymentMethod } from "@/lib/finance-utils"
+import { STANDARD_PAYMENT_METHODS, resolveStandardPaymentMethod, pickBankThenCashDefaultFinanceAccountId } from "@/lib/finance-utils"
 import { sanitizeUUID } from "@/lib/security/input-sanitizer"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { useSidebar } from "@/lib/sidebar-context"
@@ -360,9 +360,10 @@ export default function TransactionsPage({
         let active = true
         if (paymentMethods?.length) return
             ; (async () => {
-                const methods = await getPaymentMethodsAction(partnerId)
+                const res = await getPaymentMethodsAction(partnerId)
                 if (!active) return
-                setFallbackPaymentMethods(Array.isArray(methods) ? methods : [])
+                const list = Array.isArray(res) ? res : res?.methods || []
+                setFallbackPaymentMethods(list)
             })()
         return () => {
             active = false
@@ -380,6 +381,44 @@ export default function TransactionsPage({
         })()
         return () => { active = false }
     }, [partnerId])
+
+    const activePaymentMethodsList = useMemo(() => {
+        const source = (paymentMethods && paymentMethods.length > 0) ? paymentMethods : fallbackPaymentMethods
+        return (source || []).filter((m: any) => m.is_active !== false)
+    }, [paymentMethods, fallbackPaymentMethods])
+
+    const getMatchedPaymentMethod = useCallback((methodIdOrLabel: string | null | undefined) => {
+        if (!methodIdOrLabel) return null
+        const cleanVal = String(methodIdOrLabel).trim().toLowerCase()
+        const byId = activePaymentMethodsList.find((m: any) => m.id === methodIdOrLabel)
+        if (byId) return byId
+        const byName = activePaymentMethodsList.find((m: any) => (m.name || "").toLowerCase() === cleanVal)
+        if (byName) return byName
+        const byType = activePaymentMethodsList.find((m: any) => 
+            (m.type && m.type.toLowerCase() === cleanVal) || 
+            (m.payment_type && m.payment_type.toLowerCase() === cleanVal)
+        )
+        if (byType) return byType
+        return null
+    }, [activePaymentMethodsList])
+
+    const paymentMethodDropdownOptions = useMemo(() => {
+        if (activePaymentMethodsList.length > 0) {
+            return activePaymentMethodsList.map((m: any) => ({
+                value: m.name || m.type || m.id,
+                label: m.name || m.type || "Método",
+            }))
+        }
+        return STANDARD_PAYMENT_METHODS
+    }, [activePaymentMethodsList])
+
+    const handleSelectPaymentMethod = useCallback((newMethodVal: string) => {
+        setPaymentMethodId(newMethodVal)
+        const matched = getMatchedPaymentMethod(newMethodVal)
+        if (matched?.default_finance_account_id) {
+            setFinanceAccountId(matched.default_finance_account_id)
+        }
+    }, [getMatchedPaymentMethod])
 
     // ── Search debounce (300ms) ──────────────────────────────────────
     useEffect(() => {
@@ -1041,10 +1080,20 @@ export default function TransactionsPage({
         setPaymentAmount(String(initialAmount.toFixed(2)))
         setInterestAmount("0")
         setDiscountAmount("0")
-        setPaymentMethodId(transaction.paymentType && transaction.paymentType !== "Não informado" ? transaction.paymentType : "Pix")
-        setFinanceAccountId(transaction.accountId || "")
+        const initialMethod = transaction.paymentMethodId || (transaction.paymentType && transaction.paymentType !== "Não informado" ? transaction.paymentType : (activePaymentMethodsList[0]?.id || "Pix"))
+        setPaymentMethodId(initialMethod)
+        
+        const matched = getMatchedPaymentMethod(initialMethod)
+        if (matched?.default_finance_account_id) {
+            setFinanceAccountId(matched.default_finance_account_id)
+        } else if (transaction.accountId) {
+            setFinanceAccountId(transaction.accountId)
+        } else {
+            const defaultAcc = pickBankThenCashDefaultFinanceAccountId(financeAccounts) || ""
+            setFinanceAccountId(defaultAcc)
+        }
         setPaymentModalOpen(true)
-    }, [])
+    }, [getMatchedPaymentMethod, activePaymentMethodsList, financeAccounts])
 
     const handleRequestCancelPending = useCallback((transaction: ERPTransaction) => {
         const status = String(transaction.rawStatus || "").toLowerCase()
@@ -1211,10 +1260,19 @@ export default function TransactionsPage({
         setPaymentAmount(String(Number(row.remainingAmount || 0).toFixed(2)))
         setInterestAmount("0")
         setDiscountAmount("0")
-        setPaymentMethodId(row.paymentType && row.paymentType !== "Não informado" ? row.paymentType : (row.paymentMethodId || "Pix"))
-        setFinanceAccountId(row.accountId || "")
+        const initialMethod = row.paymentMethodId || (row.paymentType && row.paymentType !== "Não informado" ? row.paymentType : (activePaymentMethodsList[0]?.id || "Pix"))
+        setPaymentMethodId(initialMethod)
+        const matched = getMatchedPaymentMethod(initialMethod)
+        if (matched?.default_finance_account_id) {
+            setFinanceAccountId(matched.default_finance_account_id)
+        } else if (row.accountId) {
+            setFinanceAccountId(row.accountId)
+        } else {
+            const defaultAcc = pickBankThenCashDefaultFinanceAccountId(financeAccounts) || ""
+            setFinanceAccountId(defaultAcc)
+        }
         setPaymentModalOpen(true)
-    }, [installmentDetail, notifyError])
+    }, [installmentDetail, notifyError, getMatchedPaymentMethod, activePaymentMethodsList, financeAccounts])
 
     const handleConfirmInstallmentPayment = useCallback(async () => {
         if (!selectedInstallmentForPayment) return
@@ -1225,6 +1283,10 @@ export default function TransactionsPage({
         const finalPaid = paid + interest - discount
         if (!(finalPaid > 0)) {
             notifyError("Informe um valor final de pagamento maior que zero.")
+            return
+        }
+        if (!financeAccountId) {
+            notifyError("Selecione uma conta bancária para registrar o pagamento.")
             return
         }
         setPayingInstallment(true)
@@ -1376,6 +1438,8 @@ export default function TransactionsPage({
                         const lockedPaymentMethod = isInstallment && !!selectedInstallmentForPayment.paymentMethodId && sanitizeUUID(selectedInstallmentForPayment.paymentMethodId) !== null
                         const currentRemaining = Number(selectedInstallmentForPayment.remainingAmount ?? selectedInstallmentForPayment.amount ?? 0)
                         const nextRemaining = Math.max(0, currentRemaining - Number(paymentAmount || 0))
+                        const currentMatchedMethod = getMatchedPaymentMethod(paymentMethodId)
+                        const isAccountLockedByMethod = Boolean(currentMatchedMethod?.default_finance_account_id)
 
                         return (
                             <div className="flex flex-col md:flex-row gap-6">
@@ -1498,19 +1562,26 @@ export default function TransactionsPage({
                                         <FormDropdown
                                             label="Meio de pagamento"
                                             value={paymentMethodId || "Pix"}
-                                            setValue={setPaymentMethodId}
-                                            options={STANDARD_PAYMENT_METHODS}
+                                            setValue={handleSelectPaymentMethod}
+                                            options={paymentMethodDropdownOptions}
                                             placeholder="Selecione"
                                             disabled={lockedPaymentMethod}
                                         />
-                                        <div>
+                                        <div className="space-y-1">
                                             <FormDropdown
-                                                label="Conta bancária"
+                                                label="Conta bancária *"
                                                 value={financeAccountId}
                                                 setValue={setFinanceAccountId}
                                                 options={financeAccounts.map((a: any) => ({ value: a.id, label: a.name }))}
-                                                placeholder="Auto (via método)"
+                                                placeholder="Selecione a conta bancária"
+                                                disabled={isAccountLockedByMethod}
+                                                error={!financeAccountId}
                                             />
+                                            {isAccountLockedByMethod && (
+                                                <p className="text-[11px] text-brand-inactive-text dark:text-dark-body">
+                                                    Conta vinculada automaticamente ao meio de pagamento.
+                                                </p>
+                                            )}
                                         </div>
                                         <div>
                                             <MoneyInput
@@ -1541,7 +1612,10 @@ export default function TransactionsPage({
                                         >
                                             Cancelar
                                         </Button>
-                                        <Button onClick={() => void handleConfirmInstallmentPayment()} disabled={payingInstallment}>
+                                        <Button
+                                            onClick={() => void handleConfirmInstallmentPayment()}
+                                            disabled={payingInstallment || !financeAccountId || Number(paymentAmount || 0) <= 0}
+                                        >
                                             Confirmar {selectedInstallmentForPayment.ledgerDirection === "in" ? "recebimento" : "pagamento"}
                                         </Button>
                                     </div>

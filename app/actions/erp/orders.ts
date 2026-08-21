@@ -993,6 +993,19 @@ export async function createFinancialTransactionsForReceivedAmount(
                 const newFormatted = newReceived.toFixed(2)
                 const refNote = `sale-tx:${params.orderNumber}:${newEntry.method}:${oldFormatted}_to_${newFormatted}`
 
+                let legAccountId = params.financeAccountId || null
+                if (!legAccountId && newEntry.paymentMethodId) {
+                    const { data: pm } = await supabase
+                        .from("payment_methods")
+                        .select("default_finance_account_id")
+                        .eq("id", newEntry.paymentMethodId)
+                        .eq("partner_id", params.partnerId)
+                        .maybeSingle()
+                    if (pm?.default_finance_account_id) {
+                        legAccountId = pm.default_finance_account_id
+                    }
+                }
+
                 await createTransactionFromOrder(supabase, {
                     order_number: params.orderNumber,
                     partner_id: params.partnerId,
@@ -1009,7 +1022,7 @@ export async function createFinancialTransactionsForReceivedAmount(
                     payment_date: new Date().toISOString(),
                     customer_id: params.customerId || null,
                     customer_name: params.customerName || null,
-                    finance_account_id: params.financeAccountId || null,
+                    finance_account_id: legAccountId,
                     order_source: params.orderSource || "manual",
                     reference_note: refNote,
                 })
@@ -3854,7 +3867,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
             if (error) return { error: error.message }
             paymentProcessedCount += 1
 
-            if (capabilities.hasFinancial && paymentState.paidAmount > (order.paid_amount || 0) + 0.009 && paymentState.situation === "paid") {
+            if (capabilities.hasFinancial && paymentState.paidAmount > (order.paid_amount || 0) + 0.009) {
                 const oldBreakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : []
                 const newBreakdown = payload.paymentBreakdown || (
                     paymentState.situation === "paid"

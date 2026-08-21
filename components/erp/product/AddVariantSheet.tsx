@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast"
 import { isGifFile } from "@/lib/security/file-validator"
 import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { optimizeImageForUpload } from "@/lib/utils/variant-image-optimizer"
 import QuickStockMovementSheet from "./QuickStockMovementSheet"
 
 interface AddVariantSheetProps {
@@ -157,6 +158,7 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
     const isMobile = useMediaQuery("(max-width: 1023px)")
     const { success: notifySuccess, error: notifyError } = useNotification()
     const [isSaving, setIsSaving] = useState(false)
+    const [savingStatusText, setSavingStatusText] = useState("Salvando variações...")
     const [variants, setVariants] = useState<VariantCard[]>([
         { id: Date.now(), type: "", values: [], useImage: false },
     ])
@@ -618,62 +620,91 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
         }
 
         setIsSaving(true)
+        setSavingStatusText("Processando variações...")
 
         try {
+            // 1. Identificar e deduplicar arquivos de imagem únicos antes do upload
+            const uniqueFiles = new Set<File>()
+            tableRows.forEach((rawRow) => {
+                const row = getDisplayData(rawRow)
+                const activeImage = getRowImage(row.values, row.id)
+                if (activeImage instanceof File) {
+                    uniqueFiles.add(activeImage)
+                }
+            })
+
+            // 2. Comprimir e fazer upload apenas das imagens distintas
+            const fileUploadMap = new Map<File, string | null>()
+            if (uniqueFiles.size > 0) {
+                setSavingStatusText(`Otimizando e enviando ${uniqueFiles.size} imagem(ns)...`)
+                const uniqueFilesArray = Array.from(uniqueFiles)
+                await Promise.all(
+                    uniqueFilesArray.map(async (rawFile) => {
+                        const optimized = await optimizeImageForUpload(rawFile, {
+                            maxWidth: 1200,
+                            maxHeight: 1200,
+                            quality: 0.85,
+                            preferredFormat: "image/webp"
+                        })
+                        const uploadedKey = await uploadVariantImage(optimized)
+                        fileUploadMap.set(rawFile, uploadedKey)
+                    })
+                )
+            }
+
+            setSavingStatusText("Salvando variações...")
+
             // Get CSRF token
             const csrfResponse = await fetchWithCSRF("/api/csrf-token", { method: "GET" })
             const { token: csrfToken } = await csrfResponse.json()
 
-            // 1. Process each row, ensuring SKU uniqueness
+            // 3. Montar variações vinculando a chave de imagem correspondente sem repetições
             const usedSkusInBatch = new Set<string>()
 
-            const variantsToSave = await Promise.all(
-                tableRows.map(async (rawRow) => {
-                    const row = getDisplayData(rawRow)
-                    const activeImage = getRowImage(row.values, row.id)
-                    const wasImageModified = modifiedImageRows.has(row.id)
+            const variantsToSave = tableRows.map((rawRow) => {
+                const row = getDisplayData(rawRow)
+                const activeImage = getRowImage(row.values, row.id)
 
-                    let imagePublicId: string | null = null
-                    if (activeImage && activeImage instanceof File) {
-                        imagePublicId = await uploadVariantImage(activeImage)
-                    } else if (typeof activeImage === 'string') {
-                        imagePublicId = activeImage
+                let imagePublicId: string | null = null
+                if (activeImage instanceof File) {
+                    imagePublicId = fileUploadMap.get(activeImage) || null
+                } else if (typeof activeImage === 'string') {
+                    imagePublicId = activeImage
+                }
+
+                // SKU UNIQUENESS LOGIC
+                const rowVariantType = variants.map(v => v.type).join(" / ")
+                const rowVariantValue = row.values.join(" / ")
+                const matchingExisting = existingVariants.find(ev => ev.value === rowVariantValue && ev.type === rowVariantType)
+
+                let finalSku: string
+                if (matchingExisting) {
+                    finalSku = matchingExisting.sku || row.sku || ""
+                } else {
+                    finalSku = row.sku || ""
+                    let counter = 2
+                    while (usedSkusInBatch.has(finalSku.toLowerCase())) {
+                        finalSku = `${row.sku}-${counter}`
+                        counter++
                     }
+                }
+                usedSkusInBatch.add(finalSku.toLowerCase())
 
-                    // SKU UNIQUENESS LOGIC
-                    const rowVariantType = variants.map(v => v.type).join(" / ")
-                    const rowVariantValue = row.values.join(" / ")
-                    const matchingExisting = existingVariants.find(ev => ev.value === rowVariantValue && ev.type === rowVariantType)
+                const variantParts = row.values as string[]
+                const variantType = variants.map(v => v.type).join(" / ")
+                const variantValue = variantParts.join(" / ")
 
-                    let finalSku: string
-                    if (matchingExisting) {
-                        finalSku = matchingExisting.sku || row.sku || ""
-                    } else {
-                        finalSku = row.sku || ""
-                        let counter = 2
-                        while (usedSkusInBatch.has(finalSku.toLowerCase())) {
-                            finalSku = `${row.sku}-${counter}`
-                            counter++
-                        }
-                    }
-                    usedSkusInBatch.add(finalSku.toLowerCase())
-
-                    const variantParts = row.values as string[]
-                    const variantType = variants.map(v => v.type).join(" / ")
-                    const variantValue = variantParts.join(" / ")
-
-                    return {
-                        variantName: row.name,
-                        variantType: variantType,
-                        variantValue: variantValue,
-                        sku: finalSku, // Use the unique SKU
-                        price: Number(row.price) || 0,
-                        stockQuantity: row.stock || 0,
-                        image: imagePublicId,
-                        isActive: row.active !== false,
-                    }
-                })
-            )
+                return {
+                    variantName: row.name,
+                    variantType: variantType,
+                    variantValue: variantValue,
+                    sku: finalSku, // Use the unique SKU
+                    price: Number(row.price) || 0,
+                    stockQuantity: row.stock || 0,
+                    image: imagePublicId,
+                    isActive: row.active !== false,
+                }
+            })
 
             if (!product?.id) {
                 if (onSavePendingVariants) {
@@ -1082,7 +1113,7 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                     }}
                 />
 
-            <SavingStatusModal isOpen={isSaving} text="Salvando variações..." />
+            <SavingStatusModal isOpen={isSaving} text={savingStatusText} />
         </div>
     )
 

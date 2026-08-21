@@ -68,8 +68,8 @@ export default function CashSessionCouponPreview({ data, type, printMode = false
 
     return (
         <div
-            className={`mx-auto bg-[#fffef5] text-black font-mono text-[11px] leading-snug ${printMode ? "sale-receipt-thermal-print" : ""}`}
-            style={{ width: printMode ? "80mm" : "320px", maxWidth: "100%" }}
+            className={`mx-auto bg-white text-black font-mono text-[11px] leading-snug break-inside-avoid print:bg-white print:text-black ${printMode ? "sale-receipt-thermal-print" : ""}`}
+            style={{ width: printMode ? "80mm" : "320px", maxWidth: "100%", boxSizing: "border-box" }}
         >
             <div className="px-3 py-4">
                 <div className="text-center mb-2">

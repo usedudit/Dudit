@@ -250,11 +250,18 @@ export async function generatePdf(url: string, nextCookies: any[]): Promise<Buff
             timeout: 10000,
         })
 
-        // Fast check: wait max 300ms for fonts and images to be ready
+        // Wait for main print container or thermal receipt element to be rendered in DOM
+        try {
+            await page.waitForSelector(".sale-receipt-thermal-print, .pdf-print-container, .pdf-print-page", {
+                timeout: 4000,
+            })
+        } catch { }
+
+        // Fast check: wait for fonts and images to be ready
         await page.evaluate(async () => {
             await Promise.race([
                 document.fonts ? document.fonts.ready : Promise.resolve(),
-                new Promise((r) => setTimeout(r, 300)),
+                new Promise((r) => setTimeout(r, 400)),
             ])
             const images = Array.from(document.images)
             await Promise.all(
@@ -270,25 +277,30 @@ export async function generatePdf(url: string, nextCookies: any[]): Promise<Buff
         })
 
         if (isThermal) {
+            // Emulate screen media to ensure layout and dimensions exactly match thermal receipt preview
+            await page.emulateMediaType("screen")
+
             // Calculate exact height of thermal receipt content to create a continuous roll PDF
             const contentHeightPx = await page.evaluate(() => {
-                const thermalEl = document.querySelector(".sale-receipt-thermal-print")
+                const thermalEl = document.querySelector(".sale-receipt-thermal-print") as HTMLElement | null
                 if (thermalEl) {
                     const rect = thermalEl.getBoundingClientRect()
-                    return Math.max(Math.ceil(rect.height), Math.ceil(thermalEl.scrollHeight))
+                    return Math.max(thermalEl.scrollHeight, thermalEl.offsetHeight, Math.ceil(rect.height))
                 }
-                const containerEl = document.querySelector(".pdf-print-container")
+                const containerEl = document.querySelector(".pdf-print-container") as HTMLElement | null
                 if (containerEl) {
                     const rect = containerEl.getBoundingClientRect()
-                    return Math.max(Math.ceil(rect.height), Math.ceil(containerEl.scrollHeight))
+                    return Math.max(containerEl.scrollHeight, containerEl.offsetHeight, Math.ceil(rect.height))
                 }
-                return Math.max(Math.ceil(document.body.scrollHeight), Math.ceil(document.documentElement.scrollHeight))
+                return Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, 400)
             })
+
+            const targetHeightPx = Math.max(Math.ceil(contentHeightPx + 16), 150)
 
             // Generate exact 80mm thermal receipt PDF with continuous height (no A4 white gaps)
             const pdfBuffer = await page.pdf({
                 width: "80mm",
-                height: `${contentHeightPx + 6}px`,
+                height: `${targetHeightPx}px`,
                 printBackground: true,
                 margin: {
                     top: "0mm",
@@ -296,7 +308,6 @@ export async function generatePdf(url: string, nextCookies: any[]): Promise<Buff
                     bottom: "0mm",
                     left: "0mm",
                 },
-                pageRanges: "1",
                 preferCSSPageSize: false,
             })
 

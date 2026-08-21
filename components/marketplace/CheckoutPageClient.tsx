@@ -983,73 +983,96 @@ export function CheckoutPageClient() {
 
 
 
-    // Effect 1: Delivery fee quote + Checkout amounts - ONLY recalculate on address/deliveryType changes
+    // Effect 1: Checkout amounts + Delivery fee quote in a single unified call
     useEffect(() => {
         let active = true
 
         const timer = window.setTimeout(async () => {
-            // Delivery fee quote
-            if (partnerId && formData.deliveryAddress && productDeliveryQuoteActive) {
+            const destinationCoords = selectedAddress?.latitude && selectedAddress?.longitude
+                ? { lat: Number(selectedAddress.latitude), lng: Number(selectedAddress.longitude) }
+                : undefined
+
+            // Checkout amounts (includes delivery fee calculation)
+            if (cartItemIds.length && checkoutContext) {
+                setCheckoutAmountsLoading(true)
                 setDeliveryQuoteLoading(true)
-                const quote = await quoteDeliveryFeeAction({
-                    partnerId,
-                    storeId,
-                    destinationAddress: formData.deliveryAddress,
-                    freeDeliveryCoupon: hasFreeDeliveryCoupon,
-                    orderSubtotal,
-                    destinationCoords: selectedAddress?.latitude && selectedAddress?.longitude
-                        ? { lat: Number(selectedAddress.latitude), lng: Number(selectedAddress.longitude) }
-                        : undefined,
-                })
-                if (!active) return
-                if (quote.success) {
-                    setDeliveryError(null)
-                    setDeliveryFee(Number(quote.fee || 0))
-                    setDeliveryDistanceKm(Number(quote.distanceKm || 0))
-                    setDeliveryBreakdown((quote.breakdown as Record<string, any>) || null)
-                } else {
-                    setDeliveryError(quote.error)
-                    if (quote.error?.toLowerCase().includes("raio")) {
-                        setShowOutsideRadiusModal(true)
+                try {
+                    const result = await getMarketplaceCheckoutAmountsAction({
+                        cartItemIds,
+                        deliveryType: formData.deliveryType === "pickup" ? "pickup" : "delivery",
+                        deliveryAddress: formData.deliveryAddress || "",
+                        destinationCoords,
+                        couponCode: couponCode || null,
+                        payDepositOnly,
+                        depositPercent: checkoutContext.deposit?.percent ?? 50,
+                        depositAvailable,
+                    })
+                    if (!active) return
+                    if (result.success) {
+                        setCheckoutAmounts(result.data)
+                        setDeliveryError(null)
+                        setDeliveryFee(Number(result.data.deliveryFee || 0))
+                        setDeliveryDistanceKm(result.data.distanceKm != null ? Number(result.data.distanceKm) : null)
+                        setDeliveryBreakdown((result.data.deliveryBreakdown as Record<string, any>) || null)
+                    } else {
+                        setCheckoutAmounts(null)
+                        setDeliveryError(result.error)
+                        if (result.error?.toLowerCase().includes("raio")) {
+                            setShowOutsideRadiusModal(true)
+                        }
+                        setDeliveryFee(0)
+                        setDeliveryDistanceKm(null)
+                        setDeliveryBreakdown(null)
                     }
-                    setDeliveryFee(0)
-                    setDeliveryDistanceKm(quote.distanceKm != null ? Number(quote.distanceKm) : null)
-                    setDeliveryBreakdown(null)
+                } catch {
+                    if (!active) return
+                    setCheckoutAmounts(null)
+                    setDeliveryError("Erro ao calcular valores do pedido.")
+                } finally {
+                    if (active) {
+                        setCheckoutAmountsLoading(false)
+                        setDeliveryQuoteLoading(false)
+                    }
                 }
-                setDeliveryQuoteLoading(false)
+            } else if (partnerId && formData.deliveryAddress && productDeliveryQuoteActive) {
+                // Fallback for sessions without active cart lines
+                setDeliveryQuoteLoading(true)
+                try {
+                    const quote = await quoteDeliveryFeeAction({
+                        partnerId,
+                        storeId,
+                        destinationAddress: formData.deliveryAddress,
+                        destinationCoords,
+                        freeDeliveryCoupon: hasFreeDeliveryCoupon,
+                        orderSubtotal,
+                    })
+                    if (!active) return
+                    if (quote.success) {
+                        setDeliveryError(null)
+                        setDeliveryFee(Number(quote.fee || 0))
+                        setDeliveryDistanceKm(Number(quote.distanceKm || 0))
+                        setDeliveryBreakdown((quote.breakdown as Record<string, any>) || null)
+                    } else {
+                        setDeliveryError(quote.error)
+                        if (quote.error?.toLowerCase().includes("raio")) {
+                            setShowOutsideRadiusModal(true)
+                        }
+                        setDeliveryFee(0)
+                        setDeliveryDistanceKm(quote.distanceKm != null ? Number(quote.distanceKm) : null)
+                        setDeliveryBreakdown(null)
+                    }
+                } finally {
+                    if (active) setDeliveryQuoteLoading(false)
+                }
             } else {
                 setDeliveryFee(0)
                 setDeliveryDistanceKm(null)
                 setDeliveryBreakdown(null)
                 setDeliveryQuoteLoading(false)
-            }
-
-            if (!active) return
-
-            // Checkout amounts
-            if (cartItemIds.length && checkoutContext) {
-                setCheckoutAmountsLoading(true)
-                const result = await getMarketplaceCheckoutAmountsAction({
-                    cartItemIds,
-                    deliveryType: formData.deliveryType === "pickup" ? "pickup" : "delivery",
-                    deliveryAddress: formData.deliveryAddress || "",
-                    couponCode: couponCode || null,
-                    payDepositOnly,
-                    depositPercent: checkoutContext.deposit?.percent ?? 50,
-                    depositAvailable,
-                })
-                if (!active) return
-                if (result.success) {
-                    setCheckoutAmounts(result.data)
-                } else {
-                    setCheckoutAmounts(null)
-                }
-                setCheckoutAmountsLoading(false)
-            } else {
                 setCheckoutAmounts(null)
                 setCheckoutAmountsLoading(false)
             }
-        }, 300)
+        }, 120)
 
         return () => {
             active = false
@@ -1104,7 +1127,7 @@ export function CheckoutPageClient() {
                     setPaymentError(null)
                 }
             }
-        }, 300)
+        }, 100)
 
         return () => {
             active = false

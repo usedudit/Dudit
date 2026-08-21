@@ -2,7 +2,7 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { ActionsDropdown, Badge, Checkbox } from "@/components/reusable"
+import { ActionsDropdown, Badge, Checkbox, Tooltip } from "@/components/reusable"
 import { CreditCardIcon, MoneyIcon, QRCodeIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { PaymentMethodListItem, getPaymentTypeLabel } from "./PaymentMethodListRow"
@@ -29,28 +29,6 @@ const getPaymentIcon = (method: PaymentMethodListItem) => {
     return <CreditCardIcon className="w-5 h-5 text-brand-dark dark:text-dark-heading" />
 }
 
-const getFeeLabel = (method: PaymentMethodListItem) => {
-    const feePercent = method.fee_percent ?? method.percentage_rate
-    const feeFixed = method.fee_fixed ?? method.fixed_amount
-
-    if (!feePercent && !feeFixed) return "-"
-
-    const parts: string[] = []
-    if (feePercent) parts.push(`${feePercent}%`)
-    if (feeFixed) parts.push(`+ ${formatCurrency(feeFixed)}`)
-    return parts.join(" ")
-}
-
-const getBrandsLabel = (method: PaymentMethodListItem) => {
-    if (!method.card_brand) return ""
-
-    return method.card_brand
-        .split(";")
-        .map((brand) => brand.trim().replaceAll("_", " "))
-        .filter(Boolean)
-        .join(", ")
-}
-
 const isSystemCashMethod = (method: PaymentMethodListItem) => {
     const rawType = String(method.type || method.payment_type || "").toLowerCase()
     const rawName = String(method.name || "").trim().toLowerCase()
@@ -63,9 +41,10 @@ const PaymentMethodGridCard = React.memo(
             <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ duration: 0.3 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
                 onClick={() => onEdit(method)}
-                className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-5 hover:border-brand-green/30 dark:hover:border-brand-green/30 hover:shadow-xl hover:shadow-brand-green/5 transition-all duration-400 cursor-pointer group flex flex-col h-full relative overflow-hidden"
+                className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all duration-300 cursor-pointer group flex flex-col h-full relative"
             >
                 <div className="flex gap-4 mb-2">
                     <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
@@ -75,12 +54,25 @@ const PaymentMethodGridCard = React.memo(
                     <div className="flex-1 min-w-0 flex flex-col justify-center">
                         <div className="flex justify-between items-start gap-1">
                             <div className="flex items-center gap-2 min-w-0 pr-1">
-                                <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
-                                    {method.name || "Sem nome"}
+                                <h3
+                                    className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate"
+                                    title={method.name || "Sem nome"}
+                                >
+                                    <span className="truncate">{method.name || "Sem nome"}</span>
                                 </h3>
-                                <Badge variant={method.is_active ? "green" : "red"} icon={null} className="whitespace-nowrap scale-90 shrink-0">
-                                    {method.is_active ? "Ativo" : "Inativo"}
-                                </Badge>
+                                <Tooltip text={`Status: ${method.is_active ? "Ativo" : "Inativo"}`}>
+                                    <Badge
+                                        variant={method.is_active ? "green" : "red"}
+                                        className="whitespace-nowrap scale-90 shrink-0"
+                                    />
+                                </Tooltip>
+                                {method.is_online_default && (
+                                    <Tooltip text="Método padrão para checkout online">
+                                        <Badge variant="blue" icon={null} className="text-[10px] px-1.5 h-5 scale-90 shrink-0">
+                                            Padrão
+                                        </Badge>
+                                    </Tooltip>
+                                )}
                             </div>
 
                             <div className="shrink-0 -mt-1 -mr-1" onClick={(event) => event.stopPropagation()}>
@@ -88,40 +80,38 @@ const PaymentMethodGridCard = React.memo(
                             </div>
                         </div>
 
-                        <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate flex items-center">
-                            ID: {method.id.slice(0, 5).toUpperCase()}
+                        <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate flex items-center mt-0.5">
+                            <span>ID {method.id ? method.id.slice(0, 5).toUpperCase() : "-"}</span>
                         </div>
                     </div>
                 </div>
 
                 <div className="mt-auto pt-3 border-t border-brand-border dark:border-dark-border flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
+                    <div className="grid grid-cols-2 gap-4">
                         <div className="flex flex-col gap-0.5">
                             <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Desconto</span>
-                            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
+                            <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">
                                 {method.discount_percent ? `${method.discount_percent}%` : "-"}
                             </span>
                         </div>
-                        <div className="flex flex-col gap-0.5 items-end">
+                        <div className="flex flex-col gap-0.5 items-end min-w-0">
                             <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Conta Financeira</span>
-                            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
+                            <span
+                                className="text-[14px] font-bold text-brand-dark dark:text-dark-heading truncate max-w-full"
+                                title={method.finance_account_name || "-"}
+                            >
                                 {method.finance_account_name || "-"}
                             </span>
                         </div>
                     </div>
 
                     <div className="flex items-end justify-between mt-1">
-                        <div className="flex flex-col gap-0.5">
+                        <div className="flex flex-col gap-0.5 min-w-0">
                             <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Tipo</span>
                             <div className="flex items-center gap-2">
-                                <Badge variant="gray" icon={null} className="whitespace-nowrap scale-90">
+                                <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading truncate">
                                     {getPaymentTypeLabel(method)}
-                                </Badge>
-                                {method.is_online_default && (
-                                    <Badge variant="blue" icon={null} className="text-[10px] px-1.5 h-5">
-                                        Padrão
-                                    </Badge>
-                                )}
+                                </span>
                             </div>
                         </div>
 
@@ -136,6 +126,17 @@ const PaymentMethodGridCard = React.memo(
             </motion.div>
         )
     },
+    (prev, next) =>
+        prev.selected === next.selected &&
+        prev.method.id === next.method.id &&
+        prev.method.name === next.method.name &&
+        prev.method.is_active === next.method.is_active &&
+        prev.method.type === next.method.type &&
+        prev.method.payment_type === next.method.payment_type &&
+        prev.method.discount_percent === next.method.discount_percent &&
+        prev.method.fee_percent === next.method.fee_percent &&
+        prev.method.finance_account_name === next.method.finance_account_name &&
+        prev.method.is_online_default === next.method.is_online_default
 )
 
 PaymentMethodGridCard.displayName = "PaymentMethodGridCard"

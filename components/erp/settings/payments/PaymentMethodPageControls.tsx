@@ -28,6 +28,7 @@ interface PaymentMethodPageControlsProps {
     viewMode: "list" | "grid"
     onViewModeChange: (mode: "list" | "grid") => void
     hasActiveFilters: boolean
+    onCreate?: () => void
 }
 
 export default function PaymentMethodPageControls({
@@ -39,6 +40,7 @@ export default function PaymentMethodPageControls({
     viewMode,
     onViewModeChange,
     hasActiveFilters,
+    onCreate,
 }: PaymentMethodPageControlsProps) {
     const filtersContainerRef = useRef<HTMLDivElement>(null)
     const [filterScrollState, setFilterScrollState] = useState({ left: false, right: false })
@@ -87,12 +89,12 @@ export default function PaymentMethodPageControls({
 
     return (
         <>
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4 flex-none px-4">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4 flex-none">
                 <div className="md:hidden flex items-center gap-2 w-full">
                     <div className="flex-1 min-w-0">
                         <Input
                             name="search-payment-methods"
-                            placeholder="Buscar metodos..."
+                            placeholder="Buscar métodos..."
                             value={search}
                             onChange={(event) => onSearchChange(event.target.value)}
                             className="h-[42px] w-full"
@@ -110,6 +112,13 @@ export default function PaymentMethodPageControls({
                         >
                             <FilterIcon size={18} className="text-brand-inactive-text" />
                         </Button>
+                        {onCreate && (
+                            <Button
+                                onClick={onCreate}
+                                className="w-[42px] h-[42px] p-0 flex items-center justify-center rounded-full"
+                                leftIcon={<PlusIcon size={18} />}
+                            />
+                        )}
                     </div>
                 </div>
 
@@ -174,7 +183,7 @@ export default function PaymentMethodPageControls({
                 </div>
             </div>
 
-            <div className="md:hidden w-full overflow-x-auto hide-scrollbar mb-4 flex-none px-4">
+            <div className="md:hidden w-full overflow-x-auto hide-scrollbar mb-4 flex-none">
                 <div className="flex items-center gap-2">
                     <BadgeList />
                 </div>
