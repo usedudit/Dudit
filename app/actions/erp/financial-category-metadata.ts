@@ -11,6 +11,17 @@ function normalizeName(value: string) {
   return sanitizeInput(value, 150).trim().replace(/\s+/g, " ")
 }
 
+export type DreGroupType =
+  | "receita_bruta"
+  | "deducao_receita"
+  | "custo_direto_cmv"
+  | "despesa_comercial"
+  | "despesa_administrativa"
+  | "pro_labore"
+  | "despesa_financeira"
+  | "receita_financeira"
+  | "nao_operacional"
+
 export async function getFinancialCategoriesAction(partnerId: string) {
   try {
     await requirePermission(partnerId, "financial", "view")
@@ -19,7 +30,7 @@ export async function getFinancialCategoriesAction(partnerId: string) {
     const supabase = createAdminClient()
     const { data, error } = await supabase
       .from("financial_categories")
-      .select("id, name, parent_id, is_active, created_at, category_type")
+      .select("id, name, parent_id, is_active, created_at, category_type, dre_group")
       .eq("partner_id", partnerId)
       .order("name")
 
@@ -36,6 +47,7 @@ export async function createFinancialCategoryAction(data: {
   name: string
   parentId?: string | null
   categoryType?: "income" | "expense" | null
+  dreGroup?: DreGroupType | null
 }) {
   try {
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -48,16 +60,21 @@ export async function createFinancialCategoryAction(data: {
     const normalizedName = normalizeName(data.name)
 
     let resolvedCategoryType: "income" | "expense" | null = data.categoryType ?? null
+    let resolvedDreGroup: DreGroupType | null = data.dreGroup ?? null
+
     if (data.parentId) {
       const { data: parent, error: pError } = await supabase
         .from("financial_categories")
-        .select("id, category_type")
+        .select("id, category_type, dre_group")
         .eq("id", data.parentId)
         .eq("partner_id", data.partnerId)
         .single()
 
       if (pError || !parent) throw new Error("Categoria pai inválida.")
       resolvedCategoryType = (parent.category_type as "income" | "expense" | null) ?? null
+      if (!resolvedDreGroup && parent.dre_group) {
+        resolvedDreGroup = parent.dre_group as DreGroupType
+      }
     }
 
     if (!resolvedCategoryType) {
@@ -80,8 +97,9 @@ export async function createFinancialCategoryAction(data: {
         name: normalizedName,
         parent_id: data.parentId || null,
         category_type: resolvedCategoryType,
+        dre_group: resolvedDreGroup,
       })
-      .select("id, name, parent_id, is_active, created_at, category_type")
+      .select("id, name, parent_id, is_active, created_at, category_type, dre_group")
       .single()
 
     if (error) throw error
@@ -94,7 +112,13 @@ export async function createFinancialCategoryAction(data: {
 export async function updateFinancialCategoryAction(
   id: string,
   partnerId: string,
-  data: { name?: string; parentId?: string | null; isActive?: boolean; categoryType?: "income" | "expense" | null },
+  data: {
+    name?: string
+    parentId?: string | null
+    isActive?: boolean
+    categoryType?: "income" | "expense" | null
+    dreGroup?: DreGroupType | null
+  },
 ) {
   try {
     await requirePermission(partnerId, "financial", "edit")
@@ -103,13 +127,16 @@ export async function updateFinancialCategoryAction(
     if (data.parentId) {
       const { data: parent, error: pError } = await supabase
         .from("financial_categories")
-        .select("id, category_type")
+        .select("id, category_type, dre_group")
         .eq("id", data.parentId)
         .eq("partner_id", partnerId)
         .single()
 
       if (pError || !parent) throw new Error("Categoria pai inválida.")
       data.categoryType = (parent.category_type as "income" | "expense" | null) ?? null
+      if (data.dreGroup === undefined && parent.dre_group) {
+        data.dreGroup = parent.dre_group as DreGroupType
+      }
     }
 
     const payload: Record<string, unknown> = {}
@@ -129,13 +156,14 @@ export async function updateFinancialCategoryAction(
     if (data.parentId !== undefined) payload.parent_id = data.parentId
     if (data.isActive !== undefined) payload.is_active = data.isActive
     if (data.categoryType !== undefined) payload.category_type = data.categoryType
+    if (data.dreGroup !== undefined) payload.dre_group = data.dreGroup
 
     const { data: updated, error } = await supabase
       .from("financial_categories")
       .update(payload)
       .eq("id", id)
       .eq("partner_id", partnerId)
-      .select("id, name, parent_id, is_active, created_at, category_type")
+      .select("id, name, parent_id, is_active, created_at, category_type, dre_group")
       .single()
 
     if (error) throw error
@@ -162,3 +190,4 @@ export async function deleteFinancialCategoryAction(id: string, partnerId: strin
     return { success: false, error: error.message }
   }
 }
+

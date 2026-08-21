@@ -22,6 +22,7 @@ import {
     updateFinancialCategoryAction,
     deleteFinancialCategoryAction,
     getFinancialCategoriesAction,
+    type DreGroupType,
 } from "@/app/actions/erp/financial-category-metadata"
 import {
     createFinanceAccountAction,
@@ -46,6 +47,7 @@ interface FinancialCategoriesPageProps {
         name: string
         parent_id: string | null
         category_type?: "income" | "expense" | null
+        dre_group?: DreGroupType | null
         is_active: boolean
         created_at: string
     }[]
@@ -53,6 +55,18 @@ interface FinancialCategoriesPageProps {
     partnerId: string
     planGate?: { requiredPlanSlug: "crescer" | "escalar"; message: string }
 }
+
+const DRE_GROUP_OPTIONS: { value: DreGroupType; label: string }[] = [
+    { value: "receita_bruta", label: "Receita Operacional Bruta" },
+    { value: "deducao_receita", label: "Dedução da Receita (Taxas / Devoluções / Impostos)" },
+    { value: "custo_direto_cmv", label: "Custos Diretos (CMV / Insumos / Peças)" },
+    { value: "despesa_comercial", label: "Despesas com Vendas / Comercial" },
+    { value: "despesa_administrativa", label: "Despesas Administrativas e Gerais" },
+    { value: "pro_labore", label: "Pró-Labore e Retiradas de Sócios" },
+    { value: "despesa_financeira", label: "Despesas Financeiras (Juros / Tarifas)" },
+    { value: "receita_financeira", label: "Receitas Financeiras (Rendimentos / Juros)" },
+    { value: "nao_operacional", label: "Não Operacional / Extraordinário" },
+]
 
 const ACCOUNT_TYPE_OPTIONS: { value: FinanceAccountType; label: string }[] = [
     { value: "cash", label: "Caixa" },
@@ -284,7 +298,7 @@ export default function FinancialCategoriesPage({
             isOpen: true,
             mode: "add",
             type,
-            item: { name: "", is_active: true, parentId: null, categoryType: "income" },
+            item: { name: "", is_active: true, parentId: null, categoryType: "income", dreGroup: "receita_bruta" },
             isSaving: false,
         })
         setNameError(false)
@@ -302,6 +316,7 @@ export default function FinancialCategoriesPage({
                 is_active: item.is_active,
                 parentId: item.parent_id,
                 categoryType: (item.category_type as "income" | "expense" | null) || "income",
+                dreGroup: item.dre_group || null,
             },
             isSaving: false,
         })
@@ -368,6 +383,7 @@ export default function FinancialCategoriesPage({
                     name: item.name,
                     parentId: type === "subcategory" ? item.parentId : null,
                     categoryType: type === "subcategory" ? undefined : item.categoryType,
+                    dreGroup: item.dreGroup,
                 })
             } else {
                 if (!item.id) {
@@ -379,6 +395,7 @@ export default function FinancialCategoriesPage({
                     isActive: item.is_active,
                     parentId: type === "subcategory" ? item.parentId : null,
                     categoryType: type === "subcategory" ? undefined : item.categoryType,
+                    dreGroup: item.dreGroup,
                 })
             }
 
@@ -720,20 +737,50 @@ export default function FinancialCategoriesPage({
                     )}
 
                     {modal.type === "category" && (
-                        <FormDropdown
-                            label="Tipo da categoria"
-                            options={[
-                                { value: "income", label: "Receita" },
-                                { value: "expense", label: "Despesa" },
-                            ]}
-                            value={modal.item.categoryType}
-                            setValue={(v) =>
-                                setModal((prev) => ({
-                                    ...prev,
-                                    item: { ...prev.item, categoryType: v as "income" | "expense" },
-                                }))
-                            }
-                        />
+                        <>
+                            <FormDropdown
+                                label="Tipo da categoria"
+                                options={[
+                                    { value: "income", label: "Receita" },
+                                    { value: "expense", label: "Despesa" },
+                                ]}
+                                value={modal.item.categoryType}
+                                setValue={(v) =>
+                                    setModal((prev) => ({
+                                        ...prev,
+                                        item: {
+                                            ...prev.item,
+                                            categoryType: v as "income" | "expense",
+                                            dreGroup: v === "income" ? "receita_bruta" : "despesa_administrativa",
+                                        },
+                                    }))
+                                }
+                            />
+
+                            <FormDropdown
+                                label="Classificação no DRE"
+                                options={DRE_GROUP_OPTIONS.filter((opt) =>
+                                    modal.item.categoryType === "income"
+                                        ? ["receita_bruta", "receita_financeira", "nao_operacional"].includes(opt.value)
+                                        : [
+                                              "deducao_receita",
+                                              "custo_direto_cmv",
+                                              "despesa_comercial",
+                                              "despesa_administrativa",
+                                              "pro_labore",
+                                              "despesa_financeira",
+                                              "nao_operacional",
+                                          ].includes(opt.value),
+                                )}
+                                value={modal.item.dreGroup || (modal.item.categoryType === "income" ? "receita_bruta" : "despesa_administrativa")}
+                                setValue={(v) =>
+                                    setModal((prev) => ({
+                                        ...prev,
+                                        item: { ...prev.item, dreGroup: v as DreGroupType },
+                                    }))
+                                }
+                            />
+                        </>
                     )}
 
                     <Checkbox

@@ -99,6 +99,7 @@ const navItems: NavItem[] = [
         href: "/erp/transacoes",
         submenu: [
             { label: "Movimentações", href: "/erp/transacoes" },
+            { label: "DRE Gerencial", href: "/erp/transacoes/dre" },
             { label: "Contas a Pagar", href: "/erp/contas-a-pagar" },
             { label: "Contas a Receber", href: "/erp/contas-a-receber" },
             { label: "Caixa (PDV)", href: "/erp/caixa" },
@@ -125,6 +126,7 @@ const PLAN_GATED_MINIMUM: Record<string, "crescer" | "escalar"> = {
     "/erp/lojas": "escalar",
     "/erp/logistica": "crescer",
     "/erp/transacoes": "crescer",
+    "/erp/transacoes/dre": "crescer",
     "/erp/contas-a-pagar": "crescer",
     "/erp/contas-a-receber": "crescer",
     "/erp/caixa": "crescer",
@@ -323,6 +325,7 @@ export function ERPSidebar() {
                         }
                         if (item.label === "Financeiro") {
                             if (sub.href === "/erp/transacoes") return financialResourceActive
+                            if (sub.href === "/erp/transacoes/dre") return financialResourceActive
                             if (sub.href === "/erp/contas-a-pagar") return financialResourceActive
                             if (sub.href === "/erp/contas-a-receber") return financialResourceActive
                             if (sub.href === "/erp/caixa") return financialResourceActive

@@ -351,6 +351,7 @@ const SYSTEM_RESOURCE_ROUTE_MAP: Record<string, SystemResourceId> = {
   "/erp/clientes": "customers",
   // ── Financeiro
   "/erp/transacoes": "financial",
+  "/erp/transacoes/dre": "financial",
   "/erp/contas-a-pagar": "financial",
   "/erp/contas-a-receber": "financial",
   "/erp/caixa": "financial",

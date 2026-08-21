@@ -119,7 +119,7 @@ export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
         specificPermissions: ["can_open_cash", "can_close_cash", "can_manage_cash"],
     },
     financial_dre: {
-        key: "financial_dre", path: "/erp/financeiro/dre", label: "DRE Gerencial", category: "Financeiro", legacyCategory: "financial",
+        key: "financial_dre", path: "/erp/transacoes/dre", label: "DRE Gerencial", category: "Financeiro", legacyCategory: "financial",
         specificPermissions: ["can_view_dre"],
     },
     cadastros_financeiro: { key: "cadastros_financeiro", path: "/erp/transacoes/cadastros-financeiro", label: "Cadastros financeiros", category: "Financeiro", legacyCategory: "financial" },
