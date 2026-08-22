@@ -22,6 +22,7 @@ export interface DreSubItem {
   previousAmount?: number
   horizontalVariation?: number // % de variação vs período anterior
   transactionCount?: number
+  helpText?: string
 }
 
 export interface DreNode {
@@ -36,6 +37,21 @@ export interface DreNode {
   helpText?: string
 }
 
+export interface DreCompanyInfo {
+  partnerName: string
+  tradeName?: string
+  documentNumber?: string
+  storeName?: string
+  taxRegimeLabel?: string
+  generatedAt: string
+}
+
+export interface DreDataIntegrityAlerts {
+  zeroCostItemsCount: number
+  unclassifiedTransactionsCount: number
+  unclassifiedTransactionsAmount: number
+}
+
 export interface DreReportData {
   period: {
     startDate: string
@@ -44,6 +60,8 @@ export interface DreReportData {
     previousEndDate?: string
     regime: DreRegime
   }
+  companyInfo?: DreCompanyInfo
+  alerts: DreDataIntegrityAlerts
   kpis: {
     grossRevenue: number
     netRevenue: number
@@ -57,6 +75,8 @@ export interface DreReportData {
     ebitdaMarginPercent: number
     netProfitAmount: number
     netMarginPercent: number
+    totalSalesAndOrdersCount: number
+    averageTicketAmount: number
   }
   structure: {
     grossRevenue: DreNode
@@ -75,7 +95,7 @@ export interface DreReportData {
 }
 
 /**
- * Calcula datas do período comparativo anterior com mesma duração.
+ * Calcula datas do período comparativo anterior com mesma duração exata.
  */
 function getPreviousPeriodDates(startDate: string, endDate: string) {
   const start = new Date(`${startDate}T00:00:00Z`)
@@ -112,6 +132,7 @@ function calcVerticalPercent(amount: number, grossRevenue: number): number {
 
 /**
  * Motor central de cálculo do DRE no Dudit.
+ * Executa todas as consultas em paralelo com proteção de volume e precisão contábil.
  */
 async function computeDrePeriod(
   partnerId: string,
@@ -124,17 +145,20 @@ async function computeDrePeriod(
   const startIso = `${startDate}T00:00:00`
   const endIso = `${endDate}T23:59:59`
 
-  // ── 0. Configurações da Loja / Fiscal ───────────────────────────────────────
-  let storeQuery = supabase.from("stores").select("id, person_type, crt, simples_tax_rate_products, simples_tax_rate_services, mei_fixed_tax_amount").eq("partner_id", partnerId)
+  // ── Preparação das Queries com Cláusulas Otimizadas ─────────────────────────
+
+  // 0. Configurações da Loja e Parceiro
+  let storeQuery = supabase
+    .from("stores")
+    .select(`
+      id, name, person_type, crt, simples_tax_rate_products, simples_tax_rate_services, mei_fixed_tax_amount,
+      partner:partners(id, name, document_number, trade_name)
+    `)
+    .eq("partner_id", partnerId)
+
   if (storeId) storeQuery = storeQuery.eq("id", storeId)
-  const { data: stores } = await storeQuery
-  const activeStore = stores && stores.length > 0 ? stores[0] : null
 
-  const simplesProductTaxRate = Number(activeStore?.simples_tax_rate_products || 0) / 100
-  const simplesServiceTaxRate = Number(activeStore?.simples_tax_rate_services || 0) / 100
-  const meiFixedTax = Number(activeStore?.mei_fixed_tax_amount || 0)
-
-  // ── 1. Buscar Vendas PDV (`sales` + `sale_items`) ─────────────────────────
+  // 1. Vendas PDV (`sales` + `sale_items`)
   let salesQuery = supabase
     .from("sales")
     .select(`
@@ -144,117 +168,107 @@ async function computeDrePeriod(
     `)
     .eq("partner_id", partnerId)
     .neq("status", "cancelled")
+    .limit(10000)
 
   if (storeId) salesQuery = salesQuery.eq("store_id", storeId)
-
   if (regime === "competencia") {
     salesQuery = salesQuery.gte("created_at", startIso).lte("created_at", endIso)
   } else {
-    // Caixa: Vendas com pagamento aprovado/parcial
     salesQuery = salesQuery.in("payment_status", ["paid", "partially_paid"]).gte("created_at", startIso).lte("created_at", endIso)
   }
 
-  const { data: salesList } = await salesQuery
-
-  // ── 2. Buscar Pedidos Online (`orders` + `order_items`) ───────────────────
+  // 2. Pedidos Online (`orders` + `order_items`)
   let ordersQuery = supabase
     .from("orders")
     .select(`
-      id, total_amount, discount_amount, paid_amount, situation, created_at,
+      id, total_amount, discount_amount, paid_amount, delivery_fee, situation, created_at,
+      payment_method_fee_amount, payment_method_fixed_fee_amount, payment_method_discount_amount,
       order_items (id, product_id, variant_id, title, quantity, price, unit_cost, total)
     `)
     .eq("partner_id", partnerId)
     .not("situation", "in", '("cancelled","pending_payment")')
+    .limit(10000)
 
   if (storeId) ordersQuery = ordersQuery.eq("store_id", storeId)
-
   if (regime === "competencia") {
     ordersQuery = ordersQuery.gte("created_at", startIso).lte("created_at", endIso)
   } else {
     ordersQuery = ordersQuery.in("situation", ["paid", "preparing", "shipped", "delivered", "completed"]).gte("created_at", startIso).lte("created_at", endIso)
   }
 
-  const { data: ordersList } = await ordersQuery
-
-  // ── 3. Buscar Ordens de Serviço (`service_orders`) ─────────────────────────
+  // 3. Ordens de Serviço (`service_orders`)
   let soQuery = supabase
     .from("service_orders")
     .select("id, total_amount, discount_amount, final_amount, paid_amount, status, created_at")
     .eq("partner_id", partnerId)
     .not("status", "in", '("cancelled","draft")')
+    .limit(10000)
 
   if (storeId) soQuery = soQuery.eq("store_id", storeId)
-
   if (regime === "competencia") {
     soQuery = soQuery.gte("created_at", startIso).lte("created_at", endIso)
   } else {
     soQuery = soQuery.eq("status", "completed").gte("created_at", startIso).lte("created_at", endIso)
   }
 
-  const { data: serviceOrdersList } = await soQuery
-
-  // ── 4. Buscar Agendamentos (`appointments`) ───────────────────────────────
+  // 4. Agendamentos (`appointments`)
   let apptQuery = supabase
     .from("appointments")
     .select("id, price, status, start_date, created_at")
     .eq("partner_id", partnerId)
     .not("status", "in", '("cancelled")')
+    .limit(10000)
 
   if (storeId) apptQuery = apptQuery.eq("store_id", storeId)
-
   if (regime === "competencia") {
     apptQuery = apptQuery.gte("start_date", startDate).lte("start_date", endDate)
   } else {
     apptQuery = apptQuery.eq("status", "completed").gte("start_date", startDate).lte("start_date", endDate)
   }
 
-  const { data: appointmentsList } = await apptQuery
-
-  // ── 5. Buscar Transações Financeiras (`transactions`) com Categorias ──────
+  // 5. Transações Financeiras (`transactions`)
   let txQuery = supabase
     .from("transactions")
     .select(`
       id, description, amount, paid_amount, discount_amount, interest_amount, fee_amount,
-      transaction_type, status, due_date, payment_date, created_at, origin,
+      transaction_type, status, due_date, payment_date, transaction_date, created_at, origin,
       category_id, dre_group:financial_categories!category_id(id, name, dre_group, category_type)
     `)
     .eq("partner_id", partnerId)
     .neq("status", "cancelled")
+    .limit(10000)
 
   if (storeId) txQuery = txQuery.eq("store_id", storeId)
-
   if (regime === "competencia") {
-    txQuery = txQuery.gte("due_date", startDate).lte("due_date", endDate)
+    txQuery = txQuery.or(`and(due_date.gte.${startDate},due_date.lte.${endDate}),and(due_date.is.null,created_at.gte.${startIso},created_at.lte.${endIso})`)
   } else {
     txQuery = txQuery.eq("status", "paid").gte("payment_date", startIso).lte("payment_date", endIso)
   }
 
-  const { data: transactionsList } = await txQuery
-
-  // ── 6. Buscar Devoluções e Reembolsos (`returns`) ─────────────────────────
+  // 6. Devoluções e Reembolsos (`returns`)
   let returnsQuery = supabase
     .from("returns")
-    .select("id, refund_amount, status, created_at")
+    .select("id, refund_amount, status, created_at, refund_transaction_id")
     .eq("partner_id", partnerId)
     .eq("status", "completed")
     .gte("created_at", startIso)
     .lte("created_at", endIso)
+    .limit(5000)
 
   if (storeId) returnsQuery = returnsQuery.eq("store_id", storeId)
-  const { data: returnsList } = await returnsQuery
 
-  // ── 7. Buscar Comissões de Vendedores (`employee_commissions`) ────────────
+  // 7. Comissões (`employee_commissions`)
   let commissionsQuery = supabase
     .from("employee_commissions")
     .select("id, amount, status, created_at")
     .eq("partner_id", partnerId)
     .gte("created_at", startIso)
     .lte("created_at", endIso)
+    .limit(5000)
 
   if (storeId) commissionsQuery = commissionsQuery.eq("store_id", storeId)
-  const { data: commissionsList } = await commissionsQuery
 
-  // ── 8. Buscar Fretes e Entregas (`deliveries`) ────────────────────────────
+  // 8. Fretes / Entregas (`deliveries`)
   let deliveriesQuery = supabase
     .from("deliveries")
     .select("id, fee, driver_payout, status, created_at")
@@ -262,60 +276,135 @@ async function computeDrePeriod(
     .neq("status", "cancelled")
     .gte("created_at", startIso)
     .lte("created_at", endIso)
+    .limit(5000)
 
   if (storeId) deliveriesQuery = deliveriesQuery.eq("store_id", storeId)
-  const { data: deliveriesList } = await deliveriesQuery
+
+  // ── Execução Paralela Simultânea de Todas as 9 Queries (Zero Latência Serial) ──
+  const [
+    storesRes,
+    salesRes,
+    ordersRes,
+    soRes,
+    apptRes,
+    txRes,
+    returnsRes,
+    commissionsRes,
+    deliveriesRes,
+  ] = await Promise.all([
+    storeQuery,
+    salesQuery,
+    ordersQuery,
+    soQuery,
+    apptQuery,
+    txQuery,
+    returnsQuery,
+    commissionsQuery,
+    deliveriesQuery,
+  ])
+
+  const stores = storesRes.data || []
+  const activeStore = stores.length > 0 ? stores[0] : null
+  const partnerInfo = (activeStore?.partner as any) || null
+
+  const simplesProductTaxRate = Number(activeStore?.simples_tax_rate_products || 0) / 100
+  const simplesServiceTaxRate = Number(activeStore?.simples_tax_rate_services || 0) / 100
+  const meiFixedTax = Number(activeStore?.mei_fixed_tax_amount || 0)
+
+  const salesList = salesRes.data || []
+  const ordersList = ordersRes.data || []
+  const serviceOrdersList = soRes.data || []
+  const appointmentsList = apptRes.data || []
+  const transactionsList = txRes.data || []
+  const returnsList = returnsRes.data || []
+  const commissionsList = commissionsRes.data || []
+  const deliveriesList = deliveriesRes.data || []
 
   // ==========================================================================
-  // CONSOLIDAÇÃO DOS NÓS DA DRE
+  // 1. RECEITA OPERACIONAL BRUTA (Valor Nominal Cheio)
   // ==========================================================================
-
-  // 1. Receita Operacional Bruta
   let productsRevenue = 0
   let servicesRevenue = 0
   let recurringRevenue = 0
   let otherIncome = 0
 
-  // 1.1 Venda de Produtos (PDV)
   let posSaleCount = 0
-  for (const s of salesList || []) {
-    const val = regime === "competencia" ? Number(s.total_amount || 0) : Number(s.paid_amount || s.final_amount || 0)
-    productsRevenue += val
+  let posDiscounts = 0
+  let posFees = 0
+
+  // 1.1 PDV: Receita Bruta = Subtotal nominal (antes de descontos)
+  for (const s of salesList) {
+    const discount = Number(s.discount_amount || 0)
+    const nominalGross = Number(s.total_amount || 0) > 0 ? Number(s.total_amount) : Number(s.final_amount || 0) + discount
+    productsRevenue += nominalGross
+    posDiscounts += discount
+    posFees += Number(s.fee_amount || 0) + Number(s.fixed_fee_amount || 0)
     posSaleCount++
   }
 
-  // 1.2 Venda de Produtos (Online / Pedidos)
+  // 1.2 Pedidos Online: Receita Bruta = Subtotal dos itens (antes de cupom/desconto)
   let orderCount = 0
-  for (const o of ordersList || []) {
-    const val = regime === "competencia" ? Number(o.total_amount || 0) : Number(o.paid_amount || o.total_amount || 0)
-    productsRevenue += val
+  let orderDiscounts = 0
+  let orderFees = 0
+
+  for (const o of ordersList) {
+    const couponDiscount = Number(o.discount_amount || 0)
+    const pmDiscount = Number(o.payment_method_discount_amount || 0)
+    const totalOrderDiscount = couponDiscount + pmDiscount
+
+    let itemsGrossSum = 0
+    for (const item of (o.order_items as any[]) || []) {
+      itemsGrossSum += Number(item.quantity || 0) * Number(item.price || 0)
+    }
+
+    if (itemsGrossSum > 0) {
+      productsRevenue += itemsGrossSum
+    } else {
+      // Fallback: total_amount + descontos - taxa de entrega
+      const deliveryFee = Number(o.delivery_fee || 0)
+      const reconstructedGross = Math.max(0, Number(o.total_amount || 0) + totalOrderDiscount - deliveryFee)
+      productsRevenue += reconstructedGross
+    }
+
+    orderDiscounts += totalOrderDiscount
+    orderFees += Number(o.payment_method_fee_amount || 0) + Number(o.payment_method_fixed_fee_amount || 0)
     orderCount++
   }
 
   // 1.3 Prestação de Serviços (OS + Agendamentos)
   let soCount = 0
-  for (const so of serviceOrdersList || []) {
-    const val = regime === "competencia" ? Number(so.total_amount || so.final_amount || 0) : Number(so.paid_amount || so.final_amount || 0)
-    servicesRevenue += val
+  let soDiscounts = 0
+  for (const so of serviceOrdersList) {
+    const discount = Number(so.discount_amount || 0)
+    const grossVal = Number(so.total_amount || 0) > 0 ? Number(so.total_amount) : Number(so.final_amount || 0) + discount
+    servicesRevenue += grossVal
+    soDiscounts += discount
     soCount++
   }
 
   let apptCount = 0
-  for (const a of appointmentsList || []) {
+  for (const a of appointmentsList) {
     servicesRevenue += Number(a.price || 0)
     apptCount++
   }
 
-  // 1.4 Transações Manuais de Receita (filtrando para não duplicar origin system)
+  // 1.4 Transações Manuais de Receita (filtrando origin system para não duplicar vendas)
   let manualTxIncomeCount = 0
-  for (const tx of transactionsList || []) {
+  let unclassifiedTransactionsCount = 0
+  let unclassifiedTransactionsAmount = 0
+
+  for (const tx of transactionsList) {
+    const val = regime === "competencia" ? Number(tx.amount || 0) : Number(tx.paid_amount || tx.amount || 0)
+    const g = (tx.dre_group as any)?.dre_group
+
+    if (!g && tx.origin !== "system") {
+      unclassifiedTransactionsCount++
+      unclassifiedTransactionsAmount += val
+    }
+
     if (tx.transaction_type === "income" && tx.origin !== "system") {
-      const g = (tx.dre_group as any)?.dre_group
-      const val = regime === "competencia" ? Number(tx.amount || 0) : Number(tx.paid_amount || tx.amount || 0)
-      if (g === "receita_financeira") {
-        // Vai para resultado financeiro
-      } else if (g === "nao_operacional") {
-        // Vai para não operacional
+      if (g === "receita_financeira" || g === "nao_operacional") {
+        // Apurado nos grupos 8 e 9
       } else if (g === "receita_bruta" || !g) {
         const catName = (tx.dre_group as any)?.name?.toLowerCase() || ""
         if (catName.includes("assinatura") || catName.includes("recorren")) {
@@ -334,28 +423,24 @@ async function computeDrePeriod(
 
   const grossRevenueTotal = productsRevenue + servicesRevenue + recurringRevenue + otherIncome
 
-  // 2. Deduções da Receita Bruta
-  let paymentFees = 0
-  let discountsGiven = 0
+  // ==========================================================================
+  // 2. DEDUÇÕES DA RECEITA BRUTA
+  // ==========================================================================
+  let paymentFees = posFees + orderFees
+  let discountsGiven = posDiscounts + orderDiscounts + soDiscounts
   let returnsAndRefunds = 0
   let salesTaxes = 0
 
-  // 2.1 Taxas de Maquininha / Gateways gravadas no PDV
-  for (const s of salesList || []) {
-    paymentFees += Number(s.fee_amount || 0) + Number(s.fixed_fee_amount || 0)
-    discountsGiven += Number(s.discount_amount || 0)
-  }
-
-  for (const o of ordersList || []) {
-    discountsGiven += Number(o.discount_amount || 0)
-  }
-
-  // Devoluções
-  for (const r of returnsList || []) {
+  // 2.1 Devoluções e Reembolsos de Pedidos/PDV
+  const returnTxIds = new Set<string>()
+  for (const r of returnsList) {
     returnsAndRefunds += Number(r.refund_amount || 0)
+    if (r.refund_transaction_id) {
+      returnTxIds.add(r.refund_transaction_id)
+    }
   }
 
-  // Impostos sobre faturamento (DAS Simples ou MEI)
+  // 2.2 Impostos sobre faturamento (Simples Nacional / DAS-MEI)
   if (simplesProductTaxRate > 0 || simplesServiceTaxRate > 0) {
     salesTaxes += productsRevenue * simplesProductTaxRate
     salesTaxes += servicesRevenue * simplesServiceTaxRate
@@ -363,18 +448,19 @@ async function computeDrePeriod(
     salesTaxes += meiFixedTax
   }
 
-  // Transações avulsas de dedução
-  for (const tx of transactionsList || []) {
-    if (tx.transaction_type === "expense") {
+  // 2.3 Transações financeiras manuais de dedução (sem duplicar as já calculadas)
+  for (const tx of transactionsList) {
+    if (tx.transaction_type === "expense" && !returnTxIds.has(tx.id)) {
       const g = (tx.dre_group as any)?.dre_group
       const val = regime === "competencia" ? Number(tx.amount || 0) : Number(tx.paid_amount || tx.amount || 0)
+
       if (g === "deducao_receita") {
         const catName = (tx.dre_group as any)?.name?.toLowerCase() || ""
-        if (catName.includes("taxa") || catName.includes("cartao") || catName.includes("maquin")) {
+        if (catName.includes("taxa") || catName.includes("cartao") || catName.includes("maquin") || catName.includes("gateway")) {
           paymentFees += val
-        } else if (catName.includes("desconto")) {
+        } else if (catName.includes("desconto") || catName.includes("abatimento")) {
           discountsGiven += val
-        } else if (catName.includes("imposto") || catName.includes("das")) {
+        } else if (catName.includes("imposto") || catName.includes("das") || catName.includes("tributo")) {
           salesTaxes += val
         } else {
           returnsAndRefunds += val
@@ -386,39 +472,48 @@ async function computeDrePeriod(
   const totalDeductions = paymentFees + discountsGiven + returnsAndRefunds + salesTaxes
   const netRevenueTotal = Math.max(0, grossRevenueTotal - totalDeductions)
 
-  // 3. Custos Diretos (CMV e CSP)
+  // ==========================================================================
+  // 3. CUSTOS DIRETOS DA OPERAÇÃO (CMV / CSP / Insumos)
+  // ==========================================================================
   let cogsProducts = 0
   let cogsServices = 0
   let cogsSupplies = 0
+  let zeroCostItemsCount = 0
 
-  // CMV de itens vendidos no PDV
-  for (const s of salesList || []) {
+  // 3.1 CMV de itens vendidos no PDV
+  for (const s of salesList) {
     for (const item of (s.sale_items as any[]) || []) {
       const qty = Number(item.quantity || 0)
       const cost = Number(item.unit_cost || 0)
+      if (cost <= 0) {
+        zeroCostItemsCount++
+      }
       cogsProducts += qty * cost
     }
   }
 
-  // CMV de itens vendidos online
-  for (const o of ordersList || []) {
+  // 3.2 CMV de itens vendidos online
+  for (const o of ordersList) {
     for (const item of (o.order_items as any[]) || []) {
       const qty = Number(item.quantity || 0)
       const cost = Number(item.unit_cost || 0)
+      if (cost <= 0) {
+        zeroCostItemsCount++
+      }
       cogsProducts += qty * cost
     }
   }
 
-  // Transações manuais categorizadas como CMV/Insumos
-  for (const tx of transactionsList || []) {
+  // 3.3 Transações financeiras manuais de Custo Direto / CMV / Peças
+  for (const tx of transactionsList) {
     if (tx.transaction_type === "expense") {
       const g = (tx.dre_group as any)?.dre_group
       const val = regime === "competencia" ? Number(tx.amount || 0) : Number(tx.paid_amount || tx.amount || 0)
       if (g === "custo_direto_cmv") {
         const catName = (tx.dre_group as any)?.name?.toLowerCase() || ""
-        if (catName.includes("servi") || catName.includes("peça")) {
+        if (catName.includes("servi") || catName.includes("peça") || catName.includes("peca")) {
           cogsServices += val
-        } else if (catName.includes("insumo") || catName.includes("embalag")) {
+        } else if (catName.includes("insumo") || catName.includes("embalag") || catName.includes("materia")) {
           cogsSupplies += val
         } else {
           cogsProducts += val
@@ -430,26 +525,27 @@ async function computeDrePeriod(
   const totalCogs = cogsProducts + cogsServices + cogsSupplies
   const grossProfitTotal = netRevenueTotal - totalCogs
 
-  // 4. Despesas Operacionais
+  // ==========================================================================
+  // 4. DESPESAS OPERACIONAIS (Comerciais, Administrativas e Pró-Labore)
+  // ==========================================================================
   let commercialExpenses = 0
   let administrativeExpenses = 0
   let proLaboreExpenses = 0
 
-  // 4.1 Comissões
+  // 4.1 Comissões e Fretes apurados dos módulos
   let commissionsTotal = 0
-  for (const c of commissionsList || []) {
+  for (const c of commissionsList) {
     commissionsTotal += Number(c.amount || 0)
   }
   commercialExpenses += commissionsTotal
 
-  // 4.2 Fretes de Entrega pagos a motoristas
   let deliveriesTotal = 0
-  for (const d of deliveriesList || []) {
+  for (const d of deliveriesList) {
     deliveriesTotal += Number(d.driver_payout || d.fee || 0)
   }
   commercialExpenses += deliveriesTotal
 
-  // 4.3 Despesas das Transações por dre_group
+  // 4.2 Despesas das Transações por dre_group
   const dynamicCommercialItems: Record<string, number> = {}
   const dynamicAdminItems: Record<string, number> = {}
   const dynamicProLaboreItems: Record<string, number> = {}
@@ -458,10 +554,10 @@ async function computeDrePeriod(
   let financialExpenses = 0
   let nonOperationalTotal = 0
 
-  for (const tx of transactionsList || []) {
+  for (const tx of transactionsList) {
     const val = regime === "competencia" ? Number(tx.amount || 0) : Number(tx.paid_amount || tx.amount || 0)
     const g = (tx.dre_group as any)?.dre_group
-    const catName = (tx.dre_group as any)?.name || tx.description || "Geral"
+    const catName = (tx.dre_group as any)?.name || tx.description || "Outras Despesas"
 
     if (tx.transaction_type === "expense") {
       if (g === "despesa_comercial") {
@@ -494,8 +590,11 @@ async function computeDrePeriod(
   const netProfitTotal = ebitdaTotal + netFinancialResult + nonOperationalTotal
 
   // ==========================================================================
-  // KPIs FINANCEIROS
+  // 5. KPIs E INDICADORES CONTÁBEIS / GERENCIAIS
   // ==========================================================================
+  const totalSalesCount = posSaleCount + orderCount + soCount + apptCount
+  const averageTicket = totalSalesCount > 0 ? grossRevenueTotal / totalSalesCount : 0
+
   const grossMarginPercent = netRevenueTotal > 0 ? (grossProfitTotal / netRevenueTotal) * 100 : 0
   const variableCosts = totalCogs + paymentFees + commissionsTotal + deliveriesTotal
   const contributionMarginAmount = netRevenueTotal - variableCosts
@@ -540,6 +639,24 @@ async function computeDrePeriod(
       netFinancialResult,
       nonOperationalTotal,
       netProfit: netProfitTotal,
+      zeroCostItemsCount,
+      unclassifiedTransactionsCount,
+      unclassifiedTransactionsAmount,
+      totalSalesCount,
+      averageTicket,
+    },
+    companyInfo: {
+      partnerName: partnerInfo?.trade_name || partnerInfo?.name || "Empresa Parceira",
+      tradeName: partnerInfo?.trade_name,
+      documentNumber: partnerInfo?.document_number,
+      storeName: activeStore?.name || (storeId ? "Loja Selecionada" : "Todas as Unidades (Consolidado)"),
+      taxRegimeLabel: activeStore?.person_type === "juridica" ? "Pessoa Jurídica (Simples Nacional / MEI)" : "Pessoa Física",
+      generatedAt: new Date().toLocaleString("pt-BR"),
+    },
+    alerts: {
+      zeroCostItemsCount,
+      unclassifiedTransactionsCount,
+      unclassifiedTransactionsAmount,
     },
     kpis: {
       grossRevenue: grossRevenueTotal,
@@ -554,34 +671,38 @@ async function computeDrePeriod(
       ebitdaMarginPercent: Number(ebitdaMarginPercent.toFixed(2)),
       netProfitAmount: netProfitTotal,
       netMarginPercent: Number(netMarginPercent.toFixed(2)),
+      totalSalesAndOrdersCount: totalSalesCount,
+      averageTicketAmount: Number(averageTicket.toFixed(2)),
     },
   }
 }
 
 /**
- * Monta o relatório final da DRE com análise vertical e horizontal.
+ * Monta o relatório final da DRE com análise vertical, horizontal e estrutura contábil.
  */
 export async function getDreReport(filters: DreFilters): Promise<DreReportData> {
   const regime = filters.regime || "competencia"
-  const partnerId = sanitizeUUID(filters.partnerId)
+  const partnerId = sanitizeUUID(filters.partnerId) || filters.partnerId
   const storeId = filters.storeId ? sanitizeUUID(filters.storeId) : null
 
-  // 1. Calcula o período atual
-  const currentData = await computeDrePeriod(partnerId, storeId, filters.startDate, filters.endDate, regime)
-  const cur = currentData.raw
-  const grossRev = cur.grossRevenue
-
-  // 2. Calcula período comparativo anterior (se solicitado)
   let prevDates: { previousStartDate: string; previousEndDate: string } | undefined
-  let prev: typeof cur | undefined
-
   if (filters.compareWithPrevious) {
     prevDates = getPreviousPeriodDates(filters.startDate, filters.endDate)
-    const prevData = await computeDrePeriod(partnerId, storeId, prevDates.previousStartDate, prevDates.previousEndDate, regime)
-    prev = prevData.raw
   }
 
-  // ── Montagem da Árvore Hierárquica ─────────────────────────────────────────
+  // Executa o período atual e o comparativo simultaneamente em paralelo
+  const [currentData, prevData] = await Promise.all([
+    computeDrePeriod(partnerId, storeId, filters.startDate, filters.endDate, regime),
+    prevDates
+      ? computeDrePeriod(partnerId, storeId, prevDates.previousStartDate, prevDates.previousEndDate, regime)
+      : Promise.resolve(null),
+  ])
+
+  const cur = currentData.raw
+  const prev = prevData?.raw
+  const grossRev = cur.grossRevenue
+
+  // ── Montagem da Árvore Hierárquica da DRE ──────────────────────────────────
   return {
     period: {
       startDate: filters.startDate,
@@ -590,6 +711,8 @@ export async function getDreReport(filters: DreFilters): Promise<DreReportData> 
       previousEndDate: prevDates?.previousEndDate,
       regime,
     },
+    companyInfo: currentData.companyInfo,
+    alerts: currentData.alerts,
     kpis: currentData.kpis,
     structure: {
       // 1. Receita Bruta
@@ -601,10 +724,11 @@ export async function getDreReport(filters: DreFilters): Promise<DreReportData> 
         verticalPercent: 100,
         previousAmount: prev?.grossRevenue,
         horizontalVariation: calcHorizontalVariation(cur.grossRevenue, prev?.grossRevenue),
+        helpText: "Faturamento bruto total gerado pelas vendas de mercadorias, produtos e prestação de serviços antes de quaisquer deduções.",
         items: [
           {
             id: "1.1",
-            name: "Venda de Produtos e Mercadorias (PDV / Online)",
+            name: "Venda de Mercadorias e Produtos (PDV / Online)",
             amount: cur.productsRevenue,
             verticalPercent: calcVerticalPercent(cur.productsRevenue, grossRev),
             previousAmount: prev?.productsRevenue,
@@ -612,7 +736,7 @@ export async function getDreReport(filters: DreFilters): Promise<DreReportData> 
           },
           {
             id: "1.2",
-            name: "Prestação de Serviços (Agendamentos / OS)",
+            name: "Prestação de Serviços (Ordens de Serviço / Agendamentos)",
             amount: cur.servicesRevenue,
             verticalPercent: calcVerticalPercent(cur.servicesRevenue, grossRev),
             previousAmount: prev?.servicesRevenue,
@@ -646,10 +770,11 @@ export async function getDreReport(filters: DreFilters): Promise<DreReportData> 
         verticalPercent: calcVerticalPercent(cur.totalDeductions, grossRev),
         previousAmount: prev?.totalDeductions,
         horizontalVariation: calcHorizontalVariation(cur.totalDeductions, prev?.totalDeductions),
+        helpText: "Descontos comerciais, taxas de meios de pagamento/maquininhas, devoluções/estornos de clientes e impostos sobre vendas.",
         items: [
           {
             id: "2.1",
-            name: "Taxas de Cartão, Maquininhas e Gateways",
+            name: "Taxas de Cartão, Maquininhas e Gateways Online",
             amount: cur.paymentFees,
             verticalPercent: calcVerticalPercent(cur.paymentFees, grossRev),
             previousAmount: prev?.paymentFees,
@@ -657,23 +782,23 @@ export async function getDreReport(filters: DreFilters): Promise<DreReportData> 
           },
           {
             id: "2.2",
-            name: "Devoluções, Trocas e Estornos",
-            amount: cur.returnsAndRefunds,
-            verticalPercent: calcVerticalPercent(cur.returnsAndRefunds, grossRev),
-            previousAmount: prev?.returnsAndRefunds,
-            horizontalVariation: calcHorizontalVariation(cur.returnsAndRefunds, prev?.returnsAndRefunds),
-          },
-          {
-            id: "2.3",
-            name: "Descontos Comerciais e Cupons Concedidos",
+            name: "Descontos Comerciais, Cupons e Abatimentos",
             amount: cur.discountsGiven,
             verticalPercent: calcVerticalPercent(cur.discountsGiven, grossRev),
             previousAmount: prev?.discountsGiven,
             horizontalVariation: calcHorizontalVariation(cur.discountsGiven, prev?.discountsGiven),
           },
           {
+            id: "2.3",
+            name: "Devoluções, Trocas e Estornos Concedidos",
+            amount: cur.returnsAndRefunds,
+            verticalPercent: calcVerticalPercent(cur.returnsAndRefunds, grossRev),
+            previousAmount: prev?.returnsAndRefunds,
+            horizontalVariation: calcHorizontalVariation(cur.returnsAndRefunds, prev?.returnsAndRefunds),
+          },
+          {
             id: "2.4",
-            name: "Impostos sobre Faturamento (DAS Simples/MEI)",
+            name: "Impostos sobre Faturamento (Simples Nacional / DAS-MEI)",
             amount: cur.salesTaxes,
             verticalPercent: calcVerticalPercent(cur.salesTaxes, grossRev),
             previousAmount: prev?.salesTaxes,
@@ -691,6 +816,7 @@ export async function getDreReport(filters: DreFilters): Promise<DreReportData> 
         verticalPercent: calcVerticalPercent(cur.netRevenue, grossRev),
         previousAmount: prev?.netRevenue,
         horizontalVariation: calcHorizontalVariation(cur.netRevenue, prev?.netRevenue),
+        helpText: "Receita real que efetivamente ingressa na empresa para cobrir custos e despesas.",
         items: [],
       },
 
@@ -703,6 +829,7 @@ export async function getDreReport(filters: DreFilters): Promise<DreReportData> 
         verticalPercent: calcVerticalPercent(cur.totalCogs, grossRev),
         previousAmount: prev?.totalCogs,
         horizontalVariation: calcHorizontalVariation(cur.totalCogs, prev?.totalCogs),
+        helpText: "Custos incorridos diretamente para produzir o produto vendido ou prestar o serviço.",
         items: [
           {
             id: "4.1",
@@ -740,6 +867,7 @@ export async function getDreReport(filters: DreFilters): Promise<DreReportData> 
         verticalPercent: calcVerticalPercent(cur.grossProfit, grossRev),
         previousAmount: prev?.grossProfit,
         horizontalVariation: calcHorizontalVariation(cur.grossProfit, prev?.grossProfit),
+        helpText: "Resultado da Receita Líquida subtraída dos Custos Diretos. Indica a eficiência produtiva.",
         items: [],
       },
 
@@ -752,6 +880,7 @@ export async function getDreReport(filters: DreFilters): Promise<DreReportData> 
         verticalPercent: calcVerticalPercent(cur.commercialExpenses, grossRev),
         previousAmount: prev?.commercialExpenses,
         horizontalVariation: calcHorizontalVariation(cur.commercialExpenses, prev?.commercialExpenses),
+        helpText: "Gastos com promoção, comissões de atendentes/vendedores e taxas de entrega/logística.",
         items: [
           {
             id: "6.1.1",
@@ -789,6 +918,7 @@ export async function getDreReport(filters: DreFilters): Promise<DreReportData> 
         verticalPercent: calcVerticalPercent(cur.administrativeExpenses, grossRev),
         previousAmount: prev?.administrativeExpenses,
         horizontalVariation: calcHorizontalVariation(cur.administrativeExpenses, prev?.administrativeExpenses),
+        helpText: "Gastos fixos de estrutura como aluguel, luz, internet, sistemas/softwares e honorários contábeis.",
         items: Object.entries(cur.dynamicAdminItems).map(([name, amount], idx) => ({
           id: `6.2.${idx + 1}`,
           name,
@@ -808,6 +938,7 @@ export async function getDreReport(filters: DreFilters): Promise<DreReportData> 
         verticalPercent: calcVerticalPercent(cur.proLaboreExpenses, grossRev),
         previousAmount: prev?.proLaboreExpenses,
         horizontalVariation: calcHorizontalVariation(cur.proLaboreExpenses, prev?.proLaboreExpenses),
+        helpText: "Remuneração mensal dos sócios e administradores pelo trabalho na empresa.",
         items: Object.entries(cur.dynamicProLaboreItems).map(([name, amount], idx) => ({
           id: `6.3.${idx + 1}`,
           name,
@@ -827,6 +958,7 @@ export async function getDreReport(filters: DreFilters): Promise<DreReportData> 
         verticalPercent: calcVerticalPercent(cur.ebitda, grossRev),
         previousAmount: prev?.ebitda,
         horizontalVariation: calcHorizontalVariation(cur.ebitda, prev?.ebitda),
+        helpText: "Geração pura de caixa operacional antes de juros, impostos sobre o lucro, depreciações e amortizações.",
         items: [],
       },
 
@@ -839,6 +971,7 @@ export async function getDreReport(filters: DreFilters): Promise<DreReportData> 
         verticalPercent: calcVerticalPercent(Math.abs(cur.netFinancialResult), grossRev),
         previousAmount: prev?.netFinancialResult,
         horizontalVariation: calcHorizontalVariation(cur.netFinancialResult, prev?.netFinancialResult),
+        helpText: "Saldo entre receitas financeiras (rendimentos/juros auferidos) e despesas financeiras (tarifas/juros pagos).",
         items: [
           {
             id: "8.1",
@@ -868,6 +1001,7 @@ export async function getDreReport(filters: DreFilters): Promise<DreReportData> 
         verticalPercent: calcVerticalPercent(Math.abs(cur.nonOperationalTotal), grossRev),
         previousAmount: prev?.nonOperationalTotal,
         horizontalVariation: calcHorizontalVariation(cur.nonOperationalTotal, prev?.nonOperationalTotal),
+        helpText: "Ganhos ou perdas eventuais não ligados à atividade principal (venda de ativos, indenizações).",
         items: [],
       },
 
@@ -880,8 +1014,10 @@ export async function getDreReport(filters: DreFilters): Promise<DreReportData> 
         verticalPercent: calcVerticalPercent(cur.netProfit, grossRev),
         previousAmount: prev?.netProfit,
         horizontalVariation: calcHorizontalVariation(cur.netProfit, prev?.netProfit),
+        helpText: "Resultado financeiro final da empresa no período. Valor que sobra para distribuição ou reinvestimento.",
         items: [],
       },
     },
   }
 }
+

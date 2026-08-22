@@ -51,24 +51,26 @@ export { getCurrentUser, getCurrentContext }
  * Performance: Uses React cache() to deduplicate within the same request.
  */
 export async function requireUser(resolvedUser?: User | any): Promise<User> {
-  if (resolvedUser && resolvedUser.id) {
-    const { getCachedBanStatus } = await import("@/lib/auth/ban-check")
-    const isBanned = await getCachedBanStatus(resolvedUser.id)()
-    if (isBanned) {
-      throw new ForbiddenError("Sua conta está banida.")
-    }
-    return resolvedUser as User
-  }
-  const context = await getCurrentContext()
-  if (!context.user) {
+  // Authentication-only guard: do not resolve the full partner/ERP context
+  // here. Callers that need partner access must explicitly use
+  // getCurrentContext(), getCurrentPartnerContext(), or a require* ownership
+  // helper. This keeps generic actions (e.g. push registration, profile and
+  // marketplace actions) from loading ERP tables unnecessarily.
+  const user = resolvedUser?.id
+    ? (resolvedUser as User)
+    : await getCurrentUser()
+
+  if (!user) {
     redirect("/auth/login")
   }
+
   const { getCachedBanStatus } = await import("@/lib/auth/ban-check")
-  const isBanned = await getCachedBanStatus(context.user.id)()
+  const isBanned = await getCachedBanStatus(user.id)()
   if (isBanned) {
     throw new ForbiddenError("Sua conta está banida.")
   }
-  return context.user
+
+  return user
 }
 
 /**

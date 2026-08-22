@@ -1028,15 +1028,17 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
         setIsDownloadingXml(true)
         try {
             const res = await getXmlImportDownloadUrlAction(importId, partnerId)
-            if (res.success && res.downloadUrl) {
-                const link = document.createElement("a")
-                link.href = res.downloadUrl
-                link.download = res.fileName || `NFe-${preview?.invoice?.numero || importId}.xml`
-                link.target = "_blank"
-                link.rel = "noopener noreferrer"
-                document.body.appendChild(link)
-                link.click()
-                document.body.removeChild(link)
+            if (res.success) {
+                if (res.downloadUrl) {
+                    const link = document.createElement("a")
+                    link.href = res.downloadUrl
+                    link.download = res.fileName || `NFe-${preview?.invoice?.numero || importId}.xml`
+                    link.target = "_blank"
+                    link.rel = "noopener noreferrer"
+                    document.body.appendChild(link)
+                    link.click()
+                    document.body.removeChild(link)
+                }
             } else {
                 notifyError("Erro", res.error || "Não foi possível baixar o XML")
             }

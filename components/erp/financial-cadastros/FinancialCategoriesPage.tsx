@@ -123,13 +123,14 @@ export default function FinancialCategoriesPage({
             is_active: boolean
             parentId: string | null
             categoryType: "income" | "expense"
+            dreGroup?: DreGroupType | null
         }
         isSaving: boolean
     }>({
         isOpen: false,
         mode: "add",
         type: "category",
-        item: { name: "", is_active: true, parentId: null, categoryType: "income" },
+        item: { name: "", is_active: true, parentId: null, categoryType: "income", dreGroup: "receita_bruta" },
         isSaving: false,
     })
 

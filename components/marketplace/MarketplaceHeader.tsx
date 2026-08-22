@@ -10,7 +10,6 @@ import { useSupabase } from "@/providers/supabase-provider"
 import { Button } from "@/components/reusable/Button"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { Input } from "@/components/reusable/Input"
-import { InfoCard } from "@/components/reusable/InfoCard"
 import { Switch } from "@/components/reusable/Switch"
 import BottomSheet from "@/components/BottomSheet"
 import { getUserInitials, getAvatarColor } from "@/lib/utils/UserProfileImage"
@@ -604,12 +603,12 @@ const Header: React.FC<HeaderProps> = ({
         const isTransparentHeader = (isProductDetail || isVendorPage) && !isScrolled && !vendorCategoryTitle
 
         return (
-            <header className={`lg:hidden w-full fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isTransparentHeader ? "bg-transparent" : "bg-brand-dark"}`}>
+            <header className={`lg:hidden w-full fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isTransparentHeader ? "bg-transparent" : "bg-brand-dark dark:bg-dark-surface border-b border-white/10"}`}>
                 <div className="px-4 pt-2 pb-2">
                     <div className="flex items-center gap-3 relative min-h-[36px]">
                         {/* Back Button / User Icon */}
                         <button
-                            className={`shrink-0 z-10 w-9 h-9 flex items-center justify-center transition-all duration-300 ${isTransparentHeader ? "bg-white rounded-full shadow-md text-brand-dark" : "bg-transparent text-white"}`}
+                            className={`transition-all duration-300 flex items-center justify-center w-9 h-9 ${isScrolled ? "bg-transparent shadow-none text-white" : "bg-white rounded-full shadow-md text-brand-dark dark:text-dark-heading"}`}
                             onClick={(e) => {
                                 e.stopPropagation();
                                 if (vendorCategoryTitle && onVendorCategoryBack) {
@@ -622,7 +621,7 @@ const Header: React.FC<HeaderProps> = ({
                             }}
                         >
                             {(!isHome || isProductDetail) ? (
-                                <ChevronLeftIcon size={20} className={`${isTransparentHeader ? "text-brand-dark" : "text-white"}`} strokeWidth={2.5} />
+                                <ChevronLeftIcon size={20} className={`${isTransparentHeader ? "text-brand-dark dark:text-dark-heading" : "text-white"}`} strokeWidth={2.5} />
                             ) : user ? (
                                 <div className="relative shrink-0 w-9 h-9">
                                     <img
@@ -706,7 +705,7 @@ const Header: React.FC<HeaderProps> = ({
                                 onShare ? (
                                     <button
                                         onClick={(e) => { e.stopPropagation(); onShare?.(); }}
-                                        className={`transition-all duration-300 flex items-center justify-center w-9 h-9 ${isTransparentHeader ? "bg-white rounded-full shadow-md text-brand-dark" : "bg-transparent text-white"}`}
+                                        className={`transition-all duration-300 flex items-center justify-center w-9 h-9 ${isScrolled ? "bg-transparent shadow-none text-white" : "bg-white rounded-full shadow-md text-brand-dark dark:text-dark-heading"}`}
                                     >
                                         <ShareIcon size={20} />
                                     </button>
@@ -716,7 +715,7 @@ const Header: React.FC<HeaderProps> = ({
                                     {onShare && (
                                         <button
                                             onClick={(e) => { e.stopPropagation(); onShare?.(); }}
-                                            className={`transition-all duration-300 flex items-center justify-center w-9 h-9 ${isScrolled ? "bg-transparent shadow-none text-white" : "bg-white rounded-full shadow-md text-brand-dark"}`}
+                                            className={`transition-all duration-300 flex items-center justify-center w-9 h-9 ${isScrolled ? "bg-transparent shadow-none text-white" : "bg-white rounded-full shadow-md text-brand-dark dark:text-dark-heading"}`}
                                         >
                                             <ShareIcon size={20} />
                                         </button>
@@ -726,7 +725,7 @@ const Header: React.FC<HeaderProps> = ({
                                     ) : onFavorite ? (
                                         <button
                                             onClick={(e) => { e.stopPropagation(); onFavorite?.(); }}
-                                            className={`transition-all duration-300 flex items-center justify-center w-9 h-9 ${isScrolled ? "bg-transparent shadow-none text-white" : "bg-white rounded-full shadow-md text-brand-dark"}`}
+                                            className={`transition-all duration-300 flex items-center justify-center w-9 h-9 ${isScrolled ? "bg-transparent shadow-none text-white" : "bg-white rounded-full shadow-md text-brand-dark dark:text-dark-heading"}`}
                                         >
                                             <HeartIcon size={20} className={isFavorite ? "fill-current" : ""} />
                                         </button>

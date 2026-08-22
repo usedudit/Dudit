@@ -24,6 +24,7 @@ import {
   CreditCardIcon,
   ShoppingCartIcon,
   Users,
+  InfoIcon,
 } from "@/lib/icons"
 import { getDreReportAction } from "@/app/actions/erp/dre"
 import type { DreReportData, DreRegime, DreNode, DreSubItem } from "@/lib/services/dre.service"
@@ -40,7 +41,7 @@ interface DreViewProps {
   activeStoreId?: string | null
 }
 
-type PeriodPreset = "current_month" | "last_month" | "last_30_days" | "current_quarter" | "current_year"
+type PeriodPreset = "current_month" | "last_month" | "last_30_days" | "current_quarter" | "current_year" | "custom"
 
 function getPresetDates(preset: PeriodPreset): { startDate: string; endDate: string } {
   const now = new Date()
@@ -84,9 +85,18 @@ function getPresetDates(preset: PeriodPreset): { startDate: string; endDate: str
     }
   }
 
-  // current_year
-  const start = new Date(Date.UTC(year, 0, 1))
-  const end = new Date(Date.UTC(year, 11, 31))
+  if (preset === "current_year") {
+    const start = new Date(Date.UTC(year, 0, 1))
+    const end = new Date(Date.UTC(year, 11, 31))
+    return {
+      startDate: start.toISOString().slice(0, 10),
+      endDate: end.toISOString().slice(0, 10),
+    }
+  }
+
+  // fallback para custom
+  const start = new Date(Date.UTC(year, month, 1))
+  const end = new Date(Date.UTC(year, month + 1, 0))
   return {
     startDate: start.toISOString().slice(0, 10),
     endDate: end.toISOString().slice(0, 10),
@@ -97,6 +107,9 @@ export function DreView({ partnerId, stores = [], activeStoreId }: DreViewProps)
   const { error: notifyError, success: notifySuccess } = useNotification()
 
   const [preset, setPreset] = useState<PeriodPreset>("current_month")
+  const [customStartDate, setCustomStartDate] = useState<string>(() => getPresetDates("current_month").startDate)
+  const [customEndDate, setCustomEndDate] = useState<string>(() => getPresetDates("current_month").endDate)
+
   const [selectedStoreId, setSelectedStoreId] = useState<string>(activeStoreId || "all")
   const [regime, setRegime] = useState<DreRegime>("competencia")
   const [comparePrevious, setComparePrevious] = useState<boolean>(true)
@@ -113,7 +126,15 @@ export function DreView({ partnerId, stores = [], activeStoreId }: DreViewProps)
     "8_resultado_financeiro": true,
   })
 
-  const dates = useMemo(() => getPresetDates(preset), [preset])
+  const dates = useMemo(() => {
+    if (preset === "custom") {
+      return {
+        startDate: customStartDate || getPresetDates("current_month").startDate,
+        endDate: customEndDate || getPresetDates("current_month").endDate,
+      }
+    }
+    return getPresetDates(preset)
+  }, [preset, customStartDate, customEndDate])
 
   const fetchReport = useCallback(async () => {
     setLoading(true)
@@ -166,12 +187,16 @@ export function DreView({ partnerId, stores = [], activeStoreId }: DreViewProps)
 
   const handleExportCsv = () => {
     if (!report) return
-    let csv = "Linha;Tipo;Valor Atual (R$);Analise Vertical (%);Valor Anterior (R$);Variacao (%)\n"
-    
+    let csv = `RELATÓRIO DE DEMONSTRAÇÃO DO RESULTADO DO EXERCÍCIO (DRE)\n`
+    csv += `Empresa:;${report.companyInfo?.partnerName || ""};CNPJ:;${report.companyInfo?.documentNumber || ""}\n`
+    csv += `Unidade:;${report.companyInfo?.storeName || ""};Regime:;${regime === "competencia" ? "Competência" : "Caixa"}\n`
+    csv += `Período:;${dates.startDate} até ${dates.endDate};Gerado em:;${report.companyInfo?.generatedAt || ""}\n\n`
+    csv += "Estrutura / Conta Contábil;Tipo;Período Atual (R$);Análise Vertical (AV %);Período Anterior (R$);Variação Horizontal (AH %)\n"
+
     Object.values(report.structure).forEach((node) => {
-      csv += `"${node.title}";"${node.type}";"${node.amount.toFixed(2)}";"${node.verticalPercent.toFixed(2)}%";"${(node.previousAmount ?? 0).toFixed(2)}";"${(node.horizontalVariation ?? 0).toFixed(2)}%"\n`
+      csv += `"${node.title}";"${node.type}";"${node.amount.toFixed(2).replace(".", ",")}";"${node.verticalPercent.toFixed(2).replace(".", ",")}%";"${(node.previousAmount ?? 0).toFixed(2).replace(".", ",")}";"${(node.horizontalVariation ?? 0).toFixed(2).replace(".", ",")}%"\n`
       node.items.forEach((item) => {
-        csv += `  "${item.name}";"Item";"${item.amount.toFixed(2)}";"${item.verticalPercent.toFixed(2)}%";"${(item.previousAmount ?? 0).toFixed(2)}";"${(item.horizontalVariation ?? 0).toFixed(2)}%"\n`
+        csv += `  "${item.name}";"Item";"${item.amount.toFixed(2).replace(".", ",")}";"${item.verticalPercent.toFixed(2).replace(".", ",")}%";"${(item.previousAmount ?? 0).toFixed(2).replace(".", ",")}";"${(item.horizontalVariation ?? 0).toFixed(2).replace(".", ",")}%"\n`
       })
     })
 
@@ -192,6 +217,7 @@ export function DreView({ partnerId, stores = [], activeStoreId }: DreViewProps)
     { value: "last_30_days", label: "Últimos 30 Dias" },
     { value: "current_quarter", label: "Trimestre Atual" },
     { value: "current_year", label: "Ano Completo" },
+    { value: "custom", label: "Personalizado..." },
   ]
 
   const storeOptions = [
@@ -203,25 +229,66 @@ export function DreView({ partnerId, stores = [], activeStoreId }: DreViewProps)
 
   return (
     <div className="w-full space-y-6">
-      {/* ── Controles Superiores ────────────────────────────────────────────── */}
-      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 bg-white dark:bg-dark-card border border-brand-gray/30 dark:border-dark-border p-4 rounded-2xl shadow-xs">
+      {/* ── Cabeçalho Exclusivo para Impressão / PDF ──────────────────────────── */}
+      <div className="hidden print:block border-b-2 border-black pb-4 mb-6">
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-xl font-bold text-black tracking-tight uppercase">
+              Demonstração do Resultado do Exercício (DRE)
+            </h1>
+            <p className="text-sm font-semibold text-black mt-1">
+              {report?.companyInfo?.partnerName} {report?.companyInfo?.documentNumber ? `• CNPJ: ${report.companyInfo.documentNumber}` : ""}
+            </p>
+            <p className="text-xs text-gray-700">
+              Unidade: {report?.companyInfo?.storeName} • {report?.companyInfo?.taxRegimeLabel}
+            </p>
+          </div>
+          <div className="text-right text-xs text-gray-700">
+            <p><strong>Regime:</strong> {regime === "competencia" ? "Competência" : "Caixa"}</p>
+            <p><strong>Período:</strong> {dates.startDate} até {dates.endDate}</p>
+            <p><strong>Gerado em:</strong> {report?.companyInfo?.generatedAt}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Controles Superiores na Tela ────────────────────────────────────── */}
+      <div className="print:hidden flex flex-col xl:flex-row xl:items-center justify-between gap-4 bg-white dark:bg-dark-card border border-brand-gray/30 dark:border-dark-border p-4 rounded-2xl shadow-xs">
         <div className="flex flex-wrap items-center gap-3">
           {/* Seletor de Período */}
-          <div className="w-44">
+          <div className="w-48">
             <FormDropdown
               options={periodOptions}
               value={preset}
-              onChange={(val) => setPreset(val as PeriodPreset)}
+              setValue={(val: string) => setPreset(val as PeriodPreset)}
             />
           </div>
 
-          {/* Seletor de Loja (se houver múltiplas) */}
+          {/* Inputs de Data Customizada */}
+          {preset === "custom" && (
+            <div className="flex items-center gap-2 bg-brand-gray/10 dark:bg-dark-border/20 p-1.5 rounded-xl border border-brand-gray/20 dark:border-dark-border">
+              <input
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="text-xs px-2 py-1 bg-white dark:bg-dark-card border border-brand-gray/30 dark:border-dark-border rounded-lg text-brand-dark dark:text-dark-heading focus:outline-hidden focus:ring-1 focus:ring-brand-primary"
+              />
+              <span className="text-xs text-brand-inactive-text dark:text-dark-muted font-medium">até</span>
+              <input
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="text-xs px-2 py-1 bg-white dark:bg-dark-card border border-brand-gray/30 dark:border-dark-border rounded-lg text-brand-dark dark:text-dark-heading focus:outline-hidden focus:ring-1 focus:ring-brand-primary"
+              />
+            </div>
+          )}
+
+          {/* Seletor de Loja */}
           {stores.length > 1 && (
             <div className="w-56">
               <FormDropdown
                 options={storeOptions}
                 value={selectedStoreId}
-                onChange={(val) => setSelectedStoreId(val)}
+                setValue={(val: string) => setSelectedStoreId(val)}
               />
             </div>
           )}
@@ -231,6 +298,7 @@ export function DreView({ partnerId, stores = [], activeStoreId }: DreViewProps)
             <button
               type="button"
               onClick={() => setRegime("competencia")}
+              title="Reconhecimento das receitas e despesas pela data do fato gerador contábil"
               className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
                 regime === "competencia"
                   ? "bg-brand-primary text-white shadow-xs"
@@ -242,6 +310,7 @@ export function DreView({ partnerId, stores = [], activeStoreId }: DreViewProps)
             <button
               type="button"
               onClick={() => setRegime("caixa")}
+              title="Reconhecimento das receitas e despesas pela efetiva entrada e saída financeira"
               className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
                 regime === "caixa"
                   ? "bg-brand-primary text-white shadow-xs"
@@ -297,70 +366,102 @@ export function DreView({ partnerId, stores = [], activeStoreId }: DreViewProps)
         </div>
       </div>
 
+      {/* ── Banners de Alerta de Integridade Contábil ─────────────────────────── */}
+      {report?.alerts && (
+        <div className="print:hidden space-y-2">
+          {report.alerts.zeroCostItemsCount > 0 && (
+            <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-between gap-3 text-xs text-amber-800 dark:text-amber-300">
+              <div className="flex items-center gap-2.5">
+                <AlertTriangleIcon className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                <span>
+                  <strong>Aviso de Custo:</strong> Foram identificados <strong>{report.alerts.zeroCostItemsCount} itens vendidos</strong> sem preço de custo unitário cadastrado. Cadastre o custo nos produtos para que o CMV e a Margem Bruta tenham 100% de exatidão contábil.
+                </span>
+              </div>
+            </div>
+          )}
+
+          {report.alerts.unclassifiedTransactionsCount > 0 && (
+            <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-xl flex items-center justify-between gap-3 text-xs text-blue-800 dark:text-blue-300">
+              <div className="flex items-center gap-2.5">
+                <InfoIcon className="w-4 h-4 shrink-0 text-blue-600 dark:text-blue-400" />
+                <span>
+                  Existem <strong>{report.alerts.unclassifiedTransactionsCount} movimentações financeiras</strong> sem classificação contábil vinculada ({formatCurrency(report.alerts.unclassifiedTransactionsAmount)}). Foram atribuídas provisoriamente em Despesas Gerais.
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {loading ? (
         <div className="py-24 flex flex-col items-center justify-center space-y-3 bg-white dark:bg-dark-card border border-brand-gray/30 dark:border-dark-border rounded-2xl">
           <ThreeDotsLoader />
           <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-muted">
-            Calculando DRE e indicadores financeiros...
+            Calculando DRE e indicadores contábeis com consultas paralelas...
           </p>
         </div>
       ) : report ? (
         <>
           {/* ── KPI Summary Cards ───────────────────────────────────────────── */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-            <KPICard
-              title="Receita Líquida"
-              value={formatCurrency(kpis?.netRevenue || 0)}
-              subtext={`Bruta: ${formatCurrency(kpis?.grossRevenue || 0)}`}
-              colorVariant="blue"
-            />
-            <KPICard
-              title="Margem Bruta"
-              value={`${kpis?.grossMarginPercent || 0}%`}
-              subtext={`Lucro: ${formatCurrency(kpis?.grossProfit || 0)}`}
-              colorVariant={(kpis?.grossMarginPercent || 0) >= 35 ? "emerald" : "amber"}
-            />
-            <KPICard
-              title="Margem Contribuição"
-              value={`${kpis?.contributionMarginPercent || 0}%`}
-              subtext={formatCurrency(kpis?.contributionMarginAmount || 0)}
-              colorVariant="indigo"
-            />
-            <KPICard
-              title="EBITDA Operacional"
-              value={formatCurrency(kpis?.ebitdaAmount || 0)}
-              subtext={`Margem: ${kpis?.ebitdaMarginPercent || 0}%`}
-              colorVariant={(kpis?.ebitdaAmount || 0) >= 0 ? "emerald" : "rose"}
-            />
-            <KPICard
-              title="Ponto de Equilíbrio"
-              value={formatCurrency(kpis?.breakEvenPointAmount || 0)}
-              subtext={`Custos Fixos: ${formatCurrency(kpis?.fixedExpensesAmount || 0)}`}
-              colorVariant="purple"
-            />
-            <KPICard
-              title="Lucro Líquido"
-              value={formatCurrency(kpis?.netProfitAmount || 0)}
-              subtext={`Margem: ${kpis?.netMarginPercent || 0}%`}
-              colorVariant={(kpis?.netProfitAmount || 0) >= 0 ? "emerald" : "rose"}
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 print:hidden">
+            <div className="p-4 bg-white dark:bg-dark-card border border-brand-gray/30 dark:border-dark-border rounded-2xl shadow-2xs">
+              <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-muted">Receita Líquida</span>
+              <p className="text-xl font-bold text-brand-dark dark:text-dark-heading mt-1">{formatCurrency(kpis?.netRevenue || 0)}</p>
+              <p className="text-[11px] text-brand-inactive-text dark:text-dark-muted mt-0.5">Bruta: {formatCurrency(kpis?.grossRevenue || 0)}</p>
+            </div>
+
+            <div className="p-4 bg-white dark:bg-dark-card border border-brand-gray/30 dark:border-dark-border rounded-2xl shadow-2xs">
+              <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-muted">Margem Bruta</span>
+              <p className={`text-xl font-bold mt-1 ${(kpis?.grossMarginPercent || 0) >= 35 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
+                {kpis?.grossMarginPercent || 0}%
+              </p>
+              <p className="text-[11px] text-brand-inactive-text dark:text-dark-muted mt-0.5">Lucro: {formatCurrency(kpis?.grossProfit || 0)}</p>
+            </div>
+
+            <div className="p-4 bg-white dark:bg-dark-card border border-brand-gray/30 dark:border-dark-border rounded-2xl shadow-2xs">
+              <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-muted">Margem Contribuição</span>
+              <p className="text-xl font-bold text-indigo-600 dark:text-indigo-400 mt-1">{kpis?.contributionMarginPercent || 0}%</p>
+              <p className="text-[11px] text-brand-inactive-text dark:text-dark-muted mt-0.5">{formatCurrency(kpis?.contributionMarginAmount || 0)}</p>
+            </div>
+
+            <div className="p-4 bg-white dark:bg-dark-card border border-brand-gray/30 dark:border-dark-border rounded-2xl shadow-2xs">
+              <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-muted">EBITDA Operacional</span>
+              <p className={`text-xl font-bold mt-1 ${(kpis?.ebitdaAmount || 0) >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
+                {formatCurrency(kpis?.ebitdaAmount || 0)}
+              </p>
+              <p className="text-[11px] text-brand-inactive-text dark:text-dark-muted mt-0.5">Margem: {kpis?.ebitdaMarginPercent || 0}%</p>
+            </div>
+
+            <div className="p-4 bg-white dark:bg-dark-card border border-brand-gray/30 dark:border-dark-border rounded-2xl shadow-2xs">
+              <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-muted">Ponto de Equilíbrio</span>
+              <p className="text-xl font-bold text-purple-600 dark:text-purple-400 mt-1">{formatCurrency(kpis?.breakEvenPointAmount || 0)}</p>
+              <p className="text-[11px] text-brand-inactive-text dark:text-dark-muted mt-0.5">Fixos: {formatCurrency(kpis?.fixedExpensesAmount || 0)}</p>
+            </div>
+
+            <div className="p-4 bg-white dark:bg-dark-card border border-brand-gray/30 dark:border-dark-border rounded-2xl shadow-2xs">
+              <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-muted">Lucro Líquido</span>
+              <p className={`text-xl font-bold mt-1 ${(kpis?.netProfitAmount || 0) >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
+                {formatCurrency(kpis?.netProfitAmount || 0)}
+              </p>
+              <p className="text-[11px] text-brand-inactive-text dark:text-dark-muted mt-0.5">Margem: {kpis?.netMarginPercent || 0}%</p>
+            </div>
           </div>
 
           {/* ── Tabela Estruturada DRE ─────────────────────────────────────── */}
-          <div className="bg-white dark:bg-dark-card border border-brand-gray/30 dark:border-dark-border rounded-2xl shadow-xs overflow-hidden">
-            <div className="p-4 border-b border-brand-gray/20 dark:border-dark-border flex items-center justify-between">
+          <div className="bg-white dark:bg-dark-card border border-brand-gray/30 dark:border-dark-border rounded-2xl shadow-xs overflow-hidden print:border-none print:shadow-none">
+            <div className="p-4 border-b border-brand-gray/20 dark:border-dark-border flex items-center justify-between print:hidden">
               <div>
                 <h2 className="text-base font-bold text-brand-dark dark:text-dark-heading">
                   Demonstração do Resultado do Exercício
                 </h2>
                 <p className="text-xs text-brand-inactive-text dark:text-dark-muted mt-0.5">
-                  Regime de {regime === "competencia" ? "Competência (Econômico)" : "Caixa (Financeiro)"} • Período: {report.period.startDate} até {report.period.endDate}
+                  Regime de {regime === "competencia" ? "Competência (Econômico)" : "Caixa (Financeiro)"} • {report.period.startDate} até {report.period.endDate} • {kpis?.totalSalesAndOrdersCount || 0} operações (Ticket Médio: {formatCurrency(kpis?.averageTicketAmount || 0)})
                 </p>
               </div>
 
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className="text-xs bg-brand-gray/20 dark:bg-dark-border/40">
-                  Base 100%: {formatCurrency(kpis?.grossRevenue || 0)}
+                <Badge variant="gray" className="text-xs font-semibold">
+                  Base 100% (Rec. Bruta): {formatCurrency(kpis?.grossRevenue || 0)}
                 </Badge>
               </div>
             </div>
@@ -369,13 +470,13 @@ export function DreView({ partnerId, stores = [], activeStoreId }: DreViewProps)
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="bg-brand-gray/10 dark:bg-dark-border/20 border-b border-brand-gray/20 dark:border-dark-border text-xs font-semibold text-brand-dark/70 dark:text-dark-muted">
-                    <th className="py-3 px-4 w-1/2">Estrutura Contábil / Descrição</th>
+                    <th className="py-3 px-4 w-1/2">Estrutura Contábil / Descrição da Conta</th>
                     <th className="py-3 px-4 text-right">Período Atual (R$)</th>
                     <th className="py-3 px-4 text-right">AV (%)</th>
                     {comparePrevious && (
                       <>
-                        <th className="py-3 px-4 text-right">Período Anterior (R$)</th>
-                        <th className="py-3 px-4 text-right">AH (%)</th>
+                        <th className="py-3 px-4 text-right print:table-cell">Período Anterior (R$)</th>
+                        <th className="py-3 px-4 text-right print:table-cell">AH (%)</th>
                       </>
                     )}
                   </tr>
@@ -392,6 +493,20 @@ export function DreView({ partnerId, stores = [], activeStoreId }: DreViewProps)
                   ))}
                 </tbody>
               </table>
+            </div>
+
+            {/* ── Assinaturas para Impressão Contábil ───────────────────────── */}
+            <div className="hidden print:block pt-16 pb-8 px-6">
+              <div className="grid grid-cols-2 gap-12 text-center text-xs text-gray-800">
+                <div className="border-t border-gray-400 pt-2">
+                  <p className="font-semibold">{report.companyInfo?.partnerName}</p>
+                  <p className="text-gray-600">Representante Legal / Sócio Administrador</p>
+                </div>
+                <div className="border-t border-gray-400 pt-2">
+                  <p className="font-semibold">Responsável Contábil</p>
+                  <p className="text-gray-600">CRC / Contador</p>
+                </div>
+              </div>
             </div>
           </div>
         </>
@@ -440,7 +555,7 @@ function DreTableRow({ node, isExpanded, onToggle, showComparison }: DreTableRow
               <button
                 type="button"
                 onClick={onToggle}
-                className="p-1 rounded-md hover:bg-brand-gray/30 dark:hover:bg-dark-border text-brand-dark/70 dark:text-dark-body transition-colors"
+                className="p-1 rounded-md hover:bg-brand-gray/30 dark:hover:bg-dark-border text-brand-dark/70 dark:text-dark-body transition-colors print:hidden"
               >
                 {isExpanded ? (
                   <ChevronDownIcon className="w-4 h-4" />
@@ -449,10 +564,13 @@ function DreTableRow({ node, isExpanded, onToggle, showComparison }: DreTableRow
                 )}
               </button>
             ) : (
-              <div className="w-6" />
+              <div className="w-6 print:hidden" />
             )}
 
-            <span className={`text-sm ${isResult || isSubtotal ? "font-bold text-brand-dark dark:text-dark-heading" : "font-medium text-brand-dark/90 dark:text-dark-heading"}`}>
+            <span
+              className={`text-sm ${isResult || isSubtotal ? "font-bold text-brand-dark dark:text-dark-heading" : "font-medium text-brand-dark/90 dark:text-dark-heading"}`}
+              title={node.helpText}
+            >
               {node.title}
             </span>
           </div>
@@ -526,7 +644,6 @@ function VariationBadge({ value, type }: { value?: number; type: "income" | "exp
   if (value === 0) return <span className="text-brand-dark/40 dark:text-dark-muted">0%</span>
 
   const isPositive = value > 0
-  // Para despesas, subir valor é negativo (vermelho), cair é positivo (verde)
   let isGood = isPositive
   if (type === "expense") {
     isGood = !isPositive
@@ -544,3 +661,4 @@ function VariationBadge({ value, type }: { value?: number; type: "income" | "exp
     </span>
   )
 }
+

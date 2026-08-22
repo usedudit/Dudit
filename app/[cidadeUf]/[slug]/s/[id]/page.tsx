@@ -160,7 +160,7 @@ export default async function ServiceDetailsPage({
     }
 
     return (
-        <div className="bg-white min-h-screen font-sans text-brand-dark flex flex-col pt-[60px]">
+        <div className="bg-white min-h-screen font-sans text-brand-dark flex flex-col">
             <script
                 type="application/ld+json"
                 dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(schemaJsonLd) }}
