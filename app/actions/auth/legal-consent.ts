@@ -16,6 +16,7 @@ import {
   type LegalDocumentType,
 } from "@/lib/legal/constants"
 import { getTrustedClientIP } from "@/lib/security/client-ip"
+import { traceServerAction } from "@/lib/observability/request-trace"
 
 const recordConsentSchema = z.object({
   tipo: z.enum(["terms", "privacy"]),
@@ -113,6 +114,7 @@ export async function recordLegalConsent(input: {
  * usuário ainda não aceitou. Usado pelo banner de re-consentimento.
  */
 export async function getPendingLegalConsents(): Promise<PendingLegalConsent[]> {
+  await traceServerAction("legal.getPendingConsents")
   const user = await getCurrentUser()
   if (!user) return []
 

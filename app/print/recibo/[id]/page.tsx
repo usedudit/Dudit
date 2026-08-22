@@ -105,7 +105,7 @@ export default async function PrintReciboPage({ params, searchParams }: PageProp
         storeId
             ? supabase.from("stores").select("logo_url").eq("id", storeId).maybeSingle()
             : supabase.from("stores").select("logo_url").eq("partner_id", partnerId).limit(1).maybeSingle(),
-        supabase.from("partner_return_policies").select("receipt_message").eq("partner_id", partnerId).maybeSingle(),
+        supabase.from("partner_return_policies").select("receipt_message, receipt_show_acknowledgment, receipt_show_policy_block").eq("partner_id", partnerId).maybeSingle(),
     ])
 
     const partnerHeader = headerRes.success && headerRes.data ? headerRes.data : {
@@ -128,7 +128,11 @@ export default async function PrintReciboPage({ params, searchParams }: PageProp
     const format = resolvedSearchParams.format === "thermal" ? "thermal" : "a4"
     const defaultFooterMsg = policyRes.data?.receipt_message?.trim() || DEFAULT_RECEIPT_FOOTER_MESSAGE
     const footerMessage = resolvedSearchParams.footerMessage || defaultFooterMsg
-    const showAcknowledgment = resolvedSearchParams.showAcknowledgment !== "false"
+    const defaultAck = policyRes.data?.receipt_show_acknowledgment !== false
+    const showAcknowledgment =
+        resolvedSearchParams.showAcknowledgment !== undefined
+            ? resolvedSearchParams.showAcknowledgment !== "false"
+            : defaultAck
 
     return (
         <PrintLayout paperSize={format === "thermal" ? "thermal" : "a4"}>

@@ -34,6 +34,7 @@ const policySchema = z.object({
   fullPolicyText: z.string().max(20000),
   receiptMessage: z.string().max(1000).nullable().optional(),
   receiptShowPolicyBlock: z.boolean(),
+  receiptShowAcknowledgment: z.boolean().optional(),
   slaResponseDays: z.number().int().min(1).max(90),
 })
 
@@ -99,6 +100,7 @@ export async function upsertPartnerReturnPolicyAction(input: z.infer<typeof poli
       full_policy_text: parsed.fullPolicyText.trim(),
       receipt_message: parsed.receiptMessage || null,
       receipt_show_policy_block: parsed.receiptShowPolicyBlock,
+      receipt_show_acknowledgment: parsed.receiptShowAcknowledgment ?? true,
       sla_response_days: parsed.slaResponseDays,
       updated_at: new Date().toISOString(),
     }

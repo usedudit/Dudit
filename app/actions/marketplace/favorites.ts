@@ -4,6 +4,7 @@ import { revalidateTag } from "next/cache"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import { filterMarketplaceVisibleProducts, filterMarketplaceVisibleServices } from "@/lib/resolve-marketplace-visibility"
+import { traceServerAction } from "@/lib/observability/request-trace"
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -117,6 +118,7 @@ export async function getUserFavoriteIdsAction(): Promise<{
     favorites: { item_id: string; item_type: FavoriteItemType }[]
 }> {
     try {
+        await traceServerAction("favorites.getUserFavoriteIds")
         const user = await getCurrentUser()
         if (!user) {
             return { success: true, favorites: [] }

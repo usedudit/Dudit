@@ -183,7 +183,7 @@ async function computeDrePeriod(
     .select(`
       id, total_amount, discount_amount, paid_amount, delivery_fee, situation, created_at,
       payment_method_fee_amount, payment_method_fixed_fee_amount, payment_method_discount_amount,
-      order_items (id, product_id, variant_id, product_name, quantity, price, unit_cost, total)
+      order_items (id, product_id, variant_id, product_name, quantity, product_price, unit_cost, subtotal)
     `)
     .eq("partner_id", partnerId)
     .not("situation", "in", '("cancelled","pending_payment")')
@@ -325,7 +325,8 @@ async function computeDrePeriod(
 
     let itemsGrossSum = 0
     for (const item of (o.order_items as any[]) || []) {
-      itemsGrossSum += Number(item.quantity || 0) * Number(item.price || 0)
+      const itemSubtotal = Number(item.subtotal || 0)
+      itemsGrossSum += itemSubtotal > 0 ? itemSubtotal : Number(item.quantity || 0) * Number(item.product_price || 0)
     }
 
     if (itemsGrossSum > 0) {

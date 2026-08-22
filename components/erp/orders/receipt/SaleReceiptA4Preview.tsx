@@ -13,14 +13,14 @@ import { QUOTE_PREVIEW_PRIMARY_COLOR, QUOTE_PREVIEW_SECONDARY_COLOR } from "@/li
 type SaleReceiptA4PreviewProps = {
     data: SaleReceiptData
     footerMessage: string
-    showAcknowledgment: boolean
+    showAcknowledgment?: boolean
     printMode?: boolean
 }
 
 const SaleReceiptA4Preview = ({
     data,
     footerMessage,
-    showAcknowledgment,
+    showAcknowledgment = true,
     printMode = false,
 }: SaleReceiptA4PreviewProps) => {
     const primaryColor = data.primaryColor || QUOTE_PREVIEW_PRIMARY_COLOR
@@ -30,23 +30,27 @@ const SaleReceiptA4Preview = ({
 
     const quoteItems = data.items.map((item) => ({
         description: item.description,
+        code: item.code,
         qty: item.quantity,
+        unit: item.unit || "UN",
         unitPrice: item.unitPrice,
     }))
 
+    const grossTotal = data.itemsTotal || data.items.reduce((acc, item) => acc + item.totalPrice, 0)
     const discountValue =
-        data.generalDiscount + data.couponDiscount + data.methodDiscount
-    const shippingNum = data.shippingFee
-    const otherCosts = data.otherCosts + data.methodFee + data.methodInterest
-    const subtotal = data.subtotal
+        (data.generalDiscount || 0) + (data.couponDiscount || 0) + (data.methodDiscount || 0)
+    const shippingNum = data.shippingFee || 0
+    const otherCosts = (data.otherCosts || 0) + (data.methodFee || 0) + (data.methodInterest || 0)
     const total = data.total
     const saleDate = data.saleDateTime
 
     const isDeliveryFree = data.deliveryPayer === 'seller'
+    const isDelivery = data.deliveryType !== "pickup" && Boolean(data.customerAddress)
+    const shouldShowAck = showAcknowledgment && data.showAcknowledgment !== false
 
     const pages = useMemo(() => {
         const ROW_HEIGHT = 85
-        const TOTALS_SECTION_HEIGHT = 320
+        const TOTALS_SECTION_HEIGHT = 380
         const P1_FIXED_CONTENT_HEIGHT = 570
         const P1_TOTAL_AVAILABLE_HEIGHT = 1123
         const P1_AVAILABLE_FOR_ROWS_AND_TOTALS = P1_TOTAL_AVAILABLE_HEIGHT - P1_FIXED_CONTENT_HEIGHT
@@ -62,7 +66,7 @@ const SaleReceiptA4Preview = ({
             return chunks
         }
 
-        const maxItemsP1 = Math.floor(P1_AVAILABLE_FOR_ROWS_AND_TOTALS / ROW_HEIGHT)
+        const maxItemsP1 = Math.max(1, Math.floor(P1_AVAILABLE_FOR_ROWS_AND_TOTALS / ROW_HEIGHT))
         chunks.push({ items: remainingItems.slice(0, maxItemsP1), hasTotals: false, type: "first" })
         remainingItems = remainingItems.slice(maxItemsP1)
 
@@ -72,7 +76,7 @@ const SaleReceiptA4Preview = ({
                 chunks.push({ items: remainingItems, hasTotals: true, type: "middle" })
                 remainingItems = []
             } else {
-                const maxItemsPn = Math.floor(PN_AVAILABLE_FOR_ROWS_AND_TOTALS / ROW_HEIGHT)
+                const maxItemsPn = Math.max(1, Math.floor(PN_AVAILABLE_FOR_ROWS_AND_TOTALS / ROW_HEIGHT))
                 chunks.push({ items: remainingItems.slice(0, maxItemsPn), hasTotals: false, type: "middle" })
                 remainingItems = remainingItems.slice(maxItemsPn)
             }
@@ -89,8 +93,9 @@ const SaleReceiptA4Preview = ({
 
     return (
         <div
-            className={`flex flex-col w-full h-full bg-white dark:bg-dark-surface relative overflow-hidden ${printMode ? "sale-receipt-a4-print" : "border-l border-brand-border dark:border-dark-border"
-                }`}
+            className={`flex flex-col w-full h-full bg-white dark:bg-dark-surface relative overflow-hidden ${
+                printMode ? "sale-receipt-a4-print" : "border-l border-brand-border dark:border-dark-border"
+            }`}
         >
             <div
                 className={printMode
@@ -163,11 +168,20 @@ const SaleReceiptA4Preview = ({
                                                 <span className="font-bold text-sm text-brand-dark">{saleDate}</span>
                                             </div>
                                             <div className="flex flex-col">
-                                                <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Vendedor</span>
-                                                <span className="font-bold text-sm text-brand-dark">{data.sellerName}</span>
+                                                <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">
+                                                    {data.isOnlineOrder ? "Canal / Origem" : "Vendedor"}
+                                                </span>
+                                                <span className="font-bold text-sm text-brand-dark">
+                                                    {data.isOnlineOrder ? (
+                                                        data.deliveryType === "pickup" ? "Pedido online - retirada" : "Pedido online - entrega"
+                                                    ) : (
+                                                        data.sellerName
+                                                    )}
+                                                </span>
                                             </div>
                                         </div>
                                     </div>
+
                                     <div className="px-8 pb-6">
                                         <div className="grid grid-cols-2 gap-8">
                                             <div>
@@ -178,6 +192,12 @@ const SaleReceiptA4Preview = ({
                                                         <p>{data.partner.legalName}</p>
                                                     )}
                                                     {data.partner.phone && <p>{formatBrazilPhone(data.partner.phone)}</p>}
+                                                    {data.partner.addressLine && (
+                                                        <p className="whitespace-pre-line">{data.partner.addressLine}</p>
+                                                    )}
+                                                    {data.partner.taxIdLine && (
+                                                        <p className="font-medium text-gray-700">{data.partner.taxIdLine}</p>
+                                                    )}
                                                 </div>
                                             </div>
                                             <div>
@@ -185,7 +205,14 @@ const SaleReceiptA4Preview = ({
                                                 <div className="text-xs text-gray-600 space-y-1">
                                                     <p className="font-bold text-brand-dark">{data.customerName}</p>
                                                     {data.customerPhone && <p>{formatBrazilPhone(data.customerPhone)}</p>}
-                                                    {data.customerAddress && <p className="whitespace-pre-wrap">{data.customerAddress}</p>}
+                                                    {isDelivery ? (
+                                                        <div className="pt-2 mt-2 border-t border-gray-100">
+                                                            <p className="font-bold text-brand-dark uppercase text-[11px]">Endereço de entrega</p>
+                                                            <p className="whitespace-pre-wrap text-gray-700 mt-0.5">{data.customerAddress}</p>
+                                                        </div>
+                                                    ) : data.customerAddress ? (
+                                                        <p className="whitespace-pre-wrap">{data.customerAddress}</p>
+                                                    ) : null}
                                                 </div>
                                             </div>
                                         </div>
@@ -224,12 +251,12 @@ const SaleReceiptA4Preview = ({
                                                 </td>
                                                 <td className="py-2 px-4 border-b border-gray-50 text-right">
                                                     <span className="text-[13px] font-medium text-gray-600">
-                                                        {formatCurrency(item.unitPrice).replace("R$", "$")}
+                                                        {formatCurrency(item.unitPrice)}
                                                     </span>
                                                 </td>
                                                 <td className="py-2 pl-4 pr-6 border-b border-gray-50 text-right">
                                                     <span className="text-[13px] font-bold text-black">
-                                                        {formatCurrency(item.unitPrice * item.qty).replace("R$", "$")}
+                                                        {formatCurrency(item.unitPrice * item.qty)}
                                                     </span>
                                                 </td>
                                             </tr>
@@ -239,85 +266,94 @@ const SaleReceiptA4Preview = ({
                             </div>
 
                             {page.hasTotals && (
-                                <div className="mt-8">
-                                    <div className="px-8 pb-6 flex justify-start">
-                                        <div className="w-full bg-brand-gray/40 p-6 rounded-lg text-black space-y-2">
+                                <div className="mt-6">
+                                    <div className="px-8 pb-6 flex flex-col gap-4">
+                                        <div className="w-full bg-brand-gray/40 p-6 rounded-2xl text-black space-y-2.5">
                                             <div className="flex justify-between items-center text-xs">
-                                                <span className="text-gray-500 font-medium">Subtotal</span>
-                                                <span className="font-bold">{formatCurrency(subtotal)}</span>
+                                                <span className="text-gray-500 font-medium">Itens do pedido</span>
+                                                <span className="font-bold">{formatCurrency(grossTotal)}</span>
                                             </div>
-                                            {data.paymentLines.map((line, i) => (
-                                                <div key={i} className="flex justify-between items-center text-xs">
-                                                    <span className="text-gray-500 font-medium">{line.label}</span>
-                                                    <span className="font-bold">{formatCurrency(line.amount)}</span>
-                                                </div>
-                                            ))}
-                                            {data.methodDiscount > 0.009 && (
+
+                                            {discountValue > 0.009 && (
                                                 <div className="flex justify-between items-center text-xs">
-                                                    <span className="text-gray-500 font-medium">Desconto de método</span>
+                                                    <span className="text-gray-500 font-medium">Descontos</span>
                                                     <span className="font-bold text-brand-green">
-                                                        -{formatCurrency(data.methodDiscount)}
+                                                        -{formatCurrency(discountValue)}
                                                     </span>
                                                 </div>
                                             )}
-                                            {data.couponDiscount > 0.009 && (
+
+                                            {(shippingNum > 0.009 || data.deliveryPayer === 'seller') && (
                                                 <div className="flex justify-between items-center text-xs">
-                                                    <span className="text-gray-500 font-medium">Desconto cupom</span>
-                                                    <span className="font-bold text-brand-green">
-                                                        -{formatCurrency(data.couponDiscount)}
-                                                    </span>
-                                                </div>
-                                            )}
-                                            {data.generalDiscount > 0.009 && (
-                                                <div className="flex justify-between items-center text-xs">
-                                                    <span className="text-gray-500 font-medium">Desconto</span>
-                                                    <span className="font-bold text-brand-green">
-                                                        -{formatCurrency(data.generalDiscount)}
-                                                    </span>
-                                                </div>
-                                            )}
-                                            {data.methodFee > 0.009 && (
-                                                <div className="flex justify-between items-center text-xs">
-                                                    <span className="text-gray-500 font-medium">Taxa de método</span>
-                                                    <span className="font-bold">+{formatCurrency(data.methodFee)}</span>
-                                                </div>
-                                            )}
-                                            {data.methodInterest > 0.009 && (
-                                                <div className="flex justify-between items-center text-xs">
-                                                    <span className="text-gray-500 font-medium">Juros de método</span>
-                                                    <span className="font-bold">+{formatCurrency(data.methodInterest)}</span>
-                                                </div>
-                                            )}
-                                            {shippingNum > 0.009 && (
-                                                <div className="flex justify-between items-center text-xs">
-                                                    <span className="text-gray-500 font-medium">
-                                                        {isDeliveryFree ? "Entrega (subsidiado)" : "Entrega"}
-                                                    </span>
+                                                    <span className="text-gray-500 font-medium">Taxa de entrega</span>
                                                     <span className={`font-bold ${isDeliveryFree ? 'text-brand-green' : ''}`}>
-                                                        {isDeliveryFree ? `${formatCurrency(shippingNum)} (grátis)` : formatCurrency(shippingNum)}
+                                                        {isDeliveryFree ? "Grátis (subsidiado)" : formatCurrency(shippingNum)}
                                                     </span>
                                                 </div>
                                             )}
-                                            {data.change > 0.009 && (
+
+                                            {otherCosts > 0.009 && (
                                                 <div className="flex justify-between items-center text-xs">
-                                                    <span className="text-gray-500 font-medium">Troco</span>
-                                                    <span className="font-bold">{formatCurrency(data.change)}</span>
+                                                    <span className="text-gray-500 font-medium">Outros custos</span>
+                                                    <span className="font-bold">+{formatCurrency(otherCosts)}</span>
                                                 </div>
                                             )}
-                                            <div className="border-t border-gray-200 my-3" />
+
+                                            <div className="border-t border-gray-200 my-2" />
+
                                             <div className="flex justify-between items-center">
-                                                <span className="font-bold text-sm">Total</span>
+                                                <span className="font-bold text-sm">Total do Pedido</span>
                                                 <div
-                                                    className="text-white px-3 py-1.5 rounded text-sm font-bold shadow-sm"
+                                                    className="text-white px-3.5 py-1.5 rounded-xl text-sm font-bold shadow-sm"
                                                     style={{ backgroundColor: primaryColor }}
                                                 >
                                                     {formatCurrency(total)}
                                                 </div>
                                             </div>
+
+                                            {/* Bloco de Forma de Pagamento */}
+                                            <div className="pt-3 border-t border-gray-200/80 space-y-1.5">
+                                                <p className="text-xs font-bold text-gray-700 uppercase tracking-wide">Forma de pagamento</p>
+                                                {data.paymentLines && data.paymentLines.length > 0 ? (
+                                                    data.paymentLines.map((line, i) => (
+                                                        <div key={i} className="flex justify-between items-center text-xs">
+                                                            <span className="text-gray-600 font-medium">{line.label}</span>
+                                                            <span className="font-bold text-brand-dark">{formatCurrency(line.amount)}</span>
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    <div className="flex justify-between items-center text-xs">
+                                                        <span className="text-gray-600">Não informado</span>
+                                                        <span className="font-bold">{formatCurrency(total)}</span>
+                                                    </div>
+                                                )}
+
+                                                {/* Aviso para pagamento online */}
+                                                {data.isOnlinePayment && (
+                                                    <div className="mt-2 py-2 px-3 bg-emerald-50 border border-emerald-300 rounded-xl text-emerald-800 text-xs font-bold text-center">
+                                                        ✓ Pedido pago online. Não cobrar do cliente
+                                                    </div>
+                                                )}
+
+                                                {data.change > 0.009 && (
+                                                    <div className="flex justify-between items-center text-xs pt-1 text-gray-600">
+                                                        <span>Troco</span>
+                                                        <span className="font-bold">{formatCurrency(data.change)}</span>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
+
+                                        {/* Observações do pedido */}
+                                        {data.notes && (
+                                            <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-700">
+                                                <p className="font-bold uppercase tracking-wide text-[10px] text-gray-500 mb-1">Observações:</p>
+                                                <p className="whitespace-pre-line leading-relaxed">{data.notes}</p>
+                                            </div>
+                                        )}
                                     </div>
 
-                                    {showAcknowledgment && (
+                                    {shouldShowAck && (
                                         <div className="px-8 pb-6">
                                             <p className="text-[11px] text-gray-600 leading-relaxed text-center">
                                                 {DEFAULT_RECEIPT_ACKNOWLEDGMENT}

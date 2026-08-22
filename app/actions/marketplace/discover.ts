@@ -1030,20 +1030,6 @@ async function fetchPersonalizedUncached(tiers: PartnerTiers, ctx: DiscoverCtx):
         return null
     }
 
-    const [favRes, orderRes] = await Promise.all([
-        supabase.from("favorites").select("item_id", { count: "exact", head: true })
-            .eq("user_id", ctx.userId).eq("item_type", "produto").limit(1),
-        supabase.from("orders").select("id", { count: "exact", head: true })
-            .eq("buyer_id", ctx.userId).limit(1),
-    ])
-
-    const hasFavs = (favRes.count ?? 0) > 0
-    const hasOrders = (orderRes.count ?? 0) > 0
-    if (!hasFavs && !hasOrders) {
-        dLog(`[Discover] SKIP personalized reason=no_signals`)
-        return null
-    }
-
     const { data: userFavs, error: favErr } = await supabase
         .from("favorites")
         .select("item_id")
@@ -1059,6 +1045,23 @@ async function fetchPersonalizedUncached(tiers: PartnerTiers, ctx: DiscoverCtx):
     }
 
     const favProductIds = (userFavs || []).map((f: Record<string, any>) => f.item_id)
+
+    // The favorites list itself is the signal. Avoid a count query followed by
+    // the same list query. Only inspect orders when there are no product
+    // favorites, preserving the old fallback behavior for buyers.
+    if (favProductIds.length === 0) {
+        const { count: orderCount } = await supabase
+            .from("orders")
+            .select("id", { count: "exact", head: true })
+            .eq("buyer_id", ctx.userId)
+            .limit(1)
+
+        if ((orderCount ?? 0) === 0) {
+            dLog(`[Discover] SKIP personalized reason=no_signals`)
+            return null
+        }
+    }
+
     let preferredCatIds: string[] = []
 
     if (favProductIds.length > 0) {

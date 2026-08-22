@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 export type PrintPaperSize = "a4" | "letter" | "thermal"
 
 interface PrintLayoutProps {
@@ -9,12 +9,18 @@ interface PrintLayoutProps {
 }
 
 export default function PrintLayout({ children, paperSize = "a4" }: PrintLayoutProps) {
+    const [isHeadless, setIsHeadless] = useState(false)
+
     useEffect(() => {
-        // Skip automatic print dialog when rendering inside Puppeteer / headless browser
-        const isHeadless =
-            typeof navigator !== "undefined" &&
-            (navigator.userAgent.includes("Headless") || window.location.search.includes("headless=true"))
-        if (isHeadless) return
+        const headlessDetected =
+            typeof window !== "undefined" &&
+            (window.location.search.includes("headless=true") ||
+             (typeof navigator !== "undefined" && navigator.userAgent.includes("Headless")))
+        
+        if (headlessDetected) {
+            setIsHeadless(true)
+            return
+        }
 
         let timer: NodeJS.Timeout
 
@@ -114,26 +120,28 @@ export default function PrintLayout({ children, paperSize = "a4" }: PrintLayoutP
                 }}
             />
 
-            {/* Top Toolbar for manual print & close (hidden when printing) */}
-            <div className="no-print sticky top-0 z-50 bg-gray-900/90 backdrop-blur text-white px-4 py-2.5 flex items-center justify-between shadow-md mb-3 text-xs font-sans">
-                <span className="font-semibold">{isThermal ? "Recibo Térmico (80mm)" : "Documento para Impressão"}</span>
-                <div className="flex items-center gap-2">
-                    <button
-                        type="button"
-                        onClick={() => window.print()}
-                        className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
-                    >
-                        Imprimir
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => window.close()}
-                        className="bg-gray-700 hover:bg-gray-600 text-white font-medium px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
-                    >
-                        Fechar
-                    </button>
+            {/* Top Toolbar for manual print & close (hidden in print and headless mode) */}
+            {!isHeadless && (
+                <div className="no-print sticky top-0 z-50 bg-gray-900/90 backdrop-blur text-white px-4 py-2.5 flex items-center justify-between shadow-md mb-3 text-xs font-sans">
+                    <span className="font-semibold">{isThermal ? "Recibo Térmico (80mm)" : "Documento para Impressão"}</span>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => window.print()}
+                            className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+                        >
+                            Imprimir
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => window.close()}
+                            className="bg-gray-700 hover:bg-gray-600 text-white font-medium px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+                        >
+                            Fechar
+                        </button>
+                    </div>
                 </div>
-            </div>
+            )}
 
             <div className="pdf-print-container">
                 {children}

@@ -114,7 +114,6 @@ async function getBrowser(): Promise<Browser> {
                 "--disable-setuid-sandbox",
                 "--disable-dev-shm-usage",
                 "--disable-gpu",
-                "--font-render-hinting=none",
                 "--no-zygote",
                 "--ignore-certificate-errors",
                 "--allow-running-insecure-content",
@@ -276,6 +275,28 @@ export async function generatePdf(url: string, nextCookies: any[]): Promise<Buff
             )
         })
 
+        // Inject styles ensuring .no-print is removed and text is crisp black
+        await page.addStyleTag({
+            content: `
+                .no-print { display: none !important; }
+                html, body {
+                    background-color: #ffffff !important;
+                    color: #000000 !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                }
+                .sale-receipt-thermal-print {
+                    margin: 0 auto !important;
+                    background-color: #ffffff !important;
+                    color: #000000 !important;
+                    box-shadow: none !important;
+                    border: none !important;
+                }
+            `,
+        })
+
         if (isThermal) {
             // Emulate screen media to ensure layout and dimensions exactly match thermal receipt preview
             await page.emulateMediaType("screen")
@@ -295,7 +316,7 @@ export async function generatePdf(url: string, nextCookies: any[]): Promise<Buff
                 return Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, 400)
             })
 
-            const targetHeightPx = Math.max(Math.ceil(contentHeightPx + 16), 150)
+            const targetHeightPx = Math.max(Math.ceil(contentHeightPx + 4), 100)
 
             // Generate exact 80mm thermal receipt PDF with continuous height (no A4 white gaps)
             const pdfBuffer = await page.pdf({

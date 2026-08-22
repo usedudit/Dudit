@@ -41,6 +41,7 @@ export type SaleReceiptData = {
     orderNumber: string
     saleDateTime: string
     items: SaleReceiptItem[]
+    itemsTotal: number
     subtotal: number
     total: number
     change: number
@@ -54,6 +55,11 @@ export type SaleReceiptData = {
     shippingFee: number
     otherCosts: number
     sellerName: string
+    isOnlineOrder?: boolean
+    deliveryType?: "delivery" | "pickup" | string
+    isOnlinePayment?: boolean
+    notes?: string | null
+    showAcknowledgment?: boolean
     partner: SaleReceiptPartnerHeader
     primaryColor?: string
     secondaryColor?: string
@@ -291,22 +297,44 @@ export function buildSaleReceiptFromOrder(
     const methodInterest = Math.max(0, Number(order.payment_method_interest_amount || 0))
     const methodFee = Math.max(0, Number(order.payment_method_fee_amount || 0))
     const methodFixedFee = Math.max(0, Number(order.payment_method_fixed_fee_amount || 0))
-    const methodExtra = Math.max(0, methodInterest + methodFee + methodFixedFee)
     const shippingFee = Math.max(0, Number(order.delivery_fee || order.shipping_cost || 0))
     const otherCosts = Math.max(0, Number(order.additional_costs || 0))
+    const items = mapOrderItemsToReceiptItems(order.order_items || [])
+    const itemsTotal = items.reduce((acc, it) => acc + it.totalPrice, 0)
     const subtotal =
         Number(order.subtotal_value || 0) > 0
             ? Number(order.subtotal_value || 0)
-            : (order.order_items || []).reduce(
-                  (acc: number, item: any) =>
-                      acc + Number(item.subtotal ?? Number(item.quantity || 0) * Number(item.product_price || 0)),
-                  0,
-              )
+            : itemsTotal
     const total = Number(order.total_amount || 0)
     const paid = Number(order.paid_amount || 0)
     const change = Math.max(0, paid - total)
     const policySnap = order.return_policy_snapshot
     const customerContact = formatCustomerContact(order)
+
+    const orderSource = String(order.order_source || "").toLowerCase()
+    const isOnlineOrder =
+        orderSource.includes("vitrine") ||
+        orderSource.includes("marketplace") ||
+        orderSource.includes("online") ||
+        Boolean(order.buyer_id && order.buyer_id !== order.partner_id)
+
+    const rawDeliveryType = String(order.delivery_type || "").toLowerCase()
+    const deliveryType =
+        rawDeliveryType === "pickup" || orderSource.includes("retirada") || orderSource.includes("balcão")
+            ? "pickup"
+            : "delivery"
+
+    const paymentProvider = String(order.payment_provider || "").toLowerCase()
+    const isOnlinePayment = Boolean(
+        order.mp_payment_id ||
+        paymentProvider.includes("mercado") ||
+        paymentProvider.includes("online") ||
+        order.is_online_payment ||
+        (isOnlineOrder && paymentProvider !== "pickup" && paymentProvider !== "manual" && paymentProvider !== "presencial")
+    )
+
+    const notes = (order.notes || order.observation || order.customer_notes || "").trim() || null
+
     const returnPolicyBlock =
         policySnap && policySnap.receipt_show_policy_block !== false
             ? {
@@ -317,32 +345,40 @@ export function buildSaleReceiptFromOrder(
               }
             : null
 
-return {
-          customerName: order.customers?.name || order.customer_name || "Consumidor final",
-          customerPhone: customerContact.phone,
-          customerAddress: customerContact.address,
-          orderNumber: String(order.order_number || order.id || ""),
-          saleDateTime: formatDateTime(order.created_at || order.order_date || new Date()),
-          items: mapOrderItemsToReceiptItems(order.order_items || []),
-          subtotal,
-          total,
-          change,
-          paymentLines: buildPaymentLinesFromOrder(order),
-          methodDiscount,
-          generalDiscount: manualDiscount,
-          couponDiscount,
-          methodFee: methodFee + methodFixedFee,
-          methodInterest,
-          shippingFee,
-          otherCosts,
-          sellerName: options?.sellerName || order.seller_name || "Não informado",
-          partner,
-          primaryColor: options?.primaryColor,
-          secondaryColor: options?.secondaryColor,
-          partnerAvatar: options?.partnerAvatar,
-          returnPolicyBlock,
-          deliveryPayer: order.delivery_payer as 'seller' | 'customer' | undefined,
-      }
+    const showAcknowledgment = policySnap ? policySnap.receipt_show_acknowledgment !== false : true
+
+    return {
+        customerName: order.customers?.name || order.customer_name || "Consumidor final",
+        customerPhone: customerContact.phone,
+        customerAddress: customerContact.address,
+        orderNumber: String(order.order_number || order.id || ""),
+        saleDateTime: formatDateTime(order.created_at || order.order_date || new Date()),
+        items,
+        itemsTotal,
+        subtotal,
+        total,
+        change,
+        paymentLines: buildPaymentLinesFromOrder(order),
+        methodDiscount,
+        generalDiscount: manualDiscount,
+        couponDiscount,
+        methodFee: methodFee + methodFixedFee,
+        methodInterest,
+        shippingFee,
+        otherCosts,
+        sellerName: options?.sellerName || order.seller_name || "Não informado",
+        isOnlineOrder,
+        deliveryType,
+        isOnlinePayment,
+        notes,
+        showAcknowledgment,
+        partner,
+        primaryColor: options?.primaryColor,
+        secondaryColor: options?.secondaryColor,
+        partnerAvatar: options?.partnerAvatar,
+        returnPolicyBlock,
+        deliveryPayer: order.delivery_payer as 'seller' | 'customer' | undefined,
+    }
 }
 
 export type SaleReceiptCartSnapshot = {
@@ -366,6 +402,7 @@ export type SaleReceiptCartSnapshot = {
     methodFixedFee?: number
     deliveryPayer?: 'seller' | 'customer'
     sellerName?: string
+    notes?: string
 }
 
 export function buildSaleReceiptFromCartSnapshot(
@@ -376,12 +413,15 @@ export function buildSaleReceiptFromCartSnapshot(
     const couponDiscount = Math.max(0, Number(snapshot.couponDiscount || 0))
     const totalDiscount = Math.max(0, Number(snapshot.discountAmount || 0))
     const generalDiscount = Math.max(0, totalDiscount - couponDiscount)
+    const items = mapCartItemsToReceiptItems(snapshot.cart)
+    const itemsTotal = items.reduce((acc, it) => acc + it.totalPrice, 0)
 
     return {
         customerName: snapshot.customerName || "Consumidor final",
         orderNumber: snapshot.orderNumber,
         saleDateTime: snapshot.saleDateTime || formatDateTime(new Date()),
-        items: mapCartItemsToReceiptItems(snapshot.cart),
+        items,
+        itemsTotal,
         subtotal: Number(snapshot.subTotal || 0),
         total: Number(snapshot.total || 0),
         change: Math.max(0, Number(snapshot.change || 0)),
@@ -399,6 +439,11 @@ export function buildSaleReceiptFromCartSnapshot(
         shippingFee: Math.max(0, Number(snapshot.shippingFee || 0)),
         otherCosts: Math.max(0, Number(snapshot.otherCosts || 0)),
         sellerName: snapshot.sellerName || "Não informado",
+        isOnlineOrder: false,
+        deliveryType: "pickup",
+        isOnlinePayment: false,
+        notes: snapshot.notes?.trim() || null,
+        showAcknowledgment: true,
         partner,
         primaryColor: options?.primaryColor,
         secondaryColor: options?.secondaryColor,

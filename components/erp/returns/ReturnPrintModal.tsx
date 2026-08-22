@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Portal from "@/components/Portal"
-import { Button, Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/reusable"
-import { XIcon, PrinterIcon, DownloadIcon } from "@/lib/icons"
+import { Button, Tabs, TabsContent, TabsList, TabsTrigger, ListItem } from "@/components/reusable"
+import { XIcon, PrinterIcon, DownloadIcon, FileTextIcon } from "@/lib/icons"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useStore } from "@/lib/store-context"
 import { getReturnRequestDetailsAction } from "@/app/actions/erp/returns"
@@ -172,23 +172,51 @@ export default function ReturnPrintModal({ isOpen, onClose, returnId, partnerId,
                                         <p className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">
                                             Formato de impressão
                                         </p>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            {([
-                                                { id: "thermal", label: "Cupom (Impressora térmica)" },
-                                                { id: "a4", label: "A4 (PDF)" },
-                                            ] as Array<{ id: Format; label: string }>).map((opt) => (
-                                                <button
-                                                    key={opt.id}
-                                                    type="button"
-                                                    onClick={() => setFormat(opt.id)}
-                                                    className={`h-12 rounded-xl border text-sm font-bold transition-colors ${format === opt.id
-                                                        ? "border-brand-dark dark:border-dark-heading bg-brand-dark dark:bg-dark-heading text-white"
-                                                        : "border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border/30"
+                                        <div className="space-y-3">
+                                            <ListItem
+                                                icon={PrinterIcon}
+                                                title="Cupom de troca (Impressora térmica)"
+                                                description="Formato em 80mm para comprovante rápido de devolução/troca no balcão."
+                                                onClick={() => setFormat("thermal")}
+                                                className={`transition-all ${
+                                                    format === "thermal"
+                                                        ? "border-brand-dark dark:border-dark-heading ring-2 ring-brand-dark/10 dark:ring-white/10"
+                                                        : "opacity-80 hover:opacity-100"
+                                                }`}
+                                                right={
+                                                    <div
+                                                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                                                            format === "thermal"
+                                                                ? "border-brand-dark bg-brand-dark dark:border-dark-heading dark:bg-dark-heading"
+                                                                : "border-brand-border dark:border-dark-border"
                                                         }`}
-                                                >
-                                                    {opt.label}
-                                                </button>
-                                            ))}
+                                                    >
+                                                        {format === "thermal" && <div className="w-2 h-2 rounded-full bg-white" />}
+                                                    </div>
+                                                }
+                                            />
+                                            <ListItem
+                                                icon={FileTextIcon}
+                                                title="Documento A4 (PDF)"
+                                                description="Formato folha A4 com comprovante completo e termo assinado de troca."
+                                                onClick={() => setFormat("a4")}
+                                                className={`transition-all ${
+                                                    format === "a4"
+                                                        ? "border-brand-dark dark:border-dark-heading ring-2 ring-brand-dark/10 dark:ring-white/10"
+                                                        : "opacity-80 hover:opacity-100"
+                                                }`}
+                                                right={
+                                                    <div
+                                                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                                                            format === "a4"
+                                                                ? "border-brand-dark bg-brand-dark dark:border-dark-heading dark:bg-dark-heading"
+                                                                : "border-brand-border dark:border-dark-border"
+                                                        }`}
+                                                    >
+                                                        {format === "a4" && <div className="w-2 h-2 rounded-full bg-white" />}
+                                                    </div>
+                                                }
+                                            />
                                         </div>
                                     </div>
 

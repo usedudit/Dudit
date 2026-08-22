@@ -674,15 +674,10 @@ export default function PaymentStatusModal({
                                         </div>
                                     )}
 
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+                                    <div className="grid grid-cols-1 gap-4 mb-8">
                                         <SuccessActionCard
                                             icon={FileIcon}
                                             label="Imprimir recibo"
-                                            onClick={() => setPrintOrderId(targetOrder.id || targetOrder.originalId)}
-                                        />
-                                        <SuccessActionCard
-                                            icon={PrinterIcon}
-                                            label="Imprimir NFC-e"
                                             onClick={() => setPrintOrderId(targetOrder.id || targetOrder.originalId)}
                                         />
                                     </div>

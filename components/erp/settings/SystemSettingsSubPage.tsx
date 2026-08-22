@@ -33,6 +33,8 @@ export function SystemSettingsSubPage({
     const [originalReceiptMessage, setOriginalReceiptMessage] = useState("")
     const [receiptShowPolicyBlock, setReceiptShowPolicyBlock] = useState(true)
     const [originalReceiptShowPolicyBlock, setOriginalReceiptShowPolicyBlock] = useState(true)
+    const [receiptShowAcknowledgment, setReceiptShowAcknowledgment] = useState(true)
+    const [originalReceiptShowAcknowledgment, setOriginalReceiptShowAcknowledgment] = useState(true)
 
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -40,7 +42,8 @@ export function SystemSettingsSubPage({
     const hasChanges =
         timezone !== originalTimezone ||
         receiptMessage !== originalReceiptMessage ||
-        receiptShowPolicyBlock !== originalReceiptShowPolicyBlock
+        receiptShowPolicyBlock !== originalReceiptShowPolicyBlock ||
+        receiptShowAcknowledgment !== originalReceiptShowAcknowledgment
 
     const handleScroll = useCallback(() => {
         if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5)
@@ -61,6 +64,8 @@ export function SystemSettingsSubPage({
                     setOriginalReceiptMessage(res.receiptMessage || "")
                     setReceiptShowPolicyBlock(res.receiptShowPolicyBlock)
                     setOriginalReceiptShowPolicyBlock(res.receiptShowPolicyBlock)
+                    setReceiptShowAcknowledgment(res.receiptShowAcknowledgment)
+                    setOriginalReceiptShowAcknowledgment(res.receiptShowAcknowledgment)
                 } else {
                     notifyError(res.error || "Erro ao carregar configurações")
                 }
@@ -75,12 +80,14 @@ export function SystemSettingsSubPage({
             timezone,
             receiptMessage: receiptMessage.trim() || null,
             receiptShowPolicyBlock,
+            receiptShowAcknowledgment,
         })
         setSaving(false)
         if (res.success) {
             setOriginalTimezone(timezone)
             setOriginalReceiptMessage(receiptMessage.trim())
             setOriginalReceiptShowPolicyBlock(receiptShowPolicyBlock)
+            setOriginalReceiptShowAcknowledgment(receiptShowAcknowledgment)
             notifySuccess("Configurações do sistema salvas com sucesso!")
         } else {
             notifyError(res.error || "Erro ao salvar")
@@ -162,7 +169,12 @@ export function SystemSettingsSubPage({
                             <FormSection title="Mensagem do Recibo" hasSeparator>
                                 <div className="space-y-4">
                                     <Checkbox
-                                        label="Exibir bloco de política de devolução no recibo"
+                                        label="Incluir confirmação de recebimento e assinatura no recibo"
+                                        checked={receiptShowAcknowledgment}
+                                        onCheckedChange={(v) => setReceiptShowAcknowledgment(Boolean(v))}
+                                    />
+                                    <Checkbox
+                                        label="Exibir bloco de política de trocas e devolução no recibo"
                                         checked={receiptShowPolicyBlock}
                                         onCheckedChange={(v) => setReceiptShowPolicyBlock(Boolean(v))}
                                     />
@@ -177,7 +189,7 @@ export function SystemSettingsSubPage({
                                         showCharacterCount
                                     />
                                     <p className="text-xs text-brand-inactive-text">
-                                        Esta mensagem é exibida como padrão nos recibos de venda impressos ou em PDF.
+                                        Estas opções e mensagem são aplicadas como padrão em todos os recibos de venda (térmicos de 80mm e folhas A4).
                                     </p>
                                 </div>
                             </FormSection>

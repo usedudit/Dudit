@@ -8,6 +8,7 @@ import { buildUserAdLocationContext } from "@/lib/ads/location-context"
 import type { AdSlot, SponsoredAd, UserAdLocationContext } from "@/lib/ads/types"
 import { AD_SLOT_LIMITS } from "@/lib/ads/constants"
 import { sanitizeUUID } from "@/lib/security/input-sanitizer"
+import { traceServerAction } from "@/lib/observability/request-trace"
 
 export async function getSponsoredAdsForSlot(
     slot: AdSlot,
@@ -30,6 +31,7 @@ export async function getSponsoredAdsForSlot(
 }
 
 export async function trackAdImpression(adId: string): Promise<void> {
+    await traceServerAction("ads.trackImpression")
     const safeId = sanitizeUUID(adId)
     if (!safeId) return
 

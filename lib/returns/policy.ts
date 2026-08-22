@@ -34,6 +34,7 @@ export type ReturnPolicySnapshot = {
   full_policy_text: string
   receipt_message?: string | null
   receipt_show_policy_block: boolean
+  receipt_show_acknowledgment?: boolean
   sla_response_days: number
 }
 
@@ -55,6 +56,7 @@ export type PartnerReturnPolicy = {
   fullPolicyText: string
   receiptMessage?: string | null
   receiptShowPolicyBlock: boolean
+  receiptShowAcknowledgment: boolean
   slaResponseDays: number
   updatedAt?: string | null
 }
@@ -76,6 +78,7 @@ export const DEFAULT_POLICY: Omit<PartnerReturnPolicy, "partnerId"> = {
   fullPolicyText: "",
   receiptMessage: null,
   receiptShowPolicyBlock: true,
+  receiptShowAcknowledgment: true,
   slaResponseDays: 5,
 }
 
@@ -165,6 +168,7 @@ export function policyRowToSnapshot(row: PartnerReturnPolicy, storeName?: string
     full_policy_text: row.fullPolicyText || buildDefaultPolicyText(storeName),
     receipt_message: row.receiptMessage,
     receipt_show_policy_block: row.receiptShowPolicyBlock,
+    receipt_show_acknowledgment: row.receiptShowAcknowledgment,
     sla_response_days: row.slaResponseDays,
   }
 }
@@ -188,6 +192,7 @@ export function normalizePolicyRow(row: Record<string, unknown>, partnerId: stri
     fullPolicyText: String(row.full_policy_text || ""),
     receiptMessage: (row.receipt_message as string) || null,
     receiptShowPolicyBlock: row.receipt_show_policy_block !== false,
+    receiptShowAcknowledgment: row.receipt_show_acknowledgment !== false,
     slaResponseDays: Number(row.sla_response_days ?? DEFAULT_POLICY.slaResponseDays),
     updatedAt: (row.updated_at as string) || null,
   }

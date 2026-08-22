@@ -1,9 +1,9 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import Portal from "@/components/Portal"
-import { Button, Tabs, TabsContent, TabsList, TabsTrigger, FormTextarea } from "@/components/reusable"
-import { XIcon, PrinterIcon, DownloadIcon } from "@/lib/icons"
+import { Button, Tabs, TabsContent, TabsList, TabsTrigger, FormTextarea, ListItem } from "@/components/reusable"
+import { XIcon, PrinterIcon, DownloadIcon, FileTextIcon } from "@/lib/icons"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useStore } from "@/lib/store-context"
 import { getOrderDetailsAction } from "@/app/actions/erp/orders"
@@ -47,7 +47,6 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, orderId }: Sale
             setIsVisible(true)
             const id = setTimeout(() => setIsAnimating(true), 50)
             setActiveTab("Opções")
-            setShowAcknowledgment(true)
             return () => clearTimeout(id)
         }
         setIsAnimating(false)
@@ -90,6 +89,11 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, orderId }: Sale
                 ? policyRes.data.policy.receiptMessage.trim()
                 : null
             setFooterMessage(configuredMsg || DEFAULT_RECEIPT_FOOTER_MESSAGE)
+
+            const defaultAck = policyRes?.success && policyRes.data?.policy?.receiptShowAcknowledgment !== undefined
+                ? policyRes.data.policy.receiptShowAcknowledgment
+                : true
+            setShowAcknowledgment(defaultAck)
 
             const partnerHeader = headerRes.success && headerRes.data ? headerRes.data : {
                 fantasyName: "",
@@ -152,27 +156,20 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, orderId }: Sale
         onClose()
     }, [orderId, format, footerMessage, showAcknowledgment, onClose, isMobile, handleDownloadPdf])
 
-    const formatOptions = useMemo(
-        () => [
-            { id: "thermal" as const, label: "Impressora térmica" },
-            { id: "a4" as const, label: "A4 (PDF)" },
-        ],
-        [],
-    )
-
     if (!isVisible) return null
 
     return (
         <Portal>
             <div className="fixed inset-0 z-[130] flex flex-col bg-black/60">
                 <div
-                    className={`relative flex flex-col w-full h-full bg-white dark:bg-dark-background transition-opacity duration-200 ${isAnimating ? "opacity-100" : "opacity-0"
-                        }`}
+                    className={`relative flex flex-col w-full h-full bg-white dark:bg-dark-background transition-opacity duration-200 ${
+                        isAnimating ? "opacity-100" : "opacity-0"
+                    }`}
                 >
                     {/* Header */}
                     <div className="shrink-0 flex items-center justify-between px-4 md:px-6 py-4 border-b border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
                         <h2 className="text-lg md:text-xl font-bold text-brand-dark dark:text-dark-heading">
-                            Imprimir recibo
+                            Imprimir recibo de venda
                         </h2>
                         <Button
                             variant="filled"
@@ -208,43 +205,61 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, orderId }: Sale
 
                             {/* Left - options */}
                             <div
-                                className={`w-full lg:w-1/2 flex flex-col border-r border-brand-border dark:border-dark-border overflow-hidden ${activeTab === "Visualização" ? "hidden lg:flex" : "flex"
-                                    }`}
+                                className={`w-full lg:w-1/2 flex flex-col border-r border-brand-border dark:border-dark-border overflow-hidden ${
+                                    activeTab === "Visualização" ? "hidden lg:flex" : "flex"
+                                }`}
                             >
                                 <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-6">
                                     <div>
                                         <p className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">
                                             Formato de impressão
                                         </p>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            {formatOptions.map((opt) => (
-                                                <button
-                                                    key={opt.id}
-                                                    type="button"
-                                                    onClick={() => setFormat(opt.id)}
-                                                    className={`h-12 rounded-xl border text-sm font-bold transition-colors ${format === opt.id
-                                                        ? "border-brand-dark dark:border-dark-heading bg-brand-dark dark:bg-dark-heading text-white"
-                                                        : "border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border/30"
+                                        <div className="space-y-3">
+                                            <ListItem
+                                                icon={PrinterIcon}
+                                                title="Impressora térmica (80mm)"
+                                                description="Formato em bobina contínua, ideal para impressoras térmicas e comprovante rápido de balcão."
+                                                onClick={() => setFormat("thermal")}
+                                                className={`transition-all ${
+                                                    format === "thermal"
+                                                        ? "border-brand-dark dark:border-dark-heading ring-2 ring-brand-dark/10 dark:ring-white/10"
+                                                        : "opacity-80 hover:opacity-100"
+                                                }`}
+                                                right={
+                                                    <div
+                                                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                                                            format === "thermal"
+                                                                ? "border-brand-dark bg-brand-dark dark:border-dark-heading dark:bg-dark-heading"
+                                                                : "border-brand-border dark:border-dark-border"
                                                         }`}
-                                                >
-                                                    {opt.label}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <label className="flex items-center gap-3 cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={showAcknowledgment}
-                                                onChange={(e) => setShowAcknowledgment(e.target.checked)}
-                                                className="w-4 h-4 rounded border-brand-border"
+                                                    >
+                                                        {format === "thermal" && <div className="w-2 h-2 rounded-full bg-white" />}
+                                                    </div>
+                                                }
                                             />
-                                            <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">
-                                                Incluir confirmação de recebimento e assinatura
-                                            </span>
-                                        </label>
+                                            <ListItem
+                                                icon={FileTextIcon}
+                                                title="Documento A4 (PDF)"
+                                                description="Formato folha inteira A4, ideal para impressão comum, arquivamento e envio em PDF."
+                                                onClick={() => setFormat("a4")}
+                                                className={`transition-all ${
+                                                    format === "a4"
+                                                        ? "border-brand-dark dark:border-dark-heading ring-2 ring-brand-dark/10 dark:ring-white/10"
+                                                        : "opacity-80 hover:opacity-100"
+                                                }`}
+                                                right={
+                                                    <div
+                                                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                                                            format === "a4"
+                                                                ? "border-brand-dark bg-brand-dark dark:border-dark-heading dark:bg-dark-heading"
+                                                                : "border-brand-border dark:border-dark-border"
+                                                        }`}
+                                                    >
+                                                        {format === "a4" && <div className="w-2 h-2 rounded-full bg-white" />}
+                                                    </div>
+                                                }
+                                            />
+                                        </div>
                                     </div>
 
                                     <FormTextarea
@@ -293,8 +308,9 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, orderId }: Sale
 
                             {/* Right - preview */}
                             <div
-                                className={`w-full lg:w-1/2 bg-brand-gray dark:bg-dark-border/20 flex flex-col min-h-0 overflow-hidden ${activeTab === "Visualização" ? "flex flex-1" : "hidden lg:flex"
-                                    }`}
+                                className={`w-full lg:w-1/2 bg-brand-gray dark:bg-dark-border/20 flex flex-col min-h-0 overflow-hidden ${
+                                    activeTab === "Visualização" ? "flex flex-1" : "hidden lg:flex"
+                                }`}
                             >
                                 <TabsContent
                                     value="Visualização"

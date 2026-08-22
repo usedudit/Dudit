@@ -133,16 +133,6 @@ BEGIN
   ) INTO v_has_product;
   END IF;
 
-  UPDATE partners
-  SET
-    vendas_totais = coalesce(vendas_totais, 0) + 1,
-    vendas_produtos = vendas_produtos + CASE WHEN v_has_product THEN 1 ELSE 0 END,
-    vendas_servicos = vendas_servicos + CASE WHEN v_has_service THEN 1 ELSE 0 END,
-    vendas_assinaturas = vendas_assinaturas + CASE WHEN v_has_subscription THEN 1 ELSE 0 END,
-    completed_orders_count = completed_orders_count + 1
-  WHERE id = v_order.partner_id;
-
-  -- Also update store counters if store_id is present
   IF v_order.store_id IS NOT NULL THEN
     UPDATE stores
     SET
@@ -154,6 +144,15 @@ BEGIN
     WHERE id = v_order.store_id;
 
     PERFORM public.refresh_store_marketplace_reputation(v_order.store_id);
+  ELSE
+    UPDATE stores
+    SET
+      vendas_totais = coalesce(vendas_totais, 0) + 1,
+      vendas_produtos = vendas_produtos + CASE WHEN v_has_product THEN 1 ELSE 0 END,
+      vendas_servicos = vendas_servicos + CASE WHEN v_has_service THEN 1 ELSE 0 END,
+      vendas_assinaturas = vendas_assinaturas + CASE WHEN v_has_subscription THEN 1 ELSE 0 END,
+      completed_orders_count = completed_orders_count + 1
+    WHERE partner_id = v_order.partner_id;
   END IF;
 
   PERFORM public.refresh_partner_marketplace_reputation(v_order.partner_id);
@@ -229,13 +228,6 @@ BEGIN
     WHERE id = v_service_id;
   END IF;
 
-  UPDATE partners
-  SET
-    vendas_totais = coalesce(vendas_totais, 0) + 1,
-    vendas_servicos = vendas_servicos + 1,
-    completed_appointments_count = completed_appointments_count + 1
-  WHERE id = v_appt.partner_id;
-
   IF v_appt.store_id IS NOT NULL THEN
     UPDATE stores
     SET
@@ -245,6 +237,13 @@ BEGIN
     WHERE id = v_appt.store_id;
 
     PERFORM public.refresh_store_marketplace_reputation(v_appt.store_id);
+  ELSE
+    UPDATE stores
+    SET
+      vendas_totais = coalesce(vendas_totais, 0) + 1,
+      vendas_servicos = vendas_servicos + 1,
+      completed_appointments_count = completed_appointments_count + 1
+    WHERE partner_id = v_appt.partner_id;
   END IF;
 
   PERFORM public.refresh_partner_marketplace_reputation(v_appt.partner_id);
@@ -309,13 +308,6 @@ BEGIN
     )
   WHERE id = v_sub.recurring_plan_id;
 
-  UPDATE partners
-  SET
-    vendas_totais = coalesce(vendas_totais, 0) + 1,
-    vendas_assinaturas = vendas_assinaturas + 1,
-    active_subscriptions_count = active_subscriptions_count + 1
-  WHERE id = v_sub.partner_id;
-
   IF v_sub.store_id IS NOT NULL THEN
     UPDATE stores
     SET
@@ -325,6 +317,13 @@ BEGIN
     WHERE id = v_sub.store_id;
 
     PERFORM public.refresh_store_marketplace_reputation(v_sub.store_id);
+  ELSE
+    UPDATE stores
+    SET
+      vendas_totais = coalesce(vendas_totais, 0) + 1,
+      vendas_assinaturas = vendas_assinaturas + 1,
+      active_subscriptions_count = active_subscriptions_count + 1
+    WHERE partner_id = v_sub.partner_id;
   END IF;
 
   PERFORM public.refresh_partner_marketplace_reputation(v_sub.partner_id);

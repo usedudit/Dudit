@@ -3,6 +3,7 @@
 import { requireUser } from "@/lib/auth/authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
+import { traceServerAction } from "@/lib/observability/request-trace"
 import type { NotificationPageCursor } from "@/lib/notifications/types"
 import {
   fetchNotificationsPage,
@@ -28,6 +29,7 @@ export async function getNotificationsAction(params?: {
 }
 
 export async function getUnreadNotificationCountAction() {
+  await traceServerAction("notifications.getUnreadCount")
   const user = await requireUser()
   if (!user) return { error: "Não autenticado" as const, count: 0 }
 

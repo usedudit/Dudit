@@ -46,7 +46,7 @@ export async function getSystemSettingsAction(partnerId: string) {
 
     const [{ data: storeData, error: storeError }, { data: policyData }] = await Promise.all([
       supabase.from("stores").select("timezone").eq("partner_id", partnerId).limit(1).maybeSingle(),
-      supabase.from("partner_return_policies").select("receipt_message, receipt_show_policy_block").eq("partner_id", partnerId).maybeSingle(),
+      supabase.from("partner_return_policies").select("receipt_message, receipt_show_policy_block, receipt_show_acknowledgment").eq("partner_id", partnerId).maybeSingle(),
     ])
 
     if (storeError) return { success: false as const, error: storeError.message }
@@ -56,6 +56,7 @@ export async function getSystemSettingsAction(partnerId: string) {
       timezone: storeData?.timezone || "America/Sao_Paulo",
       receiptMessage: (policyData?.receipt_message as string | null) ?? null,
       receiptShowPolicyBlock: (policyData?.receipt_show_policy_block as boolean | null) ?? true,
+      receiptShowAcknowledgment: (policyData?.receipt_show_acknowledgment as boolean | null) ?? true,
     }
   } catch (e: any) {
     return { success: false as const, error: e.message }
@@ -68,6 +69,7 @@ export async function updateSystemSettingsAction(
     timezone: string
     receiptMessage?: string | null
     receiptShowPolicyBlock?: boolean
+    receiptShowAcknowledgment?: boolean
   }
 ) {
   try {
@@ -95,6 +97,7 @@ export async function updateSystemSettingsAction(
         .update({
           receipt_message: data.receiptMessage || null,
           receipt_show_policy_block: data.receiptShowPolicyBlock ?? true,
+          receipt_show_acknowledgment: data.receiptShowAcknowledgment ?? true,
           updated_at: new Date().toISOString(),
         })
         .eq("partner_id", partnerId)
@@ -120,6 +123,7 @@ export async function updateSystemSettingsAction(
           full_policy_text: DEFAULT_POLICY.fullPolicyText,
           receipt_message: data.receiptMessage || null,
           receipt_show_policy_block: data.receiptShowPolicyBlock ?? true,
+          receipt_show_acknowledgment: data.receiptShowAcknowledgment ?? true,
           sla_response_days: DEFAULT_POLICY.slaResponseDays,
           updated_at: new Date().toISOString(),
         })

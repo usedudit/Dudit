@@ -7,26 +7,22 @@ import {
 } from "@/lib/sales/sale-receipt"
 import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 
-const DASH = "-".repeat(60)
-
-function DashedLine({ className = "my-1" }: { className?: string }) {
+function DashedLine({ className = "my-2" }: { className?: string }) {
     return (
-        <p className={`text-center overflow-hidden whitespace-nowrap select-none ${className}`}>
-            {DASH}
-        </p>
+        <div className={`w-full border-t border-dashed border-black ${className}`} />
     )
 }
 
 type SaleReceiptThermalPreviewProps = {
     data: SaleReceiptData
     footerMessage: string
-    showAcknowledgment: boolean
+    showAcknowledgment?: boolean
     printMode?: boolean
 }
 
-function Row({ left, right, bold }: { left: string; right: string; bold?: boolean }) {
+function Row({ left, right, bold, className = "" }: { left: string; right: string; bold?: boolean; className?: string }) {
     return (
-        <div className={`flex justify-between gap-2 text-[11px] leading-tight ${bold ? "font-bold" : ""}`}>
+        <div className={`flex justify-between items-baseline gap-2 text-[10px] leading-tight ${bold ? "font-bold text-black" : "text-black"} ${className}`}>
             <span className="shrink-0">{left}</span>
             <span className="text-right shrink-0">{right}</span>
         </div>
@@ -36,74 +32,111 @@ function Row({ left, right, bold }: { left: string; right: string; bold?: boolea
 export default function SaleReceiptThermalPreview({
     data,
     footerMessage,
-    showAcknowledgment,
+    showAcknowledgment = true,
     printMode = false,
 }: SaleReceiptThermalPreviewProps) {
-    const grossTotal = data.items.reduce((acc, item) => acc + item.totalPrice, 0)
+    const grossTotal = data.itemsTotal || data.items.reduce((acc, item) => acc + item.totalPrice, 0)
     const isDeliveryFree = data.deliveryPayer === 'seller'
+    const totalDiscounts = (data.generalDiscount || 0) + (data.couponDiscount || 0) + (data.methodDiscount || 0)
+    const totalOtherCosts = (data.otherCosts || 0) + (data.methodFee || 0) + (data.methodInterest || 0)
+    const isDelivery = data.deliveryType !== "pickup" && Boolean(data.customerAddress)
+
+    // Resolved acknowledgment flag from props or data
+    const shouldShowAck = showAcknowledgment && data.showAcknowledgment !== false
 
     return (
         <div
-            className={`mx-auto bg-white text-black font-mono text-[11px] leading-snug break-inside-avoid print:bg-white print:text-black ${printMode ? "sale-receipt-thermal-print" : ""
-                }`}
-            style={{ width: printMode ? "80mm" : "320px", maxWidth: "100%", boxSizing: "border-box" }}
+            className={`mx-auto bg-white text-black font-mono text-[10px] leading-snug break-inside-avoid print:bg-white print:text-black ${
+                printMode ? "sale-receipt-thermal-print" : "shadow-sm border border-brand-border/40"
+            }`}
+            style={{
+                width: printMode ? "80mm" : "320px",
+                maxWidth: "100%",
+                boxSizing: "border-box",
+                color: "#000000",
+                backgroundColor: "#ffffff",
+                fontSmooth: "always",
+                WebkitFontSmoothing: "antialiased",
+                MozOsxFontSmoothing: "grayscale",
+            }}
         >
-            <div className="px-3 py-4">
+            <div className="px-3 py-3">
                 {/* Header estabelecimento */}
-                <div className="text-center mb-2">
-                    <p className="font-bold text-[13px] uppercase tracking-tight">{data.partner.fantasyName}</p>
-                    {data.partner.legalName ? <p className="text-[10px] mt-0.5">{data.partner.legalName}</p> : null}
-                    {data.partner.phone ? <p className="text-[9px] mt-0.5">{formatBrazilPhone(data.partner.phone)}</p> : null}
+                <div className="text-center mb-1.5 text-black">
+                    <p className="font-bold text-[13px] uppercase tracking-tight leading-tight">{data.partner.fantasyName}</p>
+                    {data.partner.legalName && data.partner.legalName !== data.partner.fantasyName ? (
+                        <p className="text-[9px] mt-0.5 leading-tight">{data.partner.legalName}</p>
+                    ) : null}
+                    {data.partner.phone ? (
+                        <p className="text-[9px] mt-0.5 leading-tight">{formatBrazilPhone(data.partner.phone)}</p>
+                    ) : null}
                     {data.partner.addressLine ? (
-                        <p className="text-[9px] mt-1 leading-tight whitespace-pre-line">{data.partner.addressLine}</p>
+                        <p className="text-[9px] mt-0.5 leading-tight whitespace-pre-line">{data.partner.addressLine}</p>
                     ) : null}
                     {data.partner.taxIdLine ? (
-                        <p className="text-[9px] mt-1 leading-tight">{data.partner.taxIdLine}</p>
+                        <p className="text-[9px] mt-0.5 leading-tight font-medium">{data.partner.taxIdLine}</p>
                     ) : null}
                 </div>
 
-                <DashedLine className="my-1" />
+                <DashedLine className="my-1.5" />
 
-                {/* Consumidor + pedido/data */}
-                <p className="text-[10px]">
-                    <span className="font-bold">Cliente:</span> {data.customerName}
-                </p>
-                {data.customerPhone ? (
-                    <p className="text-[10px]">{formatBrazilPhone(data.customerPhone)}</p>
-                ) : null}
-                {data.customerAddress ? (
-                    <p className="text-[10px] whitespace-pre-line">{data.customerAddress}</p>
-                ) : null}
-                <div className="flex justify-between text-[10px] font-bold mb-1">
-                    <span>Nº DO PEDIDO: {data.orderNumber}</span>
-                    <span>{data.saleDateTime}</span>
+                {/* Cliente / Pedido / Entrega */}
+                <div className="space-y-0.5 text-[10px] text-black">
+                    <p className="leading-tight">
+                        <span className="font-bold">Cliente:</span> {data.customerName}
+                    </p>
+                    {data.customerPhone ? (
+                        <p className="leading-tight">
+                            <span className="font-bold">Telefone:</span> {formatBrazilPhone(data.customerPhone)}
+                        </p>
+                    ) : null}
+                    <div className="flex justify-between items-baseline font-bold pt-0.5 text-[10px]">
+                        <span>Nº DO PEDIDO: {data.orderNumber}</span>
+                        <span>{data.saleDateTime}</span>
+                    </div>
+                    <p className="leading-tight">
+                        {data.isOnlineOrder ? (
+                            <span className="font-bold uppercase">
+                                {data.deliveryType === "pickup" ? "Pedido online - retirada" : "Pedido online - entrega"}
+                            </span>
+                        ) : (
+                            <>
+                                <span className="font-bold">Vendedor:</span> {data.sellerName}
+                            </>
+                        )}
+                    </p>
+
+                    {/* Endereço de entrega caso seja entrega */}
+                    {isDelivery ? (
+                        <div className="pt-1">
+                            <p className="font-bold uppercase text-[9px]">ENDEREÇO DE ENTREGA:</p>
+                            <p className="text-[9px] leading-tight whitespace-pre-line mt-0.5">{data.customerAddress}</p>
+                        </div>
+                    ) : null}
                 </div>
-                <p className="text-[10px]">
-                    <span className="font-bold">Vendedor:</span> {data.sellerName}
-                </p>
 
-                <DashedLine className="my-1" />
+                <DashedLine className="my-1.5" />
 
                 {/* Cabeçalho itens */}
-                <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-1 text-[10px] font-bold uppercase">
+                <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-1.5 text-[9px] font-bold uppercase text-black">
                     <span># COD DESC</span>
                     <span className="text-right">QTD</span>
                     <span className="text-right">VL UN</span>
                     <span className="text-right">VL ITEM</span>
                 </div>
-                <DashedLine className="mb-1" />
+                <DashedLine className="my-1" />
 
-                {/* Itens */}
-                <div className="space-y-1 mb-2">
+                {/* Lista de Itens */}
+                <div className="space-y-1 mb-1.5 text-black">
                     {data.items.map((item) => (
-                        <div key={item.index} className="grid grid-cols-[1fr_auto_auto_auto] gap-x-1 text-[10px] items-start">
-                            <span className="break-words min-w-0 pr-1">
-                                {String(item.index).padStart(3, "0")} {item.code} {item.description}
+                        <div key={item.index} className="grid grid-cols-[1fr_auto_auto_auto] gap-x-1.5 text-[10px] items-start">
+                            <span className="break-words min-w-0 pr-1 leading-tight">
+                                {String(item.index).padStart(3, "0")} {item.code ? `${item.code} ` : ""}{item.description}
                             </span>
                             <span className="text-right whitespace-nowrap shrink-0">
                                 {item.quantity} {item.unit}
                             </span>
-                            <span className="text-right whitespace-nowrap shrink-0 text-gray-700">
+                            <span className="text-right whitespace-nowrap shrink-0">
                                 {formatReceiptAmount(item.unitPrice)}
                             </span>
                             <span className="text-right whitespace-nowrap font-bold shrink-0">
@@ -113,68 +146,111 @@ export default function SaleReceiptThermalPreview({
                     ))}
                 </div>
 
-                <DashedLine className="my-1" />
+                <DashedLine className="my-1.5" />
 
-                {/* Totais */}
-                <div className="space-y-1">
-                    <Row left="Total bruto" right={formatReceiptAmount(grossTotal)} />
-                    <div className="flex justify-between items-baseline my-1">
-                        <span className="font-bold text-[14px]">TOTAL R$</span>
-                        <span className="font-bold text-[14px]">{formatReceiptAmount(data.total)}</span>
+                {/* Totais estruturados */}
+                <div className="space-y-1 text-black">
+                    <Row left="Itens do pedido:" right={`R$ ${formatReceiptAmount(grossTotal)}`} />
+                    
+                    {totalDiscounts > 0.009 && (
+                        <Row left="Descontos:" right={`-R$ ${formatReceiptAmount(totalDiscounts)}`} />
+                    )}
+
+                    {(data.shippingFee > 0.009 || data.deliveryPayer === "seller") && (
+                        <Row
+                            left="Taxa de entrega:"
+                            right={isDeliveryFree ? "Grátis" : `R$ ${formatReceiptAmount(data.shippingFee)}`}
+                        />
+                    )}
+
+                    {totalOtherCosts > 0.009 && (
+                        <Row left="Outros custos:" right={`+R$ ${formatReceiptAmount(totalOtherCosts)}`} />
+                    )}
+
+                    <div className="flex justify-between items-baseline pt-1 my-0.5 font-bold">
+                        <span className="text-[12px]">Subtotal:</span>
+                        <span className="text-[13px]">R$ {formatReceiptAmount(data.total)}</span>
                     </div>
 
-                    {data.paymentLines.map((line, i) => (
-                        <Row key={`pay-${i}`} left={line.label} right={formatReceiptAmount(line.amount)} />
-                    ))}
-
-                    {data.methodDiscount > 0.009 && (
-                        <Row left="Desconto de método" right={`-${formatReceiptAmount(data.methodDiscount)}`} />
+                    {data.change > 0.009 && (
+                        <Row left="Troco:" right={`R$ ${formatReceiptAmount(data.change)}`} />
                     )}
-                    {data.couponDiscount > 0.009 && (
-                        <Row left="Desconto cupom" right={`-${formatReceiptAmount(data.couponDiscount)}`} />
-                    )}
-                    {data.generalDiscount > 0.009 && (
-                        <Row left="Desconto" right={`-${formatReceiptAmount(data.generalDiscount)}`} />
-                    )}
-                    {data.methodFee > 0.009 && (
-                        <Row left="Taxa de método" right={`+${formatReceiptAmount(data.methodFee)}`} />
-                    )}
-                    {data.methodInterest > 0.009 && (
-                        <Row left="Juros de método" right={`+${formatReceiptAmount(data.methodInterest)}`} />
-                    )}
-                    {data.shippingFee > 0.009 && (
-                        <Row left={isDeliveryFree ? "Entrega (subsidiado)" : "Entrega"} right={isDeliveryFree ? `${formatReceiptAmount(data.shippingFee)} (grátis)` : formatReceiptAmount(data.shippingFee)} />
-                    )}
-                    {data.otherCosts > 0.009 && (
-                        <Row left="Outros custos" right={formatReceiptAmount(data.otherCosts)} />
-                    )}
-                    {data.change > 0.009 && <Row left="Troco" right={formatReceiptAmount(data.change)} />}
                 </div>
 
-                {showAcknowledgment && (
+                <DashedLine className="my-1.5" />
+
+                {/* Formas de pagamento */}
+                <div className="space-y-1 text-black">
+                    <p className="font-bold text-[10px] uppercase">Forma de pagamento:</p>
+                    {data.paymentLines && data.paymentLines.length > 0 ? (
+                        data.paymentLines.map((line, i) => (
+                            <Row
+                                key={`pay-${i}`}
+                                left={line.label}
+                                right={`R$ ${formatReceiptAmount(line.amount)}`}
+                            />
+                        ))
+                    ) : (
+                        <Row left="Não informado" right={`R$ ${formatReceiptAmount(data.total)}`} />
+                    )}
+
+                    {/* Aviso destacado para pedidos pagos online */}
+                    {data.isOnlinePayment && (
+                        <div className="mt-2 py-1 px-1.5 border border-black text-center font-bold text-[9px] uppercase tracking-tight bg-black/5">
+                            Pedido pago online. Não cobrar do cliente
+                        </div>
+                    )}
+                </div>
+
+                {/* Observações */}
+                {data.notes && (
                     <>
-                        <p className="text-[9px] text-center leading-relaxed px-1">{DEFAULT_RECEIPT_ACKNOWLEDGMENT}</p>
-                        <DashedLine className="mt-4 mb-1" />
-                        <p className="text-[9px] font-bold text-center uppercase tracking-wide">Assinatura do cliente</p>
+                        <DashedLine className="my-1.5" />
+                        <div className="text-black">
+                            <p className="font-bold text-[9px] uppercase">OBSERVAÇÕES:</p>
+                            <p className="text-[9px] leading-tight whitespace-pre-line mt-0.5">{data.notes}</p>
+                        </div>
                     </>
                 )}
 
+                {/* Confirmação e Assinatura */}
+                {shouldShowAck && (
+                    <>
+                        <DashedLine className="my-2" />
+                        <p className="text-[9px] text-center leading-relaxed px-1 text-black font-normal">
+                            {DEFAULT_RECEIPT_ACKNOWLEDGMENT}
+                        </p>
+                        <div className="mt-6 border-b border-dashed border-black w-3/4 mx-auto" />
+                        <p className="text-[9px] font-bold text-center uppercase tracking-wide mt-1 text-black">
+                            Assinatura do cliente
+                        </p>
+                    </>
+                )}
+
+                {/* Política de trocas */}
                 {data.returnPolicyBlock?.showBlock && (
                     <>
                         <DashedLine className="my-2" />
-                        <p className="text-[9px] font-bold text-center">Política de trocas</p>
-                        <p className="text-[9px] text-center">
+                        <p className="text-[9px] font-bold text-center uppercase text-black">Política de trocas</p>
+                        <p className="text-[9px] text-center text-black">
                             Prazo: {data.returnPolicyBlock.commercialDeadlineDays}d
                             {data.returnPolicyBlock.additionalWarrantyDays > 0 && ` · Garantia +${data.returnPolicyBlock.additionalWarrantyDays}d`}
                         </p>
                         {data.returnPolicyBlock.message && (
-                            <p className="text-[9px] text-center mt-1">{data.returnPolicyBlock.message}</p>
+                            <p className="text-[9px] text-center mt-0.5 text-black">{data.returnPolicyBlock.message}</p>
                         )}
                     </>
                 )}
 
-                <DashedLine className="my-2" />
-                <p className="text-[10px] font-bold text-center uppercase tracking-wide">{footerMessage}</p>
+                {/* Mensagem final / Footer */}
+                {footerMessage ? (
+                    <>
+                        <DashedLine className="my-2" />
+                        <p className="text-[10px] font-bold text-center uppercase tracking-wide text-black">
+                            {footerMessage}
+                        </p>
+                    </>
+                ) : null}
             </div>
         </div>
     )
