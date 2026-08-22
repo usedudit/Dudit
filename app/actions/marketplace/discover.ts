@@ -1017,7 +1017,7 @@ async function fetchGems(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSec
 
 // ─── 6. 👀 Você pode gostar (apenas logado com sinais reais) ────────────────
 
-async function fetchPersonalized(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
+async function fetchPersonalizedUncached(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
     if (!ctx.userId) {
         dLog(`[Discover] SKIP personalized reason=not_logged_in`)
         return null
@@ -1135,6 +1135,70 @@ async function fetchPersonalized(tiers: PartnerTiers, ctx: DiscoverCtx): Promise
         _allItems: scoped.map(item => processProduct(item as RawProduct)),
         seeMoreLink: `/explorar/${ctx.citySlug}?section=for-you`,
     }
+}
+
+function serializePartnerIds(ids: Set<string>): string {
+    return JSON.stringify([...ids].sort())
+}
+
+function parsePartnerIds(value: string): Set<string> {
+    try {
+        const parsed = JSON.parse(value)
+        return new Set(Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : [])
+    } catch {
+        return new Set()
+    }
+}
+
+/**
+ * Request-scoped deduplication for the private recommendation block.
+ * Never use unstable_cache here: favorites and purchase signals are user data.
+ */
+const getPersonalizedByStableKey = cache(async (
+    userId: string,
+    city: string,
+    state: string,
+    stateOnly: boolean,
+    citySlug: string,
+    lat: number | null,
+    lng: number | null,
+    scope: DiscoverCtx["scope"],
+    cityIdsKey: string,
+    stateIdsKey: string,
+    allIdsKey: string,
+): Promise<HomeSection | null> => {
+    return fetchPersonalizedUncached(
+        {
+            cityIds: parsePartnerIds(cityIdsKey),
+            stateIds: parsePartnerIds(stateIdsKey),
+            allIds: parsePartnerIds(allIdsKey),
+        },
+        {
+            city,
+            state,
+            stateOnly,
+            citySlug,
+            coords: lat != null && lng != null ? { lat, lng } : null,
+            userId: userId || null,
+            scope,
+        },
+    )
+})
+
+function fetchPersonalized(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
+    return getPersonalizedByStableKey(
+        ctx.userId ?? "",
+        ctx.city,
+        ctx.state,
+        ctx.stateOnly,
+        ctx.citySlug,
+        ctx.coords?.lat ?? null,
+        ctx.coords?.lng ?? null,
+        ctx.scope,
+        serializePartnerIds(tiers.cityIds),
+        serializePartnerIds(tiers.stateIds),
+        serializePartnerIds(tiers.allIds),
+    )
 }
 
 // ─── 7. ⭐ Mais vendidos ─────────────────────────────────────────────────────

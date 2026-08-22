@@ -79,9 +79,8 @@ export async function POST(
     // The webhook matches this payment to the subscription via `external_reference`.
     const paymentPayload = {
       transaction_amount: planPrice,
-      currency_id: "BRL",
       payment_method_id: "pix",
-      description: `Fatura atrasada - ${subscription.plan?.name}`,
+      description: `Fatura atrasada - ${subscription.plan?.name || "Assinatura"}`,
       payer: {
         email: subscription.billing_email || user.email,
       },

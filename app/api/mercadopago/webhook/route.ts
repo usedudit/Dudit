@@ -426,9 +426,9 @@ async function processWebhookWithRetry(
         const effectivePartnerId = partnerId || saasSubscription.partner_id
         if (effectivePartnerId !== saasSubscription.partner_id) {
           console.warn(`[WEBHOOK] Partner mismatch for SaaS subscription payment`)
-        } else if (paymentInfo.status === "approved" && saasSubscription.status === "past_due") {
+        } else if (paymentInfo.status === "approved" && ["past_due", "failed", "unpaid"].includes(saasSubscription.status)) {
           // Reactivate subscription
-          console.log(`[WEBHOOK] Reactivating SaaS subscription ${saasSubscription.id} from past_due to active`)
+          console.log(`[WEBHOOK] Reactivating SaaS subscription ${saasSubscription.id} from ${saasSubscription.status} to active`)
           
           const { error: updateError } = await supabase
             .from("subscriptions")

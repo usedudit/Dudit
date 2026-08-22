@@ -263,7 +263,7 @@ function QRCodeCard({ partnerUrl, storeName }: { partnerUrl: string; storeName: 
 
     return (
         <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-0 min-h-[240px] h-full flex flex-col md:flex-row overflow-hidden">
-            <div className="flex-1 min-w-0 bg-brand-gray/40 dark:bg-dark-border/20 p-6 flex flex-col justify-between">
+            <div className="flex-1 min-w-0 bg-brand-gray dark:bg-dark-border/50 p-6 flex flex-col justify-between">
                 <div>
                     <div className="flex items-start gap-4">
                         <div className="bg-white dark:bg-dark-surface p-2 rounded-xl border border-brand-border/60 dark:border-dark-border/60 shrink-0">
@@ -401,7 +401,7 @@ function HelpCard() {
 
     return (
         <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-0 min-h-[240px] h-full flex flex-col md:flex-row overflow-hidden">
-            <div className="flex-1 min-w-0 bg-brand-gray/40 dark:bg-dark-border/20 p-6 flex flex-col justify-between">
+            <div className="flex-1 min-w-0 bg-brand-gray dark:bg-dark-border/50 p-6 flex flex-col justify-between">
                 <div>
                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading leading-tight mb-2">
                         Ajuda e Suporte
@@ -482,7 +482,7 @@ function ProgressCard({
 
     return (
         <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-0 min-h-[200px] h-full flex flex-col md:flex-row overflow-hidden">
-            <div className="flex-1 min-w-0 bg-brand-gray/40 dark:bg-dark-border/20 p-6 flex flex-col justify-between">
+            <div className="flex-1 min-w-0 bg-brand-gray dark:bg-dark-border/50 p-6 flex flex-col justify-between">
                 <div>
                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading leading-tight mb-2">
                         Configurações iniciais

@@ -4,12 +4,9 @@ import React from "react"
 import { Button, FormDropdown, Checkbox } from "@/components/reusable"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import {
-  CalendarIcon,
-  ExportFileIcon,
-  PrinterIcon,
-  ArrowUpDownIcon,
   FileIcon,
   AnalyticsIcon,
+  ArrowUpDownIcon,
 } from "@/lib/icons"
 import type { DreRegime } from "@/lib/services/dre.service"
 
@@ -46,8 +43,6 @@ interface DrePageControlsProps {
   setComparePrevious: (compare: boolean) => void
   isAllExpanded: boolean
   onToggleExpandAll: () => void
-  onExportCsv: () => void
-  onExportPdf: () => void
 }
 
 const PERIOD_OPTIONS: { value: PeriodPreset; label: string }[] = [
@@ -77,18 +72,16 @@ export function DrePageControls({
   setComparePrevious,
   isAllExpanded,
   onToggleExpandAll,
-  onExportCsv,
-  onExportPdf,
 }: DrePageControlsProps) {
   const storeOptions = [
-    { value: "all", label: "Todas as Unidades (Consolidado)" },
+    { value: "all", label: "Todas as Lojas (Consolidado)" },
     ...stores.map((s) => ({ value: s.id, label: s.name })),
   ]
 
   return (
-    <div className="w-full space-y-4 print:hidden">
-      {/* ── Tabs de Navegação do Módulo ────────────────────────────────────── */}
-      <div className="flex items-center justify-between">
+    <>
+      {/* ── Tabs de Navegação ────────────────────────────────────────────── */}
+      <div className="mb-6 px-4 md:px-8 print:hidden">
         <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as DreViewTab)}>
           <TabsList className="px-0">
             <TabsTrigger value="structure" icon={FileIcon}>
@@ -101,12 +94,11 @@ export function DrePageControls({
         </Tabs>
       </div>
 
-      {/* ── Barra de Controles e Filtros do DRE ────────────────────────────── */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border p-3.5 md:p-4 rounded-2xl shadow-2xs">
-        {/* Esquerda: Filtros de Período, Loja, Regime */}
-        <div className="flex flex-wrap items-center gap-2.5">
+      {/* ── Barra de Controles e Filtros ─────────────────────────────────── */}
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6 flex-none px-4 md:px-8 print:hidden">
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
           {/* Seletor de Período */}
-          <div className="w-44 md:w-48">
+          <div className="w-48">
             <FormDropdown
               options={PERIOD_OPTIONS}
               value={preset}
@@ -116,26 +108,26 @@ export function DrePageControls({
 
           {/* Inputs de Data Personalizada */}
           {preset === "custom" && (
-            <div className="flex items-center gap-1.5 bg-brand-gray/10 dark:bg-dark-border/20 p-1 rounded-xl border border-brand-border dark:border-dark-border">
+            <div className="flex items-center gap-2 bg-brand-gray dark:bg-dark-border/30 p-1.5 rounded-xl border border-brand-border dark:border-dark-border">
               <input
                 type="date"
                 value={customStartDate}
                 onChange={(e) => setCustomStartDate(e.target.value)}
-                className="text-xs px-2 py-1 bg-white dark:bg-dark-card border border-brand-border dark:border-dark-border rounded-lg text-brand-dark dark:text-dark-heading focus:outline-hidden focus:ring-1 focus:ring-brand-primary"
+                className="text-xs px-2 py-1 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-lg text-brand-dark dark:text-dark-heading focus:outline-hidden"
               />
-              <span className="text-xs text-brand-inactive-text dark:text-dark-muted font-medium">até</span>
+              <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium">até</span>
               <input
                 type="date"
                 value={customEndDate}
                 onChange={(e) => setCustomEndDate(e.target.value)}
-                className="text-xs px-2 py-1 bg-white dark:bg-dark-card border border-brand-border dark:border-dark-border rounded-lg text-brand-dark dark:text-dark-heading focus:outline-hidden focus:ring-1 focus:ring-brand-primary"
+                className="text-xs px-2 py-1 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-lg text-brand-dark dark:text-dark-heading focus:outline-hidden"
               />
             </div>
           )}
 
           {/* Seletor de Loja (se houver mais de uma) */}
           {stores.length > 1 && (
-            <div className="w-52 md:w-60">
+            <div className="w-56">
               <FormDropdown
                 options={storeOptions}
                 value={selectedStoreId}
@@ -145,15 +137,14 @@ export function DrePageControls({
           )}
 
           {/* Regime Contábil: Competência vs Caixa */}
-          <div className="flex items-center bg-brand-gray/20 dark:bg-dark-border/40 p-1 rounded-xl border border-brand-border dark:border-dark-border">
+          <div className="flex items-center bg-brand-gray dark:bg-dark-border/40 p-1 rounded-xl border border-brand-border dark:border-dark-border">
             <button
               type="button"
               onClick={() => setRegime("competencia")}
-              title="Fato Gerador: vendas e despesas reconhecidas na data de emissão/vencimento"
               className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
                 regime === "competencia"
-                  ? "bg-brand-primary text-white shadow-2xs"
-                  : "text-brand-dark/70 dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading"
+                  ? "bg-brand-green text-white"
+                  : "text-brand-dark dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading"
               }`}
             >
               Competência
@@ -161,62 +152,44 @@ export function DrePageControls({
             <button
               type="button"
               onClick={() => setRegime("caixa")}
-              title="Fluxo Financeiro: receitas e despesas reconhecidas na data do efetivo pagamento"
               className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
                 regime === "caixa"
-                  ? "bg-brand-primary text-white shadow-2xs"
-                  : "text-brand-dark/70 dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading"
+                  ? "bg-brand-green text-white"
+                  : "text-brand-dark dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading"
               }`}
             >
               Caixa
             </button>
           </div>
 
-          {/* Comparativo com Período Anterior */}
-          <div className="flex items-center gap-2 pl-1.5">
+          {/* Comparativo Anterior */}
+          <div className="flex items-center gap-2 pl-1">
             <Checkbox
               checked={comparePrevious}
               onCheckedChange={(checked) => setComparePrevious(Boolean(checked))}
             />
-            <span className="text-xs text-brand-dark/80 dark:text-dark-body font-medium select-none cursor-pointer" onClick={() => setComparePrevious(!comparePrevious)}>
+            <span
+              className="text-xs text-brand-dark dark:text-dark-body font-medium select-none cursor-pointer"
+              onClick={() => setComparePrevious(!comparePrevious)}
+            >
               Comparar anterior
             </span>
           </div>
         </div>
 
-        {/* Direita: Ações (Recolher, CSV, PDF) */}
-        <div className="flex items-center gap-2 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-brand-border/40 dark:border-dark-border/40">
+        {/* Direita: Ações */}
+        <div className="flex items-center gap-2 self-end md:self-center">
           <Button
             variant="outline"
             size="sm"
             onClick={onToggleExpandAll}
-            className="text-xs h-9"
+            className="text-xs h-[42px]"
           >
-            <ArrowUpDownIcon className="w-3.5 h-3.5 mr-1.5" />
+            <ArrowUpDownIcon size={16} className="mr-1.5" />
             {isAllExpanded ? "Recolher tudo" : "Expandir tudo"}
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onExportCsv}
-            className="text-xs h-9"
-          >
-            <ExportFileIcon className="w-3.5 h-3.5 mr-1.5" />
-            Exportar CSV
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onExportPdf}
-            className="text-xs h-9"
-          >
-            <PrinterIcon className="w-3.5 h-3.5 mr-1.5" />
-            Imprimir / PDF
           </Button>
         </div>
       </div>
-    </div>
+    </>
   )
 }

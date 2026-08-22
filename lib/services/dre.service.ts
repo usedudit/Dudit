@@ -649,7 +649,7 @@ async function computeDrePeriod(
       partnerName: partnerInfo?.trade_name || partnerInfo?.name || "Empresa Parceira",
       tradeName: partnerInfo?.trade_name,
       documentNumber: partnerInfo?.document_number,
-      storeName: activeStore?.name || (storeId ? "Loja Selecionada" : "Todas as Unidades (Consolidado)"),
+      storeName: storeId ? (activeStore?.name || "Loja Selecionada") : "Todas as Lojas (Consolidado)",
       taxRegimeLabel: activeStore?.person_type === "juridica" ? "Pessoa Jurídica (Simples Nacional / MEI)" : "Pessoa Física",
       generatedAt: new Date().toLocaleString("pt-BR"),
     },

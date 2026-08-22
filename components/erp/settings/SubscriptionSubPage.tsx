@@ -8,24 +8,12 @@ import {
     CheckCircleIcon,
     ChevronLeftIcon,
     AlertTriangleIcon,
-    CopyIcon,
     XIcon,
+    ArrowRightIcon,
+    ShieldIcon,
+    EnergyIcon,
 } from "@/lib/icons"
-import {
-    Zap,
-    Loader2,
-    ArrowUpRight,
-    ShieldCheck,
-    QrCode,
-} from "lucide-react"
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogDescription,
-    DialogFooter,
-} from "@/components/ui/dialog"
+import { PixQrDisplayModal } from "@/components/erp/payments/shared"
 import { toast } from "@/hooks/use-notification"
 import {
     listPlansAction,
@@ -117,10 +105,9 @@ const PlanCard: React.FC<PlanCardProps> = ({
                     className="w-full h-12"
                     onClick={onAction}
                     disabled={isLoading || isCurrent}
+                    isLoading={isLoading}
                 >
-                    {isLoading ? (
-                        <Loader2 size={18} className="animate-spin mr-2" />
-                    ) : isCurrent ? (
+                    {isCurrent ? (
                         "Plano Atual"
                     ) : isDowngrade ? (
                         "Fazer downgrade"
@@ -317,6 +304,9 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
         polling: false,
     })
 
+    const [isVerifyingManualPayment, setIsVerifyingManualPayment] = useState(false)
+    const paymentPollIntervalRef = useRef<NodeJS.Timeout | null>(null)
+
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
 
@@ -483,20 +473,69 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
     }
 
     // ─── Manual Payment for Past Due ──────────────────────────────────────────
-    const handleGenerateManualPayment = async () => {
-        if (!subData?.subscription?.id) return
+    const stopPaymentPolling = useCallback(() => {
+        if (paymentPollIntervalRef.current) {
+            clearInterval(paymentPollIntervalRef.current)
+            paymentPollIntervalRef.current = null
+        }
+    }, [])
 
+    const closeManualPaymentModal = useCallback(() => {
+        stopPaymentPolling()
         setManualPaymentModal({
-            open: true,
-            loading: true,
+            open: false,
+            loading: false,
             paymentId: null,
             pixQrCode: null,
             pixQrCodeBase64: null,
             ticketUrl: null,
-            amount: currentPlanPrice,
+            amount: 0,
             error: null,
             polling: false,
         })
+    }, [stopPaymentPolling])
+
+    const startPaymentPolling = useCallback((paymentId: string) => {
+        stopPaymentPolling()
+        const pollInterval = setInterval(async () => {
+            try {
+                const response = await fetch(`/api/mercadopago/subscription-payment/${paymentId}`)
+                const data = await response.json()
+
+                if (data.success && data.status === "approved") {
+                    stopPaymentPolling()
+                    closeManualPaymentModal()
+                    toast.success("Pagamento aprovado! Assinatura reativada.")
+                    loadData()
+                } else if (data.success && ["rejected", "cancelled", "expired"].includes(data.status)) {
+                    stopPaymentPolling()
+                    toast.error(`Pagamento ${data.status === "rejected" ? "recusado" : "cancelado"}. Tente novamente.`)
+                }
+            } catch {
+                // Ignore polling errors
+            }
+        }, 5000)
+
+        paymentPollIntervalRef.current = pollInterval
+
+        // Stop polling after 15 minutes
+        setTimeout(() => stopPaymentPolling(), 15 * 60 * 1000)
+    }, [closeManualPaymentModal, stopPaymentPolling, loadData])
+
+    useEffect(() => {
+        return () => {
+            stopPaymentPolling()
+        }
+    }, [stopPaymentPolling])
+
+    const handleGenerateManualPayment = async () => {
+        if (!subData?.subscription?.id) return
+
+        setManualPaymentModal((prev) => ({
+            ...prev,
+            loading: true,
+            error: null,
+        }))
 
         try {
             const response = await fetch(`/api/billing/subscriptions/${subData.subscription.id}/manual-payment`, {
@@ -510,16 +549,17 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                 throw new Error(data.error || "Erro ao gerar pagamento")
             }
 
-            setManualPaymentModal((prev) => ({
-                ...prev,
+            setManualPaymentModal({
+                open: true,
                 loading: false,
                 paymentId: data.paymentId,
                 pixQrCode: data.pix?.qrCode || null,
                 pixQrCodeBase64: data.pix?.qrCodeBase64 || null,
                 ticketUrl: data.pix?.ticketUrl || null,
                 amount: data.amount,
+                error: null,
                 polling: true,
-            }))
+            })
 
             // Start polling for payment status
             startPaymentPolling(data.paymentId)
@@ -528,60 +568,35 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
             setManualPaymentModal((prev) => ({
                 ...prev,
                 loading: false,
+                open: false,
                 error: err.message || "Erro ao gerar pagamento. Tente novamente.",
             }))
+            toast.error(err.message || "Erro ao gerar pagamento. Tente novamente.")
         }
     }
 
-    const startPaymentPolling = (paymentId: string) => {
-        const pollInterval = setInterval(async () => {
-            try {
-                const response = await fetch(`/api/mercadopago/subscription-payment/${paymentId}`)
-                const data = await response.json()
+    const handleVerifyManualPayment = async () => {
+        if (!manualPaymentModal.paymentId) return
+        setIsVerifyingManualPayment(true)
+        try {
+            const response = await fetch(`/api/mercadopago/subscription-payment/${manualPaymentModal.paymentId}`)
+            const data = await response.json()
 
-                if (data.success && data.status === "approved") {
-                    clearInterval(pollInterval)
-                    setManualPaymentModal((prev) => ({ ...prev, polling: false }))
-                    toast.success("Pagamento aprovado! Assinatura reativada.")
-                    loadData()
-                } else if (data.success && ["rejected", "cancelled", "expired"].includes(data.status)) {
-                    clearInterval(pollInterval)
-                    setManualPaymentModal((prev) => ({
-                        ...prev,
-                        polling: false,
-                        error: `Pagamento ${data.status === "rejected" ? "recusado" : "cancelado"}. Tente novamente.`,
-                    }))
-                }
-            } catch {
-                // Ignore polling errors
+            if (data.success && data.status === "approved") {
+                stopPaymentPolling()
+                closeManualPaymentModal()
+                toast.success("Pagamento aprovado! Assinatura reativada.")
+                loadData()
+            } else if (data.success && ["rejected", "cancelled", "expired"].includes(data.status)) {
+                toast.error(`Pagamento ${data.status === "rejected" ? "recusado" : "cancelado"}. Tente novamente.`)
+            } else {
+                toast.info("Pagamento ainda pendente de confirmação. Se você já realizou o pagamento, aguarde alguns instantes.")
             }
-        }, 5000)
-
-        // Stop polling after 15 minutes
-        setTimeout(() => clearInterval(pollInterval), 15 * 60 * 1000)
-
-        // Cleanup on modal close
-        const originalClose = setManualPaymentModal
-        setManualPaymentModal((prev) => {
-            if (!prev.open && prev.polling) {
-                clearInterval(pollInterval)
-            }
-            return prev
-        })
-    }
-
-    const closeManualPaymentModal = () => {
-        setManualPaymentModal({
-            open: false,
-            loading: false,
-            paymentId: null,
-            pixQrCode: null,
-            pixQrCodeBase64: null,
-            ticketUrl: null,
-            amount: 0,
-            error: null,
-            polling: false,
-        })
+        } catch {
+            toast.error("Erro ao verificar status do pagamento.")
+        } finally {
+            setIsVerifyingManualPayment(false)
+        }
     }
 
     // ─── Render ────────────────────────────────────────────────────────────
@@ -703,15 +718,9 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                                         className="bg-red-500 text-white hover:bg-red-600 text-xs md:text-sm h-11 px-4 font-semibold"
                                                         onClick={handleGenerateManualPayment}
                                                         disabled={manualPaymentModal.loading}
+                                                        isLoading={manualPaymentModal.loading}
                                                     >
-                                                        {manualPaymentModal.loading ? (
-                                                            <>
-                                                                <Loader2 size={16} className="animate-spin mr-2" />
-                                                                Gerando PIX...
-                                                            </>
-                                                        ) : (
-                                                            "Pagar fatura atrasada"
-                                                        )}
+                                                        Pagar fatura atrasada
                                                     </Button>
                                                 )}
                                                 {subData?.subscription?.status !== "past_due" && (
@@ -882,52 +891,16 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                     </Portal>
                 )}
 
-                {/* ─── Subscribe Dialog ─────────────────────────────────── */}
-                <Dialog
-                    open={subscribeModal.open}
-                    onOpenChange={(open) => {
-                        if (!open && !actionLoading) setSubscribeModal({ open: false, planId: "", planName: "" })
+                {/* ─── Subscribe Modal (DefaultModal) ─────────────────────────── */}
+                <DefaultModal
+                    isOpen={subscribeModal.open}
+                    onClose={() => {
+                        if (!actionLoading) setSubscribeModal({ open: false, planId: "", planName: "" })
                     }}
-                >
-                    <DialogContent className="sm:max-w-md">
-                        <DialogHeader>
-                            <DialogTitle className="flex items-center gap-2">
-                                <Zap size={20} className="text-brand-green" />
-                                Assinar {subscribeModal.planName}
-                            </DialogTitle>
-                            <DialogDescription>
-                                Insira seu email de faturamento para prosseguir. Você será redirecionado para o Mercado Pago para finalizar o pagamento de forma segura.
-                            </DialogDescription>
-                        </DialogHeader>
-
-                        <div className="py-4 space-y-4">
-                            <Input
-                                label="Email de faturamento"
-                                name="billing_email"
-                                type="email"
-                                placeholder="seuemail@exemplo.com"
-                                value={billingEmail}
-                                onChange={(e) => {
-                                    setBillingEmail(e.target.value)
-                                    setEmailError("")
-                                }}
-                                className="mb-0"
-                            />
-                            {emailError && (
-                                <p className="text-sm text-red-500 flex items-center gap-1">
-                                    <AlertTriangleIcon size={14} /> {emailError}
-                                </p>
-                            )}
-
-                            <div className="flex items-start gap-2 p-3 rounded-lg bg-gray-50 dark:bg-zinc-900/50 text-xs text-brand-inactive-text">
-                                <ShieldCheck size={14} className="text-brand-green shrink-0 mt-0.5" />
-                                <span>
-                                    Pagamento processado com segurança pelo Mercado Pago. Seus dados financeiros nunca passam pela Dudit.
-                                </span>
-                            </div>
-                        </div>
-
-                        <DialogFooter>
+                    title={`Assinar ${subscribeModal.planName}`}
+                    maxWidth="md"
+                    footer={
+                        <>
                             <Button
                                 variant="outline"
                                 onClick={() => setSubscribeModal({ open: false, planId: "", planName: "" })}
@@ -936,78 +909,62 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                 Cancelar
                             </Button>
                             <Button
-                                className="bg-brand-green text-white hover:bg-brand-green/90"
+                                variant="default"
                                 onClick={handleSubscribe}
-                                disabled={!!actionLoading}
+                                isLoading={actionLoading === subscribeModal.planId || actionLoading === "subscribe"}
+                                rightIcon={<ArrowRightIcon size={16} />}
                             >
-                                {actionLoading ? (
-                                    <>
-                                        <Loader2 size={16} className="animate-spin mr-2" />
-                                        Processando...
-                                    </>
-                                ) : (
-                                    <>
-                                        <ArrowUpRight size={16} className="mr-2" />
-                                        Ir para o pagamento
-                                    </>
-                                )}
+                                Ir para o pagamento
                             </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
-
-                {/* ─── Downgrade Confirmation Dialog ────────────────────── */}
-                <Dialog
-                    open={downgradeModal.open}
-                    onOpenChange={(open) => {
-                        if (!open && !actionLoading) setDowngradeModal({ open: false, planId: "", planName: "" })
-                    }}
+                        </>
+                    }
                 >
-                    <DialogContent className="sm:max-w-md">
-                        <DialogHeader>
-                            <DialogTitle className="flex items-center gap-2">
-                                <AlertTriangleIcon size={20} className="text-amber-500" />
-                                Confirmar downgrade
-                            </DialogTitle>
-                            <DialogDescription>
-                                Você está rebaixando seu plano para <strong>{downgradeModal.planName}</strong>. A mudança será aplicada no final do ciclo de faturamento atual. Até lá, você continua com todos os recursos do plano atual.
-                            </DialogDescription>
-                        </DialogHeader>
+                    <div className="space-y-4 py-2">
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                            Insira seu email de faturamento para prosseguir. Você será redirecionado para o Mercado Pago para finalizar o pagamento de forma rápida e segura.
+                        </p>
 
-                        <div className="py-2">
-                            <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-xs text-amber-700 dark:text-amber-300">
-                                <AlertTriangleIcon size={14} className="shrink-0 mt-0.5" />
-                                <span>
-                                    Recursos exclusivos do plano atual podem ficar indisponíveis após o downgrade. Produtos, serviços e clientes que excederem os limites do novo plano serão arquivados (nunca excluídos) e você poderá reativá-los a qualquer momento.
-                                </span>
-                            </div>
-                        </div>
+                        <Input
+                            label="Email de faturamento"
+                            name="billing_email"
+                            type="email"
+                            placeholder="seuemail@exemplo.com"
+                            value={billingEmail}
+                            onChange={(e) => {
+                                setBillingEmail(e.target.value)
+                                setEmailError("")
+                            }}
+                            className="mb-0"
+                        />
+                        {emailError && (
+                            <p className="text-sm text-red-500 flex items-center gap-1.5 font-medium">
+                                <AlertTriangleIcon size={14} className="shrink-0" /> {emailError}
+                            </p>
+                        )}
 
-                        <DialogFooter>
-                            <Button
-                                variant="outline"
-                                onClick={() => setDowngradeModal({ open: false, planId: "", planName: "" })}
-                                disabled={!!actionLoading}
-                            >
-                                Manter plano atual
-                            </Button>
-                            <Button
-                                className="bg-amber-500 text-white hover:bg-amber-600"
-                                onClick={handleDowngrade}
-                                disabled={!!actionLoading}
-                            >
-                                {actionLoading ? (
-                                    <>
-                                        <Loader2 size={16} className="animate-spin mr-2" />
-                                        Agendando...
-                                    </>
-                                ) : (
-                                    "Confirmar downgrade"
-                                )}
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
+                        <InfoCard
+                            color="blue"
+                            title="Pagamento Seguro via Mercado Pago"
+                            message="Seus dados de pagamento são protegidos por criptografia de ponta a ponta e processados diretamente no Mercado Pago. Seus dados financeiros nunca passam pela Dudit."
+                        />
+                    </div>
+                </DefaultModal>
+
+                {/* ─── Downgrade Confirmation Modal (AlertModal) ───────────────── */}
+                <AlertModal
+                    isOpen={downgradeModal.open}
+                    onClose={() => {
+                        if (!actionLoading) setDowngradeModal({ open: false, planId: "", planName: "" })
+                    }}
+                    onConfirm={handleDowngrade}
+                    title="Confirmar downgrade de plano"
+                    message={`Você está rebaixando seu plano para ${downgradeModal.planName}. A mudança será aplicada no final do ciclo de faturamento atual. Até lá, você continuará com todos os recursos do seu plano atual sem interrupções.`}
+                    variant="warning"
+                    confirmText="Confirmar downgrade"
+                    cancelText="Manter plano atual"
+                    isLoading={actionLoading === downgradeModal.planId || actionLoading === "downgrade"}
+                    disabled={!!actionLoading}
+                />
 
                 {/* ─── Cancel Subscription Modal (DefaultModal) ─────────── */}
                 <DefaultModal
@@ -1062,129 +1019,17 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                 />
 
                 {/* ─── Manual Payment Modal (PIX QR Code) ─────────────────── */}
-                <Dialog
-                    open={manualPaymentModal.open}
-                    onOpenChange={(open) => {
-                        if (!open) closeManualPaymentModal()
-                    }}
-                >
-                    <DialogContent className="sm:max-w-md">
-                        <DialogHeader>
-                            <DialogTitle className="flex items-center gap-2">
-                                <QrCode size={20} className="text-brand-green" />
-                                Pagar fatura atrasada
-                            </DialogTitle>
-                            <DialogDescription>
-                                Escaneie o QR Code abaixo com seu app do banco para pagar via PIX. A assinatura será reativada automaticamente após a confirmação do pagamento.
-                            </DialogDescription>
-                        </DialogHeader>
-
-                        <div className="py-4 space-y-4">
-                            {manualPaymentModal.error && (
-                                <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm flex items-center gap-2">
-                                    <AlertTriangleIcon size={14} /> {manualPaymentModal.error}
-                                </div>
-                            )}
-
-                            {manualPaymentModal.loading ? (
-                                <div className="flex flex-col items-center gap-4 py-8">
-                                    <Loader2 size={32} className="animate-spin text-brand-green" />
-                                    <p className="text-brand-inactive-text dark:text-dark-body text-center">
-                                        Gerando QR Code PIX...
-                                    </p>
-                                </div>
-                            ) : manualPaymentModal.pixQrCodeBase64 ? (
-                                <div className="flex flex-col items-center px-2 pt-4">
-                                    <div className="text-center mb-6">
-                                        <div className="w-16 h-16 rounded-full bg-[#00b1ea]/10 flex items-center justify-center mx-auto mb-4">
-                                            <img
-                                                src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png"
-                                                alt="Mercado Pago"
-                                                className="w-8 h-8 object-contain"
-                                            />
-                                        </div>
-                                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-1">
-                                            Pix gerado via Mercado Pago
-                                        </h3>
-                                        <p className="text-sm text-brand-inactive-text">
-                                            Escaneie o QR Code ou copie o código
-                                        </p>
-                                    </div>
-
-                                    <div className="bg-white p-5 rounded-2xl border border-brand-border dark:border-dark-border mb-6 shadow-sm">
-                                        <img
-                                            src={`data:image/png;base64,${manualPaymentModal.pixQrCodeBase64}`}
-                                            alt="QR Code Pix"
-                                            className="w-48 h-48 mx-auto"
-                                        />
-                                    </div>
-
-                                    <div className="text-center mb-4">
-                                        <span className="text-3xl font-black text-brand-dark dark:text-dark-heading">
-                                            {formatCurrency(manualPaymentModal.amount)}
-                                        </span>
-                                    </div>
-
-                                    {manualPaymentModal.pixQrCode && (
-                                        <div className="w-full max-w-sm relative mb-6">
-                                            <input
-                                                type="text"
-                                                readOnly
-                                                value={manualPaymentModal.pixQrCode}
-                                                className="w-full pl-4 pr-12 py-4 rounded-xl bg-gray-100 dark:bg-dark-border/30 text-sm text-brand-inactive-text border border-transparent focus:border-brand-green outline-none font-medium truncate"
-                                            />
-                                            <button
-                                                onClick={() => {
-                                                    navigator.clipboard.writeText(manualPaymentModal.pixQrCode || "")
-                                                    toast.success("Código PIX copiado!")
-                                                }}
-                                                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 hover:bg-gray-200 dark:hover:bg-dark-border/50 rounded-lg transition-colors text-brand-dark dark:text-dark-heading"
-                                            >
-                                                <CopyIcon size={18} />
-                                            </button>
-                                        </div>
-                                    )}
-
-                                    {manualPaymentModal.ticketUrl && (
-                                        <Button
-                                            variant="outline"
-                                            className="w-full max-w-sm h-12"
-                                            onClick={() => window.open(manualPaymentModal.ticketUrl!, "_blank")}
-                                        >
-                                            Abrir no Mercado Pago
-                                        </Button>
-                                    )}
-
-                                    {manualPaymentModal.polling && (
-                                        <div className="flex items-center justify-center gap-2 p-3 rounded-lg bg-brand-green/10 dark:bg-brand-green/20 mt-4">
-                                            <Loader2 size={16} className="animate-spin text-brand-green" />
-                                            <span className="text-sm font-medium text-brand-green dark:text-brand-green">
-                                                Aguardando pagamento... Verificando a cada 5 segundos
-                                            </span>
-                                        </div>
-                                    )}
-                                </div>
-                            ) : (
-                                <div className="flex flex-col items-center gap-4 py-8 text-center">
-                                    <AlertTriangleIcon size={32} className="text-amber-500" />
-                                    <p className="text-brand-inactive-text dark:text-dark-body">
-                                        Não foi possível gerar o QR Code. Tente novamente.
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-
-                        <DialogFooter>
-                            <Button
-                                variant="outline"
-                                onClick={closeManualPaymentModal}
-                                disabled={manualPaymentModal.loading}
-                            >
-                                Fechar
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
+                {manualPaymentModal.open && manualPaymentModal.pixQrCodeBase64 && (
+                    <PixQrDisplayModal
+                        isOpen={manualPaymentModal.open}
+                        onClose={closeManualPaymentModal}
+                        qrCode={`data:image/png;base64,${manualPaymentModal.pixQrCodeBase64}`}
+                        payload={manualPaymentModal.pixQrCode || ""}
+                        amount={manualPaymentModal.amount}
+                        onVerifyPayment={handleVerifyManualPayment}
+                        isVerifying={isVerifyingManualPayment}
+                    />
+                )}
             </div>
         </FadeIn>
     )

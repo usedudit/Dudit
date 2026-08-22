@@ -2,7 +2,7 @@ import MarketplaceHome from "@/components/marketplace/MarketplaceHomepage"
 import { getHomeSections, type HomeSection } from "@/app/actions/marketplace/discover"
 import { resolveCityAndStateFromSlug } from "@/app/actions/marketplace/products"
 import { getCurrentUser } from "@/lib/auth/authorization"
-import { getUserSessionData } from "@/lib/data/user"
+import { getMarketplaceHomeSessionData } from "@/lib/data/user"
 import { MarketplaceHeader } from "@/components/marketplace/MarketplaceHeader"
 import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
 import { Suspense } from "react"
@@ -140,7 +140,7 @@ export default async function HomePage() {
     const user = await getCurrentUser()
 
     const sessionDataPromise = user
-        ? getUserSessionData(user.id)
+        ? getMarketplaceHomeSessionData(user.id)
         : Promise.resolve(null)
 
     const sessionData = await sessionDataPromise
