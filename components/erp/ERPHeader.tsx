@@ -289,8 +289,8 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                             showChevron={false}
                             width="w-64"
                         >
-                            <div className="py-3 border-b border-brand-border dark:border-dark-border">
-                                <div className="flex items-center space-x-3 mb-4">
+                            <div className="pt-3 py-3">
+                                <div className="flex items-center space-x-3 pb-4 border-b border-brand-border dark:border-dark-border">
                                     <div
                                         className={`w-10 h-10 rounded-full ${avatarColor || getAvatarColor(userName)} flex items-center justify-center text-white font-bold text-sm border border-brand-border dark:border-dark-border`}
                                     >
@@ -306,12 +306,22 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                                     </div>
                                 </div>
 
-                                <div className="py-2">
+                                <div className="border-b border-brand-border dark:border-dark-border">
+                                    <div className="px-1 py-2.5 flex items-center justify-between">
+                                        <span className="flex items-center gap-3">
+                                            <MoonIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
+                                            <span className="text-[14px] font-normal text-brand-inactive-text dark:text-dark-body">Modo escuro</span>
+                                        </span>
+                                        <Switch checked={theme === "dark"} onCheckedChange={() => handleThemeButtonClick(theme === "dark" ? "light" : "dark")} />
+                                    </div>
+                                </div>
+
+                                <div className="pt-2">
                                     {([
                                         { label: "Meu Perfil", href: "/perfil", icon: <UserIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" /> },
                                         { label: "Minha Assinatura", href: "/erp/configuracoes?tab=assinatura", icon: <CreditCardIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" /> },
                                         { label: "Central de Ajuda", href: "/ajuda", icon: <HelpCircleIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" /> },
-                                        { label: "Sair da sessão", onClick: handleSignOut, icon: <LogoutIcon className="w-4 h-4 text-brand-red dark:text-brand-red" /> }
+                                        { label: "Sair da sessão", className: "text-brand-red", onClick: handleSignOut, icon: <LogoutIcon className="w-4 h-4 text-brand-red dark:text-brand-red" /> }
                                     ] as any[]).map((item, idx) => {
                                         const ItemWrapper: any = item.href ? Link : "div";
                                         const wrapProps = item.href
@@ -322,28 +332,18 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                                             <ItemWrapper
                                                 key={idx}
                                                 {...wrapProps}
-                                                className="px-6 py-2.5 hover:bg-brand-gray dark:hover:bg-dark-border/30 cursor-pointer transition-colors block w-full text-left"
+                                                className="px-1 py-2.5 hover:bg-brand-gray dark:hover:bg-dark-border/30 cursor-pointer transition-colors block w-full text-left"
                                                 onClick={() => {
                                                     if (wrapProps.onClick) wrapProps.onClick();
                                                 }}
                                             >
                                                 <span className="flex items-center gap-3">
                                                     {item.icon}
-                                                    <span className="text-[14px] font-normal text-brand-inactive-text dark:text-dark-body">{item.label}</span>
+                                                    <span className={"text-[14px] font-normal text-brand-inactive-text dark:text-dark-body " + item.className}>{item.label}</span>
                                                 </span>
                                             </ItemWrapper>
                                         )
                                     })}
-                                </div>
-
-                                <div className="border-t border-brand-border dark:border-dark-border py-2">
-                                    <div className="px-6 py-2.5 flex items-center justify-between">
-                                        <span className="flex items-center gap-3">
-                                            <MoonIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
-                                            <span className="text-[14px] font-normal text-brand-inactive-text dark:text-dark-body">Modo escuro</span>
-                                        </span>
-                                        <Switch checked={theme === "dark"} onCheckedChange={() => handleThemeButtonClick(theme === "dark" ? "light" : "dark")} />
-                                    </div>
                                 </div>
                             </div>
                         </Dropdown>
@@ -351,8 +351,8 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                 </div>
             </div>
             <BottomSheet isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)}>
-                <div className="py-3 border-b border-brand-border dark:border-dark-border">
-                    <div className="flex items-center space-x-3 mb-4">
+                <div className="pt-3 py-3">
+                    <div className="flex items-center space-x-3 pb-4 border-b border-brand-border dark:border-dark-border">
                         <div
                             className={`w-10 h-10 rounded-full ${avatarColor || getAvatarColor(userName)} flex items-center justify-center text-white font-bold text-sm border border-brand-border dark:border-dark-border`}
                         >
@@ -368,12 +368,22 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                         </div>
                     </div>
 
-                    <div className="py-2">
+                    <div className="border-b border-brand-border dark:border-dark-border">
+                        <div className="px-1 py-2.5 flex items-center justify-between">
+                            <span className="flex items-center gap-3">
+                                <MoonIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
+                                <span className="text-[14px] font-normal text-brand-inactive-text dark:text-dark-body">Modo escuro</span>
+                            </span>
+                            <Switch checked={theme === "dark"} onCheckedChange={() => handleThemeButtonClick(theme === "dark" ? "light" : "dark")} />
+                        </div>
+                    </div>
+
+                    <div className="pt-2">
                         {([
                             { label: "Meu Perfil", href: "/perfil", icon: <UserIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" /> },
                             { label: "Minha Assinatura", href: "/erp/configuracoes?tab=assinatura", icon: <CreditCardIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" /> },
                             { label: "Central de Ajuda", href: "/ajuda", icon: <HelpCircleIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" /> },
-                            { label: "Sair da sessão", onClick: handleSignOut, icon: <LogoutIcon className="w-4 h-4 text-brand-red dark:text-brand-red" /> }
+                            { label: "Sair da sessão", className: "text-brand-red", onClick: handleSignOut, icon: <LogoutIcon className="w-4 h-4 text-brand-red dark:text-brand-red" /> }
                         ] as any[]).map((item, idx) => {
                             const ItemWrapper: any = item.href ? Link : "div";
                             const wrapProps = item.href
@@ -384,28 +394,18 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                                 <ItemWrapper
                                     key={idx}
                                     {...wrapProps}
-                                    className="py-2.5 hover:bg-brand-gray dark:hover:bg-dark-border/30 cursor-pointer transition-colors block w-full text-left"
+                                    className="px-1 py-2.5 hover:bg-brand-gray dark:hover:bg-dark-border/30 cursor-pointer transition-colors block w-full text-left"
                                     onClick={() => {
                                         if (wrapProps.onClick) wrapProps.onClick();
                                     }}
                                 >
                                     <span className="flex items-center gap-3">
                                         {item.icon}
-                                        <span className="text-[14px] font-normal text-brand-inactive-text dark:text-dark-body">{item.label}</span>
+                                        <span className={"text-[14px] font-normal text-brand-inactive-text dark:text-dark-body " + item.className}>{item.label}</span>
                                     </span>
                                 </ItemWrapper>
                             )
                         })}
-                    </div>
-
-                    <div className="border-t border-brand-border dark:border-dark-border py-2">
-                        <div className="px-6 py-2.5 flex items-center justify-between">
-                            <span className="flex items-center gap-3">
-                                <MoonIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
-                                <span className="text-[14px] font-normal text-brand-inactive-text dark:text-dark-body">Modo escuro</span>
-                            </span>
-                            <Switch checked={theme === "dark"} onCheckedChange={() => handleThemeButtonClick(theme === "dark" ? "light" : "dark")} />
-                        </div>
                     </div>
                 </div>
             </BottomSheet>

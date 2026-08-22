@@ -2,6 +2,7 @@ import "server-only"
 
 import { createAdminClient } from "@/lib/supabase/server"
 import { sanitizeUUID } from "@/lib/security/input-sanitizer"
+import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 
 export type DreRegime = "competencia" | "caixa"
 
@@ -43,6 +44,7 @@ export interface DreCompanyInfo {
   documentNumber?: string
   storeName?: string
   taxRegimeLabel?: string
+  partnerAvatar?: string
   generatedAt: string
 }
 
@@ -150,11 +152,9 @@ async function computeDrePeriod(
   // 0. Configurações da Loja e Parceiro
   let storeQuery = supabase
     .from("stores")
-    .select(`
-      id, name, person_type, crt, simples_tax_rate_products, simples_tax_rate_services, mei_fixed_tax_amount,
-      partner:partners(id, name, document_number, trade_name)
-    `)
+    .select("id, name, logo_url, person_type, crt, cnpj, cpf, simples_tax_rate_products, simples_tax_rate_services, mei_fixed_tax_amount, is_headquarters")
     .eq("partner_id", partnerId)
+    .order("is_headquarters", { ascending: false })
 
   if (storeId) storeQuery = storeQuery.eq("id", storeId)
 
@@ -162,7 +162,7 @@ async function computeDrePeriod(
   let salesQuery = supabase
     .from("sales")
     .select(`
-      id, total_amount, discount_amount, final_amount, paid_amount, fee_amount, fixed_fee_amount,
+      id, total_amount, discount_amount, final_amount, paid_amount,
       payment_status, status, created_at,
       sale_items (id, product_id, variant_id, product_name, quantity, unit_price, unit_cost, total_price, subtotal)
     `)
@@ -183,7 +183,7 @@ async function computeDrePeriod(
     .select(`
       id, total_amount, discount_amount, paid_amount, delivery_fee, situation, created_at,
       payment_method_fee_amount, payment_method_fixed_fee_amount, payment_method_discount_amount,
-      order_items (id, product_id, variant_id, title, quantity, price, unit_cost, total)
+      order_items (id, product_id, variant_id, product_name, quantity, price, unit_cost, total)
     `)
     .eq("partner_id", partnerId)
     .not("situation", "in", '("cancelled","pending_payment")')
@@ -199,7 +199,7 @@ async function computeDrePeriod(
   // 3. Ordens de Serviço (`service_orders`)
   let soQuery = supabase
     .from("service_orders")
-    .select("id, total_amount, discount_amount, final_amount, paid_amount, status, created_at")
+    .select("id, total_amount, status, created_at")
     .eq("partner_id", partnerId)
     .not("status", "in", '("cancelled","draft")')
     .limit(10000)
@@ -257,30 +257,7 @@ async function computeDrePeriod(
 
   if (storeId) returnsQuery = returnsQuery.eq("store_id", storeId)
 
-  // 7. Comissões (`employee_commissions`)
-  let commissionsQuery = supabase
-    .from("employee_commissions")
-    .select("id, amount, status, created_at")
-    .eq("partner_id", partnerId)
-    .gte("created_at", startIso)
-    .lte("created_at", endIso)
-    .limit(5000)
-
-  if (storeId) commissionsQuery = commissionsQuery.eq("store_id", storeId)
-
-  // 8. Fretes / Entregas (`deliveries`)
-  let deliveriesQuery = supabase
-    .from("deliveries")
-    .select("id, fee, driver_payout, status, created_at")
-    .eq("partner_id", partnerId)
-    .neq("status", "cancelled")
-    .gte("created_at", startIso)
-    .lte("created_at", endIso)
-    .limit(5000)
-
-  if (storeId) deliveriesQuery = deliveriesQuery.eq("store_id", storeId)
-
-  // ── Execução Paralela Simultânea de Todas as 9 Queries (Zero Latência Serial) ──
+  // ── Execução Paralela Simultânea de Todas as Queries em 1 Roundtrip ─────────
   const [
     storesRes,
     salesRes,
@@ -289,8 +266,6 @@ async function computeDrePeriod(
     apptRes,
     txRes,
     returnsRes,
-    commissionsRes,
-    deliveriesRes,
   ] = await Promise.all([
     storeQuery,
     salesQuery,
@@ -299,13 +274,12 @@ async function computeDrePeriod(
     apptQuery,
     txQuery,
     returnsQuery,
-    commissionsQuery,
-    deliveriesQuery,
   ])
 
   const stores = storesRes.data || []
-  const activeStore = stores.length > 0 ? stores[0] : null
-  const partnerInfo = (activeStore?.partner as any) || null
+  const hqStore = stores.find((s: any) => s.is_headquarters) || stores[0] || null
+  const selectedStore = storeId ? stores.find((s: any) => s.id === storeId) || hqStore : null
+  const activeStore = selectedStore || hqStore
 
   const simplesProductTaxRate = Number(activeStore?.simples_tax_rate_products || 0) / 100
   const simplesServiceTaxRate = Number(activeStore?.simples_tax_rate_services || 0) / 100
@@ -317,8 +291,6 @@ async function computeDrePeriod(
   const appointmentsList = apptRes.data || []
   const transactionsList = txRes.data || []
   const returnsList = returnsRes.data || []
-  const commissionsList = commissionsRes.data || []
-  const deliveriesList = deliveriesRes.data || []
 
   // ==========================================================================
   // 1. RECEITA OPERACIONAL BRUTA (Valor Nominal Cheio)
@@ -338,7 +310,6 @@ async function computeDrePeriod(
     const nominalGross = Number(s.total_amount || 0) > 0 ? Number(s.total_amount) : Number(s.final_amount || 0) + discount
     productsRevenue += nominalGross
     posDiscounts += discount
-    posFees += Number(s.fee_amount || 0) + Number(s.fixed_fee_amount || 0)
     posSaleCount++
   }
 
@@ -532,18 +503,9 @@ async function computeDrePeriod(
   let administrativeExpenses = 0
   let proLaboreExpenses = 0
 
-  // 4.1 Comissões e Fretes apurados dos módulos
+  // 4.1 Despesas Comerciais e Operacionais registradas nas transações
   let commissionsTotal = 0
-  for (const c of commissionsList) {
-    commissionsTotal += Number(c.amount || 0)
-  }
-  commercialExpenses += commissionsTotal
-
   let deliveriesTotal = 0
-  for (const d of deliveriesList) {
-    deliveriesTotal += Number(d.driver_payout || d.fee || 0)
-  }
-  commercialExpenses += deliveriesTotal
 
   // 4.2 Despesas das Transações por dre_group
   const dynamicCommercialItems: Record<string, number> = {}
@@ -567,8 +529,14 @@ async function computeDrePeriod(
         administrativeExpenses += val
         dynamicAdminItems[catName] = (dynamicAdminItems[catName] || 0) + val
       } else if (g === "pro_labore") {
-        proLaboreExpenses += val
-        dynamicProLaboreItems[catName] = (dynamicProLaboreItems[catName] || 0) + val
+        const lowerCat = catName.toLowerCase()
+        if (lowerCat.includes("distribui") || lowerCat.includes("dividendo") || lowerCat.includes("retirada de lucro")) {
+          // Distribuição de lucros / Dividendos não é despesa operacional da empresa (é destinação do lucro líquido)
+          nonOperationalTotal -= val
+        } else {
+          proLaboreExpenses += val
+          dynamicProLaboreItems[catName] = (dynamicProLaboreItems[catName] || 0) + val
+        }
       } else if (g === "despesa_financeira") {
         financialExpenses += val
       } else if (g === "nao_operacional") {
@@ -646,11 +614,12 @@ async function computeDrePeriod(
       averageTicket,
     },
     companyInfo: {
-      partnerName: partnerInfo?.trade_name || partnerInfo?.name || "Empresa Parceira",
-      tradeName: partnerInfo?.trade_name,
-      documentNumber: partnerInfo?.document_number,
-      storeName: storeId ? (activeStore?.name || "Loja Selecionada") : "Todas as Lojas (Consolidado)",
-      taxRegimeLabel: activeStore?.person_type === "juridica" ? "Pessoa Jurídica (Simples Nacional / MEI)" : "Pessoa Física",
+      partnerName: hqStore?.name || "Empresa Matriz",
+      tradeName: hqStore?.name,
+      documentNumber: selectedStore?.cnpj || selectedStore?.cpf || hqStore?.cnpj || hqStore?.cpf || "",
+      partnerAvatar: (selectedStore?.logo_url || hqStore?.logo_url) ? getR2ImageUrl(selectedStore?.logo_url || hqStore?.logo_url) : undefined,
+      storeName: storeId ? (selectedStore?.name || "Loja Selecionada") : "Todas as Lojas (Consolidado)",
+      taxRegimeLabel: (selectedStore?.person_type || hqStore?.person_type) === "juridica" ? "Pessoa Jurídica (Simples Nacional / MEI)" : "Pessoa Física",
       generatedAt: new Date().toLocaleString("pt-BR"),
     },
     alerts: {
@@ -932,13 +901,13 @@ export async function getDreReport(filters: DreFilters): Promise<DreReportData> 
       // 6.3 Pró-Labore
       proLaboreExpenses: {
         key: "6_3_pro_labore",
-        title: "(-) 6.3 PRÓ-LABORE E RETIRADAS DE SÓCIOS",
+        title: "(-) 6.3 PRÓ-LABORE DOS SÓCIOS / ADMINISTRADORES",
         type: "expense",
         amount: cur.proLaboreExpenses,
         verticalPercent: calcVerticalPercent(cur.proLaboreExpenses, grossRev),
         previousAmount: prev?.proLaboreExpenses,
         horizontalVariation: calcHorizontalVariation(cur.proLaboreExpenses, prev?.proLaboreExpenses),
-        helpText: "Remuneração mensal dos sócios e administradores pelo trabalho na empresa.",
+        helpText: "Remuneração mensal dos sócios e administradores pelo trabalho na gestão da empresa (exclui distribuição de lucros pós-apuração).",
         items: Object.entries(cur.dynamicProLaboreItems).map(([name, amount], idx) => ({
           id: `6.3.${idx + 1}`,
           name,

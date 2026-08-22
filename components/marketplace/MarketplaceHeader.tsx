@@ -753,6 +753,7 @@ const Header: React.FC<HeaderProps> = ({
                     {(!isScrolled && showDeliveryInfo && !isProductDetail) && (
                         <Link
                             href={user && userLocation ? "/perfil?tab=enderecos" : "#"}
+                            prefetch={false}
                             onClick={(e) => {
                                 if (!user || !userLocation) {
                                     e.preventDefault()
@@ -883,6 +884,7 @@ const Header: React.FC<HeaderProps> = ({
 
                     <Link
                         href={user && userLocation ? "/perfil?tab=enderecos" : "#"}
+                        prefetch={false}
                         onClick={(e) => {
                             if (!user || !userLocation) {
                                 e.preventDefault()
@@ -1005,7 +1007,7 @@ const Header: React.FC<HeaderProps> = ({
                                                 <ItemWrapper
                                                     key={idx}
                                                     {...wrapProps}
-                                                    className="px-6 py-2.5 hover:bg-brand-gray dark:hover:bg-dark-border/30 cursor-pointer transition-colors block w-full text-left"
+                                                    className="px-1 py-2.5 hover:bg-brand-gray dark:hover:bg-dark-border/30 cursor-pointer transition-colors block w-full text-left"
                                                     onClick={() => {
                                                         if (wrapProps.onClick) wrapProps.onClick();
                                                         setIsUserMenuOpen(false)

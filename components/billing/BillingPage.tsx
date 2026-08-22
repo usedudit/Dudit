@@ -136,8 +136,8 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
 
     const billingFilters: BillingFilters = useMemo(() => ({
         partner_id: initialPartnerId,
-        purchase_type: filters.purchase_type?.length === 1 ? filters.purchase_type[0] : undefined,
-        status: filters.status?.length === 1 ? filters.status[0] : undefined,
+        purchase_type: filters.purchase_type?.length ? (filters.purchase_type.length === 1 ? filters.purchase_type[0] : filters.purchase_type) : undefined,
+        status: filters.status?.length ? (filters.status.length === 1 ? filters.status[0] : filters.status) : undefined,
         search: search || undefined,
         date_from: filters.date?.from || undefined,
         date_to: filters.date?.to || undefined,

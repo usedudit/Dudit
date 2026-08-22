@@ -85,6 +85,10 @@ export async function POST(
         email: subscription.billing_email || user.email,
       },
       external_reference: subscriptionId,
+      metadata: {
+        subscription_id: subscriptionId,
+        partner_id: subscription.partner_id,
+      },
     }
 
     const mpResponse = await fetch("https://api.mercadopago.com/v1/payments", {

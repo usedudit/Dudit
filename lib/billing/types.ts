@@ -197,8 +197,8 @@ export interface BillingPageData {
 }
 
 export interface BillingFilters {
-    purchase_type?: PurchaseType | 'all'
-    status?: string
+    purchase_type?: PurchaseType | PurchaseType[] | 'all'
+    status?: string | string[]
     gateway?: string
     partner_id?: string
     search?: string

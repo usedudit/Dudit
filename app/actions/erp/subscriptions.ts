@@ -68,15 +68,50 @@ export async function getSubscriptionStatusAction(): Promise<ActionResponse<any>
     // Enrich with the next payment date from Mercado Pago when available.
     // This is more reliable than current_period_end for subscriptions that
     // were created before period dates were tracked.
+    // Enrich with MP subscription status and auto-sync with Mercado Pago if authorized
     if (
       subscriptionPayload &&
-      subscription?.mercado_pago_subscription_id &&
-      ["active", "trialing", "past_due"].includes(subscription.status)
+      subscription?.mercado_pago_subscription_id
     ) {
       try {
         const mpStatus = await getMpSubscriptionStatus(subscription.mercado_pago_subscription_id)
         if (mpStatus?.next_payment_date) {
-          subscriptionPayload.next_payment_date = mpStatus.next_payment_date
+          subscriptionPayload.next_payment_date = mpStatus.next_payment_date as string
+        }
+
+        // Auto-heal / Auto-sync: If Mercado Pago confirms the subscription is authorized,
+        // but local DB still has it as past_due, failed, unpaid, or pending:
+        if (
+          mpStatus?.status === "authorized" &&
+          ["past_due", "failed", "unpaid", "pending"].includes(subscription.status)
+        ) {
+          const admin = getAdminClient()
+          const now = new Date()
+          const nextEnd = mpStatus.next_payment_date
+            ? new Date(mpStatus.next_payment_date as string)
+            : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+
+          await admin
+            .from("subscriptions")
+            .update({
+              status: "active",
+              past_due_at: null,
+              current_period_start: now.toISOString(),
+              current_period_end: nextEnd.toISOString(),
+              updated_at: now.toISOString(),
+            })
+            .eq("id", subscription.id)
+
+          const { invalidatePartnerPlanCache } = await import("@/lib/services/subscription.service")
+          invalidatePartnerPlanCache(partner.id)
+
+          const { syncSubscriptionToBilling } = await import("@/lib/billing/sync-subscription")
+          await syncSubscriptionToBilling(subscription.id, "manual", "active", now, nextEnd).catch(console.error)
+
+          subscriptionPayload.status = "active"
+          subscriptionPayload.current_period_start = now.toISOString()
+          subscriptionPayload.current_period_end = nextEnd.toISOString()
+          subscription.status = "active"
         }
       } catch {
         // Non-critical: fall back to current_period_end on the client.

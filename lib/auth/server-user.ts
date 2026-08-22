@@ -17,7 +17,7 @@ const requestCache = new WeakMap<object, User | null>()
  * by Supabase Auth for the current request.
  */
 export const getCurrentUser = cache(async (): Promise<User | null> => {
-    let headerList: object
+    let headerList: Awaited<ReturnType<typeof headers>>
     try {
         headerList = await headers()
     } catch {
@@ -26,6 +26,13 @@ export const getCurrentUser = cache(async (): Promise<User | null> => {
 
     if (requestCache.has(headerList)) {
         return requestCache.get(headerList) ?? null
+    }
+
+    if (process.env.DUDIT_REQUEST_TRACE === "true") {
+        const requestId = headerList.get("x-dudit-request-id") || "missing"
+        const startedAt = Number(headerList.get("x-dudit-request-start"))
+        const elapsedMs = Number.isFinite(startedAt) ? Math.max(0, Date.now() - startedAt) : null
+        console.log(`[DUDIT_TRACE] request=${requestId} phase=auth.getUser elapsedMs=${elapsedMs ?? "unknown"}`)
     }
 
     const supabase = await getSupabaseServerClient()

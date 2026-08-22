@@ -2,6 +2,11 @@
 
 import React from "react"
 import { formatCurrency } from "@/lib/utils"
+import { UserProfileImage } from "@/lib/utils/UserProfileImage"
+import {
+  QUOTE_PREVIEW_PRIMARY_COLOR,
+  QUOTE_PREVIEW_SECONDARY_COLOR,
+} from "@/lib/quotes/quote-preview-theme"
 import type { DreReportData, DreRegime, DreNode } from "@/lib/services/dre.service"
 
 interface DreA4PreviewProps {
@@ -46,190 +51,217 @@ export function DreA4Preview({
   showSignatures = true,
   printMode = false,
 }: DreA4PreviewProps) {
-  const primaryColor = "#113833"
-  const secondaryColor = "#1E824C"
+  const primaryColor = QUOTE_PREVIEW_PRIMARY_COLOR // "#003229"
+  const secondaryColor = QUOTE_PREVIEW_SECONDARY_COLOR // "#d4f995"
   const partnerName = report.companyInfo?.partnerName || "Empresa Parceira"
+  const partnerAvatar = report.companyInfo?.partnerAvatar
   const kpis = report.kpis
 
   return (
     <div
       className={`flex flex-col w-full h-full bg-white dark:bg-dark-surface relative overflow-hidden ${
-        printMode ? "dre-a4-print" : ""
+        printMode ? "dre-a4-print" : "border-l border-brand-border dark:border-dark-border"
       }`}
     >
       <div
         className={
           printMode
-            ? "w-full flex flex-col items-center p-0"
-            : "flex-1 overflow-auto custom-scrollbar p-4 md:p-8 flex flex-col items-center space-y-8 bg-[#e5e7eb] dark:bg-dark-surface/50 rounded-2xl border border-brand-border dark:border-dark-border"
+            ? "w-full p-0"
+            : "absolute top-4 right-4 bottom-4 left-4 bg-[#e5e7eb] dark:bg-dark-surface/50 rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden flex flex-col shadow-xs"
         }
       >
-        {/* Folha A4 Padronizada */}
-        <div className="w-[210mm] min-w-[210mm] shrink-0 bg-white text-[#113833] shadow-md overflow-hidden relative font-sans rounded-sm min-h-[297mm] flex flex-col justify-between">
-          <div>
-            {/* ── 1. Top Banner Estilo Recibo A4 Dudit ───────────────────────── */}
+        <div
+          className={
+            printMode
+              ? "w-full flex flex-col items-center p-0"
+              : "flex-1 overflow-auto custom-scrollbar p-4 md:p-12 flex flex-col items-start lg:items-center pt-12 space-y-8"
+          }
+        >
+          {/* Folha A4 Padronizada */}
+          <div
+            className={`w-[210mm] min-w-[210mm] shrink-0 bg-white text-[#113833] overflow-hidden relative font-sans min-h-[297mm] flex flex-col justify-between ${
+              printMode ? "pdf-print-page" : "shadow-md rounded-xs"
+            }`}
+          >
+            <div>
+              {/* ── 1. Top Banner Estilo Canônico do Dudit ERP ─────────────────── */}
+              <div
+                className="px-8 py-8 relative overflow-hidden flex flex-col justify-between h-[160px] shrink-0"
+                style={{ backgroundColor: primaryColor }}
+              >
+                {/* Elementos geométricos decorativos oficiais Dudit */}
+                <div className="absolute -top-12 right-6 flex gap-3 opacity-90 rotate-180 pointer-events-none">
+                  <div className="flex flex-col gap-3">
+                    <div
+                      className="w-14 h-24 rounded-full"
+                      style={{ backgroundColor: secondaryColor }}
+                    />
+                    <div
+                      className="w-14 h-24 rounded-full"
+                      style={{ backgroundColor: secondaryColor }}
+                    />
+                    <div
+                      className="w-14 h-24 rounded-full"
+                      style={{ backgroundColor: secondaryColor }}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-3 -mt-12">
+                    <div
+                      className="w-14 h-24 rounded-full"
+                      style={{ backgroundColor: secondaryColor }}
+                    />
+                    <div
+                      className="w-14 h-24 rounded-full"
+                      style={{ backgroundColor: secondaryColor }}
+                    />
+                    <div
+                      className="w-14 h-24 rounded-full"
+                      style={{ backgroundColor: secondaryColor }}
+                    />
+                  </div>
+                </div>
+
+                <div className="relative z-10">
+                  <div className="flex items-center gap-3 mb-6">
+                    <UserProfileImage
+                      fullName={partnerName}
+                      imageUrl={partnerAvatar && !partnerAvatar.includes("Placeholder.png") ? partnerAvatar : null}
+                      className="w-8 h-8 shrink-0 text-[13px] font-bold"
+                      style={{ backgroundColor: secondaryColor }}
+                    />
+                    <span className="text-white font-bold text-md">{partnerName}</span>
+                  </div>
+
+                  <div>
+                    <h1 className="text-2xl font-medium text-white tracking-tight">
+                      Demonstração do Resultado
+                    </h1>
+                    <p className="text-white/80 text-xs tracking-widest font-light mt-1 uppercase">
+                      Período: {startDate} até {endDate} • Regime de {regime === "competencia" ? "Competência" : "Caixa"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── 2. Metadados e Informações Institucionais ────────────────────── */}
+              <div className="px-8 py-5 border-b border-gray-100">
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <span className="text-[11px] text-gray-500 font-medium block">Empresa</span>
+                    <span className="font-bold text-xs text-brand-dark block truncate">{partnerName}</span>
+                    {report.companyInfo?.documentNumber && (
+                      <span className="text-[10px] text-gray-500">CNPJ: {report.companyInfo.documentNumber}</span>
+                    )}
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-gray-500 font-medium block">Unidade / Loja</span>
+                    <span className="font-bold text-xs text-brand-dark block truncate">{storeName}</span>
+                    <span className="text-[10px] text-gray-500">{report.companyInfo?.taxRegimeLabel}</span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-gray-500 font-medium block">Emissão / Gerado em</span>
+                    <span className="font-bold text-xs text-brand-dark block">{report.companyInfo?.generatedAt}</span>
+                    <span className="text-[10px] text-gray-500">Base 100%: {formatCurrency(kpis?.grossRevenue || 0)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── 3. Tabela Principal da DRE ─────────────────────────────────── */}
+              <div className="px-8 pt-4 pb-2">
+                <table className="w-full text-left border-separate border-spacing-0">
+                  <thead>
+                    <tr className="bg-brand-gray/40">
+                      <th className="py-2.5 pl-4 pr-2 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider rounded-tl-lg border-b border-gray-200">
+                        Estrutura / Conta Contábil
+                      </th>
+                      <th className="py-2.5 px-2 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider text-center w-24 border-b border-gray-200">
+                        Tipo
+                      </th>
+                      <th className="py-2.5 px-2 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider text-right w-28 border-b border-gray-200">
+                        Atual (R$)
+                      </th>
+                      <th className="py-2.5 px-2 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider text-right w-16 border-b border-gray-200">
+                        AV (%)
+                      </th>
+                      {showComparison && (
+                        <>
+                          <th className="py-2.5 px-2 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider text-right w-24 border-b border-gray-200">
+                            Anterior (R$)
+                          </th>
+                          <th className="py-2.5 pl-2 pr-4 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider text-right w-16 rounded-tr-lg border-b border-gray-200">
+                            AH (%)
+                          </th>
+                        </>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.values(report.structure).map((node) => (
+                      <DreA4TableRow
+                        key={node.key}
+                        node={node}
+                        showSubItems={showSubItems}
+                        showComparison={showComparison}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* ── 4. Resumo de Indicadores e Margens Contábeis ────────────────── */}
+              {showKpiSummary && kpis && (
+                <div className="px-8 py-3">
+                  <div className="bg-brand-gray/40 p-4 rounded-lg text-black">
+                    <h4 className="text-[11px] font-bold uppercase tracking-wider text-gray-600 mb-2">
+                      Resumo de Margens e Indicadores Operacionais
+                    </h4>
+                    <div className="grid grid-cols-4 gap-3 text-xs">
+                      <div className="bg-white p-2.5 rounded-md border border-gray-200/60">
+                        <span className="text-[10px] text-gray-500 font-medium block">Receita Líquida</span>
+                        <span className="font-bold text-xs text-brand-dark">{formatCurrency(kpis.netRevenue)}</span>
+                      </div>
+                      <div className="bg-white p-2.5 rounded-md border border-gray-200/60">
+                        <span className="text-[10px] text-gray-500 font-medium block">Margem Bruta</span>
+                        <span className="font-bold text-xs text-brand-dark">{kpis.grossMarginPercent}%</span>
+                      </div>
+                      <div className="bg-white p-2.5 rounded-md border border-gray-200/60">
+                        <span className="text-[10px] text-gray-500 font-medium block">Margem EBITDA</span>
+                        <span className="font-bold text-xs text-brand-dark">{kpis.ebitdaMarginPercent}%</span>
+                      </div>
+                      <div className="bg-white p-2.5 rounded-md border border-gray-200/60">
+                        <span className="text-[10px] text-gray-500 font-medium block">Margem Líquida</span>
+                        <span className="font-bold text-xs text-brand-green">{kpis.netMarginPercent}%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── 5. Bloco de Assinaturas Formais Contábeis ─────────────────────── */}
+              {showSignatures && (
+                <div className="px-8 pt-8 pb-4">
+                  <div className="grid grid-cols-2 gap-12 text-center text-xs text-gray-800">
+                    <div className="border-t border-gray-400 pt-2">
+                      <p className="font-bold text-brand-dark text-xs">{partnerName}</p>
+                      <p className="text-[10px] text-gray-600">Representante Legal / Sócio Administrador</p>
+                    </div>
+                    <div className="border-t border-gray-400 pt-2">
+                      <p className="font-bold text-brand-dark text-xs">Responsável Contábil</p>
+                      <p className="text-[10px] text-gray-600">CRC / Contador Responsável</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* ── 6. Rodapé Oficial Dudit ───────────────────────────────────────── */}
             <div
-              className="px-8 py-7 relative overflow-hidden flex flex-col justify-between h-[155px] shrink-0"
+              className="text-white/80 px-8 py-2 text-[10px] flex justify-between items-center w-full h-[36px] shrink-0"
               style={{ backgroundColor: primaryColor }}
             >
-              {/* Elementos geométricos decorativos Dudit */}
-              <div className="absolute -top-12 right-6 flex gap-3 opacity-90 rotate-180 pointer-events-none">
-                <div className="flex flex-col gap-3">
-                  {[0, 1, 2].map((i) => (
-                    <div
-                      key={i}
-                      className="w-14 h-24 rounded-full"
-                      style={{ backgroundColor: secondaryColor }}
-                    />
-                  ))}
-                </div>
-                <div className="flex flex-col gap-3 -mt-12">
-                  {[0, 1, 2].map((i) => (
-                    <div
-                      key={`b-${i}`}
-                      className="w-14 h-24 rounded-full"
-                      style={{ backgroundColor: secondaryColor }}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <div className="relative z-10">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center bg-white text-[15px] font-bold text-black shrink-0">
-                    {partnerName.charAt(0).toUpperCase()}
-                  </div>
-                  <span className="text-white font-bold text-sm">{partnerName}</span>
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold text-white tracking-tight">
-                    Demonstração do Resultado do Exercício
-                  </h1>
-                  <p className="text-white/80 text-xs tracking-wider font-light mt-0.5">
-                    Período: {startDate} até {endDate} • Regime de {regime === "competencia" ? "Competência" : "Caixa"}
-                  </p>
-                </div>
-              </div>
+              <span>Demonstração Contábil Gerencial</span>
+              <span>Criado via Dudit ERP • dudit.com.br</span>
             </div>
-
-            {/* ── 2. Metadados e Informações Institucionais ────────────────────── */}
-            <div className="px-8 py-5 border-b border-gray-100">
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <span className="text-[11px] text-gray-500 font-medium block">Empresa</span>
-                  <span className="font-bold text-xs text-brand-dark block truncate">{partnerName}</span>
-                  {report.companyInfo?.documentNumber && (
-                    <span className="text-[10px] text-gray-500">CNPJ: {report.companyInfo.documentNumber}</span>
-                  )}
-                </div>
-                <div>
-                  <span className="text-[11px] text-gray-500 font-medium block">Unidade / Loja</span>
-                  <span className="font-bold text-xs text-brand-dark block truncate">{storeName}</span>
-                  <span className="text-[10px] text-gray-500">{report.companyInfo?.taxRegimeLabel}</span>
-                </div>
-                <div>
-                  <span className="text-[11px] text-gray-500 font-medium block">Emissão / Gerado em</span>
-                  <span className="font-bold text-xs text-brand-dark block">{report.companyInfo?.generatedAt}</span>
-                  <span className="text-[10px] text-gray-500">Base 100%: {formatCurrency(kpis?.grossRevenue || 0)}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* ── 3. Tabela Principal da DRE ─────────────────────────────────── */}
-            <div className="px-8 pt-4 pb-2">
-              <table className="w-full text-left border-separate border-spacing-0">
-                <thead>
-                  <tr className="bg-brand-gray/40">
-                    <th className="py-2.5 pl-4 pr-2 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider rounded-tl-lg border-b border-gray-200">
-                      Estrutura / Conta Contábil
-                    </th>
-                    <th className="py-2.5 px-2 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider text-center w-24 border-b border-gray-200">
-                      Tipo
-                    </th>
-                    <th className="py-2.5 px-2 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider text-right w-28 border-b border-gray-200">
-                      Atual (R$)
-                    </th>
-                    <th className="py-2.5 px-2 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider text-right w-16 border-b border-gray-200">
-                      AV (%)
-                    </th>
-                    {showComparison && (
-                      <>
-                        <th className="py-2.5 px-2 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider text-right w-24 border-b border-gray-200">
-                          Anterior (R$)
-                        </th>
-                        <th className="py-2.5 pl-2 pr-4 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider text-right w-16 rounded-tr-lg border-b border-gray-200">
-                          AH (%)
-                        </th>
-                      </>
-                    )}
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.values(report.structure).map((node) => (
-                    <DreA4TableRow
-                      key={node.key}
-                      node={node}
-                      showSubItems={showSubItems}
-                      showComparison={showComparison}
-                    />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* ── 4. Resumo de Indicadores e Margens Contábeis ────────────────── */}
-            {showKpiSummary && kpis && (
-              <div className="px-8 py-3">
-                <div className="bg-brand-gray/40 p-4 rounded-lg text-black">
-                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-gray-600 mb-2">
-                    Resumo de Margens e Indicadores Operacionais
-                  </h4>
-                  <div className="grid grid-cols-4 gap-3 text-xs">
-                    <div className="bg-white p-2.5 rounded-md border border-gray-200/60">
-                      <span className="text-[10px] text-gray-500 font-medium block">Receita Líquida</span>
-                      <span className="font-bold text-xs text-brand-dark">{formatCurrency(kpis.netRevenue)}</span>
-                    </div>
-                    <div className="bg-white p-2.5 rounded-md border border-gray-200/60">
-                      <span className="text-[10px] text-gray-500 font-medium block">Margem Bruta</span>
-                      <span className="font-bold text-xs text-brand-dark">{kpis.grossMarginPercent}%</span>
-                    </div>
-                    <div className="bg-white p-2.5 rounded-md border border-gray-200/60">
-                      <span className="text-[10px] text-gray-500 font-medium block">Margem EBITDA</span>
-                      <span className="font-bold text-xs text-brand-dark">{kpis.ebitdaMarginPercent}%</span>
-                    </div>
-                    <div className="bg-white p-2.5 rounded-md border border-gray-200/60">
-                      <span className="text-[10px] text-gray-500 font-medium block">Margem Líquida</span>
-                      <span className="font-bold text-xs text-brand-green">{kpis.netMarginPercent}%</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* ── 5. Bloco de Assinaturas Formais Contábeis ─────────────────────── */}
-            {showSignatures && (
-              <div className="px-8 pt-8 pb-4">
-                <div className="grid grid-cols-2 gap-12 text-center text-xs text-gray-800">
-                  <div className="border-t border-gray-400 pt-2">
-                    <p className="font-bold text-brand-dark text-xs">{partnerName}</p>
-                    <p className="text-[10px] text-gray-600">Representante Legal / Sócio Administrador</p>
-                  </div>
-                  <div className="border-t border-gray-400 pt-2">
-                    <p className="font-bold text-brand-dark text-xs">Responsável Contábil</p>
-                    <p className="text-[10px] text-gray-600">CRC / Contador Responsável</p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* ── 6. Rodapé Oficial Dudit ───────────────────────────────────────── */}
-          <div
-            className="text-white/80 px-8 py-2 text-[10px] flex justify-between items-center w-full h-[36px] shrink-0"
-            style={{ backgroundColor: primaryColor }}
-          >
-            <span>Demonstração Contábil Gerencial</span>
-            <span>Criado via Dudit ERP • dudit.com.br</span>
           </div>
         </div>
       </div>

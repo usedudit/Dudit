@@ -403,8 +403,15 @@ async function processSubscriptionWebhook(
         .eq("id", insertedEvent.id)
     }
 
-    // ── Invalidate plan cache ONLY after actual status change ──
+    // ── Invalidate plan cache and sync billing ONLY after actual status change ──
     invalidatePartnerPlanCache(sub.partner_id)
+    await syncSubscriptionToBilling(
+      sub.id,
+      "webhook",
+      newStatus,
+      updatePayload.current_period_start ? new Date(updatePayload.current_period_start) : undefined,
+      updatePayload.current_period_end ? new Date(updatePayload.current_period_end) : undefined
+    ).catch(console.error)
 
     // ── Log billing event (for audit trail, separate from idempotency) ──
     await logBillingEvent(supabase, sub.partner_id, `subscription_${newStatus}`, null, {

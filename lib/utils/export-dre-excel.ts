@@ -27,6 +27,15 @@ function translateNodeType(type: "income" | "expense" | "subtotal" | "result" | 
   }
 }
 
+function formatDateBR(dateStr: string): string {
+  if (!dateStr) return ""
+  const parts = dateStr.split("-")
+  if (parts.length === 3) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`
+  }
+  return dateStr
+}
+
 export async function exportDreToXLSX({
   report,
   regime,
@@ -53,7 +62,7 @@ export async function exportDreToXLSX({
     { key: "ah", width: 26 },
   ]
 
-  // ── 2. Cabeçalho Institucional ─────────────────────────────────────────────
+  // ── 2. Cabeçalho Institucional Unificado ─────────────────────────────────────
   // Linha 1: Título Principal
   sheet.mergeCells("A1:F1")
   const titleCell = sheet.getCell("A1")
@@ -62,44 +71,47 @@ export async function exportDreToXLSX({
   titleCell.alignment = { vertical: "middle", horizontal: "left" }
   sheet.getRow(1).height = 24
 
-  // Linha 2: Empresa e CNPJ
-  const row2 = sheet.addRow([
-    "Empresa:",
-    report.companyInfo?.partnerName || "Empresa Parceira",
-    "CNPJ:",
-    report.companyInfo?.documentNumber || "—",
-  ])
-  row2.height = 18
-  sheet.getCell("A2").font = { bold: true, size: 10, color: { argb: "FF344054" } }
-  sheet.getCell("B2").font = { size: 10, color: { argb: "FF1D2939" } }
-  sheet.getCell("C2").font = { bold: true, size: 10, color: { argb: "FF344054" } }
-  sheet.getCell("D2").font = { size: 10, color: { argb: "FF1D2939" } }
+  // Linha 2: Empresa e CNPJ/CPF unificados nas mesmas células
+  sheet.mergeCells("A2:C2")
+  sheet.mergeCells("D2:F2")
+  const cellA2 = sheet.getCell("A2")
+  cellA2.value = `Empresa: ${report.companyInfo?.partnerName || "Empresa Matriz"}`
+  cellA2.font = { bold: false, size: 10, color: { argb: "FF1D2939" } }
+  cellA2.alignment = { vertical: "middle", horizontal: "left" }
 
-  // Linha 3: Unidade e Regime
-  const row3 = sheet.addRow([
-    "Unidade:",
-    storeName,
-    "Regime:",
-    regime === "competencia" ? "Competência" : "Caixa",
-  ])
-  row3.height = 18
-  sheet.getCell("A3").font = { bold: true, size: 10, color: { argb: "FF344054" } }
-  sheet.getCell("B3").font = { size: 10, color: { argb: "FF1D2939" } }
-  sheet.getCell("C3").font = { bold: true, size: 10, color: { argb: "FF344054" } }
-  sheet.getCell("D3").font = { size: 10, color: { argb: "FF1D2939" } }
+  const cellD2 = sheet.getCell("D2")
+  cellD2.value = `CNPJ/CPF: ${report.companyInfo?.documentNumber || "—"}`
+  cellD2.font = { bold: false, size: 10, color: { argb: "FF1D2939" } }
+  cellD2.alignment = { vertical: "middle", horizontal: "left" }
+  sheet.getRow(2).height = 18
 
-  // Linha 4: Período e Data de Geração
-  const row4 = sheet.addRow([
-    "Período:",
-    `${startDate} até ${endDate}`,
-    "Gerado em:",
-    report.companyInfo?.generatedAt || new Date().toLocaleString("pt-BR"),
-  ])
-  row4.height = 18
-  sheet.getCell("A4").font = { bold: true, size: 10, color: { argb: "FF344054" } }
-  sheet.getCell("B4").font = { size: 10, color: { argb: "FF1D2939" } }
-  sheet.getCell("C4").font = { bold: true, size: 10, color: { argb: "FF344054" } }
-  sheet.getCell("D4").font = { size: 10, color: { argb: "FF1D2939" } }
+  // Linha 3: Unidade e Regime Contábil
+  sheet.mergeCells("A3:C3")
+  sheet.mergeCells("D3:F3")
+  const cellA3 = sheet.getCell("A3")
+  cellA3.value = `Unidade: ${storeName}`
+  cellA3.font = { bold: false, size: 10, color: { argb: "FF1D2939" } }
+  cellA3.alignment = { vertical: "middle", horizontal: "left" }
+
+  const cellD3 = sheet.getCell("D3")
+  cellD3.value = `Regime Contábil: ${regime === "competencia" ? "Competência" : "Caixa"}`
+  cellD3.font = { bold: false, size: 10, color: { argb: "FF1D2939" } }
+  cellD3.alignment = { vertical: "middle", horizontal: "left" }
+  sheet.getRow(3).height = 18
+
+  // Linha 4: Período Formatado em DD/MM/YYYY e Data/Hora de Geração
+  sheet.mergeCells("A4:C4")
+  sheet.mergeCells("D4:F4")
+  const cellA4 = sheet.getCell("A4")
+  cellA4.value = `Período: ${formatDateBR(startDate)} até ${formatDateBR(endDate)}`
+  cellA4.font = { bold: false, size: 10, color: { argb: "FF1D2939" } }
+  cellA4.alignment = { vertical: "middle", horizontal: "left" }
+
+  const cellD4 = sheet.getCell("D4")
+  cellD4.value = `Gerado em: ${report.companyInfo?.generatedAt || new Date().toLocaleString("pt-BR")}`
+  cellD4.font = { bold: false, size: 10, color: { argb: "FF1D2939" } }
+  cellD4.alignment = { vertical: "middle", horizontal: "left" }
+  sheet.getRow(4).height = 18
 
   // Linha 5: Espaço em branco
   sheet.addRow([])
@@ -240,7 +252,7 @@ export async function exportDreToXLSX({
   const url = URL.createObjectURL(blob)
   const a = document.createElement("a")
   a.href = url
-  a.download = `DRE_${startDate}_a_${endDate}.xlsx`
+  a.download = `DRE_${formatDateBR(startDate).replace(/\//g, "-")}_a_${formatDateBR(endDate).replace(/\//g, "-")}.xlsx`
   a.click()
   URL.revokeObjectURL(url)
 }
@@ -253,9 +265,9 @@ export function exportDreToCSV({
   storeName,
 }: ExportDreExcelParams) {
   let csv = `RELATÓRIO DE DEMONSTRAÇÃO DO RESULTADO DO EXERCÍCIO (DRE)\n`
-  csv += `Empresa:;${report.companyInfo?.partnerName || ""};CNPJ:;${report.companyInfo?.documentNumber || ""}\n`
-  csv += `Unidade:;${storeName};Regime:;${regime === "competencia" ? "Competência" : "Caixa"}\n`
-  csv += `Período:;${startDate} até ${endDate};Gerado em:;${report.companyInfo?.generatedAt || ""}\n\n`
+  csv += `Empresa: ${report.companyInfo?.partnerName || "Empresa Matriz"};CNPJ/CPF: ${report.companyInfo?.documentNumber || "—"}\n`
+  csv += `Unidade: ${storeName};Regime Contábil: ${regime === "competencia" ? "Competência" : "Caixa"}\n`
+  csv += `Período: ${formatDateBR(startDate)} até ${formatDateBR(endDate)};Gerado em: ${report.companyInfo?.generatedAt || ""}\n\n`
   csv += "Estrutura / Conta Contábil;Tipo;Período Atual (R$);Análise Vertical (AV %);Período Anterior (R$);Variação Horizontal (AH %)\n"
 
   Object.values(report.structure).forEach((node) => {
@@ -269,8 +281,12 @@ export function exportDreToCSV({
   const url = URL.createObjectURL(blob)
   const link = document.createElement("a")
   link.setAttribute("href", url)
-  link.setAttribute("download", `DRE_${startDate}_a_${endDate}.csv`)
+  link.setAttribute(
+    "download",
+    `DRE_${formatDateBR(startDate).replace(/\//g, "-")}_a_${formatDateBR(endDate).replace(/\//g, "-")}.csv`
+  )
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)
+  URL.revokeObjectURL(url)
 }

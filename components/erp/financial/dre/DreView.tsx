@@ -528,6 +528,8 @@ export function DreView({ partnerId, stores = [], activeStoreId }: DreViewProps)
       <DrePrintModal
         isOpen={isPrintModalOpen}
         onClose={() => setIsPrintModalOpen(false)}
+        partnerId={partnerId}
+        storeId={selectedStoreId === "all" ? undefined : selectedStoreId}
         report={report}
         regime={regime}
         startDate={dates.startDate}

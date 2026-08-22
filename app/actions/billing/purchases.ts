@@ -14,10 +14,26 @@ function applyFilters(query: any, filters?: BillingFilters, skipPartnerId = fals
         query = query.eq("partner_id", filters.partner_id)
     }
     if (filters?.purchase_type && filters.purchase_type !== "all") {
-        query = query.eq("purchase_type", filters.purchase_type)
+        if (Array.isArray(filters.purchase_type)) {
+            if (filters.purchase_type.length === 1) {
+                query = query.eq("purchase_type", filters.purchase_type[0])
+            } else if (filters.purchase_type.length > 1) {
+                query = query.in("purchase_type", filters.purchase_type)
+            }
+        } else {
+            query = query.eq("purchase_type", filters.purchase_type)
+        }
     }
     if (filters?.status) {
-        query = query.eq("status", filters.status)
+        if (Array.isArray(filters.status)) {
+            if (filters.status.length === 1) {
+                query = query.eq("status", filters.status[0])
+            } else if (filters.status.length > 1) {
+                query = query.in("status", filters.status)
+            }
+        } else {
+            query = query.eq("status", filters.status)
+        }
     }
     if (filters?.gateway) {
         query = query.eq("gateway", filters.gateway)
@@ -190,25 +206,23 @@ export async function listPurchasesPageAction(
     }
 
     const admin = getAdminClient()
-    let baseQuery = admin.from("billing_purchases")
+    let dataQuery = admin
+        .from("billing_purchases")
+        .select("*, partners!billing_purchases_partner_id_fkey(id, stores(name))", { count: "exact" })
 
     if (scope.partnerIds) {
         if (scope.partnerIds.length === 1) {
-            baseQuery = baseQuery.eq("partner_id", scope.partnerIds[0])
+            dataQuery = dataQuery.eq("partner_id", scope.partnerIds[0])
         } else {
-            baseQuery = baseQuery.in("partner_id", scope.partnerIds)
+            dataQuery = dataQuery.in("partner_id", scope.partnerIds)
         }
     }
 
-    baseQuery = applyFilters(baseQuery, filters, true)
-    const { count } = await baseQuery.select("*", { count: "exact", head: true })
-
-    let dataQuery = baseQuery
-        .select("*, partners!billing_purchases_partner_id_fkey(id, stores(name))")
+    dataQuery = applyFilters(dataQuery, filters, true)
         .order(sortBy || "created_at", { ascending: sortDir === "asc" })
         .range((page - 1) * pageSize, (page - 1) * pageSize + pageSize - 1)
 
-    const { data, error } = await dataQuery
+    const { data, count, error } = await dataQuery
 
     if (error) {
         console.error("[Billing] listPurchasesPage error:", error.message)

@@ -47,6 +47,8 @@ function isPublicPath(pathname: string): boolean {
 // ============================================================================
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
+  const requestId = crypto.randomUUID()
+  const requestStartedAt = Date.now()
 
   // Remove hardcoded host overrides to prevent routing inconsistencies
   // request.headers.set("host", "dudit.com.br")
@@ -101,6 +103,7 @@ export async function middleware(request: NextRequest) {
             redirectUrl.searchParams.set(key, val);
           }
         });
+        console.log(`[MIDDLEWARE] request=${requestId} redirect ${request.method} ${pathname}`)
         return NextResponse.redirect(redirectUrl, { status: 301 });
       }
     }
@@ -110,7 +113,7 @@ export async function middleware(request: NextRequest) {
   // Server Actions (POST with Next-Action header) are internal Next.js calls
   const isServerAction = request.headers.has("Next-Action")
   if (!isServerAction) {
-    console.log(`[MIDDLEWARE] ${request.method} ${pathname}`)
+    console.log(`[MIDDLEWARE] request=${requestId} ${request.method} ${pathname}`)
   }
 
   // ============================================================================
@@ -366,6 +369,10 @@ export async function middleware(request: NextRequest) {
 
   // Prepara os headers iniciais
   const requestHeaders = new Headers(request.headers)
+  // Internal correlation only. This value is generated server-side and is
+  // never used for authentication, authorization, or user identification.
+  requestHeaders.set("x-dudit-request-id", requestId)
+  requestHeaders.set("x-dudit-request-start", String(requestStartedAt))
   // Identity headers are never trusted by server-side authorization. Remove
   // client-supplied copies before forwarding the request internally.
   requestHeaders.delete("x-user-id")

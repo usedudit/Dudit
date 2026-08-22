@@ -509,7 +509,7 @@ export default function DeliveryAssignmentDetail({
                                             <div className="lg:col-span-4 space-y-6">
                                                 {/* Remuneração & Valores */}
                                                 <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden">
-                                                    <div className="px-5 py-3 border-b border-brand-border dark:border-dark-border">
+                                                    <div className="px-5 px-3 py-3">
                                                         <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading">Remuneração & Valores</h3>
                                                     </div>
                                                     <div className="p-5 space-y-4">
@@ -560,7 +560,7 @@ export default function DeliveryAssignmentDetail({
 
                                                 {/* Histórico da Corrida */}
                                                 <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden">
-                                                    <div className="px-5 py-3 border-b border-brand-border dark:border-dark-border">
+                                                    <div className="px-5 px-3 py-3">
                                                         <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading">Histórico da Corrida</h3>
                                                     </div>
                                                     <div className="p-5 space-y-2.5 text-xs text-brand-inactive-text dark:text-dark-body">
@@ -658,7 +658,7 @@ export default function DeliveryAssignmentDetail({
 
                                             <div className="lg:col-span-4 space-y-6">
                                                 <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden">
-                                                    <div className="px-5 py-3 border-b border-brand-border dark:border-dark-border">
+                                                    <div className="px-5 px-3 py-3">
                                                         <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading">Pagamento</h3>
                                                     </div>
                                                     <div className="p-5 space-y-3 text-xs">

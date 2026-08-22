@@ -201,6 +201,7 @@ export function MarketplaceBottomMenu() {
                                     {user ? (
                                         <Link
                                             href="/perfil"
+                                            prefetch={false}
                                             onClick={() => setIsMenuOpen(false)}
                                             className="text-[12px] opacity-90 underline font-medium hover:opacity-100 flex items-center mt-0.5"
                                         >

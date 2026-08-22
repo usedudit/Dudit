@@ -420,26 +420,24 @@ async function processWebhookWithRetry(
       if (saasSubscription) {
         console.log(`[WEBHOOK] Found SaaS subscription ${saasSubscription.id} for payment ${paymentId}`)
         
-        // Platform-created PIX payments have no partner token, so the partner
-        // is only known after resolving the subscription. Verify match when
-        // partnerId was resolved from a partner token, otherwise trust the subscription.
-        const effectivePartnerId = partnerId || saasSubscription.partner_id
-        if (effectivePartnerId !== saasSubscription.partner_id) {
-          console.warn(`[WEBHOOK] Partner mismatch for SaaS subscription payment`)
-        } else if (paymentInfo.status === "approved" && ["past_due", "failed", "unpaid"].includes(saasSubscription.status)) {
+        if (paymentInfo.status === "approved" && ["past_due", "failed", "unpaid", "pending"].includes(saasSubscription.status)) {
           // Reactivate subscription
           console.log(`[WEBHOOK] Reactivating SaaS subscription ${saasSubscription.id} from ${saasSubscription.status} to active`)
           
+          const now = new Date()
+          const currentEnd = saasSubscription.current_period_end ? new Date(saasSubscription.current_period_end) : null
+          const nextEnd = currentEnd && currentEnd.getTime() > now.getTime()
+            ? new Date(currentEnd.getTime() + 30 * 24 * 60 * 60 * 1000)
+            : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+
           const { error: updateError } = await supabase
             .from("subscriptions")
             .update({
               status: "active",
               past_due_at: null,
-              // Extend period by 1 month from current_period_end or now
-              current_period_end: saasSubscription.current_period_end
-                ? new Date(new Date(saasSubscription.current_period_end).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()
-                : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-              updated_at: new Date().toISOString(),
+              current_period_start: now.toISOString(),
+              current_period_end: nextEnd.toISOString(),
+              updated_at: now.toISOString(),
             })
             .eq("id", saasSubscription.id)
 
@@ -449,7 +447,7 @@ async function processWebhookWithRetry(
             invalidatePartnerPlanCache(saasSubscription.partner_id)
             
             const { syncSubscriptionToBilling } = await import("@/lib/billing/sync-subscription")
-            await syncSubscriptionToBilling(saasSubscription.id, "webhook").catch(console.error)
+            await syncSubscriptionToBilling(saasSubscription.id, "webhook", "active", now, nextEnd).catch(console.error)
             
             // Log billing event
             try {

@@ -1,15 +1,20 @@
 "use client"
 
-import React, { useState, useEffect, useCallback, useRef } from "react"
+import React, { useState, useEffect, useCallback } from "react"
 import Portal from "@/components/Portal"
 import { Button, Checkbox } from "@/components/reusable"
-import { XIcon, PrinterIcon, FileTextIcon } from "@/lib/icons"
+import { XIcon, PrinterIcon, DownloadIcon, FileTextIcon } from "@/lib/icons"
+import { useMediaQuery } from "@/components/erp/hooks"
+import { downloadPdf } from "@/lib/pdf/download"
+import { toast } from "@/hooks/use-notification"
 import type { DreReportData, DreRegime } from "@/lib/services/dre.service"
 import { DreA4Preview } from "./DreA4Preview"
 
 export interface DrePrintModalProps {
   isOpen: boolean
   onClose: () => void
+  partnerId: string
+  storeId?: string
   report: DreReportData | null
   regime: DreRegime
   startDate: string
@@ -20,22 +25,25 @@ export interface DrePrintModalProps {
 export function DrePrintModal({
   isOpen,
   onClose,
+  partnerId,
+  storeId,
   report,
   regime,
   startDate,
   endDate,
   storeName,
 }: DrePrintModalProps) {
+  const isMobile = useMediaQuery("(max-width: 1023px)")
+
   const [isVisible, setIsVisible] = useState(false)
   const [isAnimating, setIsAnimating] = useState(false)
+  const [isDownloading, setIsDownloading] = useState(false)
 
   // Opções de visualização para impressão
   const [showSubItems, setShowSubItems] = useState(true)
   const [showComparison, setShowComparison] = useState(true)
   const [showKpiSummary, setShowKpiSummary] = useState(true)
   const [showSignatures, setShowSignatures] = useState(true)
-
-  const printIframeRef = useRef<HTMLIFrameElement>(null)
 
   useEffect(() => {
     if (isOpen) {
@@ -48,75 +56,54 @@ export function DrePrintModal({
     return () => clearTimeout(id)
   }, [isOpen])
 
+  const handleDownloadPdf = useCallback(async () => {
+    if (!partnerId || isDownloading) return
+    setIsDownloading(true)
+    const params = new URLSearchParams({
+      partnerId,
+      storeId: storeId || "",
+      startDate,
+      endDate,
+      regime,
+      showSubItems: String(showSubItems),
+      showComparison: String(showComparison),
+      showKpiSummary: String(showKpiSummary),
+      showSignatures: String(showSignatures),
+    })
+
+    try {
+      await downloadPdf(`/api/pdf/dre?${params.toString()}`, `DRE-${startDate}_a_${endDate}.pdf`)
+      onClose()
+    } catch (error: any) {
+      console.error("[DrePrintModal] Error downloading PDF via Chromium:", error)
+      toast.error("Erro ao gerar PDF", error?.message || "Não foi possível gerar o PDF.")
+    } finally {
+      setIsDownloading(false)
+    }
+  }, [partnerId, storeId, startDate, endDate, regime, showSubItems, showComparison, showKpiSummary, showSignatures, isDownloading, onClose])
+
   const handlePrint = useCallback(() => {
-    // Coleta os estilos da página atual para replicar com perfeição dentro do iframe
-    const styleSheets = Array.from(document.querySelectorAll("link[rel='stylesheet'], style"))
-      .map((el) => el.outerHTML)
-      .join("\n")
+    if (!partnerId) return
+    const params = new URLSearchParams({
+      partnerId,
+      storeId: storeId || "",
+      startDate,
+      endDate,
+      regime,
+      showSubItems: String(showSubItems),
+      showComparison: String(showComparison),
+      showKpiSummary: String(showKpiSummary),
+      showSignatures: String(showSignatures),
+    })
 
-    const printContainer = document.getElementById("dre-a4-preview-container")
-    if (!printContainer) {
-      window.print()
+    if (isMobile) {
+      handleDownloadPdf()
       return
     }
 
-    const contentHtml = printContainer.innerHTML
-
-    const iframe = printIframeRef.current
-    if (!iframe) {
-      window.print()
-      return
-    }
-
-    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document
-    if (!iframeDoc) {
-      window.print()
-      return
-    }
-
-    iframeDoc.open()
-    iframeDoc.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8" />
-          <title>DRE - ${startDate} a ${endDate}</title>
-          ${styleSheets}
-          <style>
-            @page {
-              size: A4 portrait;
-              margin: 8mm 0;
-            }
-            body {
-              background: #ffffff !important;
-              color: #113833 !important;
-              margin: 0 !important;
-              padding: 0 !important;
-              -webkit-print-color-adjust: exact !important;
-              print-color-adjust: exact !important;
-            }
-            .dre-a4-print {
-              width: 100% !important;
-              display: flex !important;
-              justify-content: center !important;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="dre-a4-print">
-            ${contentHtml}
-          </div>
-          <script>
-            window.onload = function() {
-              window.focus();
-              window.print();
-            };
-          </script>
-        </body>
-      </html>
-    `)
-    iframeDoc.close()
-  }, [startDate, endDate])
+    window.open(`/print/dre?${params.toString()}`, "_blank")
+    onClose()
+  }, [partnerId, storeId, startDate, endDate, regime, showSubItems, showComparison, showKpiSummary, showSignatures, isMobile, handleDownloadPdf, onClose])
 
   if (!isVisible || !report) return null
 
@@ -128,7 +115,7 @@ export function DrePrintModal({
             isAnimating ? "opacity-100" : "opacity-0"
           }`}
         >
-          {/* ── Header do Modal ──────────────────────────────────────────────── */}
+          {/* ── Header do Modal (Idêntico a QuotePrintModal e SaleReceiptPrintModal) ── */}
           <div className="shrink-0 flex items-center justify-between px-4 md:px-8 py-4 border-b border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading">
@@ -136,7 +123,7 @@ export function DrePrintModal({
               </div>
               <div>
                 <h2 className="text-lg md:text-xl font-bold text-brand-dark dark:text-dark-heading">
-                  Impressão & PDF da DRE (Padrão A4)
+                  Imprimir DRE
                 </h2>
                 <p className="text-xs text-brand-inactive-text dark:text-dark-body">
                   {report.companyInfo?.partnerName} • {startDate} até {endDate} • {regime === "competencia" ? "Competência" : "Caixa"}
@@ -147,11 +134,19 @@ export function DrePrintModal({
             <div className="flex items-center gap-3">
               <Button
                 variant="outline"
-                onClick={handlePrint}
-                leftIcon={<PrinterIcon size={18} />}
-                className="font-bold"
+                onClick={handleDownloadPdf}
+                disabled={isDownloading}
+                leftIcon={<DownloadIcon size={18} />}
               >
-                Imprimir / Salvar PDF
+                {isDownloading ? "Gerando PDF..." : "Baixar PDF"}
+              </Button>
+
+              <Button
+                onClick={handlePrint}
+                disabled={isDownloading}
+                leftIcon={<PrinterIcon size={18} />}
+              >
+                Imprimir
               </Button>
 
               <Button
@@ -173,7 +168,7 @@ export function DrePrintModal({
                   Opções do Relatório
                 </h3>
                 <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                  Personalize o que será exibido no documento antes de imprimir ou salvar como PDF.
+                  Personalize as seções exibidas no PDF oficial gerado via Chromium.
                 </p>
               </div>
 
@@ -188,7 +183,7 @@ export function DrePrintModal({
                       Subitens Detalhados
                     </span>
                     <span className="text-[11px] text-brand-inactive-text dark:text-dark-body block">
-                      Exibe linhas analíticas de contas e categorias.
+                      Exibe linhas analíticas de categorias e contas.
                     </span>
                   </div>
                 </label>
@@ -239,43 +234,44 @@ export function DrePrintModal({
                 </label>
               </div>
 
-              <div className="pt-4 border-t border-brand-border dark:border-dark-border">
+              <div className="pt-4 border-t border-brand-border dark:border-dark-border space-y-2">
+                <Button
+                  onClick={handleDownloadPdf}
+                  disabled={isDownloading}
+                  variant="outline"
+                  leftIcon={<DownloadIcon size={18} />}
+                  className="w-full"
+                >
+                  {isDownloading ? "Gerando PDF..." : "Baixar PDF"}
+                </Button>
                 <Button
                   onClick={handlePrint}
+                  disabled={isDownloading}
                   leftIcon={<PrinterIcon size={18} />}
                   className="w-full"
                 >
-                  Imprimir Agora
+                  Imprimir
                 </Button>
               </div>
             </div>
 
             {/* Painel Direito: Preview da Folha A4 */}
             <div className="flex-1 h-full overflow-hidden relative">
-              <div id="dre-a4-preview-container" className="h-full">
-                <DreA4Preview
-                  report={report}
-                  regime={regime}
-                  startDate={startDate}
-                  endDate={endDate}
-                  storeName={storeName}
-                  showSubItems={showSubItems}
-                  showComparison={showComparison}
-                  showKpiSummary={showKpiSummary}
-                  showSignatures={showSignatures}
-                />
-              </div>
+              <DreA4Preview
+                report={report}
+                regime={regime}
+                startDate={startDate}
+                endDate={endDate}
+                storeName={storeName}
+                showSubItems={showSubItems}
+                showComparison={showComparison}
+                showKpiSummary={showKpiSummary}
+                showSignatures={showSignatures}
+              />
             </div>
           </div>
         </div>
       </div>
-
-      {/* Iframe invisível para impressão isolada */}
-      <iframe
-        ref={printIframeRef}
-        style={{ display: "none", position: "absolute", width: 0, height: 0, border: "none" }}
-        title="DRE Print Frame"
-      />
     </Portal>
   )
 }
