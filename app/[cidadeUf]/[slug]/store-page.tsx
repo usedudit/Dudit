@@ -70,7 +70,7 @@ export async function StorePage({ storeData }: { storeData: any }) {
     }))
 
     return (
-        <div className="min-h-screen bg-white w-full max-w-[100vw] overflow-x-hidden flex flex-col">
+        <div className="min-h-screen bg-white dark:bg-dark-surface w-full max-w-[100vw] overflow-x-hidden flex flex-col">
             <main className="lg:pt-[120px] flex-grow">
                 <VendorPageClient
                     partner={partnerData}

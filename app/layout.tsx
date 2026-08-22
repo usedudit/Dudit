@@ -7,15 +7,13 @@ import { SupabaseProvider } from "@/providers/supabase-provider"
 import { QueryProvider } from "@/providers/query-provider"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import { TransitionProvider } from "@/providers/transition-provider"
-import { FavoritesProvider } from "@/providers/favorites-provider"
-import { PushNotificationManager } from "@/components/notifications/PushNotificationManager"
 import { NotificationProvider } from "@/hooks/use-notification"
 import { PreventSamePageNavigation } from "@/components/PreventSamePageNavigation"
 import { PWAUpdatePrompt } from "@/components/pwa/PWAUpdatePrompt"
-import { MarketplaceBottomMenu } from "@/components/marketplace/MarketplaceBottomMenu"
 import { LegalConsentBanner } from "@/components/legal/LegalConsentBanner"
 import { TimezoneProvider } from "@/lib/date"
 import { ThemeProvider } from "@/components/theme-provider"
+import { RouteAwareGlobalFeatures } from "@/providers/route-aware-global-features"
 
 const plusJakartaSans = Plus_Jakarta_Sans({
     subsets: ["latin"],
@@ -232,17 +230,21 @@ export default async function RootLayout({
                         <QueryProvider>
                             <PreventSamePageNavigation />
                             <NotificationProvider>
-                                <FavoritesProvider>
+                                <RouteAwareGlobalFeatures>
                                     <TransitionProvider>
                                         <TimezoneProvider>
                                             {children}
                                         </TimezoneProvider>
                                     </TransitionProvider>
-                                </FavoritesProvider>
+                                </RouteAwareGlobalFeatures>
                             </NotificationProvider>
                             <PWAUpdatePrompt />
-                            <PushNotificationManager />
-                            <MarketplaceBottomMenu />
+                            {/*
+                              Legal consent intentionally remains global. The
+                              server decides whether a newly published version
+                              still needs acceptance; this is not delegated to
+                              client-side storage.
+                            */}
                             <LegalConsentBanner />
                         </QueryProvider>
                     </SupabaseProvider>

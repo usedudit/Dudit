@@ -50,23 +50,12 @@ export default async function DreRoute() {
   return (
     <>
       <ERPPageHeader title="DRE Gerencial" />
-      <FadeIn className="p-4 md:p-6 max-w-7xl mx-auto">
-        <div className="space-y-6">
-          <div>
-            <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading tracking-tight">
-              Demonstração do Resultado do Exercício (DRE)
-            </h1>
-            <p className="text-sm text-brand-inactive-text dark:text-dark-muted mt-1">
-              Visão consolidada de receitas, deduções, custos diretos (CMV/CSP), despesas operacionais e lucratividade líquida.
-            </p>
-          </div>
-
-          <DreView
-            partnerId={partnerId}
-            stores={stores}
-            activeStoreId={activeStoreId}
-          />
-        </div>
+      <FadeIn className="p-4">
+        <DreView
+          partnerId={partnerId}
+          stores={stores}
+          activeStoreId={activeStoreId}
+        />
       </FadeIn>
     </>
   )

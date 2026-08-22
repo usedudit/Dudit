@@ -242,7 +242,7 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
   }
 
   return (
-    <div className="min-h-screen bg-white w-full max-w-[100vw] overflow-x-hidden flex flex-col">
+    <div className="min-h-screen bg-white dark:bg-dark-surface w-full max-w-[100vw] overflow-x-hidden flex flex-col">
       <script type="application/ld+json" dangerouslySetInnerHTML={{
         __html: safeJsonLdStringify({
           '@context': 'https://schema.org', '@type': 'BreadcrumbList',
