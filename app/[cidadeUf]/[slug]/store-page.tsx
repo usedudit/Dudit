@@ -32,6 +32,10 @@ export async function StorePage({ storeData }: { storeData: any }) {
 
     const partnerData = {
         id: storeData.id,
+        partner_id: storeData.partner_id,
+        partnerId: storeData.partner_id,
+        user_id: partner?.user_id || storeData.user_id,
+        userId: partner?.user_id || storeData.user_id,
         storeName: storeData.name || "Loja",
         storeDescription: storeData.description || "",
         storeImageUrl: storeData.logo_url || null,

@@ -216,6 +216,36 @@ export const getPartnerSubscription = cache(async (partnerId: string): Promise<S
 
   if (!data) return null
 
+  // Check if active subscription scheduled to cancel has already expired:
+  if (
+    data.cancel_at_period_end &&
+    data.current_period_end &&
+    new Date(data.current_period_end).getTime() <= Date.now()
+  ) {
+    const nowIso = new Date().toISOString()
+    await admin
+      .from("subscriptions")
+      .update({
+        status: "cancelled",
+        ended_at: nowIso,
+        cancel_at_period_end: false,
+        updated_at: nowIso,
+      })
+      .eq("id", data.id)
+
+    try {
+      const { enforcePlanLimitsAndArchiveExcess } = await import(
+        "@/lib/services/subscription-archiver.service"
+      )
+      await enforcePlanLimitsAndArchiveExcess(partnerId)
+    } catch (archErr: any) {
+      console.error("[SUBSCRIPTION] Error archiving on expiry in getPartnerSubscription:", archErr.message)
+    }
+
+    partnerPlanCache.delete(partnerId)
+    return null
+  }
+
   return {
     ...data,
     plan: data.plan as Plan,

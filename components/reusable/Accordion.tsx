@@ -18,6 +18,7 @@ import {
   ReturnIcon,
   CancelIcon,
   TruckIcon,
+  MoneyIcon,
 } from "@/lib/icons"
 
 interface AccordionProps {
@@ -157,7 +158,7 @@ export const ActionsDropdown: React.FC<ActionsDropdownProps> = ({
     )}
     {onPaymentStatus && (
       <DropdownItem onClick={onPaymentStatus}>
-        <StatusIcon size={18} /> Status do Pagamento
+        <MoneyIcon size={18} /> Status do Pagamento
       </DropdownItem>
     )}
     {onDeliveryStatus && (
@@ -181,7 +182,7 @@ export const ActionsDropdown: React.FC<ActionsDropdownProps> = ({
       </DropdownItem>
     )}
     {onArchive && (
-      <DropdownItem onClick={onArchive}>
+      <DropdownItem onClick={onArchive} className="text-brand-orange dark:text-brand-orange">
         <ArchiveIcon size={18} /> Arquivar
       </DropdownItem>
     )}

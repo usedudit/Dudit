@@ -607,8 +607,9 @@ const Header: React.FC<HeaderProps> = ({
                 <div className="px-4 pt-2 pb-2">
                     <div className="flex items-center gap-3 relative min-h-[36px]">
                         {/* Back Button / User Icon */}
-                        <button
-                            className={`transition-all duration-300 flex items-center justify-center w-9 h-9 ${isScrolled ? "bg-transparent shadow-none text-white" : "bg-white rounded-full shadow-md text-brand-dark dark:text-dark-heading"}`}
+                        <Button
+                            variant="filled"
+                            className={`${isScrolled ? "bg-transparent shadow-none text-white" : ""}`}
                             onClick={(e) => {
                                 e.stopPropagation();
                                 if (vendorCategoryTitle && onVendorCategoryBack) {
@@ -637,7 +638,7 @@ const Header: React.FC<HeaderProps> = ({
                                     <span className="text-xs text-gray-500">?</span>
                                 </div>
                             )}
-                        </button>
+                        </Button>
 
                         {/* Middle Section: Search or Product Name */}
                         <div className="flex-1 flex items-center justify-start min-w-0 transition-all duration-300">
@@ -703,22 +704,24 @@ const Header: React.FC<HeaderProps> = ({
                                 </button>
                             ) : isProductDetail && storeSearchPlaceholder ? (
                                 onShare ? (
-                                    <button
+                                    <Button
+                                        variant="filled"
                                         onClick={(e) => { e.stopPropagation(); onShare?.(); }}
-                                        className={`transition-all duration-300 flex items-center justify-center w-9 h-9 ${isScrolled ? "bg-transparent shadow-none text-white" : "bg-white rounded-full shadow-md text-brand-dark dark:text-dark-heading"}`}
+                                        className={`${isScrolled ? "bg-transparent shadow-none text-white" : ""}`}
                                     >
                                         <ShareIcon size={20} />
-                                    </button>
+                                    </Button>
                                 ) : <div className="w-1" />
                             ) : isProductDetail ? (
                                 <>
                                     {onShare && (
-                                        <button
+                                        <Button
+                                            variant="filled"
                                             onClick={(e) => { e.stopPropagation(); onShare?.(); }}
-                                            className={`transition-all duration-300 flex items-center justify-center w-9 h-9 ${isScrolled ? "bg-transparent shadow-none text-white" : "bg-white rounded-full shadow-md text-brand-dark dark:text-dark-heading"}`}
+                                            className={`${isScrolled ? "bg-transparent shadow-none text-white" : ""}`}
                                         >
                                             <ShareIcon size={20} />
-                                        </button>
+                                        </Button>
                                     )}
                                     {favoriteButton ? (
                                         favoriteButton

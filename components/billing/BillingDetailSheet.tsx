@@ -44,14 +44,14 @@ function getStatusLabel(status: string, metadata?: any): string {
     }
     const labels: Record<string, string> = {
         pending: "Pendente",
-        completed: "Concluído",
+        completed: "Pago",
+        approved: "Pago",
         failed: "Falhou",
+        rejected: "Recusado",
         refunded: "Reembolsado",
         cancelled: "Cancelado",
-        partially_refunded: "Parcialmente Reembolsado",
+        partially_refunded: "Reembolso parcial",
         processing: "Processando",
-        approved: "Aprovado",
-        rejected: "Rejeitado",
         chargeback: "Chargeback",
     }
     return labels[status] || status

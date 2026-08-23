@@ -18,7 +18,6 @@ import { MainView } from "./MainView"
 import { AccountView } from "./AccountView"
 import { AddressView } from "./AddressView"
 import { SecurityView } from "./SecurityView"
-import { TwoFactorView } from "./TwoFactorView"
 import { ReviewsView } from "./ReviewsView"
 import { NotificationsView } from "./NotificationsView"
 import { AlertTriangleIcon } from "@/lib/icons"
@@ -374,7 +373,6 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
             case "informacoes-da-conta": return "Informações da conta"
             case "enderecos": return "Endereço"
             case "seguranca": return "Segurança"
-            case "two-factor": return "Autenticação 2FA"
             case "avaliacoes": return "Minhas avaliações"
             case "notificacoes": return "Notificações"
             default: return "Meu perfil"
@@ -465,7 +463,6 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                                 onDeleteClick={() => setDeleteStep("reason")}
                             />
                         )}
-                        {currentView === "two-factor" && <TwoFactorView key="2fa" navigate={navigate} />}
                         {currentView === "avaliacoes" && <ReviewsView key="avaliacoes" navigate={navigate} />}
                         {currentView === "notificacoes" && <NotificationsView key="notificacoes" navigate={navigate} />}
                     </AnimatePresence>

@@ -84,6 +84,7 @@ export default function AvailableDeliveriesList() {
     const [isLoading, setIsLoading] = useState(true)
     const [isRefreshing, setIsRefreshing] = useState(false)
     const [acceptingId, setAcceptingId] = useState<string | null>(null)
+    const [refreshCooldown, setRefreshCooldown] = useState(false)
     const knownOfferIdsRef = useRef<Set<string>>(new Set())
 
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection }>({
@@ -104,8 +105,12 @@ export default function AvailableDeliveriesList() {
     }, [])
 
     const loadOffers = useCallback(async (isRefresh = false) => {
-        if (isRefresh) setIsRefreshing(true)
-        else setIsLoading(true)
+        if (isRefresh) {
+            if (refreshCooldown) return
+            setIsRefreshing(true)
+            setRefreshCooldown(true)
+            setTimeout(() => setRefreshCooldown(false), 5000)
+        } else setIsLoading(true)
 
         try {
             const res = await listAvailableDeliveryOffersAction({ limit: 50 })
@@ -261,7 +266,7 @@ export default function AvailableDeliveriesList() {
                             variant="outline"
                             size="sm"
                             onClick={() => loadOffers(true)}
-                            disabled={isRefreshing || isLoading}
+                            disabled={isRefreshing || isLoading || refreshCooldown}
                             className="shrink-0"
                         >
                             <ReloadIcon size={15} className={isRefreshing ? "animate-spin" : ""} />
@@ -300,7 +305,7 @@ export default function AvailableDeliveriesList() {
                         <Button
                             variant="outline"
                             onClick={() => loadOffers(true)}
-                            disabled={isRefreshing || isLoading}
+                            disabled={isRefreshing || isLoading || refreshCooldown}
                             className="w-[42px] h-[42px] p-0 flex items-center justify-center shrink-0"
                             aria-label="Atualizar ofertas"
                         >

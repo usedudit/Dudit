@@ -123,7 +123,7 @@ export function CollectionDetailPage({ collection }: CollectionDetailProps) {
         <>
             <MarketplaceHeader simpleTitle={collection.name} />
             <div className="min-h-screen bg-white dark:bg-dark-background pt-[40px] lg:pt-[110px] font-sans flex flex-col">
-                <div className="container mx-auto px-4 max-w-[1400px] w-full mt-12 lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">
+                <div className="container mx-auto px-4 max-w-[1300px] mt-12 lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">
 
                     {/* Page Header */}
                     <div className="mb-6 animate-fade-in">

@@ -254,6 +254,49 @@ export default function ProductsPage({
     const [products, setProducts] = useState<Product[]>(effectiveBaseProducts as Product[])
     const [page, setPage] = useState(1)
     const [showLabelModal, setShowLabelModal] = useState(false)
+    const [labelProducts, setLabelProducts] = useState<Product[]>([])
+    const [labelMaxInstallments, setLabelMaxInstallments] = useState<number | undefined>(undefined)
+
+    // Fetch variants and payment methods when label modal opens
+    useEffect(() => {
+        if (!showLabelModal) return
+        let cancelled = false
+
+        async function loadLabelData() {
+            try {
+                const productIds = products.map((p) => p.id)
+                if (productIds.length === 0) return
+
+                const [variantsRes, paymentRes] = await Promise.all([
+                    fetch(`/api/erp/label-variants?productIds=${encodeURIComponent(JSON.stringify(productIds))}`),
+                    fetch(`/api/erp/label-installments?partnerId=${partnerId}`),
+                ])
+
+                if (cancelled) return
+
+                const variantsData = variantsRes.ok ? await variantsRes.json() : { variants: {} }
+                const installmentsData = paymentRes.ok ? await paymentRes.json() : { maxInstallments: undefined }
+
+                const productsWithVariants = products.map((p) => ({
+                    ...p,
+                    variants: variantsData.variants?.[p.id] || [],
+                }))
+
+                if (!cancelled) {
+                    setLabelProducts(productsWithVariants as Product[])
+                    setLabelMaxInstallments(installmentsData.maxInstallments)
+                }
+            } catch {
+                if (!cancelled) {
+                    setLabelProducts(products as Product[])
+                    setLabelMaxInstallments(undefined)
+                }
+            }
+        }
+
+        loadLabelData()
+        return () => { cancelled = true }
+    }, [showLabelModal, products, partnerId])
 
     // Sync local products when query data changes
     const prevProductsRef = useRef(effectiveBaseProducts)
@@ -1293,7 +1336,8 @@ export default function ProductsPage({
                 <LabelPrintModal
                     isOpen={showLabelModal}
                     onClose={() => setShowLabelModal(false)}
-                    allProducts={products}
+                    allProducts={(labelProducts.length > 0 ? labelProducts : products) as any}
+                    maxInstallments={labelMaxInstallments}
                 />
             )}
 

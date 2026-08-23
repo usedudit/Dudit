@@ -2794,6 +2794,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             productId: item.product_id,
             variantId: item.variant_id || null,
             quantity: item.quantity,
+            allowSellWithoutStock: item.allow_sell_without_stock,
         }))
         : nextItemsForDelta
     const stockValidationError = capabilities.hasStockMovements ? await validateERPItemsStock({

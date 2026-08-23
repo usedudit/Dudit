@@ -49,14 +49,14 @@ function getStatusLabel(status: string, metadata?: any): string {
     }
     const labels: Record<string, string> = {
         pending: "Pendente",
-        completed: "Concluído",
+        completed: "Pago",
+        approved: "Pago",
         failed: "Falhou",
+        rejected: "Recusado",
         refunded: "Reembolsado",
         cancelled: "Cancelado",
-        partially_refunded: "Parcial",
+        partially_refunded: "Reembolso parcial",
         processing: "Processando",
-        approved: "Aprovado",
-        rejected: "Rejeitado",
         chargeback: "Chargeback",
     }
     return labels[status] || status
@@ -177,25 +177,42 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
 
     const totalPages = Math.ceil(total / pageSize)
 
-    const filterSections: FilterSectionConfig[] = useMemo(() => [
-        {
-            id: "purchase_type",
-            title: "Tipo",
-            type: "checkbox-list",
-            options: ["subscription", "addon", "credit_pack", "order_payment"],
-        },
-        {
-            id: "status",
-            title: "Status",
-            type: "checkbox-list",
-            options: ["pending", "completed", "failed", "refunded", "cancelled", "partially_refunded"],
-        },
-        {
-            id: "date",
-            title: "Período",
-            type: "date-period",
-        },
-    ], [])
+    const filterSections = useMemo<FilterSectionConfig[]>(() => {
+        const sections: FilterSectionConfig[] = [
+            {
+                id: "purchase_type",
+                title: "Tipo",
+                type: "checkbox-list",
+                options: ["subscription", "addon", "credit_pack", "order_payment"],
+                optionLabels: {
+                    subscription: "Assinatura",
+                    addon: "Add-on",
+                    credit_pack: "Pacote de Créditos",
+                    order_payment: "Pedido",
+                },
+            },
+            {
+                id: "status",
+                title: "Status",
+                type: "checkbox-list",
+                options: ["completed", "pending", "failed", "refunded", "cancelled", "partially_refunded"],
+                optionLabels: {
+                    completed: "Pago",
+                    pending: "Pendente",
+                    failed: "Falhou",
+                    refunded: "Reembolsado",
+                    cancelled: "Cancelado",
+                    partially_refunded: "Reembolso parcial",
+                },
+            },
+            {
+                id: "date",
+                title: "Período",
+                type: "date-period",
+            },
+        ]
+        return sections
+    }, [])
 
     const clearFilters = useCallback(() => {
         setFilters({})

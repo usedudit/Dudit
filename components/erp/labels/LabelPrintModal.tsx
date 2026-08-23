@@ -6,11 +6,26 @@ import { Button, Tabs, TabsContent, TabsList, TabsTrigger, Combobox, Checkbox, Q
 import { XIcon, PrinterIcon, DownloadIcon, TrashIcon, Package } from "@/lib/icons"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { type LabelPreset, type LabelContentConfig, type PaperSize, DEFAULT_CONTENT_CONFIG, LABEL_PRESETS, buildCustomPreset, PAPER_SIZES } from "@/lib/labels/presets"
-import { LabelSheet, type LabelProduct } from "./LabelSheet"
+import { LabelSheet, type LabelProduct, type LabelVariant } from "./LabelSheet"
 import { formatCurrency } from "@/lib/utils"
 import { generateEAN13 } from "@/lib/utils/barcode"
 import Pagination from "@/components/reusable/Pagination"
 import SelectProductSheet from "./SelectProductSheet"
+import SelectVariantSheet from "./SelectVariantSheet"
+import { downloadPdf } from "@/lib/pdf/download"
+import { toast } from "@/hooks/use-notification"
+
+const MAX_QUANTITY = 300
+
+interface ProductVariant {
+    id: string
+    variant_type: string
+    variant_name: string
+    sku: string | null
+    price_adjustment: number
+    stock_quantity: number
+    is_active: boolean
+}
 
 interface ProductBase {
     id: string
@@ -19,12 +34,14 @@ interface ProductBase {
     gtin: string | null
     price: number
     promotional_price: number | null
+    variants?: ProductVariant[]
 }
 
 interface LabelPrintModalProps {
     isOpen: boolean
     onClose: () => void
     allProducts: ProductBase[]
+    maxInstallments?: number
 }
 
 interface SelectedItem {
@@ -32,6 +49,7 @@ interface SelectedItem {
     quantity: number
     product: ProductBase
     barcodeValue: string
+    selectedVariantId?: string
 }
 
 const presetOptions = [
@@ -49,7 +67,29 @@ function makeBarcode(product: ProductBase): string {
     return generateEAN13()
 }
 
-export function LabelPrintModal({ isOpen, onClose, allProducts }: LabelPrintModalProps) {
+function getVariantPrice(product: ProductBase, variantId?: string): number {
+    if (!variantId || !product.variants) return product.price
+    const variant = product.variants.find((v) => v.id === variantId)
+    if (!variant) return product.price
+    return product.price + variant.price_adjustment
+}
+
+function getVariantPromoPrice(product: ProductBase, variantId?: string): number | null {
+    if (!variantId || !product.variants) return product.promotional_price
+    const variant = product.variants.find((v) => v.id === variantId)
+    if (!variant) return product.promotional_price
+    if (product.promotional_price == null) return null
+    return product.promotional_price + variant.price_adjustment
+}
+
+function getVariantSku(product: ProductBase, variantId?: string): string | null {
+    if (!variantId || !product.variants) return product.sku
+    const variant = product.variants.find((v) => v.id === variantId)
+    if (!variant) return product.sku
+    return variant.sku || product.sku
+}
+
+export function LabelPrintModal({ isOpen, onClose, allProducts, maxInstallments }: LabelPrintModalProps) {
     const isMobile = useMediaQuery("(max-width: 1023px)")
 
     const [isVisible, setIsVisible] = useState(false)
@@ -59,8 +99,8 @@ export function LabelPrintModal({ isOpen, onClose, allProducts }: LabelPrintModa
     const [contentConfig, setContentConfig] = useState<LabelContentConfig>(DEFAULT_CONTENT_CONFIG)
     const [selected, setSelected] = useState<SelectedItem[]>([])
     const [showProductSheet, setShowProductSheet] = useState(false)
+    const [showVariantSheet, setShowVariantSheet] = useState<string | null>(null)
     const [selectedPage, setSelectedPage] = useState(1)
-    const [selection, setSelection] = useState<Set<string>>(new Set())
     const [customPreset, setCustomPreset] = useState({
         labelWidth: 60,
         labelHeight: 40,
@@ -74,6 +114,7 @@ export function LabelPrintModal({ isOpen, onClose, allProducts }: LabelPrintModa
         spacingY: 3,
         paperSize: "a4" as PaperSize,
     })
+    const [isDownloadingPdf, setIsDownloadingPdf] = useState(false)
 
     const totalLabels = selected.reduce((sum, p) => sum + p.quantity, 0)
 
@@ -107,13 +148,25 @@ export function LabelPrintModal({ isOpen, onClose, allProducts }: LabelPrintModa
 
     const removeProduct = (productId: string) => {
         setSelected((prev) => prev.filter((s) => s.productId !== productId))
-        setSelection((prev) => { const next = new Set(prev); next.delete(productId); return next })
         setSelectedPage(1)
     }
 
     const updateQty = (productId: string, qty: number) => {
         setSelected((prev) =>
-            prev.map((s) => (s.productId === productId ? { ...s, quantity: Math.max(1, qty) } : s)),
+            prev.map((s) => (s.productId === productId ? { ...s, quantity: Math.min(MAX_QUANTITY, Math.max(1, qty)) } : s)),
+        )
+    }
+
+    const handleVariantConfirm = (productId: string, variantId: string | null) => {
+        setSelected((prev) =>
+            prev.map((s) => {
+                if (s.productId !== productId) return s
+                if (variantId) {
+                    const variant = s.product.variants?.find((v) => v.id === variantId)
+                    return { ...s, selectedVariantId: variantId, barcodeValue: variant?.sku || s.barcodeValue }
+                }
+                return { ...s, selectedVariantId: undefined, barcodeValue: makeBarcode(s.product) }
+            }),
         )
     }
 
@@ -123,50 +176,41 @@ export function LabelPrintModal({ isOpen, onClose, allProducts }: LabelPrintModa
         [selected, selectedPage],
     )
 
-    const toggleSelection = (id: string) => {
-        setSelection((prev) => {
-            const next = new Set(prev)
-            if (next.has(id)) next.delete(id)
-            else next.add(id)
-            return next
-        })
-    }
-
-    const toggleSelectAll = () => {
-        const currentPageIds = paginatedSelected.map((s) => s.productId)
-        const allSelected = currentPageIds.every((id) => selection.has(id))
-        if (allSelected) {
-            setSelection((prev) => {
-                const next = new Set(prev)
-                currentPageIds.forEach((id) => next.delete(id))
-                return next
-            })
-        } else {
-            setSelection((prev) => {
-                const next = new Set(prev)
-                currentPageIds.forEach((id) => next.add(id))
-                return next
-            })
-        }
-    }
-
-    const selectAllChecked = paginatedSelected.length > 0 && paginatedSelected.every((s) => selection.has(s.productId))
-
     const labelProducts: LabelProduct[] = useMemo(
         () =>
-            selected.map((s) => ({
-                id: s.product.id,
-                name: s.product.name,
-                sku: s.product.sku,
-                gtin: s.product.gtin,
-                barcodeValue: s.barcodeValue,
-                price: s.product.price,
-                promotionalPrice: s.product.promotional_price,
-                internalCode: s.product.sku,
-                labelQuantity: s.quantity,
-            })),
+            selected.map((s) => {
+                const variant = s.selectedVariantId ? s.product.variants?.find((v) => v.id === s.selectedVariantId) : null
+                return {
+                    id: variant ? variant.id : s.product.id,
+                    name: s.product.name,
+                    sku: getVariantSku(s.product, s.selectedVariantId),
+                    gtin: s.product.gtin,
+                    barcodeValue: s.barcodeValue,
+                    price: getVariantPrice(s.product, s.selectedVariantId),
+                    promotionalPrice: getVariantPromoPrice(s.product, s.selectedVariantId),
+                    internalCode: getVariantSku(s.product, s.selectedVariantId),
+                    labelQuantity: s.quantity,
+                    variant: variant
+                        ? {
+                              type: variant.variant_type,
+                              name: variant.variant_name,
+                          }
+                        : undefined,
+                }
+            }),
         [selected],
     )
+
+    const installmentDisplay = useMemo(() => {
+        if (!maxInstallments || maxInstallments <= 1) return null
+        const price = selected.length > 0 ? selected[0].product.price : 0
+        const perInstallment = price / maxInstallments
+        return {
+            maxInstallments,
+            perInstallment,
+            text: `${maxInstallments}x de ${formatCurrency(perInstallment)}`,
+        }
+    }, [maxInstallments, selected])
 
     const preset = useMemo((): LabelPreset => {
         if (presetId === "custom") {
@@ -175,15 +219,19 @@ export function LabelPrintModal({ isOpen, onClose, allProducts }: LabelPrintModa
         return LABEL_PRESETS.find((p) => p.id === presetId) || LABEL_PRESETS[0]
     }, [presetId, customPreset])
 
-    const buildPrintUrl = useCallback(() => {
-        const data = {
+    const buildPrintData = useCallback(() => {
+        return {
             presetId,
             customPreset: presetId === "custom" ? customPreset : undefined,
             contentConfig,
-            products: selected.map((s) => ({ id: s.productId, quantity: s.quantity, barcodeValue: s.barcodeValue })),
+            products: selected.map((s) => ({ id: s.productId, quantity: s.quantity, barcodeValue: s.barcodeValue, variantId: s.selectedVariantId })),
         }
-        return `/print/labels?data=${encodeURIComponent(JSON.stringify(data))}`
     }, [presetId, customPreset, contentConfig, selected])
+
+    const buildPrintUrl = useCallback(() => {
+        const data = buildPrintData()
+        return `/print/labels?data=${encodeURIComponent(JSON.stringify(data))}`
+    }, [buildPrintData])
 
     const handlePrint = useCallback(() => {
         if (selected.length === 0) return
@@ -191,9 +239,21 @@ export function LabelPrintModal({ isOpen, onClose, allProducts }: LabelPrintModa
         onClose()
     }, [buildPrintUrl, selected, onClose])
 
-    const handleDownloadPdf = useCallback(() => {
-        handlePrint()
-    }, [handlePrint])
+    const handleDownloadPdf = useCallback(async () => {
+        if (selected.length === 0 || isDownloadingPdf) return
+        setIsDownloadingPdf(true)
+        try {
+            const data = buildPrintData()
+            const params = new URLSearchParams({ data: JSON.stringify(data) })
+            await downloadPdf(`/api/pdf/labels?${params.toString()}`, "etiquetas.pdf")
+            onClose()
+        } catch (error: any) {
+            console.error("[LabelPrintModal] Error downloading PDF:", error)
+            toast.error("Erro ao gerar PDF", error?.message || "Não foi possível gerar o PDF. Tente novamente.")
+        } finally {
+            setIsDownloadingPdf(false)
+        }
+    }, [selected, buildPrintData, isDownloadingPdf, onClose])
 
     if (!isVisible) return null
 
@@ -261,56 +321,58 @@ export function LabelPrintModal({ isOpen, onClose, allProducts }: LabelPrintModa
                                                     <table className="w-full text-left border-separate border-spacing-0">
                                                         <thead>
                                                             <tr className="text-xs text-brand-inactive-text">
-                                                                <th className="py-3 pl-6 pr-0 w-12">
-                                                                    <Checkbox checked={selectAllChecked} onChange={toggleSelectAll} />
-                                                                </th>
-                                                                <th className="py-3 pr-2 font-medium">Produto</th>
-                                                                <th className="py-3 px-2 font-medium w-24">Preço</th>
+                                                                <th className="py-3 pl-6 pr-0 font-medium">Produto</th>
                                                                 <th className="py-3 px-2 font-medium w-28">Qtd</th>
                                                                 <th className="py-3 pl-2 font-medium w-16">Ação</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
-                                                            {paginatedSelected.map((item) => (
-                                                                <tr
-                                                                    key={item.productId}
-                                                                    className="bg-white dark:bg-dark-background transition-colors hover:bg-brand-gray dark:hover:bg-dark-border/10 border-b border-brand-border dark:border-dark-border"
-                                                                >
-                                                                    <td className="py-3 pl-6 pr-0 w-12">
-                                                                        <Checkbox
-                                                                            checked={selection.has(item.productId)}
-                                                                            onChange={() => toggleSelection(item.productId)}
-                                                                        />
-                                                                    </td>
-                                                                    <td className="py-3 pr-2">
-                                                                        <div className="flex flex-col">
-                                                                            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate max-w-[180px]">
-                                                                                {item.product.name}
-                                                                            </span>
-                                                                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate max-w-[180px]">
-                                                                                SKU: {item.product.sku || "-"}
-                                                                            </span>
-                                                                        </div>
-                                                                    </td>
-                                                                    <td className="py-3 px-2">
-                                                                        <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading whitespace-nowrap">
-                                                                            {formatCurrency(item.product.price)}
-                                                                        </span>
-                                                                    </td>
-                                                                    <td className="py-3 px-2">
-                                                                        <QuantitySelector
-                                                                            value={item.quantity}
-                                                                            onChange={(v) => updateQty(item.productId, v)}
-                                                                            size="sm"
-                                                                        />
-                                                                    </td>
-                                                                    <td className="py-3 pl-2">
-                                                                        <Button variant="outlinered" size="icon" onClick={() => removeProduct(item.productId)}>
-                                                                            <TrashIcon size={16} />
-                                                                        </Button>
-                                                                    </td>
-                                                                </tr>
-                                                            ))}
+                                                            {paginatedSelected.map((item) => {
+                                                                const variant = item.selectedVariantId
+                                                                    ? item.product.variants?.find((v) => v.id === item.selectedVariantId)
+                                                                    : null
+                                                                const hasVariants = item.product.variants && item.product.variants.length > 0
+                                                                return (
+                                                                    <tr
+                                                                        key={item.productId}
+                                                                        className="bg-white dark:bg-dark-background transition-colors hover:bg-brand-gray dark:hover:bg-dark-border/10 border-b border-brand-border dark:border-dark-border"
+                                                                    >
+                                                                        <td className="py-3 pl-6 pr-0">
+                                                                            <div className="flex flex-col">
+                                                                                <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate max-w-[180px]">
+                                                                                    {item.product.name}
+                                                                                </span>
+                                                                                {variant && (
+                                                                                    <span className="text-xs font-medium text-brand-primary truncate max-w-[180px]">
+                                                                                        {variant.variant_type}: {variant.variant_name}
+                                                                                    </span>
+                                                                                )}
+                                                                                {hasVariants && !variant && (
+                                                                                    <button
+                                                                                        onClick={() => setShowVariantSheet(item.productId)}
+                                                                                        className="text-xs font-medium text-brand-primary hover:underline text-left truncate max-w-[180px]"
+                                                                                    >
+                                                                                        Selecionar variacao
+                                                                                    </button>
+                                                                                )}
+                                                                            </div>
+                                                                        </td>
+                                                                        <td className="py-3 px-2">
+                                                                            <QuantitySelector
+                                                                                value={item.quantity}
+                                                                                onChange={(v) => updateQty(item.productId, v)}
+                                                                                max={MAX_QUANTITY}
+                                                                                size="sm"
+                                                                            />
+                                                                        </td>
+                                                                        <td className="py-3 pl-2">
+                                                                            <Button variant="outlinered" size="icon" onClick={() => removeProduct(item.productId)}>
+                                                                                <TrashIcon size={16} />
+                                                                            </Button>
+                                                                        </td>
+                                                                    </tr>
+                                                                )
+                                                            })}
                                                         </tbody>
                                                     </table>
                                                 </div>
@@ -391,20 +453,17 @@ export function LabelPrintModal({ isOpen, onClose, allProducts }: LabelPrintModa
                                             <Checkbox name="showPrice" checked={contentConfig.showPrice} onChange={(c) => setContentConfig((prev) => ({ ...prev, showPrice: c }))} label="Preço" />
                                             <Checkbox name="showPromotionalPrice" checked={contentConfig.showPromotionalPrice} onChange={(c) => setContentConfig((prev) => ({ ...prev, showPromotionalPrice: c }))} label="Preço promocional" />
                                             <Checkbox name="showInstallment" checked={contentConfig.showInstallment} onChange={(c) => setContentConfig((prev) => ({ ...prev, showInstallment: c }))} label="Parcelamento" />
-                                            <Checkbox name="showSku" checked={contentConfig.showSku} onChange={(c) => setContentConfig((prev) => ({ ...prev, showSku: c }))} label="SKU" />
                                             <Checkbox name="showInternalCode" checked={contentConfig.showInternalCode} onChange={(c) => setContentConfig((prev) => ({ ...prev, showInternalCode: c }))} label="Código interno" />
                                             <Checkbox name="showBarcode" checked={contentConfig.showBarcode} onChange={(c) => setContentConfig((prev) => ({ ...prev, showBarcode: c }))} label="Código de barras" />
                                         </div>
-                                        {contentConfig.showInstallment && (
-                                            <div className="mt-2">
-                                                <label className="text-xs text-brand-inactive-text">Texto de parcelamento</label>
-                                                <input
-                                                    type="text"
-                                                    value={contentConfig.installmentText}
-                                                    onChange={(e) => setContentConfig((prev) => ({ ...prev, installmentText: e.target.value }))}
-                                                    className="w-full rounded-lg border border-brand-border dark:border-dark-border bg-transparent px-2 py-1 text-sm mt-1"
-                                                    placeholder='Ex: "até 12x"'
-                                                />
+                                        {contentConfig.showInstallment && installmentDisplay && (
+                                            <div className="mt-2 p-2 rounded-lg bg-brand-gray dark:bg-dark-border/20 border border-brand-border dark:border-dark-border">
+                                                <p className="text-xs font-medium text-brand-dark dark:text-dark-heading">
+                                                    Parcelamento padrao: {installmentDisplay.text}
+                                                </p>
+                                                <p className="text-xs text-brand-inactive-text mt-0.5">
+                                                    Baseado no metodo de pagamento com mais parcelas
+                                                </p>
                                             </div>
                                         )}
                                     </div>
@@ -414,8 +473,8 @@ export function LabelPrintModal({ isOpen, onClose, allProducts }: LabelPrintModa
                                         <Button className="flex-1 h-12" onClick={handlePrint} disabled={selected.length === 0} leftIcon={<PrinterIcon size={18} />}>
                                             Imprimir
                                         </Button>
-                                        <Button variant="outline" className="flex-1 h-12" onClick={handleDownloadPdf} disabled={selected.length === 0} leftIcon={<DownloadIcon size={18} />}>
-                                            Salvar PDF
+                                        <Button variant="outline" className="flex-1 h-12" onClick={handleDownloadPdf} disabled={selected.length === 0 || isDownloadingPdf} leftIcon={<DownloadIcon size={18} />}>
+                                            {isDownloadingPdf ? "Gerando PDF..." : "Salvar PDF"}
                                         </Button>
                                     </div>
                                 </div>
@@ -425,8 +484,8 @@ export function LabelPrintModal({ isOpen, onClose, allProducts }: LabelPrintModa
                                     <Button className="flex-1 h-12" onClick={handlePrint} disabled={selected.length === 0} leftIcon={<PrinterIcon size={18} />}>
                                         Imprimir
                                     </Button>
-                                    <Button variant="outline" className="flex-1 h-12" onClick={handleDownloadPdf} disabled={selected.length === 0} leftIcon={<DownloadIcon size={18} />}>
-                                        PDF
+                                    <Button variant="outline" className="flex-1 h-12" onClick={handleDownloadPdf} disabled={selected.length === 0 || isDownloadingPdf} leftIcon={<DownloadIcon size={18} />}>
+                                        {isDownloadingPdf ? "Gerando..." : "PDF"}
                                     </Button>
                                 </div>
                             </div>
@@ -448,6 +507,7 @@ export function LabelPrintModal({ isOpen, onClose, allProducts }: LabelPrintModa
                                                     products={labelProducts}
                                                     preset={preset}
                                                     contentConfig={contentConfig}
+                                                    maxInstallments={maxInstallments}
                                                 />
                                             </div>
                                         </div>
@@ -466,6 +526,19 @@ export function LabelPrintModal({ isOpen, onClose, allProducts }: LabelPrintModa
                 existingIds={existingIds}
                 onConfirm={handleProductConfirm}
             />
+
+            {showVariantSheet && (
+                <SelectVariantSheet
+                    isOpen={!!showVariantSheet}
+                    onClose={() => setShowVariantSheet(null)}
+                    product={allProducts.find((p) => p.id === showVariantSheet)!}
+                    selectedVariantId={selected.find((s) => s.productId === showVariantSheet)?.selectedVariantId}
+                    onConfirm={(variantId) => {
+                        handleVariantConfirm(showVariantSheet, variantId)
+                        setShowVariantSheet(null)
+                    }}
+                />
+            )}
         </>
     )
 }

@@ -5,13 +5,26 @@ import { useStore } from "@/lib/store-context"
 import Dropdown, { DropdownItem } from "@/components/reusable/Dropdown"
 import { StoreModal } from "@/components/erp/stores/StoreModal"
 import { useRouter } from "next/navigation"
-import { PlusIcon, SettingsIcon } from "@/lib/icons"
+import { PlusIcon, SettingsIcon, ChevronsUpDown } from "@/lib/icons"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { usePermissions } from "@/lib/permission-context"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
+import { cn } from "@/lib/utils"
 
-export function StoreSwitcher() {
+interface StoreSwitcherProps {
+    variant?: "header" | "sidebar"
+    className?: string
+    showNameAlways?: boolean
+    onSelect?: () => void
+}
+
+export function StoreSwitcher({
+    variant = "header",
+    className,
+    showNameAlways = false,
+    onSelect,
+}: StoreSwitcherProps = {}) {
     const { selectedStore, stores, isLoading, selectStore, refreshStores } = useStore()
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [partnerId, setPartnerId] = useState<string>("")
@@ -44,28 +57,63 @@ export function StoreSwitcher() {
             openPlanUpgrade("escalar")
             return
         }
+        onSelect?.()
         router.push("/erp/lojas")
     }
+
+    const isSidebar = variant === "sidebar"
 
     return (
         <>
             <Dropdown
                 trigger={
-                    <div className="flex items-center space-x-2 cursor-pointer dark:hover:bg-dark-border transition-colors">
-                        <img
-                            src={storeLogo || "https://img.dudit.com.br/static/Placeholder.png"}
-                            alt={selectedStore.name}
-                            className="w-8 h-8 rounded-full object-cover"
-                        />
-                        <div className="hidden sm:flex flex-col">
-                            <span className="text-md font-semibold text-brand-dark dark:text-dark-heading line-clamp-1">
-                                {selectedStore.name}
-                            </span>
+                    isSidebar ? (
+                        <div
+                            className={cn(
+                                "flex items-center justify-between w-full p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-dark-border transition-colors cursor-pointer group",
+                                className,
+                            )}
+                        >
+                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                <img
+                                    src={storeLogo || "https://img.dudit.com.br/static/Placeholder.png"}
+                                    alt={selectedStore.name}
+                                    className="w-8 h-8 rounded-lg object-cover border border-dark-border shrink-0"
+                                />
+                                <div className="flex flex-col min-w-0 flex-1 text-left">
+                                    <span className="text-sm font-semibold text-white truncate line-clamp-1">
+                                        {selectedStore.name}
+                                    </span>
+                                    <span className="text-[11px] text-brand-inactive-text truncate">
+                                        Trocar filial / loja
+                                    </span>
+                                </div>
+                            </div>
+                            <ChevronsUpDown className="w-4 h-4 text-brand-inactive-text group-hover:text-white shrink-0 transition-colors" />
                         </div>
-                    </div>
+                    ) : (
+                        <div
+                            className={cn(
+                                "flex items-center space-x-2 cursor-pointer dark:hover:bg-dark-border transition-colors",
+                                className,
+                            )}
+                        >
+                            <img
+                                src={storeLogo || "https://img.dudit.com.br/static/Placeholder.png"}
+                                alt={selectedStore.name}
+                                className="w-8 h-8 rounded-full object-cover"
+                            />
+                            <div className={showNameAlways ? "flex flex-col" : "hidden sm:flex flex-col"}>
+                                <span className="text-md font-semibold text-brand-dark dark:text-dark-heading line-clamp-1">
+                                    {selectedStore.name}
+                                </span>
+                            </div>
+                        </div>
+                    )
                 }
                 align="left"
                 showChevron={false}
+                fullWidth={isSidebar}
             >
                 {stores.map((store) => {
                     const storeImage = getR2ImageUrl(store.logo_url) || "/local-grocery-store.png"
@@ -73,7 +121,10 @@ export function StoreSwitcher() {
                     return (
                         <DropdownItem
                             key={store.id}
-                            onClick={() => selectStore(store.id)}
+                            onClick={() => {
+                                selectStore(store.id)
+                                onSelect?.()
+                            }}
                             className={selectedStore.id === store.id ? "bg-brand-primary/10" : ""}
                         >
                             <div className="flex items-center gap-3 w-full">

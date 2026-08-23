@@ -23,11 +23,11 @@ interface PrintData {
     paperSize?: "a4" | "letter"
   }
   contentConfig: LabelContentConfig
-  products: { id: string; quantity: number; barcodeValue?: string }[]
+  products: { id: string; quantity: number; barcodeValue?: string; variantId?: string }[]
 }
 
 interface PageProps {
-  searchParams: Promise<{ data?: string }>
+  searchParams: Promise<{ data?: string; headless?: string }>
 }
 
 export default async function PrintLabelsPage({ searchParams }: PageProps) {
@@ -50,20 +50,17 @@ export default async function PrintLabelsPage({ searchParams }: PageProps) {
 
   const supabase = getAdminClient()
 
-  // Buscar partner_id do usuário
   const { data: partner } = await supabase.from("partners").select("id").eq("user_id", user.id).single()
   if (!partner) {
     redirect("/dashboard")
   }
 
-  // Verificar permissão
   try {
     await requirePartnerAccessWithPermission(partner.id, "products", "view", user)
   } catch {
     return <div className="p-8 text-center text-brand-red font-bold">Acesso negado.</div>
   }
 
-  // Buscar dados completos dos produtos
   const productIds = printData.products.map((p) => p.id)
   const { data: dbProducts } = await supabase
     .from("products")
@@ -72,22 +69,69 @@ export default async function PrintLabelsPage({ searchParams }: PageProps) {
     data: { id: string; name: string; sku: string | null; gtin: string | null; price: number; promotional_price: number | null }[] | null
   }
 
-  const productMap = new Map(dbProducts?.map((p: { id: string; name: string; sku: string | null; gtin: string | null; price: number; promotional_price: number | null }) => [p.id, p]) || [])
+  const productMap = new Map(dbProducts?.map((p) => [p.id, p]) || [])
+
+  // Fetch variants for products that have a variantId
+  const variantIds = printData.products
+    .filter((p) => p.variantId)
+    .map((p) => p.variantId!) as string[]
+
+  let variantMap = new Map<string, { id: string; product_id: string; variant_type: string; variant_name: string; sku: string | null; price_adjustment: number }>()
+
+  if (variantIds.length > 0) {
+    const { data: variants } = await supabase
+      .from("product_variants")
+      .select("id, product_id, variant_type, variant_name, sku, price_adjustment")
+      .in("id", variantIds)
+
+    if (variants) {
+      for (const v of variants) {
+        variantMap.set(v.id, v)
+      }
+    }
+  }
+
+  // Fetch max installments
+  const { data: paymentMethods } = await supabase
+    .from("payment_methods")
+    .select("max_installments")
+    .eq("partner_id", partner.id)
+    .eq("is_active", true)
+    .not("max_installments", "is", null)
+
+  const maxInstallments = (paymentMethods as { max_installments: number | null }[] || [])
+    .map((pm: { max_installments: number | null }) => pm.max_installments)
+    .filter((n: number | null): n is number => n != null && n > 0)
+    .reduce((max: number, n: number) => Math.max(max, n), 0) || undefined
 
   const labelProducts: LabelProduct[] = printData.products
     .map((p) => {
       const db = productMap.get(p.id)
       if (!db) return null
+
+      const variant = p.variantId ? variantMap.get(p.variantId) : null
+      const price = variant ? db.price + variant.price_adjustment : db.price
+      const promoPrice = variant && db.promotional_price != null
+        ? db.promotional_price + variant.price_adjustment
+        : db.promotional_price
+      const sku = variant?.sku || db.sku
+
       return {
-        id: db.id,
+        id: variant ? variant.id : db.id,
         name: db.name,
-        sku: db.sku,
+        sku,
         gtin: db.gtin,
         barcodeValue: p.barcodeValue || db.gtin || generateEAN13(),
-        price: db.price,
-        promotionalPrice: db.promotional_price,
-        internalCode: db.sku,
+        price,
+        promotionalPrice: promoPrice,
+        internalCode: sku,
         labelQuantity: p.quantity,
+        variant: variant
+          ? {
+              type: variant.variant_type,
+              name: variant.variant_name,
+            }
+          : undefined,
       }
     })
     .filter(Boolean) as LabelProduct[]
@@ -112,6 +156,7 @@ export default async function PrintLabelsPage({ searchParams }: PageProps) {
         products={labelProducts}
         preset={preset}
         contentConfig={contentConfig}
+        maxInstallments={maxInstallments}
         printMode
       />
     </PrintLayout>

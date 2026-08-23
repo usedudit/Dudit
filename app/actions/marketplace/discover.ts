@@ -560,10 +560,11 @@ async function fetchTrending(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
 
     const tagged = applyTierSort(trendingData as RawProduct[], tiers, item => {
         const r = item as RawProduct
-        return (r.views_last_30_days ?? 0) + (r.favorites_count ?? 0) * 2 + (r.sales_last_30_days ?? 0) * 5
+        const engagement = (r.views_last_30_days ?? 0) + (r.favorites_count ?? 0) * 2 + (r.sales_last_30_days ?? 0) * 5
+        return engagement > 0 ? engagement : ((r as any).marketplace_score ?? 0)
     })
 
-    // Only items with real engagement signals
+    // Prefer items with real engagement signals, fallback to top scores if fresh database
     const withSignals = tagged.filter(item => {
         const r = item as RawProduct
         return (r.views_last_30_days ?? 0) > 0
@@ -571,15 +572,12 @@ async function fetchTrending(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
             || (r.sales_last_30_days ?? 0) > 0
     })
 
-    if (withSignals.length === 0) {
-        dLog(`[Discover] SKIP trending reason=no_signals`)
-        return null
-    }
+    const candidates = withSignals.length > 0 ? withSignals : tagged
 
-    const displayScope = determineDisplayScope(withSignals, ctx)
+    const displayScope = determineDisplayScope(candidates, ctx)
     const display = sectionDisplay("trending", ctx, displayScope)
 
-    const scoped = filterByScope(withSignals, displayScope)
+    const scoped = filterByScope(candidates, displayScope)
     if (scoped.length === 0) {
         dLog(`[Discover] SKIP trending reason=no_items_in_scope`)
         return null
@@ -1087,8 +1085,8 @@ async function fetchPersonalizedUncached(tiers: PartnerTiers, ctx: DiscoverCtx):
     }
 
     if (preferredCatIds.length === 0) {
-        dLog(`[Discover] SKIP personalized reason=no_preferred_categories → fallback to popular`)
-        return fetchPopular(tiers, ctx)
+        dLog(`[Discover] SKIP personalized reason=no_preferred_categories`)
+        return null
     }
 
     let { data, error } = await supabase
@@ -1138,70 +1136,6 @@ async function fetchPersonalizedUncached(tiers: PartnerTiers, ctx: DiscoverCtx):
         _allItems: scoped.map(item => processProduct(item as RawProduct)),
         seeMoreLink: `/explorar/${ctx.citySlug}?section=for-you`,
     }
-}
-
-function serializePartnerIds(ids: Set<string>): string {
-    return JSON.stringify([...ids].sort())
-}
-
-function parsePartnerIds(value: string): Set<string> {
-    try {
-        const parsed = JSON.parse(value)
-        return new Set(Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : [])
-    } catch {
-        return new Set()
-    }
-}
-
-/**
- * Request-scoped deduplication for the private recommendation block.
- * Never use unstable_cache here: favorites and purchase signals are user data.
- */
-const getPersonalizedByStableKey = cache(async (
-    userId: string,
-    city: string,
-    state: string,
-    stateOnly: boolean,
-    citySlug: string,
-    lat: number | null,
-    lng: number | null,
-    scope: DiscoverCtx["scope"],
-    cityIdsKey: string,
-    stateIdsKey: string,
-    allIdsKey: string,
-): Promise<HomeSection | null> => {
-    return fetchPersonalizedUncached(
-        {
-            cityIds: parsePartnerIds(cityIdsKey),
-            stateIds: parsePartnerIds(stateIdsKey),
-            allIds: parsePartnerIds(allIdsKey),
-        },
-        {
-            city,
-            state,
-            stateOnly,
-            citySlug,
-            coords: lat != null && lng != null ? { lat, lng } : null,
-            userId: userId || null,
-            scope,
-        },
-    )
-})
-
-function fetchPersonalized(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
-    return getPersonalizedByStableKey(
-        ctx.userId ?? "",
-        ctx.city,
-        ctx.state,
-        ctx.stateOnly,
-        ctx.citySlug,
-        ctx.coords?.lat ?? null,
-        ctx.coords?.lng ?? null,
-        ctx.scope,
-        serializePartnerIds(tiers.cityIds),
-        serializePartnerIds(tiers.stateIds),
-        serializePartnerIds(tiers.allIds),
-    )
 }
 
 // ─── 7. ⭐ Mais vendidos ─────────────────────────────────────────────────────
@@ -1257,7 +1191,7 @@ async function fetchTopRated(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
     }
 
     const pool = await getSharedHomeProductsPool(allIds.join(","), allIds)
-    const withRating = pool.filter(p => (p.rating ?? 0) > 0)
+    const withRating = pool.filter(p => Number(p.rating ?? 0) >= 4.0 || Number(p.rating ?? 0) > 0)
 
     if (withRating.length === 0) {
         dLog(`[Discover] SKIP topRated reason=no_products_with_rating`)
@@ -1359,44 +1293,94 @@ async function fetchPromos(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
     }
 }
 
-// ─── 10. 💬 Mais visualizados ────────────────────────────────────────────────
+// ─── 10. 🎨 Seções Temáticas Rotatórias (100% em memória do pool) ────────────
 
-async function fetchMostViewed(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
-    const allIds = [...tiers.allIds]
-    if (allIds.length === 0) {
-        dLog(`[Discover] SKIP mostViewed reason=no_partners`)
-        return null
+export interface ThemeDefinition {
+    id: string
+    title: string
+    subtitle: string
+    category: string
+    slug: string
+    emoji: string
+}
+
+export const THEME_DEFINITIONS: ThemeDefinition[] = [
+    { id: "theme_alimentacao", title: "🍽️ Sabores da região", subtitle: "Delícias e gastronomia perto de você", category: "Alimentação", slug: "alimentacao", emoji: "🍽️" },
+    { id: "theme_casa", title: "🏠 Dando um trato na casa", subtitle: "Itens para organizar, decorar e renovar seu lar", category: "Casa", slug: "casa", emoji: "🏠" },
+    { id: "theme_tecnologia", title: "💻 Tecnologia pra facilitar", subtitle: "Eletrônicos e tecnologia para o seu dia a dia", category: "Tecnologia", slug: "tecnologia", emoji: "💻" },
+    { id: "theme_moda", title: "👗 Renove o visual", subtitle: "Roupas, calçados e acessórios cheios de estilo", category: "Moda e Beleza", slug: "moda-e-beleza", emoji: "👗" },
+    { id: "theme_saude", title: "💚 Cuide de você", subtitle: "Produtos para seu bem-estar e cuidados pessoais", category: "Saúde", slug: "saude", emoji: "💚" },
+    { id: "theme_automotivo", title: "🚗 Cuidado com o veículo", subtitle: "Acessórios e produtos para seu carro ou moto", category: "Automotivo", slug: "automotivo", emoji: "🚗" },
+    { id: "theme_pets", title: "🐾 Mimos pro seu pet", subtitle: "Tudo o que seu companheiro de quatro patas merece", category: "Pets", slug: "pets", emoji: "🐾" },
+]
+
+function matchThemeCategory(item: RawProduct, targetCategory: string): boolean {
+    const rawCat: any = Array.isArray(item.marketplace_category)
+        ? item.marketplace_category[0]
+        : item.marketplace_category
+    const catName = rawCat?.parent?.name || rawCat?.name || (item as any).category || ""
+    const subName = rawCat?.parent ? rawCat?.name : (item as any).subcategoryName || ""
+
+    const normalize = (s: string) => s
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/&/g, "e")
+        .replace(/[-_]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+
+    const normTarget = normalize(targetCategory)
+    const normCat = normalize(catName)
+    const normSub = normalize(subName)
+
+    if (normCat === normTarget || normSub === normTarget) return true
+
+    if (normCat && (normCat.includes(normTarget) || normTarget.includes(normCat))) {
+        const diff = Math.abs(normCat.length - normTarget.length)
+        if (diff <= 8) return true
     }
+    if (normSub && (normSub.includes(normTarget) || normTarget.includes(normSub))) {
+        const diff = Math.abs(normSub.length - normTarget.length)
+        if (diff <= 8) return true
+    }
+
+    return false
+}
+
+async function fetchThemedSection(
+    theme: ThemeDefinition,
+    tiers: PartnerTiers,
+    ctx: DiscoverCtx,
+): Promise<HomeSection | null> {
+    const allIds = [...tiers.allIds]
+    if (allIds.length === 0) return null
 
     const pool = await getSharedHomeProductsPool(allIds.join(","), allIds)
-    if (pool.length === 0) {
-        dLog(`[Discover] SKIP mostViewed reason=no_products`)
-        return null
-    }
+    if (pool.length === 0) return null
 
-    const tagged = applyTierSort(pool, tiers, item => {
-        return (item as RawProduct).views_last_30_days ?? 0
+    const matching = pool.filter(item => matchThemeCategory(item, theme.category))
+    if (matching.length === 0) return null
+
+    const tagged = applyTierSort(matching, tiers, item => {
+        const r = item as RawProduct
+        return (r.views_last_30_days ?? 0) + (r.favorites_count ?? 0) * 2 + (r.sales_last_30_days ?? 0) * 5 + ((r as any).marketplace_score ?? 0)
     })
 
     const displayScope = determineDisplayScope(tagged, ctx)
-    const display = sectionDisplay("mostViewed", ctx, displayScope)
-
     const scoped = filterByScope(tagged, displayScope)
-    if (scoped.length === 0) {
-        dLog(`[Discover] SKIP mostViewed reason=no_items_in_scope`)
-        return null
-    }
+    if (scoped.length === 0) return null
 
     const items = scoped.slice(0, 20).map(item => processProduct(item as RawProduct))
 
     return {
-        id: "mostViewed",
-        title: display.title,
-        subtitle: display.subtitle,
-        gatilho: GATILHOS_MAP.mostViewed,
+        id: theme.id,
+        title: theme.title,
+        subtitle: theme.subtitle,
+        gatilho: GATILHOS_MAP[theme.id] || "desejo",
         items,
         _allItems: scoped.map(item => processProduct(item as RawProduct)),
-        seeMoreLink: `/explorar/${ctx.citySlug}?section=most-viewed`,
+        seeMoreLink: `/explorar/${ctx.citySlug}/${theme.slug}`,
     }
 }
 
@@ -1494,7 +1478,7 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
     }
 }
 
-// ─── 12. 🛍️ Vitrines (sempre obrigatória se houver parceiros) ─────────────
+// ─── 12. 🛍️ Vitrines (Lojas e Negócios Locais) ───────────────────────────────
 
 async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
     const allIds = [...tiers.allIds]
@@ -1573,7 +1557,6 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         }
     }
 
-
     const items = scoped.slice(0, 15).map(vitrineMapper)
 
     return {
@@ -1583,52 +1566,11 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         gatilho: GATILHOS_MAP.topVitrines,
         items,
         _allItems: scoped.map(vitrineMapper),
-        seeMoreLink: `/explorar/${ctx.citySlug}?section=vendors`,
+        seeMoreLink: `/explorar/${ctx.citySlug}?type=vitrines`,
     }
 }
 
-// ─── 13a. Produtos populares (fallback) ─────────────────────────────────────
-
-async function fetchPopular(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
-    const allIds = [...tiers.allIds]
-    if (allIds.length === 0) {
-        dLog(`[Discover] SKIP popular reason=no_partners`)
-        return null
-    }
-
-    const pool = await getSharedHomeProductsPool(allIds.join(","), allIds)
-    if (pool.length === 0) {
-        dLog(`[Discover] SKIP popular reason=no_products`)
-        return null
-    }
-
-    const tagged = applyTierSort(pool, tiers, item => {
-        return (item as any).marketplace_score ?? 0
-    })
-
-    const displayScope = determineDisplayScope(tagged, ctx)
-    const display = sectionDisplay("popular", ctx, displayScope)
-
-    const scoped = filterByScope(tagged, displayScope)
-    if (scoped.length === 0) {
-        dLog(`[Discover] SKIP popular reason=no_items_in_scope`)
-        return null
-    }
-
-    const items = scoped.slice(0, 20).map(item => processProduct(item as RawProduct))
-
-    return {
-        id: "popular",
-        title: display.title,
-        subtitle: display.subtitle,
-        gatilho: GATILHOS_MAP.popular,
-        items,
-        _allItems: scoped.map(item => processProduct(item as RawProduct)),
-        seeMoreLink: `/explorar/${ctx.citySlug}?section=popular`,
-    }
-}
-
-// ─── 13b. Último recurso: qualquer produto (sem ranking) ──────────────────────
+// ─── 13. Último recurso: qualquer produto (sem ranking) ──────────────────────
 
 async function fetchAllProducts(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
     const allIds = [...tiers.allIds]
@@ -1672,42 +1614,7 @@ async function fetchAllProducts(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<
     }
 }
 
-// ─── SECTION DEFINITIONS ──────────────────────────────────────────────────────
-
-interface SectionDef {
-    id: string
-    gatilho: string
-    priority: "high" | "medium" | "fallback"
-    fetch: (tiers: PartnerTiers, ctx: DiscoverCtx) => Promise<HomeSection | null>
-}
-
-const HIGH_SECTIONS: SectionDef[] = [
-    { id: "trending", gatilho: GATILHOS_MAP.trending, priority: "high", fetch: fetchTrending },
-    { id: "endingSoon", gatilho: GATILHOS_MAP.endingSoon, priority: "high", fetch: fetchEndingSoon },
-    { id: "recent", gatilho: GATILHOS_MAP.recent, priority: "high", fetch: fetchRecent },
-]
-
-
-const MEDIUM_SECTIONS: SectionDef[] = [
-    { id: "bestSellers", gatilho: GATILHOS_MAP.bestSellers, priority: "medium", fetch: fetchBestSellers },
-    { id: "topRated", gatilho: GATILHOS_MAP.topRated, priority: "medium", fetch: fetchTopRated },
-    { id: "promos", gatilho: GATILHOS_MAP.promos, priority: "medium", fetch: fetchPromos },
-    { id: "mostViewed", gatilho: GATILHOS_MAP.mostViewed, priority: "medium", fetch: fetchMostViewed },
-    { id: "services", gatilho: GATILHOS_MAP.services, priority: "medium", fetch: fetchServices },
-    { id: "personalized", gatilho: GATILHOS_MAP.personalized, priority: "medium", fetch: fetchPersonalized },
-    { id: "topVitrines", gatilho: GATILHOS_MAP.topVitrines, priority: "medium", fetch: fetchVitrines },
-]
-
-const FALLBACK_SECTIONS: SectionDef[] = [
-    { id: "popular", gatilho: GATILHOS_MAP.popular, priority: "fallback", fetch: fetchPopular },
-]
-
-const PROXIMITY_SECTIONS: SectionDef[] = [
-    // Adaptive single section: ≤2km → ≤10km → same city (decided internally)
-    { id: "nearby", gatilho: GATILHOS_MAP.nearby, priority: "medium", fetch: fetchNearby },
-]
-
-// ─── MAIN ENTRY POINT ────────────────────────────────────────────────────────
+// ─── MAIN ENTRY POINT (Dinâmico, Balanceado & Alta Performance) ───────────────
 
 async function getHomeSectionsUncached(ctx: DiscoverCtx): Promise<HomeSection[]> {
     const t0 = performance.now()
@@ -1720,145 +1627,107 @@ async function getHomeSectionsUncached(ctx: DiscoverCtx): Promise<HomeSection[]>
         return []
     }
 
-    // 1. HIGH sections in parallel (trending, endingSoon, recent, gems)
-    const highResults = await Promise.allSettled(
-        HIGH_SECTIONS.map(s => s.fetch(tiers, ctx)),
+    const seed = dailySeed(ctx.userId)
+
+    // 1. Core anchors in parallel
+    const [trendingRes, vitrinesRes, servicesRes] = await Promise.all([
+        fetchTrending(tiers, ctx).catch(() => null),
+        fetchVitrines(tiers, ctx).catch(() => null),
+        fetchServices(tiers, ctx).catch(() => null),
+    ])
+
+    // 2. Thematic sections in parallel (100% in-memory category filtering from cached pool)
+    const themeResults = await Promise.all(
+        THEME_DEFINITIONS.map(theme => fetchThemedSection(theme, tiers, ctx).catch(() => null))
     )
+    const availableThemes = themeResults.filter((s): s is HomeSection => s !== null && s.items.length > 0)
+    const shuffledThemes = seededShuffle(availableThemes, `${seed}-themes`)
 
+    // 3. Quality & Opportunity candidates (in-memory filtering & ranking)
+    const [topRatedRes, promosRes, recentRes, endingSoonRes, bestSellersRes, gemsRes] = await Promise.all([
+        fetchTopRated(tiers, ctx).catch(() => null),
+        fetchPromos(tiers, ctx).catch(() => null),
+        fetchRecent(tiers, ctx).catch(() => null),
+        fetchEndingSoon(tiers, ctx).catch(() => null),
+        fetchBestSellers(tiers, ctx).catch(() => null),
+        fetchGems(tiers, ctx).catch(() => null),
+    ])
+
+    const availableQuality = [
+        topRatedRes,
+        promosRes,
+        recentRes,
+        endingSoonRes,
+        bestSellersRes,
+        gemsRes,
+    ].filter((s): s is HomeSection => s !== null && s.items.length > 0)
+
+    const shuffledQuality = seededShuffle(availableQuality, `${seed}-quality`)
+
+    // 4. Proximity section (if coords available)
+    let nearbyRes: HomeSection | null = null
+    if (ctx.scope === "city" && ctx.coords) {
+        nearbyRes = await fetchNearby(tiers, ctx).catch(() => null)
+    }
+
+    // 5. Assemble diverse, rich, non-repetitive section layout
     const pool: HomeSection[] = []
-    const usedGatilhos = new Set<string>()
+    const usedIds = new Set<string>()
 
-    for (let i = 0; i < HIGH_SECTIONS.length; i++) {
-        const result = highResults[i]
-        if (result.status === "fulfilled" && result.value) {
-            pool.push(result.value)
-            usedGatilhos.add(result.value.gatilho)
-        } else if (result.status === "rejected") {
-            dWarn(`[Discover] HIGH ${HIGH_SECTIONS[i].id} error:`, result.reason)
-        }
+    const addSection = (section: HomeSection | null) => {
+        if (!section || section.items.length === 0 || usedIds.has(section.id)) return false
+        pool.push(section)
+        usedIds.add(section.id)
+        return true
     }
 
-    dLog(`[Discover] Phase 1 (HIGH): ${pool.length}/4`)
-
-    // 2. Fill gaps with MEDIUM (seeded shuffle for daily rotation)
-    if (pool.length < 5) {
-        const usedIds = new Set(pool.map(s => s.id))
-        const seed = dailySeed(ctx.userId)
-        const shuffled = seededShuffle(MEDIUM_SECTIONS, `${seed}-medium`)
-
-        for (const def of shuffled) {
-            if (pool.length >= 5) break
-            if (usedIds.has(def.id)) continue
-            if (def.id === "personalized") continue
-            if (usedGatilhos.has(def.gatilho) && pool.length >= 4) continue
-
-            const result = await def.fetch(tiers, ctx).catch(() => null)
-            if (result && result.items.length >= 1) {
-                dLog(`[Discover] Filler: ${def.id} → ${result.items.length} items`)
-                pool.push(result)
-                usedGatilhos.add(result.gatilho)
-                usedIds.add(result.id)
-            } else {
-                dLog(`[Discover] Filler: ${def.id} → empty`)
-            }
-        }
+    // Slot 1: Hero Trending
+    if (trendingRes && trendingRes.items.length > 0) {
+        addSection(trendingRes)
     }
 
-    dLog(`[Discover] Phase 2 (MEDIUM): ${pool.length} | ids=[${pool.map(s => s.id).join(",")}]`)
-
-    // 3. FALLBACK if still < 5
-    if (pool.length < 5) {
-        for (const def of FALLBACK_SECTIONS) {
-            if (pool.length >= 5) break
-            const result = await def.fetch(tiers, ctx).catch(() => null)
-            if (result && result.items.length >= 1) {
-                dLog(`[Discover] Fallback: ${def.id} → ${result.items.length} items`)
-                pool.push(result)
-            }
-        }
+    // Slot 2: First Thematic Section (e.g. 🍽️ Sabores da região)
+    if (shuffledThemes.length > 0) {
+        addSection(shuffledThemes[0])
     }
 
-    dLog(`[Discover] Phase 3 (FALLBACK): ${pool.length} | ids=[${pool.map(s => s.id).join(",")}]`)
-
-    // 4. ULTIMATE FALLBACK - any products at all (no ranking required)
-    if (pool.length < 5) {
-        const result = await fetchAllProducts(tiers, ctx).catch(() => null)
-        if (result && result.items.length >= 1) {
-            dLog(`[Discover] Ultimate fallback: allProducts → ${result.items.length} items`)
-            pool.push(result)
-        } else {
-            dWarn(`[Discover] Ultimate fallback: allProducts empty - database may be empty`)
-        }
+    // Slot 3: Vitrines / Lojas (Negócios da região)
+    if (vitrinesRes && vitrinesRes.items.length > 0) {
+        addSection(vitrinesRes)
     }
 
-    dLog(`[Discover] Phase 4 (ULTIMATE): ${pool.length} | ids=[${pool.map(s => s.id).join(",")}]`)
-
-    // 5. Proximity (nearby) - only with coords, only if room
-    //    Vitrines are NOT reserved - they participate in the seeded MEDIUM rotation
-    if (pool.length < 6 && ctx.scope === "city" && ctx.coords) {
-        for (const def of PROXIMITY_SECTIONS) {
-            if (pool.length >= 6) break
-            const result = await def.fetch(tiers, ctx).catch(() => null)
-            if (result && result.items.length >= 1) {
-                dLog(`[Discover] Proximity: ${result.id} → ${result.items.length} items`)
-                pool.push(result)
-            }
-        }
+    // Slot 4: Quality / Deals (e.g. ⭐ Melhor avaliados ou 🎯 Promoções)
+    if (nearbyRes && nearbyRes.items.length > 0) {
+        addSection(nearbyRes)
+    } else if (shuffledQuality.length > 0) {
+        addSection(shuffledQuality[0])
     }
 
-    dLog(`[Discover] Phase 5 (PROXIMITY): ${pool.length} | ids=[${pool.map(s => s.id).join(",")}]`)
-
-    // 6. Sixth dynamic section (only if room)
-    if (pool.length < 6) {
-        let sixthSection: HomeSection | null = null
-
-        if (ctx.userId) {
-            const persResult = await fetchPersonalized(tiers, ctx)
-            if (persResult) sixthSection = persResult
-        }
-
-        if (!sixthSection) {
-            const seed = dailySeed(ctx.userId)
-            const usedIds = new Set(pool.map(s => s.id))
-            const available = MEDIUM_SECTIONS.filter(s => !usedIds.has(s.id) && s.id !== "personalized")
-            const shuffled = seededShuffle(available, `${seed}-sixth`)
-
-            for (const def of shuffled) {
-                const result = await def.fetch(tiers, ctx).catch(() => null)
-                if (result && result.items.length >= 1) {
-                    sixthSection = result
-                    dLog(`[Discover] Sixth: ${def.id} → ${result.items.length} items`)
-                    break
-                }
-            }
-        }
-
-        if (sixthSection && sixthSection.items.length >= 1) {
-            const seen = new Set<string>()
-            for (const section of pool) {
-                for (const item of section.items) seen.add(item.id)
-            }
-            sixthSection.items = sixthSection.items.filter((item: any) => !seen.has(item.id))
-
-            if (sixthSection._allItems && sixthSection.items.length < Math.min(20, sixthSection._allItems.length)) {
-                const remaining = sixthSection._allItems.filter((item: any) => !seen.has(item.id))
-                const needed = Math.min(20 - sixthSection.items.length, remaining.length)
-                for (let i = 0; i < needed; i++) {
-                    sixthSection.items.push(remaining[i])
-                }
-            }
-
-            if (sixthSection.items.length >= 1) {
-                pool.push(sixthSection)
-            }
-        } else {
-            dLog(`[Discover] Sixth: none available`)
-        }
+    // Slot 5: Serviços (Profissionais da região)
+    if (servicesRes && servicesRes.items.length > 0) {
+        addSection(servicesRes)
     }
 
-    dLog(`[Discover] Phase 6 (SIXTH): ${pool.length} | ids=[${pool.map(s => s.id).join(",")}]`)
+    // Slot 6: Second Thematic Section (or second Quality/Deal)
+    if (shuffledThemes.length > 1) {
+        addSection(shuffledThemes[1])
+    } else if (shuffledQuality.length > 1) {
+        addSection(shuffledQuality[1])
+    }
 
-    // 7. Global dedup with auto-refill - sections never drop below 1 item
+    // If still < 5 sections, fill with remaining candidates
+    for (const cand of [...shuffledThemes, ...shuffledQuality]) {
+        if (pool.length >= 6) break
+        addSection(cand)
+    }
+
+    // Ultimate fallback if empty
+    if (pool.length === 0) {
+        const fallback = await fetchAllProducts(tiers, ctx).catch(() => null)
+        if (fallback) addSection(fallback)
+    }
+
+    // 6. Global dedup with auto-refill across all sections
     const globalSeen = new Set<string>()
     let totalRemovedByDedup = 0
     const finalSections: HomeSection[] = []
@@ -1866,8 +1735,9 @@ async function getHomeSectionsUncached(ctx: DiscoverCtx): Promise<HomeSection[]>
     for (const section of pool) {
         const beforeCount = section.items.length
         const deduped = section.items.filter((item: any) => {
-            if (globalSeen.has(item.id)) return false
-            globalSeen.add(item.id)
+            const key = `${item.itemType || "item"}-${item.id}`
+            if (globalSeen.has(key)) return false
+            globalSeen.add(key)
             return true
         })
 
@@ -1876,11 +1746,15 @@ async function getHomeSectionsUncached(ctx: DiscoverCtx): Promise<HomeSection[]>
         // Auto-refill from _allItems buffer
         let refilled = 0
         if (removedCount > 0 && section._allItems) {
-            const remaining = section._allItems.filter((item: any) => !globalSeen.has(item.id))
+            const remaining = section._allItems.filter((item: any) => {
+                const key = `${item.itemType || "item"}-${item.id}`
+                return !globalSeen.has(key)
+            })
             const refillCount = Math.min(20 - deduped.length, remaining.length)
             for (let i = 0; i < refillCount; i++) {
                 const refillItem = remaining[i]
-                globalSeen.add(refillItem.id)
+                const key = `${refillItem.itemType || "item"}-${refillItem.id}`
+                globalSeen.add(key)
                 deduped.push(refillItem)
                 refilled++
             }
@@ -1891,7 +1765,6 @@ async function getHomeSectionsUncached(ctx: DiscoverCtx): Promise<HomeSection[]>
             dLog(`[Discover] DEDUP ${section.id}: before=${beforeCount} removed=${removedCount} refilled=${refilled} after=${deduped.length}`)
         }
 
-        // Never drop a section entirely - if dedup killed everything, keep original
         if (deduped.length >= 1) {
             finalSections.push({ ...section, items: deduped.slice(0, 20) })
         } else {
@@ -1902,10 +1775,10 @@ async function getHomeSectionsUncached(ctx: DiscoverCtx): Promise<HomeSection[]>
 
     const result = finalSections.slice(0, 6)
 
-    // ─── Randomized urgency badges (Últimos N) ──────────────────────────
+    // Apply urgency badges
     applyUrgencyBadges(result, ctx)
 
-    // ─── Batch fetch promotions for all items across all sections ────────
+    // Batch fetch promotions for partners in result
     const partnerIds = new Set<string>()
     for (const section of result) {
         for (const item of section.items) {
@@ -1928,14 +1801,71 @@ async function getHomeSectionsUncached(ctx: DiscoverCtx): Promise<HomeSection[]>
 
     const t1 = performance.now()
     dLog(`[Discover] END | ${result.length} sections | ${(t1 - t0).toFixed(0)}ms`)
-    dLog(`[Discover] DIAG: partners=${tiers.allIds.size} | pool_before_dedup=${pool.length} | dedup_removed=${totalRemovedByDedup}`)
-    if (result.length > 0) {
-        dLog(`[Discover] SECTIONS:`, result.map(s => `${s.id}=${s.title} (${s.items.length})`).join(" | "))
-    } else {
-        dLog(`[Discover] EMPTY - no sections returned!`)
-    }
-
     return result
+}
+
+function serializePartnerIds(ids: Set<string>): string {
+    return JSON.stringify([...ids].sort())
+}
+
+function parsePartnerIds(value: string): Set<string> {
+    try {
+        const parsed = JSON.parse(value)
+        return new Set(Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : [])
+    } catch {
+        return new Set()
+    }
+}
+
+/**
+ * Request-scoped deduplication for the private recommendation block.
+ * Never use unstable_cache here: favorites and purchase signals are user data.
+ */
+const getPersonalizedByStableKey = cache(async (
+    userId: string,
+    city: string,
+    state: string,
+    stateOnly: boolean,
+    citySlug: string,
+    lat: number | null,
+    lng: number | null,
+    scope: DiscoverCtx["scope"],
+    cityIdsKey: string,
+    stateIdsKey: string,
+    allIdsKey: string,
+): Promise<HomeSection | null> => {
+    return fetchPersonalizedUncached(
+        {
+            cityIds: parsePartnerIds(cityIdsKey),
+            stateIds: parsePartnerIds(stateIdsKey),
+            allIds: parsePartnerIds(allIdsKey),
+        },
+        {
+            city,
+            state,
+            stateOnly,
+            citySlug,
+            coords: lat != null && lng != null ? { lat, lng } : null,
+            userId: userId || null,
+            scope,
+        },
+    )
+})
+
+function fetchPersonalized(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
+    return getPersonalizedByStableKey(
+        ctx.userId ?? "",
+        ctx.city,
+        ctx.state,
+        ctx.stateOnly,
+        ctx.citySlug,
+        ctx.coords?.lat ?? null,
+        ctx.coords?.lng ?? null,
+        ctx.scope,
+        serializePartnerIds(tiers.cityIds),
+        serializePartnerIds(tiers.stateIds),
+        serializePartnerIds(tiers.allIds),
+    )
 }
 
 const getSharedHomeSections = (

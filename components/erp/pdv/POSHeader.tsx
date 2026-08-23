@@ -207,15 +207,15 @@ const POSHeader = memo(function POSHeader({
 
             <div className="flex items-center gap-3 mb-6 border-b border-brand-border dark:border-dark-border">
                 {onOpenTypeFilterModal && (
-                    <div className="flex items-center gap-3 shrink-0 pb-2">
-                        <button
-                            type="button"
+                    <div className="flex items-center gap-3 shrink-0">
+                        <Button
+                            size="icon"
+                            variant="ghost"
                             onClick={onOpenTypeFilterModal}
-                            className="flex h-9 w-9 items-center justify-center rounded-xl border border-brand-border bg-white text-brand-dark hover:bg-brand-gray dark:border-dark-border dark:bg-dark-surface dark:text-dark-heading dark:hover:bg-dark-border transition-colors"
                             title="Escolher Produtos ou Serviços"
                         >
                             <Filter size={18} />
-                        </button>
+                        </Button>
                         <div className="h-5 w-[1px] bg-brand-border dark:bg-dark-border" />
                     </div>
                 )}

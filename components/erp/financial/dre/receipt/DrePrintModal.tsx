@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { motion, AnimatePresence } from "framer-motion"
 import Portal from "@/components/Portal"
 import { Button, Tabs, TabsContent, TabsList, TabsTrigger, ListItem } from "@/components/reusable"
 import { Switch } from "@/components/reusable/Switch"
@@ -37,8 +38,6 @@ export function DrePrintModal({
 }: DrePrintModalProps) {
   const isMobile = useMediaQuery("(max-width: 1023px)")
 
-  const [isVisible, setIsVisible] = useState(false)
-  const [isAnimating, setIsAnimating] = useState(false)
   const [activeTab, setActiveTab] = useState("Opções")
   const [isDownloading, setIsDownloading] = useState(false)
 
@@ -50,14 +49,8 @@ export function DrePrintModal({
 
   useEffect(() => {
     if (isOpen) {
-      setIsVisible(true)
-      const id = setTimeout(() => setIsAnimating(true), 50)
       setActiveTab("Opções")
-      return () => clearTimeout(id)
     }
-    setIsAnimating(false)
-    const id = setTimeout(() => setIsVisible(false), 200)
-    return () => clearTimeout(id)
   }, [isOpen])
 
   const handleDownloadPdf = useCallback(async () => {
@@ -137,15 +130,20 @@ export function DrePrintModal({
     onClose,
   ])
 
-  if (!isVisible) return null
+  if (!report && isOpen) return null
 
   return (
     <Portal>
-      <div className="fixed inset-0 z-[130] flex flex-col bg-black/60">
-        <div
-          className={`relative flex flex-col w-full h-full bg-white dark:bg-dark-background transition-opacity duration-200 ${isAnimating ? "opacity-100" : "opacity-0"
-            }`}
-        >
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            className="fixed inset-0 z-[130] flex flex-col bg-black/60"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <div className="relative flex flex-col w-full h-full bg-white dark:bg-dark-background">
           {/* Header oficial Dudit */}
           <div className="shrink-0 flex items-center justify-between px-4 md:px-6 py-4 border-b border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
             <h2 className="text-lg md:text-xl font-bold text-brand-dark dark:text-dark-heading">
@@ -312,8 +310,10 @@ export function DrePrintModal({
               </div>
             </Tabs>
           )}
-        </div>
-      </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </Portal>
   )
 }

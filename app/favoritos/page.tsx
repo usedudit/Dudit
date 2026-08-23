@@ -43,7 +43,7 @@ export default async function FavoritosPage() {
     }
 
     return (
-        <div className="flex flex-col min-h-screen bg-white dark:bg-dark-surface transition-colors duration-300">
+        <div className="min-h-screen bg-white dark:bg-dark-background pt-[40px] lg:pt-[110px] font-sans flex flex-col">
             <MarketplaceHeader simpleTitle="Meus favoritos" userProfile={userProfile} cartCount={cartCount} />
 
             <FavoritesPageClient

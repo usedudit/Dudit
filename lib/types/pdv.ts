@@ -11,6 +11,10 @@ export type PDVProduct = {
   allow_sell_without_stock?: boolean
   images?: string[] | null
   product_type?: string | null
+  has_variants?: boolean | null
+  variants?: any[]
+  addon_groups?: any[] | null
+  technical_specs?: any
   product_variants?: Array<{
     id: string
     variant_name: string
@@ -18,6 +22,7 @@ export type PDVProduct = {
     price_adjustment?: number | null
     stock_available?: number | null
     variant_options?: Record<string, any> | null
+    price?: number | null
   }>
 }
 
@@ -89,4 +94,11 @@ export type PDVCartItem = {
   image: string | null
   isGift?: boolean
   allowSellWithoutStock?: boolean
+  selectedAddons?: Array<{
+    groupId: string
+    groupName: string
+    optionId: string
+    optionName: string
+    price: number
+  }>
 }

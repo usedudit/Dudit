@@ -50,6 +50,13 @@ type DraftItemInput = {
     promotionId?: string | null
     isManualPrice?: boolean | null
     allowSellWithoutStock?: boolean | null
+    selectedAddons?: Array<{
+        groupId: string
+        groupName: string
+        optionId: string
+        optionName: string
+        price: number
+    }> | null
 }
 
 type DraftUpsertInput = {
@@ -684,7 +691,7 @@ export async function getPOSInitialDataAction(partnerId: string, storeId?: strin
         const [productsRes, servicesRes] = await Promise.all([
             supabase
                 .from("products")
-                .select("id, name, sku, price, promotional_price, category:product_categories!category_id(id, name), stock_available, min_stock, allow_sell_without_stock, images, product_type, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
+                .select("id, name, sku, price, promotional_price, category:product_categories!category_id(id, name), stock_available, min_stock, allow_sell_without_stock, images, product_type, has_variants, addon_groups, technical_specs, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
                 .eq("partner_id", partnerId)
                 .eq("is_active", true)
                 .order("created_at", { ascending: false })
@@ -702,6 +709,62 @@ export async function getPOSInitialDataAction(partnerId: string, storeId?: strin
         rawServices = servicesRes.error ? [] : (servicesRes.data || [])
     }
 
+    const formattedProducts = (products || []).map((p: any) => {
+        const rawVariants = Array.isArray(p.product_variants) && p.product_variants.length > 0
+            ? p.product_variants
+            : Array.isArray(p.variants)
+                ? p.variants
+                : []
+
+        const normalizedVariants = rawVariants.map((v: any) => ({
+            id: String(v.id),
+            variant_name: String(v.variant_name || v.name || "Variação"),
+            sku: v.sku || null,
+            price_adjustment: Number(v.price_adjustment || 0),
+            stock_available: Number(v.stock_available ?? v.stock_quantity ?? v.resolved_stock_quantity ?? 0),
+            variant_options: v.variant_options || null,
+            price: v.price !== undefined ? Number(v.price) : (Number(p.price || 0) + Number(v.price_adjustment || 0)),
+        }))
+
+        const hasVariants = normalizedVariants.length > 0 || Boolean(p.has_variants)
+        const totalStock = hasVariants && normalizedVariants.length > 0
+            ? normalizedVariants.reduce((sum: number, v: any) => sum + Number(v.stock_available || 0), 0)
+            : Number(p.stock_available ?? p.stock_quantity ?? p.resolved_stock_quantity ?? 0)
+
+        const addonGroups = Array.isArray(p.addon_groups) && p.addon_groups.length > 0
+            ? p.addon_groups
+            : Array.isArray(p.technical_specs?.addon_groups) && p.technical_specs.addon_groups.length > 0
+                ? p.technical_specs.addon_groups
+                : []
+
+        const categoryObj = p.category && typeof p.category === "object"
+            ? p.category
+            : p.category
+                ? { id: p.category_id || "cat", name: String(p.category) }
+                : null
+
+        return {
+            ...p,
+            id: String(p.id),
+            name: String(p.name || "Produto"),
+            category: categoryObj,
+            sku: p.sku || null,
+            gtin: p.gtin || null,
+            price: Number(p.price || 0),
+            promotional_price: p.promotional_price != null ? Number(p.promotional_price) : null,
+            stock_available: totalStock,
+            min_stock: p.min_stock != null ? Number(p.min_stock) : null,
+            allow_sell_without_stock: Boolean(p.allow_sell_without_stock),
+            images: Array.isArray(p.images) ? p.images : (p.image_url ? [p.image_url] : null),
+            product_type: p.product_type || "product",
+            has_variants: hasVariants,
+            product_variants: normalizedVariants,
+            variants: normalizedVariants,
+            addon_groups: addonGroups,
+            technical_specs: p.technical_specs || null,
+        }
+    })
+
     const formattedServices = (rawServices || []).map((s: any) => {
         const categoryName = typeof s.category === "string" ? s.category : (s.category?.name || "Serviços")
         const categoryId = s.category_id || s.category?.id || "service_cat"
@@ -718,10 +781,13 @@ export async function getPOSInitialDataAction(partnerId: string, storeId?: strin
             images: Array.isArray(s.images) ? s.images : (s.image_url ? [s.image_url] : null),
             product_type: "service",
             product_variants: [],
+            variants: [],
+            addon_groups: [],
+            has_variants: false,
         }
     })
 
-    products = [...products, ...formattedServices]
+    products = [...formattedProducts, ...formattedServices]
 
     // Build pre_sales query with optional store_id filter
     let draftsQuery = supabase
@@ -1173,11 +1239,20 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
         const draftItemsList = Array.isArray(preSaleDraft.items) ? preSaleDraft.items : []
         const erpItems: import("./orders").ERPItemPayload[] = draftItemsList.map((item: any, index: number) => {
             const isService = Boolean(item.service_id || item.serviceId || item.line_type === 'service_booking' || item.line_type === 'service')
+            const addons = Array.isArray(item.selectedAddons) ? item.selectedAddons : []
+            const addonsText = addons.map((a: any) => a.optionName || a.name).filter(Boolean).join(", ")
+            const variantText = item.variant_name || item.variantName || null
+            let computedCustomName = item.customName || item.name || undefined
+            if (addonsText) {
+                computedCustomName = `${computedCustomName || "Item"} (+ ${addonsText})`
+            }
+
             return {
                 productId: isService ? undefined : (item.product_id || item.productId || undefined),
                 serviceId: item.service_id || item.serviceId || (isService ? (item.product_id || item.productId) : undefined),
                 lineType: item.line_type || item.lineType || (isService ? 'service_booking' : 'product'),
                 variantId: item.variant_id || item.variantId || undefined,
+                customName: computedCustomName,
                 unitPrice: safeMoney(Number(item.unit_price ?? item.price ?? 0)),
                 quantity: Math.max(1, Math.floor(Number(item.quantity ?? item.qty ?? 1))),
                 sortOrder: index,

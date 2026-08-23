@@ -219,13 +219,57 @@ export async function createReport(data: {
 
     // We use adminClient to verify existence to bypass RLS false-negatives (user just needs to know if it exists)
     const adminClient = getAdminClient()
-    const { data: target, error: targetError } = await adminClient
-        .from(tableName)
-        .select("id")
-        .eq("id", targetId)
-        .single()
+    let finalTargetId = targetId
+    let targetFound = false
 
-    if (targetError || !target) {
+    if (data.targetType === "partner") {
+        // A partner report might receive a partner_id (from 'partners' table) or a store_id (from 'stores' table)
+        const { data: partnerRow } = await adminClient
+            .from("partners")
+            .select("id, user_id")
+            .eq("id", targetId)
+            .maybeSingle()
+
+        if (partnerRow?.id) {
+            finalTargetId = partnerRow.id
+            targetFound = true
+            if (partnerRow.user_id === user.id) {
+                return { success: false, error: "Você não pode denunciar o próprio negócio" }
+            }
+        } else {
+            // Check if targetId is a store ID
+            const { data: storeRow } = await adminClient
+                .from("stores")
+                .select("id, partner_id, partners(id, user_id)")
+                .eq("id", targetId)
+                .maybeSingle()
+
+            if (storeRow?.partner_id) {
+                finalTargetId = storeRow.partner_id
+                targetFound = true
+                const storeOwnerUserId = (storeRow.partners as any)?.user_id
+                if (storeOwnerUserId === user.id) {
+                    return { success: false, error: "Você não pode denunciar o próprio negócio" }
+                }
+            } else if (storeRow?.id) {
+                finalTargetId = storeRow.id
+                targetFound = true
+            }
+        }
+    } else {
+        const { data: target, error: targetError } = await adminClient
+            .from(tableName)
+            .select("id")
+            .eq("id", targetId)
+            .maybeSingle()
+
+        if (target?.id && !targetError) {
+            targetFound = true
+        }
+    }
+
+    if (!targetFound) {
+        console.warn(`[ADMIN_REPORTS] Target not found for report: targetType='${data.targetType}', targetId='${targetId}'`)
         return { success: false, error: "Item não encontrado" }
     }
 
@@ -236,7 +280,7 @@ export async function createReport(data: {
     const fingerprint = buildFingerprint({
         userId: user.id,
         targetType: data.targetType,
-        targetId,
+        targetId: finalTargetId,
         reasonCode: data.reasonCode,
         description,
         ip,
@@ -250,14 +294,17 @@ export async function createReport(data: {
     const { error: insertError } = await supabase.from("reports").insert({
         reporter_user_id: user.id,
         target_type: data.targetType,
-        target_id: targetId,
+        target_id: finalTargetId,
         reason: reasonStored,
         reason_code: data.reasonCode,
         description: description || null,
         reporter_ip_hash: ipHash,
         reporter_ua_hash: uaHash,
         fingerprint,
-        metadata: { source: "web" },
+        metadata: {
+            source: "web",
+            ...(targetId !== finalTargetId ? { original_target_id: targetId } : {}),
+        },
     })
 
     if (insertError) {
@@ -265,10 +312,10 @@ export async function createReport(data: {
             return { success: false, error: "Você já reportou este item" }
         }
         // Self-report trigger uses errcode 42501.
-        if (insertError.code === "42501") {
-            return { success: false, error: "Você não pode denunciar o próprio item" }
+        if (insertError.code === "42501" || insertError.message?.includes("self_report_forbidden")) {
+            return { success: false, error: "Você não pode denunciar o próprio negócio ou item" }
         }
-        console.error("[REPORTS] insert error:", insertError.message)
+        console.error("[REPORTS] insert error:", insertError.message, insertError)
         return { success: false, error: "Não foi possível registrar a denúncia" }
     }
 

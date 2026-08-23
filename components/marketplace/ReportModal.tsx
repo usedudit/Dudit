@@ -52,9 +52,11 @@ export function ReportModal({
                 setDescription("")
                 onClose()
             } else {
+                console.warn("[ReportModal] createReport returned error:", res.error, { targetType, targetId })
                 error("Não foi possível enviar", res.error || "Ocorreu um erro ao processar sua denúncia.")
             }
         } catch (err) {
+            console.error("[ReportModal] Unexpected submit error:", err)
             error("Erro", "Ocorreu um erro inesperado. Tente novamente mais tarde.")
         } finally {
             setIsSubmitting(false)

@@ -63,7 +63,7 @@ export function UserCollectionsPage({ collections: initialCollections }: UserCol
     }
 
     return (
-        <div className="flex flex-col min-h-screen bg-white dark:bg-dark-surface transition-colors duration-300">
+        <div className="min-h-screen bg-white dark:bg-dark-background pt-[40px] lg:pt-[110px] font-sans flex flex-col">
             <MarketplaceHeader simpleTitle="Minhas coleções" />
 
             <div className="container mx-auto px-4 max-w-[1300px] mt-12 lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">

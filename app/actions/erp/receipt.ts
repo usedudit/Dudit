@@ -95,9 +95,14 @@ const getCachedPartnerReceiptHeader = (partnerId: string, storeId?: string) => u
         }
 
         const addr = addrData || {}
-        const streetNumber = [addr.street, addr.number !== null && addr.number !== undefined && String(addr.number).trim() !== "" ? addr.number : null].filter(Boolean).join(", ")
+        const hasNumber = addr.number !== null && addr.number !== undefined && String(addr.number).trim() !== ""
+        const streetLine = addr.street
+            ? hasNumber
+                ? `${addr.street}, ${addr.number}`
+                : `${addr.street}, S/N`
+            : ""
         const neighborhoodCityState = [addr.neighborhood, [addr.city, addr.state].filter(Boolean).join("/")].filter(Boolean).join(" - ")
-        const addressLine = [streetNumber, neighborhoodCityState].filter(Boolean).join("\n")
+        const addressLine = [streetLine, neighborhoodCityState].filter(Boolean).join("\n")
 
         const header: SaleReceiptPartnerHeader = {
             fantasyName: store?.name || "Estabelecimento",

@@ -233,78 +233,128 @@ const serwist = new Serwist({
 serwist.addEventListeners()
 
 // ============================================================
-// Firebase Cloud Messaging - background push (Android PWA)
-// Config is injected at build time from NEXT_PUBLIC_* env vars.
+// Web Push Notifications Handler (Android, iOS Safari, PWA, Desktop)
+// Processa notificações push nativamente sem dependências de scripts remotos,
+// garantindo entrega instantânea mesmo em modo Doze / segundo plano.
 // ============================================================
-const FCM_API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY || ""
-const FCM_PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || ""
+self.addEventListener("push", (event) => {
+  if (!event.data) return
 
-if (FCM_API_KEY && FCM_PROJECT_ID) {
+  let payload: {
+    title?: string
+    body?: string
+    href?: string
+    notificationId?: string
+    icon?: string
+    badge?: string
+    type?: string
+    entityType?: string
+    entityId?: string
+    data?: Record<string, unknown>
+    notification?: {
+      title?: string
+      body?: string
+      icon?: string
+      badge?: string
+    }
+  } = {}
+
   try {
-    importScripts("https://www.gstatic.com/firebasejs/11.0.2/firebase-app-compat.js")
-    importScripts("https://www.gstatic.com/firebasejs/11.0.2/firebase-messaging-compat.js")
-
-    // @ts-expect-error firebase compat global from importScripts
-    firebase.initializeApp({
-      apiKey: FCM_API_KEY,
-      authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "",
-      projectId: FCM_PROJECT_ID,
-      messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "",
-      appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "",
-    })
-
-    // @ts-expect-error firebase compat global from importScripts
-    const messaging = firebase.messaging()
-
-    messaging.onBackgroundMessage((payload: {
-      data?: {
-        title?: string
-        body?: string
-        href?: string
-        notificationId?: string
-        type?: string
-        entityType?: string
-        entityId?: string
-      }
-    }) => {
-      const title = payload.data?.title || "Dudit"
-      const body = payload.data?.body || ""
-      const href = payload.data?.href || "/"
-      const notificationId = payload.data?.notificationId
-
-      self.registration.showNotification(title, {
-        body,
-        icon: "/icons/icon-192x192.png",
-        badge: "/icons/icon-192x192.png",
-        data: { href, notificationId },
-        tag: notificationId || `dudit-${Date.now()}`,
-      } as NotificationOptions)
-    })
-
-    self.addEventListener("notificationclick", (event) => {
-      const notif = event.notification
-      notif.close()
-      const href = (notif.data && (notif.data as { href?: string }).href) || "/"
-      const url = href.startsWith("http") ? href : `${self.location.origin}${href}`
-
-      event.waitUntil(
-        self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(async (windowClients) => {
-          for (const client of windowClients) {
-            if ("focus" in client) {
-              await client.focus()
-              if ("navigate" in client && typeof (client as { navigate?: (u: string) => Promise<unknown> }).navigate === "function") {
-                await (client as { navigate: (u: string) => Promise<unknown> }).navigate(url)
-              }
-              return
-            }
-          }
-          if (self.clients.openWindow) {
-            await self.clients.openWindow(url)
-          }
-        }),
-      )
-    })
-  } catch (err) {
-    console.warn("[sw] FCM background handler skipped", err)
+    payload = event.data.json()
+  } catch {
+    try {
+      payload = { body: event.data.text() }
+    } catch {
+      payload = {}
+    }
   }
-}
+
+  const notificationData = (payload.data || payload) as Record<string, unknown>
+  const rawNotif = payload.notification || {}
+
+  const title =
+    rawNotif.title ||
+    (notificationData.title as string | undefined) ||
+    payload.title ||
+    "Dudit"
+
+  const body =
+    rawNotif.body ||
+    (notificationData.body as string | undefined) ||
+    payload.body ||
+    ""
+
+  const href =
+    (notificationData.href as string | undefined) ||
+    payload.href ||
+    "/"
+
+  const notificationId =
+    (notificationData.notificationId as string | undefined) ||
+    payload.notificationId ||
+    ""
+
+  const type =
+    (notificationData.type as string | undefined) ||
+    payload.type ||
+    ""
+
+  const icon =
+    rawNotif.icon ||
+    payload.icon ||
+    "/icons/icon-192x192.png"
+
+  const badge =
+    rawNotif.badge ||
+    payload.badge ||
+    "/icons/icon-192x192.png"
+
+  const tag =
+    notificationId ||
+    (type ? `${type}-${Date.now()}` : `dudit-${Date.now()}`)
+
+  const options: NotificationOptions = {
+    body,
+    icon,
+    badge,
+    tag,
+    data: {
+      href,
+      notificationId,
+      type,
+      entityType: notificationData.entityType || payload.entityType || "",
+      entityId: notificationData.entityId || payload.entityId || "",
+    },
+    requireInteraction: false,
+    vibrate: [100, 50, 100],
+  }
+
+  event.waitUntil(self.registration.showNotification(title, options))
+})
+
+self.addEventListener("notificationclick", (event) => {
+  const notif = event.notification
+  notif.close()
+
+  const data = (notif.data || {}) as { href?: string; notificationId?: string }
+  const href = data.href || "/"
+  const targetUrl = href.startsWith("http") ? href : `${self.location.origin}${href}`
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(async (windowClients) => {
+      for (const client of windowClients) {
+        if ("focus" in client) {
+          await client.focus()
+          if ("navigate" in client && typeof (client as { navigate?: (u: string) => Promise<unknown> }).navigate === "function") {
+            await (client as { navigate: (u: string) => Promise<unknown> }).navigate(targetUrl)
+          }
+          return
+        }
+      }
+      if (self.clients.openWindow) {
+        await self.clients.openWindow(targetUrl)
+      }
+    }),
+  )
+})
+

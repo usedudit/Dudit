@@ -861,6 +861,9 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
 
             if (existing) {
                 existing.quantity += Number(item.quantity || 0)
+                if (item.allowSellWithoutStock) {
+                    existing.allowSellWithoutStock = true
+                }
                 continue
             }
 
@@ -1299,6 +1302,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 serviceId: item.serviceId || (item.isService ? item.productId : null),
                 lineType: item.isService || item.serviceId ? 'service_booking' : (item.lineType || 'product'),
                 fulfillmentMode: item.fulfillmentMode || null,
+                allowSellWithoutStock: Boolean(item.allowSellWithoutStock),
             })),
             subtotal,
             discountValue: discountAmount,

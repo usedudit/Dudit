@@ -603,15 +603,37 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
 
     const currentPlanSlug = subData?.plan?.slug || "free"
     const currentPlanPrice = subData?.plan?.price ?? 0
-    const hasActivePaidSub = subData?.subscription &&
+
+    const isScheduledToCancel = Boolean(
+        subData?.subscription?.cancel_at_period_end &&
+        subData?.subscription?.current_period_end &&
+        new Date(subData.subscription.current_period_end).getTime() > Date.now()
+    )
+
+    const isPeriodExpired = Boolean(
+        subData?.subscription?.cancel_at_period_end &&
+        subData?.subscription?.current_period_end &&
+        new Date(subData.subscription.current_period_end).getTime() <= Date.now()
+    )
+
+    const hasActivePaidSub = Boolean(
+        subData?.subscription &&
         ["active", "trialing", "past_due"].includes(subData.subscription.status) &&
-        currentPlanSlug !== "free"
+        currentPlanSlug !== "free" &&
+        !isPeriodExpired
+    )
 
     const nextInvoice = subData?.next_invoice ?? null
-    const nextInvoiceDate = nextInvoice?.due_date
-        ?? subData?.subscription?.next_payment_date
-        ?? subData?.subscription?.current_period_end
-        ?? (subData?.subscription?.status === "trialing" ? subData.subscription.trial_end : null)
+    const nextInvoiceDate = (!isScheduledToCancel && !isPeriodExpired)
+        ? (nextInvoice?.due_date
+            ?? subData?.subscription?.next_payment_date
+            ?? subData?.subscription?.current_period_end
+            ?? (subData?.subscription?.status === "trialing" ? subData.subscription.trial_end : null))
+        : null
+
+    const accessUntilDate = (isScheduledToCancel || isPeriodExpired)
+        ? subData?.subscription?.current_period_end
+        : null
 
     const nextInvoiceStatusVariant = (status: string | null | undefined): "green" | "orange" | "red" | "gray" => {
         if (status === "completed" || status === "approved") return "green"
@@ -628,6 +650,9 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
         if (status === "cancelled") return "Cancelada"
         return null
     }
+
+    const displayPlanSlug = (!hasActivePaidSub || isPeriodExpired) ? "free" : currentPlanSlug
+    const displayPlanPrice = (!hasActivePaidSub || isPeriodExpired) ? 0 : currentPlanPrice
 
     return (
         <FadeIn>
@@ -673,44 +698,50 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                         <span className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body">
                                             Plano atual
                                         </span>
-                                        {subData?.subscription?.status === "active" && (
+                                        {isScheduledToCancel ? (
+                                            <span className="bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 text-xs font-bold px-3 py-1 rounded-full">
+                                                Cancelamento agendado
+                                            </span>
+                                        ) : hasActivePaidSub && subData?.subscription?.status === "active" ? (
                                             <span className="bg-brand-green/10 text-brand-green text-xs font-bold px-3 py-1 rounded-full">
                                                 Ativo
                                             </span>
-                                        )}
-                                        {subData?.subscription?.status === "past_due" && (
+                                        ) : hasActivePaidSub && subData?.subscription?.status === "past_due" ? (
                                             <span className="bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400 text-xs font-bold px-3 py-1 rounded-full">
                                                 Atrasado
                                             </span>
-                                        )}
-                                        {subData?.subscription?.status === "trialing" && (
+                                        ) : hasActivePaidSub && subData?.subscription?.status === "trialing" ? (
                                             <span className="bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400 text-xs font-bold px-3 py-1 rounded-full">
                                                 Trial
+                                            </span>
+                                        ) : (
+                                            <span className="bg-gray-100 dark:bg-dark-border text-brand-inactive-text dark:text-dark-body text-xs font-bold px-3 py-1 rounded-full">
+                                                Gratuito
                                             </span>
                                         )}
                                     </div>
 
                                     <h2 className="text-2xl md:text-3xl font-extrabold text-brand-dark dark:text-dark-heading mb-2">
-                                        {subData ? `Plano ${getHardcodedPlan(subData.plan.slug).name}` : "Carregando..."}
+                                        {subData ? `Plano ${getHardcodedPlan(displayPlanSlug).name}` : "Carregando..."}
                                     </h2>
 
                                     <p className="text-xs md:text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed mb-6">
-                                        {subData ? getHardcodedPlan(subData.plan.slug).objective || "Recursos essenciais para gerenciar e impulsionar seu negócio." : "..."}
+                                        {subData ? getHardcodedPlan(displayPlanSlug).objective || "Recursos essenciais para gerenciar e impulsionar seu negócio." : "..."}
                                     </p>
                                 </div>
 
                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-6 border-t border-brand-border dark:border-dark-border mt-auto">
                                     <div className="flex items-baseline gap-1">
                                         <span className="text-2xl md:text-3xl font-extrabold text-brand-dark dark:text-dark-heading">
-                                            {subData ? (currentPlanPrice > 0 ? formatCurrency(currentPlanPrice) : "Grátis") : "..."}
+                                            {subData ? (displayPlanPrice > 0 ? formatCurrency(displayPlanPrice) : "Grátis") : "..."}
                                         </span>
-                                        {currentPlanPrice > 0 && (
+                                        {displayPlanPrice > 0 && (
                                             <span className="text-xs text-brand-inactive-text font-normal">/mês</span>
                                         )}
                                     </div>
 
                                     <div className="flex items-center gap-2">
-                                        {hasActivePaidSub && !subData?.subscription?.cancel_at_period_end && (
+                                        {hasActivePaidSub && !isScheduledToCancel && (
                                             <>
                                                 {subData?.subscription?.status === "past_due" && (
                                                     <Button
@@ -740,18 +771,18 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                             className="bg-brand-green text-white hover:bg-brand-green/90 text-xs md:text-sm font-bold h-11 px-6"
                                             onClick={() => setPlansOpen(true)}
                                         >
-                                            Alterar Plano
+                                            {displayPlanPrice === 0 ? "Fazer Upgrade" : "Alterar Plano"}
                                         </Button>
                                     </div>
                                 </div>
 
-                                {nextInvoiceDate && hasActivePaidSub && (
+                                {hasActivePaidSub && (
                                     <div className="mt-5 pt-4 border-t border-brand-border dark:border-dark-border flex items-center justify-between text-xs md:text-sm">
                                         <span className="text-brand-inactive-text dark:text-dark-body font-medium">
-                                            {subData?.subscription?.cancel_at_period_end ? "Acesso até" : "Renova em"}
+                                            {isScheduledToCancel ? "Acesso até" : "Renova em"}
                                         </span>
-                                        <span className={`font-bold ${subData?.subscription?.cancel_at_period_end ? "text-red-500" : "text-brand-dark dark:text-dark-heading"}`}>
-                                            {formatDate(nextInvoiceDate)}
+                                        <span className={`font-bold ${isScheduledToCancel ? "text-amber-600 dark:text-amber-400" : "text-brand-dark dark:text-dark-heading"}`}>
+                                            {(isScheduledToCancel ? accessUntilDate : nextInvoiceDate) ? formatDate(isScheduledToCancel ? accessUntilDate! : nextInvoiceDate!) : "-"}
                                         </span>
                                     </div>
                                 )}
@@ -764,47 +795,100 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                         <span className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body">
                                             Próxima fatura
                                         </span>
-                                        {nextInvoiceStatusLabel(nextInvoice?.status) && (
+                                        {isScheduledToCancel ? (
+                                            <Badge variant="gray">
+                                                Cancelada
+                                            </Badge>
+                                        ) : !hasActivePaidSub ? (
+                                            <Badge variant="gray">
+                                                Sem cobranças
+                                            </Badge>
+                                        ) : nextInvoiceStatusLabel(nextInvoice?.status) ? (
                                             <Badge variant={nextInvoiceStatusVariant(nextInvoice?.status)}>
                                                 {nextInvoiceStatusLabel(nextInvoice?.status)}
                                             </Badge>
-                                        )}
+                                        ) : null}
                                     </div>
 
                                     <h2 className="text-3xl md:text-4xl font-extrabold text-brand-dark dark:text-dark-heading mb-6">
-                                        {subData ? (currentPlanPrice > 0 ? formatCurrency(nextInvoice?.amount ?? currentPlanPrice) : "R$ 0,00") : "..."}
+                                        {subData ? (
+                                            (!hasActivePaidSub || isScheduledToCancel)
+                                                ? "R$ 0,00"
+                                                : formatCurrency(nextInvoice?.amount ?? currentPlanPrice)
+                                        ) : "..."}
                                     </h2>
                                 </div>
 
                                 <div className="space-y-3 pt-6 border-t border-brand-border dark:border-dark-border mt-auto">
-                                    <div className="flex items-center justify-between text-xs md:text-sm">
-                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">Fatura</span>
-                                        <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                            {nextInvoice?.invoice_number || "A gerar"}
-                                        </span>
-                                    </div>
+                                    {isScheduledToCancel ? (
+                                        <>
+                                            <div className="flex items-center justify-between text-xs md:text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Fatura</span>
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                    Nenhuma fatura a gerar
+                                                </span>
+                                            </div>
 
-                                    <div className="flex items-center justify-between text-xs md:text-sm">
-                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">Plano</span>
-                                        <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                            {subData ? `Plano ${getHardcodedPlan(subData.plan.slug).name}` : "-"}
-                                        </span>
-                                    </div>
+                                            <div className="flex items-center justify-between text-xs md:text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Renovação</span>
+                                                <span className="font-bold text-amber-600 dark:text-amber-400">
+                                                    Cancelada
+                                                </span>
+                                            </div>
 
-                                    <div className="flex items-center justify-between text-xs md:text-sm">
-                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">Vencimento</span>
-                                        <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                            {nextInvoiceDate ? formatDate(nextInvoiceDate) : "-"}
-                                        </span>
-                                    </div>
+                                            <div className="flex items-center justify-between text-xs md:text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Acesso até</span>
+                                                <span className="font-bold text-amber-600 dark:text-amber-400">
+                                                    {accessUntilDate ? formatDate(accessUntilDate) : "-"}
+                                                </span>
+                                            </div>
+                                        </>
+                                    ) : !hasActivePaidSub ? (
+                                        <>
+                                            <div className="flex items-center justify-between text-xs md:text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Fatura</span>
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                    Sem faturas pendentes
+                                                </span>
+                                            </div>
 
-                                    {subData?.subscription?.cancel_at_period_end && nextInvoiceDate && (
-                                        <div className="flex items-center justify-between text-xs md:text-sm">
-                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Acesso até</span>
-                                            <span className="font-bold text-red-500">
-                                                {formatDate(nextInvoiceDate)}
-                                            </span>
-                                        </div>
+                                            <div className="flex items-center justify-between text-xs md:text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Plano</span>
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                    Plano Começar (Gratuito)
+                                                </span>
+                                            </div>
+
+                                            <div className="flex items-center justify-between text-xs md:text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Vencimento</span>
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                    Sem vencimento
+                                                </span>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="flex items-center justify-between text-xs md:text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Fatura</span>
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                    {nextInvoice?.invoice_number || "A gerar"}
+                                                </span>
+                                            </div>
+
+                                            <div className="flex items-center justify-between text-xs md:text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Plano</span>
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                    {subData ? `Plano ${getHardcodedPlan(subData.plan.slug).name}` : "-"}
+                                                </span>
+                                            </div>
+
+                                            <div className="flex items-center justify-between text-xs md:text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Vencimento</span>
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                    {nextInvoiceDate ? formatDate(nextInvoiceDate) : "-"}
+                                                </span>
+                                            </div>
+                                        </>
                                     )}
                                 </div>
                             </div>

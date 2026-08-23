@@ -156,7 +156,7 @@ export async function requestDuditDeliveryAction(input: {
   revalidatePath("/erp/logistica")
   revalidatePath("/erp/pedidos")
   revalidatePath("/entregadores")
-  revalidatePath("/entregadores/disponiveis")
+  revalidatePath("/entregadores/entregas-disponiveis")
 
   return { success: true as const, assignmentId: inserted.id }
 }
@@ -210,7 +210,7 @@ export async function cancelDuditDeliveryRequestAction(input: {
   revalidatePath("/erp/logistica")
   revalidatePath("/erp/pedidos")
   revalidatePath("/entregadores")
-  revalidatePath("/entregadores/disponiveis")
+  revalidatePath("/entregadores/entregas-disponiveis")
 
   return { success: true as const }
 }

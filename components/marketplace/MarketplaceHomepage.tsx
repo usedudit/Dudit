@@ -636,6 +636,7 @@ export default function MarketplaceHome({
 
                 <div className="mx-auto max-w-[1400px] px-4 xl:px-0 space-y-10">
                     {sections.map((section) => {
+                        const onSeeAll = section.seeMoreLink ? () => router.push(section.seeMoreLink!) : undefined
                         if (section.id === "topVitrines") {
                             return (
                                 <HorizontalCarousel
@@ -643,6 +644,7 @@ export default function MarketplaceHome({
                                     title={section.title}
                                     subtitle={section.subtitle}
                                     items={section.items}
+                                    onSeeAll={onSeeAll}
                                     renderItem={(item: any) => <VitrineCard vitrine={item} locationContext={locationContext} className="w-full" />}
                                     itemWidthClass="w-[270px] sm:w-[320px]"
                                 />
@@ -654,6 +656,7 @@ export default function MarketplaceHome({
                                 title={section.title}
                                 subtitle={section.subtitle}
                                 items={section.items}
+                                onSeeAll={onSeeAll}
                                 renderItem={(item: any) => <ItemCard product={item} userCoords={userCoords} locationContext={locationContext} className="w-full" />}
                                 itemWidthClass="w-[190px] sm:w-[210px]"
                             />

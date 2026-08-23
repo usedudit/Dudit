@@ -216,6 +216,10 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
 
   const partnerData = {
     id: store.id,
+    partner_id: store.partner_id,
+    partnerId: store.partner_id,
+    user_id: partner?.user_id || store.user_id,
+    userId: partner?.user_id || store.user_id,
     short_id: store.short_id,
     slug: store.slug,
     name: store.name || "Loja",

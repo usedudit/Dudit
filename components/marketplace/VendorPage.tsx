@@ -1098,9 +1098,19 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                             <button
                                 onClick={() => setIsAboutPageOpen(true)}
                                 className="w-8 h-8 rounded-full bg-gray-100 dark:bg-dark-border/50 flex items-center justify-center text-brand-dark dark:text-dark-heading active:bg-gray-200 dark:active:bg-dark-border transition-colors"
+                                title="Sobre a loja"
                             >
                                 <InfoIcon size={14} />
                             </button>
+                            {!isStoreOwner && (
+                                <button
+                                    onClick={() => setShowReportModal(true)}
+                                    className="w-8 h-8 rounded-full bg-gray-100 dark:bg-dark-border/50 flex items-center justify-center text-brand-inactive-text dark:text-dark-body hover:text-[#d32f2f] active:bg-gray-200 dark:active:bg-dark-border transition-colors"
+                                    title="Comunicar algo errado sobre este vendedor"
+                                >
+                                    <FlagIcon size={14} />
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -1439,7 +1449,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
             </div>
 
             <ShareModal isOpen={showShareModal} onClose={() => setShowShareModal(false)} url={isMounted ? `${window.location.origin}${getStoreUrl(partner)}` : ""} title={partner.storeName} shareMessage={shareMessage} label="Link da vitrine" />
-            <ReportModal isOpen={showReportModal} onClose={() => setShowReportModal(false)} targetType="partner" targetId={partner.id} targetName={partner.storeName} />
+            <ReportModal isOpen={showReportModal} onClose={() => setShowReportModal(false)} targetType="partner" targetId={partner.partner_id || partner.partnerId || partner.id} targetName={partner.storeName} />
 
 
             <DefaultModal isOpen={!!selectedCoupon} onClose={() => setSelectedCoupon(null)} title={selectedCoupon?.code || "Cupom"} maxWidth="sm">

@@ -45,9 +45,10 @@ export async function getSubscriptionStatusAction(): Promise<ActionResponse<any>
     const user = await requireUser()
     const partner = await requirePartner()
 
-    const [subscription, plan, counters] = await Promise.all([
+    // 1. Resolve active plan first (triggers expiration downgrade if past period end)
+    const plan = await getPartnerPlan(partner.id)
+    const [subscription, counters] = await Promise.all([
       getPartnerSubscription(partner.id),
-      getPartnerPlan(partner.id),
       getUsageCounters(partner.id),
     ])
 
@@ -65,13 +66,11 @@ export async function getSubscriptionStatusAction(): Promise<ActionResponse<any>
         }
       : null
 
-    // Enrich with the next payment date from Mercado Pago when available.
-    // This is more reliable than current_period_end for subscriptions that
-    // were created before period dates were tracked.
     // Enrich with MP subscription status and auto-sync with Mercado Pago if authorized
     if (
       subscriptionPayload &&
-      subscription?.mercado_pago_subscription_id
+      subscription?.mercado_pago_subscription_id &&
+      !subscription.cancel_at_period_end
     ) {
       try {
         const mpStatus = await getMpSubscriptionStatus(subscription.mercado_pago_subscription_id)
@@ -118,8 +117,8 @@ export async function getSubscriptionStatusAction(): Promise<ActionResponse<any>
       }
     }
 
-    // Always provide a correct upcoming charge date (never in the past).
-    if (subscriptionPayload && subscription) {
+    // Provide upcoming charge date ONLY if subscription will renew (cancel_at_period_end is false)
+    if (subscriptionPayload && subscription && !subscription.cancel_at_period_end) {
       if (!subscriptionPayload.next_payment_date) {
         const periods = computeSubscriptionPeriods(subscription)
         subscriptionPayload.next_payment_date = periods.nextStart.toISOString()
@@ -127,11 +126,14 @@ export async function getSubscriptionStatusAction(): Promise<ActionResponse<any>
     }
 
     // ── Fetch the NEXT cycle purchase (the "Próxima Fatura") from billing ──
+    // Only applies if the subscription is active, paying, and NOT scheduled to cancel
     let nextInvoice: any = null
     if (
       subscriptionPayload &&
       subscription &&
-      ["active", "trialing"].includes(subscription.status)
+      ["active", "trialing"].includes(subscription.status) &&
+      !subscription.cancel_at_period_end &&
+      plan.slug !== "free"
     ) {
       try {
         const admin = getAdminClient()

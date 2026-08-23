@@ -207,7 +207,7 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                         <div className="hidden md:flex items-center gap-2">
 
                             {/* Botão Unificado (Ícone + Nome + Setas) */}
-                            <button
+                            <div
                                 className="group flex items-center gap-2 pl-1 pr-2 py-1 rounded-full hover:bg-gray-100 dark:hover:bg-dark-border transition-colors cursor-pointer select-none"
                             >
                                 <div className="flex items-center gap-1.5 h-full">
@@ -220,7 +220,7 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                                     {/* 3. Ícone Duas Setas (Selector) */}
                                     <ChevronsUpDown className="w-4 h-4 text-brand-inactive-text/70 dark:text-dark-body/70" />
                                 </div>
-                            </button>
+                            </div>
 
                             {/* Separador Chevron Right */}
                             <ChevronRightIcon className="w-4 h-4 text-brand-inactive-text/50 dark:text-dark-body/50" />
@@ -265,9 +265,10 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                                 <HelpCircleIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                             </button>
                         )}
-                        <NotificationBell variant="erp" />
-
-                        <div className="h-6 w-px bg-brand-border dark:border-dark-border" />
+                        <div className="hidden md:flex items-center gap-3">
+                            <NotificationBell variant="erp" />
+                            <div className="h-6 w-px bg-brand-border dark:border-dark-border" />
+                        </div>
 
                         <div className="md:hidden flex items-center cursor-pointer" onClick={() => setIsProfileOpen(true)}>
                             <UserProfileImage
@@ -370,6 +371,9 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                                 </p>
                             </div>
                             <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate mt-0.5">{userEmail}</p>
+                        </div>
+                        <div className="shrink-0" onClick={() => setIsProfileOpen(false)}>
+                            <NotificationBell variant="erp" />
                         </div>
                     </div>
 

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
-import { ChevronRightIcon, XIcon, SalesIcon, MoneyIcon, TagIcon, FileIcon, PackageIcon, StarIcon } from "@/lib/icons"
+import { ChevronRightIcon, XIcon, MoneyIcon, TagIcon, FileIcon, PackageIcon, StarIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { Button, AlertModal, DefaultModal, MoneyInput, PercentageInput, InfoCard, Input, IconPlaceholder, ListItem, RadioButton, Badge, FormTextarea } from "@/components/reusable"
@@ -517,8 +517,6 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
             selectedSellerId,
             discountAmount,
             discountType,
-            discountCouponCode,
-            shippingFee,
             notes,
             cart,
             hasDelivery,
@@ -529,10 +527,17 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
     const hasUnsavedOrderChanges = currentOrderSignature !== lastSavedOrderSignature
     const percentagePresets = [5, 10, 15, 20]
 
-    const addToCart = useCallback((product: Product, variantId?: string | null, quantity: number = 1, force?: boolean) => {
+    const addToCart = useCallback((
+        product: Product,
+        variantId?: string | null,
+        quantity: number = 1,
+        force?: boolean,
+        selectedAddons: Array<{ groupId: string; groupName: string; optionId: string; optionName: string; price: number }> = []
+    ) => {
         const normalizedQty = Math.max(1, Number(quantity || 1))
+        const variantsList = product.product_variants || (product as any).variants || []
         const selectedVariant = variantId
-            ? product.product_variants?.find((variant) => variant.id === variantId)
+            ? variantsList.find((variant: any) => variant.id === variantId)
             : null
 
         if (variantId && !selectedVariant) {
@@ -541,19 +546,39 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
         }
 
         const availableStock = selectedVariant
-            ? Number(selectedVariant.stock_available || 0)
-            : Number(product.stock_available || 0)
+            ? Number(selectedVariant.stock_available ?? selectedVariant.stock_quantity ?? 0)
+            : Number(product.stock_available ?? (product as any).stock_quantity ?? 0)
+
+        const addonsUnitPrice = selectedAddons.reduce((sum, item) => sum + (Number(item.price) || 0), 0)
 
         const proceedAddToCart = (forceBypass?: boolean) => {
             setCart((prev) => {
                 const targetId = product.id
                 const isService = product.product_type === "service" || product.product_type === "Serviço"
-                const found = prev.find((item) => (item.productId === targetId || item.serviceId === targetId) && item.variantId === (variantId || null))
+
+                // Compare item identity: same product, same variant, same addons
+                const found = prev.find((item) => {
+                    const isSameProduct = (item.productId === targetId || item.serviceId === targetId)
+                    const isSameVariant = item.variantId === (variantId || null)
+                    const itemAddons = item.selectedAddons || []
+                    const isSameAddons = itemAddons.length === selectedAddons.length &&
+                        itemAddons.every((ia) => selectedAddons.some((sa) => sa.optionId === ia.optionId))
+                    return isSameProduct && isSameVariant && isSameAddons
+                })
+
                 if (!found) {
-                    const listUnit = Number(product.price || 0) + Number(selectedVariant?.price_adjustment || 0)
+                    const baseListUnit = Number(product.price || 0) + Number(selectedVariant?.price_adjustment || 0)
+                    const listUnit = baseListUnit + addonsUnitPrice
                     const prodAny = product as any
                     const promoPrice = prodAny.promotional_price ? Number(prodAny.promotional_price) : 0
-                    const effectiveUnit = computeItemDisplayPrice(listUnit, promoPrice > 0 && promoPrice < listUnit ? promoPrice : null, pdvPromotions, { productId: product.id, categoryId: product.category?.id || undefined }).bestPrice
+                    const baseEffectiveUnit = computeItemDisplayPrice(
+                        baseListUnit,
+                        promoPrice > 0 && promoPrice < baseListUnit ? promoPrice : null,
+                        pdvPromotions,
+                        { productId: product.id, categoryId: product.category?.id || undefined }
+                    ).bestPrice
+                    const effectiveUnit = baseEffectiveUnit + addonsUnitPrice
+
                     return [
                         ...prev,
                         {
@@ -562,14 +587,15 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                             serviceId: isService ? product.id : null,
                             variantId: variantId || null,
                             name: product.name,
-                            variantName: selectedVariant?.variant_name || null,
+                            variantName: selectedVariant?.variant_name || selectedVariant?.name || null,
                             listUnitPrice: listUnit,
                             lineDiscountType: null,
                             lineDiscountValue: null,
                             price: effectiveUnit,
                             qty: normalizedQty,
-                            image: (selectedVariant?.variant_options?.image as string | undefined) || product.images?.[0] || null,
-                            allowSellWithoutStock: forceBypass ? true : (isService ? true : Boolean(product.allow_sell_without_stock))
+                            image: (selectedVariant?.variant_options?.image as string | undefined) || selectedVariant?.image || product.images?.[0] || null,
+                            allowSellWithoutStock: forceBypass ? true : (isService ? true : Boolean(product.allow_sell_without_stock)),
+                            selectedAddons: selectedAddons.length > 0 ? selectedAddons : undefined,
                         },
                     ]
                 }
@@ -586,21 +612,29 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
         const isServiceItem = product.product_type === "service" || product.product_type === "Serviço"
         if (!force && !isServiceItem && !product.allow_sell_without_stock) {
             const targetId = product.id
-            const existingItem = cart.find((item) => (item.productId === targetId || item.serviceId === targetId) && item.variantId === (variantId || null))
+            const existingItem = cart.find((item) => {
+                const isSameProduct = (item.productId === targetId || item.serviceId === targetId)
+                const isSameVariant = item.variantId === (variantId || null)
+                const itemAddons = item.selectedAddons || []
+                const isSameAddons = itemAddons.length === selectedAddons.length &&
+                    itemAddons.every((ia) => selectedAddons.some((sa) => sa.optionId === ia.optionId))
+                return isSameProduct && isSameVariant && isSameAddons
+            })
             if (existingItem) {
                 const nextQty = existingItem.qty + normalizedQty
                 if (nextQty > availableStock && !existingItem.allowSellWithoutStock) {
                     setPendingZeroStockItem({
                         product: { name: existingItem.name },
-                        callback: () => addToCart(product, variantId, quantity, true)
+                        callback: () => addToCart(product, variantId, quantity, true, selectedAddons)
                     })
                     setShowZeroStockAlert(true)
                     return
                 }
             } else if (normalizedQty > availableStock) {
+                const displayName = selectedVariant?.variant_name ? `${product.name} - ${selectedVariant.variant_name}` : product.name
                 setPendingZeroStockItem({
-                    product: { name: selectedVariant?.variant_name ? `${product.name} - ${selectedVariant.variant_name}` : product.name },
-                    callback: () => addToCart(product, variantId, quantity, true)
+                    product: { name: displayName },
+                    callback: () => addToCart(product, variantId, quantity, true, selectedAddons)
                 })
                 setShowZeroStockAlert(true)
                 return
@@ -608,7 +642,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
         }
 
         proceedAddToCart(force)
-    }, [cart, notifyError, pdvPromotions])
+    }, [pdvPromotions, cart, notifyError])
 
     const handleScanBarcode = useCallback(async (code: string) => {
         const cleanCode = code.trim()
@@ -669,8 +703,10 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                     })
 
                     const finalVariantId = serverProduct.matchedVariantId || null
+                    const hasVars = (Array.isArray(dbProduct.product_variants) && dbProduct.product_variants.length > 0) || (Array.isArray((dbProduct as any).variants) && (dbProduct as any).variants.length > 0)
+                    const hasAddons = (Array.isArray((dbProduct as any).addon_groups) && (dbProduct as any).addon_groups.length > 0) || (Array.isArray((dbProduct as any).technical_specs?.addon_groups) && (dbProduct as any).technical_specs.addon_groups.length > 0)
 
-                    if (dbProduct.product_variants && dbProduct.product_variants.length > 0 && !finalVariantId) {
+                    if ((hasVars || hasAddons) && !finalVariantId) {
                         setVariantPickerProduct(dbProduct)
                     } else {
                         addToCart(dbProduct, finalVariantId)
@@ -782,8 +818,9 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
         const currentItem = cart.find((i) => i.id === itemId)
         if (currentItem && delta > 0) {
             const product = products.find((p) => p.id === currentItem.productId)
-            const variant = currentItem.variantId ? product?.product_variants?.find((v) => v.id === currentItem.variantId) : null
-            const availableStock = variant ? Number(variant.stock_available || 0) : Number(product?.stock_available || 0)
+            const variantsList = product?.product_variants || (product as any)?.variants || []
+            const variant = currentItem.variantId ? variantsList.find((v: any) => v.id === currentItem.variantId) : null
+            const availableStock = variant ? Number(variant.stock_available ?? variant.stock_quantity ?? 0) : Number(product?.stock_available ?? (product as any)?.stock_quantity ?? 0)
             const nextQty = currentItem.qty + delta
 
             if (product && !product.allow_sell_without_stock && !currentItem.allowSellWithoutStock && nextQty > availableStock) {
@@ -868,6 +905,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                     lineDiscountValue: item.lineDiscountValue ?? null,
                     isManualPrice: (item as any).isManualPrice || null,
                     allowSellWithoutStock: Boolean((item as any).allowSellWithoutStock) || null,
+                    selectedAddons: item.selectedAddons || null,
                 })),
                 couponId: appliedCouponId,
                 couponCode: appliedCouponCode,
@@ -937,6 +975,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                     image: item.image || null,
                     isManualPrice: Boolean(item.isManualPrice ?? item.is_manual_price),
                     allowSellWithoutStock: Boolean(item.allow_sell_without_stock ?? item.allowSellWithoutStock),
+                    selectedAddons: Array.isArray(item.selectedAddons) ? item.selectedAddons : Array.isArray(item.selected_addons) ? item.selected_addons : undefined,
                 }
             })
 
@@ -1036,11 +1075,25 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
         setIsPaymentModalOpen(true)
     }, [cart.length, notifyError])
 
-    const handleConfirmVariantSelection = useCallback((selections: Array<{ variantId: string; qty: number }>) => {
+    const handleConfirmVariantSelection = useCallback((
+        selections: Array<{ variantId: string; qty: number }>,
+        selectedAddons: Array<{ groupId: string; groupName: string; optionId: string; optionName: string; price: number }> = [],
+        quantity: number = 1
+    ) => {
         if (!variantPickerProduct) return
-        for (const selection of selections) {
-            addToCart(variantPickerProduct, selection.variantId, selection.qty)
+        const variantsList = variantPickerProduct.product_variants || (variantPickerProduct as any).variants || []
+        const hasVariants = Array.isArray(variantsList) && variantsList.length > 0
+
+        if (hasVariants) {
+            for (const selection of selections) {
+                if (selection.qty > 0) {
+                    addToCart(variantPickerProduct, selection.variantId, selection.qty, false, selectedAddons)
+                }
+            }
+        } else {
+            addToCart(variantPickerProduct, null, quantity, false, selectedAddons)
         }
+        setVariantPickerProduct(null)
     }, [addToCart, variantPickerProduct])
 
     const handleConfirmPayment = async (paymentData: {
@@ -1089,6 +1142,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                         listUnitPrice: item.listUnitPrice ?? item.price,
                         isManualPrice: Boolean((item as any).isManualPrice),
                         allowSellWithoutStock: Boolean(item.allowSellWithoutStock),
+                        selectedAddons: item.selectedAddons || null,
                     })),
                     subtotal,
                     discountAmount: discountVal,
@@ -1566,8 +1620,19 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                                                 pdvPromotions,
                                                 { productId: product.id, categoryId: product.category?.id || undefined }
                                             )
+                                            const variantsList = product.product_variants || (product as any).variants || []
+                                            const hasVariants = Array.isArray(variantsList) && variantsList.length > 0
+                                            const rawAddonGroups = (Array.isArray(product.addon_groups) && product.addon_groups.length > 0)
+                                                ? product.addon_groups
+                                                : (Array.isArray((product as any).technical_specs?.addon_groups) && (product as any).technical_specs.addon_groups.length > 0)
+                                                    ? (product as any).technical_specs.addon_groups
+                                                    : []
+                                            const hasAddons = rawAddonGroups.length > 0
+
                                             const isServiceItem = product.product_type === "service" || product.product_type === "Serviço"
-                                            const stock = Number(product.stock_available || 0)
+                                            const stock = hasVariants
+                                                ? variantsList.reduce((sum: number, v: any) => sum + Number(v.stock_available ?? v.stock_quantity ?? v.stock ?? 0), 0)
+                                                : Number(product.stock_available ?? (product as any).stock_quantity ?? 0)
                                             const minStock = product.min_stock != null ? Number(product.min_stock) : null
                                             let stockVariant: "green" | "orange" | "red" = "green"
                                             if (stock <= 0) {
@@ -1603,8 +1668,11 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                                                     </div>
                                                     <div>
                                                         <p className="truncate text-sm font-bold text-brand-dark dark:text-dark-heading">{product.name}</p>
-                                                        {product.product_variants && product.product_variants.length > 0 && (
-                                                            <p className="text-sm text-brand-inactive-text">{product.product_variants.length} variação(ões)</p>
+                                                        {hasVariants && (
+                                                            <p className="text-sm text-brand-inactive-text">{variantsList.length} variação(ões)</p>
+                                                        )}
+                                                        {hasAddons && !hasVariants && (
+                                                            <p className="text-sm text-brand-inactive-text">{rawAddonGroups.length} grupo(s) de complementos</p>
                                                         )}
 
                                                         {pr.referencePrice ? (
@@ -1628,7 +1696,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                                                             variant="outline"
                                                             className="mt-3 h-9 w-full rounded-full border-brand-border text-xs font-bold text-brand-dark hover:bg-brand-gray"
                                                             onClick={() => {
-                                                                if (product.product_variants && product.product_variants.length > 0) {
+                                                                if (hasVariants || hasAddons) {
                                                                     setVariantPickerProduct(product)
                                                                     return
                                                                 }
@@ -1778,36 +1846,46 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                             <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
                                 Escolha se deseja visualizar os produtos ou serviços no catálogo e nas categorias do PDV.
                             </p>
-                            <div className="grid grid-cols-2 gap-3 pt-1">
-                                <button
-                                    type="button"
+                            <div className="grid gap-3 pt-1">
+                                <ListItem
                                     onClick={() => {
                                         handleItemTypeTabChange("product")
                                         setIsTypeFilterModalOpen(false)
                                     }}
-                                    className={`flex flex-col items-center justify-center gap-3 rounded-2xl border p-5 text-center transition-all ${itemTypeTab === "product"
-                                        ? "border-brand-primary bg-green-50/70 text-brand-primary dark:bg-brand-primary/10 shadow-sm"
-                                        : "border-brand-border bg-white text-brand-dark hover:border-brand-primary/50 dark:border-dark-border dark:bg-dark-surface dark:text-dark-heading"
-                                        }`}
-                                >
-                                    <PackageIcon size={32} />
-                                    <span className="font-bold text-base">Produtos</span>
-                                </button>
+                                    title="Produtos"
+                                    description="Visualizar produtos no catálogo"
+                                    right={
+                                        <RadioButton
+                                            name="itemType"
+                                            value="product"
+                                            checked={itemTypeTab === "product"}
+                                            onChange={() => {
+                                                handleItemTypeTabChange("product")
+                                                setIsTypeFilterModalOpen(false)
+                                            }}
+                                        />
+                                    }
+                                />
 
-                                <button
-                                    type="button"
+                                <ListItem
                                     onClick={() => {
                                         handleItemTypeTabChange("service")
                                         setIsTypeFilterModalOpen(false)
                                     }}
-                                    className={`flex flex-col items-center justify-center gap-3 rounded-2xl border p-5 text-center transition-all ${itemTypeTab === "service"
-                                        ? "border-brand-primary bg-green-50/70 text-brand-primary dark:bg-brand-primary/10 shadow-sm"
-                                        : "border-brand-border bg-white text-brand-dark hover:border-brand-primary/50 dark:border-dark-border dark:bg-dark-surface dark:text-dark-heading"
-                                        }`}
-                                >
-                                    <FileIcon size={32} />
-                                    <span className="font-bold text-base">Serviços</span>
-                                </button>
+                                    title="Serviços"
+                                    description="Visualizar serviços no catálogo"
+                                    right={
+                                        <RadioButton
+                                            name="itemType"
+                                            value="service"
+                                            checked={itemTypeTab === "service"}
+                                            onChange={() => {
+                                                handleItemTypeTabChange("service")
+                                                setIsTypeFilterModalOpen(false)
+                                            }}
+                                        />
+                                    }
+                                />
                             </div>
                         </div>
                     </DefaultModal>

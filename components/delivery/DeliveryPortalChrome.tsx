@@ -200,9 +200,10 @@ export function DeliveryPortalHeader({
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <NotificationBell variant="erp" />
-
-                        <div className="h-6 w-px bg-brand-border dark:border-dark-border" />
+                        <div className="hidden md:flex items-center gap-3">
+                            <NotificationBell variant="erp" />
+                            <div className="h-6 w-px bg-brand-border dark:border-dark-border" />
+                        </div>
 
                         <div className="md:hidden flex items-center" onClick={() => setIsProfileOpen(true)}>
                             <div
@@ -270,7 +271,7 @@ export function DeliveryPortalHeader({
                                     {([
                                         { label: "Meu Perfil", href: "/perfil", icon: <UserIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" /> },
                                         { label: "Central de Ajuda", href: "/ajuda", icon: <HelpCircleIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" /> },
-                                        { label: "Sair da sessão", className: "text-brand-red", onClick: handleSignOut, icon: <LogoutIcon className="w-4 h-4 text-brand-red dark:text-brand-red" /> }
+                                        { label: "Sair da sessão", className: "brand-red", onClick: handleSignOut, icon: <LogoutIcon className="w-4 h-4 text-brand-red dark:text-brand-red" /> }
                                     ] as any[]).map((item, idx) => {
                                         const ItemWrapper: any = item.href ? Link : "div";
                                         const wrapProps = item.href
@@ -318,6 +319,9 @@ export function DeliveryPortalHeader({
                                 </span>
                             </div>
                             <p className="text-sm text-brand-inactive-text dark:text-dark-body truncate">{userEmail}</p>
+                        </div>
+                        <div className="shrink-0" onClick={() => setIsProfileOpen(false)}>
+                            <NotificationBell variant="erp" />
                         </div>
                     </div>
 

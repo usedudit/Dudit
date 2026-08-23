@@ -131,9 +131,6 @@ export default function SelectProductSheet({ isOpen, onClose, products, existing
                         {product.name}
                       </span>
                     </div>
-                    <p className="truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body">
-                      SKU: {product.sku || "-"}
-                    </p>
                   </div>
                   <div className="shrink-0 text-sm font-semibold text-brand-dark dark:text-dark-heading">
                     {formatCurrency(product.price)}

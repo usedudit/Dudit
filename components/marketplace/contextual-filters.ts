@@ -99,6 +99,41 @@ export const SECTION_FILTERS: Record<string, SectionFilterMapping> = {
         icon: "🆕",
         config: { showCategory: true, showPrice: true, showSort: true, showRadius: true },
     },
+    theme_alimentacao: {
+        label: "Sabores da região",
+        icon: "🍽️",
+        config: { showSubcategories: true, showPrice: true, showSort: true, showPromo: true, showRadius: true },
+    },
+    theme_casa: {
+        label: "Dando um trato na casa",
+        icon: "🏠",
+        config: { showSubcategories: true, showPrice: true, showSort: true, showPromo: true, showRadius: true },
+    },
+    theme_tecnologia: {
+        label: "Tecnologia pra facilitar",
+        icon: "💻",
+        config: { showSubcategories: true, showPrice: true, showSort: true, showPromo: true, showRadius: true },
+    },
+    theme_moda: {
+        label: "Renove o visual",
+        icon: "👗",
+        config: { showSubcategories: true, showPrice: true, showSort: true, showPromo: true, showRadius: true },
+    },
+    theme_saude: {
+        label: "Cuide de você",
+        icon: "💚",
+        config: { showSubcategories: true, showPrice: true, showSort: true, showPromo: true, showRadius: true },
+    },
+    theme_automotivo: {
+        label: "Cuidado com o veículo",
+        icon: "🚗",
+        config: { showSubcategories: true, showPrice: true, showSort: true, showPromo: true, showRadius: true },
+    },
+    theme_pets: {
+        label: "Mimos pro seu pet",
+        icon: "🐾",
+        config: { showSubcategories: true, showPrice: true, showSort: true, showPromo: true, showRadius: true },
+    },
 }
 
 export function getFilterConfig(sectionId: string | null, pageMode: PageMode): FilterConfig {

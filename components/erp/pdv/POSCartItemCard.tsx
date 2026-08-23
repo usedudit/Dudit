@@ -37,6 +37,15 @@ const POSCartItemCard = memo(function POSCartItemCard({
           {item.variantName && (
             <p className="truncate text-xs text-brand-inactive-text dark:text-dark-body">{item.variantName}</p>
           )}
+          {item.selectedAddons && item.selectedAddons.length > 0 && (
+            <div className="mt-0.5 space-y-0.5">
+              {item.selectedAddons.map((addon, aIdx) => (
+                <p key={aIdx} className="text-xs text-brand-inactive-text dark:text-dark-body truncate">
+                  + {addon.optionName} {addon.price > 0 ? `(${formatCurrency(addon.price)})` : ""}
+                </p>
+              ))}
+            </div>
+          )}
           <p className="text-sm text-brand-inactive-text dark:text-dark-body">
             {isGift ? "Brinde" : formatCurrency(item.price)}
           </p>

@@ -3,8 +3,9 @@
 import { useCallback, useRef, useEffect } from "react"
 import { NotificationItem } from "./NotificationItem"
 import type { NotificationRecord } from "@/lib/notifications/types"
-import { Bell, Loader2 } from "lucide-react"
+import { Bell, BellRing, Loader2 } from "lucide-react"
 import { IconPlaceholder, ThreeDotsLoader } from "../reusable"
+import { usePushNotificationStatus } from "./PushNotificationManager"
 
 interface Group {
   label: string
@@ -52,6 +53,34 @@ export function NotificationPanel({
     return () => observer.disconnect()
   }, [handleIntersect])
 
+  const { isSupported, permission, isEnabling, requestEnable } = usePushNotificationStatus()
+
+  const pushBanner = isSupported && permission === "default" && (
+    <div className="mx-3 mt-3 mb-2 p-3 rounded-xl bg-brand-green/10 border border-brand-green/20 flex items-center justify-between gap-3">
+      <div className="flex items-center gap-2.5 min-w-0">
+        <div className="w-8 h-8 rounded-full bg-brand-green/20 flex items-center justify-center shrink-0 text-brand-green">
+          <BellRing className="w-4 h-4" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-xs font-semibold text-brand-dark dark:text-dark-heading leading-tight">
+            Receber alertas no aparelho
+          </p>
+          <p className="text-[11px] text-brand-muted-text dark:text-dark-muted-text truncate">
+            Ative para ser avisado sobre pedidos e vendas
+          </p>
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={() => requestEnable()}
+        disabled={isEnabling}
+        className="shrink-0 px-3 py-1.5 bg-brand-green hover:bg-brand-green/90 text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
+      >
+        {isEnabling ? "Ativando..." : "Ativar"}
+      </button>
+    </div>
+  )
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center">
@@ -62,18 +91,22 @@ export function NotificationPanel({
 
   if (grouped.length === 0) {
     return (
-      <IconPlaceholder
-        placeholderType="image"
-        imageSrc="https://img.dudit.com.br/static/mascots/Notificacoes.png"
-        imageAlt="Nenhuma notificação por aqui"
-        title="Nenhuma notificação por aqui"
-        subtitle="Quando tiver novidades, elas aparecerão aqui"
-      />
+      <>
+        {pushBanner}
+        <IconPlaceholder
+          placeholderType="image"
+          imageSrc="https://img.dudit.com.br/static/mascots/Notificacoes.png"
+          imageAlt="Nenhuma notificação por aqui"
+          title="Nenhuma notificação por aqui"
+          subtitle="Quando tiver novidades, elas aparecerão aqui"
+        />
+      </>
     )
   }
 
   return (
     <>
+      {pushBanner}
       {(unreadCount ?? 0) > 0 && onMarkAllAsRead && (
         <div className="sticky top-0 z-10 bg-white dark:bg-dark-surface px-4 py-2 border-b border-brand-border dark:border-dark-border">
           <button

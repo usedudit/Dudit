@@ -10,6 +10,16 @@ import { LABEL_PRESETS } from "@/lib/labels/presets"
 import { LabelPrintModal } from "@/components/erp/labels/LabelPrintModal"
 import type { LabelProduct } from "@/components/erp/labels/LabelSheet"
 
+interface ProductVariant {
+  id: string
+  variant_type: string
+  variant_name: string
+  sku: string | null
+  price_adjustment: number
+  stock_quantity: number
+  is_active: boolean
+}
+
 interface Product {
   id: string
   name: string
@@ -18,6 +28,7 @@ interface Product {
   price: number
   promotional_price: number | null
   description: string | null
+  variants?: ProductVariant[]
 }
 
 interface SelectedProduct {
@@ -25,7 +36,7 @@ interface SelectedProduct {
   quantity: number
 }
 
-export function LabelGenerator({ products }: { products: Product[] }) {
+export function LabelGenerator({ products, maxInstallments }: { products: Product[]; maxInstallments?: number }) {
   const [search, setSearch] = useState("")
   const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>([])
   const [showPrintModal, setShowPrintModal] = useState(false)
@@ -160,9 +171,9 @@ export function LabelGenerator({ products }: { products: Product[] }) {
                       name={`quantity-${product.id}`}
                       type="number"
                       min="1"
-                      max="100"
+                      max="300"
                       value={selectedProducts.find((p) => p.productId === product.id)?.quantity || 1}
-                      onChange={(e) => updateQuantity(product.id, Number.parseInt(e.target.value) || 1)}
+                      onChange={(e) => updateQuantity(product.id, Math.min(300, Number.parseInt(e.target.value) || 1))}
                       className="w-16 text-center"
                     />
                     <Button
@@ -170,7 +181,7 @@ export function LabelGenerator({ products }: { products: Product[] }) {
                       size="sm"
                       onClick={() => {
                         const current = selectedProducts.find((p) => p.productId === product.id)?.quantity || 1
-                        updateQuantity(product.id, current + 1)
+                        updateQuantity(product.id, Math.min(300, current + 1))
                       }}
                     >
                       +
@@ -232,6 +243,7 @@ export function LabelGenerator({ products }: { products: Product[] }) {
           isOpen={showPrintModal}
           onClose={() => setShowPrintModal(false)}
           allProducts={products}
+          maxInstallments={maxInstallments}
         />
       )}
     </div>

@@ -6,6 +6,11 @@ import { type LabelPreset, type LabelContentConfig, getPageSize } from "@/lib/la
 import { detectBarcodeFormat } from "@/lib/utils/barcode"
 import { formatCurrency } from "@/lib/utils"
 
+export interface LabelVariant {
+  type: string
+  name: string
+}
+
 export interface LabelProduct {
   id: string
   name: string
@@ -16,6 +21,7 @@ export interface LabelProduct {
   promotionalPrice: number | null
   internalCode: string | null
   labelQuantity: number
+  variant?: LabelVariant
 }
 
 interface LabelSheetProps {
@@ -23,6 +29,7 @@ interface LabelSheetProps {
   preset: LabelPreset
   contentConfig: LabelContentConfig
   printMode?: boolean
+  maxInstallments?: number
 }
 
 function BarcodeCell({ value }: { value: string }) {
@@ -51,7 +58,7 @@ function BarcodeCell({ value }: { value: string }) {
   )
 }
 
-export function LabelSheet({ products, preset, contentConfig, printMode = false }: LabelSheetProps) {
+export function LabelSheet({ products, preset, contentConfig, printMode = false, maxInstallments }: LabelSheetProps) {
   const allLabels = products.flatMap((product) =>
     Array.from({ length: product.labelQuantity }, (_, index) => ({
       ...product,
@@ -127,7 +134,20 @@ export function LabelSheet({ products, preset, contentConfig, printMode = false 
                     </div>
                   )}
 
-                  {(contentConfig.showSku || contentConfig.showInternalCode) && (
+                  {label.variant && (
+                    <div
+                      style={{
+                        textAlign: "center",
+                        fontSize: "6px",
+                        color: "#666",
+                        marginTop: "0.3mm",
+                      }}
+                    >
+                      {label.variant.type}: {label.variant.name}
+                    </div>
+                  )}
+
+                  {contentConfig.showInternalCode && label.internalCode && (
                     <div
                       style={{
                         textAlign: "center",
@@ -136,9 +156,7 @@ export function LabelSheet({ products, preset, contentConfig, printMode = false 
                         marginTop: "0.5mm",
                       }}
                     >
-                      {contentConfig.showSku && label.sku && `SKU: ${label.sku}`}
-                      {contentConfig.showSku && label.sku && contentConfig.showInternalCode && label.internalCode && " | "}
-                      {contentConfig.showInternalCode && label.internalCode && `Cód: ${label.internalCode}`}
+                      Cód: {label.internalCode}
                     </div>
                   )}
 
@@ -171,9 +189,9 @@ export function LabelSheet({ products, preset, contentConfig, printMode = false 
                     </div>
                   )}
 
-                  {contentConfig.showInstallment && (
+                  {contentConfig.showInstallment && maxInstallments && maxInstallments > 1 && (
                     <div style={{ textAlign: "center", fontSize: "6px", color: "#555", marginTop: "0.3mm" }}>
-                      ou {contentConfig.installmentText}
+                      ou {maxInstallments}x de {formatCurrency(label.price / maxInstallments)}
                     </div>
                   )}
                 </div>

@@ -21,6 +21,7 @@ export interface FilterSectionConfig {
     title: string
     type: FilterType
     options?: string[] // Para checkbox-list
+    optionLabels?: Record<string, string> // Mapeamento de valor -> rótulo legível
     rangeConfig?: {    // Para range (preço/estoque)
         minKey: string
         maxKey: string
@@ -245,7 +246,9 @@ const FilterSheet: React.FC<FilterSheetProps> = ({
                                             checked={selectedValues.includes(option)}
                                             onChange={() => toggleList(section.id, option)}
                                         />
-                                        <span className="text-sm dark:text-dark-heading">{option}</span>
+                                        <span className="text-sm dark:text-dark-heading">
+                                            {section.optionLabels?.[option] || option}
+                                        </span>
                                     </label>
                                 ))}
                             </Accordion>

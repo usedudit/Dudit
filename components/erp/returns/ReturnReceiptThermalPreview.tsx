@@ -4,19 +4,22 @@ import { formatDate, formatCurrency } from "@/lib/utils"
 import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import type { SaleReceiptPartnerHeader } from "@/lib/sales/sale-receipt"
 
-const DASH = "-".repeat(60)
-
-function DashedLine({ className = "my-1" }: { className?: string }) {
+function DashedLine({ className = "my-1.5" }: { className?: string }) {
     return (
-        <p className={`text-center overflow-hidden whitespace-nowrap select-none ${className}`}>
-            {DASH}
-        </p>
+        <div
+            className={`w-full border-t border-dashed ${className}`}
+            style={{ borderColor: "#000000" }}
+        />
     )
 }
 
-function Row({ left, right, bold }: { left: string; right: string; bold?: boolean }) {
+function Row({ left, right, bold, className = "" }: { left: string; right: string; bold?: boolean; className?: string }) {
     return (
-        <div className={`flex justify-between gap-2 text-[11px] leading-tight ${bold ? "font-bold" : ""}`}>
+        <div
+            className={`flex justify-between items-baseline gap-2 text-[10.5px] leading-tight ${bold ? "font-bold" : "font-medium"
+                } ${className}`}
+            style={{ color: "#000000" }}
+        >
             <span className="shrink-0">{left}</span>
             <span className="text-right shrink-0">{right}</span>
         </div>
@@ -77,68 +80,113 @@ export default function ReturnReceiptThermalPreview({
     const resolutionLabel = isExchange ? "Troca" : "Devolução"
     const totalResolucao = Number(returnRequest.refundValue || 0) + Number(returnRequest.storeCreditValue || 0) + Number(returnRequest.exchangeShortfallAmount || 0)
     const statusLabel = STATUS_LABELS[returnRequest.status] || returnRequest.status || "Pendente"
-    const customerAddress = returnRequest.customerAddress ? String(returnRequest.customerAddress) : undefined
+    const solicitationId = returnRequest.id ? returnRequest.id.slice(0, 8).toUpperCase() : ""
 
     return (
         <div
-            className={`mx-auto bg-white text-black font-mono text-[11px] leading-snug break-inside-avoid print:bg-white print:text-black ${printMode ? "sale-receipt-thermal-print" : ""
+            className={`thermal-receipt-root mx-auto break-inside-avoid ${printMode ? "sale-receipt-thermal-print" : ""
                 }`}
-            style={{ width: printMode ? "80mm" : "320px", maxWidth: "100%", boxSizing: "border-box" }}
+            style={{
+                width: printMode ? "80mm" : "320px",
+                maxWidth: "100%",
+                boxSizing: "border-box",
+                color: "#000000",
+                backgroundColor: "#ffffff",
+                fontFamily: "Consolas, 'Courier New', Monaco, monospace",
+                fontWeight: 500,
+                lineHeight: "1.35",
+                fontSize: "10.5px",
+                WebkitFontSmoothing: "antialiased",
+                MozOsxFontSmoothing: "grayscale",
+            }}
         >
-            <div className="px-3 py-4">
+            <style
+                dangerouslySetInnerHTML={{
+                    __html: `
+                        .thermal-receipt-root,
+                        .thermal-receipt-root * {
+                            color: #000000 !important;
+                            border-color: #000000 !important;
+                            -webkit-text-fill-color: #000000 !important;
+                            text-shadow: none !important;
+                            box-sizing: border-box !important;
+                        }
+                    `,
+                }}
+            />
+
+            <div className="px-3 py-3" style={{ backgroundColor: "#ffffff" }}>
                 {/* Header estabelecimento */}
-                <div className="text-center mb-2">
-                    <p className="font-bold text-[13px] uppercase tracking-tight">{partnerHeader.fantasyName || partnerName}</p>
-                    {partnerHeader.phone ? <p className="text-[9px] mt-0.5">{formatBrazilPhone(partnerHeader.phone)}</p> : null}
+                <div className="text-center mb-1.5" style={{ color: "#000000" }}>
+                    {partnerHeader.legalName && partnerHeader.legalName !== partnerHeader.fantasyName ? (
+                        <p className="text-[9.5px] leading-tight font-medium" style={{ color: "#000000" }}>
+                            {partnerHeader.legalName}
+                        </p>
+                    ) : null}
+                    <p className="font-bold text-[13.5px] uppercase tracking-tight leading-tight" style={{ color: "#000000" }}>
+                        {partnerHeader.fantasyName || partnerName}
+                    </p>
                     {partnerHeader.addressLine ? (
-                        <p className="text-[9px] mt-1 leading-tight whitespace-pre-line">{partnerHeader.addressLine}</p>
+                        <p className="text-[9.5px] mt-0.5 leading-tight whitespace-pre-line font-medium" style={{ color: "#000000" }}>
+                            {partnerHeader.addressLine}
+                        </p>
                     ) : null}
                     {partnerHeader.taxIdLine ? (
-                        <p className="text-[9px] mt-1 leading-tight">{partnerHeader.taxIdLine}</p>
+                        <p className="text-[9.5px] mt-0.5 leading-tight font-medium" style={{ color: "#000000" }}>
+                            {partnerHeader.taxIdLine}
+                        </p>
                     ) : null}
                 </div>
 
-                <DashedLine className="my-1" />
+                <DashedLine className="my-1.5" />
 
                 {/* Título do documento */}
-                <p className="text-[12px] font-bold text-center uppercase tracking-wide">{title}</p>
-                <p className="text-center text-[9px] mt-0.5">Solicitação #{returnRequest.id.slice(0, 8).toUpperCase()}</p>
-                <DashedLine className="my-1" />
-
-                {/* Cliente + pedido/data */}
-                <p className="text-[10px]">
-                    <span className="font-bold">Cliente:</span> {returnRequest.customerName}
+                <p className="text-[12px] font-bold text-center uppercase tracking-wide mb-1.5" style={{ color: "#000000" }}>
+                    {title}
                 </p>
-                {returnRequest.customerPhone ? (
-                    <p className="text-[10px]">{formatBrazilPhone(returnRequest.customerPhone)}</p>
-                ) : null}
-                {customerAddress ? (
-                    <p className="text-[10px] whitespace-pre-line">{customerAddress}</p>
-                ) : null}
-                <div className="flex justify-between text-[10px] font-bold mb-1">
-                    <span>PEDIDO: {returnRequest.orderNumber}</span>
-                    <span>{formatDate(returnRequest.createdAt)}</span>
+
+                {/* Cliente / Pedido / Solicitação */}
+                <div className="space-y-0.5 text-[10.5px]" style={{ color: "#000000" }}>
+                    <p className="leading-tight font-bold">{returnRequest.customerName}</p>
+                    {returnRequest.customerPhone ? (
+                        <p className="leading-tight">{formatBrazilPhone(returnRequest.customerPhone)}</p>
+                    ) : null}
+                    <div className="flex justify-between items-baseline font-bold pt-0.5 text-[10.5px]">
+                        <span>Nº DO PEDIDO: {returnRequest.orderNumber}</span>
+                        <span>{formatDate(returnRequest.createdAt)}</span>
+                    </div>
+                    {solicitationId ? (
+                        <p className="leading-tight">
+                            <span className="font-bold">Solicitação:</span> {solicitationId}
+                        </p>
+                    ) : null}
                 </div>
-                <p className="text-[10px]">
-                    <span className="font-bold">Status:</span> {statusLabel}
-                </p>
-                <p className="text-[10px]">
-                    <span className="font-bold">Resolução:</span> {resolutionLabel}
-                </p>
 
-                <DashedLine className="my-1" />
+                <DashedLine className="my-1.5" />
+
+                {/* Status e Solução */}
+                <div className="space-y-0.5 text-[10.5px]" style={{ color: "#000000" }}>
+                    <p className="leading-tight">
+                        <span className="font-bold">Status:</span> {statusLabel}
+                    </p>
+                    <p className="leading-tight">
+                        <span className="font-bold">Solução:</span> {resolutionLabel}
+                    </p>
+                </div>
+
+                <DashedLine className="my-1.5" />
 
                 {/* Cabeçalho itens */}
-                <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-1 text-[10px] font-bold uppercase">
+                <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-1.5 text-[9.5px] font-bold uppercase" style={{ color: "#000000" }}>
                     <span># DESC</span>
                     <span className="text-right">QTD</span>
                     <span className="text-right">VL UN</span>
                     <span className="text-right">VL ITEM</span>
                 </div>
-                <DashedLine className="mb-1" />
+                <DashedLine className="my-1" />
 
                 {/* Itens */}
-                <div className="space-y-1 mb-2">
+                <div className="space-y-1 mb-1.5" style={{ color: "#000000" }}>
                     {(returnRequest.items || []).map((item: any, idx: number) => {
                         const unitPrice = Number(item.price || 0)
                         const netPrice = Number(item.netItemValue || item.price || 0)
@@ -147,21 +195,21 @@ export default function ReturnReceiptThermalPreview({
                         const reasonLabel = REASON_LABELS[item.reason?.toLowerCase()] || item.reason || "Outro motivo"
                         return (
                             <div key={idx}>
-                                <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-1 text-[10px] items-start">
-                                    <span className="break-words min-w-0 pr-1">
+                                <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-1.5 text-[10.5px] items-start">
+                                    <span className="break-words min-w-0 pr-1 leading-tight font-medium">
                                         {String(idx + 1).padStart(3, "0")} {item.productName || "Produto sem nome"}
                                     </span>
-                                    <span className="text-right whitespace-nowrap shrink-0">
+                                    <span className="text-right whitespace-nowrap shrink-0 font-medium">
                                         {item.quantity}
                                     </span>
-                                    <span className="text-right whitespace-nowrap shrink-0 text-gray-700">
-                                        {new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(unitPrice)}
+                                    <span className="text-right whitespace-nowrap shrink-0 font-medium">
+                                        R$ {formatCurrency(unitPrice)}
                                     </span>
                                     <span className="text-right whitespace-nowrap font-bold shrink-0">
-                                        {new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(subtotal)}
+                                        R$ {formatCurrency(subtotal)}
                                     </span>
                                 </div>
-                                <p className="text-[9px] text-gray-700 leading-tight">
+                                <p className="text-[9px] leading-tight" style={{ color: "#000000" }}>
                                     {reasonLabel} · Estado: {conditionLabel}
                                 </p>
                             </div>
@@ -169,40 +217,46 @@ export default function ReturnReceiptThermalPreview({
                     })}
                 </div>
 
-                <DashedLine className="my-1" />
+                <DashedLine className="my-1.5" />
 
                 {/* Valores */}
-                <div className="space-y-1">
+                <div className="space-y-1" style={{ color: "#000000" }}>
                     {Number(returnRequest.refundValue || 0) > 0 && (
-                        <Row left="Valor reembolsado" right={formatCurrency(returnRequest.refundValue)} />
+                        <Row left="Valor reembolsado" right={`R$ ${formatCurrency(returnRequest.refundValue)}`} />
                     )}
                     {Number(returnRequest.storeCreditValue || 0) > 0 && (
-                        <Row left="Vale-compra gerado" right={formatCurrency(returnRequest.storeCreditValue)} />
+                        <Row left="Vale-compra gerado" right={`R$ ${formatCurrency(returnRequest.storeCreditValue)}`} />
                     )}
                     {Number(returnRequest.exchangeShortfallAmount || 0) > 0 && (
-                        <Row left="Complemento a pagar" right={formatCurrency(returnRequest.exchangeShortfallAmount || 0)} />
+                        <Row left="Complemento a pagar" right={`R$ ${formatCurrency(returnRequest.exchangeShortfallAmount || 0)}`} />
                     )}
                     {Number(returnRequest.exchangeSurplusAmount || 0) > 0 && (
-                        <Row left="Saldo de troca restante" right={formatCurrency(returnRequest.exchangeSurplusAmount || 0)} />
+                        <Row left="Saldo de troca restante" right={`R$ ${formatCurrency(returnRequest.exchangeSurplusAmount || 0)}`} />
                     )}
-                    <div className="flex justify-between items-baseline my-1">
-                        <span className="font-bold text-[14px]">TOTAL R$</span>
-                        <span className="font-bold text-[14px]">{formatCurrency(totalResolucao)}</span>
+                    <div className="flex justify-between items-baseline pt-1 my-0.5 font-bold" style={{ color: "#000000" }}>
+                        <span className="text-[10.5px]">Total:</span>
+                        <span className="text-[10.5px]">R$ {formatCurrency(totalResolucao)}</span>
                     </div>
                 </div>
 
+                {/* Observações */}
                 {returnRequest.observations && (
                     <>
-                        <DashedLine className="my-2" />
-                        <p className="text-[9px] leading-relaxed">
-                            <span className="font-bold">Observações:</span> {returnRequest.observations}
-                        </p>
+                        <DashedLine className="my-1.5" />
+                        <div style={{ color: "#000000" }}>
+                            <p className="font-bold text-[9.5px] uppercase" style={{ color: "#000000" }}>OBSERVAÇÕES:</p>
+                            <p className="text-[9.5px] leading-tight whitespace-pre-line mt-0.5 font-medium" style={{ color: "#000000" }}>
+                                {returnRequest.observations}
+                            </p>
+                        </div>
                     </>
                 )}
 
+                {/* Assinatura */}
                 <DashedLine className="my-2" />
-                <p className="text-[9px] font-bold text-center uppercase tracking-wide">Assinatura do cliente</p>
-                <p className="text-[8px] text-center text-gray-600 mt-0.5">* COMPROVANTE DE TROCA E DEVOLUÇÃO *</p>
+                <p className="text-[9.5px] font-bold text-center uppercase tracking-wide" style={{ color: "#000000" }}>
+                    Assinatura do cliente
+                </p>
             </div>
         </div>
     )

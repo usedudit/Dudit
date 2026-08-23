@@ -94,8 +94,16 @@ export async function sendPushToUser(params: {
   await Promise.all(
     subscriptions.map(async (sub: { id: string; fcm_token: string }) => {
       try {
+        const targetUrl = params.href.startsWith("http")
+          ? params.href
+          : `https://dudit.com.br${params.href}`
+
         await messaging.send({
           token: sub.fcm_token,
+          notification: {
+            title: params.title,
+            body: params.body,
+          },
           data: {
             title: params.title,
             body: params.body,
@@ -105,9 +113,41 @@ export async function sendPushToUser(params: {
             entityType: params.entityType || "",
             entityId: params.entityId || "",
           },
+          android: {
+            priority: "high",
+            notification: {
+              title: params.title,
+              body: params.body,
+              icon: "icon_192",
+              color: "#059669",
+              clickAction: targetUrl,
+              priority: "high",
+              defaultSound: true,
+              defaultVibrateTimings: true,
+            },
+          },
           webpush: {
+            headers: {
+              Urgency: "high",
+              TTL: "86400",
+            },
+            notification: {
+              title: params.title,
+              body: params.body,
+              icon: "/icons/icon-192x192.png",
+              badge: "/icons/icon-192x192.png",
+              tag: params.notificationId || `dudit-${Date.now()}`,
+              requireInteraction: false,
+              data: {
+                href: params.href,
+                notificationId: params.notificationId,
+                type: params.type,
+                entityType: params.entityType || "",
+                entityId: params.entityId || "",
+              },
+            },
             fcmOptions: {
-              link: params.href.startsWith("http") ? params.href : `https://dudit.com.br${params.href}`,
+              link: targetUrl,
             },
           },
         })

@@ -1,8 +1,9 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import { motion, AnimatePresence } from "framer-motion"
 import Portal from "@/components/Portal"
-import { Button, Tabs, TabsContent, TabsList, TabsTrigger, ListItem } from "@/components/reusable"
+import { Button, Tabs, TabsContent, TabsList, TabsTrigger, ListItem, RadioButton } from "@/components/reusable"
 import { XIcon, PrinterIcon, DownloadIcon, FileTextIcon } from "@/lib/icons"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useStore } from "@/lib/store-context"
@@ -32,8 +33,6 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, orderId }: Sale
     const isMobile = useMediaQuery("(max-width: 1023px)")
     const { selectedStore } = useStore()
 
-    const [isVisible, setIsVisible] = useState(false)
-    const [isAnimating, setIsAnimating] = useState(false)
     const [activeTab, setActiveTab] = useState("Opções")
     const [format, setFormat] = useState<SaleReceiptFormat>("thermal")
     const [footerMessage, setFooterMessage] = useState(DEFAULT_RECEIPT_FOOTER_MESSAGE)
@@ -44,14 +43,8 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, orderId }: Sale
 
     useEffect(() => {
         if (isOpen) {
-            setIsVisible(true)
-            const id = setTimeout(() => setIsAnimating(true), 50)
             setActiveTab("Opções")
-            return () => clearTimeout(id)
         }
-        setIsAnimating(false)
-        const id = setTimeout(() => setIsVisible(false), 200)
-        return () => clearTimeout(id)
     }, [isOpen])
 
     useEffect(() => {
@@ -156,15 +149,20 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, orderId }: Sale
         onClose()
     }, [orderId, format, footerMessage, showAcknowledgment, onClose, isMobile, handleDownloadPdf])
 
-    if (!isVisible) return null
+    if (!data && !loading && isOpen) return null
 
     return (
         <Portal>
-            <div className="fixed inset-0 z-[130] flex flex-col bg-black/60">
-                <div
-                    className={`relative flex flex-col w-full h-full bg-white dark:bg-dark-background transition-opacity duration-200 ${isAnimating ? "opacity-100" : "opacity-0"
-                        }`}
-                >
+            <AnimatePresence>
+                {isOpen && (
+                    <motion.div
+                        className="fixed inset-0 z-[130] flex flex-col bg-black/60"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                    >
+                        <div className="relative flex flex-col w-full h-full bg-white dark:bg-dark-background">
                     {/* Header */}
                     <div className="shrink-0 flex items-center justify-between px-4 md:px-6 py-4 border-b border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
                         <h2 className="text-lg md:text-xl font-bold text-brand-dark dark:text-dark-heading">
@@ -219,14 +217,12 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, orderId }: Sale
                                                 description="Formato em bobina contínua, ideal para impressoras térmicas e comprovante rápido de balcão."
                                                 onClick={() => setFormat("thermal")}
                                                 right={
-                                                    <div
-                                                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${format === "thermal"
-                                                            ? "border-brand-dark bg-brand-dark dark:border-dark-heading dark:bg-dark-heading"
-                                                            : "border-brand-border dark:border-dark-border"
-                                                            }`}
-                                                    >
-                                                        {format === "thermal" && <div className="w-2 h-2 rounded-full bg-white" />}
-                                                    </div>
+                                                    <RadioButton
+                                                        name={"format"}
+                                                        value={"thermal"}
+                                                        checked={format === "thermal"}
+                                                        onChange={() => setFormat("thermal")}
+                                                    />
                                                 }
                                             />
                                             <ListItem
@@ -235,14 +231,12 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, orderId }: Sale
                                                 description="Formato folha inteira A4, ideal para impressão comum, arquivamento e envio em PDF."
                                                 onClick={() => setFormat("a4")}
                                                 right={
-                                                    <div
-                                                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${format === "a4"
-                                                            ? "border-brand-dark bg-brand-dark dark:border-dark-heading dark:bg-dark-heading"
-                                                            : "border-brand-border dark:border-dark-border"
-                                                            }`}
-                                                    >
-                                                        {format === "a4" && <div className="w-2 h-2 rounded-full bg-white" />}
-                                                    </div>
+                                                    <RadioButton
+                                                        name={"format"}
+                                                        value={"a4"}
+                                                        checked={format === "a4"}
+                                                        onChange={() => setFormat("a4")}
+                                                    />
                                                 }
                                             />
                                         </div>
@@ -303,8 +297,10 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, orderId }: Sale
                             </div>
                         </Tabs>
                     )}
-                </div>
-            </div>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </Portal>
     )
 }

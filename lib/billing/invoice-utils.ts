@@ -39,13 +39,14 @@ export function getStatusLabel(status: string): string {
     const labels: Record<string, string> = {
         pending: "Pendente",
         processing: "Processando",
-        approved: "Aprovado",
-        rejected: "Rejeitado",
+        approved: "Pago",
+        completed: "Pago",
+        rejected: "Recusado",
+        failed: "Falhou",
         refunded: "Reembolsado",
+        partially_refunded: "Reembolso parcial",
         cancelled: "Cancelado",
         chargeback: "Chargeback",
-        completed: "Concluído",
-        failed: "Falhou",
     }
     return labels[status] || status
 }

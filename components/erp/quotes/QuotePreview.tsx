@@ -237,7 +237,7 @@ const QuotePreview = ({
                                                     <div className="text-xs text-gray-600 space-y-1">
                                                         <p className="font-bold text-brand-dark">{partnerName}</p>
                                                         {partnerPhone && <p>{formatBrazilPhone(partnerPhone)}</p>}
-                                                        <p className="whitespace-pre-wrap">{partnerAddressFormatted}</p>
+                                                        {partnerAddressFormatted && <p className="whitespace-pre-wrap">{partnerAddressFormatted}</p>}
                                                     </div>
                                                 </div>
                                                 <div>
@@ -250,7 +250,7 @@ const QuotePreview = ({
                                                         </div>
                                                     ) : (
                                                         <div className="text-xs text-gray-600 space-y-1">
-                                                            <p className="font-bold text-black">{QUOTE_DEFAULT_CUSTOMER_LABEL}</p>
+                                                            <p className="font-bold text-brand-dark">{QUOTE_DEFAULT_CUSTOMER_LABEL}</p>
                                                         </div>
                                                     )}
                                                 </div>

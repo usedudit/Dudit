@@ -24,7 +24,7 @@ const navItems: NavItem[] = [
     {
         icon: Package,
         label: "Entregas Disponíveis",
-        href: "/entregadores/disponiveis",
+        href: "/entregadores/entregas-disponiveis",
     },
 ]
 
@@ -220,7 +220,43 @@ export function DeliverySidebar({
                     <Drawer.Overlay className="fixed inset-0 bg-black/40 z-50" />
                     <Drawer.Content className="bg-brand-dark border-t border-dark-border flex flex-col rounded-t-[20px] h-[85vh] fixed bottom-0 left-0 right-0 z-60 outline-none">
                         <div className="mx-auto w-12 h-1.5 shrink-0 rounded-full bg-dark-border mt-3 mb-2" />
-                        <div className="p-4 flex-1 overflow-y-auto no-scrollbar">
+
+                        {/* Top Bar: Logo Dudit with link to homepage / marketplace */}
+                        <div className="px-4 py-2 flex items-center justify-between shrink-0">
+                            <Link
+                                href="/"
+                                prefetch={false}
+                                onClick={() => setIsMobileOpen(false)}
+                                className="flex items-center gap-3 group"
+                            >
+                                <div className="flex items-center justify-center shrink-0 w-[36px]">
+                                    <img
+                                        src="https://img.dudit.com.br/static/Icon.png"
+                                        alt="Dudit"
+                                        className="h-7 w-auto object-contain transition-transform group-hover:scale-105"
+                                    />
+                                </div>
+                                <img
+                                    src="https://img.dudit.com.br/static/Logo.png"
+                                    alt="Dudit Logo"
+                                    className="h-6 w-auto object-contain"
+                                />
+                            </Link>
+
+                            <button
+                                type="button"
+                                onClick={() => setIsMobileOpen(false)}
+                                className="p-1.5 rounded-lg text-brand-inactive-text hover:text-white hover:bg-white/10 transition-colors"
+                            >
+                                <XIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <div className="px-4 my-1 shrink-0">
+                            <div className="h-px w-full bg-dark-border" />
+                        </div>
+
+                        <div className="p-4 pt-1 flex-1 overflow-y-auto no-scrollbar">
                             <nav className="flex flex-col gap-1">
                                 {navItems.map((item) => {
                                     const Icon = item.icon

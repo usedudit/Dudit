@@ -24,7 +24,6 @@ export const MainView = ({ navigate }: MainViewProps) => (
       <ListItem icon={UserIcon} title="Informações da conta" description="Gerencie seus dados pessoais, email e telefone de contato." className="px-4 py-3 gap-4" onClick={() => navigate("informacoes-da-conta")} showChevron />
       <ListItem icon={MapPinIcon} title="Endereço" description="Atualize seu endereço de entrega ou cobrança." className="px-4 py-3 gap-4" onClick={() => navigate("enderecos")} showChevron />
       <ListItem icon={LockIcon} title="Segurança" description="Altere sua senha de acesso à conta." className="px-4 py-3 gap-4" onClick={() => navigate("seguranca")} showChevron />
-      <ListItem icon={LockIcon} title="Autenticação 2FA" description="Adicione uma camada extra de segurança com autenticador." className="px-4 py-3 gap-4" onClick={() => navigate("two-factor")} showChevron />
       <ListItem icon={StarIcon} title="Minhas avaliações" description="Veja e edite suas avaliações de produtos e serviços." className="px-4 py-3 gap-4" onClick={() => navigate("avaliacoes")} showChevron />
       <ListItem icon={NotificationIcon} title="Notificações" description="Gerencie suas preferências de notificação por categoria." className="px-4 py-3 gap-4" onClick={() => navigate("notificacoes")} showChevron />
     </div>

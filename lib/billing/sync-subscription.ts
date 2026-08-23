@@ -13,6 +13,7 @@ const SUBSCRIPTION_PURCHASE_MAP: Record<string, string> = {
     pending: "pending",
     cancelled: "cancelled",
     paused: "pending",
+    refunded: "refunded",
 }
 
 function samePeriod(iso: string | null | undefined, target: Date): boolean {
@@ -30,6 +31,7 @@ function normalizeStatus(status?: string | null): string | null {
     if (s === "pending") return "pending"
     if (["past_due", "error", "failed", "rejected", "unpaid"].includes(s)) return "past_due"
     if (["cancelled", "canceled"].includes(s)) return "cancelled"
+    if (["refunded", "refund"].includes(s)) return "refunded"
     if (s === "paused") return "paused"
     return s
 }
@@ -43,8 +45,8 @@ function normalizeStatus(status?: string | null): string | null {
  *   and its own invoice, so the "Próxima Fatura" is always generated on the
  *   plan's due date.
  * - Invoices are generated server-side (no auth) and only once per purchase.
- * - Supports statusOverride ('active', 'trial', 'pending', 'past_due'/'error', 'cancelled')
- *   for manual testing and simulated card failure / PIX recovery flows.
+ * - Supports statusOverride ('active', 'trial', 'pending', 'past_due'/'error', 'cancelled', 'refunded')
+ *   for manual testing and simulated card failure / PIX recovery / refund flows.
  *
  * Safe to call multiple times with the same subscription.
  */
@@ -68,20 +70,36 @@ export async function syncSubscriptionToBilling(
     const targetStatus = normalizeStatus(statusOverride)
     if (targetStatus) {
         const updateSub: Record<string, any> = {
-            status: targetStatus,
+            status: targetStatus === "refunded" ? "cancelled" : targetStatus,
             updated_at: nowIso,
         }
         if (targetStatus === "past_due") {
             updateSub.past_due_at = nowIso
         } else if (targetStatus === "active") {
             updateSub.past_due_at = null
+            updateSub.cancel_at_period_end = false
+            updateSub.cancelled_at = null
+            updateSub.ended_at = null
+            // If no custom period passed, ensure fresh 30-day period
+            if (!customPeriodStart && !customPeriodEnd) {
+                const now = new Date()
+                const nextMonth = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+                updateSub.current_period_start = now.toISOString()
+                updateSub.current_period_end = nextMonth.toISOString()
+            }
         } else if (targetStatus === "trialing") {
+            updateSub.cancel_at_period_end = false
             if (customPeriodEnd) {
                 updateSub.trial_end = customPeriodEnd.toISOString()
             }
         } else if (targetStatus === "cancelled") {
             updateSub.cancelled_at = nowIso
             updateSub.ended_at = nowIso
+            updateSub.cancel_at_period_end = false
+        } else if (targetStatus === "refunded") {
+            updateSub.cancelled_at = nowIso
+            updateSub.ended_at = nowIso
+            updateSub.cancel_at_period_end = false
         }
 
         if (customPeriodStart) updateSub.current_period_start = customPeriodStart.toISOString()
@@ -338,6 +356,11 @@ export async function syncSubscriptionToBilling(
             .from("billing_payments")
             .update({ status: "cancelled", updated_at: nowIso })
             .eq("id", existingPayment.id)
+    } else if (targetStatus === "refunded" && existingPayment) {
+        await supabase
+            .from("billing_payments")
+            .update({ status: "refunded", updated_at: nowIso })
+            .eq("id", existingPayment.id)
     }
 
     // ── 5. Invoice for the CURRENT cycle ──
@@ -352,7 +375,9 @@ export async function syncSubscriptionToBilling(
 
     // ── 6. NEXT cycle purchase (upcoming invoice to pay) ──
     let nextPurchaseId: string | null = null
-    if (isActiveOrTrialing && planPrice > 0) {
+    const isRenewing = isActiveOrTrialing && !sub.cancel_at_period_end && planPrice > 0
+
+    if (isRenewing) {
         if (nextPurchase) {
             const { error: nextErr } = await supabase
                 .from("billing_purchases")
@@ -433,7 +458,7 @@ export async function syncSubscriptionToBilling(
             }
         }
     } else {
-        // Subscription no longer bills (e.g. past_due, cancelled, pending) → cancel any stale pending "next" purchase
+        // Subscription no longer bills (e.g. past_due, cancelled, scheduled to cancel, refunded, pending) → cancel any stale pending "next" purchase
         for (const p of allPurchases) {
             if (p.status === "pending" && p.id !== currentPurchase.id) {
                 await supabase.from("billing_purchases").update({ status: "cancelled", updated_at: nowIso }).eq("id", p.id)

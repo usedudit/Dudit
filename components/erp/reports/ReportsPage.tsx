@@ -1082,7 +1082,7 @@ function FinancialSection({ financialData }: { financialData: FinancialDashboard
                     <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
                         <CardHeader icon={TagIcon} title="Maiores Despesas" />
                         <HorizontalBarRankingList
-                            items={(financialData.expensesByCategory || []).slice(0, 5).map(e => ({ label: e.label, value: Number(e.value) }))}
+                            items={(financialData.expensesByCategory || []).slice(0, 5).map(e => ({ label: String(e.label), value: Number(e.value) }))}
                             colors={CHART_COLORS_VIVID}
                             valueFormatter={v => brl(v)}
                         />
@@ -1091,7 +1091,7 @@ function FinancialSection({ financialData }: { financialData: FinancialDashboard
                 <div className="lg:col-span-4">
                     <ReportRankingCard
                         title="Contas a Pagar Críticas"
-                        items={(financialData.overdueAccounts || []).slice(0, 6).map(a => ({ id: a.id, label: a.title, value: a.value, subtitle: a.subtitle }))}
+                        items={(financialData.overdueAccounts || []).slice(0, 6).map(a => ({ id: a.id, label: a.title, value: a.value ?? 0, subtitle: a.subtitle }))}
                         variant="compact"
                         icon={AlertCircleIcon}
                         className="h-full"

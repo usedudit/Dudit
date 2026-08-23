@@ -34,10 +34,8 @@ export interface LabelContentConfig {
   showPrice: boolean
   showPromotionalPrice: boolean
   showInstallment: boolean
-  showSku: boolean
   showBarcode: boolean
   showInternalCode: boolean
-  installmentText: string
 }
 
 export const DEFAULT_CONTENT_CONFIG: LabelContentConfig = {
@@ -45,10 +43,8 @@ export const DEFAULT_CONTENT_CONFIG: LabelContentConfig = {
   showPrice: true,
   showPromotionalPrice: false,
   showInstallment: false,
-  showSku: false,
   showBarcode: true,
   showInternalCode: false,
-  installmentText: "12x",
 }
 
 interface PresetParams {

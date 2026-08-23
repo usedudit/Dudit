@@ -33,6 +33,34 @@ export default async function GenerateLabelsPage() {
     .eq("is_active", true)
     .order("name")
 
+  // Fetch variants for all products
+  const productIds = (products || []).map((p) => p.id)
+  const { data: variants } = await supabase
+    .from("product_variants")
+    .select("id, product_id, variant_type, variant_name, sku, price_adjustment, stock_quantity, is_active")
+    .in("product_id", productIds)
+    .eq("is_active", true)
+    .order("variant_name")
+
+  // Fetch max installments from payment methods
+  const { data: paymentMethods } = await supabase
+    .from("payment_methods")
+    .select("max_installments")
+    .eq("partner_id", partner.id)
+    .eq("is_active", true)
+    .not("max_installments", "is", null)
+
+  const maxInstallments = (paymentMethods || [])
+    .map((pm) => pm.max_installments)
+    .filter((n): n is number => n != null && n > 0)
+    .reduce((max, n) => Math.max(max, n), 0) || undefined
+
+  // Attach variants to products
+  const productsWithVariants = (products || []).map((product) => ({
+    ...product,
+    variants: (variants || []).filter((v) => v.product_id === product.id),
+  }))
+
   return (
     <div className="min-h-svh p-6">
       <div className="max-w-6xl mx-auto space-y-6">
@@ -46,7 +74,10 @@ export default async function GenerateLabelsPage() {
           </Button>
         </div>
 
-        <LabelGenerator products={products || []} />
+        <LabelGenerator
+          products={productsWithVariants}
+          maxInstallments={maxInstallments}
+        />
       </div>
     </div>
   )

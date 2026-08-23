@@ -155,7 +155,6 @@ export default function ReturnReceiptA4Preview({
                                 <div className="text-xs text-gray-600 space-y-1">
                                     <p className="font-bold text-sm text-brand-dark">{partnerHeader.fantasyName || partnerName}</p>
                                     {partnerHeader.phone && <p>{formatBrazilPhone(partnerHeader.phone)}</p>}
-                                    {partnerHeader.taxIdLine && <p>{partnerHeader.taxIdLine}</p>}
                                     <p className="whitespace-pre-wrap">{partnerAddress}</p>
                                 </div>
                             </div>

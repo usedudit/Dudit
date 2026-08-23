@@ -176,9 +176,9 @@ const InvoicePreview = ({ data, invoiceId, printMode = false }: InvoicePreviewPr
                                                     <h3 className="font-bold text-sm text-brand-dark mb-3">Dados da empresa</h3>
                                                     <div className="text-xs text-gray-600 space-y-1">
                                                         <p className="font-bold text-brand-dark">{data.partner.name}</p>
+                                                        {data.partner.email && <p>{data.partner.email}</p>}
                                                         {data.partner.phone && <p>{formatBrazilPhone(data.partner.phone)}</p>}
                                                         {partnerAddressFormatted && <p className="whitespace-pre-wrap">{partnerAddressFormatted}</p>}
-                                                        {data.partner.email && <p>{data.partner.email}</p>}
                                                     </div>
                                                 </div>
                                                 <div>
@@ -186,13 +186,13 @@ const InvoicePreview = ({ data, invoiceId, printMode = false }: InvoicePreviewPr
                                                     {data.customer ? (
                                                         <div className="text-xs text-gray-600 space-y-1">
                                                             <p className="font-bold text-brand-dark">{data.customer.name}</p>
+                                                            {data.customer.email && <p>{data.customer.email}</p>}
                                                             {data.customer.phone && <p>{formatBrazilPhone(data.customer.phone)}</p>}
                                                             {data.customer.address && <p className="whitespace-pre-wrap">{data.customer.address}</p>}
-                                                            {data.customer.email && <p>{data.customer.email}</p>}
                                                         </div>
                                                     ) : (
                                                         <div className="text-xs text-gray-600 space-y-1">
-                                                            <p className="font-bold text-black">Cliente</p>
+                                                            <p className="font-bold text-brand-dark">Cliente</p>
                                                         </div>
                                                     )}
                                                 </div>

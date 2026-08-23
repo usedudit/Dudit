@@ -48,12 +48,11 @@ export default function SaleReceiptThermalPreview({
     const totalOtherCosts = (data.otherCosts || 0) + (data.methodFee || 0) + (data.methodInterest || 0)
     const isDelivery = data.deliveryType !== "pickup" && Boolean(data.customerAddress)
 
-    // Resolved acknowledgment flag from props or data
     const shouldShowAck = showAcknowledgment && data.showAcknowledgment !== false
 
     return (
         <div
-            className={`thermal-receipt-root mx-auto break-inside-avoid ${printMode ? "sale-receipt-thermal-print" : "shadow-md border border-neutral-300"
+            className={`thermal-receipt-root mx-auto break-inside-avoid ${printMode ? "sale-receipt-thermal-print" : ""
                 }`}
             style={{
                 width: printMode ? "80mm" : "320px",
@@ -87,26 +86,21 @@ export default function SaleReceiptThermalPreview({
             <div className="px-3 py-3" style={{ backgroundColor: "#ffffff" }}>
                 {/* Header estabelecimento */}
                 <div className="text-center mb-1.5" style={{ color: "#000000" }}>
-                    <p className="font-bold text-[13.5px] uppercase tracking-tight leading-tight" style={{ color: "#000000" }}>
-                        {data.partner.fantasyName}
-                    </p>
                     {data.partner.legalName && data.partner.legalName !== data.partner.fantasyName ? (
-                        <p className="text-[9.5px] mt-0.5 leading-tight font-medium" style={{ color: "#000000" }}>
+                        <p className="text-[9.5px] leading-tight font-medium" style={{ color: "#000000" }}>
                             {data.partner.legalName}
                         </p>
                     ) : null}
-                    {data.partner.phone ? (
-                        <p className="text-[9.5px] mt-0.5 leading-tight font-medium" style={{ color: "#000000" }}>
-                            {formatBrazilPhone(data.partner.phone)}
-                        </p>
-                    ) : null}
+                    <p className="font-bold text-[13.5px] uppercase tracking-tight leading-tight" style={{ color: "#000000" }}>
+                        {data.partner.fantasyName}
+                    </p>
                     {data.partner.addressLine ? (
                         <p className="text-[9.5px] mt-0.5 leading-tight whitespace-pre-line font-medium" style={{ color: "#000000" }}>
                             {data.partner.addressLine}
                         </p>
                     ) : null}
                     {data.partner.taxIdLine ? (
-                        <p className="text-[9.5px] mt-0.5 leading-tight font-bold" style={{ color: "#000000" }}>
+                        <p className="text-[9.5px] mt-0.5 leading-tight font-medium" style={{ color: "#000000" }}>
                             {data.partner.taxIdLine}
                         </p>
                     ) : null}
@@ -116,13 +110,9 @@ export default function SaleReceiptThermalPreview({
 
                 {/* Cliente / Pedido / Entrega */}
                 <div className="space-y-0.5 text-[10.5px]" style={{ color: "#000000" }}>
-                    <p className="leading-tight">
-                        <span className="font-bold">Cliente:</span> {data.customerName}
-                    </p>
+                    <p className="leading-tight font-bold">{data.customerName}</p>
                     {data.customerPhone ? (
-                        <p className="leading-tight">
-                            <span className="font-bold">Telefone:</span> {formatBrazilPhone(data.customerPhone)}
-                        </p>
+                        <p className="leading-tight">{formatBrazilPhone(data.customerPhone)}</p>
                     ) : null}
                     <div className="flex justify-between items-baseline font-bold pt-0.5 text-[10.5px]">
                         <span>Nº DO PEDIDO: {data.orderNumber}</span>
@@ -140,11 +130,9 @@ export default function SaleReceiptThermalPreview({
                         )}
                     </p>
 
-                    {/* Endereço de entrega caso seja entrega */}
-                    {isDelivery ? (
+                    {isDelivery && data.customerAddress ? (
                         <div className="pt-1">
-                            <p className="font-bold uppercase text-[9.5px]">ENDEREÇO DE ENTREGA:</p>
-                            <p className="text-[9.5px] leading-tight whitespace-pre-line mt-0.5 font-medium">{data.customerAddress}</p>
+                            <p className="text-[9.5px] leading-tight whitespace-pre-line font-medium">{data.customerAddress}</p>
                         </div>
                     ) : null}
                 </div>
@@ -202,16 +190,14 @@ export default function SaleReceiptThermalPreview({
                     )}
 
                     <div className="flex justify-between items-baseline pt-1 my-0.5 font-bold" style={{ color: "#000000" }}>
-                        <span className="text-[12.5px]">Subtotal:</span>
-                        <span className="text-[13.5px]">R$ {formatReceiptAmount(data.total)}</span>
+                        <span className="text-[10.5px]">Subtotal:</span>
+                        <span className="text-[10.5px]">R$ {formatReceiptAmount(data.total)}</span>
                     </div>
 
                     {data.change > 0.009 && (
                         <Row left="Troco:" right={`R$ ${formatReceiptAmount(data.change)}`} />
                     )}
                 </div>
-
-                <DashedLine className="my-1.5" />
 
                 {/* Formas de pagamento */}
                 <div className="space-y-1" style={{ color: "#000000" }}>
@@ -228,10 +214,9 @@ export default function SaleReceiptThermalPreview({
                         <Row left="Não informado" right={`R$ ${formatReceiptAmount(data.total)}`} />
                     )}
 
-                    {/* Aviso destacado para pedidos pagos online */}
                     {data.isOnlinePayment && (
                         <div
-                            className="mt-2 py-1 px-1.5 border text-center font-bold text-[9.5px] uppercase tracking-tight"
+                            className="mt-2 py-1 px-1.5 border text-center font-bold text-[10.5px] uppercase tracking-tight"
                             style={{
                                 borderColor: "#000000",
                                 color: "#000000",

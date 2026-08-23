@@ -187,15 +187,9 @@ const SaleReceiptA4Preview = ({
                                                 <h3 className="font-bold text-sm text-brand-dark mb-3">Dados da empresa</h3>
                                                 <div className="text-xs text-gray-600 space-y-1">
                                                     <p className="font-bold text-brand-dark">{data.partner.fantasyName}</p>
-                                                    {data.partner.legalName && data.partner.legalName !== data.partner.fantasyName && (
-                                                        <p>{data.partner.legalName}</p>
-                                                    )}
                                                     {data.partner.phone && <p>{formatBrazilPhone(data.partner.phone)}</p>}
                                                     {data.partner.addressLine && (
                                                         <p className="whitespace-pre-line">{data.partner.addressLine}</p>
-                                                    )}
-                                                    {data.partner.taxIdLine && (
-                                                        <p className="font-medium text-gray-700">{data.partner.taxIdLine}</p>
                                                     )}
                                                 </div>
                                             </div>
@@ -204,14 +198,9 @@ const SaleReceiptA4Preview = ({
                                                 <div className="text-xs text-gray-600 space-y-1">
                                                     <p className="font-bold text-brand-dark">{data.customerName}</p>
                                                     {data.customerPhone && <p>{formatBrazilPhone(data.customerPhone)}</p>}
-                                                    {isDelivery ? (
-                                                        <div className="pt-2 mt-2 border-t border-gray-100">
-                                                            <p className="font-bold text-brand-dark uppercase text-[11px]">Endereço de entrega</p>
-                                                            <p className="whitespace-pre-wrap text-gray-700 mt-0.5">{data.customerAddress}</p>
-                                                        </div>
-                                                    ) : data.customerAddress ? (
-                                                        <p className="whitespace-pre-wrap">{data.customerAddress}</p>
-                                                    ) : null}
+                                                    {data.customerAddress && (
+                                                        <p className="whitespace-pre-line">{data.customerAddress}</p>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
